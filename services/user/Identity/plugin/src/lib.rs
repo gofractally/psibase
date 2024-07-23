@@ -1,11 +1,10 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::accounts::plugin::accounts;
 use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
-use bindings::accounts::plugin::
 use bindings::exports::identity::plugin::api::Guest;
 use psibase::fracpack::Pack;
-use psibase::{AccountNumber, ToKey};
 
 use serde::{Deserialize, Serialize};
 
@@ -27,18 +26,7 @@ impl Guest for IdentityPlugin {
             return Err(InvalidClaim.err(&format!("{score}")));
         }
 
-        println!(
-            "subject AccountNumber.unwrap().to_string(): {}",
-            AccountNumber::from_exact(&subject).unwrap().to_string()
-        );
-        println!(
-            "subject AccountNumber.unwrap().value: {}",
-            AccountNumber::from_exact(&subject).unwrap().value
-        );
-
-        if let Err(err) = AccountNumber::from_exact(&subject) {
-            return Err(InvalidAccountNumber.err(&err.to_string()));
-        }
+        accounts::get_account(&subject)?;
 
         let int_score = (score * 100.0).trunc() as u8;
 

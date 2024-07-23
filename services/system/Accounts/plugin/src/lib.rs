@@ -15,17 +15,10 @@ use errors::ErrorType::*;
 
 struct AccountsPlugin;
 
-#[derive(Deserialize)]
-struct ResourceLimit {
-    value: String,
-}
-
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct Account {
     accountNum: String,
-    authService: String,
-    resourceBalance: ResourceLimit,
 }
 
 #[derive(Deserialize)]
@@ -53,14 +46,10 @@ impl Accounts for AccountsPlugin {
     }
 
     fn get_account(name: String) -> Result<String, CommonTypes::Error> {
+        // let query = "query {{ getAccount(account: \"{name}\") {{ accountNum }} }}";
         let query = format!(
-            r#"query {{
-                getAccount(account: "{acctName}") {{
-                    pubkey,
-                    inviter
-                }}
-            }}"#,
-            acctName = name
+            "query {{ getAccount(account: \"{}\") {{ accountNum }} }}",
+            name
         );
 
         let account = Server::post_graphql_get_json(&query)
@@ -72,7 +61,7 @@ impl Accounts for AccountsPlugin {
                 response_root
                     .data
                     .getAccount
-                    .ok_or_else(|| QueryError.err("Error querying subject account"))
+                    .ok_or_else(|| InvalidAccountNumber.err(&name))
             })?;
 
         if name != account.accountNum {

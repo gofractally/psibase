@@ -69,7 +69,7 @@ mod service {
             AnswerTable::new().get_index_pk().get(&account)
         }
 
-        async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
+        async fn answers(&self, _account: AccountNumber) -> Option<Vec<i32>> {
             let answer_table = AnswerTable::new();
             let tab = answer_table.get_index_pk();
 

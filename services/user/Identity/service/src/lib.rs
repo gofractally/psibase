@@ -21,6 +21,8 @@ pub struct Credential {
 #[psibase::service(name = "identity")]
 #[allow(non_snake_case)]
 mod service {
+    use std::str::FromStr;
+
     use async_graphql::connection::Connection;
     use async_graphql::*;
     use psibase::{services::transact, TimePointSec, *};
@@ -38,8 +40,8 @@ mod service {
         /// creation/issue time
         issued: psibase::TimePointSec,
 
-        /// The credential subject, which includes the subject/attestee as well as the claim being made
-        subject: String,
+        /// The credential subject, in this case, the subject/attestee
+        subject: AccountNumber,
 
         value: u8,
     }
@@ -48,6 +50,10 @@ mod service {
         #[secondary_key(1)]
         fn by_attester(&self) -> (AccountNumber, u64) {
             (self.attester, self.id)
+        }
+        #[secondary_key(2)]
+        fn by_attestee(&self) -> (AccountNumber, u64) {
+            (self.subject, self.id)
         }
     }
 
@@ -66,6 +72,11 @@ mod service {
             .last()
             .map_or(0, |rec| rec.id + 1);
 
+        let subj_acct = match AccountNumber::from_str(&subject.clone()) {
+            Ok(subject_acct) => subject_acct,
+            Err(_subject_acct) => return,
+        };
+
         // TODO: Update summary stats
         // Q: Will this *update* or just add?
         // Perhaps the attester should be the primary key? because we're only interested in the *latest* attestation from each attester;
@@ -75,7 +86,7 @@ mod service {
                 id: next_id,
                 attester,
                 issued,
-                subject: subject.clone(),
+                subject: subj_acct,
                 value,
             })
             .unwrap();
@@ -127,16 +138,19 @@ mod service {
 
         async fn attestations_by_attestee(
             &self,
-            attestation_type: String,
             attestee: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            return Err(async_graphql::Error::new(
-                "attestations_by_attestee not yet implemented",
-            ));
+            TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attestee(), &attestee)
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
         }
 
         async fn summary(

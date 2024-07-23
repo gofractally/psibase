@@ -1,5 +1,5 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib";
+import { PluginId, Supervisor } from "@psibase/common-lib";
 import React, { ChangeEvent, useEffect, useState } from "react";
 
 import { fetchAnswers } from "./utils/fetchAnswers";
@@ -11,6 +11,12 @@ interface Invite {
   inviter: string;
   app: string;
   callback: string;
+}
+
+interface ErrorType {
+  code: number;
+  producer: PluginId;
+  message: string;
 }
 
 const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
@@ -194,28 +200,10 @@ function App() {
   const [c, setC] = useState("");
   const [answer, setAnswer] = useState("?");
 
-  const [accountName, setAccountName] = useState<string>("alice");
   const [claim, setClaim] = useState<number>(0.95);
   const [attestee, setAttestee] = useState<string>("bob");
-  const [attestationClaim, setAttestationClaim] =
-    useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
+  useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
 `);
-  const getAccount = async () => {
-    try {
-      console.info("calling accounts.getAccount()");
-      const res = await supervisor.functionCall({
-        service: "accounts",
-        intf: "accounts",
-        method: "getAccount",
-        params: [accountName],
-      });
-      console.info("returned from Accounts.accounts.getAccount()");
-      setRes(res as string);
-      console.info("Res:", res);
-    } catch (e) {
-      console.error(`${JSON.stringify(e, null, 2)}`);
-    }
-  };
   const attestIdentity = async () => {
     try {
       console.info("attest().calling identity.api.attest()");
@@ -229,47 +217,13 @@ function App() {
       setRes(res as string);
       console.info("Res:", res);
     } catch (e) {
-      console.error(`${JSON.stringify(e, null, 2)}`);
-    }
-  };
-  const attestAttestation = async () => {
-    try {
-      console.info(
-        "attest().calling identity.api.attest() claim:",
-        attestationClaim
-      );
-      const res = await supervisor.functionCall({
-        service: "attestation",
-        intf: "api",
-        method: "attest",
-        params: ["not identity", attestationClaim],
-      });
-      console.info("returned from Attestation.api.attest()");
-      setRes(res as string);
-      console.info("Res:", res);
-    } catch (e) {
-      console.error(`${JSON.stringify(e, null, 2)}`);
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
     }
   };
   return (
     <>
       <h1>Psibase Demo App 1</h1>
-      <h3>Accounts</h3>
-      <div>
-        <h4>getAccount query:</h4>
-        <div>
-          <span>Account:</span>
-          <input
-            id="accountName"
-            type="text"
-            onChange={(e) => {
-              setAccountName(e.target.value);
-            }}
-            value={accountName}
-          />
-        </div>
-        <button onClick={getAccount}> getAccount() </button>
-      </div>
       <h3>Attestation</h3>
       <div>
         <h4>Identity Claim:</h4>
@@ -299,18 +253,6 @@ function App() {
           />
           <button onClick={attestIdentity}> Attest </button>
         </div>
-      </div>
-      <div>
-        <h4>Attestation Claim:</h4>
-        <input
-          id="attestation-claim"
-          type="text"
-          onChange={(e) => {
-            setAttestationClaim(e.target.value);
-          }}
-          value={attestationClaim}
-        />
-        <button onClick={attestAttestation}> Attest </button>
       </div>
       <h3>{res}</h3>
       <div className="card">

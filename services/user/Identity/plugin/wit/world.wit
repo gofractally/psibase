@@ -64,6 +64,7 @@ interface queries {
 world identity {
     import common:plugin/server;
     import common:plugin/client;
+    import accounts:plugin/accounts;
     export api;
     // export queries;
 }
