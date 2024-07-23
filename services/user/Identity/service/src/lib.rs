@@ -29,11 +29,8 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
     pub struct Attestation {
-        #[primary_key]
-        id: u64,
-
         /// The attesting account / the issuer
         attester: AccountNumber,
 
@@ -47,13 +44,14 @@ mod service {
     }
 
     impl Attestation {
-        #[secondary_key(1)]
-        fn by_attester(&self) -> (AccountNumber, u64) {
-            (self.attester, self.id)
+        #[primary_key]
+        fn by_attestee(&self) -> (AccountNumber, AccountNumber) {
+            (self.subject, self.attester)
         }
-        #[secondary_key(2)]
-        fn by_attestee(&self) -> (AccountNumber, u64) {
-            (self.subject, self.id)
+
+        #[secondary_key(1)]
+        fn by_attester(&self) -> (AccountNumber, AccountNumber) {
+            (self.attester, self.subject)
         }
     }
 
@@ -66,22 +64,14 @@ mod service {
         let issued = transact::Wrapper::call().currentBlock().time;
 
         let attestation_table = AttestationTable::new();
-        let next_id = attestation_table
-            .get_index_pk()
-            .iter()
-            .last()
-            .map_or(0, |rec| rec.id + 1);
 
         let subj_acct = match AccountNumber::from_str(&subject.clone()) {
             Ok(subject_acct) => subject_acct,
             Err(_subject_acct) => return,
         };
 
-        // TODO: Update summary stats
-        // Q: Will this *update* or just add? Add; should always update
         attestation_table
             .put(&Attestation {
-                id: next_id,
                 attester,
                 issued,
                 subject: subj_acct,
@@ -125,13 +115,16 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attester(), &attester)
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-                .await
+            TableQuery::subindex::<AccountNumber>(
+                AttestationTable::new().get_index_by_attester(),
+                &attester,
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn attestations_by_attestee(
@@ -142,7 +135,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            TableQuery::subindex::<u64>(AttestationTable::new().get_index_by_attestee(), &attestee)
+            TableQuery::subindex::<AccountNumber>(AttestationTable::new().get_index_pk(), &attestee)
                 .first(first)
                 .last(last)
                 .before(before)
