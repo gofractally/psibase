@@ -1211,98 +1211,62 @@ namespace psio::schema_types
 
    namespace
    {
-      void addRef(auto& refs, AnyType& type);
-      void addRef(auto& refs, AnyType&, List& type)
+      void visitTypes(auto&& f, AnyType& type);
+      void visitTypes(auto&& f, AnyType&, List& type)
       {
-         addRef(refs, *type.type);
+         visitTypes(f, *type.type);
       }
-      void addRef(auto& refs, AnyType&, Array& type)
+      void visitTypes(auto&& f, AnyType&, Array& type)
       {
-         addRef(refs, *type.type);
+         visitTypes(f, *type.type);
       }
-      void addRef(auto& refs, AnyType&, Option& type)
+      void visitTypes(auto&& f, AnyType&, Option& type)
       {
-         addRef(refs, *type.type);
+         visitTypes(f, *type.type);
       }
-      void addRef(auto& refs, AnyType&, Custom& type)
+      void visitTypes(auto&& f, AnyType&, Custom& type)
       {
-         addRef(refs, *type.type);
+         visitTypes(f, *type.type);
       }
-      void addRef(auto& refs, std::vector<Member>& types)
+      void visitTypes(auto&& f, std::vector<Member>& types)
       {
          for (auto& member : types)
          {
-            addRef(refs, member.type);
+            visitTypes(f, member.type);
          }
       }
-      void addRef(auto& refs, AnyType&, Object& type)
+      void visitTypes(auto&& f, AnyType&, Object& type)
       {
-         addRef(refs, type.members);
+         visitTypes(f, type.members);
       }
-      void addRef(auto& refs, AnyType&, Struct& type)
+      void visitTypes(auto&& f, AnyType&, Struct& type)
       {
-         addRef(refs, type.members);
+         visitTypes(f, type.members);
       }
-      void addRef(auto& refs, AnyType&, Tuple& type)
+      void visitTypes(auto&& f, AnyType&, Tuple& type)
       {
          for (auto& member : type.members)
          {
-            addRef(refs, member);
+            visitTypes(f, member);
          }
       }
-      void addRef(auto& refs, AnyType&, Variant& type)
+      void visitTypes(auto&& f, AnyType&, Variant& type)
       {
-         addRef(refs, type.members);
+         visitTypes(f, type.members);
       }
-      void addRef(auto& refs, AnyType&, FracPack& type)
+      void visitTypes(auto&& f, AnyType&, FracPack& type)
       {
-         addRef(refs, *type.type);
+         visitTypes(f, *type.type);
       }
-      void addRef(auto& refs, AnyType&, Int&) {}
-      void addRef(auto& refs, AnyType&, Float&) {}
-      void addRef(auto& refs, AnyType& type, Type& t)
+      void visitTypes(auto&&, AnyType&, Int&) {}
+      void visitTypes(auto&&, AnyType&, Float&) {}
+      void visitTypes(auto&& f, AnyType& type, Type& t)
       {
-         refs[t.type].push_back(&type);
+         f(type, t);
       }
-      void addRef(auto& refs, AnyType& type)
+      void visitTypes(auto&& f, AnyType& type)
       {
-         std::visit([&](auto& t) { addRef(refs, type, t); }, type.value);
-      }
-      const std::string& resolveAlias(auto& resolved, const std::string& name)
-      {
-         const std::string* result = &name;
-         while (true)
-         {
-            if (auto pos = resolved.find(*result); pos != resolved.end())
-            {
-               result = &pos->second;
-            }
-            else
-            {
-               return *result;
-            }
-         }
-      }
-      void setChain(auto& resolved, const std::string& name, const std::string& newValue)
-      {
-         if (name == newValue)
-            return;
-         std::string current = name;
-         while (true)
-         {
-            if (auto pos = resolved.find(current); pos != resolved.end())
-            {
-               if (pos->second == newValue)
-                  return;
-               current     = std::move(pos->second);
-               pos->second = newValue;
-            }
-            else
-            {
-               resolved.insert({name, newValue});
-               return;
-            }
-         }
+         std::visit([&](auto& t) { visitTypes(f, type, t); }, type.value);
       }
       std::weak_ordering compareAlias(std::string_view lhs, std::string_view rhs)
       {
@@ -1310,85 +1274,128 @@ namespace psio::schema_types
          bool rhsCanReplace = rhs.starts_with('@');
          if (!lhsCanReplace && !rhsCanReplace)
             return std::weak_ordering::equivalent;
-         return std::tuple(!lhsCanReplace, lhs.size(), lhs) <=>
-                std::tuple(!rhsCanReplace, rhs.size(), rhs);
+         return std::tuple(lhsCanReplace, lhs.size(), lhs) <=>
+                std::tuple(rhsCanReplace, rhs.size(), rhs);
       }
-      void addAlias(auto& resolved, const std::string& name, const std::string& alias)
+
+      struct Renamer
       {
-         const std::string& lhs = resolveAlias(resolved, name);
-         const std::string& rhs = resolveAlias(resolved, name);
-         if (auto cmp = compareAlias(lhs, rhs); cmp != 0)
+         struct RenameInfo
          {
-            const std::string& best = cmp < 0 ? lhs : rhs;
-            setChain(resolved, name, best);
-            setChain(resolved, alias, best);
-         }
-         else
+            std::size_t count    = 0;
+            std::string bestName = "@";
+            bool        shouldInline() const { return count == 1 && bestName.starts_with('@'); }
+         };
+         std::map<std::string, RenameInfo> fixedNames;
+         Schema&                           types;
+         // returns either a non-@ name or the final name, whichever is encountered first
+         const std::string& getAlias(const std::string& name)
          {
-            setChain(resolved, name, lhs);
-            setChain(resolved, alias, rhs);
+            auto current = &name;
+            while (true)
+            {
+               if (!current->starts_with('@'))
+                  return *current;
+               auto pos = types.types.find(*current);
+               if (pos == types.types.end())
+                  throw std::runtime_error("missing type");
+               if (auto alias = std::get_if<Type>(&pos->second.value))
+               {
+                  current = &alias->type;
+               }
+               else
+               {
+                  return *current;
+               }
+            }
          }
-      }
+         auto addRef()
+         {
+            return [this](AnyType&, Type& t) { ++fixedNames[getAlias(t.type)].count; };
+         }
+         auto rename_fn()
+         {
+            return [this](AnyType& original, Type& t)
+            {
+               const auto& alias = getAlias(t.type);
+               if (alias.starts_with('@'))
+               {
+                  auto pos = fixedNames.find(alias);
+                  if (pos == fixedNames.end())
+                     throw std::runtime_error("Failed to resolved " + alias);
+                  if (pos->second.shouldInline())
+                  {
+                     auto pos = types.types.find(alias);
+                     assert(pos != types.types.end());
+                     rename(pos->second);
+                     original = std::move(pos->second);
+                  }
+                  else
+                  {
+                     t.type = pos->second.bestName;
+                  }
+               }
+               else
+                  t.type = alias;
+            };
+         }
+         void rename(AnyType& t) { visitTypes(rename_fn(), t); }
+      };
    }  // namespace
 
    void SchemaBuilder::optimize(std::span<AnyType* const> ext)
    {
-      std::map<std::string, std::vector<AnyType*>> refs;
       // Group all aliases, user defined types are not replaced
       // lower numbered aliases are preferred.
-      std::map<std::string, std::string> resolved;
+      Renamer renamer{.types = schema};
       for (AnyType* type : ext)
       {
-         addRef(refs, *type);
+         visitTypes(renamer.addRef(), *type);
       }
       for (auto& [name, type] : schema.types)
       {
          if (auto* alias = std::get_if<Type>(&type.value))
          {
-            addAlias(resolved, name, alias->type);
+            auto& bestName = renamer.fixedNames[renamer.getAlias(alias->type)].bestName;
+            if (bestName == "@" || compareAlias(name, bestName) < 0)
+               bestName = name;
          }
          else
          {
-            addRef(refs, type);
+            visitTypes(renamer.addRef(), type);
          }
-         refs.try_emplace(name);
       }
-      // Unify references to the same type
-      for (auto& [name, locations] : refs)
+      // Build the new schema
+      Schema result;
+      for (AnyType* type : ext)
       {
-         const auto& alias = resolveAlias(resolved, name);
-         setChain(resolved, name, alias);
-         if (name != alias)
+         renamer.rename(*type);
+      }
+      for (auto& [name, type] : schema.types)
+      {
+         if (auto* alias = std::get_if<Type>(&type.value))
          {
-            auto& alias_locations = refs[alias];
-            alias_locations.insert(alias_locations.end(), locations.begin(), locations.end());
-            locations.clear();
-            // ensure that the resolved location holds the actual type
-            auto pos = schema.types.find(name);
-            if (!std::holds_alternative<Type>(pos->second.value))
+            // Skip aliases that have auto-generated names
+            if (!name.starts_with('@'))
             {
-               schema.types.find(alias)->second = std::move(pos->second);
+               const auto& aliasName = renamer.getAlias(alias->type);
+               const auto& bestName =
+                   aliasName.starts_with('@') ? renamer.fixedNames[aliasName].bestName : aliasName;
+               if (bestName != name)
+                  result.types.insert({name, Type{bestName}});
             }
-            schema.types.erase(pos);
-         }
-      }
-      // Write the resolved types into schema
-      for (const auto& [name, locations] : refs)
-      {
-         if (name.starts_with('@') && locations.size() == 1)
-         {
-            auto pos           = schema.types.find(name);
-            *locations.front() = std::move(pos->second);
-            schema.types.erase(pos);
          }
          else
          {
-            for (AnyType* loc : locations)
+            const auto& info = renamer.fixedNames[name];
+            if (!info.shouldInline())
             {
-               *loc = Type{name};
+               renamer.rename(type);
+               result.types.insert({info.bestName, std::move(type)});
             }
          }
       }
+      schema = std::move(result);
    }
 
    struct SchemaMatch
