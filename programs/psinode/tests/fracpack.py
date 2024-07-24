@@ -403,12 +403,12 @@ def _as_list(c):
         return list(c)
 
 class Schema:
-    def __init__(self, types=None):
+    def __init__(self, types=None, custom=None):
         if types is None:
             self.types = {}
         else:
             self.types = {}
-            SchemaParser(types, self)
+            SchemaParser(types, self, custom)
     def __contains__(self, name):
         return name in self.types
     def __setitem__(self, name, ty):

@@ -7,6 +7,7 @@ import tempfile
 import time
 import calendar
 from collections import namedtuple
+import psibase
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
     def __init__(self, *args, **kwargs):
@@ -181,18 +182,14 @@ class API:
             return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        with self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims}) as result:
-            result.raise_for_status()
-            return result.content
+        return psibase.Transaction.packed({'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims})
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
         if isinstance(trx, bytes):
             trx = trx.hex()
         elif isinstance(trx, Transaction):
             trx = self.pack_transaction(trx).hex()
-        with self.post('/common/pack/SignedTransaction', json={'transaction': trx, 'proofs':signatures}) as result:
-            result.raise_for_status()
-            return result.content
+        return psibase.SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
     def push_transaction(self, trx):
         '''
         Push a transaction to the chain and return the transaction trace
