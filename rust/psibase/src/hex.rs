@@ -1,5 +1,6 @@
-use crate::{reflect, ToKey, ToSchema};
+use crate::{reflect, ToKey};
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
+use fracpack::{AnyType, SchemaBuilder, ToSchema};
 use std::convert::AsRef;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -22,8 +23,7 @@ trait FromHex: ToHex {
 ///
 /// `Hex<Vec<u8>>`, `Hex<&[u8]>`, and `Hex<[u8; SIZE]>` store binary
 /// data. This wrapper does not support other inner types.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Hex<T>(pub T);
 
 impl<T> Default for Hex<T>
@@ -51,6 +51,15 @@ where
 {
     fn from(inner: T) -> Self {
         Self(inner)
+    }
+}
+
+impl<T: ToSchema + 'static> ToSchema for Hex<T> {
+    fn schema(builder: &mut SchemaBuilder) -> AnyType {
+        AnyType::Custom {
+            type_: builder.insert::<T>().into(),
+            id: "hex".to_string(),
+        }
     }
 }
 

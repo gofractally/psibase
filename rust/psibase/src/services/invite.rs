@@ -1,10 +1,10 @@
 use crate::{AccountNumber, PublicKey, Reflect};
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, Unpack};
+use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[reflect(psibase_mod = "crate")]

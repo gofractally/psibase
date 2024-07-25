@@ -226,6 +226,7 @@ fn process_mod(
         }
 
         let mut action_structs = proc_macro2::TokenStream::new();
+        let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut reflect_methods = proc_macro2::TokenStream::new();
@@ -246,6 +247,7 @@ fn process_mod(
                     &mut invoke_struct_args,
                     &mut reflect_args,
                 );
+                process_action_schema(psibase_mod, &structs, f, &mut action_schema_init);
                 process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
                 process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
                 let name = &f.sig.ident;
@@ -329,6 +331,16 @@ fn process_mod(
             impl<T: #psibase_mod::Caller> From<T> for #actions<T> {
                 fn from(caller: T) -> Self {
                     Self{caller}
+                }
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::FunctionType> {
+                    let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                    #action_schema_init
+                    actions
                 }
             }
         });
@@ -571,6 +583,7 @@ fn process_mod(
 
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
+                type Actions = #actions<#psibase_mod::JustSchema>;
                 type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
@@ -1322,6 +1335,30 @@ fn process_action_callers(
             self.caller.#call(#method_number, (#invoke_args))
         }
     };
+}
+
+fn process_action_schema(
+    psibase_mod: &proc_macro2::TokenStream,
+    action_mod: &proc_macro2::TokenStream,
+    f: &ItemFn,
+    insertions: &mut proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+    let name_str = name.to_string();
+    let method_number =
+        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
+
+    let ret = match &f.sig.output {
+        ReturnType::Default => quote! { None },
+        ReturnType::Type(_, ty) => {
+            quote! { Some(builder.insert::<#ty>() ) }
+        }
+    };
+
+    *insertions = quote! {
+        #insertions
+        actions.insert(#method_number, #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+    }
 }
 
 fn process_dispatch_body(
