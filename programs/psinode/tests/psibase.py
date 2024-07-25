@@ -1,25 +1,19 @@
 import name
 import fracpack
-from fracpack import FracPack, Hex, Int, List, Object, Struct, u8, u16, u32
+from fracpack import *
 
 import calendar
 import time
 
-class AccountNumber(Int):
-    def __init__(self, ty=None):
-        super().__init__(64, False)
+class AccountNumber(u64):
     def pack(self, value, stream):
         super().pack(name.account_to_number(value), stream)
 
-class MethodNumber(Int):
-    def __init__(self, ty=None):
-        super().__init__(64, False)
+class MethodNumber(u64):
     def pack(self, value, stream):
         super().pack(name.method_to_number(value), stream)
 
-class TimePointSec(Int):
-    def __init__(self, ty=None):
-        super().__init__(32, False)
+class TimePointSec(u32):
     def pack(self, value, stream):
         if isinstance(value, str):
             value = calendar.timegm(time.strptime(value, "%Y-%m-%dT%H:%M:%SZ"))
@@ -31,16 +25,27 @@ default_custom = fracpack.default_custom | {
     "TimePointSec": TimePointSec,
 }
 
-AccountNumber = AccountNumber()
-MethodNumber = MethodNumber()
-TimePointSec = TimePointSec()
+class Action(Object):
+    sender: AccountNumber
+    service: AccountNumber
+    method: MethodNumber
+    rawData: Bytes
 
-Action = Object([('sender', AccountNumber), ('service', AccountNumber), ('method', MethodNumber), ('rawData', Hex(List(u8)))])
+class Tapos(Struct):
+    expiration: TimePointSec
+    refBlockSuffix: u32
+    flags: u16
+    refBlockIndex: u8
 
-Tapos = Struct([('expiration',TimePointSec),('refBlockSuffix',u32),('flags',u16),('refBlockIndex',u8)])
+class Claim(Object):
+    service: AccountNumber
+    rawData: Bytes
 
-Claim = Object([('service', AccountNumber), ('rawData', Hex(List(u8)))])
+class Transaction(Object):
+    tapos: Tapos
+    actions: List(Action)
+    claims: List(Claim)
 
-Transaction = Object([('tapos', Tapos), ('actions', List(Action)), ('claims', List(Claim))])
-
-SignedTransaction = Object([('transaction', Hex(FracPack(Transaction))), ('proofs', List(Hex(List(u8))))])
+class SignedTransaction(Object):
+    transaction: Hex(FracPack(Transaction))
+    proofs: List(Bytes)

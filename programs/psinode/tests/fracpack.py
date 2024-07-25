@@ -42,6 +42,10 @@ class NullRepack:
         pass
 
 class TypeBase:
+    def __mro_entries__(self, bases):
+        class Base(FracPackBase, metaclass=MetaFracPack):
+            __fracpack__ = self
+        return (Base,)
     def embedded_fixed_pack(self, value, stream):
         if self.is_variable_size:
             stream.write_u32(0)
@@ -124,7 +128,18 @@ class Float(TypeBase):
             stream.write_u8(ival & 0xff)
             ival >>= 8
 
-class Struct(TypeBase):
+class MetaStruct(type):
+    def __new__(cls, name, bases, namespace, **kw):
+        if 'pack' not in namespace:
+            members = {}
+            if '__annotations__' in namespace:
+                for (name, ty) in namespace['__annotations__'].items():
+                    if isinstance(ty, TypeBase):
+                        members[name] = ty
+                return Struct(members)
+        return super().__new__(cls, name, bases, namespace, **kw)
+
+class Struct(TypeBase, metaclass=MetaStruct):
     def __init__(self, members):
         members = _as_list(members)
         self.fixed_size = 0
@@ -150,7 +165,18 @@ class Struct(TypeBase):
         for (name, ty) in self.members:
             ty.pack(value[name], stream)
 
-class Object(TypeBase):
+class MetaObject(type):
+    def __new__(cls, name, bases, namespace, **kw):
+        if 'pack' not in namespace:
+            members = {}
+            if '__annotations__' in namespace:
+                for (name, ty) in namespace['__annotations__'].items():
+                    if isinstance(ty, TypeBase):
+                        members[name] = ty
+                return Object(members)
+        return super().__new__(cls, name, bases, namespace, **kw)
+
+class Object(TypeBase, metaclass=MetaObject):
     def __init__(self, members):
         self.fixed_size = 4
         self.is_variable_size = True
@@ -393,9 +419,7 @@ def load_type(raw, parser):
             return types[name].load(data, parser)
 
 def _as_list(c):
-    ty = type(c)
-    assert ty is not dict, "Cannot use dict because the order of elements is significant"
-    if ty is list:
+    if isinstance(c, list):
         return c
     else:
         if isinstance(c, abc.Mapping):
@@ -416,6 +440,7 @@ class Schema:
     def __getitem__(self, name):
         return self.types[name]
 
+u1 = Int(1, False)
 u8 = Int(8, False)
 u16 = Int(16, False)
 u32 = Int(32, False)
@@ -425,18 +450,41 @@ i16 = Int(16, True)
 i32 = Int(32, True)
 i64 = Int(64, True)
 
-class Bool(Int):
-    def __init__(self, ty):
-        super().__init__(bits=1, isSigned=False)
+class MetaFracPack(type):
+    def __new__(cls, name, bases, namespace, **kw):
+        result = super().__new__(cls, name, bases, namespace, **kw)
+        if '__fracpack__' not in namespace:
+            result.__init__(name, bases, namespace, **kw)
+            result = result()
+        return result
+
+class FracPackBase(TypeBase):
+    def pack(self, value, stream):
+        return self.__fracpack__.pack(value, stream)
+    def __call__(self, ty):
+        # TODO check ty is equivalent to self.__fracpack__
+        return self
+    @property
+    def is_variable_size(self):
+        return self.__fracpack__.is_variable_size
+    @property
+    def fixed_size(self):
+        return self.__fracpack__.fixed_size
+    @property
+    def is_container(self):
+        return self.__fracpack__.is_container
+    @property
+    def is_optional(self):
+        return self.__fracpack__.is_optional
+
+class Bool(u1):
     def pack(self, value, stream):
         if value:
             stream.write_u8(1)
         else:
             stream.write_u8(0)
 
-class String(List):
-    def __init__(self, ty):
-        super().__init__(u8)
+class String(List(u8)):
     def pack(self, value, stream):
         data = value.encode()
         stream.write_u32(len(data))
@@ -464,6 +512,8 @@ class Hex(TypeBase):
     @property
     def is_optional(self):
         return self.ty.is_optional
+
+Bytes = Hex(List(u8))
 
 default_custom = {
     "bool": Bool,

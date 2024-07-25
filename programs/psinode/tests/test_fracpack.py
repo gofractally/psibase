@@ -7,14 +7,10 @@ import pathlib
 import sys
 import unittest
 
-class JsonObject(list):
-    def __repr__(self):
-        return json.dumps(dict(self))
-
 class TestFracpack(unittest.TestCase):
     def test(self):
         with open(args.test_data) as f:
-            tests = json.load(f, object_pairs_hook=JsonObject)
+            tests = json.load(f)
         for t in tests:
             t = dict(t)
             schema = Schema(t['schema'])
@@ -31,5 +27,3 @@ if __name__ == '__main__':
     global args
     (args, remaining) = parser.parse_known_args(sys.argv)
     unittest.main(argv=remaining)
-
-    unittest.main()
