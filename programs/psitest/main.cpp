@@ -195,7 +195,6 @@ struct state
    std::vector<std::shared_ptr<HttpSocket>> sockets;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::shared_ptr<WatchdogManager>         watchdogManager = std::make_shared<WatchdogManager>();
-   std::optional<uint32_t>                  selected_chain_index;
    std::vector<char>                        result_key;
    std::vector<char>                        result_value;
 };
@@ -1064,16 +1063,12 @@ struct callbacks
    {
       state.chains.push_back(
           std::make_unique<test_chain>(state, hot_bytes, warm_bytes, cool_bytes, cold_bytes));
-      if (state.chains.size() == 1)
-         state.selected_chain_index = 0;
       return state.chains.size() - 1;
    }
 
    void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
-      if (state.selected_chain_index && *state.selected_chain_index == chain)
-         state.selected_chain_index.reset();
       state.chains[chain].reset();
       while (!state.chains.empty() && !state.chains.back())
       {
@@ -1261,17 +1256,9 @@ struct callbacks
       return 0;
    }
 
-   void testerSelectChainForDb(uint32_t chain_index)
+   psibase::NativeFunctions& native(std::uint32_t chain_index)
    {
-      assert_chain(chain_index);
-      state.selected_chain_index = chain_index;
-   }
-
-   psibase::NativeFunctions& native()
-   {
-      if (!state.selected_chain_index)
-         throw std::runtime_error("no chain is selected");
-      return assert_chain(*state.selected_chain_index).native();
+      return assert_chain(chain_index).native();
    }
 
    void setResult(psibase::NativeFunctions& n)
@@ -1296,49 +1283,55 @@ struct callbacks
       return state.result_key.size();
    }
 
-   uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGet(db, key);
       setResult(n);
       return result;
    }
 
-   uint32_t getSequential(uint32_t db, uint64_t indexNumber)
+   uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.getSequential(db, indexNumber);
       setResult(n);
       return result;
    }
 
-   uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   uint32_t kvGreaterEqual(std::uint32_t               chain_index,
+                           uint32_t                    db,
+                           eosio::vm::span<const char> key,
+                           uint32_t                    matchKeySize)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGreaterEqual(db, key, matchKeySize);
       setResult(n);
       return result;
    }
 
-   uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   uint32_t kvLessThan(std::uint32_t               chain_index,
+                       uint32_t                    db,
+                       eosio::vm::span<const char> key,
+                       uint32_t                    matchKeySize)
    {
-      auto& n      = native();
-      auto  result = native().kvLessThan(db, key, matchKeySize);
+      auto& n      = native(chain_index);
+      auto  result = n.kvLessThan(db, key, matchKeySize);
       setResult(n);
       return result;
    }
 
-   uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvMax(db, key);
       setResult(n);
       return result;
    }
 
-   uint32_t kvGetTransactionUsage()
+   uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGetTransactionUsage();
       setResult(n);
       return result;
@@ -1356,29 +1349,26 @@ void backtrace()
 void register_callbacks()
 {
    // Psibase Intrinsics
-   rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
-   rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
-   rhf_t::add<&callbacks::getResult>("env", "getResult");
-   rhf_t::add<&callbacks::getKey>("env", "getKey");
-   rhf_t::add<&callbacks::kvGet>("env", "kvGet");
-   rhf_t::add<&callbacks::getSequential>("env", "getSequential");
-   rhf_t::add<&callbacks::kvGreaterEqual>("env", "kvGreaterEqual");
-   rhf_t::add<&callbacks::kvLessThan>("env", "kvLessThan");
-   rhf_t::add<&callbacks::kvMax>("env", "kvMax");
-   rhf_t::add<&callbacks::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
+   rhf_t::add<&callbacks::abortMessage>("psibase", "abortMessage");
+   rhf_t::add<&callbacks::getResult>("psibase", "getResult");
+   rhf_t::add<&callbacks::getKey>("psibase", "getKey");
+   rhf_t::add<&callbacks::kvGet>("psibase", "kvGet");
+   rhf_t::add<&callbacks::getSequential>("psibase", "getSequential");
+   rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
+   rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
+   rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
+   rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics
-   rhf_t::add<&callbacks::testerAbort>("env", "testerAbort");
-   rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
-   rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");
-   rhf_t::add<&callbacks::testerShutdownChain>("env", "testerShutdownChain");
-   rhf_t::add<&callbacks::testerGetChainPath>("env", "testerGetChainPath");
-   rhf_t::add<&callbacks::testerStartBlock>("env", "testerStartBlock");
-   rhf_t::add<&callbacks::testerFinishBlock>("env", "testerFinishBlock");
-   rhf_t::add<&callbacks::testerPushTransaction>("env", "testerPushTransaction");
-   rhf_t::add<&callbacks::testerHttpRequest>("env", "testerHttpRequest");
-   rhf_t::add<&callbacks::testerSocketRecv>("env", "testerSocketRecv");
-   rhf_t::add<&callbacks::testerSelectChainForDb>("env", "testerSelectChainForDb");
+   rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
+   rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
+   rhf_t::add<&callbacks::testerGetChainPath>("psibase", "getChainPath");
+   rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
+   rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
+   rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
+   rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
 
    // WASI functions

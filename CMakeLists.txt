@@ -240,8 +240,6 @@ set(JS_DIRS
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
-set(COMMON_LOADER_DIR services/user/CommonApi/common/packages/wasm-loader/:CommonApiLoaderLib_js)
-set(SUPERVISOR_LIB_DIR services/user/Supervisor/lib/:SupervisorLib_js)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
@@ -269,8 +267,6 @@ file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/servic
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
-add_js_target(${SUPERVISOR_LIB_DIR} supervisor-lib.js ${CommonApiCommonLib_js_DEP})
-add_js_target(${COMMON_LOADER_DIR} index.html ${CommonApiCommonLib_js_DEP} ${SupervisorLib_js_DEP})
 
 # Build each UI
 # Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
@@ -280,7 +276,7 @@ endforeach()
 
 # A function that can be used to add a new target that builds a wasm component from rust
 set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
-function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
+function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
@@ -290,10 +286,10 @@ function(add_rs_component TARGET_TUPLE OUTPUT_FILE)
         BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND cargo component build -r
-            --target wasm32-wasi
+            --target ${TARGET_ARCH}
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
             --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/wasm32-wasi/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/${TARGET_ARCH}/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
         BUILD_ALWAYS 1
         INSTALL_COMMAND ""
     )
@@ -307,14 +303,13 @@ endfunction()
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
 
 # Build each component
-set(COMPONENT_PARSER_DIR services/user/CommonApi/common/packages/component-parser:ComponentParser)
-add_rs_component(${COMPONENT_PARSER_DIR} component_parser.wasm)
+add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
-add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm ${plugin-wit})
-add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm ${plugin-wit})
-add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm ${plugin-wit} ${AuthPlugin_DEP})
-add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm ${plugin-wit})
+add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wasm32-wasi )
+add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
+add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
+add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -437,7 +432,6 @@ psibase_package(
     SERVICE common-api
         WASM ${CMAKE_CURRENT_BINARY_DIR}/CommonApi.wasm
         SERVER common-api
-        DATA GLOB ${COMMON_API}/common/packages/wasm-loader/dist/*            common/wasm-loader/
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
@@ -446,7 +440,6 @@ psibase_package(
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
     DEPENDS ${CommonApi_js_DEP}
     DEPENDS ${CommonApiCommonLib_js_DEP}
-    DEPENDS ${CommonApiLoaderLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
@@ -640,9 +633,7 @@ psibase_package(
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
     DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
-    DATA ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/lib/dist/supervisor-lib.js /supervisor-lib.js
     DEPENDS ${Supervisor_js_DEP}
-    DEPENDS ${SupervisorLib_js_DEP}
 )
 
 psibase_package(
