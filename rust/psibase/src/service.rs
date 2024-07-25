@@ -1,5 +1,4 @@
 use crate::fracpack::{Pack, UnpackOwned};
-use crate::reflect::Reflect;
 use crate::{get_result_bytes, native_raw, reflect, AccountNumber, Action, MethodNumber, Reflect};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -73,8 +72,8 @@ pub trait ProcessActionStruct {
     type Output;
 
     fn process<
-        Return: Reflect + Serialize + DeserializeOwned,
-        ArgStruct: Reflect + Pack + Serialize + DeserializeOwned,
+        Return: Serialize + DeserializeOwned,
+        ArgStruct: Pack + Serialize + DeserializeOwned,
     >(
         self,
     ) -> Self::Output;
