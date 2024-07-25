@@ -124,5 +124,11 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
         .body;
     assert_eq!(format!("{}", reply), "08000500000007000000");
 
+    let reply: Value = chain.get(SERVICE, "/action_templates")?.json()?;
+    assert_eq!(
+        reply,
+        json!({"add":{"a":0, "b": 0}, "multiply": {"a": 0, "b": 0}, "serveSys": {"request": {"body": "", "contentType": "", "host": "", "method": "", "rootHost": "", "target": ""}}})
+    );
+
     Ok(())
 }
