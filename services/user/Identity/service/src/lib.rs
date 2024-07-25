@@ -55,8 +55,77 @@ mod service {
         }
     }
 
-    #[table(record = "WebContentRow", index = 1)]
+    #[table(name = "AttestationStatsTable", index = 1)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
+    pub struct AttestationStats {
+        /// The credential subject, in this case, the subject/attestee
+        #[primary_key]
+        subject: AccountNumber,
+
+        // % high conf + # unique attestations will give an approximation of a Google Review for a user
+        perc_high_conf: u8,
+
+        unique_attestations: u16,
+
+        // freshness indicator
+        most_recent_attestation: TimePointSec,
+    }
+
+    #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
+
+    fn update_attestation_stats(
+        subj_acct: AccountNumber,
+        is_unique_attester_for_subj: bool,
+        value: u8,
+        issued: TimePointSec,
+    ) -> Result<(), _> {
+        let attestation_stats_table = AttestationStatsTable::new();
+        let stats_rec = attestation_stats_table.get_index_pk().get(&(subj_acct));
+
+        match stats_rec {
+            // there exists a stats entry for this subject
+            Some(stats_rec) => {
+                let new_unique_attests = if is_unique_attester_for_subj {
+                    // case: c => new unique attester for existing attestee
+                    // This is updating an existing attestation and existing stats record
+                    // update AttestationStats fields
+                    stats_rec.unique_attestations + 1
+                } else {
+                    // This attestation doesn't replace an existing;
+                    // update AttestationStats fields
+                    stats_rec.unique_attestations
+                };
+                let new_perc_high_conf = match value {
+                    conf if conf > 75 => {
+                        ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations
+                            + value as u16)
+                            / new_unique_attests) as u8
+                    }
+                    _ => {
+                        (stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations
+                            / new_unique_attests) as u8
+                    }
+                };
+                attestation_stats_table.put(&AttestationStats {
+                    subject: stats_rec.subject,
+                    perc_high_conf: new_perc_high_conf,
+                    unique_attestations: new_unique_attests,
+                    most_recent_attestation: issued,
+                })
+            }
+            None => {
+                // case: a and b => first stats entry for this subject
+                attestation_stats_table.put(&AttestationStats {
+                    subject: subj_acct,
+                    perc_high_conf: value,
+                    unique_attestations: 1,
+                    most_recent_attestation: issued,
+                });
+                psibase::abort_message(message)
+            }
+        }
+    }
 
     #[action]
     pub fn attest(subject: String, value: u8) {
@@ -67,8 +136,11 @@ mod service {
 
         let subj_acct = match AccountNumber::from_str(&subject.clone()) {
             Ok(subject_acct) => subject_acct,
-            Err(_subject_acct) => return,
+            // TODO
+            Err(e) => psibase::abort_message(&format!("{}", e)),
         };
+
+        let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
 
         attestation_table
             .put(&Attestation {
@@ -78,6 +150,16 @@ mod service {
                 value,
             })
             .unwrap();
+
+        // Update Attestation stats
+        update_attestation_stats(subj_acct, existing_rec.is_some(), value, issued);
+        // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
+        // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
+
+        // subject: AccountNumber,
+        // perc_high_conf: u16,
+        // unique_attestations: u16,  size of index of attestee = <something>
+        // most_recent_attestation -- for freshness of attestation
 
         Wrapper::emit()
             .history()
@@ -106,7 +188,6 @@ mod service {
                 .collect::<Vec<Attestation>>())
         }
 
-        // query only most recent from each attester (there's only 1 entry per attester)
         async fn attestations_by_attester(
             &self,
             attester: AccountNumber,
