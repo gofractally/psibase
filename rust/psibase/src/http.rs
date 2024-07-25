@@ -80,6 +80,12 @@ pub struct HttpBody {
 }
 
 impl HttpBody {
+    pub fn json(data: &str) -> Self {
+        HttpBody {
+            contentType: "application/json".into(),
+            body: data.to_string().into_bytes().into(),
+        }
+    }
     pub fn graphql(query: &str) -> Self {
         HttpBody {
             contentType: "application/graphql".into(),
