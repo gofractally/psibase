@@ -1,0 +1,14 @@
+package component:wasm2;
+
+interface types {
+    record numbers {
+        num-a: s32,
+        num-b: s32,
+    }
+}
+
+world wasm2 {
+    use types.{numbers};
+    export sub: func(numbers: numbers) -> s32;
+    export divide: func(numbers: numbers) -> s32;
+}
