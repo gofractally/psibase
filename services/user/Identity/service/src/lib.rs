@@ -1,26 +1,9 @@
-use async_graphql::SimpleObject;
 /// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
-use psibase::fracpack::*;
-use psibase::AccountNumber;
-use psibase_macros::Reflect;
-use serde::{Deserialize, Serialize};
-
-#[derive(Pack, Unpack, Reflect, Deserialize, Serialize, SimpleObject, Debug, Clone, ToSchema)]
-#[allow(non_snake_case)]
-/// Given get_sender() gives us a verified `attester`, and
-/// the credentialSubject contains the subject / attestee,
-/// we only need the "claims" being made.
-pub struct Credential {
-    /// The subject (generally also the holder)
-    /// The claims being attested to (includes subject)
-    subject: AccountNumber,
-    value: u8,
-}
-
 #[psibase::service(name = "identity")]
 #[allow(non_snake_case)]
 mod service {
+    use core::fmt;
     use std::str::FromStr;
 
     use async_graphql::connection::Connection;
@@ -65,10 +48,23 @@ mod service {
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
         perc_high_conf: u8,
 
-        unique_attestations: u16,
+        unique_attesters: u16,
 
         // freshness indicator
         most_recent_attestation: TimePointSec,
+    }
+
+    impl fmt::Display for AttestationStats {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            writeln!(
+                f,
+                "--AttestationStats--\n{}\t: subject\n{} :# unique attesters\n{}\t: % high conf\n{} :most recent attestation",
+                self.subject,
+                self.unique_attesters,
+                self.perc_high_conf,
+                self.most_recent_attestation.seconds
+            )
+        }
     }
 
     impl Default for AttestationStats {
@@ -76,7 +72,7 @@ mod service {
             AttestationStats {
                 subject: AccountNumber::from(0),
                 perc_high_conf: 0,
-                unique_attestations: 0,
+                unique_attesters: 0,
                 most_recent_attestation: TimePointSec::from(0),
             }
         }
@@ -96,30 +92,102 @@ mod service {
             .get_index_pk()
             .get(&(subj_acct))
             .unwrap_or_default();
+        println!("at start:\n{}", stats_rec);
         // STEPS:
         // 1) ensure the table has a default state (do this as an impl on the table)
         //  -- This is handled by Default impl
         // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
-        if !is_new_unique_attester_for_subj {
-            stats_rec.unique_attestations -= 1;
-            stats_rec.perc_high_conf =
-                (stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations) as u8;
+        if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
+            println!("have records; is not unique; removing attestation from stats...");
+            let num_high_conf = stats_rec.perc_high_conf as f32 * stats_rec.unique_attesters as f32;
+            stats_rec.unique_attesters -= 1;
+            stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
+                0
+            } else {
+                (num_high_conf / stats_rec.unique_attesters as f32) as u8
+            };
         }
+        println!("after removing existing:\n{}", stats_rec);
+        // else {
+        // stats_rec.perc_high_conf =
+        //     (num_high_conf as f32 / stats_rec.unique_attesters as f32).round() as u8;
+        // }
+        // }
 
         // 3) update stats to include this attestations
+        // println!("subject: {}", subj_acct);
         stats_rec.subject = subj_acct;
         stats_rec.most_recent_attestation = issued;
-        stats_rec.unique_attestations += 1;
+        // println!("unique_attesters: {}", stats_rec.unique_attesters);
+        // println!("% high conf before: {}", stats_rec.perc_high_conf);
+        println!("value: {}", value);
         stats_rec.perc_high_conf = if value > 75 {
-            ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1) + value as u16)
-                as f32
-                / stats_rec.unique_attestations as f32)
+            // println!(
+            //     "{}, {}",
+            //     stats_rec.perc_high_conf as u16,
+            //     stats_rec.unique_attesters - 1
+            // );
+            // println!(
+            //     "{}",
+            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            // );
+            // println!(
+            //     "{}",
+            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            //         + value as u16
+            // );
+            // println!(
+            //     "{}",
+            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            //         + value as u16) as f32
+            //         / stats_rec.unique_attesters as f32)
+            // );
+            // println!(
+            //     "{}",
+            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            //         + value as u16) as f32
+            //         / stats_rec.unique_attesters as f32)
+            //         .round() as u8
+            // );
+            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters + 1 as u16) as f32
+                / (stats_rec.unique_attesters + 1) as f32)
                 .round() as u8
         } else {
-            ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1)) as f32
-                / stats_rec.unique_attestations as f32)
+            // println!(
+            //     "{}, {}",
+            //     stats_rec.perc_high_conf as u16,
+            //     stats_rec.unique_attesters - 1
+            // );
+            // println!(
+            //     "{}",
+            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            // );
+            // println!(
+            //     "{}",
+            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
+            //         + value as u16
+            // );
+            // println!(
+            //     "{}",
+            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1) as u16)
+            //         as f32
+            //         / stats_rec.unique_attesters as f32)
+            // );
+            // println!(
+            //     "{}",
+            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1) as u16)
+            //         as f32
+            //         / stats_rec.unique_attesters as f32)
+            //         .round() as u8
+            // );
+            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters) as f32
+                / (stats_rec.unique_attesters + 1) as f32)
                 .round() as u8
         };
+        stats_rec.unique_attesters += 1;
+        println!("new % conf: {}", stats_rec.perc_high_conf);
+        // println!("% high conf after: {}", stats_rec.perc_high_conf);
+        println!("after:\n{}", stats_rec);
 
         let _ = attestation_stats_table
             .put(&stats_rec)
@@ -128,14 +196,11 @@ mod service {
 
     #[action]
     pub fn attest(subject: String, value: u8) {
-        write_console("0");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 
-        write_console("1");
         let attestation_table = AttestationTable::new();
 
-        write_console("2");
         let subj_acct = match AccountNumber::from_str(&subject.clone()) {
             Ok(subject_acct) => subject_acct,
             // TODO
@@ -144,7 +209,6 @@ mod service {
 
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
 
-        write_console("3");
         // upsert attestation
         attestation_table
             .put(&Attestation {
@@ -155,12 +219,10 @@ mod service {
             })
             .unwrap();
 
-        write_console("5");
         // Update Attestation stats
         // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
         // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
-        update_attestation_stats(subj_acct, existing_rec.is_some(), value, issued);
-        write_console("6");
+        update_attestation_stats(subj_acct, existing_rec.is_none(), value, issued);
 
         Wrapper::emit()
             .history()
