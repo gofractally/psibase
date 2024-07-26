@@ -13,7 +13,9 @@ interface Invite {
   callback: string;
 }
 
-const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad }) => {
+const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
+  onLoad,
+}) => {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files ? event.target.files[0] : null;
 
@@ -27,12 +29,8 @@ const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad 
     }
   };
 
-  return (
-    <input type="file" accept=".pem" onChange={handleFileChange} />
-  );
+  return <input type="file" accept=".pem" onChange={handleFileChange} />;
 };
-
-
 
 function App() {
   const [res, setRes] = useState("Empty");
@@ -160,9 +158,7 @@ function App() {
         method: "generateUnmanagedKeypair",
         params: [],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Keypair written to console`);
     } catch (e) {
       if (e instanceof Error) {
@@ -181,9 +177,7 @@ function App() {
         method: "setKey",
         params: [c],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Res: ${res}`);
     } catch (e) {
       if (e instanceof Error) {
@@ -194,6 +188,25 @@ function App() {
     }
   };
 
+  const run8 = async () => {
+    try {
+      const res = await supervisor.functionCall({
+        service: "sup-test",
+        intf: "tests",
+        method: "kvTest",
+        plugin: "test",
+        params: [],
+      });
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
+      setRes(`No errors :)`);
+    } catch (e) {
+      if (e instanceof Error) {
+        console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+      } else {
+        console.error(`Caught exception: ${JSON.stringify(e, null, 2)}`);
+      }
+    }
+  };
 
   const [a, setA] = useState("");
   const [b, setB] = useState("");
@@ -237,6 +250,10 @@ function App() {
       <div className="card">
         <button onClick={() => run7()}>{"Set key"}</button>
         <FileSelector onLoad={setC} />
+      </div>
+
+      <div className="card">
+        <button onClick={() => run8()}>{"Run supervisor tests"}</button>
       </div>
     </>
   );
