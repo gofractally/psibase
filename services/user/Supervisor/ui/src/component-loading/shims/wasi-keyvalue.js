@@ -7,16 +7,16 @@ function isErrorMessage(error) {
     );
 }
 
-function getIndex(bigIndex) {
-    const maxSafeInteger = BigInt(Number.MAX_SAFE_INTEGER);
-    const minSafeInteger = BigInt(Number.MIN_SAFE_INTEGER);
+// function getIndex(bigIndex: bigint): number {
+//     const maxSafeInteger = BigInt(Number.MAX_SAFE_INTEGER);
+//     const minSafeInteger = BigInt(Number.MIN_SAFE_INTEGER);
 
-    if (bigIndex > maxSafeInteger || bigIndex < minSafeInteger) {
-        throw new ErrorOther("Cursor value out of range");
-    }
+//     if (bigIndex > maxSafeInteger || bigIndex < minSafeInteger) {
+//         throw new ErrorOther("Cursor value out of range");
+//     }
 
-    return Number(bigIndex);
-}
+//     return Number(bigIndex);
+// }
 
 ///////////////////////////////////////////////// ATOMICS
 function increment(bucket, key, delta) {
@@ -176,34 +176,34 @@ class Bucket {
         }
     }
 
-    listKeys(cursor) {
-        const prefix = `${this.bucketId}:`;
-        const pageLimit = 1000;
-        const startIndex = cursor ? getIndex(cursor) : 0;
+    // listKeys(cursor?: bigint): KeyResponse {
+    //     const prefix = `${this.bucketId}:`;
+    //     const pageLimit = 1000;
+    //     const startIndex: number = cursor ? getIndex(cursor) : 0;
 
-        const keys = [];
-        let moreRecords = false;
-        let nr = 0;
-        for (let i = startIndex; i < localStorage.length; i++) {
-            const fullKey = localStorage.key(i);
-            if (fullKey && fullKey.startsWith(prefix)) {
-                keys.push(fullKey.slice(prefix.length));
-                nr++;
+    //     const keys: string[] = [];
+    //     let moreRecords: boolean = false;
+    //     let nr = 0;
+    //     for (let i = startIndex; i < localStorage.length; i++) {
+    //         const fullKey = localStorage.key(i);
+    //         if (fullKey && fullKey.startsWith(prefix)) {
+    //             keys.push(fullKey.slice(prefix.length));
+    //             nr++;
 
-                if (nr >= pageLimit) {
-                    moreRecords = i + 1 < localStorage.length;
-                    break;
-                }
-            }
-        }
+    //             if (nr >= pageLimit) {
+    //                 moreRecords = i + 1 < localStorage.length;
+    //                 break;
+    //             }
+    //         }
+    //     }
 
-        let nextCursor = undefined;
-        if (moreRecords) {
-            nextCursor = BigInt(startIndex + keys.length);
-        }
+    //     let nextCursor: bigint | undefined = undefined;
+    //     if (moreRecords) {
+    //         nextCursor = BigInt(startIndex + keys.length);
+    //     }
 
-        return { keys, cursor: nextCursor };
-    }
+    //     return { keys, cursor: nextCursor };
+    // }
 }
 
 export const store = { Bucket, open };
