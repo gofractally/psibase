@@ -1,4 +1,4 @@
-use crate::{serialize_as_str, Pack, Reflect, ToSchema, Unpack};
+use crate::{serialize_as_str, Pack, ToSchema, Unpack};
 use custom_error::custom_error;
 use ripemd::{Digest, Ripemd160};
 use std::{fmt, str::FromStr};
@@ -65,17 +65,19 @@ custom_error! { pub K1Error
 
 pub type EccPublicKey = [u8; 33];
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub enum PublicKeyEnum {
     K1(EccPublicKey),
     R1(EccPublicKey),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate", custom_json = true)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
+#[fracpack(
+    definition_will_not_change,
+    fracpack_mod = "fracpack",
+    custom = "PublicKey"
+)]
 pub struct PublicKey {
     pub data: PublicKeyEnum,
 }
@@ -123,17 +125,19 @@ impl From<&secp256k1::PublicKey> for PublicKey {
 
 pub type EccPrivateKey = [u8; 32];
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub enum PrivateKeyEnum {
     K1(EccPrivateKey),
     R1(EccPrivateKey),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate", custom_json = true)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
+#[fracpack(
+    definition_will_not_change,
+    fracpack_mod = "fracpack",
+    custom = "PrivateKey"
+)]
 pub struct PrivateKey {
     pub data: PrivateKeyEnum,
 }
@@ -192,17 +196,19 @@ impl From<&secp256k1::SecretKey> for PrivateKey {
 
 pub type EccSignature = [u8; 64];
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub enum SignatureEnum {
     K1(EccSignature),
     R1(EccSignature),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema)]
-#[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate", custom_json = true)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema)]
+#[fracpack(
+    definition_will_not_change,
+    fracpack_mod = "fracpack",
+    custom = "Signature"
+)]
 pub struct Signature {
     pub data: SignatureEnum,
 }

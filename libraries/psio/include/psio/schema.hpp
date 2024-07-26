@@ -117,8 +117,6 @@ namespace psio
          return *box;
       }
 
-      struct Function;
-
       struct Schema
       {
          std::map<std::string, AnyType> types;
@@ -405,12 +403,12 @@ namespace psio
          return type.value;
       }
 
-      struct Function
+      struct FunctionType
       {
-         AnyType params;
-         AnyType result;
+         AnyType                params;
+         std::optional<AnyType> result;
       };
-      PSIO_REFLECT(Function, params, result)
+      PSIO_REFLECT(FunctionType, params, result)
 
       struct Member
       {
