@@ -122,6 +122,7 @@ function(add suffix)
             service/src/ossl.c
             service/src/time.c
             tester/src/tester_intrinsics.cpp
+            tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)

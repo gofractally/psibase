@@ -96,7 +96,6 @@ mod service {
             .get_index_pk()
             .get(&(subj_acct))
             .unwrap_or_default();
-
         // STEPS:
         // 1) ensure the table has a default state (do this as an impl on the table)
         //  -- This is handled by Default impl
@@ -108,14 +107,18 @@ mod service {
         }
 
         // 3) update stats to include this attestations
+        stats_rec.subject = subj_acct;
         stats_rec.most_recent_attestation = issued;
         stats_rec.unique_attestations += 1;
         stats_rec.perc_high_conf = if value > 75 {
             ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1) + value as u16)
-                / stats_rec.unique_attestations) as u8
+                as f32
+                / stats_rec.unique_attestations as f32)
+                .round() as u8
         } else {
-            (stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1)
-                / stats_rec.unique_attestations) as u8
+            ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1)) as f32
+                / stats_rec.unique_attestations as f32)
+                .round() as u8
         };
 
         let _ = attestation_stats_table
@@ -125,11 +128,14 @@ mod service {
 
     #[action]
     pub fn attest(subject: String, value: u8) {
+        write_console("0");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 
+        write_console("1");
         let attestation_table = AttestationTable::new();
 
+        write_console("2");
         let subj_acct = match AccountNumber::from_str(&subject.clone()) {
             Ok(subject_acct) => subject_acct,
             // TODO
@@ -138,6 +144,7 @@ mod service {
 
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
 
+        write_console("3");
         // upsert attestation
         attestation_table
             .put(&Attestation {
@@ -148,10 +155,12 @@ mod service {
             })
             .unwrap();
 
+        write_console("5");
         // Update Attestation stats
         // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
         // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
         update_attestation_stats(subj_acct, existing_rec.is_some(), value, issued);
+        write_console("6");
 
         Wrapper::emit()
             .history()
@@ -215,6 +224,15 @@ mod service {
                 .after(after)
                 .query()
                 .await
+        }
+
+        async fn all_attestation_stats(
+            &self,
+        ) -> async_graphql::Result<Vec<AttestationStats>, async_graphql::Error> {
+            Ok(AttestationStatsTable::new()
+                .get_index_pk()
+                .iter()
+                .collect::<Vec<AttestationStats>>())
         }
 
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {

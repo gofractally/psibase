@@ -8,19 +8,38 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+namespace psibase::tester::raw
+{
+   std::optional<std::uint32_t> selectedChain;
+   uint32_t                     getSelectedChain()
+   {
+      check(!!selectedChain, "no chain is selected");
+      return *selectedChain;
+   }
+}  // namespace psibase::tester::raw
+
+using psibase::tester::raw::selectedChain;
+
 extern "C"
 {
+#define TESTER_NATIVE(name) [[clang::import_module("psibase"), clang::import_name(#name)]]
    // clang-format off
-   [[clang::import_name("testerCreateChain")]]      uint32_t testerCreateChain(uint64_t hot_bytes, uint64_t warm_bytes, uint64_t cool_bytes, uint64_t cold_bytes);
-   [[clang::import_name("testerDestroyChain")]]     void     testerDestroyChain(uint32_t chain);
-   [[clang::import_name("testerFinishBlock")]]      void     testerFinishBlock(uint32_t chain_index);
-   [[clang::import_name("testerGetChainPath")]]     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
-   [[clang::import_name("testerPushTransaction")]]  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
-   [[clang::import_name("testerHttpRequest")]]      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
-   [[clang::import_name("testerSelectChainForDb")]] void     testerSelectChainForDb(uint32_t chain_index);
-   [[clang::import_name("testerShutdownChain")]]    void     testerShutdownChain(uint32_t chain);
-   [[clang::import_name("testerStartBlock")]]       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
+   TESTER_NATIVE(createChain)      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
+   TESTER_NATIVE(destroyChain)     void     testerDestroyChain(uint32_t chain);
+   TESTER_NATIVE(finishBlock)      void     testerFinishBlock(uint32_t chain_index);
+   TESTER_NATIVE(getChainPath)     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
+   TESTER_NATIVE(pushTransaction)  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
+   TESTER_NATIVE(httpRequest)      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
+   TESTER_NATIVE(selectChainForDb) void     testerSelectChainForDb(uint32_t chain_index);
+   TESTER_NATIVE(shutdownChain)    void     testerShutdownChain(uint32_t chain);
+   TESTER_NATIVE(startBlock)       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
    // clang-format on
+#undef TESTER_NATIVE
+
+   void testerSelectChainForDb(uint32_t chain_index)
+   {
+      psibase::tester::raw::selectedChain = chain_index;
+   }
 }
 
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
@@ -132,19 +151,23 @@ psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
                              dbconfig.coolBytes,
                              dbconfig.coldBytes)}
 {
+   if (id == 0)
+      psibase::tester::raw::selectedChain = id;
 }
 
 psibase::TestChain::TestChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
-    : id{::testerCreateChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes)}
+    : TestChain(DatabaseConfig{hot_bytes, warm_bytes, cool_bytes, cold_bytes})
 {
 }
 
 psibase::TestChain::~TestChain()
 {
    ::testerDestroyChain(id);
+   if (selectedChain && *selectedChain == id)
+      selectedChain.reset();
 }
 
 void psibase::TestChain::shutdown()
