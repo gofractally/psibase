@@ -8,7 +8,7 @@ mod service {
 
     use async_graphql::connection::Connection;
     use async_graphql::*;
-    use psibase::{services::transact, TimePointSec, *};
+    use psibase::{services::transact, AccountNumber, TimePointSec, *};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "AttestationTable", index = 0)]
@@ -81,6 +81,39 @@ mod service {
     #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
 
+    fn remove_attestation_from_stats(stats_rec: &mut AttestationStats) -> &AttestationStats {
+        let num_high_conf = stats_rec.perc_high_conf as f32 * stats_rec.unique_attesters as f32;
+        stats_rec.unique_attesters -= 1;
+        stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
+            0
+        } else {
+            (num_high_conf / stats_rec.unique_attesters as f32) as u8
+        };
+        stats_rec
+    }
+
+    fn add_attestation_to_stats(
+        stats_rec: &mut AttestationStats,
+        subject: AccountNumber,
+        value: u8,
+        issued: TimePointSec,
+    ) -> &AttestationStats {
+        stats_rec.subject = subject;
+        stats_rec.most_recent_attestation = issued;
+        println!("value: {}", value);
+        stats_rec.perc_high_conf = if value > 75 {
+            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters + 1 as u16) as f32
+                / (stats_rec.unique_attesters + 1) as f32)
+                .round() as u8
+        } else {
+            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters) as f32
+                / (stats_rec.unique_attesters + 1) as f32)
+                .round() as u8
+        };
+        stats_rec.unique_attesters += 1;
+        stats_rec
+    }
+
     fn update_attestation_stats(
         subj_acct: AccountNumber,
         is_new_unique_attester_for_subj: bool,
@@ -99,30 +132,13 @@ mod service {
         // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
         if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
             println!("have records; is not unique; removing attestation from stats...");
-            let num_high_conf = stats_rec.perc_high_conf as f32 * stats_rec.unique_attesters as f32;
-            stats_rec.unique_attesters -= 1;
-            stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
-                0
-            } else {
-                (num_high_conf / stats_rec.unique_attesters as f32) as u8
-            };
+            remove_attestation_from_stats(&mut stats_rec);
         }
         println!("after removing existing:\n{}", stats_rec);
 
-        // 3) update stats to include this attestations
-        stats_rec.subject = subj_acct;
-        stats_rec.most_recent_attestation = issued;
-        println!("value: {}", value);
-        stats_rec.perc_high_conf = if value > 75 {
-            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters + 1 as u16) as f32
-                / (stats_rec.unique_attesters + 1) as f32)
-                .round() as u8
-        } else {
-            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters) as f32
-                / (stats_rec.unique_attesters + 1) as f32)
-                .round() as u8
-        };
-        stats_rec.unique_attesters += 1;
+        // 3) update stats to include this attestation
+        add_attestation_to_stats(&mut stats_rec, subj_acct, value, issued);
+
         println!("new % conf: {}", stats_rec.perc_high_conf);
         println!("after:\n{}", stats_rec);
 
