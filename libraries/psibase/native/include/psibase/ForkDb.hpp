@@ -5,10 +5,12 @@
 #include <iostream>
 #include <psibase/BlockContext.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 #include <psibase/log.hpp>
+#include <psibase/serviceEntry.hpp>
 
 #include <ranges>
 
@@ -1115,6 +1117,153 @@ namespace psibase
          }
       }
 
+      void pushTransaction(SignedTransaction&& trx)
+      {
+         auto bc = getBlockContext();
+
+         auto             revisionAtBlockStart = getHeadRevision();
+         TransactionTrace trace;
+         try
+         {
+            if (bc->needGenesisAction)
+               trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+            else
+            {
+               check(trx.proofs.size() == trx.transaction->claims().size(),
+                     "proofs and claims must have same size");
+               // All proofs execute as of the state at block begin. This will allow
+               // consistent parallel execution of all proofs within a block during
+               // replay. Proofs don't have direct database access, but they do rely
+               // on the set of services stored within the database. They may call
+               // other services; e.g. to call crypto functions.
+               //
+               // TODO: move proof execution to background threads
+               // TODO: track CPU usage of proofs and pass it somehow to the main
+               //       execution for charging
+               // TODO: If by the time the transaction executes it's on a different
+               //       block than the proofs were verified on, then either the proofs
+               //       need to be rerun, or the hashes of the services which ran
+               //       during the proofs need to be compared against the current
+               //       service hashes. This will prevent a poison block.
+               // TODO: If the first proof and the first auth pass, but the transaction
+               //       fails (including other proof failures), then charge the first
+               //       authorizer
+               BlockContext proofBC{*systemContext, revisionAtBlockStart};
+               proofBC.start(bc->current.header.time);
+               for (size_t i = 0; i < trx.proofs.size(); ++i)
+               {
+                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
+               }
+
+               // TODO: in another thread: check first auth and first proof. After
+               //       they pass, schedule the remaining proofs. After they pass,
+               //       schedule the transaction for execution in the main thread.
+               //
+               // The first auth check is a prefiltering measure and is mostly redundant
+               // with main execution. Unlike the proofs, the first auth check is allowed
+               // to run with any state on any fork. This is OK since the main execution
+               // checks all auths including the first; the worst that could happen is
+               // the transaction being rejected because it passes on one fork but not
+               // another, potentially charging the user for the failed transaction. The
+               // first auth check, when not part of the main execution, runs in read-only
+               // mode. Transact lets the account's auth service know it's in a
+               // read-only mode so it doesn't fail the transaction trying to update its
+               // tables.
+               //
+               // Replay doesn't run the first auth check separately. This separate
+               // execution is a subjective measure; it's possible, but not advisable,
+               // for a modified node to skip it during production. This won't hurt
+               // consensus since replay never uses read-only mode for auth checks.
+               auto saveTrace = trace;
+               proofBC.checkFirstAuth(trx, trace, std::nullopt);
+               trace = std::move(saveTrace);
+
+               // TODO: RPC: don't forward failed transactions to P2P; this gives users
+               //       feedback.
+               // TODO: P2P: do forward failed transactions; this enables producers to
+               //       bill failed transactions which have tied up P2P nodes.
+               // TODO: If the first authorizer doesn't have enough to bill for failure,
+               //       then drop before running any other checks. Don't propagate.
+               // TODO: Don't propagate failed transactions which have
+               //       do_not_broadcast_flag.
+               // TODO: Revisit all of this. It doesn't appear to eliminate the need to
+               //       shadow bill, and once shadow billing is in place, failed
+               //       transaction billing seems unnecessary.
+
+               bc->pushTransaction(std::move(trx), trace, std::nullopt);
+            }
+         }
+         catch (std::bad_alloc&)
+         {
+            throw;
+         }
+         catch (...)
+         {
+            // Don't give a false positive
+            if (!trace.error)
+               throw;
+         }
+      }
+
+      std::optional<SignedTransaction> nextTransaction()
+      {
+         auto bc = getBlockContext();
+         if (!bc || bc->needGenesisAction)
+            return {};
+         Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
+         std::optional<SignedTransaction> result;
+         TransactionTrace                 trace;
+         try
+         {
+            auto& atrace = bc->execExport("nextTransaction", std::move(action), trace);
+            if (!psio::from_frac(result, atrace.rawRetval))
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, warning) << "failed to deserialize result of "
+                                                   << action.service.str() << "::nextTransaction";
+               result.reset();
+            }
+            else
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, debug)
+                   << action.service.str() << "::nextTransaction succeeded";
+            }
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc->trxLogger, warning)
+                << action.service.str() << "::nextTransaction failed: " << e.what();
+         }
+         return result;
+      }
+
+      void recvMessage(const Socket& sock, const std::vector<char>& data)
+      {
+         Action action{.service = proxyServiceNum,
+                       .rawData = psio::to_frac(std::tuple(sock.id, data))};
+
+         // TODO: This can run concurrently
+         BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
+                         systemContext->sharedDatabase.createWriter(), true};
+         TransactionTrace trace;
+         try
+         {
+            auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << action.service.str() << "::recv failed: " << e.what();
+         }
+      }
+
+      void addSocket(const std::shared_ptr<Socket>& sock) { systemContext->sockets->add(sock); }
+
       std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
       {
          Database db{systemContext->sharedDatabase, std::move(revision)};
@@ -1286,6 +1435,8 @@ namespace psibase
       }
 
      private:
+      // TODO: Use command line argument (read from database?, rearrange so services can set it explicitly?)
+      std::chrono::microseconds                                 proofWatchdogLimit{200000};
       std::optional<BlockContext>                               blockContext;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;

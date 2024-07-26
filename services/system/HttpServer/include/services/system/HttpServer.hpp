@@ -5,6 +5,15 @@
 
 namespace SystemService
 {
+   struct PendingRequestRow
+   {
+      std::int32_t           socket;
+      psibase::AccountNumber owner;
+   };
+   PSIO_REFLECT(PendingRequestRow, socket, owner)
+
+   using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
+
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
    /// Rule set:
@@ -33,6 +42,19 @@ namespace SystemService
    {
       static constexpr auto service = psibase::proxyServiceNum;
 
+      using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
+
+      void sendProds(const psibase::Action& action);
+
+      /// Indicates that the query is not expected to produce an immediate response
+      /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
+      void deferReply(std::int32_t socket);
+      /// Indicates that a reply will be produced by the current transaction/query/callback
+      /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
+      void claimReply(std::int32_t socket);
+      /// Sends a reply
+      void sendReply(std::int32_t socket, const psibase::HttpReply& response);
+
       /// Register sender's subdomain
       ///
       /// When requests are made to the sender service subdomain, `http-server` will
@@ -45,5 +67,10 @@ namespace SystemService
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
    };
-   PSIO_REFLECT(HttpServer, method(registerServer, server))
+   PSIO_REFLECT(HttpServer,
+                method(sendProds, action),
+                method(deferReply, socket),
+                method(claimReply, socket),
+                method(sendReply, socket, response),
+                method(registerServer, server))
 }  // namespace SystemService

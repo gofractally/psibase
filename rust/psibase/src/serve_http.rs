@@ -47,6 +47,7 @@ pub fn serve_simple_ui<Wrapper: WithActionStruct + ToServiceSchema>(
 pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" && (request.target == "/" || request.target == "/index.html") {
         Some(HttpReply {
+            status: 200,
             contentType: "text/html".into(),
             body: SIMPLE_UI.to_vec().into(),
             headers: vec![],
@@ -67,6 +68,7 @@ pub fn serve_simple_index(request: &HttpRequest) -> Option<HttpReply> {
 pub fn serve_schema<Wrapper: ToServiceSchema>(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" && request.target == "/schema" {
         Some(HttpReply {
+            status: 200,
             contentType: "text/html".into(),
             body: to_vec(&create_schema::<Wrapper>()).unwrap().into(),
             headers: vec![],
@@ -91,6 +93,7 @@ pub fn serve_action_templates<Wrapper: ToServiceSchema>(
 ) -> Option<HttpReply> {
     if request.method == "GET" && request.target == "/action_templates" {
         Some(HttpReply {
+            status: 200,
             contentType: "text/html".into(),
             body: generate_action_templates::<Wrapper>().into(),
             headers: vec![],
@@ -128,6 +131,7 @@ pub fn serve_pack_action<Wrapper: WithActionStruct>(request: &HttpRequest) -> Op
                 check(false, &format!("err parsing action args json {}", err));
             }
             HttpReply {
+                status: 200,
                 contentType: "application/octet-stream".into(),
                 body: arg_struct_result.unwrap().packed().into(),
                 headers: vec![],
@@ -168,12 +172,14 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
         if let Some(request) = args.strip_prefix("?query=") {
             let res = schema.execute(request).await;
             Some(HttpReply {
+                status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
                 headers: vec![],
             })
         } else if request.method == "GET" {
             Some(HttpReply {
+                status: 200,
                 contentType: "text".into(), // TODO
                 body: schema.sdl().into_bytes().into(),
                 headers: vec![],
@@ -183,6 +189,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
                 .execute(std::str::from_utf8(&request.body.0).unwrap())
                 .await;
             Some(HttpReply {
+                status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
                 headers: vec![],
@@ -201,6 +208,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
 
             let res = schema.execute(request_result.unwrap()).await;
             Some(HttpReply {
+                status: 200,
                 contentType: "application/json".into(),
                 body: serde_json::to_vec(&res).unwrap().into(),
                 headers: vec![],
@@ -218,6 +226,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
 pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" && request.target == "/graphiql.html" {
         Some(HttpReply {
+            status: 200,
             contentType: "text/html".into(),
             body: graphiql_source("/graphql", None).into(),
             headers: vec![],
@@ -246,6 +255,7 @@ impl TableRecord for WebContentRow {
 impl From<WebContentRow> for HttpReply {
     fn from(content_row: WebContentRow) -> Self {
         HttpReply {
+            status: 200,
             contentType: content_row.content_type,
             body: content_row.content,
             headers: Vec::new(),

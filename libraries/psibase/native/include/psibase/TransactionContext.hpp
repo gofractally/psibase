@@ -2,6 +2,7 @@
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/BlockContext.hpp>
+#include <psibase/Socket.hpp>
 
 namespace eosio::vm
 {
@@ -37,6 +38,9 @@ namespace psibase
       std::vector<std::vector<char>>      subjectiveData;
       size_t                              nextSubjectiveRead = 0;
 
+      // sockets that will be closed when the transaction context finishes
+      SocketAutoCloseSet ownedSockets;
+
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
                          TransactionTrace&        transactionTrace,
@@ -57,6 +61,7 @@ namespace psibase
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
+      void execExport(std::string_view fn, const Action& action, ActionTrace& atrace);
 
       ExecutionContext& getExecutionContext(AccountNumber service);
 

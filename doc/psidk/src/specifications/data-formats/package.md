@@ -39,7 +39,7 @@ Properties associated with a service.
 
 | Field  | Type    | Description                                                                                                                                                                   |
 |--------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| flags  | Array   | Can contain the following strings: `"allowSudo"`, `"allowWriteNative"`, `"isSubjective"`, `"allowWriteSubjective"`, `"canNotTimeOut"`, `"canSetTimeLimit"`, `"isAuthService"`, `"forceReplay"` |
+| flags  | Array   | Can contain the following strings: `"allowSudo"`, `"allowWriteNative"`, `"isSubjective"`, `"allowWriteSubjective"`, `"canNotTimeOut"`, `"canSetTimeLimit"`, `"isAuthService"`, `"forceReplay"`, `"allowSocket"` |
 | server | String  | The account that will handle HTTP requests for the service                                                                                                                    |
 
 ## data/&lt;service&gt;/*

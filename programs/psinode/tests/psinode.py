@@ -212,10 +212,7 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        tapos = tapos=self.get_tapos()
-        tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))
-        tapos['flags'] = 0
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)]))
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
@@ -250,11 +247,14 @@ class API:
                 raise GraphQLError(json)
             return json['data']
 
-    def get_tapos(self):
+    def get_tapos(self, timeout=10, flags=0):
         '''Returns TaPoS for the current head block'''
         with  self.get('/common/tapos/head') as result:
             result.raise_for_status()
-            return result.json()
+            tapos = result.json()
+            tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + timeout))
+            tapos['flags'] = flags
+            return tapos
 
     def get_producers(self):
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
@@ -297,6 +297,49 @@ class API:
         else:
             return edges[0]['node']['header']
 
+class Service(object):
+    def __init__(self, api, service=None):
+        self.api = api
+        if service is not None:
+            self.service = service
+
+    def request(self, method, path, **kw):
+        '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
+        return self.api.request(method, path, self.service, **kw)
+    def head(self, path, **kw):
+        '''HTTP HEAD request'''
+        return self.request('HEAD', path, **kw)
+    def get(self, path, **kw):
+        '''HTTP GET request'''
+        return self.request('GET', path, **kw)
+    def post(self, path, **kw):
+        '''HTTP POST request'''
+        return self.request('POST', path, **kw)
+    def put(self, path, **kw):
+        '''HTTP PUT request'''
+        return self.request('PUT', path, **kw)
+    def patch(self, path, **kw):
+        '''HTTP PATCH request'''
+        return self.request('PATCH', path, **kw)
+    def delete(self, path, **kw):
+        '''HTTP DELETE request'''
+        return self.request('DELETE', path, **kw)
+
+    def push_action(self, sender, method, data):
+        '''
+        Push a transaction consisting of a single action to the chain and return the transaction trace
+
+        Raise TransactionError if the transaction fails
+        '''
+        return self.api.push_action(sender, self.service, method, data)
+    def graphql(self, query):
+        '''
+        Sends a GraphQL query to a service and returns the result as json
+
+        Raise GraphQLError if the query fails
+        '''
+        return self.api.graphql(self.service, query)
+
 _default_config = '''# psinode config
 service  = localhost:$PSIBASE_DATADIR/services/x-admin
 service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
@@ -315,7 +358,7 @@ filter = %s
 format = %s
 '''
 _default_log_filter = 'Severity >= info'
-_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
 def _write_config(dir, log_filter, log_format):
     logfile = os.path.join(dir, 'config')

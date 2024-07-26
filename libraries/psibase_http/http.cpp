@@ -6,6 +6,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include "psibase/http.hpp"
+#include "psibase/Socket.hpp"
 #include "psibase/TransactionContext.hpp"
 #include "psibase/log.hpp"
 #include "psibase/serviceEntry.hpp"
@@ -463,6 +464,84 @@ namespace psibase::http
       return std::vector(s.begin(), s.end());
    }
 
+   struct QueryTimes
+   {
+      std::chrono::microseconds             packTime;
+      std::chrono::microseconds             serviceLoadTime;
+      std::chrono::microseconds             databaseTime;
+      std::chrono::microseconds             wasmExecTime;
+      std::chrono::steady_clock::time_point startTime;
+   };
+
+   template <typename Session, typename F, typename E>
+   struct HttpSocket : AutoCloseSocket, std::enable_shared_from_this<HttpSocket<Session, F, E>>
+   {
+      explicit HttpSocket(std::shared_ptr<Session>&& session, F&& f, E&& err)
+          : session(std::move(session)), callback(std::forward<F>(f)), err(std::forward<E>(err))
+      {
+         this->session->queue_.pause_read = true;
+         this->once                       = true;
+      }
+      void autoClose(const std::optional<std::string>& message) noexcept override
+      {
+         sendImpl([message = message.value_or("service did not send a response")](
+                      HttpSocket* self) mutable { return self->err(message); });
+      }
+      void send(std::span<const char> data) override
+      {
+         sendImpl([result = psio::from_frac<HttpReply>(data)](HttpSocket* self) mutable
+                  { return self->callback(std::move(result)); });
+      }
+      void sendImpl(auto make_reply)
+      {
+         auto self = this->shared_from_this();
+         net::post(
+             session->derived_session().stream.get_executor(),
+             [self = std::move(self), make_reply = std::move(make_reply)]() mutable
+             {
+                auto session = std::move(self->session);
+                if (!session)
+                   return;
+                auto& trace                = self->trace;
+                auto& queryTimes           = self->queryTimes;
+                session->queue_.pause_read = false;
+                {
+                   auto endTime = steady_clock::now();
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "Trace", std::move(trace));
+
+                   // TODO: consider bundling into a single attribute
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "PackTime", queryTimes.packTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "ServiceLoadTime",
+                                               queryTimes.serviceLoadTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "DatabaseTime",
+                                               queryTimes.databaseTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(session->logger, "WasmExecTime",
+                                               queryTimes.wasmExecTime);
+                   BOOST_LOG_SCOPED_LOGGER_TAG(
+                       session->logger, "ResponseTime",
+                       std::chrono::duration_cast<std::chrono::microseconds>(endTime -
+                                                                             queryTimes.startTime));
+                   session->queue_(make_reply(self.get()));
+                }
+                if (session->queue_.can_read())
+                   session->do_read();
+             });
+      }
+      std::shared_ptr<Session> session;
+      F                        callback;
+      E                        err;
+      TransactionTrace         trace;
+      QueryTimes               queryTimes;
+   };
+
+   template <typename Send, typename F, typename E>
+   auto makeHttpSocket(Send& send, F&& f, E&& e)
+   {
+      return std::make_shared<HttpSocket<std::remove_reference_t<decltype(send.self)>,
+                                         std::decay_t<F>, std::decay_t<E>>>(
+          send.self.derived_session().shared_from_this(), std::forward<F>(f), std::forward<E>(e));
+   }
+
    // This function produces an HTTP response for the given
    // request. The type of the response object depends on the
    // contents of the request, so the interface requires the
@@ -814,7 +893,8 @@ namespace psibase::http
             l.unlock();
 
             // TODO: time limit
-            auto          system = server.sharedState->getSystemContext();
+            auto system = server.sharedState->getSystemContext();
+
             psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
             BlockContext  bc{*system, system->sharedDatabase.getHead(),
                             system->sharedDatabase.createWriter(), true};
@@ -822,45 +902,78 @@ namespace psibase::http
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
                                  "Need genesis block; use 'psibase boot' to boot chain"));
-            SignedTransaction trx;
-            Action            action{
-                           .sender  = AccountNumber(),
-                           .service = proxyServiceNum,
-                           .rawData = psio::convert_to_frac(data),
-            };
+
+            SignedTransaction  trx;
             TransactionTrace   trace;
             TransactionContext tc{bc, trx, trace, true, false, true};
-            ActionTrace        atrace;
+            ActionTrace&       atrace        = trace.actionTraces.emplace_back();
             auto               startExecTime = steady_clock::now();
-            tc.execServe(action, atrace);
-            auto endExecTime = steady_clock::now();
-            // TODO: option to print this
-            // printf("%s\n", prettyTrace(atrace).c_str());
-            auto result  = psio::from_frac<std::optional<HttpReply>>(atrace.rawRetval);
-            auto endTime = steady_clock::now();
 
-            trace.actionTraces.push_back(std::move(atrace));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
+            auto socket = makeHttpSocket(
+                send,
+                [req_version, set_cors, set_keep_alive](HttpReply&& reply)
+                {
+                   bhttp::response<bhttp::vector_body<char>> res{
+                       bhttp::int_to_status(static_cast<std::uint16_t>(reply.status)), req_version};
+                   res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+                   for (auto& h : reply.headers)
+                      res.set(h.name, h.value);
+                   res.set(bhttp::field::content_type, reply.contentType);
+                   set_cors(res);
+                   set_keep_alive(res);
+                   res.body() = std::move(reply.body);
+                   res.prepare_payload();
+                   return res;
+                },
+                [error](const std::string& message)
+                { return error(bhttp::status::internal_server_error, message); });
+            system->sockets->add(socket, &tc.ownedSockets);
 
-            // TODO: consider bundling into a single attribute
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "PackTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "ServiceLoadTime",
-                                        std::chrono::duration_cast<std::chrono::microseconds>(
-                                            endExecTime - startExecTime - tc.getBillableTime()));
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "DatabaseTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "WasmExecTime",
-                                        std::chrono::duration_cast<std::chrono::microseconds>(
-                                            tc.getBillableTime() - tc.databaseTime));
-            BOOST_LOG_SCOPED_LOGGER_TAG(
-                send.self.logger, "ResponseTime",
-                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
-            if (!result)
-               return send(not_found(req.target()));
-            return send(ok(std::move(result->body), result->contentType.c_str(), &result->headers));
+            auto setStatus = psio::finally(
+                [&]
+                {
+                   auto endExecTime = steady_clock::now();
+
+                   socket->trace = std::move(trace);
+
+                   socket->queryTimes.packTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(startExecTime -
+                                                                             startTime);
+                   socket->queryTimes.serviceLoadTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(
+                           endExecTime - startExecTime - tc.getBillableTime());
+                   socket->queryTimes.databaseTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
+                   socket->queryTimes.wasmExecTime =
+                       std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
+                                                                             tc.databaseTime);
+                   socket->queryTimes.startTime = startTime;
+                });
+
+            try
+            {
+               Action action{
+                   .sender  = AccountNumber(),
+                   .service = proxyServiceNum,
+                   .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
+               };
+               tc.execServe(action, atrace);
+            }
+            catch (...)
+            {
+               // An error will be sent by the transaction context, if needed
+            }
+            if (!tc.ownedSockets.owns(*system->sockets, *socket))
+            {
+               auto error = trace.error;
+               BOOST_LOG_SCOPED_LOGGER_TAG(send.self.logger, "Trace", std::move(trace));
+               if (error)
+                  PSIBASE_LOG(send.self.logger, warning)
+                      << proxyServiceNum.str() << "::serve failed: " << *error;
+               else
+                  PSIBASE_LOG(send.self.logger, info)
+                      << proxyServiceNum.str() << "::serve succeeded";
+            }
          }  // !native
          else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
          {

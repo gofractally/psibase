@@ -72,12 +72,15 @@ extern "C" {
     /// TODO: Support sub-second block times
     pub fn startBlock(chain_handle: u32, time_seconds: u32);
 
-    /// Runs an HttpRequest and returns the TransactionTrace
+    /// Runs an HttpRequest and returns a socket
     pub fn httpRequest(
         chain_handle: u32,
         request_packed: *const u8,
         request_packed_size: usize,
-    ) -> u32;
+    ) -> i32;
+
+    /// Reads a message from a socket
+    pub fn socketRecv(fd: i32, size: *mut u32) -> u32;
 }
 
 #[cfg(target_family = "wasm")]
