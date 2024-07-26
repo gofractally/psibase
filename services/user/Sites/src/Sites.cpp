@@ -4,6 +4,7 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
+#include <services/system/HttpServer.hpp>
 
 using namespace psibase;
 
@@ -27,7 +28,8 @@ namespace SystemService
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
    {
-      check(request.host.size() > request.rootHost.size(), "oops");
+      check(request.host.size() > request.rootHost.size(),
+            "Request host [" + request.host + "] is not valid.");
 
       std::string_view accountName{request.host.data(),
                                    request.host.size() - request.rootHost.size() - 1};
@@ -88,6 +90,14 @@ namespace SystemService
       auto   table = tables.template open<SitesContentTable>();
 
       check(path.starts_with('/'), "Path doesn't begin with /");
+
+      auto regServer = HttpServer::Tables(HttpServer::service)
+                           .open<SystemService::RegServTable>()
+                           .get(getSender());
+      check(!regServer.has_value(),
+            getSender().str() +
+                " already has a registered http server. Uploaded artifact would be overshadowed.");
+
       SitesContentRow row{
           .account     = getSender(),
           .path        = std::move(path),
