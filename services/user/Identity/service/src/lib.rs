@@ -108,85 +108,22 @@ mod service {
             };
         }
         println!("after removing existing:\n{}", stats_rec);
-        // else {
-        // stats_rec.perc_high_conf =
-        //     (num_high_conf as f32 / stats_rec.unique_attesters as f32).round() as u8;
-        // }
-        // }
 
         // 3) update stats to include this attestations
-        // println!("subject: {}", subj_acct);
         stats_rec.subject = subj_acct;
         stats_rec.most_recent_attestation = issued;
-        // println!("unique_attesters: {}", stats_rec.unique_attesters);
-        // println!("% high conf before: {}", stats_rec.perc_high_conf);
         println!("value: {}", value);
         stats_rec.perc_high_conf = if value > 75 {
-            // println!(
-            //     "{}, {}",
-            //     stats_rec.perc_high_conf as u16,
-            //     stats_rec.unique_attesters - 1
-            // );
-            // println!(
-            //     "{}",
-            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            // );
-            // println!(
-            //     "{}",
-            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            //         + value as u16
-            // );
-            // println!(
-            //     "{}",
-            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            //         + value as u16) as f32
-            //         / stats_rec.unique_attesters as f32)
-            // );
-            // println!(
-            //     "{}",
-            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            //         + value as u16) as f32
-            //         / stats_rec.unique_attesters as f32)
-            //         .round() as u8
-            // );
             ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters + 1 as u16) as f32
                 / (stats_rec.unique_attesters + 1) as f32)
                 .round() as u8
         } else {
-            // println!(
-            //     "{}, {}",
-            //     stats_rec.perc_high_conf as u16,
-            //     stats_rec.unique_attesters - 1
-            // );
-            // println!(
-            //     "{}",
-            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            // );
-            // println!(
-            //     "{}",
-            //     stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1)
-            //         + value as u16
-            // );
-            // println!(
-            //     "{}",
-            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1) as u16)
-            //         as f32
-            //         / stats_rec.unique_attesters as f32)
-            // );
-            // println!(
-            //     "{}",
-            //     ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attesters - 1) as u16)
-            //         as f32
-            //         / stats_rec.unique_attesters as f32)
-            //         .round() as u8
-            // );
             ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters) as f32
                 / (stats_rec.unique_attesters + 1) as f32)
                 .round() as u8
         };
         stats_rec.unique_attesters += 1;
         println!("new % conf: {}", stats_rec.perc_high_conf);
-        // println!("% high conf after: {}", stats_rec.perc_high_conf);
         println!("after:\n{}", stats_rec);
 
         let _ = attestation_stats_table
@@ -203,7 +140,6 @@ mod service {
 
         let subj_acct = match AccountNumber::from_str(&subject.clone()) {
             Ok(subject_acct) => subject_acct,
-            // TODO
             Err(e) => psibase::abort_message(&format!("{}", e)),
         };
 
