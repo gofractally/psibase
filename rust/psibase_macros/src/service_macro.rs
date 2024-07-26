@@ -844,6 +844,7 @@ fn process_mod(
     } else {
         quote! {#[allow(dead_code)]}
     };
+    let polyfill = gen_polyfill(psibase_mod);
     quote! {
         #silence
         #impl_mod
@@ -857,6 +858,8 @@ fn process_mod(
 
         #[automatically_derived]
         pub use #mod_name::#structs;
+
+        #polyfill
     }
     .into()
 } // process_mod
@@ -1502,4 +1505,66 @@ fn process_gql_union(
             }
         }
     };
+}
+
+fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        #[cfg(all(test, target_family="wasm"))]
+        mod psibase_tester_polyfill {
+            #![allow(non_snake_case)]
+            use #psibase_mod::tester_raw;
+            use #psibase_mod::DbId;
+            use tester_raw::get_selected_chain;
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getResult(dest: *mut u8, dest_size: u32, offset: u32) -> u32 {
+                tester_raw::getResult(dest, dest_size, offset)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
+                tester_raw::getKey(dest, dest_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn writeConsole(message: *const u8, len: u32) {
+                print!("{}", std::str::from_utf8(std::slice::from_raw_parts(message, len as usize)).unwrap());
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn abortMessage(message: *const u8, len: u32) -> ! {
+                tester_raw::abortMessage(message, len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGet(db: DbId, key: *const u8, key_len: u32) -> u32 {
+                tester_raw::kvGet(get_selected_chain(), db, key, key_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
+                tester_raw::getSequential(get_selected_chain(), db, id)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGreaterEqual(
+                db: DbId,
+                key: *const u8,
+                key_len: u32,
+                match_key_size: u32,
+            ) -> u32 {
+                tester_raw::kvGreaterEqual(get_selected_chain(), db, key, key_len, match_key_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvLessThan(db: DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
+                tester_raw::kvLessThan(get_selected_chain(), db, key, key_len, match_key_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
+                tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            }
+        }
+    }
 }
