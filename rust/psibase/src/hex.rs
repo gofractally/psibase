@@ -1,4 +1,4 @@
-use crate::{reflect, ToKey};
+use crate::ToKey;
 use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType};
 use fracpack::{AnyType, SchemaBuilder, ToSchema};
 use std::convert::AsRef;
@@ -7,9 +7,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 
-trait ToHex:
-    Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + reflect::Reflect + ToKey
-{
+trait ToHex: Sized + Debug + Clone + PartialEq + Eq + PartialOrd + Ord + ToKey {
     fn to_hex(&self) -> String;
 }
 
@@ -98,33 +96,12 @@ impl From<String> for Hex<Vec<u8>> {
     }
 }
 
-impl reflect::Reflect for Hex<Vec<u8>> {
-    type StaticType = Self;
-    fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
-        visitor.builtin::<Hex<Vec<u8>>>("hex")
-    }
-}
-
 impl AsRef<[u8]> for Hex<Vec<u8>>
 where
     <Hex<Vec<u8>> as Deref>::Target: AsRef<[u8]>,
 {
     fn as_ref(&self) -> &[u8] {
         self.deref().as_ref()
-    }
-}
-
-impl<'a> reflect::Reflect for Hex<&'a [u8]> {
-    type StaticType = Hex<&'static [u8]>;
-    fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
-        visitor.builtin::<Hex<&'a [u8]>>("hex")
-    }
-}
-
-impl<const SIZE: usize> reflect::Reflect for Hex<[u8; SIZE]> {
-    type StaticType = Self;
-    fn reflect<V: reflect::Visitor>(visitor: V) -> V::Return {
-        visitor.hex::<SIZE>()
     }
 }
 

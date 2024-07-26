@@ -11,7 +11,7 @@ mod service {
 
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]

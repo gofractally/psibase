@@ -1,5 +1,5 @@
 use crate::fracpack::{Pack, UnpackOwned};
-use crate::{get_result_bytes, native_raw, reflect, AccountNumber, Action, MethodNumber, Reflect};
+use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -111,15 +111,7 @@ impl Caller for JustSchema {
     fn call<Ret: UnpackOwned, Args: Pack>(&self, _method: MethodNumber, _args: Args) {}
 }
 
-impl reflect::Reflect for JustSchema {
-    type StaticType = Self;
-    fn reflect<V: reflect::Visitor>(_visitor: V) -> V::Return {
-        unimplemented!()
-    }
-}
-
-#[derive(Clone, Default, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Default)]
 pub struct ServiceCaller {
     pub sender: AccountNumber,
     pub service: AccountNumber,
@@ -153,8 +145,7 @@ impl Caller for ServiceCaller {
     }
 }
 
-#[derive(Clone, Default, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Default)]
 pub struct ActionPacker {
     pub sender: AccountNumber,
     pub service: AccountNumber,

@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, PackageRegistry, Reflect, SignedTransaction, StatusRow,
-    TimePointSec, Transaction, TransactionTrace,
+    InnerTraceEnum, JointRegistry, PackageRegistry, SignedTransaction, StatusRow, TimePointSec,
+    Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -369,10 +369,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     }
 }
 
-#[derive(Clone, Debug, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Debug)]
 pub struct ChainPusher<'a> {
-    #[reflect(skip)]
     pub chain: &'a Chain,
     pub sender: AccountNumber,
     pub service: AccountNumber,

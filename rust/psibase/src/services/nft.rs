@@ -5,25 +5,14 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-use crate::{AccountNumber, Reflect};
+use crate::AccountNumber;
 
 pub type NID = u32;
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
-    ToSchema,
+    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "NftRecordInput")]
 pub struct NftRecord {
     id: NID,
@@ -32,20 +21,9 @@ pub struct NftRecord {
 }
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
-    ToSchema,
+    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "NftHolderRecordInput")]
 pub struct NftHolderRecord {
     account: AccountNumber,
@@ -53,20 +31,9 @@ pub struct NftHolderRecord {
 }
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
-    ToSchema,
+    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "CreditRecordInput")]
 pub struct CreditRecord {
     nftId: NID,

@@ -1,8 +1,6 @@
 #![allow(non_snake_case)]
 
-use crate::{
-    AccountNumber, Hex, MethodNumber, Pack, Reflect, TimePointSec, ToKey, ToSchema, Unpack,
-};
+use crate::{AccountNumber, Hex, MethodNumber, Pack, TimePointSec, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject, Union};
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +23,6 @@ pub type BlockNum = u32;
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -34,7 +31,6 @@ pub type BlockNum = u32;
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ActionInput")]
 pub struct Action {
@@ -51,9 +47,8 @@ pub struct Action {
     pub rawData: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedAction<'a> {
     pub sender: AccountNumber,
@@ -65,18 +60,16 @@ pub struct SharedAction<'a> {
 /// The genesis action is the first action of the first transaction of
 /// the first block. The action struct's fields are ignored, except
 /// rawData, which contains this struct.
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToKey, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisActionData {
     pub memo: String,
     pub services: Vec<GenesisService>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisActionData<'a> {
     pub memo: String,
@@ -84,9 +77,8 @@ pub struct SharedGenesisActionData<'a> {
     pub services: Vec<SharedGenesisService<'a>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToKey, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct GenesisService {
     pub service: AccountNumber,
@@ -96,9 +88,8 @@ pub struct GenesisService {
     pub code: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToKey, ToSchema, Serialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToKey, ToSchema, Serialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct SharedGenesisService<'a> {
     pub service: AccountNumber,
@@ -114,7 +105,6 @@ pub struct SharedGenesisService<'a> {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -123,7 +113,6 @@ pub struct SharedGenesisService<'a> {
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ClaimInput")]
 pub struct Claim {
@@ -159,7 +148,6 @@ pub struct Claim {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -168,7 +156,6 @@ pub struct Claim {
     InputObject,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TaposInput")]
 pub struct Tapos {
@@ -189,7 +176,6 @@ impl Tapos {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -198,7 +184,6 @@ impl Tapos {
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TransactionInput")]
 pub struct Transaction {
@@ -213,7 +198,6 @@ pub struct Transaction {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -222,7 +206,6 @@ pub struct Transaction {
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "SignedTransactionInput")]
 pub struct SignedTransaction {
@@ -239,7 +222,6 @@ type TermNum = u32;
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -248,7 +230,6 @@ type TermNum = u32;
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ProducerInput")]
 pub struct Producer {
@@ -257,46 +238,23 @@ pub struct Producer {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    ToSchema,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
+    Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct CftConsensus {
     pub producers: Vec<Producer>,
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Default,
-    Pack,
-    Unpack,
-    Reflect,
-    ToSchema,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
+    Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct BftConsensus {
     pub producers: Vec<Producer>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize, Union)]
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Union)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub enum Consensus {
     CFT(CftConsensus),
     BFT(BftConsensus),
@@ -308,7 +266,6 @@ pub enum Consensus {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -318,7 +275,6 @@ pub enum Consensus {
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[fracpack(definition_will_not_change)]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct ConsensusBytes {
     pub consensusVariantIdx: u8,
@@ -331,7 +287,6 @@ pub struct ConsensusBytes {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -340,7 +295,6 @@ pub struct ConsensusBytes {
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct BlockHeaderAuthAccount {
     pub codeNum: AccountNumber,
@@ -355,7 +309,6 @@ pub struct BlockHeaderAuthAccount {
     Default,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -364,7 +317,6 @@ pub struct BlockHeaderAuthAccount {
     InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct BlockHeaderCode {
     pub vmType: u8,
@@ -372,9 +324,8 @@ pub struct BlockHeaderCode {
     pub code: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
@@ -410,26 +361,23 @@ pub struct BlockHeader {
     authCode: Option<Vec<BlockHeaderCode>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
     pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct SignedBlock {
     pub block: Block,
     pub signature: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Default, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct BlockInfo {
     pub header: BlockHeader,
     pub blockId: Checksum256,

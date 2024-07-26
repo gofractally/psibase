@@ -2,7 +2,7 @@ use crate::services::{accounts, auth_delegate, http_server, packages, setcode, s
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, Reflect, ToSchema, Unpack, Version,
+    GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
 };
 use anyhow::Context;
 use custom_error::custom_error;
@@ -46,21 +46,15 @@ custom_error! {
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
 }
 
-#[derive(
-    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, Reflect, ToSchema,
-)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct PackageRef {
     pub name: String,
     pub version: String,
 }
 
-#[derive(
-    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, Reflect, ToSchema,
-)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub struct Meta {
     pub name: String,
     pub version: String,
