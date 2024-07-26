@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, PackageRegistry, Reflect, SignedTransaction, StatusRow,
-    TimePointSec, Transaction, TransactionTrace,
+    InnerTraceEnum, JointRegistry, PackageRegistry, SignedTransaction, StatusRow, TimePointSec,
+    Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -260,6 +260,18 @@ impl Chain {
 
         Ok(HttpReply::unpacked(&get_result_bytes(size))?)
     }
+
+    pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            rootHost: "psibase.io".into(),
+            method: "GET".into(),
+            target: target.into(),
+            contentType: "".into(),
+            body: <Vec<u8>>::new().into(),
+        })
+    }
+
     pub fn post(
         &self,
         account: AccountNumber,
@@ -349,10 +361,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     }
 }
 
-#[derive(Clone, Debug, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Debug)]
 pub struct ChainPusher<'a> {
-    #[reflect(skip)]
     pub chain: &'a Chain,
     pub sender: AccountNumber,
     pub service: AccountNumber,
