@@ -81,7 +81,12 @@ export class Supervisor implements AppInterface {
         return dependencies.filter((id) => this.validated(id));
     }
 
-    private async loadPlugins(plugins: QualifiedPluginId[]) {
+    private async preload(callerOrigin: string, plugins: QualifiedPluginId[]) {
+        this.setParentOrigination(callerOrigin);
+        await Promise.all([this.loadPlugins(plugins)]);
+    }
+
+    private async loadPlugins(plugins: QualifiedPluginId[]): Promise<any> {
         if (plugins.length === 0) return;
 
         const addedPlugins: Plugin[] = [];
@@ -93,6 +98,8 @@ export class Supervisor implements AppInterface {
             }
         });
 
+        if (addedPlugins.length === 0) return;
+
         const imports = await Promise.all(
             addedPlugins.map((plugin) => this.getDependencies(plugin)),
         );
@@ -101,7 +108,7 @@ export class Supervisor implements AppInterface {
         const pluginsReady = Promise.all(
             addedPlugins.map((plugin) => plugin.ready),
         );
-        await Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
+        return Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
     private replyToParent(call: FunctionCallArgs, result: any) {
@@ -215,9 +222,9 @@ export class Supervisor implements AppInterface {
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
-            this.setParentOrigination(callerOrigin);
-            await this.loadPlugins(plugins);
+            this.preload(callerOrigin, plugins);
         } catch (e) {
+            console.error("TODO: Return an error to the caller.");
             console.error(e);
         }
     }
@@ -228,16 +235,12 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            // Store the origin of the root app. That should be the one-and-only root app that ever tries
-            //      to interact with this supervisor.
-            this.setParentOrigination(callerOrigin);
-
             // Wait to load the full plugin tree (a plugin and all it's dependencies, recursively).
             // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
             //   transpiling the component, bundling with rollup, and importing & instantiating the es module
             //   in memory.
-            // Use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await this.loadPlugins([
+            // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
+            await this.preload(callerOrigin, [
                 {
                     service: args.service,
                     plugin: args.plugin,

@@ -307,6 +307,7 @@ add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wa
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
+add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -623,8 +624,21 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+        DATA ${COMPONENT_BIN_DIR}/${TestsPlugin_OUTPUT_FILE} /test.wasm
     DEPENDS ${Supervisor_js_DEP}
+    DEPENDS ${TestsPlugin_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
+    NAME SupervisorTests
+    DESCRIPTION "Plugin functions for testing Supervisor functionality"
+    VERSION ${PSIBASE_VERSION}
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    SERVICE sup-test
+        DATA ${COMPONENT_BIN_DIR}/${TestsPlugin_OUTPUT_FILE} /test.wasm
+    DEPENDS ${TestsPlugin_DEP}
 )
 
 psibase_package(
@@ -700,7 +714,7 @@ psibase_package(
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
                     Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
+                    Sites SetCode Supervisor SupervisorTests Symbol TokenUsers Tokens Transact
 )
 
 psibase_package(
@@ -754,6 +768,7 @@ install(
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Supervisor.psi
+          ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi

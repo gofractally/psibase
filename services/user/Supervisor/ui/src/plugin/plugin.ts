@@ -2,7 +2,7 @@ import { siblingUrl, QualifiedPluginId } from "@psibase/common-lib";
 
 import { HostInterface } from "../hostInterface";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
-import { parser, wasmFromUrl } from "../utils";
+import { assertTruthy, parser, wasmFromUrl } from "../utils";
 import { DownloadFailed } from "../errors";
 import { loadPlugin } from "../component-loading/loader";
 import { ComponentAPI } from "../witExtraction";

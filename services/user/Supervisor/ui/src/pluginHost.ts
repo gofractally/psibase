@@ -1,8 +1,5 @@
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
-import {
-    HostInterface,
-    Result,
-} from "./hostInterface";
+import { HostInterface, Result } from "./hostInterface";
 import { Supervisor } from "./supervisor";
 import {
     assertTruthy,

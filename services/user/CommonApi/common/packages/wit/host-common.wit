@@ -78,8 +78,8 @@ interface client {
     my-service-origin: func() -> string;
 }
 
-world plugin-capabilities {
-    export types;
-    export server;
-    export client;
+world imports {
+    import types;
+    import server;
+    import client;
 }
