@@ -56,7 +56,7 @@ mod service {
     }
 
     #[table(name = "AttestationStatsTable", index = 1)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
+    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/attestee
         #[primary_key]
@@ -71,60 +71,56 @@ mod service {
         most_recent_attestation: TimePointSec,
     }
 
+    impl Default for AttestationStats {
+        fn default() -> Self {
+            AttestationStats {
+                subject: AccountNumber::from(0),
+                perc_high_conf: 0,
+                unique_attestations: 0,
+                most_recent_attestation: TimePointSec::from(0),
+            }
+        }
+    }
+
     #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
 
     fn update_attestation_stats(
         subj_acct: AccountNumber,
-        is_unique_attester_for_subj: bool,
+        is_new_unique_attester_for_subj: bool,
         value: u8,
         issued: TimePointSec,
-    ) -> Result<(), _> {
+    ) {
         let attestation_stats_table = AttestationStatsTable::new();
-        let stats_rec = attestation_stats_table.get_index_pk().get(&(subj_acct));
+        let mut stats_rec = attestation_stats_table
+            .get_index_pk()
+            .get(&(subj_acct))
+            .unwrap_or_default();
 
-        match stats_rec {
-            // there exists a stats entry for this subject
-            Some(stats_rec) => {
-                let new_unique_attests = if is_unique_attester_for_subj {
-                    // case: c => new unique attester for existing attestee
-                    // This is updating an existing attestation and existing stats record
-                    // update AttestationStats fields
-                    stats_rec.unique_attestations + 1
-                } else {
-                    // This attestation doesn't replace an existing;
-                    // update AttestationStats fields
-                    stats_rec.unique_attestations
-                };
-                let new_perc_high_conf = match value {
-                    conf if conf > 75 => {
-                        ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations
-                            + value as u16)
-                            / new_unique_attests) as u8
-                    }
-                    _ => {
-                        (stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations
-                            / new_unique_attests) as u8
-                    }
-                };
-                attestation_stats_table.put(&AttestationStats {
-                    subject: stats_rec.subject,
-                    perc_high_conf: new_perc_high_conf,
-                    unique_attestations: new_unique_attests,
-                    most_recent_attestation: issued,
-                })
-            }
-            None => {
-                // case: a and b => first stats entry for this subject
-                attestation_stats_table.put(&AttestationStats {
-                    subject: subj_acct,
-                    perc_high_conf: value,
-                    unique_attestations: 1,
-                    most_recent_attestation: issued,
-                });
-                psibase::abort_message(message)
-            }
+        // STEPS:
+        // 1) ensure the table has a default state (do this as an impl on the table)
+        //  -- This is handled by Default impl
+        // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
+        if !is_new_unique_attester_for_subj {
+            stats_rec.unique_attestations -= 1;
+            stats_rec.perc_high_conf =
+                (stats_rec.perc_high_conf as u16 * stats_rec.unique_attestations) as u8;
         }
+
+        // 3) update stats to include this attestations
+        stats_rec.most_recent_attestation = issued;
+        stats_rec.unique_attestations += 1;
+        stats_rec.perc_high_conf = if value > 75 {
+            ((stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1) + value as u16)
+                / stats_rec.unique_attestations) as u8
+        } else {
+            (stats_rec.perc_high_conf as u16 * (stats_rec.unique_attestations - 1)
+                / stats_rec.unique_attestations) as u8
+        };
+
+        let _ = attestation_stats_table
+            .put(&stats_rec)
+            .map_err(|e| psibase::abort_message(&format!("{}", e)));
     }
 
     #[action]
@@ -142,6 +138,7 @@ mod service {
 
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
 
+        // upsert attestation
         attestation_table
             .put(&Attestation {
                 attester,
@@ -152,14 +149,9 @@ mod service {
             .unwrap();
 
         // Update Attestation stats
-        update_attestation_stats(subj_acct, existing_rec.is_some(), value, issued);
         // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
         // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
-
-        // subject: AccountNumber,
-        // perc_high_conf: u16,
-        // unique_attestations: u16,  size of index of attestee = <something>
-        // most_recent_attestation -- for freshness of attestation
+        update_attestation_stats(subj_acct, existing_rec.is_some(), value, issued);
 
         Wrapper::emit()
             .history()

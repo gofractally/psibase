@@ -52,6 +52,6 @@ impl Guest for IdentityPlugin {
     // }
 }
 
-// CONSIDER: Query definition here for attestations for each user access, to complete the abstraction from the Attestation service
+// CONSIDER: Query definition here for attestations
 
 bindings::export!(IdentityPlugin with_types_in bindings);
