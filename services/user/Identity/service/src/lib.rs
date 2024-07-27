@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use psibase::AccountNumber;
 
 /// Identity service to log identity attestations, and provide a graphiql
@@ -95,10 +93,18 @@ mod service {
     #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
 
+    fn get_num_high_conf_attestations(perc_high_conf: u8, unique_attesters: u16) -> f32 {
+        perc_high_conf as f32 / 100.0 * unique_attesters as f32
+    }
+
+    fn get_perc_high_conf(num_high_conf_attestations: f32, num_unique_attesters: f32) -> u8 {
+        (num_high_conf_attestations / num_unique_attesters * 100.0).round() as u8
+    }
+
     fn remove_attestation_from_stats(stats_rec: &mut AttestationStats) -> &mut AttestationStats {
         // REMINDER: I broke the math here when I used u16 to truncate; perhaps I just wipe the chain instead of fix data in table with code... or just create new accounts to work with clean attestatations
         let num_high_conf =
-            stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32;
+            get_num_high_conf_attestations(stats_rec.perc_high_conf, stats_rec.unique_attesters);
         stats_rec.unique_attesters -= 1;
         stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
             0
@@ -107,14 +113,12 @@ mod service {
                 "num_high_conf: {}, unique_attesters: {} = new % high conf: {}",
                 num_high_conf,
                 stats_rec.unique_attesters,
-                (num_high_conf / stats_rec.unique_attesters as f32 * 100.0) as u8
+                get_perc_high_conf(num_high_conf, stats_rec.unique_attesters as f32)
             );
-            (num_high_conf / stats_rec.unique_attesters as f32 * 100.0) as u8
+            get_perc_high_conf(num_high_conf, stats_rec.unique_attesters as f32)
         };
         stats_rec
     }
-
-    fn get_num_high_conf_attestations(perc_high_conf: u8, unique_attesters: u16) -> f32 {}
 
     fn add_attestation_to_stats(
         stats_rec: &mut AttestationStats,
@@ -126,15 +130,21 @@ mod service {
         stats_rec.most_recent_attestation = issued;
         println!("value: {}", value);
         stats_rec.perc_high_conf = if value > 75 {
-            ((stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32 + 1.0)
-                / (stats_rec.unique_attesters as f32 + 1.0) as f32
-                * 100.0)
-                .round() as u8
+            get_perc_high_conf(
+                get_num_high_conf_attestations(
+                    stats_rec.perc_high_conf,
+                    stats_rec.unique_attesters + 1,
+                ),
+                stats_rec.unique_attesters as f32 + 1.0,
+            )
         } else {
-            ((stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32)
-                / (stats_rec.unique_attesters as f32 + 1.0)
-                * 100.0)
-                .round() as u8
+            get_perc_high_conf(
+                get_num_high_conf_attestations(
+                    stats_rec.perc_high_conf,
+                    stats_rec.unique_attesters,
+                ),
+                stats_rec.unique_attesters as f32 + 1.0,
+            )
         };
         stats_rec.unique_attesters += 1;
         stats_rec
