@@ -1,3 +1,7 @@
+use std::any::Any;
+
+use psibase::AccountNumber;
+
 /// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
 #[psibase::service(name = "identity")]
@@ -35,6 +39,16 @@ mod service {
         #[secondary_key(1)]
         fn by_attester(&self) -> (AccountNumber, AccountNumber) {
             (self.attester, self.subject)
+        }
+    }
+
+    impl fmt::Display for Attestation {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            writeln!(
+                f,
+                "--Attestation--\n  {}: attester\n  {}: subject\n  {}: value\n  {}: issued",
+                self.attester, self.subject, self.value, self.issued.seconds
+            )
         }
     }
 
@@ -81,16 +95,26 @@ mod service {
     #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
 
-    fn remove_attestation_from_stats(stats_rec: &mut AttestationStats) -> &AttestationStats {
-        let num_high_conf = stats_rec.perc_high_conf as f32 * stats_rec.unique_attesters as f32;
+    fn remove_attestation_from_stats(stats_rec: &mut AttestationStats) -> &mut AttestationStats {
+        // REMINDER: I broke the math here when I used u16 to truncate; perhaps I just wipe the chain instead of fix data in table with code... or just create new accounts to work with clean attestatations
+        let num_high_conf =
+            stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32;
         stats_rec.unique_attesters -= 1;
         stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
             0
         } else {
-            (num_high_conf / stats_rec.unique_attesters as f32) as u8
+            println!(
+                "num_high_conf: {}, unique_attesters: {} = new % high conf: {}",
+                num_high_conf,
+                stats_rec.unique_attesters,
+                (num_high_conf / stats_rec.unique_attesters as f32 * 100.0) as u8
+            );
+            (num_high_conf / stats_rec.unique_attesters as f32 * 100.0) as u8
         };
         stats_rec
     }
+
+    fn get_num_high_conf_attestations(perc_high_conf: u8, unique_attesters: u16) -> f32 {}
 
     fn add_attestation_to_stats(
         stats_rec: &mut AttestationStats,
@@ -102,12 +126,14 @@ mod service {
         stats_rec.most_recent_attestation = issued;
         println!("value: {}", value);
         stats_rec.perc_high_conf = if value > 75 {
-            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters + 1 as u16) as f32
-                / (stats_rec.unique_attesters + 1) as f32)
+            ((stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32 + 1.0)
+                / (stats_rec.unique_attesters as f32 + 1.0) as f32
+                * 100.0)
                 .round() as u8
         } else {
-            ((stats_rec.perc_high_conf as u16 * stats_rec.unique_attesters) as f32
-                / (stats_rec.unique_attesters + 1) as f32)
+            ((stats_rec.perc_high_conf as f32 / 100.0 * stats_rec.unique_attesters as f32)
+                / (stats_rec.unique_attesters as f32 + 1.0)
+                * 100.0)
                 .round() as u8
         };
         stats_rec.unique_attesters += 1;
@@ -130,6 +156,10 @@ mod service {
         // 1) ensure the table has a default state (do this as an impl on the table)
         //  -- This is handled by Default impl
         // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
+        println!(
+            "is_unique: {}, # unique: {}",
+            is_new_unique_attester_for_subj, stats_rec.unique_attesters
+        );
         if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
             println!("have records; is not unique; removing attestation from stats...");
             remove_attestation_from_stats(&mut stats_rec);
@@ -159,7 +189,18 @@ mod service {
             Err(e) => psibase::abort_message(&format!("{}", e)),
         };
 
+        println!(
+            "checking for existing attestation: ({}, {})",
+            subj_acct, attester
+        );
+
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
+        let is_unique_attester = existing_rec.is_none();
+        if existing_rec.is_some() {
+            println!("Existing Attestation rec: {}", existing_rec.unwrap());
+        } else {
+            println!("No existing Attestation rec...");
+        }
 
         // upsert attestation
         attestation_table
@@ -174,7 +215,7 @@ mod service {
         // Update Attestation stats
         // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
         // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
-        update_attestation_stats(subj_acct, existing_rec.is_none(), value, issued);
+        update_attestation_stats(subj_acct, is_unique_attester, value, issued);
 
         Wrapper::emit()
             .history()
@@ -270,4 +311,65 @@ mod service {
         let table = WebContentTable::new();
         store_content(path, contentType, content, &table).unwrap();
     }
+}
+
+fn test_attest(
+    chain: psibase::Chain,
+    attester: AccountNumber,
+    subject: String,
+    conf: u8,
+) -> Result<(), psibase::Error> {
+    use psibase::services::http_server;
+
+    http_server::Wrapper::push_to(&chain, SERVICE).registerServer(SERVICE);
+    let result = Wrapper::push_from(&chain, attester).attest(subject, conf);
+    assert_eq!(result.get()?, ());
+    println!("\n\nTrace:\n{}", result.trace);
+
+    chain.finish_block();
+    Ok(())
+}
+
+#[psibase::test_case(services("identity"))]
+pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use serde_json::{json, Value};
+
+    test_attest(chain, AccountNumber::from("alice"), String::from("bob"), 95)?;
+
+    return Ok(());
+    // TODO: handle 404 the following code causes
+    let reply: Value = chain.graphql(
+        SERVICE,
+        // r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
+        r#"query { allAttestations { attester subject value } }"#,
+    )?;
+    println!("graphql reply: {}", reply);
+    assert_eq!(
+        reply,
+        json!({ "data": { "allAttestationsStats": {"uniqueAttesters": 1} } })
+    );
+
+    Ok(())
+}
+
+#[psibase::test_case(services("identity"))]
+pub fn test_attest_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use serde_json::{json, Value};
+
+    test_attest(chain, AccountNumber::from("alice"), String::from("bob"), 75)?;
+
+    return Ok(());
+    // TODO: handle 404 the following code causes
+    let reply: Value = chain.graphql(
+        SERVICE,
+        // r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
+        r#"query { allAttestations { attester subject value } }"#,
+    )?;
+    println!("graphql reply: {}", reply);
+    assert_eq!(
+        reply,
+        json!({ "data": { "allAttestationsStats": {"uniqueAttesters": 1} } })
+    );
+
+    Ok(())
 }

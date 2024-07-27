@@ -939,6 +939,7 @@ dependencies = [
  "psibase",
  "psibase_macros",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
