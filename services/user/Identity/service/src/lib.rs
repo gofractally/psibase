@@ -129,23 +129,12 @@ mod service {
         stats_rec.subject = subject;
         stats_rec.most_recent_attestation = issued;
         println!("value: {}", value);
-        stats_rec.perc_high_conf = if value > 75 {
-            get_perc_high_conf(
-                get_num_high_conf_attestations(
-                    stats_rec.perc_high_conf,
-                    stats_rec.unique_attesters + 1,
-                ),
-                stats_rec.unique_attesters as f32 + 1.0,
-            )
-        } else {
-            get_perc_high_conf(
-                get_num_high_conf_attestations(
-                    stats_rec.perc_high_conf,
-                    stats_rec.unique_attesters,
-                ),
-                stats_rec.unique_attesters as f32 + 1.0,
-            )
-        };
+        let num_existing_high_conf_attestations =
+            get_num_high_conf_attestations(stats_rec.perc_high_conf, stats_rec.unique_attesters);
+        stats_rec.perc_high_conf = get_perc_high_conf(
+            num_existing_high_conf_attestations + if value > 75 { 1.0 } else { 0.0 },
+            stats_rec.unique_attesters as f32 + 1.0,
+        );
         stats_rec.unique_attesters += 1;
         stats_rec
     }
@@ -173,8 +162,8 @@ mod service {
         if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
             println!("have records; is not unique; removing attestation from stats...");
             remove_attestation_from_stats(&mut stats_rec);
+            println!("after removing existing:\n{}", stats_rec);
         }
-        println!("after removing existing:\n{}", stats_rec);
 
         // 3) update stats to include this attestation
         add_attestation_to_stats(&mut stats_rec, subj_acct, value, issued);
@@ -324,7 +313,7 @@ mod service {
 }
 
 fn test_attest(
-    chain: psibase::Chain,
+    chain: &psibase::Chain,
     attester: AccountNumber,
     subject: String,
     conf: u8,
@@ -344,7 +333,12 @@ fn test_attest(
 pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use serde_json::{json, Value};
 
-    test_attest(chain, AccountNumber::from("alice"), String::from("bob"), 95)?;
+    test_attest(
+        &chain,
+        AccountNumber::from("alice"),
+        String::from("bob"),
+        95,
+    )?;
 
     return Ok(());
     // TODO: handle 404 the following code causes
@@ -366,7 +360,12 @@ pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error
 pub fn test_attest_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use serde_json::{json, Value};
 
-    test_attest(chain, AccountNumber::from("alice"), String::from("bob"), 75)?;
+    test_attest(
+        &chain,
+        AccountNumber::from("alice"),
+        String::from("bob"),
+        75,
+    )?;
 
     return Ok(());
     // TODO: handle 404 the following code causes
