@@ -71,7 +71,7 @@ impl PackageDisposition {
 //
 //struct DepGraph
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PackageOp {
     Install(PackageInfo),
     Replace(Meta, PackageInfo),
@@ -376,6 +376,7 @@ impl<'a> DepGraph<'a> {
             }
         }
         self.solver.add_clause(&negated);
+        self.solver.assume(&[]);
         self.solver.solve().unwrap_or(false)
     }
     fn get_matching(&self, pattern: &PackageRef) -> Result<Vec<Lit>, anyhow::Error> {
@@ -519,7 +520,7 @@ mod tests {
 
     #[test]
     fn test_solve_empty() -> Result<(), anyhow::Error> {
-        let mut graph = DepGraph::new();
+        let graph = DepGraph::new();
         assert_eq!(graph.solve()?, vec![]);
         Ok(())
     }
@@ -535,7 +536,7 @@ mod tests {
             name: "A".to_string(),
             version: "1.0.0".to_string(),
         });
-        assert_eq!(graph.solve()?, vec![a]);
+        assert_eq!(graph.solve()?, vec![PackageOp::Install(a)]);
         Ok(())
     }
 
@@ -555,7 +556,13 @@ mod tests {
             name: "B".to_string(),
             version: "1.0.0".to_string(),
         });
-        assert_eq!(graph.solve()?, packages);
+        assert_eq!(
+            graph.solve()?,
+            packages
+                .into_iter()
+                .map(|i| PackageOp::Install(i))
+                .collect::<Vec<_>>()
+        );
         Ok(())
     }
 

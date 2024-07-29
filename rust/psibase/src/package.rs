@@ -53,7 +53,7 @@ pub struct PackageRef {
     pub version: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Pack, Unpack, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
