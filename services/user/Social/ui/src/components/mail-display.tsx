@@ -11,10 +11,15 @@ import { Separator } from "@shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { ScrollArea } from "@shadcn/scroll-area";
 
-import { MarkdownEditor } from "@components";
+import {
+    ComposeDialog,
+    MarkdownEditor,
+    ReplyDialogTriggerIconWithTooltip,
+} from "@components";
 import { Message, useLocalMail, useLocalStorage } from "@hooks";
 
 import { accounts } from "../fixtures/data";
+import { Dialog } from "@shadcn/dialog";
 
 export function MailDisplay() {
     const [_messages, selectedMessage] = useLocalMail();
@@ -201,15 +206,12 @@ const ActionBar = ({ message }: { message: Message }) => {
                 </Tooltip> */}
             </div>
             <div className="ml-auto flex items-center gap-2">
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!message}>
-                            <Reply className="h-4 w-4" />
-                            <span className="sr-only">Reply</span>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Reply</TooltipContent>
-                </Tooltip>
+                <Dialog>
+                    <ComposeDialog
+                        trigger={<ReplyDialogTriggerIconWithTooltip />}
+                        inReplyTo={message.id}
+                    />
+                </Dialog>
                 {/* <Tooltip>
                     <TooltipTrigger asChild>
                         <Button

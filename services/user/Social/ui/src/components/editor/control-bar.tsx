@@ -138,7 +138,7 @@ export const ControlBar = () => {
 
     return (
         <div className="flex justify-center p-2">
-            <div className="flex w-full max-w-prose items-center gap-2">
+            <div className="flex w-full items-center gap-2">
                 <ControlBarToggle
                     Icon={Bold}
                     action={cmd(toggleStrongCommand.key)}

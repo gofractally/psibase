@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { SquarePen } from "lucide-react";
+import { Reply, SquarePen } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +41,13 @@ const formSchema = z.object({
     subject: z.string(),
 });
 
-export const ComposeDialog = ({ trigger }: { trigger: ReactNode }) => {
+export const ComposeDialog = ({
+    trigger,
+    inReplyTo,
+}: {
+    trigger: ReactNode;
+    inReplyTo?: string;
+}) => {
     const [open, setOpen] = useState(false);
     const [selectedAccount] = useUser();
     const [messages, setMessages, getMessages] = useLocalStorage<Message[]>(
@@ -56,17 +62,28 @@ export const ComposeDialog = ({ trigger }: { trigger: ReactNode }) => {
         },
     });
 
+    useEffect(() => {
+        if (!inReplyTo) {
+            form.reset();
+        }
+        const data = getMessages() ?? [];
+        const topicMsg = data.find((msg) => msg.id === inReplyTo);
+        if (!topicMsg) return;
+        form.setValue("to", topicMsg.from as "brandonfancher" | "thegazelle");
+        form.setValue("subject", `RE: ${topicMsg.subject}`);
+    }, [inReplyTo]);
+
     const id = useRef<string>();
 
     const createDraft = (value: string) => {
         const draft = {
             id: id.current,
             from: selectedAccount.account,
-            to: "recipient",
+            to: form.getValues().to || "recipient",
             datetime: Date.now(),
             status: "draft",
             inReplyTo: null,
-            subject: "subject here",
+            subject: form.getValues().subject || "subject here",
             body: value,
         } as Message;
         setMessages([...(messages ?? []), draft]);
@@ -210,6 +227,26 @@ export const ComposeDialogTriggerIconWithTooltip = ({
                 </DialogTrigger>
             </TooltipTrigger>
             <TooltipContent>Compose</TooltipContent>
+        </Tooltip>
+    );
+};
+
+export const ReplyDialogTriggerIconWithTooltip = ({
+    disabled = false,
+}: {
+    disabled?: boolean;
+}) => {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={disabled}>
+                        <Reply className="h-4 w-4" />
+                        <span className="sr-only">Reply</span>
+                    </Button>
+                </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Reply</TooltipContent>
         </Tooltip>
     );
 };
