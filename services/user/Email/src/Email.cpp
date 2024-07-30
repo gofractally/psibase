@@ -27,15 +27,6 @@ namespace
               .body        = std::vector(s.begin(), s.end())};
    }
 
-   auto json_reply = [](const auto& obj)
-   {
-      auto json = psio::convert_to_json(obj);
-      return HttpReply{
-          .contentType = "application/json",
-          .body        = {json.begin(), json.end()},
-      };
-   };
-
    auto extractUser = [](const std::string& target) -> optional<string>
    {
       auto pos = target.find("?user=");
@@ -110,9 +101,6 @@ optional<HttpReply> serveRestApi(const HttpRequest& request)
          auto user = extractUser(request.target);
          if (user == nullopt)
             return nullopt;
-
-         writeConsole("SELECT * FROM \"history.email.sent\" WHERE " + property.value() + " = '" +
-                      user.value() + "' ORDER BY ROWID");
 
          return to<REvents>().serveSys(
              makeQuery(request, "SELECT * FROM \"history.email.sent\" WHERE " + property.value() +
