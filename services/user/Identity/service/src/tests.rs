@@ -30,11 +30,19 @@ pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error
         95,
     )?;
 
-    // TODO: handle 404 the following code causes
+    let attestation_reply: Value = chain.graphql(
+        SERVICE,
+        r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value } } }"#,
+    )?;
+    println!("graphql reply: {}", attestation_reply);
+    assert_eq!(
+        attestation_reply,
+        json!({ "data": { "attestationsByAttestee": { "nodes": [{"attester": "alice", "subject": "bob", "value": 95}] } } })
+    );
+
     let reply: Value = chain.graphql(
         SERVICE,
         r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
-        // r#"query { allAttestations { attester subject value } }"#,
     )?;
     println!("graphql reply: {}", reply);
     assert_eq!(
@@ -57,7 +65,16 @@ pub fn test_attest_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error>
         75,
     )?;
 
-    // TODO: handle 404 the following code causes
+    let attestation_reply: Value = chain.graphql(
+        SERVICE,
+        r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value } } }"#,
+    )?;
+    println!("graphql reply: {}", attestation_reply);
+    assert_eq!(
+        attestation_reply,
+        json!({ "data": { "attestationsByAttestee": { "nodes": [{"attester": "alice", "subject": "bob", "value": 75}] } } })
+    );
+
     let reply: Value = chain.graphql(
         SERVICE,
         r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
