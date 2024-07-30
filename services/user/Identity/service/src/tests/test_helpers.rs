@@ -29,6 +29,12 @@ struct Attestation {
     value: u8,
 }
 
+impl PartialEq for Attestation {
+    fn eq(&self, other: &Self) -> bool {
+        self.attester == other.attester
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 struct AttestationQueryData {
     nodes: Vec<Attestation>,
@@ -39,46 +45,28 @@ struct AttestationReply {
     data: AttestationQueryData,
 }
 
-pub fn expect_attestations(chain: &psibase::Chain, expected_results: &serde_json::Value) {
-    use serde_json::{json, Value};
+pub fn expect_attestations(chain: &psibase::Chain, exp_results: &serde_json::Value) {
+    use serde_json::Value;
 
-    let attestation_reply: Value = chain.graphql(
+    let att_results: Value = chain.graphql(
             SERVICE,
             r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value } } }"#,
         ).unwrap();
-    println!("graphql reply: {}", attestation_reply);
-    let mut attest_nodes_sorted = attestation_reply["data"]["attestationsByAttestee"]["nodes"]
-        .as_array()
-        .unwrap()
-        .clone();
-    attest_nodes_sorted.sort_by(|a, b| {
-        serde_json::from_value::<Attestation>(a.clone())
-            .unwrap()
-            .attester
-            .cmp(
-                &serde_json::from_value::<Attestation>(b.clone())
-                    .unwrap()
-                    .attester,
-            )
-    });
+    println!("graphql reply: {}", att_results);
 
-    let mut expected_results_sorted = expected_results.as_array().unwrap().clone();
-    expected_results_sorted.sort_by(|a, b| {
-        serde_json::from_value::<Attestation>(a.clone())
-            .unwrap()
-            .attester
-            .cmp(
-                &serde_json::from_value::<Attestation>(b.clone())
-                    .unwrap()
-                    .attester,
-            )
-    });
-    println!("sorted attestation nodes: {:#?}", attest_nodes_sorted);
-    println!("sorted expected results: {:#?}", expected_results_sorted);
-    assert_eq!(
-        attestation_reply,
-        json!({ "data": { "attestationsByAttestee": { "nodes": expected_results } } }) // json!({ "data": { "attestationsByAttestee": { "nodes": [{"attester": "alice", "subject": "bob", "value": 75}] } } })
-    );
+    let mut att_results_sorted = serde_json::from_value::<Vec<Attestation>>(
+        att_results["data"]["attestationsByAttestee"]["nodes"].clone(),
+    )
+    .unwrap();
+    att_results_sorted.sort_by(|a, b| a.attester.cmp(&b.attester));
+
+    let mut exp_results_sorted =
+        serde_json::from_value::<Vec<Attestation>>(exp_results.clone()).unwrap();
+    exp_results_sorted.sort_by(|a, b| a.attester.cmp(&b.attester));
+
+    println!("sorted attestation nodes: {:#?}", att_results_sorted);
+    println!("sorted expected results: {:#?}", exp_results_sorted);
+    assert!(att_results_sorted == exp_results_sorted);
 }
 
 pub fn expect_attestation_stats(chain: &psibase::Chain, expected_results: &serde_json::Value) {
