@@ -52,7 +52,7 @@ ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WA
 echo =====
 ${DOCKER} bash -c "cd build && make -j $(nproc)"
 echo =====
-${DOCKER} bash -c "cd rust && cargo build"
+${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust"
 echo =====
 ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
 echo =====
