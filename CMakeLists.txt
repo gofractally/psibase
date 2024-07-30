@@ -310,6 +310,7 @@ add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wa
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
+add_rs_component(services/user/Email/plugin:EmailPlugin email_plugin.wasm wasm32-wasi)
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -624,8 +625,10 @@ psibase_package(
     SERVICE email
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Email.wasm
         SERVER email
+        DATA ${COMPONENT_BIN_DIR}/${EmailPlugin_OUTPUT_FILE} /plugin.wasm
         INIT
     DEPENDS wasm
+    DEPENDS ${EmailPlugin_DEP}
 )
 
 psibase_package(
@@ -634,8 +637,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
     SERVICE nft
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-    INIT
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
+        INIT
     DEPENDS wasm
 )
 

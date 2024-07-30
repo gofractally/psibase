@@ -1,0 +1,13 @@
+package email:plugin;
+
+interface api {
+    use common:plugin/types.{error};
+
+    // Send an email
+    send: func(recipient: string, subject: string, body: string) -> result<_, error>;
+}
+
+world impl {
+    import common:plugin/server;
+    export api;
+}
