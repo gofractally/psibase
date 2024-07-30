@@ -3,7 +3,7 @@ use anyhow::{anyhow, Context};
 use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
 use cargo_metadata::Metadata;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use regex::Regex;
@@ -44,12 +44,6 @@ struct CargoSubcommandArgs {
 #[derive(Subcommand, Debug)]
 enum PsibaseCommand {
     Psibase(Args),
-}
-
-#[derive(Debug, Copy, Clone, ValueEnum)]
-pub enum HostType {
-    Dev,
-    Prod,
 }
 
 /// Build, test, and deploy psibase services
