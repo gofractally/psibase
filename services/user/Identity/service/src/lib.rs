@@ -1,4 +1,7 @@
+use psibase::services::http_server;
 use psibase::AccountNumber;
+
+// mod tests;
 
 /// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
@@ -318,10 +321,9 @@ fn test_attest(
     subject: String,
     conf: u8,
 ) -> Result<(), psibase::Error> {
-    use psibase::services::http_server;
-
+    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     http_server::Wrapper::push_to(&chain, SERVICE).registerServer(SERVICE);
-    let result = Wrapper::push_from(&chain, attester).attest(subject, conf);
+    let result = crate::Wrapper::push_from(&chain, attester).attest(subject, conf);
     assert_eq!(result.get()?, ());
     println!("\n\nTrace:\n{}", result.trace);
 
@@ -340,17 +342,16 @@ pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error
         95,
     )?;
 
-    return Ok(());
     // TODO: handle 404 the following code causes
     let reply: Value = chain.graphql(
         SERVICE,
-        // r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
-        r#"query { allAttestations { attester subject value } }"#,
+        r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
+        // r#"query { allAttestations { attester subject value } }"#,
     )?;
     println!("graphql reply: {}", reply);
     assert_eq!(
         reply,
-        json!({ "data": { "allAttestationsStats": {"uniqueAttesters": 1} } })
+        json!({ "data": { "allAttestationStats": [{"subject": "bob", "uniqueAttesters": 1}] } })
     );
 
     Ok(())
@@ -358,6 +359,7 @@ pub fn test_attest_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error
 
 #[psibase::test_case(services("identity"))]
 pub fn test_attest_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    // use psibase::HttpBody;
     use serde_json::{json, Value};
 
     test_attest(
@@ -367,17 +369,16 @@ pub fn test_attest_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error>
         75,
     )?;
 
-    return Ok(());
     // TODO: handle 404 the following code causes
     let reply: Value = chain.graphql(
         SERVICE,
-        // r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
-        r#"query { allAttestations { attester subject value } }"#,
+        r#"query { allAttestationStats { subject, uniqueAttesters } }"#,
+        // r#"query { allAttestations { attester subject value } }"#,
     )?;
     println!("graphql reply: {}", reply);
     assert_eq!(
         reply,
-        json!({ "data": { "allAttestationsStats": {"uniqueAttesters": 1} } })
+        json!({ "data": { "allAttestationStats": [{"subject": "bob", "uniqueAttesters": 1}] } })
     );
 
     Ok(())
