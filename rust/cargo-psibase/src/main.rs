@@ -7,7 +7,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
 use regex::Regex;
-use serde::Deserialize;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, OpenOptions};
 use std::path::Path;
@@ -21,6 +20,9 @@ use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
+
+mod config;
+use config::{read_host_config_url, setup_config_host};
 
 /// The version of the cargo-psibase crate at compile time
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -99,9 +101,10 @@ struct DeployCommand {
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
     sender: ExactAccountNumber,
 
-    /// Defines which psibase host environment config to be deployed.
+    /// Defines which psibase host environment defined in the config file ~/.psibase.toml
+    /// to be deployed. Example: dev, prod. (See the config command for more details.)
     #[clap(long, value_name = "HOST")]
-    host: Option<HostType>,
+    host: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -109,6 +112,18 @@ struct TestCommand {
     /// Path to psitest executable
     #[clap(long, default_value = "psitest")]
     psitest: PathBuf,
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigCommand {
+    /// Setup a host
+    Host {
+        /// Host key. Example: dev, prod, qa1, uat, etc.
+        key: String,
+
+        /// Host URL. Example: https://prod.my-psibase-app.io
+        url: Url,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -121,12 +136,10 @@ enum Command {
 
     /// Build and deploy a service
     Deploy(DeployCommand),
-}
 
-#[derive(Deserialize, Debug)]
-struct Hosts {
-    dev: String,
-    prod: String,
+    /// Setup the psibase local config file
+    #[command(subcommand)]
+    Config(ConfigCommand),
 }
 
 fn pretty(label: &str, message: &str) {
@@ -290,7 +303,7 @@ fn check_psibase_version(metadata: &Metadata) {
 
     if *psibase_version != cargo_psibase_version {
         let version_mismatch_msg = format!(
-            "cargo-psibase v{} != psibase v{}",
+            "The version of `cargo-psibase` used (v{}) and the version of `psibase` on which your service depends (v{}) should match",
             CARGO_PSIBASE_VERSION, psibase_version
         );
         warn("Version Mismatch", &version_mismatch_msg);
@@ -531,46 +544,16 @@ fn pass_api_arg(opts: &DeployCommand, psibase_args: &mut Vec<String>) -> Result<
     if let Some(api) = &opts.api {
         psibase_args.push("--api".into());
         psibase_args.push(api.to_string());
-    } else if let Some(host_opt) = opts.host {
-        let hosts = read_hosts_config();
-        if let Some(hosts) = hosts {
-            pass_hosts_to_api_arg(hosts, host_opt, psibase_args);
-        } else {
-            return Err(anyhow!(
-                r#"No psibase.hosts found in Cargo.toml.
-            
-Make sure you defined both the prod and the dev properties like so:
-
-[psibase.hosts]
-prod = "https://prod.example.com"
-dev = "https://dev.example.com"
-            "#
-            ));
-        }
+    } else if let Some(host_opt) = &opts.host {
+        let host_url = read_host_config_url(host_opt)?;
+        pretty(
+            &format!("Host {}", host_opt),
+            &format!("deploying to {}", host_url),
+        );
+        psibase_args.push("--api".into());
+        psibase_args.push(host_url);
     }
-
     Ok(())
-}
-
-fn pass_hosts_to_api_arg(hosts: Hosts, host_opt: HostType, psibase_args: &mut Vec<String>) {
-    let (api_url, host_name) = match host_opt {
-        HostType::Prod => (hosts.prod.to_string(), "prod"),
-        HostType::Dev => (hosts.dev.to_string(), "dev"),
-    };
-
-    let message = format!("Pushing to {} host {}", host_name, api_url);
-    pretty("Host Config", &message);
-
-    psibase_args.push("--api".into());
-    psibase_args.push(api_url.to_string());
-}
-
-fn read_hosts_config() -> Option<Hosts> {
-    let toml_content = std::fs::read_to_string("Cargo.toml").ok()?;
-    let toml_value: toml::Value = toml::from_str(&toml_content).ok()?;
-    let psibase_section = toml_value.get("psibase")?;
-    let hosts_section = psibase_section.get("hosts")?;
-    hosts_section.clone().try_into().ok()
 }
 
 #[tokio::main]
@@ -610,6 +593,11 @@ async fn main2() -> Result<(), Error> {
         Command::Deploy(opts) => {
             deploy(&args, opts, root).await?;
         }
+        Command::Config(opts) => match opts {
+            ConfigCommand::Host { key, url } => {
+                setup_config_host(key, url)?;
+            }
+        },
     };
 
     Ok(())
