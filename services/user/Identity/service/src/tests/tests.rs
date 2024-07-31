@@ -61,7 +61,6 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
     let value2 = 76;
 
     chain.start_block();
-    // http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     chain.new_account(attester2)?;
 
     chain.start_block();
@@ -81,7 +80,6 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
     let value3 = 77;
 
     chain.start_block();
-    // http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     chain.new_account(attester3)?;
 
     chain.start_block();

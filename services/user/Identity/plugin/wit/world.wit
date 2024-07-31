@@ -12,10 +12,10 @@ interface types {
     }
     type attestation-graph = list<attestation-graph-node>;
 
-    /* an identity profile summarizes a member's identity attestations over a 3 month window.
+    /* an identity profile summarizes a member's identity attestations.
         A Member profile will show % of high-confidence attestations (from unique attesters) with the total number of (unique) attesters, e.g., 83% of 12.
         Attestations from the same attester will simply replace the most recent attestation from that attester, to maintain the freshness of attestations, and
-        the data that’s summarized in a Member profile will be a summary of the last 3 months of data.
+        the data that’s summarized in a Member profile.
         */
     record identity-attestation {
         attester: account,
@@ -32,17 +32,9 @@ interface types {
 interface api {
     use common:plugin/types.{error};
 
-    // calls Attestation service's attest("identity", ???)
+    // calls Attestation service's attest() action
     // The attestor attests (being something of a provider in this scenario), logging an event on chain, with a signature from the issuer (account)
     // which can always become a verifiable credential for someone else (more of a consumer in this equation)
-    attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
-    // impl: attestation:plugin.attest("identity", vc)
-}
-
-interface queries {
-    use common:plugin/types.{error};
-    use types.{attestation-graph, identity-summary, identity-attestation};
-
     /* identity attestation args:
         - subject: the username being attested to
         - confidence: a float representing a percentage confidence.
@@ -55,9 +47,18 @@ interface queries {
             4 High chance they are who they claim (75%) --> 0.75
             5 I’m very confident they are who they claim (90%+) --> 0.90
         */
-    graph: func() -> result<attestation-graph, error>;
-    summary-identity-claims: func(subject: string) -> result<identity-summary, error>;
-    get-history: func(subject: string) -> result<list<identity-attestation>, error>;
+    attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
+}
+
+interface queries {
+    use common:plugin/types.{error};
+    use types.{attestation-graph, identity-summary, identity-attestation};
+
+    
+    summary: func(subject: string) -> result<identity-summary, error>;
+    // Future implementations (for attestation graphs)
+    // graph: func() -> result<attestation-graph, error>;
+    // get-history: func(subject: string) -> result<list<identity-attestation>, error>;
 }
 
 world identity {
@@ -65,5 +66,6 @@ world identity {
     import common:plugin/client;
     import accounts:plugin/accounts;
     export api;
-    // export queries;
+    export queries;
+    export types;
 }

@@ -11,19 +11,12 @@ fn get_perc_high_conf(num_high_conf_attestations: f32, num_unique_attesters: f32
 }
 
 fn remove_attestation_from_stats(stats_rec: &mut AttestationStats) -> &mut AttestationStats {
-    // REMINDER: I broke the math here when I used u16 to truncate; perhaps I just wipe the chain instead of fix data in table with code... or just create new accounts to work with clean attestatations
     let num_high_conf =
         get_num_high_conf_attestations(stats_rec.perc_high_conf, stats_rec.unique_attesters);
     stats_rec.unique_attesters -= 1;
     stats_rec.perc_high_conf = if stats_rec.unique_attesters == 0 {
         0
     } else {
-        println!(
-            "num_high_conf: {}, unique_attesters: {} = new % high conf: {}",
-            num_high_conf,
-            stats_rec.unique_attesters,
-            get_perc_high_conf(num_high_conf, stats_rec.unique_attesters as f32)
-        );
         get_perc_high_conf(num_high_conf, stats_rec.unique_attesters as f32)
     };
     stats_rec
@@ -37,7 +30,6 @@ fn add_attestation_to_stats(
 ) -> &AttestationStats {
     stats_rec.subject = subject;
     stats_rec.most_recent_attestation = issued;
-    println!("value: {}", value);
     let num_existing_high_conf_attestations =
         get_num_high_conf_attestations(stats_rec.perc_high_conf, stats_rec.unique_attesters);
     stats_rec.perc_high_conf = get_perc_high_conf(
@@ -59,26 +51,15 @@ pub fn update_attestation_stats(
         .get_index_pk()
         .get(&(subj_acct))
         .unwrap_or_default();
-    println!("at start:\n{}", stats_rec);
     // STEPS:
-    // 1) ensure the table has a default state (do this as an impl on the table)
-    //  -- This is handled by Default impl
+    // 1) ensure the table has a default state (handled by Default impl)
     // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
-    println!(
-        "is_unique: {}, # unique: {}",
-        is_new_unique_attester_for_subj, stats_rec.unique_attesters
-    );
     if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
-        println!("have records; is not unique; removing attestation from stats...");
         remove_attestation_from_stats(&mut stats_rec);
-        println!("after removing existing:\n{}", stats_rec);
     }
 
     // 3) update stats to include this attestation
     add_attestation_to_stats(&mut stats_rec, subj_acct, value, issued);
-
-    println!("new % conf: {}", stats_rec.perc_high_conf);
-    println!("after:\n{}", stats_rec);
 
     let _ = attestation_stats_table
         .put(&stats_rec)

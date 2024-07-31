@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+// mod queries;
 mod stats;
 
 /// Identity service to log identity attestations, and provide a graphiql
@@ -11,8 +12,8 @@ mod service {
     use core::fmt;
     use std::str::FromStr;
 
-    use async_graphql::connection::Connection;
     use async_graphql::*;
+
     use psibase::{services::transact, AccountNumber, TimePointSec, *};
     use serde::{Deserialize, Serialize};
 
@@ -110,18 +111,8 @@ mod service {
             Err(e) => psibase::abort_message(&format!("{}", e)),
         };
 
-        println!(
-            "checking for existing attestation: ({}, {})",
-            subj_acct, attester
-        );
-
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
         let is_unique_attester = existing_rec.is_none();
-        if existing_rec.is_some() {
-            println!("Existing Attestation rec: {}", existing_rec.unwrap());
-        } else {
-            println!("No existing Attestation rec...");
-        }
 
         // upsert attestation
         attestation_table
@@ -152,6 +143,7 @@ mod service {
     ) {
     }
 
+    use async_graphql::connection::Connection;
     struct Query;
 
     #[Object]
@@ -209,6 +201,16 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .collect::<Vec<AttestationStats>>())
+        }
+
+        async fn subject_stats(
+            &self,
+            subject: AccountNumber,
+        ) -> async_graphql::Result<AttestationStats, async_graphql::Error> {
+            Ok(AttestationStatsTable::new()
+                .get_index_pk()
+                .get(&subject)
+                .unwrap())
         }
 
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {

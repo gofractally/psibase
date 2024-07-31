@@ -221,6 +221,24 @@ function App() {
       console.error(`${(e as ErrorType).message}`);
     }
   };
+  const getIdentitySummary = async () => {
+    try {
+      console.info("attest().calling identity.queries.summary()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "queries",
+        method: "summary",
+        params: [attestee],
+      });
+      console.info("returned from Identity.queries.summary()");
+      setRes(res as string);
+      console.info("Res:", res);
+      // console.info(`${res.percHighConfidence}% of ${res.uniqueAttestations}`);
+    } catch (e) {
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
+    }
+  };
   return (
     <>
       <h1>Psibase Demo App 1</h1>
@@ -252,6 +270,7 @@ function App() {
             value={claim}
           />
           <button onClick={attestIdentity}> Attest </button>
+          <button onClick={getIdentitySummary}> get Summary </button>
         </div>
       </div>
       <h3>{res}</h3>
