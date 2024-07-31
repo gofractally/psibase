@@ -3,8 +3,10 @@ import json
 from collections import abc
 
 class OutputStream:
-    def __init__(self):
+    def __init__(self, custom=None):
         self.bytes = bytearray()
+        if custom is not None:
+            self.custom = custom
     def write_bytes(self, data):
         self.bytes.extend(data)
     def write_u8(self, value):
@@ -41,11 +43,7 @@ class NullRepack:
     def pack(self):
         pass
 
-class TypeBase:
-    def __mro_entries__(self, bases):
-        class Base(FracPackBase, metaclass=MetaFracPack):
-            __fracpack__ = self
-        return (Base,)
+class TypeBase(type):
     def embedded_fixed_pack(self, value, stream):
         if self.is_variable_size:
             stream.write_u32(0)
@@ -59,6 +57,65 @@ class TypeBase:
         self.pack(value, stream)
         return stream.bytes
 
+def pack(value, ty=None, *, custom=None):
+    valtype = type(value)
+    if valtype is not None:
+        ty = valtype
+    stream = OutputStream(custom)
+    valtype.pack(value, stream)
+    return stream.bytes
+
+def _handle_args(args, kw, extra, genname, base):
+    assert len(extra) != 3
+    def handle_args_class(name, bases, dict, **kw):
+        extra_values = []
+        for i in range(len(extra)):
+            n = extra[i]
+            extra_values.append(kw.get(n))
+            if n in kw:
+                del kw[n]
+        return ((name, bases, dict), kw, extra_values)
+
+    if len(args) == 3 or 'dict' in kw:
+        ((name, bases, dict), kw, extra) = handle_args_class(*args, **kw)
+        if not any(issubclass(b, base) for b in bases):
+            bases += (base,)
+        else:
+            extra_values = None
+        return ((name, bases, dict), kw, extra_values)
+    else:
+        if len(extra) < len(args):
+            raise Exception("Too many args")
+        extra_values = []
+        for i in range(len(extra)):
+            if i < len(args):
+                extra_values.append(args[i])
+            else:
+                name = extra[i]
+                extra_values.append(kw[name])
+                del kw[name]
+        for (k, v) in kw.items():
+            raise Exception("Extra argument: %s=%s" % (k, v))
+        return ((genname(*extra_values), (base,), {}), {}, extra_values)
+
+# Adjusts __init__ and __new__ to forward the correct arguments to type.
+def _fracpackmeta(argnames, gentype, base=object):
+    def fn(cls):
+        def __new__(c, *args, **kw):
+            (args, kw, extra) = _handle_args(args, kw, argnames, gentype, base)
+            return super(cls, c).__new__(cls, *args, **kw)
+        cls.__new__ = staticmethod(__new__)
+        original_init = cls.__init__
+        def __init__(self, *args, **kw):
+            (args, kw, extra) = _handle_args(args, kw, argnames, gentype, base)
+            if extra is not None:
+                original_init(self, *extra)
+            super(cls, self).__init__(*args, **kw)
+        cls.__init__ = __init__
+        return cls
+    return fn
+
+@_fracpackmeta(['bits', 'isSigned'], lambda bits, isSigned: '%s%d' % ('s' if isSigned else 'u', bits), int)
 class Int(TypeBase):
     def __init__(self, bits, isSigned):
         self.bits = bits
@@ -86,6 +143,7 @@ class Int(TypeBase):
             stream.write_u8(value & 0xFF)
             value = value >> 8
 
+@_fracpackmeta(['exp', 'mantissa'], lambda exp, mantissa: 'f%d' % (exp + mantissa), float)
 class Float(TypeBase):
     def __init__(self, exp, mantissa):
         assert((exp + mantissa) % 8 == 0)
@@ -128,19 +186,48 @@ class Float(TypeBase):
             stream.write_u8(ival & 0xff)
             ival >>= 8
 
-class MetaStruct(type):
+class ObjectValue:
+    def __init__(self, *args, **kw):
+        cls = type(self)
+        for ((name, ty), value) in zip(cls.members, args):
+            self.__dict__[name] = value
+        for (name, value) in kw.items():
+            if name in self.__dict__:
+                raise Exception('%s is already defined' % name)
+            if name not in cls.members_by_name:
+                raise Exception('%s is not a member of %s' % (name, cls))
+            self.__dict__[name] = value
+        for (name, ty) in cls.members:
+            if name not in self.__dict__:
+                if ty.is_optional:
+                    self.__dict__[name] = None
+                else:
+                    raise Exception('%s is required' % name)
+
+class DerivedAsInstance(type):
     def __new__(cls, name, bases, namespace, **kw):
-        if 'pack' not in namespace:
-            members = {}
-            if '__annotations__' in namespace:
-                for (name, ty) in namespace['__annotations__'].items():
-                    if isinstance(ty, TypeBase):
-                        members[name] = ty
-                return Struct(members)
+        for base in bases:
+            if isinstance(base, DerivedAsInstance):
+                members = {}
+                if '__annotations__' in namespace:
+                    for (n, ty) in namespace['__annotations__'].items():
+                        if isinstance(ty, TypeBase):
+                            members[n] = ty
+                    return base(name, members)
         return super().__new__(cls, name, bases, namespace, **kw)
 
-class Struct(TypeBase, metaclass=MetaStruct):
-    def __init__(self, members):
+class MembersByName:
+    @property
+    def members_by_name(self):
+        if not hasattr(self, "_members_by_name"):
+            self._members_by_name = {}
+            for (i, (name, ty)) in enumerate(self.members):
+                self._members_by_name[name] = i
+        return self._members_by_name
+
+@_fracpackmeta(['name', 'members'], lambda name, members: name, ObjectValue)
+class Struct(TypeBase, MembersByName, metaclass=DerivedAsInstance):
+    def __init__(self, name, members):
         members = _as_list(members)
         self.fixed_size = 0
         self.is_variable_size = False
@@ -159,25 +246,18 @@ class Struct(TypeBase, metaclass=MetaStruct):
         members = []
         for (name, ty) in _as_list(raw):
             members.append((name, load_type(ty, parser)))
-        return Struct(members)
+        return Struct('<anonymous Struct>', members)
     def pack(self, value, stream):
-        value = dict(value)
+        if isinstance(value, ObjectValue):
+            value = value.__dict__
+        else:
+            value = dict(value)
         for (name, ty) in self.members:
             ty.pack(value[name], stream)
 
-class MetaObject(type):
-    def __new__(cls, name, bases, namespace, **kw):
-        if 'pack' not in namespace:
-            members = {}
-            if '__annotations__' in namespace:
-                for (name, ty) in namespace['__annotations__'].items():
-                    if isinstance(ty, TypeBase):
-                        members[name] = ty
-                return Object(members)
-        return super().__new__(cls, name, bases, namespace, **kw)
-
-class Object(TypeBase, metaclass=MetaObject):
-    def __init__(self, members):
+@_fracpackmeta(['name', 'members'], lambda name, members: name, ObjectValue)
+class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
+    def __init__(self, name, members):
         self.fixed_size = 4
         self.is_variable_size = True
         self.is_optional = False
@@ -186,7 +266,7 @@ class Object(TypeBase, metaclass=MetaObject):
             self.members = _as_list(members)
     @staticmethod
     def load(raw, parser):
-        result = Object(None)
+        result = Object("<anonymous>", None)
         def init():
             members = []
             for (name, ty) in _as_list(raw):
@@ -195,7 +275,10 @@ class Object(TypeBase, metaclass=MetaObject):
         parser.post(init)
         return result
     def pack(self, value, stream):
-        value = dict(value)
+        if isinstance(value, ObjectValue):
+            value = value.__dict__
+        else:
+            value = dict(value)
         num_present = 0
         i = 0
         for (name, ty) in self.members:
@@ -210,6 +293,7 @@ class Object(TypeBase, metaclass=MetaObject):
         for r in repack:
             r.pack()
 
+@_fracpackmeta(['type', 'len'], lambda type, len: '%s[%d]' % (type.__name__, len), list)
 class Array(TypeBase):
     def __init__(self, ty, n):
         self.ty = ty
@@ -233,6 +317,7 @@ class Array(TypeBase):
         for r in repack:
             r.pack()
 
+@_fracpackmeta(['type'], lambda ty: ty.__name__ + '[]' if ty is not None else 'List', list)
 class List(TypeBase):
     def __init__(self, ty):
         if ty is not None:
@@ -249,6 +334,7 @@ class List(TypeBase):
         parser.post(init)
         return result
     def pack(self, value, stream):
+        ty = self.ty
         stream.write_u32(self.ty.fixed_size * len(value))
         repack = []
         for item in value:
@@ -256,6 +342,11 @@ class List(TypeBase):
         for r in repack:
             r.pack()
 
+class OptionValue:
+    def __init__(self, value=None):
+        self.value = value
+
+@_fracpackmeta(['type'], lambda type: '%s?' % (type.__name__) if type is not None else 'Option', OptionValue)
 class Option(TypeBase):
     def __init__(self, ty):
         if ty is not None:
@@ -273,12 +364,16 @@ class Option(TypeBase):
         parser.post(init)
         return result
     def pack(self, value, stream):
+        if isinstance(value, OptionValue):
+            value = value.value
         if value is None:
             stream.write_u32(1)
         else:
             stream.write_u32(4)
             self.ty.embedded_fixed_pack(value, stream).pack()
     def embedded_fixed_pack(self, value, stream):
+        if isinstance(value, OptionValue):
+            value = value.value
         if value is None:
             stream.write_u32(1)
             return NullRepack()
@@ -288,17 +383,23 @@ class Option(TypeBase):
         else:
             return OffsetRepack(stream, value, self.ty)
 
-class Variant(TypeBase):
-    def __init__(self, members):
+class VariantValue:
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
+
+@_fracpackmeta(['name', 'members'], lambda name, members: name, VariantValue)
+class Variant(TypeBase, metaclass=DerivedAsInstance):
+    def __init__(self, name, members):
         if members is not None:
-            self.members = members
+            self.members = _as_list(members)
         self.fixed_size = 4
         self.is_variable_size = True
         self.is_optional = False
         self.is_container = False
     @staticmethod
     def load(raw, parser):
-        result = Variant(None)
+        result = Variant('<anonymous variant>', None)
         def init():
             members = []
             for (name, ty) in _as_list(raw):
@@ -307,6 +408,8 @@ class Variant(TypeBase):
         parser.post(init)
         return result
     def pack(self, value, stream):
+        if isinstance(value, VariantValue):
+            value = {value.type: value.value}
         assert(len(value) == 1)
         for (name, v) in dict(value).items():
             idx = self.members_by_name[name]
@@ -323,6 +426,7 @@ class Variant(TypeBase):
                 self._members_by_name[name] = i
         return self._members_by_name
 
+@_fracpackmeta(['members'], lambda members: 'Tuple', tuple)
 class Tuple(TypeBase):
     def __init__(self, members):
         if members is not None:
@@ -358,6 +462,7 @@ class Tuple(TypeBase):
         for r in repack:
             r.pack()
 
+@_fracpackmeta(['type'], lambda ty: 'FracPack', object)
 class FracPack(TypeBase):
     def __init__(self, ty):
         if ty is not None:
@@ -379,7 +484,11 @@ class FracPack(TypeBase):
         self.ty.pack(value, stream)
         stream.repack_u32(pos - 4, stream.pos - pos)
 
+@_fracpackmeta(['type', 'id'], lambda ty, id: id, object)
 class Custom(TypeBase):
+    def __init__(self, type, id):
+        self.type = type
+        self.id = id
     @staticmethod
     def load(raw, parser):
         raw = dict(raw)
@@ -387,8 +496,33 @@ class Custom(TypeBase):
         id = raw["id"]
         if id in parser.custom:
             # TODO: validate equivalence
-            return parser.custom[id](ty)
+            result = parser.custom[id]
+            if isinstance(result, TypeBase):
+                return result
+            else:
+                return result(ty)
         return ty
+    def pack(self, value, stream):
+        if hasattr(stream, 'custom'):
+            actual = stream.custom.get(self.id)
+        else:
+            actual = None
+        if actual is not None:
+            actual.pack(value, stream)
+        else:
+            self.type.pack(value, stream)
+    @property
+    def is_variable_size(self):
+        return self.type.is_variable_size
+    @property
+    def fixed_size(self):
+        return self.type.fixed_size
+    @property
+    def is_container(self):
+        return self.type.is_container
+    @property
+    def is_optional(self):
+        return self.type.is_optional
 
 class Type(TypeBase):
     @staticmethod
@@ -439,6 +573,8 @@ class Schema:
         self.types[name] = ty
     def __getitem__(self, name):
         return self.types[name]
+    def post(self, f):
+        f()
 
 u1 = Int(1, False)
 u8 = Int(8, False)
@@ -450,56 +586,33 @@ i16 = Int(16, True)
 i32 = Int(32, True)
 i64 = Int(64, True)
 
-class MetaFracPack(type):
-    def __new__(cls, name, bases, namespace, **kw):
-        result = super().__new__(cls, name, bases, namespace, **kw)
-        if '__fracpack__' not in namespace:
-            result.__init__(name, bases, namespace, **kw)
-            result = result()
-        return result
-
-class FracPackBase(TypeBase):
-    def pack(self, value, stream):
-        return self.__fracpack__.pack(value, stream)
-    def __call__(self, ty):
-        # TODO check ty is equivalent to self.__fracpack__
-        return self
-    @property
-    def is_variable_size(self):
-        return self.__fracpack__.is_variable_size
-    @property
-    def fixed_size(self):
-        return self.__fracpack__.fixed_size
-    @property
-    def is_container(self):
-        return self.__fracpack__.is_container
-    @property
-    def is_optional(self):
-        return self.__fracpack__.is_optional
+f32 = Float(8, 24)
+f64 = Float(11, 53)
 
 class Bool(u1):
-    def pack(self, value, stream):
-        if value:
-            stream.write_u8(1)
-        else:
-            stream.write_u8(0)
+    @staticmethod
+    def pack(value, stream):
+        u1.pack(int(value), stream)
 
-class String(List(u8)):
-    def pack(self, value, stream):
+class String(Custom(List(u8), "string"), str):
+    @staticmethod
+    def pack(value, stream):
         data = value.encode()
         stream.write_u32(len(data))
         stream.write_bytes(data)
 
+@_fracpackmeta(['type'], lambda type: 'Hex', object)
 class Hex(TypeBase):
     def __init__(self, ty):
         self.ty = ty
     def pack(self, value, stream):
-        data = bytes.fromhex(value)
+        if isinstance(value, str):
+            value = bytes.fromhex(value)
         if self.ty.is_container:
-            stream.write_u32(len(data))
-            stream.write_bytes(data)
+            stream.write_u32(len(value))
+            stream.write_bytes(value)
         else:
-            stream.write_bytes(data)
+            stream.write_bytes(value)
     @property
     def is_variable_size(self):
         return self.ty.is_variable_size

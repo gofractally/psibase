@@ -32,6 +32,20 @@ def get_raw_retval(trace):
 def get_retval(trace, type):
     return type.unpack(io.BytesIO(bytes.fromhex(get_raw_retval(trace))))
 
+class ThreadErrorHandler:
+    def __init__(self):
+        self.error = None
+    def __call__(self, target, args):
+        def wrapper(*args, **kw):
+            try:
+                return target(*args, **kw)
+            except Exception as e:
+                self.error = e
+        return Thread(target=wrapper, args=args)
+    def check(self):
+        if self.error is not None:
+            raise self.error
+
 class TestSubjective(unittest.TestCase):
     @testutil.psinode_test
     def test_parallel(self, cluster):
@@ -42,6 +56,7 @@ class TestSubjective(unittest.TestCase):
         a.wait(new_block())
 
         def parallel_query(fn):
+            launcher = ThreadErrorHandler()
             threads = []
 
             nthreads = 4
@@ -53,12 +68,14 @@ class TestSubjective(unittest.TestCase):
                         out.append(fn(api))
                 v = []
                 values.append(v)
-                threads.append(Thread(target=tfn, args=(a.new_api(),v)))
+                threads.append(launcher(target=tfn, args=(a.new_api(),v)))
 
             for t in threads:
                 t.start()
             for t in threads:
                 t.join()
+
+            launcher.check()
 
             all_values = []
             for v in values:
@@ -91,6 +108,7 @@ class TestSubjective(unittest.TestCase):
         a.run_psibase(['install', '--package-source', testutil.test_packages(), 'PSubjective', 'Counter'])
         a.wait(new_block())
 
+        launcher = ThreadErrorHandler()
         nthreads = 4
         threads = []
 
@@ -104,7 +122,7 @@ class TestSubjective(unittest.TestCase):
                         out.append(response.json()['value'])
             v = []
             values.append(v)
-            threads.append(Thread(target=tfn, args=(a.new_api(),v)))
+            threads.append(launcher(target=tfn, args=(a.new_api(),v)))
 
         for t in threads:
             t.start()
@@ -117,6 +135,7 @@ class TestSubjective(unittest.TestCase):
 
         for t in threads:
             t.join()
+        launcher.check()
 
         all_values = []
         for v in values:

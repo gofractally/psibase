@@ -2,8 +2,11 @@
 
 import unittest
 from psibase import Action, Transaction
+import fracpack
 
 class TestPsibaseTypes(unittest.TestCase):
+    def test_action_value(self):
+        self.assertEqual(fracpack.pack(Action('alice', 'ink', 'foo', '0000')).hex().upper(), '1C000F316600000000002A49800000000000D3D500000000000004000000020000000000')
     def test_action(self):
         self.assertEqual(Action.packed({"sender":"alice", "service": "ink", "method": "foo", "rawData": "0000"}).hex().upper(), '1C000F316600000000002A49800000000000D3D500000000000004000000020000000000')
     def test_transaction(self):
