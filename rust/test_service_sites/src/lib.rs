@@ -34,6 +34,7 @@ mod service {
     impl From<ContentRow> for HttpReply {
         fn from(content_row: ContentRow) -> Self {
             HttpReply {
+                status: 200,
                 contentType: content_row.content_type,
                 body: content_row.content,
                 headers: Vec::new(),
@@ -519,6 +520,7 @@ mod tests {
         assert_eq!(
             reply,
             &HttpReply {
+                status: 200,
                 contentType: content_type.to_owned(),
                 body: content.clone().into(),
                 headers: Vec::new(),
