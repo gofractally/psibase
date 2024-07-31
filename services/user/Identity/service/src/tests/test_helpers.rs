@@ -35,15 +35,15 @@ impl PartialEq for Attestation {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-struct AttestationQueryData {
-    nodes: Vec<Attestation>,
-}
+// #[derive(Deserialize, Debug, Clone)]
+// struct AttestationQueryData {
+//     nodes: Vec<Attestation>,
+// }
 
-#[derive(Deserialize, Debug, Clone)]
-struct AttestationReply {
-    data: AttestationQueryData,
-}
+// #[derive(Deserialize, Debug, Clone)]
+// struct AttestationReply {
+//     data: AttestationQueryData,
+// }
 
 pub fn expect_attestations(chain: &psibase::Chain, exp_results: &serde_json::Value) {
     use serde_json::Value;
