@@ -37,7 +37,7 @@ namespace psibase::test
       return mock_current_time;
    }
 
-   bool mock_clock::advance()
+   bool mock_clock::advance(mock_clock::time_point)
    {
       assert(!"not implemented");
    }

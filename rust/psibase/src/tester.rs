@@ -245,28 +245,20 @@ impl Chain {
         //}
 
         let packed_request = request.packed();
-        let size = unsafe {
+        let fd = unsafe {
             tester_raw::httpRequest(
                 self.chain_handle,
                 packed_request.as_ptr(),
                 packed_request.len(),
             )
         };
-        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
-
-        if let Some(error) = &trace.error {
-            return Err(anyhow!("http request failed: {}", error));
+        let mut size: u32 = 0;
+        let err = unsafe { tester_raw::socketRecv(fd, &mut size) };
+        if err != 0 {
+            Err(anyhow!("Could not read response: {}", err))?;
         }
 
-        if trace.action_traces.len() != 1 {
-            return Err(anyhow!("Expected exactly one action trace"));
-        }
-        let action_trace = trace.action_traces.first().unwrap();
-        if let Some(response) = <Option<HttpReply>>::unpacked(&action_trace.raw_retval)? {
-            Ok(response)
-        } else {
-            return Err(anyhow!("404 Not Found"));
-        }
+        Ok(HttpReply::unpacked(&get_result_bytes(size))?)
     }
 
     pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {

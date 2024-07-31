@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::{Hex, Pack, ToKey, ToSchema, Unpack};
+use anyhow::anyhow;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// An HTTP header
@@ -79,6 +80,8 @@ impl HttpBody {
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpReply {
+    pub status: u16,
+
     /// "application/json", "text/html", ...
     pub contentType: String,
 
@@ -94,6 +97,15 @@ impl HttpReply {
         Ok(String::from_utf8(self.body.0)?)
     }
     pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
+        if self.status != 200 {
+            let status = self.status;
+            if self.contentType == "text/html" {
+                if let Ok(msg) = self.text() {
+                    Err(anyhow!("Request returned {} {}", status, msg))?
+                }
+            }
+            return Err(anyhow!("Request returned {}", status));
+        }
         Ok(serde_json::de::from_str(&self.text()?)?)
     }
 }

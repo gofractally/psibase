@@ -17,7 +17,7 @@ TEST_CASE("mock_timer")
    timer.async_wait([&](std::error_code) { ++counter; });
    ctx.poll();
    CHECK(counter == 0);
-   mock_clock::advance(1s);
+   mock_clock::advance(mock_clock::now() + 1s);
    CHECK(counter == 0);
    ctx.poll();
    CHECK(counter == 1);

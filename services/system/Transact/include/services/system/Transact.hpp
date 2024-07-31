@@ -180,6 +180,7 @@ namespace SystemService
    {
       onTransaction,
       onBlock,
+      onFailedTransaction,
    };
 
    struct Callbacks

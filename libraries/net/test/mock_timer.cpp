@@ -12,7 +12,14 @@ namespace psibase::test
    {
       static constexpr auto timer_queue_compare = [](const auto& lhs, const auto& rhs)
       { return std::tie(lhs->deadline, lhs->sequence) > std::tie(rhs->deadline, rhs->sequence); };
-      mock_clock::time_point                         mock_current_time;
+
+      // The fake block 00000000000000000000 has a timestamp of zero which
+      // prevents the first real block from having a timestamp less than 1.
+      // Since the timestamp is the start time, rather than the finish time,
+      // it cannot complete earlier than epoch+2s. So, start the timer at 1
+      // to avoid issues.
+      constexpr auto         initial_time      = mock_clock::time_point{} + std::chrono::seconds(1);
+      mock_clock::time_point mock_current_time = initial_time;
       std::vector<std::shared_ptr<mock_timer::impl>> timer_queue;
       std::mutex                                     queue_mutex;
       std::atomic<std::uint64_t>                     timer_sequence;
@@ -60,19 +67,13 @@ namespace psibase::test
    void mock_clock::reset()
    {
       std::lock_guard l{queue_mutex};
-      mock_current_time = {};
+      mock_current_time = initial_time;
       timer_queue.clear();
    }
-   void mock_clock::advance(mock_clock::duration diff)
+   bool mock_clock::advance(mock_clock::time_point limit)
    {
       std::lock_guard l{queue_mutex};
-      mock_current_time += diff;
-      process_queue(mock_current_time);
-   }
-   bool mock_clock::advance()
-   {
-      std::lock_guard l{queue_mutex};
-      if (!timer_queue.empty())
+      if (!timer_queue.empty() && timer_queue.front()->deadline <= limit)
       {
          mock_current_time = timer_queue.front()->deadline;
          process_queue(mock_current_time);
@@ -80,6 +81,7 @@ namespace psibase::test
       }
       else
       {
+         mock_current_time = limit;
          return false;
       }
    }

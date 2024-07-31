@@ -292,6 +292,19 @@ namespace psibase
          }
          else
          {
+            if (response.status != HttpStatus::ok)
+            {
+               if (response.contentType == "text/html")
+               {
+                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
+                               std::string(response.body.begin(), response.body.end()));
+               }
+               else
+               {
+                  abortMessage("Request returned " +
+                               std::to_string(static_cast<std::uint16_t>(response.status)));
+               }
+            }
             if (response.contentType != "application/json")
                abortMessage("Wrong Content-Type " + response.contentType);
             response.body.push_back('\0');

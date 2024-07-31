@@ -373,7 +373,8 @@ TEST_CASE("producer cancel fork switch")
    node.send(invalid);
    CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
    // The next block should be built off fork1
-   runFor(node.ctx, 1s);
+   while (node.head().blockId == BlockInfo{fork1.block->block()}.blockId)
+      runFor(node.ctx, 1s);
    CHECK(node.head().header.previous == BlockInfo{fork1.block->block()}.blockId);
    CHECK(node.head().header.producer.str() == "a");
 }
