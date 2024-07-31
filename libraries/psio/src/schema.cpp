@@ -1298,7 +1298,7 @@ namespace psio::schema_types
                   return *current;
                auto pos = types.types.find(*current);
                if (pos == types.types.end())
-                  throw std::runtime_error("missing type");
+                  check(false, "missing type");
                if (auto alias = std::get_if<Type>(&pos->second.value))
                {
                   current = &alias->type;
@@ -1322,7 +1322,7 @@ namespace psio::schema_types
                {
                   auto pos = fixedNames.find(alias);
                   if (pos == fixedNames.end())
-                     throw std::runtime_error("Failed to resolved " + alias);
+                     check(false, "Failed to resolved " + alias);
                   if (pos->second.shouldInline())
                   {
                      auto pos = types.types.find(alias);
