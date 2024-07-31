@@ -46,7 +46,6 @@ impl Accounts for AccountsPlugin {
     }
 
     fn get_account(name: String) -> Result<String, CommonTypes::Error> {
-        // let query = "query {{ getAccount(account: \"{name}\") {{ accountNum }} }}";
         let query = format!(
             "query {{ getAccount(account: \"{}\") {{ accountNum }} }}",
             name

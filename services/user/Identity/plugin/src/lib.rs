@@ -67,9 +67,7 @@ impl QueriesGuest for IdentityPlugin {
             subject
         );
         let summary = CommonServer::post_graphql_get_json(&graphql_str).unwrap();
-        println!("summary: {}", summary);
         let summary_val = serde_json::from_str::<IdentitySummaryResponse>(&summary).unwrap();
-        println!("summary stats: {:#?}", summary_val.data.subjectStats);
         Ok(IdentityTypes::IdentitySummary {
             perc_high_confidence: summary_val.data.subjectStats.percHighConf,
             num_unique_attestations: summary_val.data.subjectStats.uniqueAttesters,

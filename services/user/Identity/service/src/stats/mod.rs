@@ -40,6 +40,9 @@ fn add_attestation_to_stats(
     stats_rec
 }
 
+/* Keep attestations stats update to date for simpler response to identity-summary queries
+if attester-subject pair already in table, recalc %high_conf if necessary based on new score
+if attester-subject pair not in table, increment unique attestations and calc new %high_conf score */
 pub fn update_attestation_stats(
     subj_acct: AccountNumber,
     is_new_unique_attester_for_subj: bool,

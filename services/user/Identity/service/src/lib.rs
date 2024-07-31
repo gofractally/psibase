@@ -125,8 +125,6 @@ mod service {
             .unwrap();
 
         // Update Attestation stats
-        // if attester-subject pair already in table, recalc %high_conf if necessary based on new score
-        // if attester-subject pair not in table, increment unique attestations and calc new %high_conf score
         update_attestation_stats(subj_acct, is_unique_attester, value, issued);
 
         Wrapper::emit()
