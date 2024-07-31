@@ -11,8 +11,9 @@ pub fn test_attest(
     conf: u8,
 ) -> Result<(), psibase::Error> {
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
-    let result = crate::Wrapper::push_from(&chain, attester).attest(subject.clone(), conf);
-    assert_eq!(result.get()?, ());
+    crate::Wrapper::push_from(&chain, attester)
+        .attest(subject.clone(), conf)
+        .get()?;
 
     chain.finish_block();
     Ok(())

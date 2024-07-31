@@ -101,6 +101,7 @@ mod service {
 
     #[action]
     pub fn attest(subject: String, value: u8) {
+        check(value <= 100, "bad confidence score");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 

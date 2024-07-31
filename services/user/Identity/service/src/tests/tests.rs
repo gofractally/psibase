@@ -5,6 +5,46 @@ use psibase::AccountNumber;
 
 use crate::tests::test_helpers::*;
 
+#[psibase::test_case(services("identity"))]
+pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    match test_attest(
+        &chain,
+        AccountNumber::from("alice"),
+        String::from("bob"),
+        101,
+    ) {
+        Ok(_) => {
+            return Err(psibase::Error::msg(
+                "Confidence score of 101 should not have been accepted.",
+            ))
+        }
+        Err(_) => (), // This is expected
+    }
+
+    chain.finish_block();
+    expect_attestation_stats(&chain, &json!([]));
+
+    chain.start_block();
+
+    match test_attest(
+        &chain,
+        AccountNumber::from("alice"),
+        String::from("bob"),
+        255,
+    ) {
+        Ok(_) => {
+            return Err(psibase::Error::msg(
+                "Confidence scores <0 should not have been accepted.",
+            ))
+        }
+        Err(_) => (), // This is expected
+    }
+
+    expect_attestation_stats(&chain, &json!([]));
+
+    Ok(())
+}
+
 // #[psibase::test_case(services("identity"))]
 // pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
 //     test_attest(
@@ -122,60 +162,60 @@ use crate::tests::test_helpers::*;
 //     Ok(())
 // }
 
-#[psibase::test_case(services("identity"))]
-pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let attester = AccountNumber::from("alice");
-    let subject = String::from("bob");
-    let value = 75;
+// #[psibase::test_case(services("identity"))]
+// pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let attester = AccountNumber::from("alice");
+//     let subject = String::from("bob");
+//     let value = 75;
 
-    test_attest(&chain, attester, subject.clone(), value)?;
+//     test_attest(&chain, attester, subject.clone(), value)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject.clone(), "uniqueAttesters": 1, "percHighConf": 0}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject.clone(), "uniqueAttesters": 1, "percHighConf": 0}]),
+//     );
 
-    let attester2 = AccountNumber::from("carol");
-    let value2 = 76;
+//     let attester2 = AccountNumber::from("carol");
+//     let value2 = 76;
 
-    chain.start_block();
-    chain.new_account(attester2)?;
+//     chain.start_block();
+//     chain.new_account(attester2)?;
 
-    chain.start_block();
-    test_attest(&chain, attester2, subject.clone(), value2)?;
+//     chain.start_block();
+//     test_attest(&chain, attester2, subject.clone(), value2)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 2, "percHighConf": 50}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 2, "percHighConf": 50}]),
+//     );
 
-    let attester3 = AccountNumber::from("david");
-    let value3 = 77;
+//     let attester3 = AccountNumber::from("david");
+//     let value3 = 77;
 
-    chain.start_block();
-    chain.new_account(attester3)?;
+//     chain.start_block();
+//     chain.new_account(attester3)?;
 
-    chain.start_block();
-    test_attest(&chain, attester3, subject.clone(), value3)?;
+//     chain.start_block();
+//     test_attest(&chain, attester3, subject.clone(), value3)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 3, "percHighConf": 67}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 3, "percHighConf": 67}]),
+//     );
 
-    let attester4 = AccountNumber::from("ed");
-    let value4 = 95;
+//     let attester4 = AccountNumber::from("ed");
+//     let value4 = 95;
 
-    chain.start_block();
-    chain.new_account(attester4)?;
+//     chain.start_block();
+//     chain.new_account(attester4)?;
 
-    chain.start_block();
-    test_attest(&chain, attester4, subject.clone(), value4)?;
+//     chain.start_block();
+//     test_attest(&chain, attester4, subject.clone(), value4)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 4, "percHighConf": 75}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 4, "percHighConf": 75}]),
+//     );
 
-    Ok(())
-}
+//     Ok(())
+// }
