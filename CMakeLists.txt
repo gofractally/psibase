@@ -783,6 +783,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/Webmail.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
