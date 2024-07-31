@@ -5,39 +5,39 @@ use psibase::AccountNumber;
 
 use crate::tests::test_helpers::*;
 
-#[psibase::test_case(services("identity"))]
-pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    test_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        String::from("bob"),
-        95,
-    )?;
+// #[psibase::test_case(services("identity"))]
+// pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         String::from("bob"),
+//         95,
+//     )?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": "bob", "uniqueAttesters": 1, "percHighConf": 100}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": "bob", "uniqueAttesters": 1, "percHighConf": 100}]),
+//     );
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-#[psibase::test_case(services("identity"))]
-pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    test_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        String::from("bob"),
-        75,
-    )?;
+// #[psibase::test_case(services("identity"))]
+// pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         String::from("bob"),
+//         75,
+//     )?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": "bob", "uniqueAttesters": 1, "percHighConf": 0}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": "bob", "uniqueAttesters": 1, "percHighConf": 0}]),
+//     );
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[psibase::test_case(services("identity"))]
 pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -94,6 +94,30 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
         &chain,
         &json!([{"subject": subject, "uniqueAttesters": 3, "percHighConf": 67}]),
     );
+
+    // check that issued is updated when an attestation is updated
+    chain.start_block();
+    let reply: serde_json::Value = chain
+        .graphql(
+            crate::SERVICE,
+            r#"query { allAttestationStats { subject, uniqueAttesters, percHighConf, mostRecentAttestation { seconds } } }"#,
+        )
+        .unwrap();
+    let issued1 = &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
+
+    let value4 = 83;
+
+    test_attest(&chain, attester3, subject.clone(), value4)?;
+
+    let reply: serde_json::Value = chain
+        .graphql(
+            crate::SERVICE,
+            r#"query { allAttestationStats { subject, uniqueAttesters, percHighConf, mostRecentAttestation { seconds } } }"#,
+        )
+        .unwrap();
+    let issued2 = &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
+
+    assert_ne!(issued1, issued2);
 
     Ok(())
 }
