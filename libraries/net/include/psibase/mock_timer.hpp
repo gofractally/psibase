@@ -28,8 +28,7 @@ namespace psibase::test
       static time_point     now();
       static void           reset();
       static void           reset(time_point);
-      static void           advance(duration);
-      static bool           advance();
+      static bool           advance(time_point);
    };
 
    std::ostream& operator<<(std::ostream&, mock_clock::time_point);

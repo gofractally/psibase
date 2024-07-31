@@ -4,7 +4,7 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "SubjectiveTable", index = 0, db = "Subjective")]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Fracpack, Serialize, Deserialize)]
     pub struct SubjectiveRow {
         #[primary_key]
         id: i32,

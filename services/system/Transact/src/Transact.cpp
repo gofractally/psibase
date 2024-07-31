@@ -2,6 +2,7 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 
 #include <boost/container/flat_map.hpp>
@@ -94,6 +95,36 @@ namespace SystemService
       }
    }
 
+   static void checkObjectiveCallback(CallbackType type)
+   {
+      switch (type)
+      {
+         case CallbackType::onBlock:
+            abortMessage("Objective block callbacks not supported");
+         case CallbackType::onTransaction:
+            break;
+         case CallbackType::onFailedTransaction:
+            abortMessage("Objective failed transaction callbacks not supported");
+         default:
+            abortMessage("Unknown callback type");
+      }
+   }
+
+   static NotifyType getNotifyType(CallbackType type)
+   {
+      switch (type)
+      {
+         case CallbackType::onBlock:
+            return NotifyType::acceptBlock;
+         case CallbackType::onTransaction:
+            return NotifyType::acceptTransaction;
+         case CallbackType::onFailedTransaction:
+            return NotifyType::rejectTransaction;
+         default:
+            abortMessage("Unknown callback type");
+      }
+   }
+
    void Transact::addCallback(CallbackType type, bool objective, psibase::Action act)
    {
       auto me = getReceiver();
@@ -101,7 +132,7 @@ namespace SystemService
       if (objective)
       {
          check(act.sender == me, "Objective callbacks must have 'transact' as sender");
-         check(type == CallbackType::onTransaction, "Objective block callbacks not supported");
+         checkObjectiveCallback(type);
          Tables tables(me);
          auto   table = tables.open<CallbacksTable>();
          auto   index = table.getIndex<0>();
@@ -116,8 +147,7 @@ namespace SystemService
       else
       {
          check(act.sender == AccountNumber{}, "Subjective callbacks must not have a sender");
-         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
-         auto ntype = NotifyType::acceptBlock;
+         auto ntype = getNotifyType(type);
          auto key   = notifyKey(ntype);
          auto value = kvGet<NotifyRow>(NotifyRow::db, key);
          if (!value)
@@ -154,8 +184,7 @@ namespace SystemService
       }
       else
       {
-         check(type == CallbackType::onBlock, "Subjective transaction callbacks not supported");
-         auto ntype = NotifyType::acceptBlock;
+         auto ntype = getNotifyType(type);
          auto key   = notifyKey(ntype);
          if (auto value = kvGet<NotifyRow>(NotifyRow::db, key))
          {
@@ -445,6 +474,16 @@ namespace SystemService
       }
 
       trxData = std::span<const char>{};
+   }
+
+   extern "C" [[clang::export_name("nextTransaction")]] void nextTransaction()
+   {
+      // forward to r-transact
+      auto act       = getCurrentActionView();
+      act->sender()  = act->service().unpack();
+      act->service() = RTransact::service;
+      act->method()  = MethodNumber{"next"};
+      setRetvalBytes(call(act.data_without_size_prefix()));
    }
 
 }  // namespace SystemService

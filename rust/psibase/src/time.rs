@@ -1,4 +1,4 @@
-use crate::{Pack, Reflect, ToKey, ToSchema, Unpack};
+use crate::{Pack, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
@@ -14,7 +14,6 @@ use std::ops::{Add, Sub};
     Ord,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -23,7 +22,6 @@ use std::ops::{Add, Sub};
     InputObject,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TimePointSecInput")]
 pub struct TimePointSec {

@@ -6,6 +6,7 @@
 namespace psibase
 {
    struct WatchdogManager;
+   struct Sockets;
 
    struct SystemContext
    {
@@ -13,6 +14,7 @@ namespace psibase
       WasmCache                        wasmCache;
       std::vector<ExecutionMemory>     executionMemories;
       std::shared_ptr<WatchdogManager> watchdogManager;
+      std::shared_ptr<Sockets>         sockets;
 
       void setNumMemories(size_t n)
       {

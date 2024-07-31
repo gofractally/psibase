@@ -339,6 +339,8 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::checkoutSubjective>("env", "checkoutSubjective");
       rhf_t::add<&ExecutionContextImpl::commitSubjective>("env", "commitSubjective");
       rhf_t::add<&ExecutionContextImpl::abortSubjective>("env", "abortSubjective");
+      rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
+      rhf_t::add<&ExecutionContextImpl::socketAutoClose>("env", "socketAutoClose");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const
@@ -356,7 +358,8 @@ namespace psibase
    void ExecutionContext::execCalled(uint64_t callerFlags, ActionContext& actionContext)
    {
       // Prevents a poison block
-      if (callerFlags & CodeRow::isSubjective)
+      if (callerFlags & CodeRow::isSubjective &&
+          !actionContext.transactionContext.allowDbReadSubjective)
       {
          check(impl->code.flags & CodeRow::isSubjective,
                "subjective services may not call non-subjective ones");
@@ -423,6 +426,13 @@ namespace psibase
    {
       impl->exec(actionContext, [&] {  //
          (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "serve");
+      });
+   }
+
+   void ExecutionContext::exec(ActionContext& actionContext, std::string_view fn)
+   {
+      impl->exec(actionContext, [&] {  //
+         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", fn);
       });
    }
 

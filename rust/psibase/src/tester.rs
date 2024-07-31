@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, PackageRegistry, Reflect, SignedTransaction, StatusRow,
-    TimePointSec, Transaction, TransactionTrace,
+    InnerTraceEnum, JointRegistry, PackageRegistry, SignedTransaction, StatusRow, TimePointSec,
+    Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -44,7 +44,8 @@ impl Default for Chain {
 
 impl Drop for Chain {
     fn drop(&mut self) {
-        unsafe { tester_raw::testerDestroyChain(self.chain_handle) }
+        unsafe { tester_raw::destroyChain(self.chain_handle) }
+        tester_raw::tester_clear_chain_for_db(self.chain_handle)
     }
 }
 
@@ -93,14 +94,15 @@ impl Chain {
     /// The arguments are the file sizes in bytes for the database's
     /// various files.
     pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
-        unsafe {
-            Chain {
-                chain_handle: tester_raw::testerCreateChain(
-                    hot_bytes, warm_bytes, cool_bytes, cold_bytes,
-                ),
-                status: None.into(),
-                producing: false.into(),
-            }
+        let chain_handle =
+            unsafe { tester_raw::createChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes) };
+        if chain_handle == 0 {
+            tester_raw::tester_select_chain_for_db(chain_handle)
+        }
+        Chain {
+            chain_handle,
+            status: None.into(),
+            producing: false.into(),
         }
     }
 
@@ -116,10 +118,10 @@ impl Chain {
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time.seconds + 1 < time.seconds {
-                unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds - 1) }
+                unsafe { tester_raw::startBlock(self.chain_handle, time.seconds - 1) }
             }
         }
-        unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds) }
+        unsafe { tester_raw::startBlock(self.chain_handle, time.seconds) }
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
         self.producing.replace(true);
     }
@@ -135,7 +137,7 @@ impl Chain {
     ///
     /// This does nothing if a block isn't currently being produced.
     pub fn finish_block(&self) {
-        unsafe { tester_raw::testerFinishBlock(self.chain_handle) }
+        unsafe { tester_raw::finishBlock(self.chain_handle) }
         self.producing.replace(false);
     }
 
@@ -168,11 +170,7 @@ impl Chain {
 
         let transaction = transaction.packed();
         let size = unsafe {
-            tester_raw::testerPushTransaction(
-                self.chain_handle,
-                transaction.as_ptr(),
-                transaction.len(),
-            )
+            tester_raw::pushTransaction(self.chain_handle, transaction.as_ptr(), transaction.len())
         };
         TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
@@ -199,9 +197,9 @@ impl Chain {
     /// will corrupt the database and likely crash the `psitest` process running this
     /// wasm.
     pub unsafe fn get_path(&self) -> String {
-        let size = tester_raw::testerGetChainPath(self.chain_handle, null_mut(), 0);
+        let size = tester_raw::getChainPath(self.chain_handle, null_mut(), 0);
         let mut bytes = Vec::with_capacity(size);
-        tester_raw::testerGetChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
+        tester_raw::getChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
         bytes.set_len(size);
         String::from_utf8_unchecked(bytes)
     }
@@ -217,7 +215,7 @@ impl Chain {
     /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
     pub fn select_chain(&self) {
-        unsafe { tester_raw::testerSelectChainForDb(self.chain_handle) }
+        tester_raw::tester_select_chain_for_db(self.chain_handle)
     }
 
     /// Create a new account
@@ -247,29 +245,33 @@ impl Chain {
         //}
 
         let packed_request = request.packed();
-        let size = unsafe {
-            tester_raw::testerHttpRequest(
+        let fd = unsafe {
+            tester_raw::httpRequest(
                 self.chain_handle,
                 packed_request.as_ptr(),
                 packed_request.len(),
             )
         };
-        let trace = TransactionTrace::unpacked(&get_result_bytes(size)).unwrap();
-
-        if let Some(error) = &trace.error {
-            return Err(anyhow!("http request failed: {}", error));
+        let mut size: u32 = 0;
+        let err = unsafe { tester_raw::socketRecv(fd, &mut size) };
+        if err != 0 {
+            Err(anyhow!("Could not read response: {}", err))?;
         }
 
-        if trace.action_traces.len() != 1 {
-            return Err(anyhow!("Expected exactly one action trace"));
-        }
-        let action_trace = trace.action_traces.first().unwrap();
-        if let Some(response) = <Option<HttpReply>>::unpacked(&action_trace.raw_retval)? {
-            Ok(response)
-        } else {
-            return Err(anyhow!("404 Not Found"));
-        }
+        Ok(HttpReply::unpacked(&get_result_bytes(size))?)
     }
+
+    pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            rootHost: "psibase.io".into(),
+            method: "GET".into(),
+            target: target.into(),
+            contentType: "".into(),
+            body: <Vec<u8>>::new().into(),
+        })
+    }
+
     pub fn post(
         &self,
         account: AccountNumber,
@@ -359,10 +361,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     }
 }
 
-#[derive(Clone, Debug, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Debug)]
 pub struct ChainPusher<'a> {
-    #[reflect(skip)]
     pub chain: &'a Chain,
     pub sender: AccountNumber,
     pub service: AccountNumber,

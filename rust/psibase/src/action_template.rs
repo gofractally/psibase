@@ -1,361 +1,102 @@
-use crate::reflect::{
-    ArgVisitor, IgnoreVisit, MethodsVisitor, NamedVisitor, Reflect, StructVisitor, UnnamedVisitor,
-    Visitor,
-};
+use crate::ToServiceSchema;
+use fracpack::AnyType;
 use serde_json::to_string;
 
-pub fn generate_action_templates<T: Reflect>() -> String {
-    let mut result = "{".to_owned();
-    T::reflect(TemplateGenerator {
-        result: &mut result,
-        first: true,
-    });
+pub fn generate_action_templates<T: ToServiceSchema>() -> String {
+    let schema = T::actions_schema();
+
+    let mut result = String::new();
+
+    result.push('{');
+    let mut first = true;
+    for (name, ty) in &schema.actions {
+        if !first {
+            result.push(',')
+        } else {
+            first = false
+        }
+        result.push_str(&to_string(&name).unwrap());
+        result.push(':');
+        generate_type_template(&schema.types, &ty.params, &mut result);
+    }
     result.push('}');
     result
 }
 
-struct TemplateGenerator<'a> {
-    result: &'a mut String,
-    first: bool,
-}
-
-impl<'a> Visitor for TemplateGenerator<'a> {
-    type Return = ();
-    type TupleVisitor = IgnoreVisit<()>;
-    type StructTupleVisitor = IgnoreVisit<()>;
-    type StructVisitor = Self;
-    type EnumVisitor = IgnoreVisit<()>;
-
-    fn struct_named<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::StructVisitor {
-        self
-    }
-
-    fn custom_json(self) -> Self {
-        unimplemented!()
-    }
-    fn definition_will_not_change(self) -> Self {
-        self
-    }
-    fn unit(self) {
-        unimplemented!()
-    }
-    fn builtin<T: Reflect>(self, _name: &'static str) {
-        unimplemented!()
-    }
-    fn refed<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn mut_ref<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn boxed<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn rc<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn arc<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn cell<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn ref_cell<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn option<Inner: Reflect>(self) {
-        unimplemented!()
-    }
-    fn container<T: Reflect, Inner: Reflect>(self) {
-        unimplemented!()
-    }
-    fn array<Inner: Reflect, const SIZE: usize>(self) {
-        unimplemented!()
-    }
-    fn hex<const SIZE: usize>(self) {
-        unimplemented!()
-    }
-    fn tuple<T: Reflect>(self, _fields_len: usize) -> Self::TupleVisitor {
-        unimplemented!()
-    }
-    fn struct_single<T: Reflect, Inner: Reflect>(self, _name: std::borrow::Cow<'static, str>) {
-        unimplemented!()
-    }
-    fn struct_tuple<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::StructTupleVisitor {
-        unimplemented!()
-    }
-    fn enumeration<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::EnumVisitor {
-        unimplemented!()
-    }
-}
-
-impl<'a> NamedVisitor<()> for TemplateGenerator<'a> {
-    fn field<T: Reflect>(self, _name: std::borrow::Cow<'static, str>) -> Self {
-        self
-    }
-    fn end(self) {}
-}
-
-impl<'a> StructVisitor<()> for TemplateGenerator<'a> {
-    type MethodsVisitor = Self;
-
-    fn with_methods(self, _num_methods: usize) -> Self::MethodsVisitor {
-        self
-    }
-}
-
-impl<'a> MethodsVisitor<()> for TemplateGenerator<'a> {
-    type ArgVisitor = ArgsGenerator<'a>;
-
-    fn method<MethodReturn: Reflect>(
-        self,
-        name: std::borrow::Cow<'static, str>,
-        _num_args: usize,
-    ) -> Self::ArgVisitor {
-        if !self.first {
-            self.result.push(',');
+fn generate_type_template(schema: &fracpack::Schema, ty: &AnyType, out: &mut String) {
+    match ty {
+        AnyType::Struct(members) | AnyType::Object(members) => {
+            out.push('{');
+            let mut first = true;
+            for (name, ty) in members {
+                if !first {
+                    out.push(',')
+                } else {
+                    first = false
+                }
+                out.push_str(&to_string(&name).unwrap());
+                out.push(':');
+                generate_type_template(schema, ty, out)
+            }
+            out.push('}');
         }
-        self.result.push_str(&to_string(&name).unwrap());
-        self.result.push_str(":{");
-        ArgsGenerator {
-            result: self.result,
-            first: true,
+        AnyType::Array { type_, len } => {
+            out.push('[');
+            let mut first = true;
+            for _i in 0..*len {
+                if !first {
+                    out.push(',')
+                } else {
+                    first = false
+                }
+                generate_type_template(schema, type_, out);
+            }
+            out.push(']');
         }
-    }
-    fn end(self) {}
-}
-
-struct ArgsGenerator<'a> {
-    result: &'a mut String,
-    first: bool,
-}
-
-impl<'a> ArgVisitor<TemplateGenerator<'a>> for ArgsGenerator<'a> {
-    fn arg<T: Reflect>(mut self, name: std::borrow::Cow<'static, str>) -> Self {
-        if !self.first {
-            self.result.push(',');
+        AnyType::List(ty) => {
+            out.push('[');
+            generate_type_template(schema, ty.as_ref(), out);
+            out.push(']');
         }
-        self.first = false;
-        self.result.push_str(&to_string(&name).unwrap());
-        self.result.push(':');
-        T::reflect(ValueGenerator {
-            result: self.result,
-            skip: false,
-        });
-        self
-    }
-    fn end(self) -> TemplateGenerator<'a> {
-        self.result.push('}');
-        TemplateGenerator {
-            result: self.result,
-            first: false,
+        AnyType::Option(_ty) => {
+            out.push_str("null");
         }
-    }
-}
-
-struct ValueGenerator<'a> {
-    result: &'a mut String,
-    skip: bool,
-}
-
-impl<'a> Visitor for ValueGenerator<'a> {
-    type Return = ();
-    type TupleVisitor = FieldGenerator<'a>;
-    type StructTupleVisitor = FieldGenerator<'a>;
-    type StructVisitor = FieldGenerator<'a>;
-    type EnumVisitor = IgnoreVisit<()>;
-
-    fn custom_json(mut self) -> Self {
-        if !self.skip {
-            self.result.push_str("\"\"");
-            self.skip = true;
+        AnyType::Variant(_types) => {
+            out.push_str("{}");
         }
-        self
-    }
-    fn definition_will_not_change(self) -> Self {
-        self
-    }
-    fn unit(self) {
-        self.result.push_str("null")
-    }
-    fn builtin<T: Reflect>(self, name: &'static str) {
-        if !self.skip {
-            match name {
-                "bool" => self.result.push_str("false"),
-                "u8" => self.result.push('0'),
-                "u16" => self.result.push('0'),
-                "u32" => self.result.push('0'),
-                "u64" => self.result.push('0'),
-                "i8" => self.result.push('0'),
-                "i16" => self.result.push('0'),
-                "i32" => self.result.push('0'),
-                "i64" => self.result.push('0'),
-                "f32" => self.result.push('0'),
-                "f64" => self.result.push('0'),
-                "string" => self.result.push_str("\"\""),
-                "hex" => self.result.push_str("\"\""),
-                _ => self.result.push('?'),
+        AnyType::Tuple(types) => {
+            out.push('[');
+            let mut first = true;
+            for ty in types {
+                if !first {
+                    out.push(',')
+                } else {
+                    first = false
+                }
+                generate_type_template(schema, ty, out)
+            }
+            out.push(']');
+        }
+        AnyType::Int {
+            bits: _,
+            is_signed: _,
+        } => out.push('0'),
+        AnyType::Float {
+            exp: _,
+            mantissa: _,
+        } => {
+            out.push('0');
+        }
+        AnyType::FracPack(_) => {
+            out.push_str(r#""""#);
+        }
+        AnyType::Custom { type_: _, id } => {
+            if id == "bool" {
+                out.push_str("false");
+            } else {
+                out.push_str(r#""""#);
             }
         }
-    }
-    fn refed<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn mut_ref<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn boxed<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn rc<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn arc<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn cell<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn ref_cell<Inner: Reflect>(self) {
-        Inner::reflect(self)
-    }
-    fn option<Inner: Reflect>(self) {
-        if !self.skip {
-            self.result.push_str("null");
-        }
-    }
-    fn container<T: Reflect, Inner: Reflect>(self) {
-        if !self.skip {
-            self.result.push_str("[]");
-        }
-    }
-    fn array<Inner: Reflect, const SIZE: usize>(self) {
-        if !self.skip {
-            self.result.push_str("[]");
-        }
-    }
-    fn hex<const SIZE: usize>(self) {
-        if !self.skip {
-            self.result.push_str("\"\"");
-        }
-    }
-    fn tuple<T: Reflect>(self, _fields_len: usize) -> Self::TupleVisitor {
-        if !self.skip {
-            self.result.push('[');
-        }
-        FieldGenerator {
-            result: self.result,
-            first: true,
-            skip: self.skip,
-        }
-    }
-    fn struct_single<T: Reflect, Inner: Reflect>(self, _name: std::borrow::Cow<'static, str>) {
-        if !self.skip {
-            T::reflect(self)
-        }
-    }
-    fn struct_tuple<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::StructTupleVisitor {
-        if !self.skip {
-            self.result.push('[')
-        }
-        FieldGenerator {
-            result: self.result,
-            first: true,
-            skip: self.skip,
-        }
-    }
-    fn struct_named<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::StructVisitor {
-        if !self.skip {
-            self.result.push('{')
-        }
-        FieldGenerator {
-            result: self.result,
-            first: true,
-            skip: self.skip,
-        }
-    }
-    fn enumeration<T: Reflect>(
-        self,
-        _name: std::borrow::Cow<'static, str>,
-        _fields_len: usize,
-    ) -> Self::EnumVisitor {
-        if !self.skip {
-            self.result.push_str("{}");
-        }
-        IgnoreVisit(())
-    }
-}
-
-struct FieldGenerator<'a> {
-    result: &'a mut String,
-    first: bool,
-    skip: bool,
-}
-
-impl<'a> UnnamedVisitor<()> for FieldGenerator<'a> {
-    fn field<T: Reflect>(mut self) -> Self {
-        if !self.skip {
-            if !self.first {
-                self.result.push(',');
-            }
-            self.first = false;
-            T::reflect(ValueGenerator {
-                result: self.result,
-                skip: false,
-            });
-        }
-        self
-    }
-    fn end(self) {}
-}
-
-impl<'a> NamedVisitor<()> for FieldGenerator<'a> {
-    fn field<T: Reflect>(mut self, name: std::borrow::Cow<'static, str>) -> Self {
-        if !self.skip {
-            if !self.first {
-                self.result.push(',');
-            }
-            self.first = false;
-            self.result.push_str(&to_string(&name).unwrap());
-            self.result.push(':');
-            T::reflect(ValueGenerator {
-                result: self.result,
-                skip: false,
-            });
-        }
-        self
-    }
-    fn end(self) {
-        if !self.skip {
-            self.result.push('}');
-        }
-    }
-}
-
-impl<'a> StructVisitor<()> for FieldGenerator<'a> {
-    type MethodsVisitor = IgnoreVisit<()>;
-
-    fn with_methods(self, _num_methods: usize) -> Self::MethodsVisitor {
-        IgnoreVisit(())
+        AnyType::Type(name) => generate_type_template(schema, schema.get(name).unwrap(), out),
     }
 }

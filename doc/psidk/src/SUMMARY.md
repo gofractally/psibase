@@ -9,6 +9,7 @@
     - [Database](specifications/blockchain/database.md)
     - [Validation](specifications/blockchain/validation.md)
     - [Wasm runtime](specifications/blockchain/wasm-runtime.md)
+    - [Entry points](specifications/blockchain/entry-points.md)
     - [Peer consensus algorithms](specifications/blockchain/peer-consensus/README.md)
       - [CFT](specifications/blockchain/peer-consensus/cft.md)
       - [BFT](specifications/blockchain/peer-consensus/bft.md)

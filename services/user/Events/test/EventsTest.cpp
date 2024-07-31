@@ -28,6 +28,9 @@ template <typename R>
 std::vector<R> query(TestChain& chain, std::string_view s)
 {
    auto response = chain.http(makeQuery(s));
+   INFO(static_cast<unsigned>(response.status)
+        << " " << std::string(response.body.begin(), response.body.end()));
+   CHECK(response.status == HttpStatus::ok);
    CHECK(response.contentType == "application/json");
    response.body.push_back('\0');
    psio::json_token_stream stream(response.body.data());

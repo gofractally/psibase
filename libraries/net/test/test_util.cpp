@@ -325,17 +325,14 @@ ViewChangeMessage makeViewChange(std::string_view                        produce
 
 void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
 {
-   for (auto end = mock_clock::now() + total_time; mock_clock::now() < end;)
+   ctx.poll();
+   ctx.restart();
+   auto end = mock_clock::now() + total_time;
+   while (mock_clock::advance(end))
    {
       ctx.poll();
       ctx.restart();
-      if (!mock_clock::advance())
-      {
-         return;
-      }
    }
-   ctx.poll();
-   ctx.restart();
 }
 
 void printAccounts(std::ostream& os, const std::vector<AccountNumber>& producers)

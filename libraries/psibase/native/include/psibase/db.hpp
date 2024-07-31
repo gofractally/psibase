@@ -2,6 +2,7 @@
 
 #include_next <psibase/db.hpp>
 
+#include <psibase/Socket.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
@@ -81,7 +82,13 @@ namespace psibase
                                                     std::span<const char> key);
 
       DbPtr getSubjective();
-      bool  commitSubjective(Writer& writer, DbPtr& original, DbPtr updated, DbChangeSet&& changes);
+      bool  commitSubjective(Writer&             writer,
+                             DbPtr&              original,
+                             DbPtr               updated,
+                             DbChangeSet&&       changes,
+                             SocketChangeSet&&   socketChanges,
+                             Sockets&            sockets,
+                             SocketAutoCloseSet& closing);
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
@@ -158,8 +165,14 @@ namespace psibase
 
       // Manage access to subjective database
       void checkoutSubjective();
-      bool commitSubjective();
+      bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
       void abortSubjective();
+      // sockets options are linked to subjective checkouts. Eventually the state might
+      // be exposed in a table.
+      std::int32_t socketAutoClose(std::int32_t        socket,
+                                   bool                value,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing);
       // Used to ensure that checkout and commit are run in the same action
       std::size_t saveSubjective();
       void        restoreSubjective(std::size_t depth);

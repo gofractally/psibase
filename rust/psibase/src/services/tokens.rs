@@ -47,25 +47,12 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-use crate::Reflect;
-
 pub type NID = u32;
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Reflect,
-    Serialize,
-    Deserialize,
-    ToSchema,
-    SimpleObject,
-    InputObject,
+    Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "PrecisionInput")]
 pub struct Precision {
     pub value: u8,
@@ -78,30 +65,18 @@ impl From<u8> for Precision {
 }
 
 #[derive(
-    Debug, Clone, Pack, Unpack, Reflect, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "MemoInput")]
 pub struct Memo {
     pub contents: String,
 }
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Pack,
-    Unpack,
-    Reflect,
-    ToSchema,
-    Serialize,
-    Deserialize,
-    SimpleObject,
-    InputObject,
+    Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "QuantityInput")]
 pub struct Quantity {
     pub value: u64,
