@@ -1,5 +1,5 @@
 function(add suffix)
-    add_user_service("${suffix}" Email src/Email.cpp)
+    add_user_service("${suffix}" Webmail src/Webmail.cpp)
 endfunction(add)
 
 conditional_add()

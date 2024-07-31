@@ -1,4 +1,4 @@
-#[crate::service(name = "email", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "webmail", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{http::HttpRequest, AccountNumber, Hex};
@@ -14,7 +14,7 @@ mod service {
     }
 
     #[action]
-    fn send(recipient: AccountNumber, subject: String, body: String) {
+    fn send(receiver: AccountNumber, subject: String, body: String) {
         unimplemented!()
     }
 }

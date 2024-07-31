@@ -6,18 +6,18 @@
 
 namespace UserService
 {
-   class Email : public psibase::Service<Email>
+   class Webmail : public psibase::Service<Webmail>
    {
      public:
       using Tables = psibase::ServiceTables<InitTable, psibase::WebContentTable>;
 
-      static constexpr auto service = psibase::AccountNumber("email");
+      static constexpr auto service = psibase::AccountNumber("webmail");
 
-      Email(psio::shared_view_ptr<psibase::Action> action);
+      Webmail(psio::shared_view_ptr<psibase::Action> action);
 
       void init();
 
-      void send(psibase::AccountNumber recipient,
+      void send(psibase::AccountNumber receiver,
                 const std::string&     subject,
                 const std::string&     body);
 
@@ -29,7 +29,7 @@ namespace UserService
       {
          struct History
          {
-            void sent(psibase::AccountNumber sender, psibase::AccountNumber recipient, std::string subject, std::string body) {}
+            void sent(psibase::AccountNumber sender, psibase::AccountNumber receiver, std::string subject, std::string body) {}
          };
          struct Ui{};
          struct Merkle{};
@@ -38,18 +38,18 @@ namespace UserService
    };
 
    // clang-format off
-   PSIO_REFLECT(Email,
+   PSIO_REFLECT(Webmail,
       method(init),
-      method(send, recipient, subject, body),
+      method(send, receiver, subject, body),
       method(serveSys, request),
       method(storeSys, path, contentType, content)
    );
-   PSIBASE_REFLECT_EVENTS(Email);
-   PSIBASE_REFLECT_HISTORY_EVENTS(Email,
-      method(sent, sender, recipient, subject, body),
+   PSIBASE_REFLECT_EVENTS(Webmail);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Webmail,
+      method(sent, sender, receiver, subject, body),
    );
-   PSIBASE_REFLECT_UI_EVENTS(Email);
-   PSIBASE_REFLECT_MERKLE_EVENTS(Email);
+   PSIBASE_REFLECT_UI_EVENTS(Webmail);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Webmail);
    // clang-format on
 
 }  // namespace UserService

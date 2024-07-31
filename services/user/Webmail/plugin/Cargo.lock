@@ -580,14 +580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "email-plugin"
-version = "0.1.0"
-dependencies = [
- "psibase",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,6 +2314,14 @@ checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webmail-plugin"
+version = "0.1.0"
+dependencies = [
+ "psibase",
+ "wit-bindgen-rt",
 ]
 
 [[package]]

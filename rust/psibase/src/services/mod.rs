@@ -6,7 +6,6 @@ pub mod auth_k1;
 pub mod auth_sig;
 pub mod common_api;
 pub mod cpu_limit;
-pub mod email;
 pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite;
@@ -18,3 +17,4 @@ pub mod setcode;
 pub mod sites;
 pub mod tokens;
 pub mod transact;
+pub mod webmail;
