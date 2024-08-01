@@ -113,6 +113,21 @@ struct Empty
 };
 PSIO_REFLECT(Empty, definitionWillNotChange())
 
+namespace nnn
+{
+   struct string
+   {
+      std::int32_t value;
+   };
+   PSIO_REFLECT(string, value)
+
+   constexpr bool psio_custom_schema(string*)
+   {
+      return true;
+   }
+}  // namespace nnn
+using WrongCustom = nnn::string;
+
 int main()
 {
    test_builder builder;
@@ -163,6 +178,7 @@ int main()
    builder.add<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty-hex", {{Empty{}}});
    builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
        "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
+   builder.add<WrongCustom>("WrongCustom", {{3}});
    std::cout << "[";
    to_json(builder, std::cout);
    std::cout << "]";

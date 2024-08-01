@@ -11,6 +11,14 @@ class TestObject(Object):
     i: i32
     b: Bool
 
+class ExtTestObject(Object):
+    i: i32
+    b: Bool
+    o: Option(i32)
+
+TestTuple = Tuple([i32, Bool])
+ExtTestTuple = Tuple([i32, Bool, Option(i32)])
+
 class TestStruct(Struct):
     i: i32
     f: f32
@@ -18,6 +26,11 @@ class TestStruct(Struct):
 class TestVariant(Variant):
     TestObject: TestObject
     TestStruct: TestStruct
+
+class ExtVariant(Variant):
+    TestObject: TestObject
+    TestStruct: TestStruct
+    TestTuple: TestTuple
 
 IntList = List(i32)
 IntArray = Array(i32, 3)
@@ -64,6 +77,36 @@ class TestFracpack(unittest.TestCase):
     def test_empty(self):
         self.assertEqual(pack(Empty()).hex().upper(), '')
         self.assertEqual(pack([Empty], NestedEmpty).hex().upper(), '040000000000')
+    def test_compat(self):
+        self.assertIsNone(compatibility(i32, i64))
+        self.assertIsNone(compatibility(i32, u32))
+        self.assertIsNone(compatibility(f32, f64))
+        self.assertIsNone(compatibility(TestObject, f64))
+        self.assertIsNone(compatibility(TestTuple, f64))
+        self.assertIsNone(compatibility(TestVariant, f64))
+        self.assertIsNone(compatibility(FracPack(Empty), f64))
+        self.assertIsNone(compatibility(TestStruct, f64))
+        self.assertTrue(is_equivalent(i32, i32))
+        self.assertTrue(is_equivalent(f32, f32))
+        self.assertTrue(is_equivalent(TestObject, TestObject))
+        self.assertTrue(is_equivalent(TestTuple, TestTuple))
+        self.assertTrue(is_equivalent(TestVariant, TestVariant))
+        self.assertTrue(is_equivalent(IntList, IntList))
+        self.assertTrue(is_equivalent(IntArray, IntArray))
+        self.assertTrue(is_equivalent(OptInt, OptInt))
+        self.assertEqual(compatibility(TestObject, TestTuple), TypeCompatibility())
+        self.assertEqual(compatibility(TestObject, ExtTestObject), TypeCompatibility(addField=True))
+        self.assertEqual(compatibility(TestObject, ExtTestTuple), TypeCompatibility(addField=True))
+        self.assertEqual(compatibility(TestTuple, ExtTestObject), TypeCompatibility(addField=True))
+        self.assertEqual(compatibility(TestTuple, ExtTestTuple), TypeCompatibility(addField=True))
+        self.assertEqual(compatibility(ExtTestObject, TestObject), TypeCompatibility(dropField=True))
+        self.assertEqual(compatibility(ExtTestObject, TestTuple), TypeCompatibility(dropField=True))
+        self.assertEqual(compatibility(ExtTestTuple, TestObject), TypeCompatibility(dropField=True))
+        self.assertEqual(compatibility(ExtTestTuple, TestTuple), TypeCompatibility(dropField=True))
+        self.assertEqual(compatibility(TestVariant, ExtVariant), TypeCompatibility(addAlternative=True))
+        self.assertEqual(compatibility(ExtVariant, TestVariant), TypeCompatibility(dropAlternative=True))
+        self.assertEqual(compatibility(FracPack(Empty), Bytes), TypeCompatibility(addAlternative=True))
+        self.assertEqual(compatibility(Bytes, FracPack(Empty)), TypeCompatibility(dropAlternative=True))
     def test_schema(self):
         with open(args.test_data) as f:
             tests = json.load(f)

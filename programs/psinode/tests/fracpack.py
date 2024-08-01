@@ -1,5 +1,6 @@
 import math
 import json
+import itertools
 from collections import abc
 
 class OutputStream:
@@ -56,6 +57,8 @@ class TypeBase(type):
         stream = OutputStream()
         self.pack(value, stream)
         return stream.bytes
+    def get_canonical(self):
+        return self
 
 def pack(value, ty=None, *, custom=None):
     if ty is None:
@@ -63,6 +66,82 @@ def pack(value, ty=None, *, custom=None):
     stream = OutputStream(custom)
     ty.pack(value, stream)
     return stream.bytes
+
+class TypeCompatibility:
+    __slots__ = ['addField', 'addAlternative', 'dropField', 'dropAlternative']
+    def __init__(self, *, addField=False, addAlternative=False, dropField=False, dropAlternative=False):
+        self.addField = addField
+        self.addAlternative = addAlternative
+        self.dropField = dropField
+        self.dropAlternative = dropAlternative
+    def __repr__(self):
+        return 'TypeCompatibility(addField=%s, addAlternative=%s, dropField=%s, dropAlternative=%s)' % \
+            (self.addField, self.addAlternative, self.dropField, self.dropAlternative)
+    def __eq__(self, other):
+        if not isinstance(other, TypeCompatibility):
+            return NotImplemented
+        return self.addField == other.addField and \
+            self.addAlternative == other.addAlternative and \
+            self.dropField == other.dropField and \
+            self.dropAlternative == other.dropAlternative
+    def equivalent(self):
+        return self == TypeCompatibility()
+
+class MatchContext:
+    def __init__(self):
+        self.lstack = {}
+        self.rstack = {}
+        self.compatibility = TypeCompatibility()
+        self.known = set()
+    def match(self, lhs, rhs):
+        lhs = lhs.get_canonical()
+        rhs = rhs.get_canonical()
+        lid = id(lhs)
+        rid = id(rhs)
+        if self.lstack.get(lid, -1) != self.rstack.get(rid, -1):
+            return False
+        if (lid, rid) in self.known:
+            return True
+
+        n = len(self.lstack)
+        self.lstack[lid] = n
+        self.rstack[rid] = n
+
+        result = lhs.match(rhs, self)
+
+        if result:
+            self.known.add((lid, rid))
+
+        del self.lstack[lid]
+        del self.rstack[rid]
+
+        return result
+
+    def member_types(self, ty):
+        if isinstance(ty, Object):
+            return [v for (k,v) in ty.members]
+        elif isinstance(ty, Tuple):
+            return ty.members
+
+    def match_tuple(self, lhs, rhs):
+        if not isinstance(rhs, Tuple) and not isinstance(rhs, Object):
+            return False
+        lmembers = self.member_types(lhs)
+        rmembers = self.member_types(rhs)
+        for (l, r) in itertools.zip_longest(lmembers, rmembers, fillvalue=_TrailingOption()):
+            if not self.match(l, r):
+                return False
+        return True
+
+def compatibility(lhs, rhs):
+    context = MatchContext()
+    if not context.match(lhs, rhs):
+        return None
+    return context.compatibility
+
+def is_equivalent(lhs, rhs):
+    compat = compatibility(lhs, rhs)
+    return compat is not None and compat.equivalent()
 
 def _handle_args(args, kw, extra, genname, base):
     assert len(extra) != 3
@@ -114,6 +193,16 @@ def _fracpackmeta(argnames, gentype, base=object):
         return cls
     return fn
 
+@_fracpackmeta([], lambda: 'TrailingOption')
+class _TrailingOption(TypeBase):
+    def __init__(self):
+        pass
+    def match(self, other, context):
+        if isinstance(other, Option):
+            context.compatibility.addField = True
+            return True
+        return False
+
 @_fracpackmeta(['bits', 'isSigned'], lambda bits, isSigned: '%s%d' % ('s' if isSigned else 'u', bits), int)
 class Int(TypeBase):
     def __init__(self, bits, isSigned):
@@ -141,6 +230,10 @@ class Int(TypeBase):
         for i in range(self.fixed_size):
             stream.write_u8(value & 0xFF)
             value = value >> 8
+    def match(self, other, context):
+        if not isinstance(other, Int):
+            return False
+        return self.bits == other.bits and self.isSigned == other.isSigned
 
 @_fracpackmeta(['exp', 'mantissa'], lambda exp, mantissa: 'f%d' % (exp + mantissa), float)
 class Float(TypeBase):
@@ -184,6 +277,10 @@ class Float(TypeBase):
         for i in range((self.mantissa + self.exp) // 8):
             stream.write_u8(ival & 0xff)
             ival >>= 8
+    def match(self, other, context):
+        if not isinstance(other, Float):
+            return False
+        return self.exp == other.exp and self.mantissa == other.mantissa
 
 class ObjectValue:
     def __init__(self, *args, **kw):
@@ -253,6 +350,15 @@ class Struct(TypeBase, MembersByName, metaclass=DerivedAsInstance):
             value = dict(value)
         for (name, ty) in self.members:
             ty.pack(value[name], stream)
+    def match(self, other, context):
+        if not isinstance(other, Struct):
+            return False
+        if not len(self.members) == len(other.members):
+            return false
+        for ((ln,l), (rn,r)) in zip(self.members, other.members):
+            if not context.match(l, r):
+                return False
+        return True
 
 @_fracpackmeta(['name', 'members'], lambda name, members: name, ObjectValue)
 class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
@@ -291,6 +397,8 @@ class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
             repack.append(ty.embedded_fixed_pack(value.get(name), stream))
         for r in repack:
             r.pack()
+    def match(self, other, context):
+        return context.match_tuple(self, other)
 
 @_fracpackmeta(['type', 'len'], lambda type, len: '%s[%d]' % (type.__name__, len), list)
 class Array(TypeBase):
@@ -315,6 +423,10 @@ class Array(TypeBase):
             repack.append(self.ty.embedded_fixed_pack(item, stream))
         for r in repack:
             r.pack()
+    def match(self, other, context):
+        if not isinstance(other, Array):
+            return False
+        return self.n == other.n and context.match(self.ty, other.ty)
 
 @_fracpackmeta(['type'], lambda ty: ty.__name__ + '[]' if ty is not None else 'List', list)
 class List(TypeBase):
@@ -342,6 +454,13 @@ class List(TypeBase):
             repack.append(self.ty.embedded_fixed_pack(item, stream))
         for r in repack:
             r.pack()
+    def match(self, other, context):
+        if isinstance(other, FracPack) and context.match(self.ty, u8):
+            context.compatibility.dropAlternative = True
+            return True
+        if not isinstance(other, List):
+            return False
+        return context.match(self.ty, other.ty)
 
 class OptionValue:
     def __init__(self, value=None):
@@ -382,6 +501,13 @@ class Option(TypeBase):
     @property
     def is_container(self):
         return self.ty.is_container and not self.ty.is_optional
+    def match(self, other, context):
+        if isinstance(other, _TrailingOption):
+            context.compatibility.dropField = True
+            return True
+        if not isinstance(other, Option):
+            return False
+        return context.match(self.ty, other.ty)
 
 class VariantValue:
     def __init__(self, type, value):
@@ -425,6 +551,17 @@ class Variant(TypeBase, metaclass=DerivedAsInstance):
             for (i, (name, ty)) in enumerate(self.members):
                 self._members_by_name[name] = i
         return self._members_by_name
+    def match(self, other, context):
+        if not isinstance(other, Variant):
+            return False
+        for ((lname, lty), (rname, rty)) in zip(self.members, other.members):
+            if not context.match(lty, rty):
+                return False
+        if len(self.members) < len(other.members):
+            context.compatibility.addAlternative = True
+        elif len(self.members) > len(other.members):
+            context.compatibility.dropAlternative = True
+        return True
 
 @_fracpackmeta(['members'], lambda members: 'Tuple', tuple)
 class Tuple(TypeBase):
@@ -461,6 +598,8 @@ class Tuple(TypeBase):
             repack.append(ty.embedded_fixed_pack(v, stream))
         for r in repack:
             r.pack()
+    def match(self, other, context):
+        return context.match_tuple(self, other)
 
 @_fracpackmeta(['type'], lambda ty: 'FracPack', object)
 class FracPack(TypeBase):
@@ -485,6 +624,13 @@ class FracPack(TypeBase):
         pos = stream.pos
         self.ty.pack(value, stream)
         stream.repack_u32(pos - 4, stream.pos - pos)
+    def match(self, other, context):
+        if isinstance(other, FracPack):
+            return context.match(self.ty, other.ty)
+        if isinstance(other, List) and context.match(other.ty, u8):
+            context.compatibility.addAlternative = True
+            return True
+        return False
 
 @_fracpackmeta(['type', 'id'], lambda ty, id: id, object)
 class Custom(TypeBase):
@@ -497,14 +643,23 @@ class Custom(TypeBase):
         ty = load_type(raw["type"], parser)
         id = raw["id"]
         if id in parser.custom:
-            # TODO: validate equivalence
-            result = parser.custom[id]
-            if isinstance(result, TypeBase):
-                return result
-            else:
-                return result(ty)
+            resolved = parser.custom[id]
+            result = Custom(ty, id)
+            result._pending = resolved
+            return result
         return ty
     def resolve(self, stream):
+        if hasattr(self, '_resolved'):
+            return self._resolved
+        if hasattr(self, '_pending'):
+            if not isinstance(self._pending, TypeBase):
+                self._resolved = self._pending(self.type)
+            elif is_equivalent(self._pending, self.type):
+                self._resolved = self._pending
+            else:
+                self._resolved = self.type
+            del self._pending
+            return self._resolved
         if hasattr(stream, 'custom'):
             actual = stream.custom.get(self.id)
             if actual is not None:
@@ -514,6 +669,8 @@ class Custom(TypeBase):
         self.resolve(stream).pack(value, stream)
     def embedded_fixed_pack(self, value, stream):
         return self.resolve(stream).embedded_fixed_pack(value, stream)
+    def get_canonical(self):
+        return self.type.get_canonical()
     @property
     def is_variable_size(self):
         return self.type.is_variable_size
@@ -621,6 +778,8 @@ class Hex(TypeBase):
             stream.write_bytes(value)
     def is_empty_container(self, value):
         return len(value) == 0
+    def get_canonical(self):
+        return self.ty
     @property
     def is_variable_size(self):
         return self.ty.is_variable_size
