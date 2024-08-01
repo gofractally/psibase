@@ -30,6 +30,8 @@ class Empty(Struct):
 
 NestedEmpty = Tuple([FracPack(Empty)])
 
+CustomOption = Custom(OptInt, "MyOptInt")
+
 class TestFracpack(unittest.TestCase):
     def test_u32(self):
         self.assertEqual(pack(u32(10)).hex().upper(), '0A000000')
@@ -47,6 +49,10 @@ class TestFracpack(unittest.TestCase):
         self.assertEqual(pack(OptInt()).hex().upper(), '01000000')
         self.assertEqual(pack(OptInt(None)).hex().upper(), '01000000')
         self.assertEqual(pack(OptInt(-1)).hex().upper(), '04000000FFFFFFFF')
+        self.assertEqual(pack(7, CustomOption).hex().upper(), '0400000007000000')
+        self.assertEqual(pack(None, CustomOption).hex().upper(), '01000000')
+        self.assertEqual(pack([None], Tuple([CustomOption])).hex().upper(), '0000')
+        self.assertEqual(pack([None, 7], Tuple([CustomOption, i32])).hex().upper(), '08000100000007000000')
     def test_tuple(self):
         self.assertEqual(pack(IntTuple((-1, 42))).hex().upper(), '0C00FFFFFFFF2A00000000000000')
     def test_variant(self):

@@ -1357,6 +1357,13 @@ namespace psio::schema_types
          auto& bestName = renamer.fixedNames[renamer.getAlias(name)].bestName;
          if (bestName == "@" || compareAlias(name, bestName) < 0)
             bestName = name;
+         if (!name.starts_with('@'))
+         {
+            if (auto* alias = std::get_if<Type>(&type.value))
+            {
+               renamer.fixedNames[renamer.getAlias(alias->type)].bestName = name;
+            }
+         }
          if (!std::holds_alternative<Type>(type.value))
          {
             visitTypes(renamer.addRef(), type);

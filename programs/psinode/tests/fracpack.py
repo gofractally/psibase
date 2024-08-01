@@ -352,7 +352,6 @@ class Option(TypeBase):
     def __init__(self, ty):
         if ty is not None:
             self.ty = ty
-            self.is_container = ty.is_container and not ty.is_optional
         self.fixed_size = 4
         self.is_variable_size = True
         self.is_optional = True
@@ -361,7 +360,6 @@ class Option(TypeBase):
         result = Option(None)
         def init():
             result.ty = load_type(raw, parser)
-            result.is_container = result.ty.is_container and not result.ty.is_optional
         parser.post(init)
         return result
     def is_empty_container(self, value):
@@ -369,13 +367,7 @@ class Option(TypeBase):
             value = value.value
         return value is not None and self.ty.is_empty_container(value)
     def pack(self, value, stream):
-        if isinstance(value, OptionValue):
-            value = value.value
-        if value is None:
-            stream.write_u32(1)
-        else:
-            stream.write_u32(4)
-            self.ty.embedded_fixed_pack(value, stream).pack()
+        self.embedded_fixed_pack(value, stream).pack()
     def embedded_fixed_pack(self, value, stream):
         if isinstance(value, OptionValue):
             value = value.value
@@ -387,6 +379,9 @@ class Option(TypeBase):
             return NullRepack()
         else:
             return OffsetRepack(stream, value, self.ty)
+    @property
+    def is_container(self):
+        return self.ty.is_container and not self.ty.is_optional
 
 class VariantValue:
     def __init__(self, type, value):
@@ -509,15 +504,16 @@ class Custom(TypeBase):
             else:
                 return result(ty)
         return ty
-    def pack(self, value, stream):
+    def resolve(self, stream):
         if hasattr(stream, 'custom'):
             actual = stream.custom.get(self.id)
-        else:
-            actual = None
-        if actual is not None:
-            actual.pack(value, stream)
-        else:
-            self.type.pack(value, stream)
+            if actual is not None:
+                return actual
+        return self.type
+    def pack(self, value, stream):
+        self.resolve(stream).pack(value, stream)
+    def embedded_fixed_pack(self, value, stream):
+        return self.resolve(stream).embedded_fixed_pack(value, stream)
     @property
     def is_variable_size(self):
         return self.type.is_variable_size

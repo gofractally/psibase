@@ -161,6 +161,8 @@ int main()
    builder.add<psio::shared_view_ptr<std::int64_t>>("nestedhex", {42});
    builder.add_nested<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty", {{Empty{}}});
    builder.add<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty-hex", {{Empty{}}});
+   builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
+       "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
    std::cout << "[";
    to_json(builder, std::cout);
    std::cout << "]";
