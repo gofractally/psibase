@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::server::*;
 use bindings::exports::webmail::plugin::api::{Error, Guest as API};
+use bindings::host::common::server::*;
 use psibase::fracpack::Pack;
 use psibase::services::webmail;
 use psibase::AccountNumber;
