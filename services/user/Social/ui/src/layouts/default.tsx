@@ -1,15 +1,13 @@
 import * as React from "react";
-import { Outlet, useLoaderData } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
 import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
 } from "@shadcn/resizable";
-import { ComposeDialog, NavMenu } from "@components";
+import { NavMenu } from "@components";
 import { cn } from "@lib/utils";
-
-import { type Account, accounts } from "../fixtures/data";
 
 export default function DefaultLayout() {
     const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -40,7 +38,6 @@ export default function DefaultLayout() {
                     <Outlet />
                 </ResizablePanel>
             </ResizablePanelGroup>
-            {/* <ComposeDialog /> */}
         </div>
     );
 }

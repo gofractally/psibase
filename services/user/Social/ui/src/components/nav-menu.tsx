@@ -1,4 +1,4 @@
-import { Send, PencilLine, Inbox } from "lucide-react";
+import { Send, Inbox } from "lucide-react";
 
 import { Separator } from "@shadcn/separator";
 import { cn } from "@lib/utils";
@@ -6,6 +6,7 @@ import { cn } from "@lib/utils";
 import { AccountSwitcher } from "./account-switcher";
 import { Nav } from "./nav";
 import { useLocation } from "react-router-dom";
+import { useIncomingMessages } from "@hooks";
 
 interface Props {
     isCollapsed?: boolean;
@@ -14,6 +15,9 @@ interface Props {
 export const NavMenu = ({ isCollapsed = false }: Props) => {
     const location = useLocation();
     const at = location.pathname;
+
+    const { query } = useIncomingMessages();
+
     return (
         <>
             <div
@@ -30,68 +34,28 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                 links={[
                     {
                         title: "Inbox",
-                        // label: "128",
+                        label: query.data
+                            ? query.data.length.toString()
+                            : undefined,
                         icon: Inbox,
                         variant: at === "/" ? "default" : "ghost",
                         href: "#",
                     },
-                    {
-                        title: "Drafts",
-                        // label: "9",
-                        icon: PencilLine,
-                        variant: at === "/drafts" ? "default" : "ghost",
-                        href: "#/drafts",
-                    },
+                    // {
+                    //     title: "Drafts",
+                    //     // label: "9",
+                    //     icon: PencilLine,
+                    //     variant: at === "/drafts" ? "default" : "ghost",
+                    //     href: "#/drafts",
+                    // },
                     {
                         title: "Sent",
-                        // label: "9",
                         icon: Send,
                         variant: at === "/sent" ? "default" : "ghost",
                         href: "#/sent",
                     },
                 ]}
             />
-            {/* <Separator />
-            <Nav
-                isCollapsed={isCollapsed}
-                links={[
-                    {
-                        title: "All",
-                        label: "972",
-                        icon: Users2,
-                        variant: "ghost",
-                        href: "#",
-                    },
-                    {
-                        title: "Contributions",
-                        label: "342",
-                        icon: AlertCircle,
-                        variant: "ghost",
-                        href: "#",
-                    },
-                    {
-                        title: "Petitions",
-                        label: "128",
-                        icon: MessagesSquare,
-                        variant: "ghost",
-                        href: "#",
-                    },
-                    {
-                        title: "Council",
-                        label: "8",
-                        icon: ShoppingCart,
-                        variant: "ghost",
-                        href: "#",
-                    },
-                    {
-                        title: "Foreign Relations",
-                        label: "21",
-                        icon: Archive,
-                        variant: "ghost",
-                        href: "#",
-                    },
-                ]}
-            /> */}
         </>
     );
 };

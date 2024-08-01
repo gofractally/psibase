@@ -1,19 +1,7 @@
 import { atom, useAtom } from "jotai";
 
 import { useUser } from "./use-user";
-import { useLocalStorage } from "./use-local-storage";
-import { Mail, mails } from "../fixtures/data";
-
-type Config = {
-    selected: Mail["id"] | null;
-};
-
-const configAtom = atom<Config>({
-    selected: mails[0].id,
-});
-export function useMail() {
-    return useAtom(configAtom);
-}
+import { useQuery } from "@tanstack/react-query";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -32,19 +20,84 @@ export type Message = {
     body: string;
 };
 
-const msgAtom = atom<Message["id"]>("");
-export function useLocalMail() {
-    const [selectedAccount, setSelectedAccount] = useUser();
-    const [messages, setMessages, getMessages] = useLocalStorage<Message[]>(
-        "messages",
-        [],
+type RawMessage = {
+    sender: string;
+    receiver: string;
+    subject: string;
+    body: string;
+};
+
+const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
+    return rawMessages.map(
+        (msg, i) =>
+            ({
+                id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.body}`,
+                from: msg.sender,
+                to: msg.receiver,
+                datetime: Date.now() - i * 1_000_000,
+                status: "sent",
+                read: false,
+                inReplyTo: null,
+                subject: msg.subject,
+                body: msg.body,
+            }) as Message,
     );
+};
 
-    const [selectedMessageId, setSelectedMessageId] = useAtom(msgAtom);
+const getIncomingMessages = async (account: string) => {
+    const res = await fetch(
+        `https://webmail.psibase.127.0.0.1.sslip.io:8081/messages?receiver=${account}`,
+    );
+    const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(rawMessages);
+};
 
-    const selectedMessage = messages?.find(
+const incomingMsgAtom = atom<Message["id"]>("");
+export function useIncomingMessages() {
+    const [selectedAccount] = useUser();
+    const query = useQuery({
+        queryKey: ["incoming", selectedAccount.account],
+        queryFn: () => getIncomingMessages(selectedAccount.account),
+        enabled: Boolean(selectedAccount.account),
+    });
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
+    const selectedMessage = query.data?.find(
         (msg) => msg.id === selectedMessageId,
     );
 
-    return [messages, selectedMessage, setSelectedMessageId] as const;
+    return {
+        query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
+}
+
+const getSentMessages = async (account: string) => {
+    const res = await fetch(
+        `https://webmail.psibase.127.0.0.1.sslip.io:8081/messages?sender=${account}`,
+    );
+    const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(rawMessages);
+};
+
+const sentMsgAtom = atom<Message["id"]>("");
+export function useSentMessages() {
+    const [selectedAccount] = useUser();
+    const query = useQuery({
+        queryKey: ["sent", selectedAccount.account],
+        queryFn: () => getSentMessages(selectedAccount.account),
+        enabled: Boolean(selectedAccount.account),
+    });
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
+    const selectedMessage = query.data?.find(
+        (msg) => msg.id === selectedMessageId,
+    );
+
+    return {
+        query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
 }

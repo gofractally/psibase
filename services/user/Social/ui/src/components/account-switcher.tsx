@@ -1,4 +1,4 @@
-import { useLocalMail, useUser } from "@hooks";
+import { useIncomingMessages, useUser } from "@hooks";
 import { cn } from "@lib/utils";
 import { accounts } from "src/fixtures/data";
 import {
@@ -14,7 +14,7 @@ interface AccountSwitcherProps {
 }
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
-    const [_, _a, setSelectedMessageId] = useLocalMail();
+    const { setSelectedMessageId } = useIncomingMessages();
     const [selectedAccount, setSelectedAccount] = useUser();
 
     return (

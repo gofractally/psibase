@@ -1,7 +1,3 @@
-import type { Mail } from "../fixtures/data";
-
-import { useLoaderData } from "react-router-dom";
-
 import {
     ResizableHandle,
     ResizablePanel,
@@ -12,22 +8,18 @@ import { Separator } from "@shadcn/separator";
 import { MailDisplay } from "@components/mail-display";
 import { MailList } from "@components/mail-list";
 
-import { useLocalMail, useMail } from "@hooks/use-mail";
+import { useIncomingMessages } from "@hooks/use-mail";
 import { Dialog } from "@shadcn/dialog";
 import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
 } from "@components";
 
-import { mails } from "../fixtures/data";
 import { useEffect } from "react";
 
-export const homeLoader = () => {
-    return { mails };
-};
-
 export function Home() {
-    const [_, _a, setSelectedMessageId] = useLocalMail();
+    const { query, selectedMessage, setSelectedMessageId } =
+        useIncomingMessages();
 
     useEffect(() => {
         setSelectedMessageId("");
@@ -62,12 +54,17 @@ export function Home() {
                     </form>
                 </div> */}
                 <div className="py-4">
-                    <MailList filter="inbox" />
+                    <MailList
+                        mailbox="inbox"
+                        messages={query.data ?? []}
+                        selectedMessage={selectedMessage}
+                        setSelectedMessageId={setSelectedMessageId}
+                    />
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel id="message" order={4}>
-                <MailDisplay />
+                <MailDisplay message={selectedMessage} mailbox="inbox" />
             </ResizablePanel>
         </ResizablePanelGroup>
     );

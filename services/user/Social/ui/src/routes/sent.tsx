@@ -13,11 +13,11 @@ import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
 } from "@components";
-import { useLocalMail } from "@hooks";
+import { useSentMessages } from "@hooks";
 import { useEffect } from "react";
 
 export function Sent() {
-    const [_, _a, setSelectedMessageId] = useLocalMail();
+    const { query, selectedMessage, setSelectedMessageId } = useSentMessages();
 
     useEffect(() => {
         setSelectedMessageId("");
@@ -52,12 +52,17 @@ export function Sent() {
                     </form>
                 </div> */}
                 <div className="py-4">
-                    <MailList filter="sent" />
+                    <MailList
+                        mailbox="sent"
+                        messages={query.data ?? []}
+                        selectedMessage={selectedMessage}
+                        setSelectedMessageId={setSelectedMessageId}
+                    />
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel id="message" order={4}>
-                <MailDisplay />
+                <MailDisplay message={selectedMessage} mailbox="sent" />
             </ResizablePanel>
         </ResizablePanelGroup>
     );

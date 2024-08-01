@@ -1,3 +1,5 @@
+import type { Mailbox } from "src/types";
+
 import { ComponentProps } from "react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -5,41 +7,56 @@ import { cn } from "@lib/utils";
 import { Badge } from "@shadcn/badge";
 import { ScrollArea } from "@shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
-import { type Message, useLocalMail, useUser } from "@hooks";
+import { type Message } from "@hooks";
 
 import { accounts } from "../fixtures/data";
 
-export function MailList({ filter }: { filter: "inbox" | "drafts" | "sent" }) {
-    const [mail] = useLocalMail();
-    const [user] = useUser();
+interface SharedProps {
+    mailbox: Mailbox;
+    selectedMessage?: Message;
+    setSelectedMessageId: (id: string) => void;
+}
 
-    let messages = mail?.filter((m) => {
-        switch (filter) {
-            case "inbox":
-                return m.to === user.account && m.status === "sent";
-            case "drafts":
-                return m.from === user.account && m.status === "draft";
-            case "sent":
-                return m.from === user.account && m.status === "sent";
-            default:
-                return true;
-        }
-    });
+interface MailListProps extends SharedProps {
+    messages: Message[];
+}
 
+export function MailList({
+    mailbox,
+    messages,
+    selectedMessage,
+    setSelectedMessageId,
+}: MailListProps) {
     return (
         <ScrollArea className="h-screen">
             <div className="flex flex-1 flex-col gap-2 p-4 pt-0">
                 {messages
                     ?.sort((a, b) => b.datetime - a.datetime)
-                    .map((item) => <MailItem item={item} />)}
+                    .map((item) => (
+                        <MailItem
+                            mailbox={mailbox}
+                            item={item}
+                            setSelectedMessageId={setSelectedMessageId}
+                            selectedMessage={selectedMessage}
+                        />
+                    ))}
             </div>
         </ScrollArea>
     );
 }
 
-const MailItem = ({ item }: { item: Message }) => {
-    const [_, selectedMessage, setSelectedMessageId] = useLocalMail();
-    const account = accounts.find((a) => a.account === item.from);
+interface MailItemProps extends SharedProps {
+    item: Message;
+}
+
+const MailItem = ({
+    mailbox,
+    item,
+    selectedMessage,
+    setSelectedMessageId,
+}: MailItemProps) => {
+    const fromAccount = accounts.find((a) => a.account === item.from);
+    const toAccount = accounts.find((a) => a.account === item.to);
     return (
         <button
             key={item.id}
@@ -55,11 +72,13 @@ const MailItem = ({ item }: { item: Message }) => {
             <div className="flex w-full flex-col gap-1">
                 <div className="flex items-center">
                     <div className="flex items-center gap-2">
-                        {account ? (
+                        {fromAccount && toAccount ? (
                             <Tooltip>
                                 <TooltipTrigger>
                                     <div className="font-semibold">
-                                        {account?.name}
+                                        {mailbox === "inbox"
+                                            ? fromAccount?.name
+                                            : `To: ${toAccount.name}`}
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">
