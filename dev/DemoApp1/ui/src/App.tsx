@@ -230,6 +230,7 @@ function App() {
         method: "summary",
         params: [attestee],
       });
+      console.info("typeof res:", typeof res);
       console.info("returned from Identity.queries.summary()");
       setRes(res as string);
       console.info("Res:", res);

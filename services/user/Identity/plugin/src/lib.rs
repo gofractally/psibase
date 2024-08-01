@@ -45,14 +45,21 @@ impl Guest for IdentityPlugin {
 #[derive(Deserialize, Debug)]
 #[allow(non_snake_case)]
 struct IdentitySummary {
-    percHighConf: f32,
-    uniqueAttesters: u32,
+    perc_high_confidence: u8,
+    num_unique_attestations: u16,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+struct IdentitySummaryFromService {
+    numHighConfAttestations: u16,
+    uniqueAttesters: u16,
 }
 
 #[derive(Deserialize, Debug)]
 #[allow(non_snake_case)]
 struct IdentitySummaryResponseData {
-    subjectStats: IdentitySummary,
+    subjectStats: IdentitySummaryFromService,
 }
 
 #[derive(Deserialize, Debug)]
@@ -61,17 +68,28 @@ struct IdentitySummaryResponse {
 }
 
 impl QueriesGuest for IdentityPlugin {
-    fn summary(subject: String) -> Result<IdentityTypes::IdentitySummary, CommonTypes::Error> {
+    fn summary(
+        subject: String,
+    ) -> Result<Option<IdentityTypes::IdentitySummary>, CommonTypes::Error> {
         let graphql_str = format!(
-            "query {{ subjectStats(subject:\"{}\") {{ percHighConf, uniqueAttesters }} }}",
+            "query {{ subjectStats(subject:\"{}\") {{ numHighConfAttestations, uniqueAttesters }} }}",
             subject
         );
-        let summary = CommonServer::post_graphql_get_json(&graphql_str).unwrap();
-        let summary_val = serde_json::from_str::<IdentitySummaryResponse>(&summary).unwrap();
-        Ok(IdentityTypes::IdentitySummary {
-            perc_high_confidence: summary_val.data.subjectStats.percHighConf,
-            num_unique_attestations: summary_val.data.subjectStats.uniqueAttesters,
-        })
+        let summary_wrapped = serde_json::from_str::<IdentitySummaryResponse>(
+            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+        );
+        if summary_wrapped.is_ok() {
+            let summary_val = summary_wrapped.unwrap();
+            Ok(Some(IdentityTypes::IdentitySummary {
+                perc_high_confidence: (summary_val.data.subjectStats.numHighConfAttestations as f32
+                    / summary_val.data.subjectStats.uniqueAttesters as f32
+                    * 100.0)
+                    .round() as u8,
+                num_unique_attestations: summary_val.data.subjectStats.uniqueAttesters,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 

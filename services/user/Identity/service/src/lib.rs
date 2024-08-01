@@ -64,7 +64,8 @@ mod service {
         pub subject: AccountNumber,
 
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
-        pub perc_high_conf: u8,
+        // pub perc_high_conf: u8,
+        pub num_high_conf_attestations: u16,
 
         pub unique_attesters: u16,
 
@@ -79,7 +80,7 @@ mod service {
                 "--AttestationStats--\n{}\t: subject\n{} :# unique attesters\n{}\t: % high conf\n{} :most recent attestation",
                 self.subject,
                 self.unique_attesters,
-                self.perc_high_conf,
+                self.num_high_conf_attestations,
                 self.most_recent_attestation.seconds
             )
         }
@@ -89,7 +90,7 @@ mod service {
         fn default() -> Self {
             AttestationStats {
                 subject: AccountNumber::from(0),
-                perc_high_conf: 0,
+                num_high_conf_attestations: 0,
                 unique_attesters: 0,
                 most_recent_attestation: TimePointSec::from(0),
             }
@@ -113,7 +114,6 @@ mod service {
         };
 
         let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
-        let is_unique_attester = existing_rec.is_none();
 
         // upsert attestation
         attestation_table
@@ -126,7 +126,7 @@ mod service {
             .unwrap();
 
         // Update Attestation stats
-        update_attestation_stats(subj_acct, is_unique_attester, value, issued);
+        update_attestation_stats(existing_rec, subj_acct, value, issued);
 
         Wrapper::emit()
             .history()
@@ -205,11 +205,8 @@ mod service {
         async fn subject_stats(
             &self,
             subject: AccountNumber,
-        ) -> async_graphql::Result<AttestationStats, async_graphql::Error> {
-            Ok(AttestationStatsTable::new()
-                .get_index_pk()
-                .get(&subject)
-                .unwrap())
+        ) -> async_graphql::Result<Option<AttestationStats>, async_graphql::Error> {
+            Ok(AttestationStatsTable::new().get_index_pk().get(&subject))
         }
 
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {

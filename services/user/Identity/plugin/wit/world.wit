@@ -24,8 +24,8 @@ interface types {
         date: date-time,
     }
     record identity-summary {
-        perc-high-confidence: f32,
-        num-unique-attestations: u32,
+        perc-high-confidence: u8,
+        num-unique-attestations: u16,
     }
 }
 
@@ -55,7 +55,7 @@ interface queries {
     use types.{attestation-graph, identity-summary, identity-attestation};
 
     
-    summary: func(subject: string) -> result<identity-summary, error>;
+    summary: func(subject: string) -> result<option<identity-summary>, error>;
     // Future implementations (for attestation graphs)
     // graph: func() -> result<attestation-graph, error>;
     // get-history: func(subject: string) -> result<list<identity-attestation>, error>;
