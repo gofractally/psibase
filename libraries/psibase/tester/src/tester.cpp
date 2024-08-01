@@ -30,6 +30,7 @@ extern "C"
    TESTER_NATIVE(getChainPath)     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
    TESTER_NATIVE(pushTransaction)  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    TESTER_NATIVE(httpRequest)      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
+   TESTER_NATIVE(socketRecv)       uint32_t testerSocketRecv(int32_t fd, std::size_t* size);
    TESTER_NATIVE(selectChainForDb) void     testerSelectChainForDb(uint32_t chain_index);
    TESTER_NATIVE(shutdownChain)    void     testerShutdownChain(uint32_t chain);
    TESTER_NATIVE(startBlock)       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
@@ -266,19 +267,19 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
       finishBlock();
 
    std::vector<char> packed_request = psio::convert_to_frac(request);
-   auto              size  = ::testerHttpRequest(id, packed_request.data(), packed_request.size());
-   auto              trace = psio::from_frac<TransactionTrace>(getResult(size));
-
-   if (trace.error)
+   auto              fd = ::testerHttpRequest(id, packed_request.data(), packed_request.size());
+   std::size_t       size;
+   if (auto err = ::testerSocketRecv(fd, &size))
    {
-      check(false, "http request failed: " + *trace.error);
+      if (err == EAGAIN)
+      {
+         abortMessage("Query did not return a synchronous response");
+      }
+      else
+      {
+         abortMessage("Could not read response: " + std::to_string(err));
+      }
    }
 
-   check(trace.actionTraces.size() == 1, "Expected exactly one action trace");
-   const auto& actionTrace = trace.actionTraces.front();
-   auto        response    = psio::from_frac<std::optional<HttpReply>>(actionTrace.rawRetval);
-   if (!response)
-      check(false, "404 Not Found");
-
-   return std::move(*response);
+   return psio::from_frac<HttpReply>(getResult(size));
 }

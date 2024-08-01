@@ -176,7 +176,7 @@ namespace psibase
       if (!psio::fracpack_validate<NotifyRow>(notifySpan))
          return;
 
-      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions();
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
 
       auto oldIsProducing = isProducing;
       auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
@@ -195,11 +195,61 @@ namespace psibase
          {
             tc.execNonTrxAction(0, action, atrace);
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
-            PSIBASE_LOG(trxLogger, info) << "onBlock succeeded";
+            PSIBASE_LOG(trxLogger, debug) << "onBlock succeeded";
          }
          catch (std::exception& e)
          {
-            PSIBASE_LOG(trxLogger, info) << "onBlock failed: " << e.what();
+            PSIBASE_LOG(trxLogger, warning) << "onBlock failed: " << e.what();
+         }
+      }
+   }
+
+   void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
+   {
+      auto notifyType = trace.error ? NotifyType::rejectTransaction : NotifyType::acceptTransaction;
+      auto notifyData = db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(notifyType)));
+      if (!notifyData)
+         return;
+      auto notifySpan = std::span{notifyData->pos, notifyData->end};
+      if (!psio::fracpack_validate<NotifyRow>(notifySpan))
+         return;
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{notifySpan}).actions().unpack();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple(id, trace))};
+
+      for (const auto& a : actions)
+      {
+         if (a.sender != AccountNumber{})
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid onTransaction callback" << std::endl;
+            continue;
+         }
+         if (!a.rawData.empty())
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid onTransaction callback" << std::endl;
+            continue;
+         }
+         action.service = a.service;
+         action.method  = a.method;
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, debug) << "onTransaction succeeded";
+         }
+         catch (std::exception& e)
+         {
+            PSIBASE_LOG(trxLogger, warning) << "onTransaction failed: " << e.what();
          }
       }
    }
@@ -352,7 +402,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
+         auto id = sha256(trx.transaction.data(), trx.transaction.size());
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
+         PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
       catch (...)
@@ -375,10 +429,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
-                                     sha256(trx.transaction.data(), trx.transaction.size()));
+         auto id = sha256(trx.transaction.data(), trx.transaction.size());
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
    }
@@ -392,6 +447,51 @@ namespace psibase
       check(!trx.subjectiveData, "Subjective data should be set by the block producer");
       trx.subjectiveData = exec(trx, trace, initialWatchdogLimit, enableUndo, commit);
       current.transactions.push_back(std::move(trx));
+   }
+
+   void BlockContext::execNonTrxAction(Action&& action, ActionTrace& atrace)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      TransactionContext tc{*this, trx, trace, true, false, true, true};
+
+      auto session = db.startWrite(writer);
+      tc.execNonTrxAction(0, action, atrace);
+      session.commit();
+   }
+
+   auto BlockContext::execExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
+   {
+      SignedTransaction  trx;
+      auto&              atrace = trace.actionTraces.emplace_back();
+      TransactionContext tc{*this, trx, trace, true, false, true, true};
+
+      auto session = db.startWrite(writer);
+      tc.execExport(fn, action, atrace);
+      session.commit();
+      return atrace;
+   }
+
+   void BlockContext::execAsyncAction(Action&& action)
+   {
+      SignedTransaction  trx;
+      TransactionTrace   trace;
+      auto&              atrace = trace.actionTraces.emplace_back();
+      TransactionContext tc{*this, trx, trace, true, false, true};
+
+      tc.execNonTrxAction(0, action, atrace);
+   }
+
+   auto BlockContext::execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+       -> ActionTrace&
+   {
+      SignedTransaction  trx;
+      auto&              atrace = trace.actionTraces.emplace_back();
+      TransactionContext tc{*this, trx, trace, true, false, true};
+
+      tc.execExport(fn, action, atrace);
+      return atrace;
    }
 
    // TODO: call callStartBlock() here? caller's responsibility?
@@ -413,8 +513,8 @@ namespace psibase
        bool                                     enableUndo,
        bool                                     commit)
    {
-      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId",
-                                  sha256(trx.transaction.data(), trx.transaction.size()));
+      auto id = sha256(trx.transaction.data(), trx.transaction.size());
+      BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
       try
       {
          checkActive();
@@ -445,6 +545,7 @@ namespace psibase
          if (commit)
          {
             session.commit();
+            callOnTransaction(id, trace);
             active = true;
          }
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
@@ -455,6 +556,7 @@ namespace psibase
       {
          PSIBASE_LOG(trxLogger, info) << "Transaction failed";
          trace.error = e.what();
+         callOnTransaction(id, trace);
          throw;
       }
    }

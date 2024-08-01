@@ -67,6 +67,7 @@ namespace psibase
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
       void execVerify(ActionContext& actionContext);
       void execServe(ActionContext& actionContext);
+      void exec(ActionContext& actionContext, std::string_view fn);
 
       // Cancel execution because of timeout; may be called from another thread
       void asyncTimeout();

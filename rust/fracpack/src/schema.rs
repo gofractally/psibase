@@ -16,6 +16,12 @@ pub use indexmap;
 #[fracpack(fracpack_mod = "crate")]
 pub struct Schema(IndexMap<String, AnyType>);
 
+impl Schema {
+    pub fn get(&self, name: &str) -> Option<&AnyType> {
+        self.0.get(name)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
 #[fracpack(fracpack_mod = "crate")]
 pub enum AnyType {
@@ -63,6 +69,13 @@ impl AnyType {
             panic!("expected Type");
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[fracpack(fracpack_mod = "crate")]
+pub struct FunctionType {
+    pub params: AnyType,
+    pub result: Option<AnyType>,
 }
 
 pub struct SchemaBuilder {
@@ -121,9 +134,42 @@ impl VisitTypes for () {
     fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, _f: &mut F) {}
 }
 
+macro_rules! visit_tuple {
+    ($($id:ident $i:tt)+) => {
+        impl<$($id: VisitTypes),+> VisitTypes for ($(&mut $id),+,) {
+            fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+                $(self.$i.visit_types(f));+;
+            }
+        }
+    }
+}
+
+visit_tuple!(T0 0);
+visit_tuple!(T0 0 T1 1);
+visit_tuple!(T0 0 T1 1 T2 2);
+visit_tuple!(T0 0 T1 1 T2 2 T3 3);
+visit_tuple!(T0 0 T1 1 T2 2 T3 3 T4 4);
+visit_tuple!(T0 0 T1 1 T2 2 T3 3 T4 4 T5 5);
+visit_tuple!(T0 0 T1 1 T2 2 T3 3 T4 4 T5 5 T6 6);
+
 impl VisitTypes for AnyType {
     fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
         visit_types(self, f);
+    }
+}
+
+impl VisitTypes for FunctionType {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        self.params.visit_types(f);
+        self.result.visit_types(f);
+    }
+}
+
+impl<T: VisitTypes> VisitTypes for Option<T> {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        if let Some(t) = self {
+            t.visit_types(f)
+        }
     }
 }
 

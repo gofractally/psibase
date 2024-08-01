@@ -273,6 +273,7 @@ struct NetworkBase
 
    void recv(const psibase::net::HelloRequest&) {}
    void recv(const psibase::net::HelloResponse&) {}
+   void recv(const psibase::net::WasmProducerMessage&) {}
 
    template <typename T>
    static bool has_message(const psibase::net::SignedMessage<T>&              message,

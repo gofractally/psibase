@@ -40,6 +40,8 @@ namespace psibase
                result |= (1 << 6);
             else if (flag == "forceReplay")
                result |= (1 << 7);
+            else if (flag == "allowSocket")
+               result |= (1 << 8);
             else
                check(false, "Invalid service flags");
          }

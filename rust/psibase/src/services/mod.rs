@@ -17,3 +17,4 @@ pub mod setcode;
 pub mod sites;
 pub mod tokens;
 pub mod transact;
+pub mod webmail;

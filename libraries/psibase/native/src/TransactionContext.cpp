@@ -152,6 +152,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         self.ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -199,6 +200,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -224,6 +226,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
@@ -266,6 +269,33 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
+         ownedSockets.close(atrace.error);
+         throw;
+      }
+   }
+
+   void TransactionContext::execExport(std::string_view fn,
+                                       const Action&    action,
+                                       ActionTrace&     atrace)
+   {
+      auto& db         = blockContext.db;
+      config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
+      impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
+          WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
+      blockContext.systemContext.setNumMemories(impl->wasmConfig.numExecutionMemories);
+      remainingStack = impl->wasmConfig.vmOptions.max_stack_bytes;
+
+      atrace.action    = action;
+      ActionContext ac = {*this, action, atrace};
+      try
+      {
+         auto& ec = getExecutionContext(action.service);
+         ec.exec(ac, fn);
+      }
+      catch (std::exception& e)
+      {
+         atrace.error = e.what();
+         ownedSockets.close(atrace.error);
          throw;
       }
    }
