@@ -4,6 +4,7 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serveSchema.hpp>
 
 using namespace psibase;
 
@@ -39,6 +40,9 @@ namespace SystemService
             return result;
 
          if (auto result = psibase::servePackAction<Sites>(request))
+            return result;
+
+         if (auto result = psibase::serveSchema<Sites>(request))
             return result;
 
          if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))

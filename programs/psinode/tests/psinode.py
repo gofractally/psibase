@@ -8,7 +8,7 @@ import time
 import calendar
 from collections import namedtuple
 import psibase
-from psibase import Action, Transaction, SignedTransaction
+from psibase import Action, Transaction, SignedTransaction, ServiceSchema
 import fracpack
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
@@ -129,13 +129,14 @@ class ChainPackContext:
     def pack(self, value, ty=None):
         return fracpack.pack(value, ty, custom=self._custom)
     def pack_action_data(self, service, method, data):
-        with self._api.post('/pack_action/%s' % method, service=service, json=data) as result:
-            result.raise_for_status()
-            return result.content.hex()
+        if isinstance(type(data), fracpack.TypeBase):
+            return fracpack.pack(data, custom=self._custom)
+        return fracpack.pack(data, self.get_schema(service).actions[method].params)
     def get_schema(self, service):
         if service not in self._schemas:
             with self._api.get('/schema', service) as reply:
-                self._schemas[service] = ServiceSchema(reply.json(), api=self._api)
+                reply.raise_for_status()
+                self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
         return self._schemas[service]
 
 class TransactionError(Exception):

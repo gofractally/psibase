@@ -5,6 +5,7 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serveSchema.hpp>
 #include <string>
 
 using namespace psibase;
@@ -62,6 +63,8 @@ std::optional<HttpReply> SubjectiveCounterService::serveSys(const HttpRequest& r
       psio::to_json(value, stream);
       return result;
    }
+   if (auto result = serveSchema<SubjectiveCounterService>(req))
+      return result;
    return servePackAction<SubjectiveCounterService>(req);
 }
 

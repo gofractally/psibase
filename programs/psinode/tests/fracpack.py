@@ -603,6 +603,9 @@ class Bool(u1):
 
 class String(Custom(List(u8), "string"), str):
     @staticmethod
+    def is_empty_container(value):
+        return len(value) == 0
+    @staticmethod
     def pack(value, stream):
         data = value.encode()
         stream.write_u32(len(data))
@@ -642,6 +645,11 @@ default_custom = {
     "string": String,
     "hex": Hex
 }
+
+class FunctionType:
+    def __init__(self, params, result=None):
+        self.params = params
+        self.result = result
 
 class SchemaError(Exception):
     pass

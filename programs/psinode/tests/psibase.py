@@ -66,15 +66,13 @@ default_custom = fracpack.default_custom | {
 }
 
 class ServiceSchema:
-    def __init__(self, json, custom=None, api=None):
+    def __init__(self, json, custom=None):
         if custom is None:
             custom = default_custom
-        if api is not None:
-            custom = custom | {"Action": ActionEx2}
         self.service = json['service']
         self.types = Schema(json.get('types', {}), custom=custom)
         self.actions = {}
-        for (name, ty) in json.get('actions', {}):
+        for (name, ty) in json.get('actions', {}).items():
             params = load_type(ty['params'], self.types)
             result = ty.get('result')
             if result is not None:
@@ -82,7 +80,7 @@ class ServiceSchema:
             self.actions[name] = FunctionType(params, result)
         def get_events(name):
             events = {}
-            for (name, ty) in json.get(name, {}):
+            for (name, ty) in json.get(name, {}).items():
                 events[name] = load_type(result, self.types)
             return events
         self.ui = get_events('ui')
