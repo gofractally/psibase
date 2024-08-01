@@ -25,6 +25,11 @@ IntTuple = Tuple((i32, i64))
 
 OptInt = Option(i32)
 
+class Empty(Struct):
+    pass
+
+NestedEmpty = Tuple([FracPack(Empty)])
+
 class TestFracpack(unittest.TestCase):
     def test_u32(self):
         self.assertEqual(pack(u32(10)).hex().upper(), '0A000000')
@@ -50,6 +55,9 @@ class TestFracpack(unittest.TestCase):
         self.assertEqual(pack(String('foo')).hex().upper(), '03000000666F6F')
     def test_bool(self):
         self.assertEqual(pack(Bool(True)).hex().upper(), '01')
+    def test_empty(self):
+        self.assertEqual(pack(Empty()).hex().upper(), '')
+        self.assertEqual(pack([Empty], NestedEmpty).hex().upper(), '040000000000')
     def test_schema(self):
         with open(args.test_data) as f:
             tests = json.load(f)

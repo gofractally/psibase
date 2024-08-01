@@ -108,6 +108,11 @@ void to_json(const V1& v1, auto& stream)
    to_json(v1.v0, stream);
 }
 
+struct Empty
+{
+};
+PSIO_REFLECT(Empty, definitionWillNotChange())
+
 int main()
 {
    test_builder builder;
@@ -154,6 +159,8 @@ int main()
    builder.add<std::vector<unsigned char>>("hex", {{}, {23, 45, 67}});
    builder.add<std::tuple<std::vector<unsigned char>>>("(hex)", {{{}}, {{23, 45, 67}}});
    builder.add<psio::shared_view_ptr<std::int64_t>>("nestedhex", {42});
+   builder.add_nested<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty", {{Empty{}}});
+   builder.add<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty-hex", {{Empty{}}});
    std::cout << "[";
    to_json(builder, std::cout);
    std::cout << "]";

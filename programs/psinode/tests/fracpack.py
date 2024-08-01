@@ -47,7 +47,7 @@ class TypeBase(type):
     def embedded_fixed_pack(self, value, stream):
         if self.is_variable_size:
             stream.write_u32(0)
-            if not self.is_container or len(value) > 0:
+            if not self.is_container or not self.is_empty_container(value):
                 return OffsetRepack(stream, value, self)
         else:
             self.pack(value, stream)
@@ -58,11 +58,10 @@ class TypeBase(type):
         return stream.bytes
 
 def pack(value, ty=None, *, custom=None):
-    valtype = type(value)
-    if valtype is not None:
-        ty = valtype
+    if ty is None:
+        ty = type(value)
     stream = OutputStream(custom)
-    valtype.pack(value, stream)
+    ty.pack(value, stream)
     return stream.bytes
 
 def _handle_args(args, kw, extra, genname, base):
@@ -213,7 +212,7 @@ class DerivedAsInstance(type):
                     for (n, ty) in namespace['__annotations__'].items():
                         if isinstance(ty, TypeBase):
                             members[n] = ty
-                    return base(name, members)
+                return base(name, members)
         return super().__new__(cls, name, bases, namespace, **kw)
 
 class MembersByName:
@@ -333,6 +332,8 @@ class List(TypeBase):
             result.ty = load_type(raw, parser)
         parser.post(init)
         return result
+    def is_empty_container(self, value):
+        return len(value) == 0
     def pack(self, value, stream):
         ty = self.ty
         stream.write_u32(self.ty.fixed_size * len(value))
@@ -363,6 +364,10 @@ class Option(TypeBase):
             result.is_container = result.ty.is_container and not result.ty.is_optional
         parser.post(init)
         return result
+    def is_empty_container(self, value):
+        if isinstance(value, OptionValue):
+            value = value.value
+        return value is not None and self.ty.is_empty_container(value)
     def pack(self, value, stream):
         if isinstance(value, OptionValue):
             value = value.value
@@ -378,7 +383,7 @@ class Option(TypeBase):
             stream.write_u32(1)
             return NullRepack()
         stream.write_u32(0)
-        if self.is_container and len(value) == 0:
+        if self.is_container and self.is_empty_container(value):
             return NullRepack()
         else:
             return OffsetRepack(stream, value, self.ty)
@@ -478,6 +483,8 @@ class FracPack(TypeBase):
             result.ty = load_type(raw, parser)
         parser.post(init)
         return result
+    def is_empty_container(self, value):
+        return self.ty.fixed_size == 0
     def pack(self, value, stream):
         stream.write_u32(0)
         pos = stream.pos
@@ -613,6 +620,8 @@ class Hex(TypeBase):
             stream.write_bytes(value)
         else:
             stream.write_bytes(value)
+    def is_empty_container(self, value):
+        return len(value) == 0
     @property
     def is_variable_size(self):
         return self.ty.is_variable_size
