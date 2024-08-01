@@ -1,3 +1,6 @@
+var decoder = new TextDecoder("utf8");
+var encoder = new TextEncoder();
+
 function isErrorMessage(error) {
     return (
         typeof error === "object" &&
@@ -59,7 +62,11 @@ function deleteMany(bucket, keys) {
         bucket.delete(key);
     });
 }
-export const batch = { getMany, setMany, deleteMany };
+export const batch = {
+    getMany,
+    setMany,
+    deleteMany,
+};
 
 export class ErrorNoSuchStore {
     tag = "no-such-store";
@@ -104,9 +111,7 @@ class Bucket {
         this.validateKey(key);
         try {
             const item = localStorage.getItem(`${this.bucketId}:${key}`);
-            return item
-                ? new Uint8Array(item.split(",").map(Number))
-                : undefined;
+            return item ? encoder.encode(atob(item)) : undefined;
         } catch (e) {
             if (isErrorMessage(e)) {
                 throw new ErrorOther(e.message);
@@ -128,7 +133,10 @@ class Bucket {
         }
 
         try {
-            localStorage.setItem(`${this.bucketId}:${key}`, value.toString());
+            localStorage.setItem(
+                `${this.bucketId}:${key}`,
+                btoa(decoder.decode(value)),
+            );
         } catch (e) {
             if (isErrorMessage(e)) {
                 throw new ErrorOther(e.message);
@@ -206,4 +214,7 @@ class Bucket {
     // }
 }
 
-export const store = { Bucket, open };
+export const store = {
+    Bucket,
+    open,
+};

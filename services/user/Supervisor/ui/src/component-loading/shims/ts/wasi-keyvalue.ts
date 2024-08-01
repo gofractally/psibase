@@ -4,6 +4,9 @@
 
 declare const host: any;
 
+var decoder = new TextDecoder("utf8");
+var encoder = new TextEncoder();
+
 function isErrorMessage(error: any): error is { message: string } {
     return (
         typeof error === "object" &&
@@ -68,7 +71,11 @@ function deleteMany(bucket: Bucket, keys: string[]): void {
         bucket.delete(key);
     });
 }
-export const batch = { getMany, setMany, deleteMany };
+export const batch = {
+    getMany,
+    setMany,
+    deleteMany,
+};
 
 ///////////////////////////////////////////////// STORE
 export interface ErrorNoSuchStore {
@@ -134,9 +141,7 @@ class Bucket {
         this.validateKey(key);
         try {
             const item = localStorage.getItem(`${this.bucketId}:${key}`);
-            return item
-                ? new Uint8Array(item.split(",").map(Number))
-                : undefined;
+            return item ? encoder.encode(atob(item)) : undefined;
         } catch (e) {
             if (isErrorMessage(e)) {
                 throw new ErrorOther(e.message);
@@ -158,7 +163,10 @@ class Bucket {
         }
 
         try {
-            localStorage.setItem(`${this.bucketId}:${key}`, value.toString());
+            localStorage.setItem(
+                `${this.bucketId}:${key}`,
+                btoa(decoder.decode(value)),
+            );
         } catch (e) {
             if (isErrorMessage(e)) {
                 throw new ErrorOther(e.message);
@@ -236,4 +244,7 @@ class Bucket {
     // }
 }
 
-export const store = { Bucket, open };
+export const store = {
+    Bucket,
+    open,
+};
