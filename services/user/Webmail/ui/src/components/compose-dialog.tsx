@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { type PluginId, Supervisor } from "@psibase/common-lib";
+
 import { Reply, SquarePen } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -33,11 +35,15 @@ import {
 } from "@shadcn/form";
 import { Input } from "@shadcn/input";
 
+const supervisor = new Supervisor();
+interface SupervisorError {
+    code: number;
+    producer: PluginId;
+    message: string;
+}
+
 const formSchema = z.object({
-    to: z.enum(["brandonfancher", "thegazelle"], {
-        message:
-            "For testing, recipient should be either brandonfancher or thegazelle",
-    }),
+    to: z.string(),
     subject: z.string(),
 });
 
@@ -50,8 +56,8 @@ export const ComposeDialog = ({
 }) => {
     const [open, setOpen] = useState(false);
     const [selectedAccount] = useUser();
-    const [messages, setMessages, getMessages] = useLocalStorage<Message[]>(
-        "messages",
+    const [drafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
+        "drafts",
         [],
     );
 
@@ -64,12 +70,12 @@ export const ComposeDialog = ({
 
     useEffect(() => {
         if (!inReplyTo) {
-            form.reset();
+            return form.reset();
         }
-        const data = getMessages() ?? [];
+        const data = getDrafts() ?? [];
         const topicMsg = data.find((msg) => msg.id === inReplyTo);
         if (!topicMsg) return;
-        form.setValue("to", topicMsg.from as "brandonfancher" | "thegazelle");
+        form.setValue("to", topicMsg.from);
         form.setValue("subject", `RE: ${topicMsg.subject}`);
     }, [inReplyTo]);
 
@@ -86,12 +92,12 @@ export const ComposeDialog = ({
             subject: form.getValues().subject || "subject here",
             body: value,
         } as Message;
-        setMessages([...(messages ?? []), draft]);
+        setDrafts([...(drafts ?? []), draft]);
     };
 
     const updateDraft = (value: string) => {
-        // using getMessages() here instead of messages prevents stale closure
-        const data = getMessages() ?? [];
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
         let draft = data.find((msg) => msg.id === id.current);
         if (!draft) {
             createDraft(value);
@@ -100,28 +106,42 @@ export const ComposeDialog = ({
             draft.to = form.getValues().to ?? "";
             draft.subject = form.getValues().subject ?? "";
             draft.body = value;
-            setMessages(data);
+            setDrafts(data);
         }
     };
 
-    const sendMessage = (values: z.infer<typeof formSchema>) => {
-        // using getMessages() here instead of messages prevents stale closure
-        const data = getMessages() ?? [];
+    const deleteDraft = () => {
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
+        const remainingDrafts = data.filter((msg) => msg.id !== id.current);
+        setDrafts(remainingDrafts);
+    };
+
+    const sendMessage = async (values: z.infer<typeof formSchema>) => {
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
         let draft = data.find((msg) => msg.id === id.current);
         if (!draft) {
-            console.error("No message found to send");
-        } else {
-            draft.datetime = Date.now();
-            draft.from = selectedAccount.account;
-            draft.to = values.to;
-            draft.status = "sent";
-            draft.subject = values.subject;
-            setMessages(data);
+            return console.error("No message found to send");
+        }
+
+        try {
+            await supervisor.functionCall({
+                service: "webmail",
+                intf: "api",
+                method: "send",
+                params: [draft.to, draft.subject, draft.body],
+            });
+        } catch (e: unknown) {
+            alert(`${(e as SupervisorError).message}`);
+            console.error(`${(e as SupervisorError).message}`);
+        } finally {
+            deleteDraft();
         }
     };
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        sendMessage(values);
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        await sendMessage(values);
         form.reset();
         setOpen(false);
     }
