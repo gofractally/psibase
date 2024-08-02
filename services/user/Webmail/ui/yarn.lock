@@ -741,13 +741,20 @@
   dependencies:
     tslib "^2.5.0"
 
-"@milkdown/plugin-diagram@^7.3.6":
-  version "7.3.6"
-  resolved "https://registry.yarnpkg.com/@milkdown/plugin-diagram/-/plugin-diagram-7.3.6.tgz#b824f3c1c1ae3e18589bd913541ed32c6332a9e1"
-  integrity sha512-2jz7a4prIElE4WmcJ/ol46OL+KipkCMj5l/KOvMQhgloJbYgcqkcFUJRlwUDBlUx6chqAZoa9msszNUCKerI/A==
+"@milkdown/exception@7.4.0":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@milkdown/exception/-/exception-7.4.0.tgz#68ae72f007beaff0154bffa7779ad05b2e87df6b"
+  integrity sha512-id0kZrhIA6QRlpgPsrmNNZY71NPwujJg4RPZUSrbM+4PuXXZfzaVtMWd3LGn5HrDRDhkvmIrRzbEmqqfUnGYLg==
   dependencies:
-    "@milkdown/exception" "7.3.6"
-    "@milkdown/utils" "7.3.6"
+    tslib "^2.5.0"
+
+"@milkdown/plugin-diagram@^7.4.0":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@milkdown/plugin-diagram/-/plugin-diagram-7.4.0.tgz#ab6b7c2d6651c13aa2bf147dfd854d2a959b6b1b"
+  integrity sha512-b7NQTBFc1av1MPR/Vuli7Yta56nMUwIEmR/OIRWZrdAdEpPmfvnYTtlMatVo1/4MB77jTWy92FY866Kl831qYQ==
+  dependencies:
+    "@milkdown/exception" "7.4.0"
+    "@milkdown/utils" "7.4.0"
     "@types/dompurify" "^3.0.0"
     mermaid "^10.9.0"
     nanoid "^5.0.0"
@@ -873,6 +880,15 @@
   integrity sha512-V2ljZN72PIJ/7dQmEtasyNVi7wpgfjxmPX+b82cncd3vA+m/4wKosTeK+oHRIlt0JlpMGNrxd4ikIGHoy1+6UQ==
   dependencies:
     "@milkdown/exception" "7.3.6"
+    nanoid "^5.0.0"
+    tslib "^2.5.0"
+
+"@milkdown/utils@7.4.0":
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@milkdown/utils/-/utils-7.4.0.tgz#01f474ed7c32064524ca4eaeb289a4ad355b9db7"
+  integrity sha512-spGlHJbEVJqNtIvUrQd6xyA10x+8Zaf1eb2cXQGr5qjpoQVVDybazx18pEr5cIKmuCRBID13Agd47NKQgkjS7A==
+  dependencies:
+    "@milkdown/exception" "7.4.0"
     nanoid "^5.0.0"
     tslib "^2.5.0"
 

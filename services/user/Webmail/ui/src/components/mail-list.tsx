@@ -34,6 +34,7 @@ export function MailList({
                     ?.sort((a, b) => b.datetime - a.datetime)
                     .map((item) => (
                         <MailItem
+                            key={item.id}
                             mailbox={mailbox}
                             item={item}
                             setSelectedMessageId={setSelectedMessageId}

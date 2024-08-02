@@ -22,7 +22,7 @@ import {
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 import { math, mathBlockSchema } from "@milkdown/plugin-math";
-import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
+// import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
 import { useNodeViewFactory } from "@prosemirror-adapter/react";
 import { Node, Schema } from "@milkdown/prose/model";
 
@@ -31,7 +31,8 @@ import {
     selectionListener,
 } from "@lib/editor/plugin-selection-listener";
 
-import { MathBlock, MermaidDiagram } from "./editor";
+// import { MathBlock, MermaidDiagram } from "./editor";
+import { MathBlock } from "./editor";
 
 import "@milkdown/theme-nord/style.css";
 import "katex/dist/katex.min.css";
@@ -70,17 +71,17 @@ export const MarkdownEditor = ({
         ].flat();
     }, [nodeViewFactory]);
 
-    const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
-        return [
-            diagram,
-            $view(diagramSchema.node, () =>
-                nodeViewFactory({
-                    component: () => <MermaidDiagram readOnly={readOnly} />,
-                    stopEvent: () => true,
-                }),
-            ),
-        ].flat();
-    }, [nodeViewFactory]);
+    // const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
+    //     return [
+    //         diagram,
+    //         $view(diagramSchema.node, () =>
+    //             nodeViewFactory({
+    //                 component: () => <MermaidDiagram readOnly={readOnly} />,
+    //                 stopEvent: () => true,
+    //             }),
+    //         ),
+    //     ].flat();
+    // }, [nodeViewFactory]);
 
     useEditor((root) =>
         MilkdownEditor.make()
@@ -118,7 +119,7 @@ export const MarkdownEditor = ({
             .use(history)
             .use(listItemBlockComponent)
             .use(mathPlugins)
-            .use(diagramPlugins)
+            // .use(diagramPlugins)
             .use(linkTooltipPlugin),
     );
 

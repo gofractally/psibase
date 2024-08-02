@@ -45,9 +45,7 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 };
 
 const getIncomingMessages = async (account: string) => {
-    const res = await fetch(
-        `https://webmail.psibase.127.0.0.1.sslip.io:8081/messages?receiver=${account}`,
-    );
+    const res = await fetch(`/messages?receiver=${account}`);
     const rawMessages = (await res.json()) as RawMessage[];
     return transformRawMessagesToMessages(rawMessages);
 };

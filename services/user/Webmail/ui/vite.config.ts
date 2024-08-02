@@ -42,6 +42,7 @@ const psibase = (service: string, isServing?: boolean) => {
                         subdomain === service &&
                         req.method !== "POST" &&
                         req.headers.accept !== "application/json" &&
+                        !req.url.startsWith("/messages") &&
                         !req.url.startsWith("/common") &&
                         !req.url.startsWith("/api")
                     ) {
@@ -94,6 +95,7 @@ const psibase = (service: string, isServing?: boolean) => {
             config: () => {
                 return {
                     build: {
+                        sourcemap: false,
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {
@@ -129,14 +131,8 @@ const psibase = (service: string, isServing?: boolean) => {
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
     plugins: [
-        react({
-            babel: {
-                parserOpts: {
-                    plugins: ["decorators-legacy"],
-                },
-            },
-        }),
-        psibase("social", command === "serve"),
+        react(),
+        psibase("webmail", command === "serve"),
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),
