@@ -1,5 +1,14 @@
-var decoder = new TextDecoder("utf8");
-var encoder = new TextEncoder();
+function bytesToBase64(bytes) {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) {
+        bin += String.fromCharCode(bytes[i]);
+    }
+    return btoa(bin);
+}
+
+function base64ToBytes(str) {
+    return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
+}
 
 function isErrorMessage(error) {
     return (
@@ -111,7 +120,7 @@ class Bucket {
         this.validateKey(key);
         try {
             const item = localStorage.getItem(`${this.bucketId}:${key}`);
-            return item ? encoder.encode(atob(item)) : undefined;
+            return item ? base64ToBytes(item) : undefined;
         } catch (e) {
             if (isErrorMessage(e)) {
                 throw new ErrorOther(e.message);
@@ -135,7 +144,7 @@ class Bucket {
         try {
             localStorage.setItem(
                 `${this.bucketId}:${key}`,
-                btoa(decoder.decode(value)),
+                bytesToBase64(value),
             );
         } catch (e) {
             if (isErrorMessage(e)) {
