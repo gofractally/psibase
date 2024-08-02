@@ -188,26 +188,6 @@ function App() {
     }
   };
 
-  const run8 = async () => {
-    try {
-      const res = await supervisor.functionCall({
-        service: "sup-test",
-        intf: "tests",
-        method: "kvTest",
-        plugin: "test",
-        params: [],
-      });
-      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
-      setRes(`No errors :)`);
-    } catch (e) {
-      if (e instanceof Error) {
-        console.error(`Error: ${e.message}\nStack: ${e.stack}`);
-      } else {
-        console.error(`Caught exception: ${JSON.stringify(e, null, 2)}`);
-      }
-    }
-  };
-
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [c, setC] = useState("");
@@ -250,10 +230,6 @@ function App() {
       <div className="card">
         <button onClick={() => run7()}>{"Set key"}</button>
         <FileSelector onLoad={setC} />
-      </div>
-
-      <div className="card">
-        <button onClick={() => run8()}>{"Run supervisor tests"}</button>
       </div>
     </>
   );
