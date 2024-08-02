@@ -110,13 +110,6 @@ export const ComposeDialog = ({
         }
     };
 
-    // const deleteDraft = () => {
-    //     // using getDrafts() here instead of messages prevents stale closure
-    //     const data = getDrafts() ?? [];
-    //     const remainingDrafts = data.filter((msg) => msg.id !== id.current);
-    //     setDrafts(remainingDrafts);
-    // };
-
     const sendMessage = async (values: z.infer<typeof formSchema>) => {
         // using getDrafts() here instead of messages prevents stale closure
         const data = getDrafts() ?? [];
@@ -132,12 +125,11 @@ export const ComposeDialog = ({
                 method: "send",
                 params: [draft.to, draft.subject, draft.body],
             });
+            if (!id.current) return;
+            deleteDraftById(id.current);
         } catch (e: unknown) {
             alert(`${(e as SupervisorError).message}`);
             console.error(`${(e as SupervisorError).message}`);
-        } finally {
-            if (!id.current) return;
-            deleteDraftById(id.current);
         }
     };
 
@@ -153,7 +145,13 @@ export const ComposeDialog = ({
             onOpenChange={(open) => {
                 setOpen(open);
                 if (!open) return;
-                id.current = uuid();
+
+                // the ID should be (re)set each time this opens; remember, it stays mounted
+                if (message?.status === "draft") {
+                    id.current = message.id;
+                } else {
+                    id.current = uuid();
+                }
             }}
         >
             {trigger}
@@ -211,7 +209,11 @@ export const ComposeDialog = ({
                                         <Separator />
                                     </div>
                                     <MarkdownEditor
-                                        initialValue=""
+                                        initialValue={
+                                            message?.status === "draft"
+                                                ? message.body
+                                                : ""
+                                        }
                                         updateMarkdown={updateDraft}
                                     />
                                 </ProsemirrorAdapterProvider>
