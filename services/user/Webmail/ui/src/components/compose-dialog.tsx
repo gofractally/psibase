@@ -49,10 +49,10 @@ const formSchema = z.object({
 
 export const ComposeDialog = ({
     trigger,
-    inReplyTo,
+    message,
 }: {
     trigger: ReactNode;
-    inReplyTo?: string;
+    message?: Message;
 }) => {
     const [open, setOpen] = useState(false);
     const [selectedAccount] = useUser();
@@ -67,15 +67,17 @@ export const ComposeDialog = ({
     });
 
     useEffect(() => {
-        if (!inReplyTo) {
+        if (!message) {
             return form.reset();
         }
-        const data = getDrafts() ?? [];
-        const topicMsg = data.find((msg) => msg.id === inReplyTo);
-        if (!topicMsg) return;
-        form.setValue("to", topicMsg.from);
-        form.setValue("subject", `RE: ${topicMsg.subject}`);
-    }, [inReplyTo]);
+        if (message.status === "draft") {
+            form.setValue("to", message.to);
+            form.setValue("subject", message.subject);
+        } else {
+            form.setValue("to", message.from);
+            form.setValue("subject", `RE: ${message.subject}`);
+        }
+    }, [message]);
 
     const id = useRef<string>();
 

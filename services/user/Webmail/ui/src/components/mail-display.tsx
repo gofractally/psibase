@@ -130,12 +130,12 @@ const ActionBar = ({
                     {mailbox === "drafts" ? (
                         <ComposeDialog
                             trigger={<EditSendDialogTriggerIconWithTooltip />}
-                            inReplyTo={message.id}
+                            message={message}
                         />
                     ) : (
                         <ComposeDialog
                             trigger={<ReplyDialogTriggerIconWithTooltip />}
-                            inReplyTo={message.id}
+                            message={message}
                         />
                     )}
                 </Dialog>
