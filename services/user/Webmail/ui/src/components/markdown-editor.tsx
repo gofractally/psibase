@@ -21,7 +21,7 @@ import {
 } from "@milkdown/components/link-tooltip";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
-import { math, mathBlockSchema } from "@milkdown/plugin-math";
+// import { math, mathBlockSchema } from "@milkdown/plugin-math";
 // import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
 import { useNodeViewFactory } from "@prosemirror-adapter/react";
 import { Node, Schema } from "@milkdown/prose/model";
@@ -32,10 +32,10 @@ import {
 } from "@lib/editor/plugin-selection-listener";
 
 // import { MathBlock, MermaidDiagram } from "./editor";
-import { MathBlock } from "./editor";
+// import { MathBlock } from "./editor";
 
 import "@milkdown/theme-nord/style.css";
-import "katex/dist/katex.min.css";
+// import "katex/dist/katex.min.css";
 import "../styles/editor.css";
 
 export const editorSelectionAtom = atom<{
@@ -59,17 +59,17 @@ export const MarkdownEditor = ({
     const nodeViewFactory = useNodeViewFactory();
     const setSelection = useSetAtom(editorSelectionAtom);
 
-    const mathPlugins: MilkdownPlugin[] = useMemo(() => {
-        return [
-            $view(mathBlockSchema.node, () =>
-                nodeViewFactory({
-                    component: () => <MathBlock readOnly={readOnly} />,
-                    stopEvent: () => true,
-                }),
-            ),
-            math,
-        ].flat();
-    }, [nodeViewFactory]);
+    // const mathPlugins: MilkdownPlugin[] = useMemo(() => {
+    //     return [
+    //         $view(mathBlockSchema.node, () =>
+    //             nodeViewFactory({
+    //                 component: () => <MathBlock readOnly={readOnly} />,
+    //                 stopEvent: () => true,
+    //             }),
+    //         ),
+    //         math,
+    //     ].flat();
+    // }, [nodeViewFactory]);
 
     // const diagramPlugins: MilkdownPlugin[] = useMemo(() => {
     //     return [
@@ -118,7 +118,7 @@ export const MarkdownEditor = ({
             .use(gfm)
             .use(history)
             .use(listItemBlockComponent)
-            .use(mathPlugins)
+            // .use(mathPlugins)
             // .use(diagramPlugins)
             .use(linkTooltipPlugin),
     );
