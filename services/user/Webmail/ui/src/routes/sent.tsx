@@ -8,11 +8,6 @@ import { Separator } from "@shadcn/separator";
 import { MailDisplay } from "@components/mail-display";
 import { MailList } from "@components/mail-list";
 
-import { Dialog } from "@shadcn/dialog";
-import {
-    ComposeDialog,
-    ComposeDialogTriggerIconWithTooltip,
-} from "@components";
 import { useSentMessages } from "@hooks";
 import { useEffect } from "react";
 
@@ -30,17 +25,8 @@ export function Sent() {
             autoSaveId="post-list-panels"
         >
             <ResizablePanel minSize={30} id="list" order={3}>
-                <div className="flex items-center justify-between px-4">
+                <div className="flex h-[56px] items-center justify-between px-4">
                     <h1 className="text-xl font-bold">Sent</h1>
-                    <div className="flex items-center gap-2">
-                        <Dialog>
-                            <ComposeDialog
-                                trigger={
-                                    <ComposeDialogTriggerIconWithTooltip />
-                                }
-                            />
-                        </Dialog>
-                    </div>
                 </div>
                 <Separator />
                 {/* <div className="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">

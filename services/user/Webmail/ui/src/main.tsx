@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
-import { Editor, Home, Sent, Viewer } from "@routes";
+import { Drafts, Editor, Home, Sent, Viewer } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
 
 import DefaultLayout from "./layouts/default";
@@ -23,11 +23,11 @@ const router = createHashRouter([
                 element: <Home />,
                 children: [],
             },
-            // {
-            //     path: "/drafts",
-            //     element: <Drafts />,
-            //     children: [],
-            // },
+            {
+                path: "/drafts",
+                element: <Drafts />,
+                children: [],
+            },
             {
                 path: "/sent",
                 element: <Sent />,

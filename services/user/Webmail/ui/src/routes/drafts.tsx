@@ -8,16 +8,12 @@ import { Separator } from "@shadcn/separator";
 import { MailDisplay } from "@components/mail-display";
 import { MailList } from "@components/mail-list";
 
-import { Dialog } from "@shadcn/dialog";
-import {
-    ComposeDialog,
-    ComposeDialogTriggerIconWithTooltip,
-} from "@components";
-import { useLocalMail } from "@hooks";
+import { useDraftMessages } from "@hooks";
 import { useEffect } from "react";
 
 export function Drafts() {
-    const [_, _a, setSelectedMessageId] = useLocalMail();
+    const { drafts, selectedMessage, setSelectedMessageId } =
+        useDraftMessages();
 
     useEffect(() => {
         setSelectedMessageId("");
@@ -30,17 +26,8 @@ export function Drafts() {
             autoSaveId="post-list-panels"
         >
             <ResizablePanel minSize={30} id="list" order={3}>
-                <div className="flex items-center justify-between px-4">
+                <div className="flex h-[56px] items-center justify-between px-4">
                     <h1 className="text-xl font-bold">Drafts</h1>
-                    <div className="flex items-center gap-2">
-                        <Dialog>
-                            <ComposeDialog
-                                trigger={
-                                    <ComposeDialogTriggerIconWithTooltip />
-                                }
-                            />
-                        </Dialog>
-                    </div>
                 </div>
                 <Separator />
                 {/* <div className="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -52,12 +39,17 @@ export function Drafts() {
                     </form>
                 </div> */}
                 <div className="py-4">
-                    <MailList filter="drafts" />
+                    <MailList
+                        mailbox="drafts"
+                        messages={drafts ?? []}
+                        selectedMessage={selectedMessage}
+                        setSelectedMessageId={setSelectedMessageId}
+                    />
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel id="message" order={4}>
-                <MailDisplay />
+                <MailDisplay message={selectedMessage} mailbox="drafts" />
             </ResizablePanel>
         </ResizablePanelGroup>
     );

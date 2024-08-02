@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { MilkdownProvider, useInstance } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { format } from "date-fns";
-import { Reply, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { replaceAll } from "@milkdown/utils";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
@@ -15,10 +15,11 @@ import { ScrollArea } from "@shadcn/scroll-area";
 
 import {
     ComposeDialog,
+    EditSendDialogTriggerIconWithTooltip,
     MarkdownEditor,
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
-import { Message, useIncomingMessages } from "@hooks";
+import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
 
 import { accounts } from "../fixtures/data";
 import { Dialog } from "@shadcn/dialog";
@@ -87,16 +88,27 @@ const ActionBar = ({
     mailbox: Mailbox;
     message: Message;
 }) => {
-    const { setSelectedMessageId } = useIncomingMessages();
+    const { setSelectedMessageId: setInboxMessageId } = useIncomingMessages();
+    const {
+        selectedMessage: selectedDraftMessage,
+        setSelectedMessageId: setDraftMessageId,
+        deleteDraftById,
+    } = useDraftMessages();
 
     const onDelete = () => {
-        setSelectedMessageId("");
+        if (mailbox === "inbox") {
+            setInboxMessageId("");
+        } else if (mailbox === "drafts") {
+            setDraftMessageId("");
+            if (!selectedDraftMessage?.id) return;
+            deleteDraftById(selectedDraftMessage.id);
+        }
     };
 
     return (
         <div className="flex p-2">
             <div className="flex items-center gap-2">
-                {mailbox === "inbox" ? (
+                {mailbox !== "sent" ? (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -115,10 +127,17 @@ const ActionBar = ({
             </div>
             <div className="ml-auto flex items-center gap-2">
                 <Dialog>
-                    <ComposeDialog
-                        trigger={<ReplyDialogTriggerIconWithTooltip />}
-                        inReplyTo={message.id}
-                    />
+                    {mailbox === "drafts" ? (
+                        <ComposeDialog
+                            trigger={<EditSendDialogTriggerIconWithTooltip />}
+                            inReplyTo={message.id}
+                        />
+                    ) : (
+                        <ComposeDialog
+                            trigger={<ReplyDialogTriggerIconWithTooltip />}
+                            inReplyTo={message.id}
+                        />
+                    )}
                 </Dialog>
                 {/* <Tooltip>
                     <TooltipTrigger asChild>
@@ -168,7 +187,7 @@ const MessageHeader = ({
     const fromAccount = accounts.find((a) => a.account === message.from);
     const toAccount = accounts.find((a) => a.account === message.to);
 
-    const account = mailbox === "sent" ? toAccount : fromAccount;
+    const account = mailbox === "inbox" ? fromAccount : toAccount;
 
     return (
         <div className="flex items-center gap-4 p-4 text-sm">

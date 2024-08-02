@@ -1,4 +1,4 @@
-import { Send, Inbox } from "lucide-react";
+import { PencilLine, Send, Inbox } from "lucide-react";
 
 import { Separator } from "@shadcn/separator";
 import { cn } from "@lib/utils";
@@ -41,13 +41,12 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                         variant: at === "/" ? "default" : "ghost",
                         href: "#",
                     },
-                    // {
-                    //     title: "Drafts",
-                    //     // label: "9",
-                    //     icon: PencilLine,
-                    //     variant: at === "/drafts" ? "default" : "ghost",
-                    //     href: "#/drafts",
-                    // },
+                    {
+                        title: "Drafts",
+                        icon: PencilLine,
+                        variant: at === "/drafts" ? "default" : "ghost",
+                        href: "#/drafts",
+                    },
                     {
                         title: "Sent",
                         icon: Send,

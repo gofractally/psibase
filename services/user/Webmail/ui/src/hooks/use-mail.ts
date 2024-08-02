@@ -2,6 +2,7 @@ import { atom, useAtom } from "jotai";
 
 import { useUser } from "./use-user";
 import { useQuery } from "@tanstack/react-query";
+import { useLocalStorage } from "./use-local-storage";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -93,6 +94,37 @@ export function useSentMessages() {
 
     return {
         query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
+}
+
+const draftMsgAtom = atom<Message["id"]>("");
+export function useDraftMessages() {
+    const [selectedAccount] = useUser();
+
+    const [allDrafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
+        "drafts",
+        [],
+    );
+
+    const deleteDraftById = (id: string) => {
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
+        const remainingDrafts = data.filter((d) => d.id !== id);
+        setDrafts(remainingDrafts);
+    };
+
+    const drafts = allDrafts?.filter((d) => d.from === selectedAccount.account);
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
+    const selectedMessage = drafts?.find((msg) => msg.id === selectedMessageId);
+
+    return {
+        drafts,
+        setDrafts,
+        getDrafts,
+        deleteDraftById,
         selectedMessage,
         setSelectedMessageId,
     };

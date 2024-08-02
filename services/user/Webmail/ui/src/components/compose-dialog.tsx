@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { type PluginId, Supervisor } from "@psibase/common-lib";
 
-import { Reply, SquarePen } from "lucide-react";
+import { PencilIcon, Reply, SquarePen } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { Separator } from "@shadcn/separator";
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
-import { type Message, useLocalStorage, useUser } from "@hooks";
+import { type Message, useDraftMessages, useUser } from "@hooks";
 import { ScrollArea } from "@shadcn/scroll-area";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
@@ -56,10 +56,8 @@ export const ComposeDialog = ({
 }) => {
     const [open, setOpen] = useState(false);
     const [selectedAccount] = useUser();
-    const [drafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
-        "drafts",
-        [],
-    );
+    const { drafts, setDrafts, getDrafts, deleteDraftById } =
+        useDraftMessages();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -110,12 +108,12 @@ export const ComposeDialog = ({
         }
     };
 
-    const deleteDraft = () => {
-        // using getDrafts() here instead of messages prevents stale closure
-        const data = getDrafts() ?? [];
-        const remainingDrafts = data.filter((msg) => msg.id !== id.current);
-        setDrafts(remainingDrafts);
-    };
+    // const deleteDraft = () => {
+    //     // using getDrafts() here instead of messages prevents stale closure
+    //     const data = getDrafts() ?? [];
+    //     const remainingDrafts = data.filter((msg) => msg.id !== id.current);
+    //     setDrafts(remainingDrafts);
+    // };
 
     const sendMessage = async (values: z.infer<typeof formSchema>) => {
         // using getDrafts() here instead of messages prevents stale closure
@@ -136,7 +134,8 @@ export const ComposeDialog = ({
             alert(`${(e as SupervisorError).message}`);
             console.error(`${(e as SupervisorError).message}`);
         } finally {
-            deleteDraft();
+            if (!id.current) return;
+            deleteDraftById(id.current);
         }
     };
 
@@ -267,6 +266,26 @@ export const ReplyDialogTriggerIconWithTooltip = ({
                 </DialogTrigger>
             </TooltipTrigger>
             <TooltipContent>Reply</TooltipContent>
+        </Tooltip>
+    );
+};
+
+export const EditSendDialogTriggerIconWithTooltip = ({
+    disabled = false,
+}: {
+    disabled?: boolean;
+}) => {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={disabled}>
+                        <PencilIcon className="h-4 w-4" />
+                        <span className="sr-only">Edit &amp; Send</span>
+                    </Button>
+                </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Edit &amp; Send</TooltipContent>
         </Tooltip>
     );
 };
