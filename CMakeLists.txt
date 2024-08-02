@@ -626,6 +626,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
         SERVER webmail
         DATA ${COMPONENT_BIN_DIR}/${WebmailPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Webmail/ui/dist/* /
         INIT
     DEPENDS wasm
     DEPENDS ${WebmailPlugin_DEP}
