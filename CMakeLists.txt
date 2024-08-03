@@ -237,6 +237,7 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
+    services/user/Webmail/ui:Webmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -626,7 +627,9 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
         SERVER webmail
         DATA ${COMPONENT_BIN_DIR}/${WebmailPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Webmail/ui/dist/* /
         INIT
+    DEPENDS ${Webmail_js_DEP}
     DEPENDS wasm
     DEPENDS ${WebmailPlugin_DEP}
 )
