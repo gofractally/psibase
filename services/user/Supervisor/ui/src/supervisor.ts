@@ -103,7 +103,15 @@ export class Supervisor implements AppInterface {
         const imports = await Promise.all(
             addedPlugins.map((plugin) => this.getDependencies(plugin)),
         );
-        const dependencies = [...new Set(imports.flat())];
+
+        const dependencies = imports
+            .flat()
+            .reduce((acc: QualifiedPluginId[], current: QualifiedPluginId) => {
+                if (!acc.some((obj) => isEqual(obj, current))) {
+                    acc.push(current);
+                }
+                return acc;
+            }, []);
 
         const pluginsReady = Promise.all(
             addedPlugins.map((plugin) => plugin.ready),
