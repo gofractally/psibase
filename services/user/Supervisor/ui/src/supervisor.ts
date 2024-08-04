@@ -219,18 +219,28 @@ export class Supervisor implements AppInterface {
                 plugin: "plugin",
             },
         ]);
+
+        let loginArgs: QualifiedFunctionCallArgs = getCallArgs(
             "accounts",
             "plugin",
             "accounts",
             "getLoggedInUser",
-
             [],
         );
-        const user = this.call(this.parentOrigination, args);
+
+        let user = this.call(this.parentOrigination, loginArgs);
         if (user === null || user === undefined) {
-            throw new Error(
-                "[supervisor] No logged in user with which to submit transaction",
+            alert("[Warning] No logged-in user. Alice will be auto-logged-in");
+            this.call(
+                this.parentOrigination,
+                getCallArgs("accounts", "plugin", "accounts", "loginTemp", [
+                    "alice",
+                ]),
             );
+            user = this.call(this.parentOrigination, loginArgs);
+            if (user === null || user === undefined) {
+                throw new Error("[supervisor] Unable to log in alice");
+            }
         }
         if (!isString(user)) {
             throw new Error(
