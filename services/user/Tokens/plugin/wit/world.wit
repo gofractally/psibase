@@ -1,6 +1,5 @@
 package tokens:plugin;
 
-
 interface types {
 
     type quantity = string;
@@ -23,8 +22,6 @@ interface types {
         token-number: token-number,
     }
 }
-
-
 
 interface intf {
     use host:common/types.{error};
@@ -49,16 +46,8 @@ interface transfer {
     credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
 }
 
-/// An example world for the component to target.
-world example {
-
-    import host:common/server;
-    import host:common/client;
-
-
-
-    export types;
-    export intf;
-    export transfer;
-    export queries;
+world imports {
+    import intf;
+    import queries;
+    import transfer;
 }

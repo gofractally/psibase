@@ -48,7 +48,7 @@ fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error>
     let parsed = identify_token_type(token_id)?;
     match parsed {
         TokenType::Number(number) => Ok(number),
-        TokenType::Symbol(_) => {
+        TokenType::Symbol(_str) => {
             Err(ErrorType::NotImplemented.err("Symbol to token number not ready"))
         }
     }
