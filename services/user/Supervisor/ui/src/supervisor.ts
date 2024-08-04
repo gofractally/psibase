@@ -16,6 +16,7 @@ import {
     OriginationData,
     assert,
     assertTruthy,
+    isString,
     parser,
     serviceFromOrigin,
 } from "./utils";
@@ -24,6 +25,8 @@ import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
 import { isRecoverableError } from "./plugin/errors";
 import { Action } from "./action";
+import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
+import { isEqual } from "@psibase/common-lib/messaging/PluginId";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
@@ -205,9 +208,30 @@ export class Supervisor implements AppInterface {
         const actions = this.context.actions;
         if (actions.length <= 0) return;
 
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        let args = getCallArgs(
+            "accounts",
+            "plugin",
+            "accounts",
+            "getLoggedInUser",
+
+            [],
+        );
+        const user = this.call(this.parentOrigination, args);
+        if (user === null || user === undefined) {
+            throw new Error(
+                "[supervisor] No logged in user with which to submit transaction",
+            );
+        }
+        if (!isString(user)) {
+            throw new Error(
+                "[supervisor] Malformed response from getLoggedInUser",
+            );
+        }
+
         const formatted = actions.map((a: Action) => {
             return {
-                sender: "alice",
+                sender: user,
                 service: a.service,
                 method: a.action,
                 rawData: uint8ArrayToHex(a.args),
@@ -272,7 +296,7 @@ export class Supervisor implements AppInterface {
             this.replyToParent(args, result);
 
             // Pack any scheduled actions into a transaction and submit
-            this.submitTx();
+            await this.submitTx();
 
             this.context = undefined;
         } catch (e) {
