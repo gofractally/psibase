@@ -186,7 +186,10 @@ export class Supervisor implements AppInterface {
 
         const { service, plugin, intf, method, params } = args;
         const p = this.loadContext(service).loadPlugin(plugin);
-        assert(p.new === false, "Tried to call plugin before initialization");
+        assert(
+            p.new === false,
+            `Tried to call plugin ${service}:${plugin} before initialization`,
+        );
 
         this.context.stack.push(sender, args);
 
@@ -209,7 +212,13 @@ export class Supervisor implements AppInterface {
         if (actions.length <= 0) return;
 
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        let args = getCallArgs(
+
+        await this.loadPlugins([
+            {
+                service: "accounts",
+                plugin: "plugin",
+            },
+        ]);
             "accounts",
             "plugin",
             "accounts",
