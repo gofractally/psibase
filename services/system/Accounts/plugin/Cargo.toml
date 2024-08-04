@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path="../../../../rust/psibase/" }
+psibase = { path = "../../../../rust/psibase/" }
 
 [profile.release]
 codegen-units = 1
@@ -20,5 +20,9 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 package = "accounts:plugin"
 
+[package.metadata.component.target]
+world = "impl"
+
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }

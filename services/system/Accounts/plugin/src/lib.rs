@@ -1,8 +1,9 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::host::common::{server as Server, types as CommonTypes};
+use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
+use bindings::host::common::{server as Server, types as CommonTypes};
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
@@ -12,13 +13,36 @@ use errors::ErrorType::*;
 
 struct AccountsPlugin;
 
+/****** Database
+[
+    {
+        key: "logged-in",
+        description: "Account name of currently logged in user"
+    },
+]
+******/
+
+fn from_utf8(bytes: Vec<u8>, error: &str) -> Result<String, CommonTypes::Error> {
+    String::from_utf8(bytes).map_err(|_| Deserialization.err(error))
+}
+
 impl Accounts for AccountsPlugin {
     fn login() -> Result<(), CommonTypes::Error> {
+        println!("Login with popup window not yet supported.");
         return Err(NotYetImplemented.err("login"));
     }
 
+    fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
+        Keyvalue::set("logged-in", &user.as_bytes())?;
+        Ok(())
+    }
+
     fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
-        Ok(Some("alice".to_string()))
+        if let Some(user) = Keyvalue::get("logged-in")? {
+            Ok(Some(from_utf8(user, "key: logged-in")?))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_available_accounts() -> Result<Vec<String>, CommonTypes::Error> {

@@ -1,0 +1,8 @@
+package accounts:plugin;
+
+world impl {
+    include host:common/imports;
+    include clientdata:plugin/imports;
+
+    export accounts;
+}
