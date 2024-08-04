@@ -237,6 +237,7 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
+    services/user/Webmail/ui:Webmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -310,6 +311,7 @@ add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wa
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
+add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -616,13 +618,30 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Webmail.psi
+    NAME Webmail
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "This app provides a webmail client for authenticated asynchronous communication between network users"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})"
+    SERVICE webmail
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
+        SERVER webmail
+        DATA ${COMPONENT_BIN_DIR}/${WebmailPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Webmail/ui/dist/* /
+        INIT
+    DEPENDS ${Webmail_js_DEP}
+    DEPENDS wasm
+    DEPENDS ${WebmailPlugin_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
     VERSION ${PSIBASE_VERSION}
-    SERVICE nft
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-    INIT
+    SERVICE nft
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
+        INIT
     DEPENDS wasm
 )
 
@@ -708,7 +727,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
@@ -767,6 +786,7 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/Webmail.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
