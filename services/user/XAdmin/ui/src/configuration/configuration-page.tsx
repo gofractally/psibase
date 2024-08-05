@@ -8,7 +8,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Service } from "../components";
-import { PsinodeConfig, ServiceConfig } from "./interfaces";
+import { PsinodeConfigUI, ServiceConfig } from "./interfaces";
 import {
     defaultService,
     emptyService,
@@ -31,11 +31,12 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Trash } from "lucide-react";
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading } = useConfig();
 
-    const configForm = useForm<PsinodeConfig>({
+    const configForm = useForm<PsinodeConfigUI>({
         defaultValues: initialConfigForm(),
     });
 
@@ -61,7 +62,7 @@ export const ConfigurationPage = () => {
         const fields = services.fields;
         if (fields !== undefined) {
             const defaultValues = configForm.formState
-                .defaultValues as PsinodeConfig;
+                .defaultValues as PsinodeConfigUI;
             if (
                 fields.length != 0 &&
                 fields.length == defaultValues.services.length &&
@@ -79,7 +80,7 @@ export const ConfigurationPage = () => {
 
     const { mutateAsync, error: configPutError } = useConfigUpdate();
 
-    const onConfig = async (input: PsinodeConfig) => {
+    const onConfig = async (input: PsinodeConfigUI) => {
         for (let service of input.services) {
             if (service.host == "") {
                 service.host = defaultService(service.root);
@@ -195,7 +196,7 @@ export const ConfigurationPage = () => {
                                     <Input {...configForm.register("host")} />
                                 </div>
                             </div>
-                            <div className="border">
+                            <div>
                                 <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
                                     Ports
                                 </h4>
@@ -281,7 +282,7 @@ export const ConfigurationPage = () => {
                                                                 )
                                                             }
                                                         >
-                                                            Remove
+                                                            <Trash size={16} />
                                                         </Button>
                                                     </td>
                                                 </tr>
@@ -292,9 +293,22 @@ export const ConfigurationPage = () => {
                             </div>
                         </TabsContent>
                         <TabsContent value="logs">
-                            <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                                Loggers
-                            </h2>
+                            <div className="flex justify-between">
+                                <h2 className="my-3 scroll-m-20 pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                                    Loggers
+                                </h2>
+                                <div>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            onAddNewLoggerClick();
+                                        }}
+                                    >
+                                        <Plus size={20} className="" />
+                                    </Button>
+                                </div>
+                            </div>
                             {loggers && (
                                 <div className="flex flex-col gap-4">
                                     {Object.entries(loggers).map(
@@ -324,15 +338,6 @@ export const ConfigurationPage = () => {
                                     )}
                                 </div>
                             )}
-                            <Button
-                                className="mt-4"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    onAddNewLoggerClick();
-                                }}
-                            >
-                                New Logger
-                            </Button>
                         </TabsContent>
                         <TabsContent value="services">
                             <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">

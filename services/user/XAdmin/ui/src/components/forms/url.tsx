@@ -18,7 +18,7 @@ const FormSchema = z.object({
     url: z.string().url(),
 });
 
-type Schema = z.infer<typeof FormSchema>;
+export type Schema = z.infer<typeof FormSchema>;
 
 const defaultValues = {
     url: "",

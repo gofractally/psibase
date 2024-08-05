@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BootState, PackageInfo, ProducerType } from "@/types";
 import { UseFormReturn } from "react-hook-form";
-import { PsinodeConfig } from "@/configuration/interfaces";
+import { PsinodeConfigUI } from "@/configuration/interfaces";
 import { Button } from "../ui/button";
 
 import { bootChain } from "@/lib/bootChain";
@@ -18,7 +18,7 @@ import { bootChain } from "@/lib/bootChain";
 interface InstallFormProps {
     packages: PackageInfo[];
     producerForm: UseFormReturn<ProducerType>;
-    config?: PsinodeConfig;
+    config?: PsinodeConfigUI;
     setCurrentPage: (page: string) => void;
     setBootState: (state: BootState) => void;
 }

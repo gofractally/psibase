@@ -6,7 +6,9 @@ function App() {
     return (
         <div className="mx-auto max-w-screen-xl">
             <NavHeader />
-            <StatusBanner />
+            <div className="py-2">
+                <StatusBanner />
+            </div>
             <Outlet />
         </div>
     );

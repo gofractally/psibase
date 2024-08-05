@@ -2,14 +2,14 @@ import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
 import { readLoggers } from "../log/utils";
 import {
-    PsinodeConfig,
+    PsinodeConfigUI,
     ServiceConfig,
     ListenConfig,
     PsinodeConfigSelect,
     PsinodeConfigUpdate,
 } from "./interfaces";
 
-export const initialConfigForm = (): PsinodeConfig => ({
+export const initialConfigForm = (): PsinodeConfigUI => ({
     p2p: false,
     producer: "",
     host: "",
@@ -261,10 +261,10 @@ function writeListen(listen: ListenConfig): any {
 
 // On conflict, updated overrides user
 export const mergeConfig = (
-    prev: PsinodeConfig,
-    updated: PsinodeConfig,
-    user: PsinodeConfig
-): PsinodeConfig => {
+    prev: PsinodeConfigUI,
+    updated: PsinodeConfigUI,
+    user: PsinodeConfigUI
+): PsinodeConfigUI => {
     return {
         ...updated,
         p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
@@ -281,7 +281,7 @@ export const mergeConfig = (
     };
 };
 
-export const writeConfig = (input: PsinodeConfig): PsinodeConfigUpdate => ({
+export const writeConfig = (input: PsinodeConfigUI): PsinodeConfigUpdate => ({
     ...input,
     listen: input.listen.map(writeListen),
     services: input.services
@@ -316,11 +316,11 @@ export const resolveListDiff = <T>(
 };
 
 export const resolveConfigFormDiff = (
-    config: PsinodeConfig,
-    configForm: UseFormReturn<PsinodeConfig, any>
+    config: PsinodeConfigUI,
+    configForm: UseFormReturn<PsinodeConfigUI, any>
 ) => {
     const result = { ...config };
-    const oldDefaults = configForm.formState.defaultValues as PsinodeConfig;
+    const oldDefaults = configForm.formState.defaultValues as PsinodeConfigUI;
     const userValues = configForm.getValues();
     result.services = resolveListDiff(
         oldDefaults.services,

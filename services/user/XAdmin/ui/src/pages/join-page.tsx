@@ -1,12 +1,25 @@
-import { EaseIn } from "@/components/EaseIn";
-import { UrlForm } from "@/components/forms/url";
+import { Schema, UrlForm } from "@/components/forms/url";
 import { useConnect } from "../hooks/useConnect";
-import { NavHeader } from "@/components/nav-header";
-import { MenuContent } from "@/components/menu-content";
 import { SetupWrapper } from "./setup-wrapper";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 
 export const JoinPage = () => {
-    const { mutateAsync } = useConnect();
+    const { mutateAsync: connect } = useConnect();
+
+    const navigate = useNavigate();
+    const { toast } = useToast();
+
+    const onSubmit = async (data: Schema) => {
+        const res = await connect(data);
+        toast({
+            title: "Success",
+            description: `Connected to ${
+                res.newPeer.url || res.newPeer.endpoint
+            }.`,
+        });
+        navigate("/");
+    };
 
     return (
         <SetupWrapper>
@@ -18,7 +31,7 @@ export const JoinPage = () => {
                     Connect to a psibase compatible node to join a network.
                 </p>
                 <div>
-                    <UrlForm onSubmit={mutateAsync} />
+                    <UrlForm onSubmit={onSubmit} />
                 </div>
             </div>
         </SetupWrapper>

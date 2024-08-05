@@ -10,9 +10,9 @@ export const bootChain = async (
     onProgressUpdate: (state: BootState) => void
 ): Promise<void> => {
     try {
-        // Set producer name
+        
         try {
-            await chain.updateConfig({
+            await chain.extendConfig({
                 producer: producerName,
             });
             queryClient.invalidateQueries({ queryKey: queryKeys.config });
@@ -42,13 +42,10 @@ export const bootChain = async (
         i++;
 
         for (const t of transactions) {
-            console.log(`Pushing transaction number: ${i}`);
             onProgressUpdate(["push", i + 1, transactions.length + 1]);
             let trace = await chain.pushArrayBufferTransaction(t.buffer);
-            console.log(trace, "is the trace");
             if (trace.error) {
                 onProgressUpdate(trace);
-                console.error(trace.error);
                 return;
             }
             i++;

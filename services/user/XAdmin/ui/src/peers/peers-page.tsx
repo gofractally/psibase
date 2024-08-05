@@ -1,299 +1,297 @@
 import { useState } from "react";
-import { SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Button } from "@/components/ui/button";
-import { PsinodeConfig } from "../configuration/interfaces";
-import {
-    AddConnectionInputs,
-    ConnectInputs,
-    isConfigured,
-    isConnected,
-    Peer,
-    PeerSpec,
-    PeerState,
-} from "./interfaces";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useConfig } from "../hooks/useConfig";
 import { usePeers } from "../hooks/usePeers";
-import { chain } from "@/lib/chainEndpoints";
+import {
+    PeerType,
+    PeersType,
+    StateEnum,
+    UIPeer,
+    chain,
+} from "@/lib/chainEndpoints";
 
-export const PeersPage = () => {
-    const {
-        data: peers,
-        error: peersError,
-        refetch: refetchPeers,
-    } = usePeers();
+import { Clipboard, MoreHorizontal, Plus, Trash, Unplug } from "lucide-react";
 
-    const { data: config, refetch: refetchConfig } = useConfig();
+import {
+    Table,
+    TableBody,
+    TableCaption,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { EmptyBlock } from "@/components/EmptyBlock";
 
-    const [configPeersError, setConfigPeersError] = useState<string>();
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { SmartConnectForm } from "@/components/forms/smart-connect-form";
+import { z } from "zod";
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-        reset,
-        control,
-    } = useForm<AddConnectionInputs>({
-        defaultValues: {
-            url: "",
-            state: "transient",
-        },
-    });
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "../components/ui/use-toast";
+import { Pulse } from "@/components/Pulse";
 
-    const onDisconnect = async (id: number) => {
-        try {
-            await chain.disconnectPeer(id);
-            refetchPeers();
-        } catch (e) {
-            console.error("DISCONNECT ERROR", e);
-        }
-    };
+const randomIntFromInterval = (min: number, max: number) =>
+    Math.floor(Math.random() * (max - min + 1) + min);
 
-    const onConnect: SubmitHandler<ConnectInputs> = async (
-        endpoint: ConnectInputs
-    ) => {
-        try {
-            console.log(endpoint, "is the endpoint");
-            await chain.connect(endpoint);
-            reset();
-            refetchPeers();
-        } catch (e) {
-            console.error("CONNECT ERROR", e);
-        }
-    };
-
-    const setConfigPeers = async (input: PsinodeConfig) => {
-        // TODO: Re-implement
-        // try {
-        // setConfigPeersError(undefined);
-        // const result = await chain.updateConfig(input);
-        //     if (result.ok) {
-        //         // TODO: revisit
-        //         // configForm.resetField("peers", { defaultValue: input.peers });
-        //         refetchConfig();
-        //     } else {
-        //         setConfigPeersError(await result.text());
-        //     }
-        // } catch (e) {
-        //     setConfigPeersError("Failed to write /native/admin/config");
-        // }
-    };
-
-    const modifyPeer = (
-        id: number,
-        url: string,
-        oldState: PeerState,
-        state: PeerState
-    ) => {
-        if (!config) {
-            setConfigPeersError("Unable to load config");
-            return;
-        }
-        if (!isConfigured(oldState) && isConfigured(state)) {
-            // TODO: revisit
-            // const oldConfig = configForm.formState
-            //     .defaultValues as PsinodeConfig;
-            // setConfigPeers({ ...oldConfig, peers: [...config.peers, url] });
-            setConfigPeers({ ...config, peers: [...config.peers, url] });
-        } else if (isConfigured(oldState) && !isConfigured(state)) {
-            // TODO: revisit
-            // const oldConfig = configForm.formState
-            //     .defaultValues as PsinodeConfig;
-            // setConfigPeers({
-            //     ...oldConfig,
-            //     peers: oldConfig.peers.filter((p) => p != url),
-            // });
-            setConfigPeers({
-                ...config,
-                peers: config.peers.filter((p) => p != url),
-            });
-        }
-
-        if (!isConnected(oldState) && isConnected(state)) {
-            onConnect({ url: url });
-        } else if (isConnected(oldState) && !isConnected(state)) {
-            onDisconnect(id);
-        }
-    };
-
-    const onAddConnection = (input: AddConnectionInputs) => {
-        modifyPeer(0, input.url, "disabled", input.state);
-    };
-
-    const peerControl = (id: number, url: string, state: PeerState) => {
-        //const update = (e: any)=>modifyPeer(id, url, state, e.target.value);
-        const setState = (newState: PeerState) =>
-            modifyPeer(id, url, state, newState);
-        if (state == "persistent") {
-            return (
-                <>
-                    <Button onClick={() => setState("backup")}>
-                        Disconnect
-                    </Button>
-                    <Button onClick={() => setState("transient")}>
-                        Disable auto-connect
-                    </Button>
-                    <Button onClick={() => setState("disabled")}>Remove</Button>
-                </>
-            );
-            /*
-            return (<select onChange={update}>
-                <option selected value="persistent">Connected+</option>
-                <option value="backup">Disconnect</option>
-                <option value="transient">Disable auto-connect</option>
-                <option value="disabled">Remove</option>
-                </select>); */
-        } else if (state == "transient") {
-            return (
-                <>
-                    <Button onClick={() => setState("disabled")}>
-                        Disconnect
-                    </Button>
-                    <Button onClick={() => setState("persistent")}>
-                        Enable auto-connect
-                    </Button>
-                </>
-            );
-            /*
-            return (<select onChange={update}>
-                <option selected value="transient">Connected</option>
-                <option value="disabled">Disconnect</option>
-                <option value="persistent" disabled={!url}>Enable auto-connect</option>
-                </select>); */
-        } else if (state == "backup") {
-            return (
-                <>
-                    <Button onClick={() => setState("persistent")}>
-                        Connect
-                    </Button>
-                    <Button onClick={() => setState("disabled")}>Remove</Button>
-                </>
-            );
-            /*
-            return (<select onChange={update}>
-                <option selected value="backup">Not Connected</option>
-                <option value="persistent">Connect</option>
-                <option value="disabled">Remove</option>
-                </select>); */
-        }
-    };
-
-    const combinedPeers = combinePeers(config?.peers || [], peers || []);
-
-    return (
-        <>
-            <h1>Peers</h1>
-            <table>
-                <thead>
-                    <tr>
-                        <th>URL</th>
-                        <th>Address</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {combinedPeers.map((peer) => (
-                        <tr key={peer.id}>
-                            <td>{peer.url}</td>
-                            <td>{peer.endpoint}</td>
-                            <td>
-                                {peerControl(peer.id, peer.url, peer.state)}
-                            </td>
-                        </tr>
-                    ))}
-                    <tr>
-                        <td>
-                            <form
-                                onSubmit={handleSubmit(onAddConnection)}
-                                id="new-connection"
-                            >
-                                <Input
-                                    autoComplete="url"
-                                    {...register("url", {
-                                        required: "This field is required",
-                                    })}
-                                />
-                                {errors.url?.message && (
-                                    <Label>{errors.url?.message}</Label>
-                                )}
-                            </form>
-                        </td>
-                        <td>
-                            <Controller
-                                name="state"
-                                control={control}
-                                render={({ field }) => (
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                    >
-                                        <SelectTrigger className="w-[280px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="transient">
-                                                Connect now
-                                            </SelectItem>
-                                            <SelectItem value="persistent">
-                                                Remember this connection
-                                            </SelectItem>
-                                            <SelectItem value="backup">
-                                                Connect automatically
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            />
-                        </td>
-                        <td>
-                            <Button type="submit" form="new-connection">
-                                Add Connection
-                            </Button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            {configPeersError && <div>{configPeersError}</div>}
-        </>
-    );
-};
-
-const combinePeers = (configured: string[], connected: Peer[]): PeerSpec[] => {
+const combinePeers = (
+    configured: string[],
+    connected: PeersType
+): z.infer<typeof UIPeer>[] => {
     let configMap: { [index: string]: boolean } = {};
     for (const url of configured) {
         configMap[url] = true;
     }
-    let connectMap: { [index: string]: Peer } = {};
+
+    let connectMap: { [index: string]: PeerType } = {};
     for (const peer of connected) {
         if (peer.url) {
             connectMap[peer.url] = peer;
         }
     }
-    let result1 = configured.map((url) => {
+
+    const persistentPeers = configured.map((url): z.infer<typeof UIPeer> => {
         if (url in connectMap) {
             return {
-                state: "persistent" as PeerState,
+                state: "persistent",
                 url: url,
                 ...connectMap[url],
             };
         } else {
             return {
-                state: "backup" as PeerState,
+                state: "backup",
                 url: url,
                 endpoint: "",
-                id: 0,
+                id: randomIntFromInterval(200, 2000) * -1,
             };
         }
     });
-    let result2 = connected
+
+    const transientPeers: z.infer<typeof UIPeer>[] = connected
         .filter((peer) => !peer.url || !(peer.url in configMap))
-        .map((peer) => ({ state: "transient" as PeerState, url: "", ...peer }));
-    return [...result1, ...result2];
+        .map(
+            (peer): z.infer<typeof UIPeer> => ({
+                state: "transient",
+                url: peer.url ?? "",
+                ...peer,
+            })
+        );
+
+    return UIPeer.array().parse([...persistentPeers, ...transientPeers]);
+};
+
+const Status = ({ state }: { state: z.infer<typeof StateEnum> }) => {
+    const color =
+        state == "persistent"
+            ? "green"
+            : state == "transient"
+            ? "yellow"
+            : "red";
+
+    const label =
+        state == "persistent"
+            ? "Online"
+            : state == "transient"
+            ? "Transient"
+            : "Disconnected";
+    return (
+        <div className="flex gap-1">
+            <div className="my-auto">
+                <Pulse color={color} />
+            </div>
+            <span>{label}</span>
+        </div>
+    );
+};
+
+export const PeersPage = () => {
+    const {
+        data: livePeers,
+        error: peersError,
+        refetch: refetchPeers,
+    } = usePeers();
+    const { data: config, refetch: refetchConfig } = useConfig();
+    const configPeers = config?.peers || [];
+
+    const combinedPeers = combinePeers(configPeers, livePeers);
+
+    const [configPeersError, setConfigPeersError] = useState<string>();
+    const { toast } = useToast();
+
+    const [showAddModalConnection, setShowModalConnection] = useState(false);
+
+    const onTransientConnection = async (endpoint: string) => {
+        setShowModalConnection(false);
+        await chain.addPeer(endpoint);
+        refetchConfig();
+    };
+
+    const disconnectPeer = async (id: number) => {
+        await chain.disconnectPeer(id);
+        refetchPeers();
+    };
+
+    const removePeer = async (id: number) => {
+        const peer = combinedPeers.find((peer) => peer.id == id);
+        if (!peer) {
+            throw new Error("Failed to find the peer locally");
+        }
+
+        if (peer.state == "transient") {
+            throw new Error(
+                "Only disconnections from transient connections are possible."
+            );
+        } else if (peer.state == "backup") {
+            await chain.removePeer(peer.url!);
+            refetchConfig();
+            toast({
+                title: "Error",
+                description: "Failed to remove peer",
+            });
+        } else if (peer.state == "persistent") {
+            try {
+                await Promise.all([
+                    chain.removePeer(peer.url!),
+                    chain.disconnectPeer(peer.id),
+                ]);
+                refetchConfig();
+            } catch (e) {
+                toast({
+                    title: "Error",
+                    description: "Failed to disconnect & remove peer",
+                });
+            }
+        }
+    };
+
+    return (
+        <>
+            <Dialog
+                open={showAddModalConnection}
+                onOpenChange={(show) => {
+                    setShowModalConnection(show);
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add connection</DialogTitle>
+                        <DialogDescription>
+                            <SmartConnectForm
+                                onConnection={onTransientConnection}
+                            />
+                        </DialogDescription>
+                    </DialogHeader>
+                </DialogContent>
+            </Dialog>
+
+            <div className="flex justify-between py-2">
+                <div></div>
+                {combinedPeers.length !== 0 && (
+                    <div>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowModalConnection(true)}
+                        >
+                            <Plus size={20} />
+                        </Button>
+                    </div>
+                )}
+            </div>
+            {combinedPeers.length == 0 ? (
+                <EmptyBlock
+                    buttonLabel="Add Connection"
+                    onClick={() => setShowModalConnection(true)}
+                    title="No connections"
+                    description="No existing connections to other nodes."
+                />
+            ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>URL</TableHead>
+                            <TableHead>Address</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {combinedPeers.map((peer) => (
+                            <TableRow key={peer.id}>
+                                <TableHead>{peer.url}</TableHead>
+                                <TableHead>{peer.endpoint}</TableHead>
+                                <TableHead>
+                                    <Status state={peer.state} />
+                                </TableHead>
+                                <TableHead>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                className="my-auto h-full w-8 p-0"
+                                            >
+                                                <span className="sr-only">
+                                                    Open menu
+                                                </span>
+                                                <MoreHorizontal className="h-8 w-8" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>
+                                                Actions
+                                            </DropdownMenuLabel>
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(
+                                                        peer.url ||
+                                                            peer.endpoint
+                                                    );
+                                                }}
+                                            >
+                                                <Clipboard className="mr-2 h-4 w-4" />
+                                                <span>Copy URL </span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    disconnectPeer(peer.id)
+                                                }
+                                            >
+                                                <Unplug className="mr-2 h-4 w-4" />
+                                                <span>Disconnect</span>
+                                            </DropdownMenuItem>
+                                            {peer.state !== "transient" && (
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        removePeer(peer.id)
+                                                    }
+                                                >
+                                                    <Trash className="mr-2 h-4 w-4" />
+                                                    <span>Remove</span>
+                                                </DropdownMenuItem>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableHead>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            )}
+            {configPeersError && <div>{configPeersError}</div>}
+        </>
+    );
 };

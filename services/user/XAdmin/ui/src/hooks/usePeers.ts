@@ -1,19 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Peer } from "../peers/interfaces";
-import { z } from "zod";
 import { queryKeys } from "@/lib/queryKeys";
-import { chain } from "@/lib/chainEndpoints";
-
-const Peers = z
-    .object({
-        id: z.number(),
-        endpoint: z.string(),
-        url: z.string().optional(),
-    })
-    .array();
+import { PeersType, chain } from "@/lib/chainEndpoints";
 
 export const usePeers = () =>
-    useQuery<Peer[], string>({
+    useQuery<PeersType, string>({
         queryKey: queryKeys.peers,
         queryFn: async () => {
             try {
@@ -23,5 +14,6 @@ export const usePeers = () =>
                 throw "Failed to fetch peers";
             }
         },
+        initialData: [],
         refetchInterval: 10000,
     });

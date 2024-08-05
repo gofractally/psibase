@@ -167,7 +167,7 @@ export const CreatePage = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const { data: config, refetch: refetchConfig } = useConfig();
+    const { data: config } = useConfig();
 
     const chainTypeForm = useForm<z.infer<typeof chainTypeSchema>>({
         resolver: zodResolver(chainTypeSchema),
@@ -179,6 +179,7 @@ export const CreatePage = () => {
     const { data: packages } = usePackages();
 
     const isDev = chainTypeForm.watch("type") == "dev";
+    const bpName = blockProducerForm.watch("name");
 
     const suggestedSelection = getDefaultSelectedPackages(
         {
@@ -186,8 +187,6 @@ export const CreatePage = () => {
         },
         packages
     );
-
-    console.log(JSON.stringify(packages.map((x) => x.name)));
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -211,17 +210,13 @@ export const CreatePage = () => {
         }
     );
 
-    console.log(rows, "rows");
-
     useEffect(() => {
         if (currentStep == 3) {
-            console.log("running");
             const state = suggestedSelection.selectedPackages.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
             );
 
-            console.log(state, "should be set too");
             overWriteRows(state);
         }
     }, [currentStep]);
@@ -238,7 +233,7 @@ export const CreatePage = () => {
     }));
 
     const installRan = useRef(false);
-    const bpName = blockProducerForm.watch("name");
+    const [errorMessage, setErrorMessage] = useState<string>("");
 
     const [currentState, setCurrentState] = useState(1);
 
@@ -272,12 +267,23 @@ export const CreatePage = () => {
                             description: "Successfully booted chain.",
                         });
                     } else {
-                        // TODO: Display boot failure message
+                        setLoading(false);
+                        const message = "Something went wrong.";
+                        toast({
+                            title: "Error",
+                            description: message,
+                        });
+                        setErrorMessage(message);
                     }
                 } else {
-                    console.log(state, "Unrecognised message.");
+                    console.warn(state, "Unrecognised message.");
                 }
             });
+        } else if (currentStep == 3) {
+            // This case allows the user to retry after a failed step 4.
+            if (installRan.current) {
+                installRan.current = false;
+            }
         }
     }, [currentStep, rows, bpName, config]);
 
@@ -332,7 +338,7 @@ export const CreatePage = () => {
 
                                         <Card
                                             label="Block Producer Name"
-                                            value="orelosoftware"
+                                            value={bpName}
                                         />
                                     </div>
                                 </div>
@@ -355,7 +361,7 @@ export const CreatePage = () => {
                             </div>
                         </div>
                     )}
-                    {currentStep == 4 && <div>better</div>}
+                    {currentStep == 4 && <div>{errorMessage}</div>}
                     <PrevNextButtons
                         canNext={canNext}
                         canPrev={canPrev}

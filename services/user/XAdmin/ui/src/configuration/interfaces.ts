@@ -18,7 +18,7 @@ export type ListenConfig = {
     text?: string;
 };
 
-export type PsinodeConfig = {
+export type PsinodeConfigUI = {
     p2p: boolean;
     peers: string[];
     producer: string;
@@ -64,7 +64,7 @@ export const psinodeConfigSchema = z
     .object({
         p2p: z.boolean(),
         peers: z.string().array(),
-        autoconnect: z.boolean(),
+        autoconnect: z.boolean().or(z.string()),
         pkcs11_modules: z.string().array(),
         tls: z.object({
             certificate: path,

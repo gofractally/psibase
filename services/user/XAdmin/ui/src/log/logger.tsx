@@ -1,17 +1,11 @@
-import { Controller, RegisterOptions } from "react-hook-form";
+import { RegisterOptions } from "react-hook-form";
 import { LogConfig } from "./interfaces";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Trash } from "lucide-react";
 
 interface LoggerProps {
     loggerKey: string;
@@ -35,8 +29,8 @@ export const Logger = ({
                 <legend className="scroll-m-20 text-2xl font-semibold tracking-tight">
                     {loggerKey}
                 </legend>
-                <Button size="sm" variant="default" onClick={remove}>
-                    Remove
+                <Button size="sm" variant="outline" onClick={remove}>
+                    <Trash size={20} />
                 </Button>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

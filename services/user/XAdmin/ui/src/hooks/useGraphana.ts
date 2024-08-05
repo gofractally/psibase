@@ -27,5 +27,6 @@ export const useGraphana = () => {
         queryFn: async () => {
             await axios.get(url);
         },
+        retry: false, 
     });
 };
