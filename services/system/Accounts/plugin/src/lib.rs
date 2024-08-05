@@ -1,6 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::accounts::plugin::types as AccountTypes;
 use bindings::common::plugin::server as Server;
 use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
@@ -15,12 +16,6 @@ use errors::ErrorType::*;
 
 struct AccountsPlugin;
 
-#[allow(non_snake_case)]
-#[derive(Deserialize)]
-struct Account {
-    accountNum: String,
-}
-
 #[derive(Deserialize)]
 struct ResponseRoot {
     data: Data,
@@ -29,7 +24,7 @@ struct ResponseRoot {
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct Data {
-    getAccount: Option<Account>,
+    getAccount: Option<AccountTypes::Account>,
 }
 
 impl Accounts for AccountsPlugin {
@@ -45,13 +40,13 @@ impl Accounts for AccountsPlugin {
         Err(NotYetImplemented.err("add_auth_service"))
     }
 
-    fn get_account(name: String) -> Result<String, CommonTypes::Error> {
+    fn get_account(name: String) -> Result<Option<AccountTypes::Account>, CommonTypes::Error> {
         let query = format!(
             "query {{ getAccount(account: \"{}\") {{ accountNum }} }}",
             name
         );
 
-        let account = Server::post_graphql_get_json(&query)
+        let account: AccountTypes::Account = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
             .and_then(|result| {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
@@ -63,10 +58,10 @@ impl Accounts for AccountsPlugin {
                     .ok_or_else(|| InvalidAccountNumber.err(&name))
             })?;
 
-        if name != account.accountNum {
+        if account.account_num.value != AccountNumber::from_exact(&name).unwrap().value {
             return Err(InvalidAccountNumber.err(&name));
         } else {
-            return Ok(account.accountNum);
+            return Ok(Some(account));
         }
     }
 

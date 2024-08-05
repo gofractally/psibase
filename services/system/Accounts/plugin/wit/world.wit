@@ -1,7 +1,24 @@
 package accounts:plugin;
 
+interface types {
+    record account-number {
+        value: u64,
+    }
+
+    record resource-limit {
+        value: u64,
+    }
+
+    record account {
+        account-num: account-number,
+        auth-service: account-number,
+        resource-balance: option<resource-limit>,
+    }
+}
+
 interface accounts {
     use common:plugin/types.{error};
+    use types.{account};
 
     /// Gets the name of the currently logged in user, if there is one.
     /// Returned option can be empty if there is no currently logged in user.
@@ -11,7 +28,7 @@ interface accounts {
     get-available-accounts: func() -> result<list<string>, error>;
     
     /// Verifies an account name corresponds with an existing account
-    get-account: func(name: string) -> result<string, error>;
+    get-account: func(name: string) -> result<option<account>, error>;
 
     /// Adds a new auth service locally that can be used to authenticate
     /// a user.
