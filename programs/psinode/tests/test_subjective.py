@@ -7,7 +7,7 @@ from threading import Event
 import testutil
 import unittest
 import io
-from fracpack import Int
+from fracpack import Int, unpack
 
 def is_user_action(action):
     if action['service'] == 'cpu-limit':
@@ -30,7 +30,7 @@ def get_raw_retval(trace):
                 expect_auth = not expect_auth
 
 def get_retval(trace, type):
-    return type.unpack(io.BytesIO(bytes.fromhex(get_raw_retval(trace))))
+    return unpack(bytes.fromhex(get_raw_retval(trace)), type)
 
 class ThreadErrorHandler:
     def __init__(self):
