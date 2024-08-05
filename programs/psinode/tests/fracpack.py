@@ -2,6 +2,7 @@ import math
 import json
 import itertools
 from collections import abc
+from functools import wraps
 
 class OutputStream:
     def __init__(self, custom=None):
@@ -297,6 +298,7 @@ def _fracpackmeta(argnames, gentype, base=object):
             return super(cls, c).__new__(cls, *args, **kw)
         cls.__new__ = staticmethod(__new__)
         original_init = cls.__init__
+        @wraps(cls.__init__)
         def __init__(self, *args, **kw):
             (args, kw, extra) = _handle_args(args, kw, argnames, gentype, base)
             if extra is not None:
@@ -601,6 +603,10 @@ class Object(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
 @_fracpackmeta(['type', 'len'], lambda type, len: '%s[%d]' % (type.__name__, len), list)
 class Array(TypeBase):
     def __init__(self, ty, n):
+        '''
+        ty: The array element type
+        n: The number of elements in the array
+        '''
         self.ty = ty
         self.n = n
         self.is_variable_size = ty.is_variable_size
