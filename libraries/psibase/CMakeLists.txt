@@ -121,7 +121,6 @@ function(add suffix)
             service/src/intrinsic.cpp
             service/src/ossl.c
             service/src/time.c
-            tester/src/tester_intrinsics.cpp
             tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
         )
