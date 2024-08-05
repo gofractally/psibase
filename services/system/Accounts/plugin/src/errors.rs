@@ -4,7 +4,7 @@ use crate::bindings::host::common::types::{Error, PluginId};
 pub enum ErrorType {
     NotYetImplemented,
     InvalidAccountNumber,
-    Deserialization,
+    Unauthorized,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -27,10 +27,10 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Invalid account number: {}", msg),
             },
-            ErrorType::Deserialization => Error {
+            ErrorType::Unauthorized => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Failed to deserialize into expected type: {}", msg),
+                message: format!("Unauthorized access: {}", msg),
             },
         }
     }

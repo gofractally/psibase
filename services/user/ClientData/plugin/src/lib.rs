@@ -77,7 +77,7 @@ impl KeyValue for ClientData {
         // Set the non-empty value on the key
         bucket
             .set(&key, &value)
-            .map_err(|_| KvError.err("Error setting value on key"))?;
+            .map_err(|e| KvError.err(&format!("Error setting value on key: {}", e.to_string())))?;
 
         Ok(())
     }

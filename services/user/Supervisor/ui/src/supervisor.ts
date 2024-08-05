@@ -173,8 +173,9 @@ export class Supervisor implements AppInterface {
 
         if (this.context.stack.isEmpty()) {
             assert(
-                sender.origin === this.parentOrigination.origin,
-                "Parent origin mismatch",
+                sender.origin === this.parentOrigination.origin ||
+                    sender.origin === supervisorDomain,
+                "Invalid call origination",
             );
         } else {
             assertTruthy(sender.app, "Cannot determine caller service");
@@ -220,24 +221,30 @@ export class Supervisor implements AppInterface {
             },
         ]);
 
-        let loginArgs: QualifiedFunctionCallArgs = getCallArgs(
+        let getLoggedInUser: QualifiedFunctionCallArgs = getCallArgs(
+            "accounts",
+            "plugin",
+            "admin",
+            "getLoggedInUser",
+            [this.parentOrigination.origin],
+        );
+        let logInAlice: QualifiedFunctionCallArgs = getCallArgs(
             "accounts",
             "plugin",
             "accounts",
-            "getLoggedInUser",
-            [],
+            "loginTemp",
+            ["alice"],
         );
-
-        let user = this.call(this.parentOrigination, loginArgs);
+        let supervisorOrigination = {
+            app: serviceFromOrigin(supervisorDomain),
+            origin: supervisorDomain,
+        };
+        let user = this.call(supervisorOrigination, getLoggedInUser);
         if (user === null || user === undefined) {
             alert("[Warning] No logged-in user. Alice will be auto-logged-in");
-            this.call(
-                this.parentOrigination,
-                getCallArgs("accounts", "plugin", "accounts", "loginTemp", [
-                    "alice",
-                ]),
-            );
-            user = this.call(this.parentOrigination, loginArgs);
+            this.call(this.parentOrigination, logInAlice);
+
+            user = this.call(supervisorOrigination, getLoggedInUser);
             if (user === null || user === undefined) {
                 throw new Error("[supervisor] Unable to log in alice");
             }

@@ -1,12 +1,17 @@
 #[allow(warnings)]
 mod bindings;
 
+use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
-use bindings::host::common::{server as Server, types as CommonTypes};
+use bindings::exports::accounts::plugin::admin::Guest as Admin;
+use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
+
+extern crate url;
+use url::Url;
 
 mod errors;
 use errors::ErrorType::*;
@@ -22,8 +27,36 @@ struct AccountsPlugin;
 ]
 ******/
 
-fn from_utf8(bytes: Vec<u8>, error: &str) -> Result<String, CommonTypes::Error> {
-    String::from_utf8(bytes).map_err(|_| Deserialization.err(error))
+fn login_key(origin: String) -> String {
+    // Do not namespace logged-in user by protocol
+    let url = Url::parse(&origin).unwrap();
+    let mut origin = url.domain().unwrap().to_string();
+    if let Some(port) = url.port() {
+        origin += ":";
+        origin += &port.to_string();
+    }
+
+    // Encode the origin as base64, URL_SAFE character set
+    let encoded = URL_SAFE.encode(origin);
+
+    // Construct the key. The logged-in user is namespaced by origin,
+    //  so a new
+    let key_pre: String = "logged-in".to_string();
+    return key_pre + "." + &encoded;
+}
+impl Admin for AccountsPlugin {
+    fn get_logged_in_user(domain: String) -> Result<Option<String>, CommonTypes::Error> {
+        let sender = Client::get_sender_app().app;
+        if sender.is_none() || sender.unwrap() != "supervisor" {
+            return Err(Unauthorized.err("get_logged_in_user"));
+        }
+
+        if let Some(user) = Keyvalue::get(&login_key(domain))? {
+            Ok(Some(String::from_utf8(user).unwrap()))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl Accounts for AccountsPlugin {
@@ -33,16 +66,9 @@ impl Accounts for AccountsPlugin {
     }
 
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
-        Keyvalue::set("logged-in", &user.as_bytes())?;
+        let origin = Client::get_sender_app().origin;
+        Keyvalue::set(&login_key(origin), &user.as_bytes())?;
         Ok(())
-    }
-
-    fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
-        if let Some(user) = Keyvalue::get("logged-in")? {
-            Ok(Some(from_utf8(user, "key: logged-in")?))
-        } else {
-            Ok(None)
-        }
     }
 
     fn get_available_accounts() -> Result<Vec<String>, CommonTypes::Error> {

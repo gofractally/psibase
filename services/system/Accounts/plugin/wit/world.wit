@@ -10,10 +10,6 @@ interface accounts {
     /// This function will log in the specified user with zero error checking.
     login-temp: func(user: string) -> result<_, error>;
 
-    /// Gets the name of the currently logged in user, if there is one.
-    /// Returned option can be empty if there is no currently logged in user.
-    get-logged-in-user: func() -> result<option<string>, error>;
-
     /// Retrieves a list of accounts to which the user can log in.
     get-available-accounts: func() -> result<list<string>, error>;
 

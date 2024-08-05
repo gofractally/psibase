@@ -3,9 +3,6 @@ package invite:plugin;
 world impl {
     include host:common/imports;
 
-    // For getting logged-in-user, for example to generate an invite
-    import accounts:plugin/accounts;
-
     // For generating a keypair for the invite
     import auth-sig:plugin/keyvault;
 
