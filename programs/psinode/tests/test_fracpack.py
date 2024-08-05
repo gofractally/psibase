@@ -115,12 +115,17 @@ class TestFracpack(unittest.TestCase):
             schema = Schema(t['schema'])
             for v in t['values']:
                 v = dict(v)
-                with self.subTest(**{v['type']:v['json']}):
-                    ty = schema[v['type']]
-                    expected = v['fracpack'].upper()
-                    self.assertEqual(pack(v['json'], ty).hex().upper(), expected)
-                    json2 = unpack(bytes.fromhex(v['fracpack']), ty)
-                    self.assertEqual(pack(json2, ty).hex().upper(), expected)
+                ty = schema[v['type']]
+                if v.get('error', False):
+                    with self.subTest(**{'error(' + v['type'] + ')':v['fracpack']}):
+                        with self.assertRaises(FracpackError):
+                            unpack(bytes.fromhex(v['fracpack']), ty)
+                else:
+                    with self.subTest(**{v['type']:v['json']}):
+                        expected = v['fracpack'].upper()
+                        self.assertEqual(pack(v['json'], ty).hex().upper(), expected)
+                        json2 = unpack(bytes.fromhex(v['fracpack']), ty)
+                        self.assertEqual(pack(json2, ty).hex().upper(), expected)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

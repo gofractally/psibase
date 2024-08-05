@@ -13,11 +13,17 @@ struct test_case
    std::string       type;
    std::string       json;
    std::vector<char> fracpack;
+   bool              error = false;
 };
 void to_json(const test_case& t, std::ostream& os)
 {
-   os << "{\"type\":\"" << t.type << "\""
-      << ",\"json\":" << t.json << ",\"fracpack\":\"" << psio::to_hex(t.fracpack) << "\"}";
+   os << "{\"type\":\"" << t.type << "\"";
+   if (!t.json.empty())
+      os << ",\"json\":" << t.json;
+   os << ",\"fracpack\":\"" << psio::to_hex(t.fracpack) << "\"";
+   if (t.error)
+      os << ",\"error\":true";
+   os << "}";
 }
 
 struct test_builder
@@ -40,6 +46,17 @@ struct test_builder
       for (const T& value : values)
       {
          tests.push_back({type, psio::expand_json(value), psio::to_frac(value)});
+      }
+   }
+   template <typename T>
+   void add_errors(const std::string& type, std::initializer_list<std::string_view> data)
+   {
+      builder.insert<T>(type);
+      for (auto row : data)
+      {
+         test_case t{type, "", {}, true};
+         psio::from_hex(row, t.fracpack);
+         tests.push_back(std::move(t));
       }
    }
    psio::SchemaBuilder    builder;
@@ -69,12 +86,21 @@ struct FixedStruct
 };
 PSIO_REFLECT(FixedStruct, definitionWillNotChange(), v0, v1)
 
+// Trailing optional is not elided
 struct VariableStruct
 {
    std::uint8_t                v0;
    std::optional<std::uint8_t> v1;
 };
 PSIO_REFLECT(VariableStruct, definitionWillNotChange(), v0, v1)
+
+// Fixed data contains offsets
+struct VariableStruct2
+{
+   std::vector<std::int32_t> v1;
+   std::vector<std::int8_t>  v2;
+};
+PSIO_REFLECT(VariableStruct2, definitionWillNotChange(), v1, v2)
 
 struct Extensible
 {
@@ -128,6 +154,62 @@ namespace nnn
 }  // namespace nnn
 using WrongCustom = nnn::string;
 
+struct OffsetTest
+{
+   std::uint32_t               v0;
+   std::optional<std::uint8_t> v1;
+};
+PSIO_REFLECT(OffsetTest, v0, v1)
+
+struct GapTest0
+{
+   std::uint32_t v0;
+};
+PSIO_REFLECT(GapTest0, v0)
+
+struct GapTest1
+{
+   std::uint32_t               v0;
+   std::optional<std::uint8_t> v1;
+};
+PSIO_REFLECT(GapTest1, v0, v1)
+
+struct GapTest
+{
+   GapTest0 v0;
+   GapTest1 v1;
+};
+PSIO_REFLECT(GapTest, v0, v1)
+
+struct EmptyObject
+{
+};
+PSIO_REFLECT(EmptyObject)
+
+struct TrailingTest
+{
+   std::optional<std::uint8_t> v0;
+};
+PSIO_REFLECT(TrailingTest, v0)
+
+struct StringMember
+{
+   std::string v0;
+};
+PSIO_REFLECT(StringMember, v0)
+
+struct BytesMember
+{
+   std::vector<std::uint8_t> v0;
+};
+PSIO_REFLECT(BytesMember, v0)
+
+struct VecTupleMember
+{
+   std::vector<std::tuple<>> v0;
+};
+PSIO_REFLECT(VecTupleMember, v0)
+
 int main()
 {
    test_builder builder;
@@ -151,6 +233,7 @@ int main()
         -std::numeric_limits<double>::denorm_min(), std::numeric_limits<double>::quiet_NaN()});
    builder.add<FixedStruct>("FixedStruct", {{0, 0}, {1, 2}});
    builder.add<VariableStruct>("VariableStruct", {{0, 0}, {1, 2}, {3, std::nullopt}});
+   builder.add<VariableStruct2>("VariableStruct2", {{{-1}, {3, 4, 5}}});
    builder.add<Extensible>("Extensible", {{0, 0, 0, 0},
                                           {1, 2, 3, 4},
                                           {5, std::nullopt, 6, 7},
@@ -179,6 +262,61 @@ int main()
    builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
        "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
    builder.add<WrongCustom>("WrongCustom", {{3}});
+
+   // bool is 0 or 1
+   builder.add_errors<bool>("bool", {"02", "03", "FF"});
+   // optional must be 1 or an offset pointer
+   builder.add_errors<std::optional<std::uint8_t>>(
+       "opt-u8", {"00000000", "02000000", "03000000", "05000000FFFF"});
+   // vector byte size must be a multiple of the element size
+   builder.add_errors<std::vector<std::uint16_t>>("vec-u16", {"03000000FFFFFFFFFFFF"});
+   // negative offset
+   builder.add_errors<std::tuple<std::uint32_t, std::optional<std::uint8_t>>>(
+       "(u32,u8?)", {"0800CCCCCCCCFFFFFFFF"});
+   builder.add_errors<OffsetTest>("OffsetTest", {"0800CCCCCCCCFFFFFFFF"});
+   // gaps after unknown fields
+   builder.add_errors<std::tuple<std::tuple<std::uint32_t>,
+                                 std::tuple<std::uint32_t, std::optional<std::uint8_t>>>>(
+       "((u32),(u32,u8?))", {"0800"
+                             "08000000"
+                             "0F000000"
+                             "0800CCCCCCCC04000000FF"
+                             "0800DDDDDDDD05000000EEEE"});
+   builder.add_errors<GapTest>("GapTest", {"0800"
+                                           "08000000"
+                                           "0F000000"
+                                           "0800CCCCCCCC04000000FF"
+                                           "0800DDDDDDDD05000000EEEE"});
+   // Malformed extensions
+   builder.add_errors<std::tuple<>>(
+       "()", {"0100FF", "040002000000", "040005000000FFFF", "08000800000005000000",
+              "08000100000005000000FF", "0C000C0000000900000004000000FF"});
+   builder.add_errors<EmptyObject>(
+       "EmptyObject", {"0100FF", "040002000000", "040005000000FFFF", "08000800000005000000",
+                       "08000100000005000000FF", "0C000C0000000900000004000000FF"});
+
+   // variant cannot unpack unknown alternatives; known alternatives must have the correct size
+   builder.add_errors<std::variant<std::uint8_t>>("UnknownAlt", {"0002000000FFFF", "0101000000FF"});
+   // No trailing empty optionals
+   builder.add_errors<std::tuple<std::optional<std::uint8_t>>>(
+       "(u8?)", {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   builder.add_errors<std::tuple<>>(
+       "()", {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   builder.add_errors<TrailingTest>(
+       "TrailingTest", {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   builder.add_errors<EmptyObject>(
+       "EmptyObject", {"040001000000", "08000100000001000000", "08000800000001000000FF"});
+   // Offset pointer to empty container must use compression
+   builder.add_errors<std::optional<std::string>>("opt-str", {"0400000000000000"});
+   builder.add_errors<std::optional<std::vector<std::uint8_t>>>("opt-bytes", {"0400000000000000"});
+   builder.add_errors<std::optional<std::vector<std::tuple<>>>>("()[]?", {"0400000000000000"});
+   builder.add_errors<std::tuple<std::string>>("(str)", {"04000400000000000000"});
+   builder.add_errors<std::tuple<std::vector<std::uint8_t>>>("(u8[])", {"04000400000000000000"});
+   builder.add_errors<std::tuple<std::vector<std::tuple<>>>>("(()[])", {"04000400000000000000"});
+   builder.add_errors<StringMember>("StringMember", {"04000400000000000000"});
+   builder.add_errors<BytesMember>("BytesMember", {"04000400000000000000"});
+   builder.add_errors<VecTupleMember>("VecTupleMember", {"04000400000000000000"});
+
    std::cout << "[";
    to_json(builder, std::cout);
    std::cout << "]";
