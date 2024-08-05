@@ -1,0 +1,13 @@
+package webmail:plugin;
+
+interface api {
+    use host:common/types.{error};
+
+    // Send an email
+    send: func(receiver: string, subject: string, body: string) -> result<_, error>;
+}
+
+world impl {
+    include host:common/imports;
+    export api;
+}

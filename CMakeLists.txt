@@ -136,14 +136,18 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -234,6 +238,7 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
+    services/user/Webmail/ui:Webmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -307,6 +312,8 @@ add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wa
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
+add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
+add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -362,10 +369,15 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-    FLAGS allowSudo allowWriteNative
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
+        FLAGS allowSudo allowWriteNative
+        SERVER r-transact
+    SERVICE r-transact
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
+        FLAGS allowWriteSubjective
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -543,6 +555,7 @@ psibase_package(
     SERVICE http-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SERVER rhttp-server
+        FLAGS allowSocket allowWriteSubjective
     SERVICE rhttp-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
     DEPENDS wasm
@@ -607,13 +620,30 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Webmail.psi
+    NAME Webmail
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "This app provides a webmail client for authenticated asynchronous communication between network users"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})"
+    SERVICE webmail
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
+        SERVER webmail
+        DATA ${COMPONENT_BIN_DIR}/${WebmailPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Webmail/ui/dist/* /
+        INIT
+    DEPENDS ${Webmail_js_DEP}
+    DEPENDS wasm
+    DEPENDS ${WebmailPlugin_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
     VERSION ${PSIBASE_VERSION}
-    SERVICE nft
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})"
-    WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-    INIT
+    SERVICE nft
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
+        INIT
     DEPENDS wasm
 )
 
@@ -623,8 +653,19 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
+    NAME SupervisorTests
+    DESCRIPTION "Plugin functions for testing Supervisor functionality"
+    VERSION ${PSIBASE_VERSION}
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    SERVICE sup-test
+        DATA ${COMPONENT_BIN_DIR}/${TestsPlugin_OUTPUT_FILE} /test.wasm
+    DEPENDS ${TestsPlugin_DEP}
 )
 
 psibase_package(
@@ -699,7 +740,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
@@ -754,10 +795,12 @@ install(
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Supervisor.psi
+          ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/Webmail.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 
@@ -786,7 +829,34 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/AsyncQuery.psi
+    NAME AsyncQuery
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Test service for the various ways to respond to http requests"
+    SERVICE as-query
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
+        SERVER as-query
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/psibase_tests/AsyncQueryService.json
+        FLAGS allowWriteSubjective
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SubjectiveCounter.psi
+    NAME SubjectiveCounter
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Test service that increments a counter in the subjective db"
+    SERVICE s-counter
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
+        SERVER s-counter
+        FLAGS isSubjective allowWriteSubjective
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter)
 
 ExternalProject_Add(
     rust

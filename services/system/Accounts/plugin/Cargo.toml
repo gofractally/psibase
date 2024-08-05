@@ -27,3 +27,4 @@ package = "accounts:plugin"
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }

@@ -8,6 +8,7 @@
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
 use crate::{native_raw, AccountNumber, DbId, ToKey};
+use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
 /// Write message to console
@@ -327,5 +328,34 @@ macro_rules! subjective_tx {
             }
         };
         r
+    }
+}
+
+/// Send a message to a socket
+pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
+    if err == 0 {
+        Ok(())
+    } else {
+        Err(anyhow!("socket_send: {}", err))
+    }
+}
+
+/// Tells the current transaction/query/callback context to take or release
+/// ownership of a socket.
+///
+/// Any sockets that are owned by a context will be closed when it finishes.
+/// - HTTP socket: send a 500 response with an error message in the body
+/// - Other sockets may not be set to auto-close
+///
+/// If this function is called within a subjectiveCheckout, it will only take
+/// effect if the top-level commit succeeds. If another context takes ownership
+/// of the socket, subjectiveCommit may fail.
+pub fn socket_auto_close(fd: i32, value: bool) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketAutoClose(fd, value) };
+    if err == 0 {
+        Ok(())
+    } else {
+        Err(anyhow!("socket_auto_close: {}", err))
     }
 }

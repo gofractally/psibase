@@ -26,7 +26,7 @@ package = "tokens:plugin"
 
 
 [package.metadata.component.target.dependencies]
-"common:plugin" = { path = "../../CommonApi/common/packages/wit/plugin.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 
 
 [package.metadata.component.dependencies]

@@ -20,12 +20,70 @@ namespace UserService
    {
       psibase::AccountNumber service;
       psio::Schema           types;
+      using ActionMap = std::map<psibase::MethodNumber, psio::schema_types::FunctionType>;
+      ActionMap actions;
       using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
       EventMap ui;
       EventMap history;
       EventMap merkle;
 
      private:
+      template <typename M>
+      static auto makeParams(psio::SchemaBuilder& builder, const psio::meta& ref)
+          -> psio::schema_types::Object
+      {
+         psio::schema_types::Object type;
+         auto                       nameIter = ref.param_names.begin();
+         auto                       nameEnd  = ref.param_names.end();
+         auto                       i        = ref.param_names.size();
+         forEachType(
+             typename M::SimplifiedArgTypes{},
+             [&](auto* t)
+             {
+                std::string name = nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
+                type.members.push_back(
+                    {std::move(name), builder.insert<std::remove_pointer_t<decltype(t)>>()});
+             });
+         return type;
+      }
+      template <typename T>
+      static auto makeResult(psio::SchemaBuilder& builder)
+          -> std::optional<psio::schema_types::AnyType>
+      {
+         if constexpr (std::is_void_v<T>)
+         {
+            return {};
+         }
+         else
+         {
+            return builder.insert<T>();
+         }
+      }
+      template <typename T>
+      static void makeActions(psio::SchemaBuilder&                       builder,
+                              ActionMap&                                 out,
+                              std::vector<psio::schema_types::AnyType*>& eventTypes)
+      {
+         psio::reflect<T>::for_each(
+             [&](const psio::meta& ref, auto member)
+             {
+                using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
+                if constexpr (m::isFunction)
+                {
+                   auto [pos, inserted] =
+                       out.try_emplace(psibase::MethodNumber{ref.name},
+                                       psio::schema_types::FunctionType{
+                                           makeParams<m>(builder, ref),
+                                           makeResult<typename m::ReturnType>(builder)});
+                   if (inserted)
+                   {
+                      eventTypes.push_back(&pos->second.params);
+                      if (pos->second.result)
+                         eventTypes.push_back(&*pos->second.result);
+                   }
+                }
+             });
+      }
       template <typename T>
       static void makeEvents(psio::SchemaBuilder&                       builder,
                              EventMap&                                  out,
@@ -37,21 +95,8 @@ namespace UserService
                 using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
                 if constexpr (m::isFunction)
                 {
-                   psio::schema_types::Object type;
-                   auto                       nameIter = ref.param_names.begin();
-                   auto                       nameEnd  = ref.param_names.end();
-                   auto                       i        = ref.param_names.size();
-                   forEachType(typename m::SimplifiedArgTypes{},
-                               [&](auto* t)
-                               {
-                                  std::string name =
-                                      nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
-                                  type.members.push_back(
-                                      {std::move(name),
-                                       builder.insert<std::remove_pointer_t<decltype(t)>>()});
-                               });
-                   auto [pos, inserted] =
-                       out.try_emplace(psibase::MethodNumber{ref.name}, std::move(type));
+                   auto [pos, inserted] = out.try_emplace(psibase::MethodNumber{ref.name},
+                                                          makeParams<m>(builder, ref));
                    if (inserted)
                    {
                       eventTypes.push_back(&pos->second);
@@ -66,21 +111,22 @@ namespace UserService
       static ServiceSchema make()
       {
          ServiceSchema                             result{.service = T::service};
-         std::vector<psio::schema_types::AnyType*> eventTypes;
+         std::vector<psio::schema_types::AnyType*> typeRefs;
          psio::SchemaBuilder                       builder;
+         makeActions<T>(builder, result.actions, typeRefs);
          if constexpr (requires { typename T::Events::Ui; })
          {
-            makeEvents<typename T::Events::Ui>(builder, result.ui, eventTypes);
+            makeEvents<typename T::Events::Ui>(builder, result.ui, typeRefs);
          }
          if constexpr (requires { typename T::Events::History; })
          {
-            makeEvents<typename T::Events::History>(builder, result.history, eventTypes);
+            makeEvents<typename T::Events::History>(builder, result.history, typeRefs);
          }
          if constexpr (requires { typename T::Events::Merkle; })
          {
-            makeEvents<typename T::Events::Merkle>(builder, result.merkle, eventTypes);
+            makeEvents<typename T::Events::Merkle>(builder, result.merkle, typeRefs);
          }
-         result.types = std::move(builder).build(eventTypes);
+         result.types = std::move(builder).build(typeRefs);
          return result;
       }
 
@@ -121,7 +167,7 @@ namespace UserService
          return result;
       }
    };
-   PSIO_REFLECT(ServiceSchema, service, types, ui, history, merkle)
+   PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
 
    struct SecondaryIndexInfo
    {

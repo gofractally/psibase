@@ -1,4 +1,4 @@
-use crate::{Pack, Reflect, ToKey, ToSchema, Unpack};
+use crate::{Pack, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
     Debug,
     Pack,
     Unpack,
-    Reflect,
     ToKey,
     ToSchema,
     Serialize,
@@ -20,7 +19,6 @@ use serde::{Deserialize, Serialize};
     InputObject,
 )]
 #[fracpack(fracpack_mod = "crate::fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "ServiceMethodInput")]
 pub struct ServiceMethod {

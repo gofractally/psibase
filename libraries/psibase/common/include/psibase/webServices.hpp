@@ -21,7 +21,8 @@ namespace psibase
       /// - Return `std::nullopt` to signal not found. psinode produces a 404 response in this case.
       /// - Abort. psinode produces a 500 response with the service's abort message.
       /// - Return a [psibase::HttpReply]. psinode produces a 200 response with the body and contentType returned.
-      /// - Call other services.
+      /// - Call `http-server::sendReply`. Explicitly sends a response.
+      /// - Call `http-server::deferReply`. No response will be produced until `http-server::sendReply` is called.
       ///
       /// A service runs in RPC mode while serving an HTTP request. This mode prevents database writes,
       /// but allows database reads, including reading data and events which are normally not available
@@ -29,9 +30,9 @@ namespace psibase
       //
       // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
       //       implementations of this interface may, of course, use it.
-      std::optional<HttpReply> serveSys(HttpRequest request);
+      std::optional<HttpReply> serveSys(HttpRequest request, std::optional<std::int32_t> socket);
    };
-   PSIO_REFLECT(ServerInterface, method(serveSys, request))
+   PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
 
    /// Interface for services which support storing files
    ///
