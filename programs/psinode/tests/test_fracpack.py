@@ -120,6 +120,11 @@ class TestFracpack(unittest.TestCase):
                     with self.subTest(**{'error(' + v['type'] + ')':v['fracpack']}):
                         with self.assertRaises(FracpackError):
                             unpack(bytes.fromhex(v['fracpack']), ty)
+                elif v.get('compat') is not None:
+                    with self.subTest(**{'compat(%s)' % v['type']:v['compat']}):
+                        expected = v['fracpack'].upper()
+                        json2 = unpack(bytes.fromhex(v['compat']), ty)
+                        self.assertEqual(pack(json2, ty).hex().upper(), expected)
                 else:
                     with self.subTest(**{v['type']:v['json']}):
                         expected = v['fracpack'].upper()

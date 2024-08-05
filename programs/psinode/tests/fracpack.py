@@ -82,6 +82,7 @@ class InputStream:
             if self.pos > new_pos:
                 raise BadOffset()
             self.pos = new_pos
+            self.known_pos = True
     def save(self, new_pos):
         state = (self.pos, self.known_pos)
         self.pos = new_pos
@@ -309,6 +310,7 @@ class _UnknownType:
     def __init__(self):
         self.is_container = False
     def unpack(self, stream):
+        stream.known_pos = False
         pass
 
 _Unknown = _UnknownType()

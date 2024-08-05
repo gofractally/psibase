@@ -14,6 +14,7 @@ struct test_case
    std::string       json;
    std::vector<char> fracpack;
    bool              error = false;
+   std::vector<char> compat;
 };
 void to_json(const test_case& t, std::ostream& os)
 {
@@ -23,6 +24,8 @@ void to_json(const test_case& t, std::ostream& os)
    os << ",\"fracpack\":\"" << psio::to_hex(t.fracpack) << "\"";
    if (t.error)
       os << ",\"error\":true";
+   if (!t.compat.empty())
+      os << ",\"compat\":\"" << psio::to_hex(t.compat) << "\"";
    os << "}";
 }
 
@@ -47,6 +50,13 @@ struct test_builder
       {
          tests.push_back({type, psio::expand_json(value), psio::to_frac(value)});
       }
+   }
+   template <typename T, typename U>
+   void add_compat(const std::string& type, T value, U expected)
+   {
+      builder.insert<U>(type);
+      tests.push_back({type, psio::convert_to_json(expected), psio::to_frac(expected), false,
+                       psio::to_frac(value)});
    }
    template <typename T>
    void add_errors(const std::string& type, std::initializer_list<std::string_view> data)
@@ -210,6 +220,12 @@ struct VecTupleMember
 };
 PSIO_REFLECT(VecTupleMember, v0)
 
+struct IntMember
+{
+   std::int32_t v0;
+};
+PSIO_REFLECT(IntMember, v0)
+
 int main()
 {
    test_builder builder;
@@ -262,6 +278,17 @@ int main()
    builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
        "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
    builder.add<WrongCustom>("WrongCustom", {{3}});
+
+   // Compatible serialization
+   builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
+                      std::tuple<std::int32_t>(42));
+   builder.add_compat("()", std::tuple<std::optional<std::uint8_t>>(42), std::tuple());
+   builder.add_compat("IntMember", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
+                      IntMember{42});
+   builder.add_compat(
+       "((),)",
+       std::tuple(std::tuple(std::optional{std::uint8_t{0xFF}}), std::optional{std::uint8_t{0xCC}}),
+       std::tuple<std::tuple<>>{});
 
    // bool is 0 or 1
    builder.add_errors<bool>("bool", {"02", "03", "FF"});
