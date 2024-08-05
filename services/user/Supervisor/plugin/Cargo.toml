@@ -1,11 +1,10 @@
 [package]
-name = "webmail-plugin"
+name = "test"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
-psibase = { path="../../../../rust/psibase/" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -18,7 +17,8 @@ strip = true
 lto = true
 
 [package.metadata.component]
-package = "webmail:plugin"
+package = "supervisor:test"
 
 [package.metadata.component.target.dependencies]
+"wasi:keyvalue" = { path = "../../CommonApi/common/packages/wit/wasi-keyvalue.wit" }
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }

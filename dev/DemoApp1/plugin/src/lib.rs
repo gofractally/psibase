@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::{server, types as CommonTypes};
+use bindings::host::common::{server, types as CommonTypes};
 use bindings::exports::demoapp1::example::intf::Guest as Intf;
 use bindings::invite;
 use bindings::Guest as MainInterface;

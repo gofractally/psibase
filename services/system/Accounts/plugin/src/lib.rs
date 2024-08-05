@@ -1,8 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::server as Server;
-use bindings::common::plugin::types as CommonTypes;
+use bindings::host::common::{server as Server, types as CommonTypes};
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
@@ -14,6 +13,10 @@ use errors::ErrorType::*;
 struct AccountsPlugin;
 
 impl Accounts for AccountsPlugin {
+    fn login() -> Result<(), CommonTypes::Error> {
+        return Err(NotYetImplemented.err("login"));
+    }
+
     fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
         Ok(Some("alice".to_string()))
     }

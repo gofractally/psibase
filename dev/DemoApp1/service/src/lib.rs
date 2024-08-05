@@ -11,7 +11,7 @@ mod service {
 
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
@@ -69,7 +69,7 @@ mod service {
             AnswerTable::new().get_index_pk().get(&account)
         }
 
-        async fn answers(&self, account: AccountNumber) -> Option<Vec<i32>> {
+        async fn answers(&self, _account: AccountNumber) -> Option<Vec<i32>> {
             let answer_table = AnswerTable::new();
             let tab = answer_table.get_index_pk();
 
