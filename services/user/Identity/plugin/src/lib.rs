@@ -44,13 +44,6 @@ impl Guest for IdentityPlugin {
 
 #[derive(Deserialize, Debug)]
 #[allow(non_snake_case)]
-struct IdentitySummary {
-    perc_high_confidence: u8,
-    num_unique_attestations: u16,
-}
-
-#[derive(Deserialize, Debug)]
-#[allow(non_snake_case)]
 struct IdentitySummaryFromService {
     numHighConfAttestations: u16,
     uniqueAttesters: u16,
