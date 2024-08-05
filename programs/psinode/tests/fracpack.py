@@ -93,7 +93,7 @@ class InputStream:
         self.pos = pos
         self.known_pos = known_pos
 
-class OffsetRepack:
+class _OffsetRepack:
     def __init__(self, stream, value, ty):
         self.pos = stream.pos - 4
         self.stream = stream
@@ -104,11 +104,11 @@ class OffsetRepack:
         self.stream.repack_u32(self.pos, offset)
         self.ty.pack(self.value, self.stream)
 
-class NullRepack:
+class _NullRepack:
     def pack(self):
         pass
 
-class OffsetUnpack:
+class _OffsetUnpack:
     def __init__(self, stream, offset, ty):
         self.pos = stream.pos - 4 + offset
         self.stream = stream
@@ -117,41 +117,41 @@ class OffsetUnpack:
         self.stream.set_pos(self.pos)
         return self.ty.unpack(self.stream)
 
-class OffsetUnpackNonEmpty(OffsetUnpack):
+class _OffsetUnpackNonEmpty(_OffsetUnpack):
     def unpack(self):
         result = super().unpack()
         if self.ty.is_empty_container(result, self.stream):
             raise FracpackError('Empty containers must use zero offset')
         return result
 
-class InlineUnpack:
+class _InlineUnpack:
     def __init__(self, value):
         self.value = value
     def unpack(self):
         return self.value
 
-NullUnpack = InlineUnpack(None)
+NullUnpack = _InlineUnpack(None)
 
 class TypeBase(type):
     def embedded_fixed_pack(self, value, stream):
         if self.is_variable_size:
             stream.write_u32(0)
             if not self.is_container or not self.is_empty_container(value, stream):
-                return OffsetRepack(stream, value, self)
+                return _OffsetRepack(stream, value, self)
         else:
             self.pack(value, stream)
-        return NullRepack()
+        return _NullRepack()
     def embedded_unpack(self, stream):
         if self.is_variable_size:
             offset = stream.read_u32()
             if offset == 0:
-                return InlineUnpack(self.new_empty_container(stream))
+                return _InlineUnpack(self.new_empty_container(stream))
             elif self.is_container:
-                return OffsetUnpackNonEmpty(stream, offset, self)
+                return _OffsetUnpackNonEmpty(stream, offset, self)
             else:
-                return OffsetUnpack(stream, offset, self)
+                return _OffsetUnpack(stream, offset, self)
         else:
-            return InlineUnpack(self.unpack(stream))
+            return _InlineUnpack(self.unpack(stream))
     def new_empty_container(self, stream):
         try:
             state = stream.save(stream.pos - 4)
@@ -200,7 +200,7 @@ class TypeCompatibility:
     def equivalent(self):
         return self == TypeCompatibility()
 
-class MatchContext:
+class _MatchContext:
     def __init__(self):
         self.lstack = {}
         self.rstack = {}
@@ -247,7 +247,7 @@ class MatchContext:
         return True
 
 def compatibility(lhs, rhs):
-    context = MatchContext()
+    context = _MatchContext()
     if not context.match(lhs, rhs):
         return None
     return context.compatibility
@@ -322,11 +322,11 @@ class _TrailingOption(TypeBase):
     def embedded_unpack(self, stream):
         offset = stream.read_u32()
         if offset > 1:
-            return OffsetUnpack(stream, offset, _Unknown)
+            return _OffsetUnpack(stream, offset, _Unknown)
         if offset == 1:
             return NullUnpack
         else:
-            return InlineUnpack(None)
+            return _InlineUnpack(None)
     def match(self, other, context):
         if isinstance(other, Option):
             context.compatibility.addField = True
@@ -468,7 +468,7 @@ class DerivedAsInstance(type):
                 return base(name, members)
         return super().__new__(cls, name, bases, namespace, **kw)
 
-class MembersByName:
+class _MembersByName:
     @property
     def members_by_name(self):
         if not hasattr(self, "_members_by_name"):
@@ -478,7 +478,7 @@ class MembersByName:
         return self._members_by_name
 
 @_fracpackmeta(['name', 'members'], lambda name, members: name, ObjectValue)
-class Struct(TypeBase, MembersByName, metaclass=DerivedAsInstance):
+class Struct(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
     def __init__(self, name, members):
         members = _as_list(members)
         self.fixed_size = 0
@@ -527,7 +527,7 @@ class Struct(TypeBase, MembersByName, metaclass=DerivedAsInstance):
         return True
 
 @_fracpackmeta(['name', 'members'], lambda name, members: name, ObjectValue)
-class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
+class Object(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
     def __init__(self, name, members):
         self.fixed_size = 4
         self.is_variable_size = True
@@ -553,7 +553,7 @@ class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
         for (name, ty) in self.members:
             if stream.pos == fixed_end:
                 if ty.is_optional:
-                    result[name] = InlineUnpack(None)
+                    result[name] = _InlineUnpack(None)
                 else:
                     raise MissingField(self, name)
             elif stream.pos + ty.fixed_size > fixed_end:
@@ -706,22 +706,22 @@ class Option(TypeBase):
             return NullUnpack
         elif self.is_container:
             if offset == 0:
-                return InlineUnpack(self.ty.new_empty_container(stream))
+                return _InlineUnpack(self.ty.new_empty_container(stream))
             else:
-                return OffsetUnpackNonEmpty(stream, offset, self.ty)
+                return _OffsetUnpackNonEmpty(stream, offset, self.ty)
         else:
-            return OffsetUnpack(stream, offset, self.ty)
+            return _OffsetUnpack(stream, offset, self.ty)
     def embedded_fixed_pack(self, value, stream):
         if isinstance(value, OptionValue):
             value = value.value
         if value is None:
             stream.write_u32(1)
-            return NullRepack()
+            return _NullRepack()
         stream.write_u32(0)
         if self.is_container and self.is_empty_container(value, stream):
-            return NullRepack()
+            return _NullRepack()
         else:
-            return OffsetRepack(stream, value, self.ty)
+            return _OffsetRepack(stream, value, self.ty)
     @property
     def is_container(self):
         return self.ty.is_container and not self.ty.is_optional
@@ -823,7 +823,7 @@ class Tuple(TypeBase):
         for (i, ty) in enumerate(self.members):
             if stream.pos == fixed_end:
                 if ty.is_optional:
-                    result.append(InlineUnpack(None))
+                    result.append(_InlineUnpack(None))
                 else:
                     raise MissingField(self, i)
             elif stream.pos + ty.fixed_size > fixed_end:
