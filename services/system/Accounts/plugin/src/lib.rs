@@ -21,7 +21,7 @@ struct AccountsPlugin;
 /****** Database
 [
     {
-        key: "logged-in",
+        key: "<base64_app_domain>.logged-in",
         description: "Account name of currently logged in user"
     },
 ]
