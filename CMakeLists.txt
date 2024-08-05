@@ -143,6 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
