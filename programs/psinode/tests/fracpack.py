@@ -29,6 +29,64 @@ class OutputStream:
     def pos(self):
         return len(self.bytes)
 
+class FracpackError(Exception):
+    pass
+
+class BadOffset(FracpackError):
+    def __init__(self):
+        super().__init__(self, "Invalid offset")
+
+class BadSize(FracpackError):
+    def __init__(self):
+        super().__init__(self, "Invalid size")
+
+class MissingField(FracpackError):
+    def __init__(self, ty, name):
+        super().__init__(self, "Missing field %s.%s" % (ty.__name__, name))
+
+class InputStream:
+    def __init__(self, data, custom=None):
+        self.bytes = data
+        self.pos = 0
+        self.known_pos = True
+        if custom is not None:
+            self.custom = custom
+    def read_u8(self):
+        result = self.bytes[self.pos]
+        self.pos += 1
+        return result
+    def read_u16(self):
+        result = 0
+        for i in range(2):
+            result |= self.read_u8() << 8*i;
+        return result
+    def read_u32(self):
+        result = 0
+        for i in range(4):
+            result |= self.read_u8() << 8*i;
+        return result
+    def read_bytes(self, n):
+        result = self.bytes[self.pos:self.pos+n]
+        self.pos += n
+        return result
+    def set_pos(self, new_pos):
+        if self.known_pos:
+            if self.pos != new_pos:
+                raise BadOffset()
+        else:
+            if self.pos > new_pos:
+                raise BadOffset()
+            self.pos = new_pos
+    def save(self, new_pos):
+        state = (self.pos, self.known_pos)
+        self.pos = new_pos
+        self.known_pos = True
+        return state
+    def restore(self, state):
+        (pos, known_pos) = state
+        self.pos = pos
+        self.known_pos = known_pos
+
 class OffsetRepack:
     def __init__(self, stream, value, ty):
         self.pos = stream.pos - 4
@@ -44,6 +102,21 @@ class NullRepack:
     def pack(self):
         pass
 
+class OffsetUnpack:
+    def __init__(self, stream, offset, ty):
+        self.pos = stream.pos - 4 + offset
+        self.stream = stream
+        self.ty = ty
+    def unpack(self):
+        self.stream.set_pos(self.pos)
+        return self.ty.unpack(self.stream)
+
+class InlineUnpack:
+    def __init__(self, value):
+        self.value = value
+    def unpack(self):
+        return self.value
+
 class TypeBase(type):
     def embedded_fixed_pack(self, value, stream):
         if self.is_variable_size:
@@ -53,6 +126,21 @@ class TypeBase(type):
         else:
             self.pack(value, stream)
         return NullRepack()
+    def embedded_unpack(self, stream):
+        if self.is_variable_size:
+            offset = stream.read_u32()
+            if offset == 0:
+                return InlineUnpack(self.new_empty_container(stream))
+            else:
+                return OffsetUnpack(stream, offset, self)
+        else:
+            return InlineUnpack(self.unpack(stream))
+    def new_empty_container(self, stream):
+        try:
+            state = stream.save(stream.pos - 4)
+            return self.unpack(stream)
+        finally:
+            stream.restore(state)
     def packed(self, value):
         stream = OutputStream()
         self.pack(value, stream)
@@ -66,6 +154,12 @@ def pack(value, ty=None, *, custom=None):
     stream = OutputStream(custom)
     ty.pack(value, stream)
     return stream.bytes
+
+def unpack(data, ty=None, *, custom=None):
+    if ty is None:
+        ty = type(value)
+    stream = InputStream(data, custom)
+    return ty.unpack(stream)
 
 class TypeCompatibility:
     __slots__ = ['addField', 'addAlternative', 'dropField', 'dropAlternative']
@@ -220,10 +314,10 @@ class Int(TypeBase):
     def unpack(self, stream):
         result = 0
         for i in range(self.fixed_size):
-            b = stream.read(1)[0]
+            b = stream.read_u8()
             result = result + (b << (i*8))
         if self.isSigned and result >= (1 << (self.bits - 1)):
-            result = result - 1<<self.bits
+            result = result - (1<<self.bits)
         return result
     def pack(self, value, stream):
         value = int(value)
@@ -249,6 +343,26 @@ class Float(TypeBase):
     def load(raw, parser):
         raw = dict(raw)
         return Float(raw["exp"], raw["mantissa"])
+    def unpack(self, stream):
+        ival = 0
+        for i in range((self.mantissa + self.exp) // 8):
+            ival = ival | (stream.read_u8() << 8*i)
+        sign = (ival >> (self.exp + self.mantissa - 1)) & 1
+        exp = (ival >> (self.mantissa - 1)) & ((1 << self.exp) - 1)
+        mantissa = ival & ((1 << (self.mantissa - 1)) - 1)
+        bias = (1 << (self.exp - 1)) - 1
+        if exp == 0:
+            result = math.ldexp(float(mantissa), -bias + 2 - self.mantissa)
+        elif exp == (1 << self.exp) - 1:
+            if mantissa == 0:
+                result = math.inf
+            else:
+                result = math.nan
+        else:
+            result = math.ldexp(float(mantissa + (1 << (self.mantissa - 1))), exp - bias - self.mantissa + 1)
+        if sign:
+            result = -result
+        return result
     def pack(self, value, stream):
         value = float(value)
         sign = 1 if math.copysign(1, value) < 0 else 0
@@ -343,6 +457,11 @@ class Struct(TypeBase, MembersByName, metaclass=DerivedAsInstance):
         for (name, ty) in _as_list(raw):
             members.append((name, load_type(ty, parser)))
         return Struct('<anonymous Struct>', members)
+    def unpack(self, stream):
+        fields = {}
+        for (name, ty) in self.members:
+            fields[name] = ty.unpack(stream)
+        return fields
     def pack(self, value, stream):
         if isinstance(value, ObjectValue):
             value = value.__dict__
@@ -378,6 +497,28 @@ class Object(TypeBase, MembersByName, metaclass=DerivedAsInstance):
                 members.append((name, load_type(ty, parser)))
             result.members = members
         parser.post(init)
+        return result
+    def unpack(self, stream):
+        result = {}
+        fixed_size = stream.read_u16()
+        fixed_end = stream.pos + fixed_size
+        for (name, ty) in self.members:
+            if stream.pos == fixed_end:
+                if ty.is_optional:
+                    result[name] = InlineUnpack(None)
+                else:
+                    raise MissingField(self, name)
+            elif stream.pos + ty.fixed_size > fixed_end:
+                raise BadSize()
+            else:
+                result[name] = ty.embedded_unpack(stream)
+        extra = []
+        while stream.pos < fixed_end:
+            extra.append(_TrailingOption().embedded_unpack())
+        for (name, ty) in self.members:
+            result[name] = result[name].unpack()
+        for e in extra:
+            e.unpack()
         return result
     def pack(self, value, stream):
         if isinstance(value, ObjectValue):
@@ -416,6 +557,11 @@ class Array(TypeBase):
     def load(raw, parser):
         raw = dict(raw)
         return Array(load_type(raw["type"], parser), int(raw["len"]))
+    def unpack(self, stream):
+        result = [self.ty.embedded_unpack(stream) for i in range(self.n)]
+        for i in range(self.n):
+            result[i] = result[i].unpack()
+        return result
     def pack(self, value, stream):
         assert(len(value) == self.n)
         repack = []
@@ -446,6 +592,14 @@ class List(TypeBase):
         return result
     def is_empty_container(self, value):
         return len(value) == 0
+    def unpack(self, stream):
+        size = stream.read_u32()
+        if size % self.ty.fixed_size != 0:
+            raise BadSize()
+        result = [self.ty.embedded_unpack(stream) for i in range(0, size, self.ty.fixed_size)]
+        for i in range(len(result)):
+            result[i] = result[i].unpack()
+        return result
     def pack(self, value, stream):
         ty = self.ty
         stream.write_u32(self.ty.fixed_size * len(value))
@@ -485,8 +639,18 @@ class Option(TypeBase):
         if isinstance(value, OptionValue):
             value = value.value
         return value is not None and self.ty.is_empty_container(value)
+    def unpack(self, stream):
+        return self.embedded_unpack(stream).unpack()
     def pack(self, value, stream):
         self.embedded_fixed_pack(value, stream).pack()
+    def embedded_unpack(self, stream):
+        offset = stream.read_u32()
+        if offset == 1:
+            return InlineUnpack(None)
+        elif self.is_container and offset == 0:
+            return InlineUnpack(self.ty.new_empty_container(stream))
+        else:
+            return OffsetUnpack(stream, offset, self.ty)
     def embedded_fixed_pack(self, value, stream):
         if isinstance(value, OptionValue):
             value = value.value
@@ -533,6 +697,13 @@ class Variant(TypeBase, metaclass=DerivedAsInstance):
             result.members = members
         parser.post(init)
         return result
+    def unpack(self, stream):
+        idx = stream.read_u8()
+        size = stream.read_u32()
+        end_pos = stream.pos + size
+        result = self.members[idx][1].unpack(stream)
+        stream.set_pos(end_pos)
+        return {self.members[idx][0]: result}
     def pack(self, value, stream):
         if isinstance(value, VariantValue):
             value = {value.type: value.value}
@@ -582,6 +753,28 @@ class Tuple(TypeBase):
             result.members = members
         parser.post(init)
         return result
+    def unpack(self, stream):
+        result = []
+        fixed_size = stream.read_u16()
+        fixed_end = stream.pos + fixed_size
+        for (i, ty) in enumerate(self.members):
+            if stream.pos == fixed_end:
+                if ty.is_optional:
+                    result.append(InlineUnpack(None))
+                else:
+                    raise MissingField(self, i)
+            elif stream.pos + ty.fixed_size > fixed_end:
+                raise BadSize()
+            else:
+                result.append(ty.embedded_unpack(stream))
+        extra = []
+        while stream.pos < fixed_end:
+            extra.append(_TrailingOption().embedded_unpack())
+        for i in range(len(self.members)):
+            result[i] = result[i].unpack()
+        for e in extra:
+            e.unpack()
+        return result
     def pack(self, value, stream):
         assert(len(value) == len(self.members))
         num_present = 0
@@ -619,6 +812,12 @@ class FracPack(TypeBase):
         return result
     def is_empty_container(self, value):
         return self.ty.fixed_size == 0
+    def unpack(self, stream):
+        size = stream.read_u32()
+        end_pos = stream.pos + size
+        result = self.ty.unpack(stream)
+        stream.set_pos(end_pos)
+        return result
     def pack(self, value, stream):
         stream.write_u32(0)
         pos = stream.pos
@@ -665,6 +864,8 @@ class Custom(TypeBase):
             if actual is not None:
                 return actual
         return self.type
+    def unpack(self, stream):
+        return self.resolve(stream).unpack(stream)
     def pack(self, value, stream):
         self.resolve(stream).pack(value, stream)
     def embedded_fixed_pack(self, value, stream):
@@ -751,6 +952,9 @@ f64 = Float(11, 53)
 
 class Bool(u1):
     @staticmethod
+    def unpack(stream):
+        return bool(u1.unpack(stream))
+    @staticmethod
     def pack(value, stream):
         u1.pack(int(value), stream)
 
@@ -758,6 +962,11 @@ class String(Custom(List(u8), "string"), str):
     @staticmethod
     def is_empty_container(value):
         return len(value) == 0
+    @staticmethod
+    def unpack(stream):
+        size = stream.read_u32()
+        data = stream.read_bytes(size)
+        return data.decode()
     @staticmethod
     def pack(value, stream):
         data = value.encode()
@@ -768,6 +977,13 @@ class String(Custom(List(u8), "string"), str):
 class Hex(TypeBase):
     def __init__(self, ty):
         self.ty = ty
+    def unpack(self, stream):
+        if self.ty.is_container:
+            size = stream.read_u32()
+        else:
+            assert not self.ty.is_variable_size
+            size = self.ty.fixed_size
+        return stream.read_bytes(size).hex()
     def pack(self, value, stream):
         if isinstance(value, str):
             value = bytes.fromhex(value)

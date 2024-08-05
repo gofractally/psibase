@@ -116,7 +116,11 @@ class TestFracpack(unittest.TestCase):
             for v in t['values']:
                 v = dict(v)
                 with self.subTest(**{v['type']:v['json']}):
-                    self.assertEqual(schema[v['type']].packed(v['json']), bytes.fromhex(v['fracpack']))
+                    ty = schema[v['type']]
+                    expected = v['fracpack'].upper()
+                    self.assertEqual(pack(v['json'], ty).hex().upper(), expected)
+                    json2 = unpack(bytes.fromhex(v['fracpack']), ty)
+                    self.assertEqual(pack(json2, ty).hex().upper(), expected)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
