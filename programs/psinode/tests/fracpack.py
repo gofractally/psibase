@@ -552,14 +552,18 @@ class Object(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
         fixed_size = stream.read_u16()
         fixed_end = stream.pos + fixed_size
         last = None
+        at_end = False
         for (name, ty) in self.members:
-            if stream.pos == fixed_end:
-                if ty.is_optional:
-                    result[name] = _InlineUnpack(None)
+            if stream.pos + ty.fixed_size > fixed_end:
+                at_end = True
+            if at_end:
+                if stream.pos == fixed_end:
+                    if ty.is_optional:
+                        result[name] = _InlineUnpack(None)
+                    else:
+                        raise MissingField(self, name)
                 else:
-                    raise MissingField(self, name)
-            elif stream.pos + ty.fixed_size > fixed_end:
-                raise BadSize()
+                    raise BadSize()
             else:
                 last = name
                 result[name] = ty.embedded_unpack(stream)
@@ -826,14 +830,18 @@ class Tuple(TypeBase):
         fixed_size = stream.read_u16()
         fixed_end = stream.pos + fixed_size
         last = None
+        at_end = False
         for (i, ty) in enumerate(self.members):
-            if stream.pos == fixed_end:
-                if ty.is_optional:
-                    result.append(_InlineUnpack(None))
+            if stream.pos + ty.fixed_size > fixed_end:
+                at_end = True
+            if at_end:
+                if stream.pos == fixed_end:
+                    if ty.is_optional:
+                        result.append(_InlineUnpack(None))
+                    else:
+                        raise MissingField(self, i)
                 else:
-                    raise MissingField(self, i)
-            elif stream.pos + ty.fixed_size > fixed_end:
-                raise BadSize()
+                    raise BadSize()
             else:
                 last = i
                 result.append(ty.embedded_unpack(stream))

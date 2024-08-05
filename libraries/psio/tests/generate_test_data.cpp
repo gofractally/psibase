@@ -226,6 +226,19 @@ struct IntMember
 };
 PSIO_REFLECT(IntMember, v0)
 
+struct EmptyMember
+{
+   Empty v0;
+};
+PSIO_REFLECT(EmptyMember, v0)
+
+struct EmptyTrailing
+{
+   std::optional<std::int32_t> v0;
+   Empty                       v1;
+};
+PSIO_REFLECT(EmptyTrailing, v0, v1)
+
 int main()
 {
    test_builder builder;
@@ -278,6 +291,8 @@ int main()
    builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
        "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
    builder.add<WrongCustom>("WrongCustom", {{3}});
+   builder.add<std::tuple<Empty>>("(Empty)", {{Empty{}}});
+   builder.add<EmptyMember>("EmptyMember", {{Empty{}}});
 
    // Compatible serialization
    builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
@@ -343,6 +358,8 @@ int main()
    builder.add_errors<StringMember>("StringMember", {"04000400000000000000"});
    builder.add_errors<BytesMember>("BytesMember", {"04000400000000000000"});
    builder.add_errors<VecTupleMember>("VecTupleMember", {"04000400000000000000"});
+   builder.add_errors<std::tuple<std::optional<std::int32_t>, Empty>>("(i32?, Empty)", {"0000"});
+   builder.add_errors<EmptyTrailing>("EmptyTrailing", {"0000"});
 
    std::cout << "[";
    to_json(builder, std::cout);
