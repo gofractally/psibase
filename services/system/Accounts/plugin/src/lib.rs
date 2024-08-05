@@ -2,8 +2,6 @@
 mod bindings;
 
 use bindings::accounts::plugin::types as AccountTypes;
-use bindings::common::plugin::server as Server;
-use bindings::common::plugin::types as CommonTypes;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::host::common::{server as Server, types as CommonTypes};
 use psibase::fracpack::Pack;
@@ -47,21 +45,24 @@ impl Accounts for AccountsPlugin {
 
     fn get_account(name: String) -> Result<Option<AccountTypes::Account>, CommonTypes::Error> {
         let query = format!(
-            "query {{ getAccount(account: \"{}\") {{ accountNum }} }}",
+            "query {{ getAccount(account: \"{}\") {{ accountNum, authService, reesourceBalance }} }}",
             name
         );
 
-        let account: AccountTypes::Account = Server::post_graphql_get_json(&query)
+        let account_result = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
             .and_then(|result| {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
-            })
-            .and_then(|response_root: ResponseRoot| {
-                response_root
-                    .data
-                    .getAccount
-                    .ok_or_else(|| InvalidAccountNumber.err(&name))
-            })?;
+            });
+
+        println!("got here 1");
+        let account = account_result.and_then(|response_root: ResponseRoot| {
+            println!("got here 2");
+            response_root
+                .data
+                .getAccount
+                .ok_or_else(|| InvalidAccountNumber.err(&name))
+        })?;
 
         if account.account_num.value != AccountNumber::from_exact(&name).unwrap().value {
             return Err(InvalidAccountNumber.err(&name));

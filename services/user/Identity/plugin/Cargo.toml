@@ -16,8 +16,8 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 # this name must match the package name in world.wit
 # However, it is not authoritative in the operation of the component
-package = "identity:plugin"
+package = "identity:psibase-plugin"
 
 [package.metadata.component.target.dependencies]
-"common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }

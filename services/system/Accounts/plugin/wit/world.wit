@@ -18,6 +18,7 @@ interface types {
 
 interface accounts {
     use host:common/types.{error};
+    use types.{account};
 
     /// Creates a login popup allowing the user to log into an account.
     login: func() -> result<_, error>;

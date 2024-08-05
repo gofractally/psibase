@@ -20,7 +20,7 @@ mod service {
     use crate::stats::update_attestation_stats;
 
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -57,7 +57,7 @@ mod service {
     }
 
     #[table(name = "AttestationStatsTable", index = 1)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/attestee
         #[primary_key]

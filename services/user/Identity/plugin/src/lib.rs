@@ -2,10 +2,10 @@
 mod bindings;
 
 use bindings::accounts::plugin::accounts;
-use bindings::common::plugin::{server as CommonServer, types as CommonTypes};
-use bindings::exports::identity::plugin::api::Guest;
-use bindings::exports::identity::plugin::queries::Guest as QueriesGuest;
+use bindings::exports::identity::plugin::api::Guest as Api;
+use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
+use bindings::host::common::{server as CommonServer, types as CommonTypes};
 use psibase::fracpack::Pack;
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ struct Attestation {
     score: f32,
 }
 
-impl Guest for IdentityPlugin {
+impl Api for IdentityPlugin {
     fn attest_identity_claim(subject: String, score: f32) -> Result<(), CommonTypes::Error> {
         if !(score >= 0.0 && score <= 1.0) {
             return Err(InvalidClaim.err(&format!("{score}")));
@@ -60,7 +60,7 @@ struct IdentitySummaryResponse {
     data: IdentitySummaryResponseData,
 }
 
-impl QueriesGuest for IdentityPlugin {
+impl QueriesApi for IdentityPlugin {
     fn summary(
         subject: String,
     ) -> Result<Option<IdentityTypes::IdentitySummary>, CommonTypes::Error> {
@@ -69,7 +69,7 @@ impl QueriesGuest for IdentityPlugin {
             subject
         );
         let summary_wrapped = serde_json::from_str::<IdentitySummaryResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+            &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
         if summary_wrapped.is_ok() {
             let summary_val = summary_wrapped.unwrap();

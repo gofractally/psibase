@@ -30,28 +30,17 @@ interface types {
 }
 
 interface api {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
 
-    // calls Attestation service's attest() action
-    // The attestor attests (being something of a provider in this scenario), logging an event on chain, with a signature from the issuer (account)
-    // which can always become a verifiable credential for someone else (more of a consumer in this equation)
-    /* identity attestation args:
-        - subject: the username being attested to
-        - confidence: a float representing a percentage confidence.
-            The question an identity attestation is answering:
-            How confident are you that this is a real person and that they are the person they claim to be?
-            Generally, the expectation is for humans to only distinguish 5 useful degrees of confidence:
-            1 I’m sure they're not who they claim to be (0%) --> 0.0
-            2 Very unlikely to be who they claim to be (20%) --> 0.2
-            3 50/50 chance (50%) --> 0.5
-            4 High chance they are who they claim (75%) --> 0.75
-            5 I’m very confident they are who they claim (90%+) --> 0.90
-        */
+    /// Attest to another Account's identity
+    ///  @subject: the username being attested to
+    ///  @score: float, the percentage confidence in attestee's identity.
+    ///   The score answers: How confident are you that this is a real person and that they are the person they claim to be?
     attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
 }
 
 interface queries {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{attestation-graph, identity-summary, identity-attestation};
 
     
@@ -61,9 +50,9 @@ interface queries {
     // get-history: func(subject: string) -> result<list<identity-attestation>, error>;
 }
 
-world identity {
-    import common:plugin/server;
-    import common:plugin/client;
+world psibase-plugin {
+    import host:common/server;
+    import host:common/client;
     import accounts:plugin/accounts;
     export api;
     export queries;

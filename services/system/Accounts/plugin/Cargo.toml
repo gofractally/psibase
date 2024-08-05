@@ -23,8 +23,7 @@ crate-type = ["cdylib"]
 package = "accounts:plugin"
 
 [package.metadata.component.target.dependencies]
-"common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
 
 [package.metadata.component.bindings]
 derives = ["serde::Deserialize"]
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
