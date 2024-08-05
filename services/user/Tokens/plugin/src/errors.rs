@@ -1,4 +1,4 @@
-use crate::bindings::common::plugin::types::{Error, PluginId};
+use crate::bindings::host::common::types::{Error, PluginId};
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {

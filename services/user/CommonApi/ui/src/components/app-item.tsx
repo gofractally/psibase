@@ -16,7 +16,7 @@ export const AppItem = ({ service, description, name }: Props) => {
     )}`;
 
     return (
-        <div className="flex h-[40rem] w-full items-center justify-center  ">
+        <div className="flex h-[16rem] w-full items-center justify-center">
             <a href={url}>
                 <PinContainer title={title.toString()} href={url}>
                     <div className="flex h-[20rem] w-[20rem] basis-full flex-col justify-center  p-4 tracking-tight text-slate-100/50 sm:basis-1/2 ">

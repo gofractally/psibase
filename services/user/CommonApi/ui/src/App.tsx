@@ -5,7 +5,7 @@ const App = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav />
-            <div className="flex flex-col sm:flex-row">
+            <div className="mt-40 grid grid-cols-1 gap-32 lg:grid-cols-2 xl:grid-cols-3">
                 <AppItem
                     name="Tokens"
                     description="Create, burn and send tokens."
@@ -15,6 +15,11 @@ const App = () => {
                     name="Explorer"
                     description="Explore recent transactions and chain history."
                     service="explorer"
+                />
+                <AppItem
+                    name="Chain mail"
+                    description="Send mail between accounts."
+                    service="webmail"
                 />
                 <AppItem
                     name="Doc"

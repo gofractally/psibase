@@ -2,11 +2,11 @@ import { transpile } from "@bytecodealliance/jco";
 import { rollup } from "@rollup/browser";
 import { plugin } from "./index.js";
 
-const wasiShimURL = new URL("./bundled/_preview2-shim.js", import.meta.url);
+const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
 import hostShimCode from "./host-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI, Functions } from "../witExtraction.js";
-import { assert, assertTruthy } from "../utils.js";
+import { assert } from "../utils.js";
 import { ProxyPkg } from "./proxy/proxyPackage.js";
 import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
 
@@ -46,7 +46,7 @@ function getProxiedImports({
     const interfaces = allInterfaces.filter(
         (i) =>
             i.namespace !== "wasi" &&
-            i.namespace !== "common" &&
+            i.namespace !== "host" &&
             i.funcs.length !== 0,
     );
 
@@ -61,6 +61,25 @@ function getProxiedImports({
 
     const imports: ImportDetails[] = packages.map((p) => p.getImportDetails());
     return mergeImports(imports);
+}
+
+// These are shims for wasi interfaces that have not yet been standardized
+// Since the interface is not standard, the shim is not provided by BCA.
+async function getNonstandardWasiImports(): Promise<ImportDetails> {
+    const shimName = "./wasi-keyvalue.js";
+    const nameMapping: Array<[PkgId, FilePath]> = [
+        ["wasi:keyvalue/*", `${shimName}#*`],
+    ];
+    // If the transpiled library contains bizarre inputs, such as:
+    //    import {  as _, } from './shim.js';
+    // It is very likely an issue with an invalid import mapping.
+    const shimUrl = new URL("./shims/wasi-keyvalue.js", import.meta.url);
+    const shimCode = await fetch(shimUrl).then((r) => r.text());
+    const shimFile: [FilePath, Code] = [shimName, shimCode];
+    return {
+        importMap: nameMapping,
+        files: [shimFile],
+    };
 }
 
 async function getWasiImports(): Promise<ImportDetails> {
@@ -109,7 +128,7 @@ async function getWasiImports(): Promise<ImportDetails> {
 async function getHostImports(): Promise<ImportDetails> {
     const hostShimName = "./host-api.js"; // internal name used by bundler
     const host_importMap: Array<[PkgId, FilePath]> = [
-        [`common:plugin/*`, `${hostShimName}#*`],
+        [`host:common/*`, `${hostShimName}#*`],
     ];
     const host_ShimFile: [FilePath, Code] = [hostShimName, hostShimCode];
     return {
@@ -138,15 +157,15 @@ export async function loadPlugin(
             getWasiImports(),
             getHostImports(),
             getProxiedImports(api.importedFuncs),
+            getNonstandardWasiImports(),
         ]),
     );
-    const { app } = pluginHost.getSelf();
-    assertTruthy(app, "Plugin must correspond to a psibase service");
-
-    const pluginModule = await load(wasmBytes, imports, `${app} plugin`);
-
-    const { __setHost } = pluginModule;
-    __setHost(pluginHost);
+    const pluginModule = await load(
+        wasmBytes,
+        imports,
+        `${pluginHost.myServiceAccount()} plugin`,
+    );
+    pluginModule.__setHost(pluginHost);
 
     return pluginModule;
 }

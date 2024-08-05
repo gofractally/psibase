@@ -45,6 +45,15 @@ class Intf {
     };
 }
 
+// Most components import functionality from other components, and not just from the host.
+// Whenever a component imports functionality from another component, it must be composed with
+//   an interface that exports whatever external functionality was imported.
+// Rather than compose the two plugins together directly, we proxy the call to the external component
+//   through the supervisor syncCall interface, which allows the supervisor to maintain a callstack.
+// The callstack then allows then the supervisor to track which app's component is responsible for
+//   calling which other app's component. Relatedly, it ensures the components operate in their own
+//   namespace (which can be used for various purposes like private data storage unreadable by other
+//   components).
 export class ProxyPkg {
     namespace: string;
     id: string;
