@@ -5,15 +5,25 @@ from fracpack import *
 import calendar
 import time
 
-class AccountNumber(u64):
-    @staticmethod
-    def pack(value, stream):
-        u64.pack(name.account_to_number(value), stream)
+class RawAccountNumber(Struct):
+    value: u64
 
-class MethodNumber(u64):
+class AccountNumber(RawAccountNumber):
     @staticmethod
     def pack(value, stream):
-        u64.pack(name.method_to_number(value), stream)
+        RawAccountNumber.pack(RawAccountNumber(name.account_to_number(value)), stream)
+
+class RawMethodNumber(Struct):
+    value: u64
+
+class MethodNumber(Custom(RawMethodNumber, "MethodNumber"), str):
+    def __eq__(self, other):
+        return name.method_to_number(self) == name.method_to_number(other)
+    def __hash__(self):
+        return hash(name.method_to_number(self))
+    @staticmethod
+    def pack(value, stream):
+        RawMethodNumber.pack(RawMethodNumber(name.method_to_number(value)), stream)
 
 class TimePointSec(u32):
     @staticmethod
@@ -77,11 +87,11 @@ class ServiceSchema:
             result = ty.get('result')
             if result is not None:
                 result = load_type(result, self.types)
-            self.actions[name] = FunctionType(params, result)
+            self.actions[MethodNumber(name)] = FunctionType(params, result)
         def get_events(name):
             events = {}
             for (name, ty) in json.get(name, {}).items():
-                events[name] = load_type(result, self.types)
+                events[MethodNumber(name)] = load_type(result, self.types)
             return events
         self.ui = get_events('ui')
         self.history = get_events('history')

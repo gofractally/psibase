@@ -8,7 +8,7 @@ import time
 import calendar
 from collections import namedtuple
 import psibase
-from psibase import Action, Transaction, SignedTransaction, ServiceSchema
+from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
 import fracpack
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
@@ -115,9 +115,9 @@ class Cluster(object):
 
 def _get_producer_claim(producer):
     if isinstance(producer, str):
-        return {'name': producer}
+        return {'name': producer, 'auth':{'service':'', 'rawData': ''}}
     elif isinstance(producer, Node):
-        return {'name': producer.producer}
+        return {'name': producer.producer, 'auth':{'service':'', 'rawData': ''}}
     else:
         return producer
 
@@ -131,6 +131,8 @@ class ChainPackContext:
     def pack_action_data(self, service, method, data):
         if isinstance(type(data), fracpack.TypeBase):
             return fracpack.pack(data, custom=self._custom)
+        if isinstance(method, str):
+            method = MethodNumber(method)
         return fracpack.pack(data, self.get_schema(service).actions[method].params)
     def get_schema(self, service):
         if service not in self._schemas:

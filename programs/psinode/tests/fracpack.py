@@ -598,7 +598,8 @@ class Object(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
         stream.write_u16(sum(ty.fixed_size for (name, ty) in present_members))
         repack = []
         for (name, ty) in present_members:
-            repack.append(ty.embedded_fixed_pack(value.get(name), stream))
+            field = value.get(name) if ty.is_optional else value[name]
+            repack.append(ty.embedded_fixed_pack(field, stream))
         for r in repack:
             r.pack()
     def match(self, other, context):
@@ -957,9 +958,15 @@ class Custom(TypeBase):
     def pack(self, value, stream):
         self.resolve(stream).pack(value, stream)
     def embedded_unpack(self, stream):
-        return self.resolve(stream).embedded_unpack(stream)
+        resolved = self.resolve(stream)
+        if resolved is self:
+            resolved = super()
+        return resolved.embedded_unpack(stream)
     def embedded_fixed_pack(self, value, stream):
-        return self.resolve(stream).embedded_fixed_pack(value, stream)
+        resolved = self.resolve(stream)
+        if resolved is self:
+            resolved = super()
+        return resolved.embedded_fixed_pack(value, stream)
     def get_canonical(self):
         return self.type.get_canonical()
     @property
