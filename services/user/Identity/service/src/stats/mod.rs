@@ -6,7 +6,7 @@ fn is_high_confidence_score(score: u8) -> bool {
     score > 75
 }
 
-fn remove_attestation_from_stats(
+fn remove_existing_attestation_from_stats(
     stats_rec: &mut AttestationStats,
     existing_attest_rec: Attestation,
 ) -> &mut AttestationStats {
@@ -53,7 +53,7 @@ pub fn update_attestation_stats(
     // 1) ensure the table has a default state (handled by Default impl)
     // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
     if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
-        remove_attestation_from_stats(&mut stats_rec, existing_attestation.unwrap());
+        remove_existing_attestation_from_stats(&mut stats_rec, existing_attestation.unwrap());
     }
 
     // 3) update stats to include this attestation

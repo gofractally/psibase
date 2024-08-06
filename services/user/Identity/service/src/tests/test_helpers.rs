@@ -22,8 +22,6 @@ pub fn test_attest(
 #[derive(Deserialize, Debug, Clone)]
 struct Attestation {
     attester: String,
-    subject: String,
-    value: u8,
 }
 
 impl PartialEq for Attestation {
@@ -59,7 +57,7 @@ pub fn expect_attestation_stats(chain: &psibase::Chain, expected_results: &serde
     let reply: Value = chain
         .graphql(
             SERVICE,
-            r#"query { allAttestationStats { subject, uniqueAttesters, percHighConf } }"#,
+            r#"query { allAttestationStats { subject, uniqueAttesters, numHighConfAttestations } }"#,
         )
         .unwrap();
     assert_eq!(
