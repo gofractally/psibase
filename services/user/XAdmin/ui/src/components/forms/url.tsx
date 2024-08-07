@@ -45,7 +45,6 @@ export function UrlForm({ onSubmit: handleSubmit, existingValues }: Props) {
             } else if (typeof e == "string") {
                 form.setError("root", { message: e });
             } else {
-                console.warn("Unrecognised error of", e);
                 form.setError("root", { message });
             }
         }

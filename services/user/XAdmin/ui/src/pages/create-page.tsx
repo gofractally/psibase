@@ -1,11 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
-import {
-    ChevronRight,
-    ChevronLeft,
-    ChevronLast,
-    ChevronFirst,
-} from "lucide-react";
+
 import { SetupWrapper } from "./setup-wrapper";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UseFormReturn, useForm } from "react-hook-form";
@@ -45,77 +40,9 @@ import { useConfig } from "../hooks/useConfig";
 import { useToast } from "@/components/ui/use-toast";
 
 import { useNavigate } from "react-router-dom";
-
-const useStepper = (
-    numberOfSteps: number,
-    formsOrFunctions: (UseFormReturn<any> | string)[]
-) => {
-    const [currentStep, setStep] = useState(1);
-    const canNext = currentStep < numberOfSteps;
-    const canPrev = currentStep > 1;
-
-    const next = async () => {
-        if (canNext) {
-            const currentChecker = formsOrFunctions[currentStep - 1];
-            const isPassable =
-                typeof currentChecker == "string"
-                    ? !!currentChecker
-                    : await currentChecker.trigger();
-            if (isPassable) {
-                setStep((step) => (canNext ? step + 1 : step));
-            }
-        }
-    };
-
-    const previous = () => {
-        setStep((step) => (canPrev ? step - 1 : step));
-    };
-
-    return {
-        currentStep,
-        maxSteps: numberOfSteps,
-        next,
-        previous,
-        canPrev,
-        canNext,
-    };
-};
-
-interface PrevNextProps {
-    previous: () => void;
-    next: () => void;
-    canPrev: boolean;
-    canNext: boolean;
-}
-
-const PrevNextButtons = ({
-    canNext,
-    canPrev,
-    next,
-    previous,
-}: PrevNextProps) => (
-    <div className="flex w-full justify-between">
-        <Button
-            variant="ghost"
-            onClick={() => {
-                previous();
-            }}
-            disabled={!canPrev}
-        >
-            {canPrev ? <ChevronLeft /> : <ChevronFirst />}
-        </Button>
-
-        <Button
-            variant="ghost"
-            onClick={() => {
-                next();
-            }}
-            disabled={!canNext}
-        >
-            {canNext ? <ChevronRight /> : <ChevronLast />}
-        </Button>
-    </div>
-);
+import { useStepper } from "../hooks/useStepper";
+import { PrevNextButtons } from "../components/PrevNextButtons";
+import { calculateIndex } from "../lib/calculateIndex";
 
 const BlockProducerSchema = z.object({
     name: z.string().min(2),
@@ -140,15 +67,6 @@ const Card = ({ label, value }: Props) => (
         {value}
     </div>
 );
-
-const calculateIndex = (
-    packagesLength: number,
-    currentTx: number,
-    totalTransactions: number
-) => {
-    const percentProgressed = currentTx / totalTransactions;
-    return Math.floor(percentProgressed * (packagesLength - 1));
-};
 
 const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
     RequestUpdateSchema.safeParse(data).success;

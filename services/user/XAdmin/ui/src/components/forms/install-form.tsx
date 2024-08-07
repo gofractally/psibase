@@ -36,7 +36,6 @@ export const InstallForm = ({
         nameChange = actualProducer;
     }
 
-    console.log({ packages });
     return (
         <>
             {nameChange && (

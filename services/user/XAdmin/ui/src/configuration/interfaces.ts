@@ -81,7 +81,7 @@ export const psinodeConfigSchema = z
                 address: z.string().optional(),
             })
             .array(),
-        http_timeout: z.number().nullable().optional(),
+        http_timeout: z.string().nullable().optional(),
         listen: ListenProperty,
         services: z
             .object({

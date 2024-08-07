@@ -6,12 +6,14 @@ export const recursiveFetch = async <T>(
     msDelay = 800,
     maxAttempts = 5
 ): Promise<T> => {
-    if (attempt >= 5) {
-        throw new Error(`Failed to success within attempt range`);
+    if (attempt >= maxAttempts) {
+        throw new Error(
+            `Failed to success within attempt range of ${maxAttempts}`
+        );
     } else {
         const res = await prom();
         if (res === false) {
-            await wait(800);
+            await wait(msDelay);
             return recursiveFetch(prom, attempt + 1, msDelay, maxAttempts);
         } else {
             return res;
