@@ -27,7 +27,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 mod cli;
-use cli::config::{handle_cli_config_cmd, read_host_config_url, ConfigCommand};
+use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
@@ -1167,7 +1167,7 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
     if let Ok(api_url) = Url::parse(api_str) {
         Ok(api_url)
     } else {
-        let host_url = read_host_config_url(api_str)?;
+        let host_url = read_host_url(api_str)?;
         Ok(Url::parse(&host_url)?)
     }
 }
