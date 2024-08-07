@@ -37,6 +37,19 @@ pub enum HostSubCommand {
     List,
 }
 
+pub const PSIBASE_CONFIG_NOT_FOUND_ERR: &str = r#"No hosts config found in ~/.psibase.toml
+    
+Make sure you have the psibase config file setup properly. 
+
+You can do that by running `psibase config host dev=http://my-dev-env.example.com`
+
+Or manually editing the ~/.psibase.toml:
+
+[hosts]
+prod = "https://prod.example.com"
+dev = "https://dev.example.com"
+qa1 = "https://qa1.example.com""#;
+
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct PsibaseConfig {
     pub hosts: HashMap<String, String>,
@@ -44,23 +57,34 @@ pub struct PsibaseConfig {
 
 pub fn handle_cli_config_cmd(config: &ConfigCommand) -> Result<(), anyhow::Error> {
     match config {
-        ConfigCommand::Host(host_opts) => handle_host_subcommand(host_opts),
-        ConfigCommand::Read => {
-            println!("{}", get_psibase_config_str()?);
-            Ok(())
-        }
+        ConfigCommand::Host(host_opts) => handle_host_subcommand(host_opts)?,
+        ConfigCommand::Read => println!("{}", get_psibase_config_str()?),
     }
+    Ok(())
+}
+
+pub fn read_host_config_url(host_key: &str) -> Result<String, Error> {
+    let psibase_config = read_psibase_config()?;
+    psibase_config.hosts.get(host_key).cloned().ok_or_else(|| {
+        let available_hosts = psibase_config
+            .hosts
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow!(
+            "Host {} not found in ~/.psibase.toml; Available hosts: {}",
+            host_key,
+            available_hosts
+        )
+    })
 }
 
 fn handle_host_subcommand(host_opts: &HostSubCommand) -> Result<(), anyhow::Error> {
     match host_opts {
         HostSubCommand::Set { key, url } => setup_config_host(key, url),
         HostSubCommand::Delete { key } => remove_config_host(key),
-        HostSubCommand::List => {
-            let config = read_psibase_config().expect("No hosts config found in ~/.psibase.toml");
-            println!("{:?}", config.hosts);
-            Ok(())
-        }
+        HostSubCommand::List => list_config_hosts(),
     }
 }
 
@@ -71,73 +95,48 @@ fn psibase_config_path() -> Result<PathBuf, Error> {
     Ok(path)
 }
 
-pub fn get_psibase_config_str() -> Result<String, Error> {
+fn get_psibase_config_str() -> Result<String, Error> {
     let path = psibase_config_path()?;
-    let config_str = std::fs::read_to_string(&path)?;
-    Ok(config_str)
+    std::fs::read_to_string(&path).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => anyhow!(PSIBASE_CONFIG_NOT_FOUND_ERR),
+        _ => e.into(),
+    })
 }
 
-pub fn parse_psibase_config_str(config_str: &str) -> Result<PsibaseConfig, Error> {
-    toml::from_str::<PsibaseConfig>(config_str).map_err(Error::from)
+fn read_psibase_config() -> Result<PsibaseConfig, Error> {
+    let config_str = get_psibase_config_str()?;
+    toml::from_str::<PsibaseConfig>(&config_str).map_err(Error::from)
 }
 
-pub fn read_psibase_config() -> Option<PsibaseConfig> {
-    get_psibase_config_str()
-        .ok()
-        .map(|cfg| parse_psibase_config_str(&cfg).ok())
-        .flatten()
-}
-
-pub fn write_psibase_config(config: PsibaseConfig) -> Result<(), Error> {
+fn write_psibase_config(config: PsibaseConfig) -> Result<(), Error> {
     let path = psibase_config_path()?;
     let config_str = toml::to_string(&config)?;
     std::fs::write(path, config_str)?;
     Ok(())
 }
 
-pub fn read_host_config_url(host_key: &str) -> Result<String, Error> {
-    let psibase_config = read_psibase_config().expect(
-        r#"No hosts config found in ~/.psibase.toml
-    
-Make sure you have the psibase config file setup properly. 
-
-You can do that by running `cargo psibase config host dev=http://my-dev-env.example.com`
-
-Or manually editing the ~/.psibase.toml:
-
-[hosts]
-prod = "https://prod.example.com"
-dev = "https://dev.example.com"
-qa1 = "https://qa1.example.com""#,
-    );
-
-    match psibase_config.hosts.get(host_key) {
-        Some(host_url) => Ok(host_url.to_string()),
-        None => Err(anyhow!(
-            "Host {} not found in ~/.psibase.toml; Available hosts: {}",
-            host_key,
-            psibase_config
-                .hosts
-                .keys()
-                .map(|k| k.to_string())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )),
-    }
+fn list_config_hosts() -> Result<(), Error> {
+    let config = get_psibase_config_str()?;
+    let toml_value = toml::from_str::<toml::Value>(&config)?;
+    println!("{}", toml::to_string_pretty(&toml_value)?);
+    Ok(())
 }
 
-pub fn setup_config_host(key: &str, url: &Url) -> Result<(), Error> {
+fn setup_config_host(key: &str, url: &Url) -> Result<(), Error> {
     let mut config = read_psibase_config().unwrap_or_default();
     config.hosts.insert(key.to_string(), url.to_string());
-    write_psibase_config(config)
+    write_psibase_config(config)?;
+    println!("Host {} set successfully", key);
+    Ok(())
 }
 
-pub fn remove_config_host(key: &str) -> Result<(), Error> {
-    let mut config = read_psibase_config().expect("No hosts config found in ~/.psibase.toml");
-    if config.hosts.get(key).is_none() {
-        return Err(anyhow!("Host {} not found in ~/.psibase.toml", key));
+fn remove_config_host(key: &str) -> Result<(), Error> {
+    let mut config = read_psibase_config()?;
+    if config.hosts.remove(key).is_some() {
+        write_psibase_config(config)?;
+        println!("Host {} removed successfully", key);
+        Ok(())
     } else {
-        config.hosts.remove(key);
-        write_psibase_config(config)
+        Err(anyhow!("Host {} not found in ~/.psibase.toml", key))
     }
 }

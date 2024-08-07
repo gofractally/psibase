@@ -553,22 +553,7 @@ async fn main2() -> Result<(), Error> {
         }
         Command::Deploy(opts) => {
             deploy(&args, opts, root).await?;
-        } // Command::Config(_opts) => {
-          //     let original_args: Vec<String> = if is_cargo_subcommand {
-          //         env::args().skip(3).collect()
-          //     } else {
-          //         env::args().skip(2).collect()
-          //     };
-          //     let msg = format!("Failed running: psibase {}", original_args.join(" "));
-          //     if !std::process::Command::new("psibase")
-          //         .args(&original_args)
-          //         .status()
-          //         .context(msg.clone())?
-          //         .success()
-          //     {
-          //         Err(anyhow! {msg})?;
-          //     }
-          // }
+        }
     };
 
     Ok(())
