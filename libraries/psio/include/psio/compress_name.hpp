@@ -207,7 +207,7 @@ namespace psio
          uint8_t               m_last_byte = char_to_symbol[0];
       };
 
-      inline std::uint64_t seahash(std::string_view input)
+      inline constexpr std::uint64_t seahash(std::string_view input)
       {
          auto g = [](std::uint64_t x)
          {
