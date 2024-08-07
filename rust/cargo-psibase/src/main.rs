@@ -14,15 +14,11 @@ use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
-use url::Url;
 use walrus::Module;
 use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
-
-mod config;
-use config::{read_host_config_url, setup_config_host};
 
 /// The version of the cargo-psibase crate at compile time
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -68,9 +64,14 @@ struct Args {
 
 #[derive(Parser, Debug)]
 struct DeployCommand {
-    /// API Endpoint
-    #[clap(short = 'a', long, value_name = "URL", env = "PSINODE_URL")]
-    api: Option<Url>,
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
+    #[clap(
+        short = 'a',
+        long,
+        value_name = "URL_OR_HOST_ALIAS",
+        env = "PSINODE_URL"
+    )]
+    api: Option<String>,
 
     /// Account to deploy service on
     account: Option<ExactAccountNumber>,
@@ -94,11 +95,6 @@ struct DeployCommand {
     /// Sender to use when creating the account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
     sender: ExactAccountNumber,
-
-    /// Defines which psibase host environment defined in the config file ~/.psibase.toml
-    /// to be deployed. Example: dev, prod. (See the config command for more details.)
-    #[clap(long, value_name = "HOST")]
-    host: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -106,18 +102,6 @@ struct TestCommand {
     /// Path to psitest executable
     #[clap(long, default_value = "psitest")]
     psitest: PathBuf,
-}
-
-#[derive(Subcommand, Debug)]
-enum ConfigCommand {
-    /// Setup a host
-    Host {
-        /// Host key. Example: dev, prod, qa1, uat, etc.
-        key: String,
-
-        /// Host URL. Example: https://prod.my-psibase-app.io
-        url: Url,
-    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -130,10 +114,6 @@ enum Command {
 
     /// Build and deploy a service
     Deploy(DeployCommand),
-
-    /// Setup the psibase local config file
-    #[command(subcommand)]
-    Config(ConfigCommand),
 }
 
 fn pretty(label: &str, message: &str) {
@@ -504,7 +484,10 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
     };
 
     let mut args = vec!["--suppress-ok".into()];
-    pass_api_arg(opts, &mut args)?;
+    if let Some(api) = &opts.api {
+        args.push("--api".into());
+        args.push(api.to_string());
+    }
     args.push("deploy".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
@@ -531,22 +514,6 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
 
     pretty("Deployed", &account);
 
-    Ok(())
-}
-
-fn pass_api_arg(opts: &DeployCommand, psibase_args: &mut Vec<String>) -> Result<(), Error> {
-    if let Some(api) = &opts.api {
-        psibase_args.push("--api".into());
-        psibase_args.push(api.to_string());
-    } else if let Some(host_opt) = &opts.host {
-        let host_url = read_host_config_url(host_opt)?;
-        pretty(
-            &format!("Host {}", host_opt),
-            &format!("deploying to {}", host_url),
-        );
-        psibase_args.push("--api".into());
-        psibase_args.push(host_url);
-    }
     Ok(())
 }
 
@@ -586,12 +553,22 @@ async fn main2() -> Result<(), Error> {
         }
         Command::Deploy(opts) => {
             deploy(&args, opts, root).await?;
-        }
-        Command::Config(opts) => match opts {
-            ConfigCommand::Host { key, url } => {
-                setup_config_host(key, url)?;
-            }
-        },
+        } // Command::Config(_opts) => {
+          //     let original_args: Vec<String> = if is_cargo_subcommand {
+          //         env::args().skip(3).collect()
+          //     } else {
+          //         env::args().skip(2).collect()
+          //     };
+          //     let msg = format!("Failed running: psibase {}", original_args.join(" "));
+          //     if !std::process::Command::new("psibase")
+          //         .args(&original_args)
+          //         .status()
+          //         .context(msg.clone())?
+          //         .success()
+          //     {
+          //         Err(anyhow! {msg})?;
+          //     }
+          // }
     };
 
     Ok(())
