@@ -7,7 +7,7 @@ use serde_json::json;
 pub fn test_attest(
     chain: &psibase::Chain,
     attester: AccountNumber,
-    subject: String,
+    subject: AccountNumber,
     conf: u8,
 ) -> Result<(), psibase::Error> {
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);

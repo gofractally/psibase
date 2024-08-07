@@ -14,7 +14,10 @@ mod service {
 
     use async_graphql::*;
 
-    use psibase::{services::transact, AccountNumber, TimePointSec, *};
+    use psibase::{
+        services::accounts::Wrapper as AccountsSvc, services::transact, AccountNumber,
+        TimePointSec, *,
+    };
     use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
@@ -101,32 +104,33 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    pub fn attest(subject: String, value: u8) {
+    pub fn attest(subject: AccountNumber, value: u8) {
         check(value <= 100, "bad confidence score");
         let attester = get_sender();
         let issued = transact::Wrapper::call().currentBlock().time;
 
         let attestation_table = AttestationTable::new();
 
-        let subj_acct = match AccountNumber::from_str(&subject.clone()) {
-            Ok(subject_acct) => subject_acct,
-            Err(e) => psibase::abort_message(&format!("{}", e)),
-        };
+        // verify subject is valid chain account
+        psibase::check(
+            AccountsSvc::call().exists(subject),
+            &format!("subject account {} doesn't exist", subject),
+        );
 
-        let existing_rec = attestation_table.get_index_pk().get(&(subj_acct, attester));
+        let existing_rec = attestation_table.get_index_pk().get(&(subject, attester));
 
         // upsert attestation
         attestation_table
             .put(&Attestation {
                 attester,
                 issued,
-                subject: subj_acct,
+                subject,
                 value,
             })
             .unwrap();
 
         // Update Attestation stats
-        update_attestation_stats(existing_rec, subj_acct, value, issued);
+        update_attestation_stats(existing_rec, subject, value, issued);
 
         Wrapper::emit()
             .history()
@@ -137,7 +141,7 @@ mod service {
     pub fn attest_identity_claim(
         id: AccountNumber,
         issued: TimePointSec,
-        subject: String,
+        subject: AccountNumber,
         value: u8,
     ) {
     }
