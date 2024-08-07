@@ -309,12 +309,31 @@ class Model:
         return Prob(cumulative_frequency[c], cumulative_frequency[c + 1],
                     cumulative_frequency[self.model_width])
 
+    def getChar(self, scaled_value):
+        cumulative_frequency = self.model_cf[self.m_last_byte]
 
-    def compress(self, input):
+        for i in range(self.model_width):
+            if scaled_value < cumulative_frequency[i + 1]:
+                c      = i
+                p = Prob(cumulative_frequency[i], cumulative_frequency[i + 1],
+                         cumulative_frequency[self.model_width])
+                if p.count == 0:
+                    c = char_to_symbol[0]
+                    self.m_last_byte = c
+                    return (Prob(0, 1, 1), c)
+                self.m_last_byte = c
+                return (p, c)
+        return (Prob(0, 1, 1), char_to_symbol[0])
+
+    def getCount(self):
+        return self.model_cf[self.m_last_byte][self.model_width];
+
+    def compress(self, input, out=None):
         for i in input:
             if self.char_to_symbol[ord(i)] == 0:
                 raise InvalidName()
-        out = BitStream()
+        if out is None:
+            out = BitStream()
 
         def getBytes():
             for ch in input:
@@ -374,7 +393,61 @@ class Model:
         else:
             out.put_bit_plus_pending(1);
 
-        return out.finish()
+        return out
+
+    def uncompress(self, input):
+        if input == 0:
+            return ""
+
+        stream = BitInputStream(input)
+        out = ""
+
+        high  = MAX_CODE;
+        low   = 0;
+        value = 0;
+        for i in range(code_value_bits):
+            value <<= 1
+            value += stream.get_bit()
+        while not stream.done():
+            range_ = high - low + 1;
+
+            if range_ == 0:
+                raise Exception("RUNTIME LOGIC ERROR")
+
+            scaled_value = ((value - low + 1) * self.getCount() - 1) // range_;
+            (p, c) = self.getChar(scaled_value);
+            if c == 0:
+                break
+
+            out += self.symbol_to_char[c]
+
+            if p.count == 0:
+                raise Exception("RUNTIME LOGIC ERROR")
+
+            high = low + (range_ * p.high) // p.count - 1;
+            low  = low + (range_ * p.low) // p.count;
+
+            while not stream.done():
+                if high < ONE_HALF:
+                    # do nothing, bit is a zero
+                    pass
+                elif low >= ONE_HALF:
+                    value -= ONE_HALF  # subtract one half from all three code values
+                    low -= ONE_HALF
+                    high -= ONE_HALF
+                elif low >= ONE_FOURTH and high < THREE_FOURTHS:
+                    value -= ONE_FOURTH
+                    low -= ONE_FOURTH
+                    high -= ONE_FOURTH
+                else:
+                    break
+                low <<= 1
+                high <<= 1
+                high += 1
+                value <<= 1
+                value += stream.get_bit()
+
+        return out
 
 class BitStream:
     def __init__(self):
@@ -410,8 +483,63 @@ class BitStream:
                 self.m_output = 0
         return self.m_output
 
+    def too_long(self):
+        raise InvalidName()
+
     def done(self):
         return self.m_bit >= 64
+
+def seahash(input):
+    input = input.encode()
+    def h(x):
+        return x ^ ((x >> 32) >> (x >> 60))
+    def j(x):
+        p = 0x6eed0e9da4d94a4f
+        return (p*x) & ((1 << 64) - 1)
+    def g(x):
+        return j(h(j(x)))
+    a = 0x16f11fe89b0d677c
+    b = 0xb480a793d8e6c86c
+    c = 0x6fe2e5aaf078ebc9
+    d = 0x14f994a4c5259381
+    for i in range(0, len(input), 8):
+        n = int.from_bytes(input[i:i+8], 'little')
+        (a, b, c, d) = (b, c, d, g(a ^ n))
+    return g(a ^ b ^ c ^ d ^ len(input))
+
+def city64_seed(s, seed):
+    global city64_seed
+    from cityhash import CityHash64WithSeed as city64_seed
+    return city64_seed(s, seed)
+
+class MethodBitStream(BitStream):
+    def too_long(self):
+        return self
+    def finish(self, input):
+        if not self.done():
+            result = super().finish()
+            if result != 0:
+                return result
+        return seahash(input) | (1 << 56)
+
+class BitInputStream:
+    def __init__(self, input):
+        self.input = input
+        self.current_byte = 0;
+        self.last_mask    = 1;
+        self.not_eof = 64 + 16;  # allow extra bits to be brought in as helps improve accuracy
+    def get_bit(self):
+        if self.last_mask == 1:
+            self.current_byte = self.input & 0xff
+            self.input >>= 8
+            self.last_mask = 0x80
+        else:
+            self.last_mask >>= 1
+            self.not_eof -= 1
+        return 1 if (self.current_byte & self.last_mask) != 0 else 0
+
+    def done(self):
+        return self.not_eof == 0
 
 class InvalidName(Exception):
     def __init__():
@@ -428,7 +556,15 @@ def account_to_number(m_input):
         raise InvalidName()
 
     model = Model(symbol_to_char, model_cf)
-    return model.compress(m_input)
+    return model.compress(m_input).finish()
+
+def number_to_account(input):
+    model = Model(symbol_to_char, model_cf)
+    return model.uncompress(input)
+
+
+def is_hash_name(h):
+    return (h & (0x01 << (64 - 8))) > 0
 
 def method_to_number(input):
     if len(input) == 0:
@@ -449,4 +585,18 @@ def method_to_number(input):
         return output
 
     # TODO: handle hash name
-    return model.compress(input)
+    return model.compress(input, MethodBitStream()).finish(input)
+
+def number_to_method(input):
+    model = Model(method_symbol_to_char, method_model_cf)
+    #if (input & (uint64_t(0x01) << (64 - 8)))
+    if is_hash_name(input):
+        s = "#";
+        # then it is a hash
+        r = input;
+        for i in range(16):
+            s += model.symbol_to_char[(r & 0x0f) + 1]
+            r >>= 4
+        return s
+
+    return model.uncompress(input)
