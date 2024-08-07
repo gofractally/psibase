@@ -48,8 +48,16 @@ export const useSelectedRows = (
             if (!pack) throw new Error("Failed to find package");
             if (change.isAddition) {
                 const newSelected = Object.keys(incomingRows);
-                const dependenciesOfPackage = pack.depends.map(getId);
-                const final = [...newSelected, ...dependenciesOfPackage]
+                const dependenciesOfPackage = pack.depends.map(
+                    (pack) => pack.name
+                );
+                const deps = allPackages
+                    .filter((pack) =>
+                        dependenciesOfPackage.some((p) => p == pack.name)
+                    )
+                    .map(getId);
+
+                const final = [...newSelected, ...deps]
                     .filter((item, index, arr) => arr.indexOf(item) == index)
                     .reduce<RowSelectionState>(
                         (acc, item) => ({ ...acc, [item]: true }),
@@ -89,18 +97,17 @@ export const useSelectedRows = (
 
     useEffect(() => {
         if (skipEffect.current) {
-            skipEffect.current = false;    
+            skipEffect.current = false;
         } else {
             check();
         }
     }, [incomingRows]);
 
-
     const overWriteRows = (rows: RowSelectionState) => {
         skipEffect.current = true;
         setOutgoingRows(rows);
         setIncomingRows(rows);
-    }
+    };
 
     return [outgoingRows, setIncomingRows, overWriteRows] as const;
 };

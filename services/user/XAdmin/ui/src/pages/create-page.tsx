@@ -130,7 +130,7 @@ export const CreatePage = () => {
 
     useEffect(() => {
         if (currentStep == 3) {
-            const state = suggestedSelection.selectedPackages.reduce(
+            const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
             );

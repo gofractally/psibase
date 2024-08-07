@@ -1,34 +1,4 @@
 import { PackageInfo } from "@/types";
-import partition from "lodash.partition";
-
-const knownNames = [
-    "Accounts",
-    "AuthAny",
-    "AuthDelegate",
-    "AuthK1",
-    "AuthSig",
-    "CommonApi",
-    "CpuLimit",
-    "Default",
-    "Docs",
-    "Events",
-    "Explorer",
-    "Fractal",
-    "HttpServer",
-    "Invite",
-    "Minimal",
-    "Nft",
-    "Nop",
-    "Packages",
-    "Producers",
-    "SetCode",
-    "Sites",
-    "Supervisor",
-    "Symbol",
-    "TokenUsers",
-    "Tokens",
-    "Transact",
-];
 
 interface InstallationOptions {
     dev: boolean;
@@ -37,26 +7,22 @@ interface InstallationOptions {
 export const getDefaultSelectedPackages = (
     options: InstallationOptions,
     packages: PackageInfo[]
-): {
-    selectedPackages: PackageInfo[];
-    unknownPackages: PackageInfo[];
-} => {
+): PackageInfo[] => {
     const { dev } = options;
+    if (packages.length == 0) return [];
 
-    const [knownPackages, unknownPackages] = partition(packages, (pack) =>
-        knownNames.includes(pack.name)
+    const relevantPackageName = dev ? "DevDefault" : "ProdDefault";
+    const relevantPackage = packages.find(
+        (pack) => pack.name === relevantPackageName
     );
+    if (!relevantPackage)
+        throw new Error(
+            `Failed to find relevant package for ${relevantPackageName}`
+        );
 
-    const selectedNames = dev
-        ? knownNames
-        : knownNames
-              .filter((name) => name !== "Nop")
-              .filter((name) => name !== "TokenUsers");
-
-    return {
-        selectedPackages: knownPackages.filter((pack) =>
-            selectedNames.includes(pack.name)
-        ),
-        unknownPackages,
-    };
+    return packages.filter(
+        (pack) =>
+            relevantPackage.depends.some((p) => p.name === pack.name) ||
+            relevantPackage.name == pack.name
+    );
 };
