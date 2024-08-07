@@ -154,6 +154,10 @@ mod tests {
             MethodNumber::from_str("natasharomanoff").unwrap(),
             MethodNumber::new(6905860632893337981)
         );
+        assert_eq!(
+            MethodNumber::from_str("abcdefghijklmnopqrstuvwxyz").unwrap(),
+            MethodNumber::new(2393445670689189432)
+        );
     }
 
     #[test]
@@ -189,5 +193,16 @@ mod tests {
 
         let name = MethodNumber::from(0);
         assert_eq!(name.to_string(), "");
+    }
+
+    #[test]
+    fn case_sensitivity() {
+        // regular compression ignores case
+        let name = MethodNumber::from_str("A").unwrap();
+        assert_eq!(name.value, 32783);
+
+        // but weirdly, hash names are case sensitive
+        let name = MethodNumber::from_str("NATASHAROMANOFF").unwrap();
+        assert_eq!(name.value, 679355919866582572);
     }
 }

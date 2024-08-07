@@ -345,7 +345,7 @@ class Model:
 
         for c in getBytes():
             if out.done():
-                raise InvalidName()
+                return out.too_long()
 
             p     = self.getProbability(c)
             range = high - low + 1
@@ -571,9 +571,9 @@ def method_to_number(input):
         return 0;
 
     model = Model(method_symbol_to_char, method_model_cf)
-    input = input.lower()
 
     if input[0] == '#':
+        input = input.lower()
         if len(input) != 17:
             raise InvalidName()
 
@@ -585,7 +585,7 @@ def method_to_number(input):
         return output
 
     # TODO: handle hash name
-    return model.compress(input, MethodBitStream()).finish(input)
+    return model.compress(input.lower(), MethodBitStream()).finish(input)
 
 def number_to_method(input):
     model = Model(method_symbol_to_char, method_model_cf)

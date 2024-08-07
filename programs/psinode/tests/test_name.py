@@ -33,6 +33,8 @@ class TestName(unittest.TestCase):
         self.assertEqual(name.method_to_number("natasharomanoff"), 6905860632893337981)
         self.assertEqual(name.method_to_number("#psaoryoiluhlrpyn"), 6905860632893337981)
         self.assertEqual(name.number_to_method(6905860632893337981), "#psaoryoiluhlrpyn")
+        self.assertEqual(name.method_to_number("NATASHAROMANOFF"), 679355919866582572)
+        self.assertEqual(name.method_to_number("abcdefghijklmnopqrstuvwxyz"), 2393445670689189432)
 
 if __name__ == '__main__':
     unittest.main()
