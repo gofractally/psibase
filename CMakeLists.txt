@@ -143,6 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
@@ -311,6 +312,7 @@ add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wa
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
+add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -651,8 +653,19 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE supervisor
-    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Supervisor/ui/dist/* /
     DEPENDS ${Supervisor_js_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
+    NAME SupervisorTests
+    DESCRIPTION "Plugin functions for testing Supervisor functionality"
+    VERSION ${PSIBASE_VERSION}
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    SERVICE sup-test
+        DATA ${COMPONENT_BIN_DIR}/${TestsPlugin_OUTPUT_FILE} /test.wasm
+    DEPENDS ${TestsPlugin_DEP}
 )
 
 psibase_package(
@@ -782,6 +795,7 @@ install(
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Supervisor.psi
+          ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi

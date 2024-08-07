@@ -28,7 +28,7 @@ interface types {
 /// Methods related to psibase smart authorization
 /// Every auth service must export this interface
 interface smart-auth {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{claim, proof};
 
     /// Gets the claim needed for this user to satisfy the authorization check
@@ -44,7 +44,7 @@ interface smart-auth {
 
 /// Methods related to key management
 interface keyvault {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{keypair};
 
     /// Generates a new keypair managed by this auth plugin.
@@ -57,7 +57,7 @@ interface keyvault {
 }
 
 interface actions {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
 
     /// Updates the key used by the current user to the specified public key
     /// The specified public key should be the PEM representation of the public key
@@ -66,7 +66,7 @@ interface actions {
 
 world psibase-plugin {
     import accounts:plugin/accounts;
-    import common:plugin/server;
+    import host:common/server;
 
     export smart-auth;
     export keyvault;

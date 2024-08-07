@@ -31,6 +31,10 @@ export interface OriginationData {
     origin: string;
 }
 
+export interface QualifiedOriginationData extends OriginationData {
+    app: string;
+}
+
 export const assert = (condition: boolean, errorMessage: string): void => {
     if (!condition) throw new Error(errorMessage);
 };

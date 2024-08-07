@@ -1,11 +1,11 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::common::plugin::{server, types as CommonTypes};
 use bindings::exports::tokens::plugin::types as Wit;
 use bindings::exports::tokens::plugin::{
     intf::Guest as Intf, queries::Guest as Queries, transfer::Guest as Transfer,
 };
+use bindings::host::common::{server, types as CommonTypes};
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
 use query::token_detail::fetch_token;
