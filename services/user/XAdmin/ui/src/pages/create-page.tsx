@@ -229,18 +229,24 @@ export const CreatePage = () => {
                     <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
                     {currentStep == 1 && (
                         <div>
+                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
+                                Boot template
+                            </h1>{" "}
                             <ChainTypeForm form={chainTypeForm} />
                         </div>
                     )}
                     {currentStep == 2 && (
                         <div>
+                            <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
+                                Name yourself
+                            </h1>{" "}
                             <BlockProducerForm form={blockProducerForm} />
                         </div>
                     )}
                     {currentStep == 3 && (
                         <div className="px-4">
                             <div className="grid grid-cols-2 py-6">
-                                <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
+                                <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                     Installation summary
                                 </h1>{" "}
                                 <div className="flex flex-row-reverse ">

@@ -5,7 +5,7 @@ import { queryClient } from "../../main";
 import { queryKeys } from "@/lib/queryKeys";
 
 interface Props {
-    onConnection: (endpoint: string) => void;
+    onConnection: () => void;
 }
 
 export const SmartConnectForm = ({ onConnection }: Props) => {
@@ -15,14 +15,13 @@ export const SmartConnectForm = ({ onConnection }: Props) => {
     const onSubmit = async (data: Schema) => {
         const res = await connect(data);
         queryClient.invalidateQueries({ queryKey: queryKeys.config });
-        queryClient.setQueryData(queryKeys.peers, () => res.peers);
         toast({
             title: "Success",
             description: `Connected to ${
                 res.newPeer.url || res.newPeer.endpoint
             }.`,
         });
-        onConnection(res.newPeer.endpoint);
+        onConnection();
     };
 
     return <UrlForm onSubmit={onSubmit} />;

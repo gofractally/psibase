@@ -43,7 +43,7 @@ export const useConnect = () =>
             try {
                 const beforePeers = await chain.getPeers();
                 const connectedPeer = await connectToPeer(param, beforePeers);
-                chain.addPeer(param.url);
+                await chain.addPeer(param.url);
                 return connectedPeer;
             } catch (e) {
                 throw new Error("Failed connecting to node");
