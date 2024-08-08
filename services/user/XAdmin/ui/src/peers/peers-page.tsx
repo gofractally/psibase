@@ -44,27 +44,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "../components/ui/use-toast";
 import { Pulse } from "@/components/Pulse";
+import { cn } from "@/lib/utils";
 
 const randomIntFromInterval = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1) + min);
 
 const combinePeers = (
-    configured: string[],
-    connected: PeersType
+    configPeers: string[],
+    livePeers: PeersType
 ): z.infer<typeof UIPeer>[] => {
-    let configMap: { [index: string]: boolean } = {};
-    for (const url of configured) {
-        configMap[url] = true;
-    }
+    const configSet = new Set<string>();
+    configPeers.forEach((peer) => configSet.add(peer));
 
     let connectMap: { [index: string]: PeerType } = {};
-    for (const peer of connected) {
+    for (const peer of livePeers) {
         if (peer.url) {
             connectMap[peer.url] = peer;
         }
     }
 
-    const persistentPeers = configured.map((url): z.infer<typeof UIPeer> => {
+    const persistentPeers = configPeers.map((url): z.infer<typeof UIPeer> => {
         if (url in connectMap) {
             return {
                 state: "persistent",
@@ -81,8 +80,8 @@ const combinePeers = (
         }
     });
 
-    const transientPeers: z.infer<typeof UIPeer>[] = connected
-        .filter((peer) => !peer.url || !(peer.url in configMap))
+    const transientPeers: z.infer<typeof UIPeer>[] = livePeers
+        .filter((peer) => !peer.url || !configSet.has(peer.url))
         .map(
             (peer): z.infer<typeof UIPeer> => ({
                 state: "transient",
@@ -134,9 +133,8 @@ export const PeersPage = () => {
 
     const [showAddModalConnection, setShowModalConnection] = useState(false);
 
-    const onTransientConnection = async (endpoint: string) => {
+    const onConnection = async () => {
         setShowModalConnection(false);
-        await chain.addPeer(endpoint);
         refetchConfig();
     };
 
@@ -190,9 +188,7 @@ export const PeersPage = () => {
                     <DialogHeader>
                         <DialogTitle>Add connection</DialogTitle>
                         <DialogDescription>
-                            <SmartConnectForm
-                                onConnection={onTransientConnection}
-                            />
+                            <SmartConnectForm onConnection={onConnection} />
                         </DialogDescription>
                     </DialogHeader>
                 </DialogContent>
@@ -231,7 +227,11 @@ export const PeersPage = () => {
                     <TableBody>
                         {combinedPeers.map((peer) => (
                             <TableRow key={peer.id}>
-                                <TableHead>{peer.url}</TableHead>
+                                <TableHead>
+                                    <span className={cn({ italic: !peer.url })}>
+                                        {peer.url ?? "Unknown"}
+                                    </span>
+                                </TableHead>
                                 <TableHead>{peer.endpoint}</TableHead>
                                 <TableHead>
                                     <Status state={peer.state} />

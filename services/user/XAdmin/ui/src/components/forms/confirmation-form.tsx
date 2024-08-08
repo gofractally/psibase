@@ -123,7 +123,10 @@ export function ConfirmationForm({
     });
 
     return (
-        <div className="w-full ">
+        <div className="w-full">
+            <div className="py-2">
+                Selected packages correspond to selected boot template.
+            </div>
             <div className="rounded-md border">
                 <ScrollArea className="h-[600px]">
                     <Table>

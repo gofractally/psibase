@@ -37,15 +37,15 @@ const chartConfig = {
         color: "hsl(var(--chart-5))",
     },
     wasmMemory: {
-        label: "Firefox",
+        label: "WASM Memory",
         color: "hsl(var(--chart-3))",
     },
     wasmCode: {
-        label: "Edge",
+        label: "WASM Code",
         color: "hsl(var(--chart-4))",
     },
     unclassified: {
-        label: "Other",
+        label: "Unclassified",
         color: "hsl(var(--chart-5))",
     },
 } satisfies ChartConfig;

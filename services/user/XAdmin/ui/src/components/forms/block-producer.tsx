@@ -34,7 +34,7 @@ export const BlockProducerForm = ({ form }: Props) => (
                             />
                         </FormControl>
                         <FormDescription>
-                            Must be a valid psibase account name
+                            Must be a valid psibase account name.
                         </FormDescription>
                         <FormMessage />
                     </FormItem>
