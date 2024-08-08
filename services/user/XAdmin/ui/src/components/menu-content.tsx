@@ -20,7 +20,7 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
         <>
             {condense && (
                 <Button asChild variant="outline">
-                    <Link to="/setup-config">
+                    <Link to="/Configuration">
                         <Cog size={20} />
                     </Link>
                 </Button>
