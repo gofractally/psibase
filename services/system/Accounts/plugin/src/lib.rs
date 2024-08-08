@@ -15,15 +15,22 @@ use errors::ErrorType::*;
 
 struct AccountsPlugin;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct ResponseRoot {
     data: Data,
 }
 
+// #[derive(Deserialize, Debug)]
+// struct Account {
+//     accountNum: AccountNumber,
+//     authService: AccountNumber,
+// }
+
 #[allow(non_snake_case)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Data {
-    getAccount: Option<AccountTypes::Account>,
+    // getAccount: Option<AccountTypes::Account>,
+    getAccount: Option<AccountsService::Account>,
 }
 
 impl Accounts for AccountsPlugin {
@@ -45,9 +52,10 @@ impl Accounts for AccountsPlugin {
 
     fn get_account(name: String) -> Result<Option<AccountTypes::Account>, CommonTypes::Error> {
         let query = format!(
-            "query {{ getAccount(account: \"{}\") {{ accountNum, authService, reesourceBalance }} }}",
-            name
+            "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
+            AccountNumber::from(name.as_str())
         );
+        println!("get_account; query: {}", query);
 
         let account_result = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
@@ -56,6 +64,7 @@ impl Accounts for AccountsPlugin {
             });
 
         println!("got here 1");
+        println!("{:#?}", account_result);
         let account = account_result.and_then(|response_root: ResponseRoot| {
             println!("got here 2");
             response_root
@@ -64,10 +73,20 @@ impl Accounts for AccountsPlugin {
                 .ok_or_else(|| InvalidAccountNumber.err(&name))
         })?;
 
-        if account.account_num.value != AccountNumber::from_exact(&name).unwrap().value {
+        if account.accountNum.value != AccountNumber::from_exact(&name).unwrap().value {
             return Err(InvalidAccountNumber.err(&name));
         } else {
-            return Ok(Some(account));
+            return Ok(Some(AccountTypes::Account {
+                account_num: AccountTypes::AccountNumber {
+                    value: account.accountNum.value,
+                },
+                auth_service: AccountTypes::AccountNumber {
+                    value: account.authService.value,
+                },
+                resource_balance: Some(AccountTypes::ResourceLimit {
+                    value: account.resourceBalance.unwrap().value,
+                }),
+            }));
         }
     }
 

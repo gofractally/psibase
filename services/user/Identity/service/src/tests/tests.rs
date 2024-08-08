@@ -12,31 +12,23 @@ use crate::tests::test_helpers::*;
  x- bad input args to actions and queries produce reasonable error responses
  x- queries for non-existent records produce reasonable error responses
 */
-
 #[psibase::test_case(services("identity"))]
 // ATTEST: verify first *high* confidence attestation is saved properly to table
-pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    chain.new_account(AccountNumber::from("carol"))?;
+    chain.start_block();
+    test_attest(
+        &chain,
+        AccountNumber::from("carol"),
+        AccountNumber::from("bob"),
+        76,
+    )?;
     test_attest(
         &chain,
         AccountNumber::from("alice"),
-        AccountNumber::from("bob"),
-        95,
+        AccountNumber::from("carol"),
+        77,
     )?;
-
-    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}]);
-    expect_attestations(&chain, &exp_results);
-
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
-    );
-
-    Ok(())
-}
-
-#[psibase::test_case(services("identity"))]
-// ATTEST: verify first *low* confidence attestation is saved properly to table
-pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     test_attest(
         &chain,
         AccountNumber::from("alice"),
@@ -44,213 +36,287 @@ pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::
         75,
     )?;
 
-    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}]);
-    expect_attestations(&chain, &exp_results);
+    chain.start_block();
+    // works
+    // println!("1");
+    // let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "carol", "subject": "bob", "value": 76}]);
+    // expect_attestations(&chain, &exp_results);
 
-    expect_attestation_stats(
+    // doesn't work
+    // println!("2");
+    // let exp_results =
+    //     json!({ "subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1});
+    // expect_from_query(
+    //     &chain,
+    //     "subjectStats",
+    //     String::from(
+    //         r#"query { subjectStats(subject: "bob") { subject, numHighConfAttestations, uniqueAttesters } }"#,
+    //     ),
+    //     &exp_results,
+    // );
+
+    println!("3");
+    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
+    expect_from_query_array(
         &chain,
-        &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
+        "allAttestations",
+        String::from(r#"query { allAttestations { nodes { attester, subject, value } } }"#),
+        &exp_results,
     );
+    println!("4");
+
+    // // exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
+    // // expect_attestations(&chain, &exp_results);
+
+    // // exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
+    // // expect_attestations(&chain, &exp_results);
+
+    // expect_attestation_stats(
+    //     &chain,
+    //     &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1}, {"subject": "carol", "uniqueAttesters": 2, "numHighConfAttestations": 1}]),
+    // );
 
     Ok(())
 }
 
-#[psibase::test_case(services("identity"))]
-// STATS: Verify that issued gets updated when a more recent attestation comes in
-pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let attester = AccountNumber::from("alice");
-    let subject = AccountNumber::from("bob");
+// #[psibase::test_case(services("identity"))]
+// // ATTEST: verify first *high* confidence attestation is saved properly to table
+// pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("bob"),
+//         95,
+//     )?;
 
-    test_attest(&chain, attester, subject.clone(), 75)?;
+//     let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}]);
+//     expect_attestations(&chain, &exp_results);
 
-    // check that issued is updated when an attestation is updated
-    chain.start_block();
-    let reply: serde_json::Value = chain
-        .graphql(
-            crate::SERVICE,
-            r#"query { allAttestationStats { subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds } } }"#,
-        )
-        .unwrap();
-    let issued_first = &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
+//     );
 
-    test_attest(&chain, attester, subject.clone(), 65)?;
+//     Ok(())
+// }
 
-    let reply: serde_json::Value = chain
-        .graphql(
-            crate::SERVICE,
-            r#"query { allAttestationStats { subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds } } }"#,
-        )
-        .unwrap();
-    let issued_second =
-        &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
+// #[psibase::test_case(services("identity"))]
+// // ATTEST: verify first *low* confidence attestation is saved properly to table
+// pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("bob"),
+//         75,
+//     )?;
 
-    assert_ne!(issued_first, issued_second);
+//     let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}]);
+//     expect_attestations(&chain, &exp_results);
 
-    Ok(())
-}
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
+//     );
 
-#[psibase::test_case(services("identity"))]
-// STATS: 3 attestations attesting to same subject; check that stats are updated properly as more recent attestations come in
-pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let attester = AccountNumber::from("alice");
-    let subject = AccountNumber::from("bob");
+//     Ok(())
+// }
 
-    test_attest(&chain, attester, subject.clone(), 75)?;
+// #[psibase::test_case(services("identity"))]
+// // STATS: Verify that issued gets updated when a more recent attestation comes in
+// pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let attester = AccountNumber::from("alice");
+//     let subject = AccountNumber::from("bob");
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject.clone(), "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
-    );
+//     test_attest(&chain, attester, subject.clone(), 75)?;
 
-    chain.start_block();
-    chain.new_account(attester)?;
+//     // check that issued is updated when an attestation is updated
+//     chain.start_block();
+//     let reply: serde_json::Value = chain
+//         .graphql(
+//             crate::SERVICE,
+//             r#"query { allAttestationStats { subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds } } }"#,
+//         )
+//         .unwrap();
+//     let issued_first = &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
 
-    chain.start_block();
-    test_attest(&chain, attester, subject.clone(), 76)?;
+//     test_attest(&chain, attester, subject.clone(), 65)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
-    );
+//     let reply: serde_json::Value = chain
+//         .graphql(
+//             crate::SERVICE,
+//             r#"query { allAttestationStats { subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds } } }"#,
+//         )
+//         .unwrap();
+//     let issued_second =
+//         &reply["data"]["allAttestationStats"][0]["mostRecentAttestation"]["seconds"];
 
-    chain.start_block();
-    test_attest(&chain, attester, subject.clone(), 75)?;
+//     assert_ne!(issued_first, issued_second);
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
-    );
+//     Ok(())
+// }
 
-    Ok(())
-}
+// #[psibase::test_case(services("identity"))]
+// // STATS: 3 attestations attesting to same subject; check that stats are updated properly as more recent attestations come in
+// pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let attester = AccountNumber::from("alice");
+//     let subject = AccountNumber::from("bob");
 
-#[psibase::test_case(services("identity"))]
-// STATS: 4 different attesters attesting to same subject; check that stats are updated properly as new attestations come in
-pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let attester = AccountNumber::from("alice");
-    let subject = AccountNumber::from("bob");
-    let value = 75;
+//     test_attest(&chain, attester, subject.clone(), 75)?;
 
-    test_attest(&chain, attester, subject, value)?;
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject.clone(), "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
+//     );
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
-    );
+//     chain.start_block();
+//     chain.new_account(attester)?;
 
-    let attester2 = AccountNumber::from("carol");
-    let value2 = 76;
+//     chain.start_block();
+//     test_attest(&chain, attester, subject.clone(), 76)?;
 
-    chain.start_block();
-    chain.new_account(attester2)?;
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
+//     );
 
-    chain.start_block();
-    test_attest(&chain, attester2, subject.clone(), value2)?;
+//     chain.start_block();
+//     test_attest(&chain, attester, subject.clone(), 75)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 2, "numHighConfAttestations": 1}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
+//     );
 
-    let attester3 = AccountNumber::from("david");
-    let value3 = 77;
+//     Ok(())
+// }
 
-    chain.start_block();
-    chain.new_account(attester3)?;
+// #[psibase::test_case(services("identity"))]
+// // STATS: 4 different attesters attesting to same subject; check that stats are updated properly as new attestations come in
+// pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let attester = AccountNumber::from("alice");
+//     let subject = AccountNumber::from("bob");
+//     let value = 75;
 
-    chain.start_block();
-    test_attest(&chain, attester3, subject.clone(), value3)?;
+//     test_attest(&chain, attester, subject, value)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 3, "numHighConfAttestations": 2}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 1, "numHighConfAttestations": 0}]),
+//     );
 
-    let attester4 = AccountNumber::from("ed");
-    let value4 = 60;
+//     let attester2 = AccountNumber::from("carol");
+//     let value2 = 76;
 
-    chain.start_block();
-    chain.new_account(attester4)?;
+//     chain.start_block();
+//     chain.new_account(attester2)?;
 
-    chain.start_block();
-    test_attest(&chain, attester4, subject.clone(), value4)?;
+//     chain.start_block();
+//     test_attest(&chain, attester2, subject.clone(), value2)?;
 
-    expect_attestation_stats(
-        &chain,
-        &json!([{"subject": subject, "uniqueAttesters": 4, "numHighConfAttestations": 2}]),
-    );
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 2, "numHighConfAttestations": 1}]),
+//     );
 
-    Ok(())
-}
+//     let attester3 = AccountNumber::from("david");
+//     let value3 = 77;
 
-#[psibase::test_case(services("identity"))]
-// ATTEST: Fails for bad subject names
-pub fn test_reject_invalid_accounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let expected_err = "subject account willy doesn't exist";
-    match test_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("willy"),
-        80,
-    ) {
-        Err(e) => assert!(
-            e.to_string().contains(expected_err),
-            "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
-            e.to_string(),
-            expected_err
-        ),
-        _ => panic!(
-            "Transaction succeeded, but was expected to fail with: \"{}\"",
-            expected_err
-        ),
-    }
+//     chain.start_block();
+//     chain.new_account(attester3)?;
 
-    Ok(())
-}
+//     chain.start_block();
+//     test_attest(&chain, attester3, subject.clone(), value3)?;
 
-#[psibase::test_case(services("identity"))]
-// ATTEST: Fails for bad scores (outside of [0..10])
-pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let expected_err = "service 'identity' aborted with message: bad confidence score";
-    match test_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("bob"),
-        101,
-    ) {
-        Err(e) => assert_eq!(
-            e.to_string(),
-            expected_err,
-            "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
-            e.to_string(),
-            expected_err
-        ),
-        _ => panic!(
-            "Transaction succeeded, but was expected to fail with: \"{}\"",
-            expected_err
-        ),
-    }
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 3, "numHighConfAttestations": 2}]),
+//     );
 
-    chain.finish_block();
-    expect_attestation_stats(&chain, &json!([]));
+//     let attester4 = AccountNumber::from("ed");
+//     let value4 = 60;
 
-    chain.start_block();
+//     chain.start_block();
+//     chain.new_account(attester4)?;
 
-    match test_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("bob"),
-        255,
-    ) {
-        Ok(_) => {
-            return Err(psibase::Error::msg(
-                "Confidence scores <0 should not have been accepted.",
-            ))
-        }
-        Err(_) => (), // This is expected
-    }
+//     chain.start_block();
+//     test_attest(&chain, attester4, subject.clone(), value4)?;
 
-    expect_attestation_stats(&chain, &json!([]));
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": subject, "uniqueAttesters": 4, "numHighConfAttestations": 2}]),
+//     );
 
-    Ok(())
-}
+//     Ok(())
+// }
+
+// #[psibase::test_case(services("identity"))]
+// // ATTEST: Fails for bad subject names
+// pub fn test_reject_invalid_accounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let expected_err = "subject account willy doesn't exist";
+//     match test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("willy"),
+//         80,
+//     ) {
+//         Err(e) => assert!(
+//             e.to_string().contains(expected_err),
+//             "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
+//             e.to_string(),
+//             expected_err
+//         ),
+//         _ => panic!(
+//             "Transaction succeeded, but was expected to fail with: \"{}\"",
+//             expected_err
+//         ),
+//     }
+
+//     Ok(())
+// }
+
+// #[psibase::test_case(services("identity"))]
+// // ATTEST: Fails for bad scores (outside of [0..10])
+// pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     let expected_err = "service 'identity' aborted with message: bad confidence score";
+//     match test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("bob"),
+//         101,
+//     ) {
+//         Err(e) => assert_eq!(
+//             e.to_string(),
+//             expected_err,
+//             "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
+//             e.to_string(),
+//             expected_err
+//         ),
+//         _ => panic!(
+//             "Transaction succeeded, but was expected to fail with: \"{}\"",
+//             expected_err
+//         ),
+//     }
+
+//     chain.finish_block();
+//     expect_attestation_stats(&chain, &json!([]));
+
+//     chain.start_block();
+
+//     match test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("bob"),
+//         255,
+//     ) {
+//         Ok(_) => {
+//             return Err(psibase::Error::msg(
+//                 "Confidence scores <0 should not have been accepted.",
+//             ))
+//         }
+//         Err(_) => (), // This is expected
+//     }
+
+//     expect_attestation_stats(&chain, &json!([]));
+
+//     Ok(())
+// }

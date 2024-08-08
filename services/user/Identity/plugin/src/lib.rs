@@ -1,12 +1,15 @@
 #[allow(warnings)]
 mod bindings;
 
+use std::str::FromStr;
+
 use bindings::accounts::plugin::accounts;
 use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
 use bindings::host::common::{server as CommonServer, types as CommonTypes};
 use psibase::fracpack::Pack;
+use psibase::AccountNumber;
 
 use serde::{Deserialize, Serialize};
 
@@ -28,15 +31,19 @@ impl Api for IdentityPlugin {
             return Err(InvalidClaim.err(&format!("{score}")));
         }
 
-        accounts::get_account(&subject)?;
+        println!("0");
+        let acct = accounts::get_account(&subject)?;
 
+        println!("1: {:#?}", acct);
         let int_score = (score * 100.0).trunc() as u8;
+        println!("2");
 
         let packed_a = identity::action_structs::attest {
-            subject: subject.clone(),
+            subject: AccountNumber::from(subject.as_str()),
             value: int_score,
         }
         .packed();
+        println!("3");
 
         CommonServer::add_action_to_transaction("attest", &packed_a)
     }
