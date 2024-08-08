@@ -61,10 +61,10 @@ export const getCouncilLinks = (graph: AttestationGraph, targetDepth: number) =>
 
     visitedNodeIds.add(node.id);
     // for all links that start at this node, recurse to all its neighbors
-    const links_from_this_node = graph.attestations.filter((link) => {
+    const linksFromThisNode = graph.attestations.filter((link) => {
       return link.source.id === node.id;
     });
-    links_from_this_node.forEach((L) => {
+    linksFromThisNode.forEach((L) => {
       // find all the nodes this node has attested
       const nodeAttestedTo = graph.nodes.find((n) => n.id === L.target.id)
       if (!nodeAttestedTo) throw Error("next nodeAttestedTo DNE")
