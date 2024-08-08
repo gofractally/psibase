@@ -10,7 +10,6 @@ mod stats;
 #[allow(non_snake_case)]
 mod service {
     use core::fmt;
-    use std::str::FromStr;
 
     use async_graphql::*;
 
