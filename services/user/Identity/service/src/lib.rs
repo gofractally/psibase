@@ -14,8 +14,8 @@ mod service {
     use async_graphql::*;
 
     use psibase::{
-        services::accounts::Wrapper as AccountsSvc, services::transact, AccountNumber,
-        TimePointSec, *,
+        services::{accounts::Wrapper as AccountsSvc, transact},
+        AccountNumber, TableQuery, TimePointSec, *,
     };
     use serde::{Deserialize, Serialize};
 
@@ -152,11 +152,20 @@ mod service {
     impl Query {
         async fn all_attestations(
             &self,
-        ) -> async_graphql::Result<Vec<Attestation>, async_graphql::Error> {
-            Ok(AttestationTable::new()
-                .get_index_pk()
-                .iter()
-                .collect::<Vec<Attestation>>())
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Attestation>, async_graphql::Error> {
+            TableQuery::new(AttestationTable::new().get_index_pk())
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            // .iter()
+            // .collect::<Vec<Attestation>>())
         }
 
         async fn attestations_by_attester(
@@ -198,11 +207,19 @@ mod service {
 
         async fn all_attestation_stats(
             &self,
-        ) -> async_graphql::Result<Vec<AttestationStats>, async_graphql::Error> {
-            Ok(AttestationStatsTable::new()
-                .get_index_pk()
-                .iter()
-                .collect::<Vec<AttestationStats>>())
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, AttestationStats>, async_graphql::Error>
+        {
+            TableQuery::new(AttestationStatsTable::new().get_index_pk())
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
         }
 
         async fn subject_stats(

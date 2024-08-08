@@ -1,18 +1,10 @@
 package accounts:plugin;
 
 interface types {
-    record account-number {
-        value: u64,
-    }
-
-    record resource-limit {
-        value: u64,
-    }
-
     record account {
-        account-num: account-number,
-        auth-service: account-number,
-        resource-balance: option<resource-limit>,
+        account-num: string,
+        auth-service: string,
+        resource-balance: option<u64>,
     }
 }
 

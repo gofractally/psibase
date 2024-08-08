@@ -13,8 +13,12 @@ use crate::tests::test_helpers::*;
  x- queries for non-existent records produce reasonable error responses
 */
 #[psibase::test_case(services("identity"))]
-// ATTEST: verify first *high* confidence attestation is saved properly to table
+// ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use crate::SERVICE;
+    use psibase::services::http_server;
+    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
+
     chain.new_account(AccountNumber::from("carol"))?;
     chain.start_block();
     test_attest(
@@ -37,26 +41,22 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
     )?;
 
     chain.start_block();
-    // works
-    // println!("1");
-    // let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "carol", "subject": "bob", "value": 76}]);
-    // expect_attestations(&chain, &exp_results);
 
-    // doesn't work
-    // println!("2");
-    // let exp_results =
-    //     json!({ "subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1});
-    // expect_from_query(
-    //     &chain,
-    //     "subjectStats",
-    //     String::from(
-    //         r#"query { subjectStats(subject: "bob") { subject, numHighConfAttestations, uniqueAttesters } }"#,
-    //     ),
-    //     &exp_results,
-    // );
+    // queries to cover:
+    // x - allAttestations
+    // x - attestationsByAttester
+    // x - attestationsByAttestee
+    // allAttestationStats
+    // O - subjectStats
+    // event
+
+    // works
+    println!("1");
+    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "carol", "subject": "bob", "value": 76}]);
+    expect_attestations(&chain, &exp_results);
 
     println!("3");
-    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
+    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "alice", "subject": "carol", "value": 77}, { "attester": "carol", "subject": "bob", "value": 76}]);
     expect_from_query_array(
         &chain,
         "allAttestations",
@@ -65,20 +65,123 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
     );
     println!("4");
 
-    // // exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
-    // // expect_attestations(&chain, &exp_results);
+    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "alice", "subject": "carol", "value": 77}]);
+    expect_from_query_array(
+        &chain,
+        "attestationsByAttester",
+        String::from(
+            r#"query { attestationsByAttester(attester: "alice") { nodes { attester, subject, value } } }"#,
+        ),
+        &exp_results,
+    );
+    println!("5");
 
-    // // exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 95}, { "attester": "bob", "subject": "carol", "value": 65}, { "attester": "alice", "subject": "carol", "value": 85}]);
-    // // expect_attestations(&chain, &exp_results);
+    let exp_results = json!([ { "attester": "alice", "subject": "bob", "value": 75}, { "attester": "carol", "subject": "bob", "value": 76}]);
+    expect_from_query_array(
+        &chain,
+        "attestationsByAttestee",
+        String::from(
+            r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value } } }"#,
+        ),
+        &exp_results,
+    );
+    println!("6");
 
-    // expect_attestation_stats(
-    //     &chain,
-    //     &json!([{"subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1}, {"subject": "carol", "uniqueAttesters": 2, "numHighConfAttestations": 1}]),
-    // );
+    // TODO: stats queries
+
+    expect_attestation_stats(
+        &chain,
+        &json!([{"subject": "bob", "uniqueAttesters": 2, "numHighConfAttestations": 1}, {"subject": "carol", "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
+    );
+
+    // doesn't work
+    // TASKS
+    // 1) get this working (add PartialEq to AttestationStats)
+    // 2) move PartialEq for AttestationStats out of test_helpers and just put it on the crate's AttestationStats struct?
+    println!("7");
+    let exp_results =
+        json!({ "subject": "bob", "uniqueAttesters": 1, "numHighConfAttestations": 1});
+    expect_from_query(
+        &chain,
+        "subjectStats",
+        String::from(
+            r#"query { subjectStats(subject: "bob") { subject, numHighConfAttestations, uniqueAttesters } }"#,
+        ),
+        &exp_results,
+    );
 
     Ok(())
 }
 
+// #[psibase::test_case(services("identity"))]
+// // ATTEST QUERY: verify empty query responses are correct
+// pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
+//     use crate::SERVICE;
+//     use psibase::services::http_server;
+//     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
+//     chain.new_account(AccountNumber::from("carol"))?;
+//     chain.start_block();
+
+//     println!("1");
+//     let exp_results = json!([]);
+//     expect_from_query_array(
+//         &chain,
+//         "allAttestations",
+//         String::from(r#"query { allAttestations { nodes { attester, subject, value } } }"#),
+//         &exp_results,
+//     );
+//     println!("2");
+
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("carol"),
+//         AccountNumber::from("bob"),
+//         76,
+//     )?;
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("carol"),
+//         77,
+//     )?;
+//     test_attest(
+//         &chain,
+//         AccountNumber::from("alice"),
+//         AccountNumber::from("bob"),
+//         75,
+//     )?;
+
+//     chain.start_block();
+
+//     println!("4");
+
+//     expect_from_query_array(
+//         &chain,
+//         "attestationsByAttester",
+//         String::from(
+//             r#"query { attestationsByAttester(attester: "bob") { nodes { attester, subject, value } } }"#,
+//         ),
+//         &exp_results,
+//     );
+//     println!("5");
+
+//     expect_from_query_array(
+//         &chain,
+//         "attestationsByAttestee",
+//         String::from(
+//             r#"query { attestationsByAttestee(attestee: "alice") { nodes { attester, subject, value } } }"#,
+//         ),
+//         &exp_results,
+//     );
+//     println!("6");
+
+//     expect_attestation_stats(
+//         &chain,
+//         &json!([{"subject": "bob", "uniqueAttesters": 2, "numHighConfAttestations": 1}, {"subject": "carol", "uniqueAttesters": 1, "numHighConfAttestations": 1}]),
+//     );
+
+//     Ok(())
+// }
 // #[psibase::test_case(services("identity"))]
 // // ATTEST: verify first *high* confidence attestation is saved properly to table
 // pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {

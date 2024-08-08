@@ -1,8 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
-
 use bindings::accounts::plugin::accounts;
 use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
@@ -31,19 +29,15 @@ impl Api for IdentityPlugin {
             return Err(InvalidClaim.err(&format!("{score}")));
         }
 
-        println!("0");
-        let acct = accounts::get_account(&subject)?;
+        accounts::get_account(&subject)?;
 
-        println!("1: {:#?}", acct);
         let int_score = (score * 100.0).trunc() as u8;
-        println!("2");
 
         let packed_a = identity::action_structs::attest {
             subject: AccountNumber::from(subject.as_str()),
             value: int_score,
         }
         .packed();
-        println!("3");
 
         CommonServer::add_action_to_transaction("attest", &packed_a)
     }

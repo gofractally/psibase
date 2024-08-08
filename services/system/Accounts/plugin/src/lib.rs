@@ -55,7 +55,6 @@ impl Accounts for AccountsPlugin {
             "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
             AccountNumber::from(name.as_str())
         );
-        println!("get_account; query: {}", query);
 
         let account_result = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
@@ -63,10 +62,7 @@ impl Accounts for AccountsPlugin {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
             });
 
-        println!("got here 1");
-        println!("{:#?}", account_result);
         let account = account_result.and_then(|response_root: ResponseRoot| {
-            println!("got here 2");
             response_root
                 .data
                 .getAccount
@@ -77,14 +73,11 @@ impl Accounts for AccountsPlugin {
             return Err(InvalidAccountNumber.err(&name));
         } else {
             return Ok(Some(AccountTypes::Account {
-                account_num: AccountTypes::AccountNumber {
-                    value: account.accountNum.value,
-                },
-                auth_service: AccountTypes::AccountNumber {
-                    value: account.authService.value,
-                },
-                resource_balance: Some(AccountTypes::ResourceLimit {
-                    value: account.resourceBalance.unwrap().value,
+                account_num: account.accountNum.to_string(),
+                auth_service: account.authService.to_string(),
+                resource_balance: Some(match account.resourceBalance {
+                    Some(val) => val.value,
+                    None => 0,
                 }),
             }));
         }
