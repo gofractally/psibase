@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
     RegisterOptions,
     useFieldArray,
@@ -8,7 +8,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Service } from "../components";
-import { PsinodeConfig, ServiceConfig } from "./interfaces";
+import { PsinodeConfigUI, ServiceConfig } from "./interfaces";
 import {
     defaultService,
     emptyService,
@@ -17,7 +17,6 @@ import {
     writeConfig,
     newId,
 } from "./utils";
-import { putJson } from "../helpers";
 import { Logger } from "../log/logger";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,19 +29,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useConfig, useConfigUpdate } from "../hooks/useConfig";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Trash } from "lucide-react";
 
-interface ConfigurationPageProps {
-    config?: PsinodeConfig;
-    refetchConfig: () => void;
-}
+export const ConfigurationPage = () => {
+    const { data: config, isLoading } = useConfig();
 
-export const ConfigurationPage = ({
-    config,
-    refetchConfig,
-}: ConfigurationPageProps) => {
-    const [configPutError, setConfigPutError] = useState<string>();
-
-    const configForm = useForm<PsinodeConfig>({
+    const configForm = useForm<PsinodeConfigUI>({
         defaultValues: initialConfigForm(),
     });
 
@@ -68,7 +62,7 @@ export const ConfigurationPage = ({
         const fields = services.fields;
         if (fields !== undefined) {
             const defaultValues = configForm.formState
-                .defaultValues as PsinodeConfig;
+                .defaultValues as PsinodeConfigUI;
             if (
                 fields.length != 0 &&
                 fields.length == defaultValues.services.length &&
@@ -84,28 +78,15 @@ export const ConfigurationPage = ({
         }
     });
 
-    const onConfig = async (input: PsinodeConfig) => {
-        try {
-            setConfigPutError(undefined);
-            for (let service of input.services) {
-                if (service.host == "") {
-                    service.host = defaultService(service.root);
-                }
+    const { mutateAsync, error: configPutError } = useConfigUpdate();
+
+    const onConfig = async (input: PsinodeConfigUI) => {
+        for (let service of input.services) {
+            if (service.host == "") {
+                service.host = defaultService(service.root);
             }
-            const result = await putJson(
-                "/native/admin/config",
-                writeConfig(input)
-            );
-            if (result.ok) {
-                configForm.reset(input);
-                refetchConfig();
-            } else {
-                setConfigPutError(await result.text());
-            }
-        } catch (e) {
-            console.error("error", e);
-            setConfigPutError("Failed to write /native/admin/config");
         }
+        mutateAsync(writeConfig(input));
     };
 
     const onAddNewLoggerClick = () => {
@@ -143,6 +124,7 @@ export const ConfigurationPage = ({
         loggerName: string,
         field: string,
         options?: RegisterOptions
+        // @ts-expect-error eee
     ) => configForm.register(`loggers.${loggerName}.${field}`, options);
 
     const handleLoggerRemove = (loggerName: string) => {
@@ -164,6 +146,8 @@ export const ConfigurationPage = ({
         listeners.append({ key: newId(), text: "", protocol: "http" });
     };
 
+    if (isLoading) return <div>Loading...</div>;
+
     return (
         <>
             {!config ? (
@@ -173,208 +157,277 @@ export const ConfigurationPage = ({
                     onSubmit={configForm.handleSubmit(onConfig)}
                     className="px-2"
                 >
-                    <Controller
-                        name="p2p"
-                        control={configForm.control}
-                        render={({ field }) => (
-                            <div className="my-6 flex items-center space-x-2">
-                                <Switch
-                                    onCheckedChange={field.onChange}
-                                    checked={field.value}
-                                />
-                                <Label>Accept incoming P2P connections</Label>
-                            </div>
-                        )}
-                    />
-                    <div className="flex justify-between gap-4">
-                        <div className="grid w-full items-center gap-1.5">
-                            <Label htmlFor="blockProducerName">
-                                Block producer name
-                            </Label>
-                            <Input
-                                id="blockProducerName"
-                                {...configForm.register("producer")}
+                    <Tabs defaultValue="connections" className="">
+                        <TabsList>
+                            <TabsTrigger value="connections">
+                                Connections
+                            </TabsTrigger>
+                            <TabsTrigger value="logs">Logs</TabsTrigger>
+                            <TabsTrigger value="services">Services</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="connections">
+                            <Controller
+                                name="p2p"
+                                control={configForm.control}
+                                render={({ field }) => (
+                                    <div className="my-6 flex items-center space-x-2">
+                                        <Switch
+                                            onCheckedChange={field.onChange}
+                                            checked={field.value}
+                                        />
+                                        <Label>
+                                            Accept incoming P2P connections
+                                        </Label>
+                                    </div>
+                                )}
                             />
-                        </div>
-                        <div className="grid w-full items-center gap-1.5">
-                            <Label>Host</Label>
-                            <Input {...configForm.register("host")} />
-                        </div>
-                    </div>
-                    <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
-                        Ports
-                    </h4>
-                    <Label>Requires restart</Label>
-                    <table>
-                        <tbody>
-                            {listeners.fields.map((l, idx: number) => (
-                                <tr key={l.key}>
-                                    <td>
-                                        <Input
-                                            type="number"
-                                            {...configForm.register(
-                                                `listen.${idx}.text`
-                                            )}
-                                        />
-                                    </td>
-                                    <td>
-                                        <Controller
-                                            name={`listen.${idx}.protocol`}
-                                            control={configForm.control}
-                                            render={({ field }) => (
-                                                <Select
-                                                    value={field.value}
-                                                    onValueChange={(value) =>
-                                                        field.onChange(value)
-                                                    }
+                            <div className="flex justify-between gap-4">
+                                <div className="grid w-full items-center gap-1.5">
+                                    <Label htmlFor="blockProducerName">
+                                        Block producer name
+                                    </Label>
+                                    <Input
+                                        id="blockProducerName"
+                                        {...configForm.register("producer")}
+                                    />
+                                </div>
+                                <div className="grid w-full items-center gap-1.5">
+                                    <Label>Host</Label>
+                                    <Input {...configForm.register("host")} />
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
+                                    Ports
+                                </h4>
+
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th colSpan={2}>
+                                                <Label>Requires restart</Label>
+                                            </th>
+                                            <th className="flex flex-row-reverse ">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        onAddNewListenerClick();
+                                                    }}
                                                 >
-                                                    <SelectTrigger className="w-[180px]">
-                                                        <SelectValue placeholder="Theme" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="http">
-                                                            HTTP
-                                                        </SelectItem>
-                                                        <SelectItem value="https">
-                                                            HTTPS
-                                                        </SelectItem>
-                                                        <SelectItem value="socket">
-                                                            Local socket
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                    </td>
-                                    <td>
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() =>
-                                                listeners.remove(idx)
+                                                    +
+                                                </Button>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {listeners.fields.map(
+                                            (l, idx: number) => (
+                                                <tr key={l.key}>
+                                                    <td>
+                                                        <Input
+                                                            type="number"
+                                                            {...configForm.register(
+                                                                `listen.${idx}.text`
+                                                            )}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <Controller
+                                                            name={`listen.${idx}.protocol`}
+                                                            control={
+                                                                configForm.control
+                                                            }
+                                                            render={({
+                                                                field,
+                                                            }) => (
+                                                                <Select
+                                                                    value={
+                                                                        field.value
+                                                                    }
+                                                                    onValueChange={(
+                                                                        value
+                                                                    ) =>
+                                                                        field.onChange(
+                                                                            value
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <SelectTrigger className="w-[180px]">
+                                                                        <SelectValue placeholder="Theme" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="http">
+                                                                            HTTP
+                                                                        </SelectItem>
+                                                                        <SelectItem value="https">
+                                                                            HTTPS
+                                                                        </SelectItem>
+                                                                        <SelectItem value="socket">
+                                                                            Local
+                                                                            socket
+                                                                        </SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            )}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <Button
+                                                            variant="secondary"
+                                                            onClick={() =>
+                                                                listeners.remove(
+                                                                    idx
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash size={16} />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="logs">
+                            <div className="flex justify-between">
+                                <h2 className="my-3 scroll-m-20 pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                                    Loggers
+                                </h2>
+                                <div>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            onAddNewLoggerClick();
+                                        }}
+                                    >
+                                        <Plus size={20} className="" />
+                                    </Button>
+                                </div>
+                            </div>
+                            {loggers && (
+                                <div className="flex flex-col gap-4">
+                                    {Object.entries(loggers).map(
+                                        ([name, _contents]) => (
+                                            <Logger
+                                                key={name}
+                                                loggerKey={name}
+                                                control={configForm.control}
+                                                register={(field, options) =>
+                                                    handleLoggerFieldRegister(
+                                                        name,
+                                                        field,
+                                                        options
+                                                    )
+                                                }
+                                                watch={(field) =>
+                                                    handleLoggerFieldWatch(
+                                                        name,
+                                                        field
+                                                    )
+                                                }
+                                                remove={() =>
+                                                    handleLoggerRemove(name)
+                                                }
+                                            />
+                                        )
+                                    )}
+                                </div>
+                            )}
+                        </TabsContent>
+                        <TabsContent value="services">
+                            <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                                Built-in Services
+                            </h2>
+                            <fieldset>
+                                <table className="w-full">
+                                    <thead>
+                                        <tr>
+                                            <th className="text-left">
+                                                Hostname
+                                            </th>
+                                            <th className="text-left">Path</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {services.fields.map((field, index) => (
+                                            <Service
+                                                key={field.key}
+                                                register={(name, options) =>
+                                                    configForm.register(
+                                                        `services.${name}`,
+                                                        // @ts-expect-error eeej
+                                                        options
+                                                    )
+                                                }
+                                                getValues={() =>
+                                                    configForm.getValues(
+                                                        `services.${index}`
+                                                    ) as ServiceConfig
+                                                }
+                                                index={index}
+                                                services={services}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </fieldset>
+                            <Controller
+                                name="admin"
+                                control={configForm.control}
+                                render={({ field }) => (
+                                    <fieldset className="mt-4">
+                                        <Label>Access to admin API</Label>
+                                        <RadioGroup
+                                            value={field.value}
+                                            onValueChange={(e) =>
+                                                field.onChange(e)
                                             }
                                         >
-                                            Remove
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                            <tr>
-                                <td>
-                                    <Button
-                                        className="mt-4"
-                                        type="button"
-                                        onClick={onAddNewListenerClick}
-                                    >
-                                        New Listener
-                                    </Button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                        Loggers
-                    </h2>
-                    {loggers && (
-                        <div className="flex flex-col gap-4">
-                            {Object.entries(loggers).map(
-                                ([name, _contents]) => (
-                                    <Logger
-                                        key={name}
-                                        loggerKey={name}
-                                        control={configForm.control}
-                                        register={(field, options) =>
-                                            handleLoggerFieldRegister(
-                                                name,
-                                                field,
-                                                options
-                                            )
-                                        }
-                                        watch={(field) =>
-                                            handleLoggerFieldWatch(name, field)
-                                        }
-                                        remove={() => handleLoggerRemove(name)}
-                                    />
-                                )
-                            )}
-                        </div>
-                    )}
-                    <Button className="mt-4" onClick={onAddNewLoggerClick}>
-                        New Logger
-                    </Button>
-                    <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                        Built-in Services
-                    </h2>
-                    <fieldset>
-                        <table className="w-full">
-                            <thead>
-                                <tr>
-                                    <th className="text-left">Hostname</th>
-                                    <th className="text-left">Path</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {services.fields.map((field, index) => (
-                                    <Service
-                                        key={field.key}
-                                        register={(name, options) =>
-                                            configForm.register(
-                                                `services.${name}`,
-                                                options
-                                            )
-                                        }
-                                        getValues={() =>
-                                            configForm.getValues(
-                                                `services.${index}`
-                                            ) as ServiceConfig
-                                        }
-                                        index={index}
-                                        services={services}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </fieldset>
-                    <Controller
-                        name="admin"
-                        control={configForm.control}
-                        render={({ field }) => (
-                            <fieldset className="mt-4">
-                                <Label>Access to admin API</Label>
-                                <RadioGroup
-                                    value={field.value}
-                                    onValueChange={(e) => field.onChange(e)}
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem
-                                            value="static:*"
-                                            id="r1"
-                                        />
-                                        <Label htmlFor="r1">
-                                            Builtin services only{" "}
-                                            <span className="text-muted-foreground">
-                                                (recommended)
-                                            </span>
-                                        </Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="*" id="r2" />
-                                        <Label htmlFor="r2">
-                                            All services{" "}
-                                            <span className="text-muted-foreground">
-                                                (not recommended)
-                                            </span>
-                                        </Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="" id="r3" />
-                                        <Label htmlFor="r3">Disabled</Label>
-                                    </div>
-                                </RadioGroup>
-                            </fieldset>
-                        )}
-                    />
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem
+                                                    value="static:*"
+                                                    id="r1"
+                                                />
+                                                <Label htmlFor="r1">
+                                                    Builtin services only{" "}
+                                                    <span className="text-muted-foreground">
+                                                        (recommended)
+                                                    </span>
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem
+                                                    value="*"
+                                                    id="r2"
+                                                />
+                                                <Label htmlFor="r2">
+                                                    All services{" "}
+                                                    <span className="text-muted-foreground">
+                                                        (not recommended)
+                                                    </span>
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem
+                                                    value=""
+                                                    id="r3"
+                                                />
+                                                <Label htmlFor="r3">
+                                                    Disabled
+                                                </Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </fieldset>
+                                )}
+                            />
+                        </TabsContent>
+                    </Tabs>
 
                     <Button
                         className="my-4"
