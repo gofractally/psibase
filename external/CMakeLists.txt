@@ -3,8 +3,6 @@ include(ProcessorCount)
 
 ProcessorCount(NUM_PROCS)
 
-add_subdirectory( simdjson )
-
 add_library(rapidjson INTERFACE)
 target_mapped_include_directories(rapidjson INTERFACE rapidjson/include )
 
@@ -57,10 +55,6 @@ if(IS_WASM)
     install(DIRECTORY ${CMAKE_BINARY_DIR}/catch2/include/ TYPE INCLUDE COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
-    # TODO: copy simdjson license to clsdk/licenses
-    # TODO: debug vs release builds
-    install(DIRECTORY simdjson/include/ TYPE INCLUDE COMPONENT libpsibase)
-    install(TARGETS simdjson ARCHIVE COMPONENT libpsibase)
 endif()
 
 if(NOT IS_WASM)
