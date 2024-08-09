@@ -24,4 +24,4 @@ class Transact(Service):
             return trace
     def push_action(self, sender, service, method, data, timeout=10, flags=0):
         tapos = self.api.get_tapos(timeout=timeout, flags=flags)
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)]))
+        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)], claims=[]))
