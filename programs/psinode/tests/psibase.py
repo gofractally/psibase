@@ -69,11 +69,11 @@ class Action(Custom(RawAction, "Action"), ObjectValue):
                 RawAction.pack({'sender': value['sender'], 'service': service, 'method': method, 'rawData':rawData}, stream)
         return Action
 
-default_custom = fracpack.default_custom | {
+default_custom = dict(**fracpack.default_custom, **{
     "AccountNumber": AccountNumber,
     "MethodNumber": MethodNumber,
     "TimePointSec": TimePointSec,
-}
+})
 
 class ServiceSchema:
     def __init__(self, json, custom=None):

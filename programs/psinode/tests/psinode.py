@@ -125,7 +125,7 @@ class ChainPackContext:
     def __init__(self, api):
         self._api = api
         self._schemas = {}
-        self._custom = psibase.default_custom | {"Action": Action.with_context(self)}
+        self._custom = dict(**psibase.default_custom, **{"Action": Action.with_context(self)})
     def pack(self, value, ty=None):
         return fracpack.pack(value, ty, custom=self._custom)
     def pack_action_data(self, service, method, data):
