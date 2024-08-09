@@ -318,11 +318,11 @@ export class Supervisor implements AppInterface {
             // Post execution assertions
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
-            // Send plugin result to parent window
-            this.replyToParent(args, result);
-
             // Pack any scheduled actions into a transaction and submit
             await this.submitTx();
+
+            // Send plugin result to parent window
+            this.replyToParent(args, result);
 
             this.context = undefined;
         } catch (e) {
