@@ -136,11 +136,11 @@ NullUnpack = _InlineUnpack(None)
 class TypeBase(type):
     def pack(self, value, stream):
         assert self.is_optional
-        self.embedded_fixed_pack(value, stream).pack()
+        self.embedded_pack(value, stream).pack()
     def unpack(self, stream):
         assert self.is_optional
         return self.embedded_unpack(stream).unpack()
-    def embedded_fixed_pack(self, value, stream):
+    def embedded_pack(self, value, stream):
         assert not self.is_optional
         if self.is_variable_size:
             stream.write_u32(0)
@@ -523,7 +523,7 @@ class Struct(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
             value = dict(value)
         fields = []
         for (name, ty) in self.members:
-            fields.append(ty.embedded_fixed_pack(value[name], stream))
+            fields.append(ty.embedded_pack(value[name], stream))
         for field in fields:
             field.pack()
     def match(self, other, context):
@@ -607,7 +607,7 @@ class Object(TypeBase, _MembersByName, metaclass=DerivedAsInstance):
         repack = []
         for (name, ty) in present_members:
             field = value.get(name) if ty.is_optional else value[name]
-            repack.append(ty.embedded_fixed_pack(field, stream))
+            repack.append(ty.embedded_pack(field, stream))
         for r in repack:
             r.pack()
     def match(self, other, context):
@@ -642,7 +642,7 @@ class Array(TypeBase):
         assert(len(value) == self.n)
         repack = []
         for item in value:
-            repack.append(self.ty.embedded_fixed_pack(item, stream))
+            repack.append(self.ty.embedded_pack(item, stream))
         for r in repack:
             r.pack()
     def match(self, other, context):
@@ -681,7 +681,7 @@ class List(TypeBase):
         stream.write_u32(self.ty.fixed_size * len(value))
         repack = []
         for item in value:
-            repack.append(self.ty.embedded_fixed_pack(item, stream))
+            repack.append(self.ty.embedded_pack(item, stream))
         for r in repack:
             r.pack()
     def match(self, other, context):
@@ -726,7 +726,7 @@ class Option(TypeBase):
                 return _OffsetUnpackNonEmpty(stream, offset, self.ty)
         else:
             return _OffsetUnpack(stream, offset, self.ty)
-    def embedded_fixed_pack(self, value, stream):
+    def embedded_pack(self, value, stream):
         if isinstance(value, OptionValue):
             value = value.value
         if value is None:
@@ -879,7 +879,7 @@ class Tuple(TypeBase):
         stream.write_u16(sum(ty.fixed_size for ty in present_members))
         repack = []
         for (v, ty) in zip(value, present_members):
-            repack.append(ty.embedded_fixed_pack(v, stream))
+            repack.append(ty.embedded_pack(v, stream))
         for r in repack:
             r.pack()
     def match(self, other, context):
@@ -966,8 +966,8 @@ class Custom(TypeBase):
         self.resolve(stream, not self.is_optional).pack(value, stream)
     def embedded_unpack(self, stream):
         return self.resolve(stream, self.is_optional).embedded_unpack(stream)
-    def embedded_fixed_pack(self, value, stream):
-        return self.resolve(stream, self.is_optional).embedded_fixed_pack(value, stream)
+    def embedded_pack(self, value, stream):
+        return self.resolve(stream, self.is_optional).embedded_pack(value, stream)
     def get_canonical(self):
         return self.type.get_canonical()
     @property
