@@ -262,17 +262,19 @@ export const PeersPage = () => {
                                                 }}
                                             >
                                                 <Clipboard className="mr-2 h-4 w-4" />
-                                                <span>Copy URL </span>
+                                                <span>Copy URL</span>
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={() =>
-                                                    disconnectPeer(peer.id)
-                                                }
-                                            >
-                                                <Unplug className="mr-2 h-4 w-4" />
-                                                <span>Disconnect</span>
-                                            </DropdownMenuItem>
+                                            {peer.state == "transient" && (
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        disconnectPeer(peer.id)
+                                                    }
+                                                >
+                                                    <Unplug className="mr-2 h-4 w-4" />
+                                                    <span>Disconnect</span>
+                                                </DropdownMenuItem>
+                                            )}
                                             {peer.state !== "transient" && (
                                                 <DropdownMenuItem
                                                     onClick={() =>
