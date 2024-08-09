@@ -1,4 +1,22 @@
-// TODO: tables
+use async_graphql::{InputObject, SimpleObject};
+use fracpack::{Pack, ToSchema, Unpack};
+use serde::{Deserialize, Serialize};
+
+pub type Spki = Vec<u8>;
+
+#[derive(
+    Debug, Clone, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, InputObject,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+#[graphql(input_name = "AuthRecord")]
+/// A record containing the authorization claims needed for an account using this auth service.
+pub struct AuthRecord {
+    /// The account whose transactions will be required to contain the specified public key.
+    pub account: crate::AccountNumber,
+
+    /// The public key included in the claims for each transaction sent by this account.
+    pub pubkey: Spki,
+}
 
 /// The `auth-sig` service is an auth service that can be used to authenticate actions for accounts.
 ///
@@ -10,6 +28,7 @@
 #[crate::service(name = "auth-sig", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
+    use super::Spki;
     use crate::{services::transact::ServiceMethod, AccountNumber, Action, Claim};
 
     /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
@@ -46,7 +65,7 @@ mod service {
     /// This is the public key that must be claimed by the transaction whenever a sender using this auth service
     /// submits a transaction.
     #[action]
-    fn setKey(key: Vec<u8>) {
+    fn setKey(key: Spki) {
         unimplemented!()
     }
 }

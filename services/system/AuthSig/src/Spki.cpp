@@ -3,12 +3,19 @@
 #include <botan/ber_dec.h>
 #include <botan/der_enc.h>
 #include <botan/pem.h>
+#include <botan/x509_key.h>
 #include <psibase/crypto.hpp>
 
 namespace SystemService
 {
    namespace AuthSig
    {
+      bool SubjectPublicKeyInfo::validate(const std::vector<unsigned char>& data)
+      {
+         Botan::X509::load_key({data.data(), data.size()});  // Throws if decoding fails
+         return true;
+      }
+
       std::vector<unsigned char> parseSubjectPublicKeyInfoFromPem(std::string_view s)
       {
          Botan::AlgorithmIdentifier algorithm;

@@ -13,6 +13,8 @@ namespace SystemService
       {
          std::vector<unsigned char> data;
 
+         static bool validate(const std::vector<unsigned char>& data);
+
          friend bool operator==(const SubjectPublicKeyInfo&, const SubjectPublicKeyInfo&) = default;
          friend auto operator<=>(const SubjectPublicKeyInfo& lhs, const SubjectPublicKeyInfo& rhs)
          {
@@ -27,6 +29,10 @@ namespace SystemService
       inline const std::vector<unsigned char>& clio_unwrap_packable(const SubjectPublicKeyInfo& obj)
       {
          return obj.data;
+      }
+      inline bool clio_validate_packable(const SubjectPublicKeyInfo& obj)
+      {
+         return SubjectPublicKeyInfo::validate(obj.data);
       }
 
       // Takes a public key in any of the following formats

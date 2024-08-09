@@ -17,11 +17,14 @@ interface types {
         signature: list<u8>,
     }
 
-    // This represents a keypair of the specified type.
-    // The public and private keys are encoded in PEM format.
+    /// PEM type is just a string
+    type pem = string;
+
+    /// This represents a keypair of the specified type.
+    /// The public and private keys are encoded in PEM format.
     record keypair {
-        pub-pem: string,
-        priv-pem: string,
+        public-key: pem,
+        private-key: pem,
     }
 }
 
@@ -45,23 +48,31 @@ interface smart-auth {
 /// Methods related to key management
 interface keyvault {
     use host:common/types.{error};
-    use types.{keypair};
+    use types.{keypair, pem};
 
     /// Generates a new keypair managed by this auth plugin.
-    /// It stores the private key and returns the public key.
-    generate-keypair: func() -> result<string, error>;
+    /// It stores the private key and returns the public key in pem format.
+    generate-keypair: func() -> result<pem, error>;
 
     /// Generates a new keypair that is unmanaged (nothing is stored).
     /// The full keypair is returned to the caller.
     generate-unmanaged-keypair: func() -> result<keypair, error>;
+
+    /// Returns the public key corresponding to the specified
+    /// private key.
+    pub-from-priv: func(private-key: pem) -> result<pem, error>;
+
+    /// Returns the DER encoded key
+    to-der: func(key: pem) -> result<list<u8>, error>;
 }
 
 interface actions {
+    use types.{pem};
     use host:common/types.{error};
 
     /// Updates the key used by the current user to the specified public key
     /// The specified public key should be the PEM representation of the public key
-    set-key: func(pub-pem: string) -> result<_, error>;
+    set-key: func(public-key: pem) -> result<_, error>;
 }
 
 world imports {

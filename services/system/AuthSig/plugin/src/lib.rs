@@ -1,28 +1,37 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::auth_sig::plugin::types::Keypair;
-use bindings::host::common::server as Server;
-use bindings::host::common::types as CommonTypes;
+use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::exports::auth_sig::plugin::smart_auth;
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, keyvault::Guest as KeyVault, smart_auth::Guest as SmartAuth,
 };
 
+use bindings::host::common::server as Server;
+use bindings::host::common::types as CommonTypes;
+
 mod errors;
 use errors::ErrorType::*;
 
 use p256::ecdsa::{SigningKey, VerifyingKey};
-use p256::pkcs8::Document;
-use p256::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
+use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use rand_core::OsRng;
 
 use psibase::fracpack::Pack;
 use psibase::services::auth_sig::action_structs as MyService;
 
-struct Component;
+trait TryFromPemStr: Sized {
+    fn try_from_pem_str(p: Pem) -> Result<Self, CommonTypes::Error>;
+}
 
-impl SmartAuth for Component {
+impl TryFromPemStr for pem::Pem {
+    fn try_from_pem_str(key_string: Pem) -> Result<Self, CommonTypes::Error> {
+        Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError.err(&e.to_string()))?)
+    }
+}
+struct AuthSig;
+
+impl SmartAuth for AuthSig {
     fn get_claim() -> Result<smart_auth::Claim, CommonTypes::Error> {
         Err(NotYetImplemented.err("get_claim"))
     }
@@ -32,7 +41,7 @@ impl SmartAuth for Component {
     }
 }
 
-impl KeyVault for Component {
+impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
         Err(NotYetImplemented.err("generate_keypair"))
     }
@@ -41,29 +50,43 @@ impl KeyVault for Component {
         let signing_key = SigningKey::random(&mut OsRng);
         let verifying_key: &VerifyingKey = signing_key.verifying_key();
 
-        let priv_pem = signing_key
+        let private_key = signing_key
             .to_pkcs8_pem(LineEnding::LF)
             .map_err(|e| CryptoError.err(&e.to_string()))?
             .to_string();
-        let pub_pem = verifying_key
+        let public_key = verifying_key
             .to_public_key_pem(LineEnding::LF)
             .map_err(|e| CryptoError.err(&e.to_string()))?;
 
         Ok(Keypair {
-            pub_pem: pub_pem,
-            priv_pem: priv_pem,
+            public_key,
+            private_key,
         })
+    }
+
+    fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
+        let pem = pem::Pem::try_from_pem_str(private_key)?;
+        let signing_key = SigningKey::from_pkcs8_der(&pem.contents())
+            .map_err(|e| CryptoError.err(&e.to_string()))?;
+        let verifying_key = signing_key.verifying_key();
+
+        Ok(verifying_key
+            .to_public_key_pem(LineEnding::LF)
+            .map_err(|e| CryptoError.err(&e.to_string()))?)
+    }
+
+    fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
+        let pem = pem::Pem::try_from_pem_str(key)?;
+        Ok(pem.contents().to_vec())
     }
 }
 
-impl Actions for Component {
-    fn set_key(pub_pem: String) -> Result<(), CommonTypes::Error> {
-        let (_, doc) = Document::from_pem(&pub_pem).map_err(|e| CryptoError.err(&e.to_string()))?;
-
+impl Actions for AuthSig {
+    fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
         Server::add_action_to_transaction(
             "setKey",
             &MyService::setKey {
-                key: doc.into_vec(),
+                key: AuthSig::to_der(public_key)?,
             }
             .packed(),
         )?;
@@ -72,4 +95,4 @@ impl Actions for Component {
     }
 }
 
-bindings::export!(Component with_types_in bindings);
+bindings::export!(AuthSig with_types_in bindings);
