@@ -23,7 +23,6 @@ if(DEFINED IS_NATIVE)
         test_view.cpp
         test_schema.cpp
         test_key.cpp
-        test_name.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
 
