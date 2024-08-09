@@ -134,7 +134,14 @@ class _InlineUnpack:
 NullUnpack = _InlineUnpack(None)
 
 class TypeBase(type):
+    def pack(self, value, stream):
+        assert self.is_optional
+        self.embedded_fixed_pack(value, stream).pack()
+    def unpack(self, stream):
+        assert self.is_optional
+        return self.embedded_unpack(stream).unpack()
     def embedded_fixed_pack(self, value, stream):
+        assert not self.is_optional
         if self.is_variable_size:
             stream.write_u32(0)
             if not self.is_container or not self.is_empty_container(value, stream):
@@ -143,6 +150,7 @@ class TypeBase(type):
             self.pack(value, stream)
         return _NullRepack()
     def embedded_unpack(self, stream):
+        assert not self.is_optional
         if self.is_variable_size:
             offset = stream.read_u32()
             if offset == 0:
@@ -707,10 +715,6 @@ class Option(TypeBase):
         if isinstance(value, OptionValue):
             value = value.value
         return value is not None and self.ty.is_empty_container(value, stream)
-    def unpack(self, stream):
-        return self.embedded_unpack(stream).unpack()
-    def pack(self, value, stream):
-        self.embedded_fixed_pack(value, stream).pack()
     def embedded_unpack(self, stream):
         offset = stream.read_u32()
         if offset == 1:
@@ -934,7 +938,7 @@ class Custom(TypeBase):
             result._pending = resolved
             return result
         return ty
-    def resolve(self, stream):
+    def resolve(self, stream, forward):
         if hasattr(self, '_resolved'):
             return self._resolved
         if hasattr(self, '_pending'):
@@ -948,25 +952,22 @@ class Custom(TypeBase):
             return self._resolved
         if hasattr(stream, 'custom'):
             actual = stream.custom.get(self.id)
-            if actual is not None:
+            if actual is not None and actual is not self:
                 return actual
-        return self.type
+        if forward:
+            return self.type
+        else:
+            return super()
     def is_empty_container(self, value, stream):
-        return self.resolve(stream).unpack(stream)
+        return self.resolve(stream, True).is_empty_container(value, stream)
     def unpack(self, stream):
-        return self.resolve(stream).unpack(stream)
+        return self.resolve(stream, not self.is_optional).unpack(stream)
     def pack(self, value, stream):
-        self.resolve(stream).pack(value, stream)
+        self.resolve(stream, not self.is_optional).pack(value, stream)
     def embedded_unpack(self, stream):
-        resolved = self.resolve(stream)
-        if resolved is self:
-            resolved = super()
-        return resolved.embedded_unpack(stream)
+        return self.resolve(stream, self.is_optional).embedded_unpack(stream)
     def embedded_fixed_pack(self, value, stream):
-        resolved = self.resolve(stream)
-        if resolved is self:
-            resolved = super()
-        return resolved.embedded_fixed_pack(value, stream)
+        return self.resolve(stream, self.is_optional).embedded_fixed_pack(value, stream)
     def get_canonical(self):
         return self.type.get_canonical()
     @property
