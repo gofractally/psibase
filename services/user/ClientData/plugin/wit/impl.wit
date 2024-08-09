@@ -1,0 +1,8 @@
+package clientdata:plugin;
+
+world impl {
+    include host:common/imports;
+    include wasi:keyvalue/imports@0.2.0-draft;
+
+    export keyvalue;
+}

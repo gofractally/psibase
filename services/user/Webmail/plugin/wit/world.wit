@@ -7,7 +7,6 @@ interface api {
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;
 }
 
-world impl {
-    include host:common/imports;
-    export api;
+world imports {
+    import api;
 }

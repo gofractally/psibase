@@ -1,4 +1,4 @@
-use crate::bindings::host::common::{client, server, types as CommonTypes};
+use crate::bindings::host::common::{server, types as CommonTypes};
 use crate::errors::ErrorType;
 
 use serde::{Deserialize, Serialize};

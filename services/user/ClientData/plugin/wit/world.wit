@@ -1,0 +1,25 @@
+package clientdata:plugin;
+
+// Each plugin that depends on the `keyvalue` interface of `clientdata` 
+//   will have access to a simple key-value api.
+//   The `clientdata` plugin creates a table for each caller plugin, and all reads/writes
+//   from that plugin will modify records in that plugin's one and only table.
+interface keyvalue {
+    use host:common/types.{error};
+
+    // Gets the value of the record with the specified key
+    get: func(key: string) -> result<option<list<u8>>, error>;
+
+    // Stores the <key, value> record. 
+    // If a record with the specified key does not exist, it is created.
+    // If a record with the specified key is created, the value is overwritten.
+    // Setting an empty value is equivalent to calling `delete` on that record.
+    set: func(key: string, value: list<u8>) -> result<_, error>;
+
+    // Deletes the record with the specified key.
+    delete: func(key: string) -> result<_, error>;
+}
+
+world imports {
+    import keyvalue;
+}

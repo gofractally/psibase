@@ -140,9 +140,9 @@ class Bucket {
     }
 
     private validateKey(key: string) {
-        // ~40 bytes per key, so `listKeys` pagesize limit of 1000 yield a 40kb payload
-        if (key.length >= 20) {
-            throw new ErrorOther("key must be less than 20 characters");
+        // ~160 bytes per key, so `listKeys` pagesize limit of 1000 yield a 160kb payload
+        if (key.length >= 80) {
+            throw new ErrorOther("key must be less than 80 characters");
         }
     }
 

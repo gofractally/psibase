@@ -7,7 +7,7 @@ edition = "2021"
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
-psibase = { path="../../../../rust/psibase" }
+psibase = { path = "../../../../rust/psibase" }
 
 [profile.release]
 codegen-units = 1
@@ -21,6 +21,9 @@ crate-type = ["cdylib"]
 
 [package.metadata.component]
 package = "auth-sig:plugin"
+
+[package.metadata.component.target]
+world = "impl"
 
 [package.metadata.component.dependencies]
 

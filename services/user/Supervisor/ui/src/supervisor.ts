@@ -16,6 +16,7 @@ import {
     OriginationData,
     assert,
     assertTruthy,
+    isString,
     parser,
     serviceFromOrigin,
 } from "./utils";
@@ -24,6 +25,8 @@ import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
 import { isRecoverableError } from "./plugin/errors";
 import { Action } from "./action";
+import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
+import { isEqual } from "@psibase/common-lib/messaging/PluginId";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 
@@ -103,7 +106,15 @@ export class Supervisor implements AppInterface {
         const imports = await Promise.all(
             addedPlugins.map((plugin) => this.getDependencies(plugin)),
         );
-        const dependencies = [...new Set(imports.flat())];
+
+        const dependencies = imports
+            .flat()
+            .reduce((acc: QualifiedPluginId[], current: QualifiedPluginId) => {
+                if (!acc.some((obj) => isEqual(obj, current))) {
+                    acc.push(current);
+                }
+                return acc;
+            }, []);
 
         const pluginsReady = Promise.all(
             addedPlugins.map((plugin) => plugin.ready),
@@ -162,8 +173,9 @@ export class Supervisor implements AppInterface {
 
         if (this.context.stack.isEmpty()) {
             assert(
-                sender.origin === this.parentOrigination.origin,
-                "Parent origin mismatch",
+                sender.origin === this.parentOrigination.origin ||
+                    sender.origin === supervisorDomain,
+                "Invalid call origination",
             );
         } else {
             assertTruthy(sender.app, "Cannot determine caller service");
@@ -175,7 +187,10 @@ export class Supervisor implements AppInterface {
 
         const { service, plugin, intf, method, params } = args;
         const p = this.loadContext(service).loadPlugin(plugin);
-        assert(p.new === false, "Tried to call plugin before initialization");
+        assert(
+            p.new === false,
+            `Tried to call plugin ${service}:${plugin} before initialization`,
+        );
 
         this.context.stack.push(sender, args);
 
@@ -197,9 +212,52 @@ export class Supervisor implements AppInterface {
         const actions = this.context.actions;
         if (actions.length <= 0) return;
 
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+
+        await this.loadPlugins([
+            {
+                service: "accounts",
+                plugin: "plugin",
+            },
+        ]);
+
+        let getLoggedInUser: QualifiedFunctionCallArgs = getCallArgs(
+            "accounts",
+            "plugin",
+            "admin",
+            "getLoggedInUser",
+            [this.parentOrigination.origin],
+        );
+        let logInAlice: QualifiedFunctionCallArgs = getCallArgs(
+            "accounts",
+            "plugin",
+            "accounts",
+            "loginTemp",
+            ["alice"],
+        );
+        let supervisorOrigination = {
+            app: serviceFromOrigin(supervisorDomain),
+            origin: supervisorDomain,
+        };
+        let user = this.call(supervisorOrigination, getLoggedInUser);
+        if (user === null || user === undefined) {
+            alert("[Warning] No logged-in user. Alice will be auto-logged-in");
+            this.call(this.parentOrigination, logInAlice);
+
+            user = this.call(supervisorOrigination, getLoggedInUser);
+            if (user === null || user === undefined) {
+                throw new Error("[supervisor] Unable to log in alice");
+            }
+        }
+        if (!isString(user)) {
+            throw new Error(
+                "[supervisor] Malformed response from getLoggedInUser",
+            );
+        }
+
         const formatted = actions.map((a: Action) => {
             return {
-                sender: "alice",
+                sender: user,
                 service: a.service,
                 method: a.action,
                 rawData: uint8ArrayToHex(a.args),
@@ -264,7 +322,7 @@ export class Supervisor implements AppInterface {
             this.replyToParent(args, result);
 
             // Pack any scheduled actions into a transaction and submit
-            this.submitTx();
+            await this.submitTx();
 
             this.context = undefined;
         } catch (e) {

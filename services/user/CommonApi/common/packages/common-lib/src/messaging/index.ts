@@ -15,6 +15,7 @@ export {
     type QualifiedFunctionCallArgs,
     isQualifiedFunctionCallArgs,
     toString,
+    getCallArgs,
 } from "./FunctionCallRequest";
 
 export {
@@ -22,7 +23,8 @@ export {
     isPreLoadPluginsRequest,
 } from "./PreLoadPluginsRequest";
 
-export { type PluginId, type QualifiedPluginId } from "./PluginId";
+export { type PluginId, type QualifiedPluginId, isEqual } from "./PluginId";
+
 export {
     isSupervisorInitialized,
     buildMessageSupervisorInitialized,

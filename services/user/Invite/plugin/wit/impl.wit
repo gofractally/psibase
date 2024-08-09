@@ -1,0 +1,12 @@
+package invite:plugin;
+
+world impl {
+    include host:common/imports;
+
+    // For generating a keypair for the invite
+    import auth-sig:plugin/keyvault;
+
+    export admin;
+    export inviter;
+    export invitee;
+}

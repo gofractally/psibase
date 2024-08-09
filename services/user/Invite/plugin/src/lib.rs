@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
-use bindings::accounts::plugin::accounts;
 use bindings::auth_sig::plugin::keyvault;
 use bindings::exports::invite::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
@@ -26,7 +25,6 @@ use errors::ErrorType::*;
 
 #[derive(Serialize, Deserialize)]
 struct InviteParams {
-    inviter: String,
     app: String,
     pk: String,
     cb: String,
@@ -112,12 +110,8 @@ impl Invitee for Component {
                     .ok_or_else(|| QueryError.err("Invite not found"))
             })?;
 
-        if invite.inviter != decoded.inviter {
-            return Err(CorruptedInviteId.err(&id));
-        }
-
         Ok(Invite {
-            inviter: decoded.inviter,
+            inviter: invite.inviter,
             app: decoded.app,
             callback: decoded.cb,
         })
@@ -126,8 +120,6 @@ impl Invitee for Component {
 
 impl Inviter for Component {
     fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
-        let inviter = accounts::get_logged_in_user()?.ok_or_else(|| InviterLoggedIn.err(""))?;
-
         // TODO: I actually need a function here to generate both a private and
         //         public key (and return them both). Private needs to be added to invite link,
         //         while public is pushed in a tx to add the invite to the chain.
@@ -154,7 +146,6 @@ impl Inviter for Component {
 
         let callback_url = format!("{}{}", orig_domain, callback_subpath);
         let params = InviteParams {
-            inviter,
             app: originator,
             pk: pubkey_str,
             cb: callback_url,
