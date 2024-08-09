@@ -1,7 +1,7 @@
 enable_testing()
 
 add_library( psio src/fpconv.c src/schema.cpp)
-target_link_libraries( psio PUBLIC rapidjson simdjson boost )
+target_link_libraries( psio PUBLIC rapidjson boost )
 target_include_directories( psio PUBLIC include )
 add_compile_options( -Wall -Wstrict-aliasing )
 
