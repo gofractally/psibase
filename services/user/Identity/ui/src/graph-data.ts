@@ -50,23 +50,28 @@ export const getCouncilLinks = (graph: AttestationGraph, targetDepth: number) =>
 
   function recurseForCouncilLinks(graph: AttestationGraph, node: AttestationGraphNode, depth: number, targetDepth: number, pathLinks: AttestationGraphLink[]) {
     if (depth > targetDepth) return;
-    if (visitedNodeIds.has(node)) return;
+    if (visitedNodeIds.has(node)) return; // Is this right? What if a node is approached from different directions and different council members?
+    // if a council member is encountered, return links (what links exactly?)
     if (depth > 0 && node.council) {
+      console.info("stopping at node:", node, "; adding pathLinks:", pathLinks, "; depth:", depth, "; returning...");
       councilLinks = councilLinks.concat(pathLinks);
+      console.info("councilLinks:", councilLinks);
       return;
     }
 
     visitedNodeIds.add(node.id);
     // for all links that start at this node, recurse to all its neighbors
-    const links = graph.attestations.filter((link) => {
+    const linksFromThisNode = graph.attestations.filter((link) => {
       return link.source.id === node.id;
     });
-    links.forEach((L) => {
-      const targetNode = graph.nodes.find((n) => n.id === L.target.id)
-      if (!targetNode) throw Error("next targetNode DNE")
+    linksFromThisNode.forEach((L) => {
+      // find all the nodes this node has attested
+      const nodeAttestedTo = graph.nodes.find((n) => n.id === L.target.id)
+      if (!nodeAttestedTo) throw Error("next nodeAttestedTo DNE")
+      // and look at the nodes they point at (until we hit our requested depth)
       recurseForCouncilLinks(
         graph,
-        targetNode,
+        nodeAttestedTo,
         depth + 1,
         targetDepth,
         pathLinks.concat([L])

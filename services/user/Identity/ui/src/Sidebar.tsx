@@ -23,8 +23,6 @@ export const Sidebar = ({
     handlers.handleCouncilDistanceChange(newDist);
   };
 
-  // console.info("rendering <SideBar />");
-
   return (
     <div className="sidebar">
       Attestations:
