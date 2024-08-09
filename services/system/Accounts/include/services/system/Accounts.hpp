@@ -107,19 +107,6 @@ namespace SystemService
       /// Reduces the account balance. Aborts the transaction if the
       /// account does not have sufficient resources.
       void billCpu(psibase::AccountNumber name, std::chrono::nanoseconds amount);
-
-      struct Events
-      {
-         struct History
-         {
-         };
-         struct Ui
-         {
-         };
-         struct Merkle
-         {
-         };
-      };
    };
 
    PSIO_REFLECT(Accounts,

@@ -9,4 +9,4 @@ description = "Psibase name conversion functions"
 license = "MIT"
 
 [dependencies]
-seahash = "2.0.0"
+seahash = "4.1.0"

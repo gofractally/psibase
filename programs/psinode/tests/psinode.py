@@ -7,6 +7,9 @@ import tempfile
 import time
 import calendar
 from collections import namedtuple
+import psibase
+from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
+import fracpack
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
     def __init__(self, *args, **kwargs):
@@ -112,14 +115,31 @@ class Cluster(object):
 
 def _get_producer_claim(producer):
     if isinstance(producer, str):
-        return {'name': producer}
+        return {'name': producer, 'auth':{'service':'', 'rawData': ''}}
     elif isinstance(producer, Node):
-        return {'name': producer.producer}
+        return {'name': producer.producer, 'auth':{'service':'', 'rawData': ''}}
     else:
         return producer
 
-Action = namedtuple('Action', ['sender', 'service', 'method', 'data'])
-Transaction = namedtuple('Transaction', ['tapos', 'actions', 'claims'], defaults=[[]])
+class ChainPackContext:
+    def __init__(self, api):
+        self._api = api
+        self._schemas = {}
+        self._custom = dict(**psibase.default_custom, **{"Action": Action.with_context(self)})
+    def pack(self, value, ty=None):
+        return fracpack.pack(value, ty, custom=self._custom)
+    def pack_action_data(self, service, method, data):
+        if isinstance(type(data), fracpack.TypeBase):
+            return fracpack.pack(data, custom=self._custom)
+        if isinstance(method, str):
+            method = MethodNumber(method)
+        return fracpack.pack(data, self.get_schema(service).actions[method].params)
+    def get_schema(self, service):
+        if service not in self._schemas:
+            with self._api.get('/schema', service) as reply:
+                reply.raise_for_status()
+                self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
+        return self._schemas[service]
 
 class TransactionError(Exception):
     def __init__(self, trace):
@@ -176,23 +196,17 @@ class API:
     # Transaction processing
     def pack_action(self, act):
         '''Pack an action and return a json object suitable for use in pack_transaction'''
-        with self.post('/pack_action/%s' % act.method, service=act.service, json=act.data) as result:
-            result.raise_for_status()
-            return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
+        return ChainPackContext(self).pack(trx, Action)
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        with self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims}) as result:
-            result.raise_for_status()
-            return result.content
+        return ChainPackContext(self).pack(trx, Transaction)
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
         if isinstance(trx, bytes):
             trx = trx.hex()
         elif isinstance(trx, Transaction):
             trx = self.pack_transaction(trx).hex()
-        with self.post('/common/pack/SignedTransaction', json={'transaction': trx, 'proofs':signatures}) as result:
-            result.raise_for_status()
-            return result.content
+        return SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
     def push_transaction(self, trx):
         '''
         Push a transaction to the chain and return the transaction trace
@@ -212,7 +226,7 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]))
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):

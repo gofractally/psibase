@@ -2,6 +2,7 @@
 
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serveSchema.hpp>
 #include <psibase/serviceEntry.hpp>
 
 namespace psibase
@@ -31,6 +32,8 @@ namespace psibase
       if (auto result = serveActionTemplates<Service>(request))
          return result;
       if (auto result = servePackAction<Service>(request))
+         return result;
+      if (auto result = serveSchema<Service>(request))
          return result;
       if (IncludeRoot && request.method == "GET" && request.target == "/")
       {
