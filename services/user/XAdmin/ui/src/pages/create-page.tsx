@@ -224,9 +224,15 @@ export const CreatePage = () => {
                 loading={loading}
                 currentState={currentState}
             />
-            <div className="flex h-full flex-col  ">
-                <div className="my-auto flex h-full flex-col justify-between sm:h-5/6">
-                    <Steps currentStep={currentStep} numberOfSteps={maxSteps} />
+            <div className="relative flex h-full flex-col justify-between ">
+                <div></div>
+                <div className="flex flex-col">
+                    <div className="pb-20">
+                        <Steps
+                            currentStep={currentStep}
+                            numberOfSteps={maxSteps}
+                        />
+                    </div>
                     {currentStep == 1 && (
                         <div>
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
@@ -267,7 +273,7 @@ export const CreatePage = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="max-h-[600px] ">
+                            <div className="max-h-full ">
                                 <Accordion type="single" collapsible>
                                     <AccordionItem value="item-1">
                                         <AccordionTrigger className="w-60">
@@ -286,6 +292,8 @@ export const CreatePage = () => {
                         </div>
                     )}
                     {currentStep == 4 && <div>{errorMessage}</div>}
+                </div>
+                <div className="py-4">
                     <PrevNextButtons
                         canNext={canNext}
                         canPrev={canPrev}
