@@ -1,11 +1,13 @@
 #[allow(warnings)]
 mod bindings;
-
+use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::exports::auth_sig::plugin::smart_auth;
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, keyvault::Guest as KeyVault, smart_auth::Guest as SmartAuth,
 };
+
+use bindings::clientdata::plugin::keyvalue as Keyvalue;
 
 use bindings::host::common::server as Server;
 use bindings::host::common::types as CommonTypes;
@@ -43,7 +45,15 @@ impl SmartAuth for AuthSig {
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
-        Err(NotYetImplemented.err("generate_keypair"))
+        let keypair = AuthSig::generate_unmanaged_keypair()?;
+        let b64 = URL_SAFE.encode(&AuthSig::to_der(keypair.public_key.clone())?);
+
+        // Trim off the DER metadata, and then take the first 32 characters as a key
+        let trimmed = b64.get(36..).unwrap_or("").get(..32).unwrap_or("");
+        assert!(trimmed.len() == 32, "Error generating new keypair");
+
+        Keyvalue::set(trimmed, &AuthSig::to_der(keypair.private_key)?)?;
+        Ok(keypair.public_key)
     }
 
     fn generate_unmanaged_keypair() -> Result<Keypair, CommonTypes::Error> {
