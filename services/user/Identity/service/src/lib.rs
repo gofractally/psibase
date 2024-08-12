@@ -20,9 +20,44 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
+    use std::cmp::Ordering;
+
+    impl PartialEq for Attestation {
+        fn eq(&self, other: &Self) -> bool {
+            self.cmp(&other) == Ordering::Equal
+        }
+    }
+    impl PartialOrd for Attestation {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(&other))
+        }
+    }
+
+    impl Ord for Attestation {
+        fn cmp(&self, other: &Self) -> Ordering {
+            match self.attester.to_string().cmp(&other.attester.to_string()) {
+                Ordering::Equal => {
+                    return match self.subject.to_string().cmp(&other.subject.to_string()) {
+                        Ordering::Equal => {
+                            return match self.value.cmp(&other.value) {
+                                Ordering::Equal => {
+                                    return self.issued.seconds.cmp(&other.issued.seconds)
+                                }
+                                ord => ord,
+                            }
+                        }
+                        ord => ord,
+                    }
+                }
+                ord => ord,
+            }
+        }
+    }
 
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
+    #[derive(
+        Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Default, Eq,
+    )]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -58,8 +93,16 @@ mod service {
         }
     }
 
+    impl PartialEq for AttestationStats {
+        fn eq(&self, other: &Self) -> bool {
+            self.subject == other.subject
+                && self.num_high_conf_attestations == other.num_high_conf_attestations
+                && self.unique_attesters == other.unique_attesters
+        }
+    }
+
     #[table(name = "AttestationStatsTable", index = 1)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Eq)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/attestee
         #[primary_key]
