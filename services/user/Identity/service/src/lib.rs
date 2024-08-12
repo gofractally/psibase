@@ -13,58 +13,15 @@ mod service {
 
     use async_graphql::*;
 
-    use psibase::{
-        services::{accounts::Wrapper as AccountsSvc, transact},
-        AccountNumber, TableQuery, TimePointSec, *,
-    };
+    use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
+    use psibase::*;
+
     use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
-    // use std::cmp::Ordering;
-
-    // impl PartialEq for Attestation {
-    //     fn eq(&self, other: &Self) -> bool {
-    //         self.cmp(&other) == Ordering::Equal
-    //     }
-    // }
-    // impl PartialOrd for Attestation {
-    //     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    //         Some(self.cmp(&other))
-    //     }
-    // }
-
-    // impl Ord for Attestation {
-    //     fn cmp(&self, other: &Self) -> Ordering {
-    //         match self.attester.to_string().cmp(&other.attester.to_string()) {
-    //             Ordering::Equal => {
-    //                 return match self.subject.to_string().cmp(&other.subject.to_string()) {
-    //                     Ordering::Equal => {
-    //                         return match self.value.cmp(&other.value) {
-    //                             Ordering::Equal => {
-    //                                 return self.issued.seconds.cmp(&other.issued.seconds)
-    //                             }
-    //                             ord => ord,
-    //                         }
-    //                     }
-    //                     ord => ord,
-    //                 }
-    //             }
-    //             ord => ord,
-    //         }
-    //     }
-    // }
 
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(
-        Fracpack,
-        ToSchema,
-        Serialize,
-        Deserialize,
-        SimpleObject,
-        Debug,
-        Clone,
-        Default, // Eq,
-    )]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Default)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
