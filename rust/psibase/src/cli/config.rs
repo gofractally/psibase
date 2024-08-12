@@ -132,7 +132,7 @@ fn cmd_host_list_section() -> Result<(), Error> {
 }
 
 fn cmd_host_get(key: &str) -> Result<(), Error> {
-    let mut config = read_psibase_config().unwrap_or_default();
+    let config = read_psibase_config().unwrap_or_default();
     println!("{}", config.hosts.get(key).expect("Host not set"));
     Ok(())
 }
