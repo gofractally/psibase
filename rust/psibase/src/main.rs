@@ -12,8 +12,8 @@ use psibase::{
     get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
     push_transaction, push_transactions, reg_server, set_auth_service_action, set_code_action,
     set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
-    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, Meta,
-    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
+    AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry,
+    Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
     SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
     TransactionBuilder, TransactionTrace,
 };
@@ -21,6 +21,7 @@ use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::ffi::OsString;
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
@@ -81,7 +82,7 @@ enum Command {
         #[clap(long, value_name = "URL")]
         package_source: Vec<String>,
 
-        services: Vec<String>,
+        services: Vec<OsString>,
     },
 
     /// Create or modify an account
@@ -180,7 +181,7 @@ enum Command {
     Install {
         /// Packages to install
         #[clap(required = true)]
-        packages: Vec<String>,
+        packages: Vec<OsString>,
 
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
@@ -232,7 +233,7 @@ enum Command {
     Info {
         /// Packages to show
         #[clap(required = true)]
-        packages: Vec<String>,
+        packages: Vec<OsString>,
 
         /// A URL or path to a package repository (repeatable)
         #[clap(long, value_name = "URL")]
@@ -604,11 +605,11 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
     Ok(base.join("share/psibase"))
 }
 
-async fn get_package_registry(
+async fn add_package_registry(
     sources: &Vec<String>,
     client: reqwest::Client,
-) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
-    let mut result = JointRegistry::new();
+    result: &mut JointRegistry<BufReader<File>>,
+) -> Result<(), anyhow::Error> {
     if sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
@@ -620,6 +621,15 @@ async fn get_package_registry(
             }
         }
     }
+    Ok(())
+}
+
+async fn get_package_registry(
+    sources: &Vec<String>,
+    client: reqwest::Client,
+) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
+    let mut result = JointRegistry::new();
+    add_package_registry(sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -629,21 +639,22 @@ async fn boot(
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
     package_source: &Vec<String>,
-    services: &Vec<String>,
+    services: &Vec<OsString>,
 ) -> Result<(), anyhow::Error> {
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec {
         seconds: now_plus_120secs.timestamp() as u32,
     };
-    let default_services = vec!["Default".to_string()];
-    let package_registry = get_package_registry(package_source, client.clone()).await?;
-    let mut packages = package_registry
-        .resolve(if services.is_empty() {
-            &default_services[..]
-        } else {
-            &services[..]
-        })
-        .await?;
+    let mut package_registry = JointRegistry::new();
+    let package_names = if services.is_empty() {
+        vec!["Default".to_string()]
+    } else {
+        let (files, packages) = FileSetRegistry::from_files(services)?;
+        package_registry.push(files)?;
+        packages
+    };
+    add_package_registry(package_source, client.clone(), &mut package_registry).await?;
+    let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, transactions) =
         create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
 
@@ -849,16 +860,19 @@ async fn apply_packages<
 async fn install(
     args: &Args,
     mut client: reqwest::Client,
-    packages: &[String],
+    packages: &[OsString],
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
     reinstall: bool,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
-    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    package_registry.push(files)?;
+    add_package_registry(sources, client.clone(), &mut package_registry).await?;
     let to_install = installed
-        .resolve_changes(&package_registry, packages, reinstall)
+        .resolve_changes(&package_registry, &packages, reinstall)
         .await?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
@@ -1112,14 +1126,17 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
 async fn package_info(
     args: &Args,
     mut client: reqwest::Client,
-    packages: &Vec<String>,
+    packages: &Vec<OsString>,
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
-    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    package_registry.push(files)?;
+    add_package_registry(sources, client.clone(), &mut package_registry).await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
-    for package in packages {
+    for package in &packages {
         if let Some((meta, origin)) = installed.get_by_name(package)? {
             show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
