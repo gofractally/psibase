@@ -20,43 +20,50 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
-    use std::cmp::Ordering;
+    // use std::cmp::Ordering;
 
-    impl PartialEq for Attestation {
-        fn eq(&self, other: &Self) -> bool {
-            self.cmp(&other) == Ordering::Equal
-        }
-    }
-    impl PartialOrd for Attestation {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            Some(self.cmp(&other))
-        }
-    }
+    // impl PartialEq for Attestation {
+    //     fn eq(&self, other: &Self) -> bool {
+    //         self.cmp(&other) == Ordering::Equal
+    //     }
+    // }
+    // impl PartialOrd for Attestation {
+    //     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    //         Some(self.cmp(&other))
+    //     }
+    // }
 
-    impl Ord for Attestation {
-        fn cmp(&self, other: &Self) -> Ordering {
-            match self.attester.to_string().cmp(&other.attester.to_string()) {
-                Ordering::Equal => {
-                    return match self.subject.to_string().cmp(&other.subject.to_string()) {
-                        Ordering::Equal => {
-                            return match self.value.cmp(&other.value) {
-                                Ordering::Equal => {
-                                    return self.issued.seconds.cmp(&other.issued.seconds)
-                                }
-                                ord => ord,
-                            }
-                        }
-                        ord => ord,
-                    }
-                }
-                ord => ord,
-            }
-        }
-    }
+    // impl Ord for Attestation {
+    //     fn cmp(&self, other: &Self) -> Ordering {
+    //         match self.attester.to_string().cmp(&other.attester.to_string()) {
+    //             Ordering::Equal => {
+    //                 return match self.subject.to_string().cmp(&other.subject.to_string()) {
+    //                     Ordering::Equal => {
+    //                         return match self.value.cmp(&other.value) {
+    //                             Ordering::Equal => {
+    //                                 return self.issued.seconds.cmp(&other.issued.seconds)
+    //                             }
+    //                             ord => ord,
+    //                         }
+    //                     }
+    //                     ord => ord,
+    //                 }
+    //             }
+    //             ord => ord,
+    //         }
+    //     }
+    // }
 
     #[table(name = "AttestationTable", index = 0)]
     #[derive(
-        Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Default, Eq,
+        Fracpack,
+        ToSchema,
+        Serialize,
+        Deserialize,
+        SimpleObject,
+        Debug,
+        Clone,
+        Default, // Eq,
     )]
     pub struct Attestation {
         /// The attesting account / the issuer
@@ -207,8 +214,6 @@ mod service {
                 .after(after)
                 .query()
                 .await
-            // .iter()
-            // .collect::<Vec<Attestation>>())
         }
 
         async fn attestations_by_attester(

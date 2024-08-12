@@ -6,7 +6,7 @@
  - queries for non-existent records produce reasonable error responses
 */
 mod attestations;
-// mod errors; // updated
-// mod queries; // updated
+mod errors; // updated
+mod queries; // updated
 mod stats;
 mod test_helpers;

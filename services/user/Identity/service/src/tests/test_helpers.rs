@@ -49,15 +49,6 @@ pub fn get_gql_query_attestation_stats_no_args(query_name: &str) -> String {
     query_name)
 }
 
-pub fn get_gql_query_attestation_stats_one_arg(
-    query_name: &str,
-    param_name: &str,
-    param: &str,
-) -> String {
-    format!("query {{ {}({}: \"{}\") {{ nodes {{ subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation {{ seconds }} }} }} }}",
-    query_name, param_name, param)
-}
-
 pub fn get_gql_query_subject_stats_one_arg(
     query_name: &str,
     param_name: &str,
@@ -66,19 +57,6 @@ pub fn get_gql_query_subject_stats_one_arg(
     format!("query {{ {}({}: \"{}\") {{ subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation {{ seconds }} }} }}",
     query_name, param_name, param)
 }
-// pub fn test_attest(
-//     chain: &psibase::Chain,
-//     attester: AccountNumber,
-//     subject: AccountNumber,
-//     conf: u8,
-// ) -> Result<(), psibase::Error> {
-//     crate::Wrapper::push_from(&chain, attester)
-//         .attest(subject.clone(), conf)
-//         .get()?;
-
-//     chain.finish_block();
-//     Ok(())
-// }
 
 pub fn push_attest(
     chain: &psibase::Chain,
@@ -93,61 +71,6 @@ pub fn push_attest(
     chain.finish_block();
     Ok(())
 }
-
-// #[derive(Deserialize, Debug, Clone)]
-// struct Attestation {
-//     attester: String,
-//     subject: String,
-//     value: u8,
-// }
-
-// pub fn expect_from_query_unused?(
-//     chain: &psibase::Chain,
-//     query_name: &str,
-//     graphql_query: String,
-//     exp_results: &serde_json::Value,
-// ) {
-//     use serde_json::Value;
-
-//     // println!("{}", query_name);
-//     // println!("{}", graphql_query);
-//     // println!("{}", exp_results);
-//     let att_results: Value = chain.graphql(SERVICE, &graphql_query).unwrap();
-
-//     let att_result = serde_json::from_value::<AttestationStats>(
-//         att_results["data"][query_name]["nodes"].clone(),
-//     )
-//     .unwrap();
-
-//     let exp_result = serde_json::from_value::<AttestationStats>(exp_results.clone()).unwrap();
-
-//     assert_eq!(att_result, exp_result);
-// }
-
-// pub fn expect_from_query_array_v2_using_attestation_struct(
-//     chain: &psibase::Chain,
-//     query_name: &str,
-//     graphql_query: String,
-//     exp_results: &serde_json::Value,
-// ) {
-//     use serde_json::Value;
-
-//     let att_results: Value = chain.graphql(SERVICE, &graphql_query).unwrap();
-
-//     println!("{:#?}", att_results);
-//     let att_results_sorted_option = serde_json::from_value::<Vec<Attestation>>(
-//         att_results["data"][query_name]["nodes"].clone(),
-//     );
-//     println!("{:#?}", att_results_sorted_option);
-//     let mut att_results_sorted = att_results_sorted_option.unwrap();
-//     att_results_sorted.sort_by(|a, b| a.cmp(&b));
-
-//     let mut exp_results_sorted =
-//         serde_json::from_value::<Vec<Attestation>>(exp_results.clone()).unwrap();
-//     exp_results_sorted.sort_by(|a, b| a.cmp(&b));
-
-//     assert_eq!(att_results_sorted, exp_results_sorted);
-// }
 
 // Pass in graphql query string
 // get gql results into specified struct
@@ -241,46 +164,3 @@ pub fn expect_from_attestation_stats_query(
             .is_some(),);
     }
 }
-
-// pub fn expect_attestations(chain: &psibase::Chain, exp_results: &PartialAttestation) {
-//     let graphql_query = r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value, issued { seconds } } } }"#;
-//     expect_from_query::<crate::service::Attestation, PartialAttestation>(
-//         &chain,
-//         "attestationsByAttestee",
-//         String::from(graphql_query),
-//         exp_results,
-//     )
-//     // use serde_json::Value;
-
-//     // let att_results: Value = chain.graphql(
-//     //         SERVICE,
-//     //         r#"query { attestationsByAttestee(attestee: "bob") { nodes { attester, subject, value, issued } } }"#,
-//     //     ).unwrap();
-
-//     // let mut att_results_sorted = serde_json::from_value::<Vec<Attestation>>(
-//     //     att_results["data"]["attestationsByAttestee"]["nodes"].clone(),
-//     // )
-//     // .unwrap();
-//     // att_results_sorted.sort_by(|a, b| a.cmp(&b));
-
-//     // let mut exp_results_sorted =
-//     //     serde_json::from_value::<Vec<Attestation>>(exp_results.clone()).unwrap();
-//     // exp_results_sorted.sort_by(|a, b| a.cmp(&b));
-
-//     // assert!(att_results_sorted.cmp(&exp_results_sorted) == Ordering::Equal);
-// }
-
-// pub fn expect_attestation_stats(chain: &psibase::Chain, expected_results: &serde_json::Value) {
-//     use serde_json::{json, Value};
-
-//     let reply: Value = chain
-//         .graphql(
-//             SERVICE,
-//             r#"query { allAttestationStats { nodes { subject, uniqueAttesters, numHighConfAttestations } } }"#,
-//         )
-//         .unwrap();
-//     assert_eq!(
-//         reply,
-//         json!({ "data": { "allAttestationStats": { "nodes": expected_results } } })
-//     );
-// }
