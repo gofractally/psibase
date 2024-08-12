@@ -27,17 +27,21 @@ use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
+mod cli;
+use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
+
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// API Endpoint
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
         short = 'a',
         long,
-        value_name = "URL",
+        value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
+        default_value = "http://psibase.127.0.0.1.sslip.io:8080/",
+        value_parser = parse_api_endpoint
     )]
     api: Url,
 
@@ -250,6 +254,10 @@ enum Command {
         #[clap(short = 'm', long, default_value = "rw")]
         mode: String,
     },
+
+    /// Setup the psibase local config file
+    #[command(subcommand)]
+    Config(ConfigCommand),
 }
 
 #[allow(dead_code)] // TODO: move to lib if still needed
@@ -1172,6 +1180,15 @@ async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>
     Ok((builder.gzip(true).build()?, result))
 }
 
+pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
+    if let Ok(api_url) = Url::parse(api_str) {
+        Ok(api_url)
+    } else {
+        let host_url = read_host_url(api_str)?;
+        Ok(Url::parse(&host_url)?)
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
@@ -1286,6 +1303,7 @@ async fn main() -> Result<(), anyhow::Error> {
             expires_after,
             mode,
         } => create_token(Duration::seconds(*expires_after), mode)?,
+        Command::Config(config) => handle_cli_config_cmd(config)?,
     }
 
     Ok(())
