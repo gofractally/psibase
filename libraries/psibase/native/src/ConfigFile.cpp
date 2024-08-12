@@ -520,6 +520,12 @@ void ConfigFile::set(std::string_view                             section,
          {
             insertions[insertPoint] += editLine(opts, section, key, value);
          }
+         else if (lines[iter->second].empty())
+         {
+            // Multiple values for the same key. Make sure that they appear in order
+            insertPoint = iter->second + 1;
+            insertions[insertPoint] += editLine(opts, section, key, value);
+         }
          else
          {
             auto location = iter->second;

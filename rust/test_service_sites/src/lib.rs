@@ -9,14 +9,14 @@ mod service {
     use psibase::{
         check, get_sender, get_service, queries, serve_action_templates, serve_graphiql,
         serve_graphql, serve_pack_action, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
-        Reflect, Table, TableIndex, ToKey, Unpack,
+        Table, TableIndex, ToKey, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
     type ContentKey = (AccountNumber, String);
 
     #[table(name = "ContentTable", index = 0)]
-    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Reflect, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Pack, Unpack, PartialEq, Eq, Serialize, Deserialize, SimpleObject)]
     pub struct ContentRow {
         pub account: AccountNumber,
         pub path: String,
@@ -34,6 +34,7 @@ mod service {
     impl From<ContentRow> for HttpReply {
         fn from(content_row: ContentRow) -> Self {
             HttpReply {
+                status: 200,
                 contentType: content_row.content_type,
                 body: content_row.content,
                 headers: Vec::new(),
@@ -519,6 +520,7 @@ mod tests {
         assert_eq!(
             reply,
             &HttpReply {
+                status: 200,
                 contentType: content_type.to_owned(),
                 body: content.clone().into(),
                 headers: Vec::new(),
