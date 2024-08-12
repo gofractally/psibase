@@ -55,11 +55,11 @@ impl FromStr for ConfigKey {
     }
 }
 
-pub const PSIBASE_CONFIG_NOT_FOUND_ERR: &str = r#"No hosts config found in ~/.psibase.toml
+pub const PSIBASE_CONFIG_NOT_FOUND_ERR: &str = r#"No config found in ~/.psibase.toml
     
 Make sure you have the psibase config file setup properly. 
 
-You can do that by running `psibase config set host.dev http://my-dev-env.example.com`
+You can do that by setting psibase config values running `psibase config set hosts.dev http://my-dev-env.example.com`
 
 Or manually editing the ~/.psibase.toml:
 
