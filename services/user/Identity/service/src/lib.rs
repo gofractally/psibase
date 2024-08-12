@@ -96,8 +96,8 @@ mod service {
     impl PartialEq for AttestationStats {
         fn eq(&self, other: &Self) -> bool {
             self.subject == other.subject
-                && self.num_high_conf_attestations == other.num_high_conf_attestations
-                && self.unique_attesters == other.unique_attesters
+                && self.numHighConfAttestations == other.numHighConfAttestations
+                && self.uniqueAttesters == other.uniqueAttesters
         }
     }
 
@@ -110,12 +110,12 @@ mod service {
 
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
         // pub perc_high_conf: u8,
-        pub num_high_conf_attestations: u16,
+        pub numHighConfAttestations: u16,
 
-        pub unique_attesters: u16,
+        pub uniqueAttesters: u16,
 
         // freshness indicator
-        pub most_recent_attestation: TimePointSec,
+        pub mostRecentAttestation: TimePointSec,
     }
 
     impl fmt::Display for AttestationStats {
@@ -124,9 +124,9 @@ mod service {
                 f,
                 "--AttestationStats--\n{}\t: subject\n{} :# unique attesters\n{}\t: % high conf\n{} :most recent attestation",
                 self.subject,
-                self.unique_attesters,
-                self.num_high_conf_attestations,
-                self.most_recent_attestation.seconds
+                self.uniqueAttesters,
+                self.numHighConfAttestations,
+                self.mostRecentAttestation.seconds
             )
         }
     }
@@ -135,9 +135,9 @@ mod service {
         fn default() -> Self {
             AttestationStats {
                 subject: AccountNumber::from(0),
-                num_high_conf_attestations: 0,
-                unique_attesters: 0,
-                most_recent_attestation: TimePointSec::from(0),
+                numHighConfAttestations: 0,
+                uniqueAttesters: 0,
+                mostRecentAttestation: TimePointSec::from(0),
             }
         }
     }

@@ -11,9 +11,9 @@ fn remove_existing_attestation_from_stats(
     existing_attest_rec: Attestation,
 ) -> &mut AttestationStats {
     if is_high_confidence_score(existing_attest_rec.value) {
-        stats_rec.num_high_conf_attestations -= 1;
+        stats_rec.numHighConfAttestations -= 1;
     }
-    stats_rec.unique_attesters -= 1;
+    stats_rec.uniqueAttesters -= 1;
     stats_rec
 }
 
@@ -24,13 +24,13 @@ fn add_attestation_to_stats(
     issued: TimePointSec,
 ) -> &AttestationStats {
     stats_rec.subject = subject;
-    stats_rec.most_recent_attestation = issued;
-    stats_rec.num_high_conf_attestations += if is_high_confidence_score(value) {
+    stats_rec.mostRecentAttestation = issued;
+    stats_rec.numHighConfAttestations += if is_high_confidence_score(value) {
         1
     } else {
         0
     };
-    stats_rec.unique_attesters += 1;
+    stats_rec.uniqueAttesters += 1;
     stats_rec
 }
 
@@ -52,7 +52,7 @@ pub fn update_attestation_stats(
     // STEPS:
     // 1) ensure the table has a default state (handled by Default impl)
     // 2) if this is a new attestation for an existing subject; remove stat that this entry will replace
-    if !is_new_unique_attester_for_subj && stats_rec.unique_attesters > 0 {
+    if !is_new_unique_attester_for_subj && stats_rec.uniqueAttesters > 0 {
         remove_existing_attestation_from_stats(&mut stats_rec, existing_attestation.unwrap());
     }
 
