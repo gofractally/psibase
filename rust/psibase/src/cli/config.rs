@@ -3,6 +3,7 @@ use clap::Subcommand;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use url::Url;
 
 #[derive(Subcommand, Debug)]
@@ -10,38 +11,55 @@ pub enum ConfigCommand {
     /// Read the config file
     Read,
 
-    /// Manages Hosts config: they are api endpoint aliases
-    #[command(subcommand)]
-    Host(HostSubCommand),
+    /// Set a config value
+    Set {
+        /// Config key to set. Example: hosts.dev, hosts.prod, etc.
+        key: String,
+
+        /// Config value to set on the provided key. Example: https://prod.my-psibase-app.io
+        value: String,
+    },
+
+    /// Get a config section or value
+    Get {
+        /// Config key to get. Example: hosts.dev, hosts.prod or hosts (to get the full section).
+        key: String,
+    },
+
+    Unset {
+        /// Config key to unset (removed). Example: hosts.dev, hosts.prod, etc.
+        key: String,
+    },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum HostSubCommand {
-    /// Setup a host environment alias in the config file ~/.psibase.toml
-    /// to be deployed. Example: dev, prod.
-    Set {
-        /// Host key. Example: dev, prod, qa1, uat, etc.
-        key: String,
+pub enum ConfigKey {
+    Hosts(String),
+    HostsSection,
+}
 
-        /// Host URL. Example: https://prod.my-psibase-app.io
-        url: Url,
-    },
+impl FromStr for ConfigKey {
+    type Err = Error;
 
-    /// Delete a host environment alias from the config file ~/.psibase.toml
-    Delete {
-        /// Host key. Example: dev, prod, qa1, uat, etc.
-        key: String,
-    },
-
-    /// List all the hosts in the config file
-    List,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((section, key)) = s.split_once('.') {
+            if section == "hosts" {
+                Ok(ConfigKey::Hosts(key.to_string()))
+            } else {
+                Err(anyhow!("Unknown config section: {}", section))
+            }
+        } else if s == "hosts" {
+            Ok(ConfigKey::HostsSection)
+        } else {
+            Err(anyhow!("Invalid config key format. Expected 'section.key'"))
+        }
+    }
 }
 
 pub const PSIBASE_CONFIG_NOT_FOUND_ERR: &str = r#"No hosts config found in ~/.psibase.toml
     
 Make sure you have the psibase config file setup properly. 
 
-You can do that by running `psibase config host dev=http://my-dev-env.example.com`
+You can do that by running `psibase config set host.dev http://my-dev-env.example.com`
 
 Or manually editing the ~/.psibase.toml:
 
@@ -57,10 +75,36 @@ pub struct PsibaseConfig {
 
 pub fn handle_cli_config_cmd(config: &ConfigCommand) -> Result<(), anyhow::Error> {
     match config {
-        ConfigCommand::Host(host_opts) => handle_cli_host_subcommand(host_opts)?,
+        ConfigCommand::Set { key, value } => cmd_set(key, value)?,
+        ConfigCommand::Get { key } => cmd_get(key)?,
+        ConfigCommand::Unset { key } => cmd_unset(key)?,
+        // ConfigCommand::Host(host_opts) => handle_cli_host_subcommand(host_opts)?,
         ConfigCommand::Read => println!("{}", get_psibase_config_str()?),
     }
     Ok(())
+}
+
+pub fn cmd_set(key: &str, value: &str) -> Result<(), Error> {
+    match ConfigKey::from_str(key)? {
+        ConfigKey::Hosts(key) => cmd_host_set(&key, value),
+        ConfigKey::HostsSection => Err(anyhow!("It's not allowed to set the entire hosts section")),
+    }
+}
+
+pub fn cmd_get(key: &str) -> Result<(), Error> {
+    match ConfigKey::from_str(key)? {
+        ConfigKey::Hosts(key) => cmd_host_get(&key),
+        ConfigKey::HostsSection => cmd_host_list_section(),
+    }
+}
+
+pub fn cmd_unset(key: &str) -> Result<(), Error> {
+    match ConfigKey::from_str(key)? {
+        ConfigKey::Hosts(key) => cmd_host_unset(&key),
+        ConfigKey::HostsSection => Err(anyhow!(
+            "It's not allowed to unset the entire hosts section"
+        )),
+    }
 }
 
 pub fn read_host_url(host_key: &str) -> Result<String, Error> {
@@ -80,22 +124,21 @@ pub fn read_host_url(host_key: &str) -> Result<String, Error> {
     })
 }
 
-fn handle_cli_host_subcommand(host_opts: &HostSubCommand) -> Result<(), anyhow::Error> {
-    match host_opts {
-        HostSubCommand::Set { key, url } => cmd_host_set(key, url),
-        HostSubCommand::Delete { key } => cmd_host_delete(key),
-        HostSubCommand::List => cmd_host_list(),
-    }
-}
-
-fn cmd_host_list() -> Result<(), Error> {
+fn cmd_host_list_section() -> Result<(), Error> {
     let config = get_psibase_config_str()?;
     let toml_value = toml::from_str::<toml::Value>(&config)?;
     println!("{}", toml::to_string_pretty(&toml_value)?);
     Ok(())
 }
 
-fn cmd_host_set(key: &str, url: &Url) -> Result<(), Error> {
+fn cmd_host_get(key: &str) -> Result<(), Error> {
+    let mut config = read_psibase_config().unwrap_or_default();
+    println!("{}", config.hosts.get(key).expect("Host not set"));
+    Ok(())
+}
+
+fn cmd_host_set(key: &str, url_str: &str) -> Result<(), Error> {
+    let url = Url::parse(url_str)?;
     let mut config = read_psibase_config().unwrap_or_default();
     config.hosts.insert(key.to_string(), url.to_string());
     write_psibase_config(config)?;
@@ -103,7 +146,7 @@ fn cmd_host_set(key: &str, url: &Url) -> Result<(), Error> {
     Ok(())
 }
 
-fn cmd_host_delete(key: &str) -> Result<(), Error> {
+fn cmd_host_unset(key: &str) -> Result<(), Error> {
     let mut config = read_psibase_config()?;
     if config.hosts.remove(key).is_some() {
         write_psibase_config(config)?;
