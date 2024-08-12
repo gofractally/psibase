@@ -282,18 +282,22 @@ void validate(boost::any& v, const std::vector<std::string>& values, Timeout*, i
 
 std::string to_string(const Timeout& timeout)
 {
-   auto ms = timeout.duration.count();
    if (timeout == Timeout::none())
    {
       return "inf";
    }
-   if (ms % 1000 == 0)
+   auto us = std::chrono::duration_cast<std::chrono::microseconds>(timeout.duration).count();
+   if (us % 1000000 == 0)
    {
-      return std::to_string(ms / 1000) + " s";
+      return std::to_string(us / 1000000) + " s";
+   }
+   else if (us % 1000 == 0)
+   {
+      return std::to_string(us / 1000) + " ms";
    }
    else
    {
-      return std::to_string(ms) + " ms";
+      return std::to_string(us) + " us";
    }
 }
 
