@@ -19,6 +19,8 @@ use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
+mod package;
+use package::build_package;
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
 const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
@@ -106,6 +108,9 @@ struct TestCommand {
 enum Command {
     /// Build a service
     Build {},
+
+    /// Package a service
+    Package {},
 
     /// Build and run tests
     Test(TestCommand),
@@ -503,6 +508,10 @@ async fn main2() -> Result<(), Error> {
     match &args.command {
         Command::Build {} => {
             build(&args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
+            pretty("Done", "");
+        }
+        Command::Package {} => {
+            build_package(&args, &metadata, root).await?;
             pretty("Done", "");
         }
         Command::Test(opts) => {

@@ -422,6 +422,7 @@ dependencies = [
  "console",
  "psibase",
  "regex",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
@@ -431,6 +432,7 @@ dependencies = [
  "wasmparser 0.201.0",
  "wasmprinter",
  "wat",
+ "zip",
 ]
 
 [[package]]
