@@ -20,16 +20,9 @@ struct ResponseRoot {
     data: Data,
 }
 
-// #[derive(Deserialize, Debug)]
-// struct Account {
-//     accountNum: AccountNumber,
-//     authService: AccountNumber,
-// }
-
 #[allow(non_snake_case)]
 #[derive(Deserialize, Debug)]
 struct Data {
-    // getAccount: Option<AccountTypes::Account>,
     getAccount: Option<AccountsService::Account>,
 }
 
