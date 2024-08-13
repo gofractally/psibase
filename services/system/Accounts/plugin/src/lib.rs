@@ -2,10 +2,10 @@
 mod bindings;
 
 use bindings::accounts::plugin::types::{self as AccountTypes};
-use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
+use bindings::exports::accounts::plugin::accounts::Guest as AccountsApi;
 use bindings::host::common::{server as Server, types as CommonTypes};
 use psibase::fracpack::Pack;
-use psibase::services::accounts as AccountsService;
+use psibase::services::accounts::{self as AccountsService};
 use psibase::AccountNumber;
 
 use serde::Deserialize;
@@ -26,7 +26,7 @@ struct Data {
     getAccount: Option<AccountsService::Account>,
 }
 
-impl Accounts for AccountsPlugin {
+impl AccountsApi for AccountsPlugin {
     fn login() -> Result<(), CommonTypes::Error> {
         return Err(NotYetImplemented.err("login"));
     }
@@ -51,27 +51,22 @@ impl Accounts for AccountsPlugin {
             acct_num 
         );
 
-        let account_result = Server::post_graphql_get_json(&query)
-            .map_err(|e| QueryError.err(&e.message))
-            .and_then(|result| {
-                serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
-            });
+        let response_str = Server::post_graphql_get_json(&query).map_err(|e| QueryError.err(&e.message))?;
+        let response_root = serde_json::from_str::<ResponseRoot>(&response_str).map_err(|e| QueryError.err(&e.to_string()))?;
 
-        let account = account_result.and_then(|response_root: ResponseRoot| {
-            response_root
-                .data
-                .getAccount
-                .ok_or_else(|| AccountDNE.err(&name))
-        })?;
-
-        Ok(Some(AccountTypes::Account {
-            account_num: account.accountNum.to_string(),
-            auth_service: account.authService.to_string(),
-            resource_balance: Some(match account.resourceBalance {
-                Some(val) => val.value,
-                None => 0,
-            }),
-        }))
+        match response_root.data.getAccount {
+            Some(acct_val) => {
+                Ok(Some(AccountTypes::Account {
+                    account_num: acct_val.accountNum.to_string(),
+                    auth_service: acct_val.authService.to_string(),
+                    resource_balance: Some(match acct_val.resourceBalance {
+                        Some(val) => val.value,
+                        None => 0,
+                    }),
+                }))
+            },
+            None => Ok(None)
+        }
     }
 
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
