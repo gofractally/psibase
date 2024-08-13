@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["service", "query"]
+
+[workspace.metadata.psibase]
+package-name = "TestPackage"
+version = "0.12.0"
+description = "Test for package building"
+services = ["tpack"]
+
+[workspace.package]
+version = "0.12.0"
+rust-version = "1.64"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
