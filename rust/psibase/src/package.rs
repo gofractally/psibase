@@ -9,6 +9,7 @@ use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::str::FromStr;
@@ -23,8 +24,6 @@ use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
-#[cfg(not(target_family = "wasm"))]
-use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
 use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
@@ -663,7 +662,7 @@ impl PackageRegistry for DirectoryRegistry {
     }
 }
 
-// Stores a set of
+// A virtual registry that contains packages from a set of files
 pub struct FileSetRegistry {
     info: Vec<PackageInfo>,
     by_hash: HashMap<Checksum256, PathBuf>,
