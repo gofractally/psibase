@@ -59,11 +59,11 @@ impl Accounts for AccountsPlugin {
             response_root
                 .data
                 .getAccount
-                .ok_or_else(|| InvalidAccountNumber.err(&name))
+                .ok_or_else(|| AccountDNE.err(&name))
         })?;
 
         if account.accountNum.value != AccountNumber::from_exact(&name).unwrap().value {
-            return Err(InvalidAccountNumber.err(&name));
+            return Err(AccountDNE.err(&name));
         } else {
             return Ok(Some(AccountTypes::Account {
                 account_num: account.accountNum.to_string(),
@@ -77,8 +77,8 @@ impl Accounts for AccountsPlugin {
     }
 
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
-        let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
-            .map_err(|_| InvalidAccountNumber.err(&service_name))?;
+        let account_num: AccountNumber =
+            AccountNumber::from_exact(&service_name).map_err(|_| AccountDNE.err(&service_name))?;
         Server::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {

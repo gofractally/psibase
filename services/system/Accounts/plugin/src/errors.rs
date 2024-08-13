@@ -3,7 +3,7 @@ use crate::bindings::host::common::types::{Error, PluginId};
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
     NotYetImplemented,
-    InvalidAccountNumber,
+    AccountDNE,
     QueryError,
 }
 
@@ -22,15 +22,15 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Not yet implemented: {}", msg),
             },
-            ErrorType::InvalidAccountNumber => Error {
+            ErrorType::AccountDNE => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Invalid account number: {}", msg),
+                message: format!("Account number DNE: {}", msg),
             },
             ErrorType::QueryError => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Failed to post graphql query: {}", msg),
+                message: format!("Graphql query error: {}", msg),
             },
         }
     }
