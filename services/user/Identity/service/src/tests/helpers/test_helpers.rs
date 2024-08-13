@@ -40,11 +40,6 @@ pub fn push_attest(
     Ok(())
 }
 
-// Pass in graphql query string
-// get gql results into specified struct
-//   outside of testing, return data as a struct
-// compare gql_results with expected results field-by-field based on fields in expected_results struct
-// calling looks like expect_from_query_array<Vec<Attestation>>(&chain, <query_name>, <gql_query>, exp_results)
 pub fn query_attestations(
     chain: &psibase::Chain,
     query_name: &str,

@@ -1,8 +1,6 @@
+mod stats;
 #[cfg(test)]
 mod tests;
-
-// mod queries;
-mod stats;
 
 /// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
@@ -73,7 +71,6 @@ mod service {
         pub subject: AccountNumber,
 
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
-        // pub perc_high_conf: u8,
         pub numHighConfAttestations: u16,
 
         pub uniqueAttesters: u16,
