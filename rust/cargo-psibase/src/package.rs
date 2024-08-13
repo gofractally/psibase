@@ -1,6 +1,6 @@
 use crate::{build, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
-use cargo_metadata::{Metadata, Node, Package};
+use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{AccountNumber, Meta, PackageRef, ServiceInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -19,20 +19,46 @@ struct PsibaseMetadata {
     dependencies: HashMap<String, String>,
 }
 
+#[derive(Serialize, Deserialize, Default)]
+struct PsibaseWorkspaceMetadata {
+    #[serde(rename = "package-name")]
+    package_name: String,
+    version: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    services: Vec<String>,
+    #[serde(default)]
+    dependencies: HashMap<String, String>,
+}
+
+fn find_dep<'a>(
+    packages: &HashMap<&str, &Package>,
+    ids: &'a [PackageId],
+    name: &str,
+) -> Option<&'a PackageId> {
+    for id in ids {
+        let p = packages.get(&id.repr.as_str()).unwrap();
+        if &p.name == name {
+            return Some(id);
+        }
+    }
+    None
+}
+
 pub async fn build_package(
     args: &Args,
     metadata: &Metadata,
-    service: &str,
+    service: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     let mut depends = vec![];
     let mut accounts = vec![];
     let mut visited = HashSet::new();
-    let mut queue = vec![service];
+    let mut queue = Vec::new();
     let mut packages: HashMap<&str, &Package> = HashMap::new();
     let mut services = Vec::new();
     let mut resolved: HashMap<&str, &Node> = HashMap::new();
-
-    visited.insert(service);
+    let mut package_info = None;
 
     for package in &metadata.packages {
         packages.insert(&package.id.repr, &package);
@@ -44,19 +70,50 @@ pub async fn build_package(
         }
     }
 
+    if let Some(root) = service {
+        visited.insert(root);
+        queue.push(root);
+    } else {
+        let work_meta: PsibaseWorkspaceMetadata = serde_json::from_value(
+            metadata
+                .workspace_metadata
+                .as_object()
+                .and_then(|m| m.get("psibase"))
+                .unwrap_or(&json!({}))
+                .clone(),
+        )?;
+        package_info = Some((
+            work_meta.package_name,
+            work_meta.version,
+            work_meta.description,
+        ));
+        for service in work_meta.services {
+            let Some(id) = find_dep(&packages, &metadata.workspace_members, &service) else {
+                return Err(anyhow!("{} is not a workspace member", service,));
+            };
+            visited.insert(&id.repr);
+            queue.push(&id.repr);
+        }
+        for (k, v) in work_meta.dependencies {
+            depends.push(PackageRef {
+                name: k,
+                version: v,
+            })
+        }
+    }
     let get_dep = |service: &str, dep: &str| {
         let r = resolved.get(service).unwrap();
-        for id in &r.dependencies {
-            let p = packages.get(&id.repr.as_str()).unwrap();
-            if &p.name == dep {
-                return Ok(id);
-            }
+        if let Some(id) = find_dep(&packages, &r.dependencies, dep) {
+            Ok(id)
+        } else if let Some(id) = find_dep(&packages, &metadata.workspace_members, dep) {
+            Ok(id)
+        } else {
+            Err(anyhow!(
+                "{} is not a dependency of {}",
+                dep,
+                packages.get(service).unwrap().name
+            ))
         }
-        return Err(anyhow!(
-            "{} is not a dependency of {}",
-            dep,
-            packages.get(service).unwrap().name
-        ));
     };
 
     while !queue.is_empty() {
@@ -99,24 +156,32 @@ pub async fn build_package(
         }
     }
 
-    let root = packages.get(service).unwrap();
-    let root_meta: PsibaseMetadata = serde_json::from_value(
-        root.metadata
-            .as_object()
-            .and_then(|m| m.get("psibase"))
-            .unwrap_or(&json!({}))
-            .clone(),
-    )?;
-
-    let package_name = root_meta.package_name.as_ref().unwrap_or(&root.name);
+    let (package_name, package_version, package_description) = if let Some(info) = package_info {
+        info
+    } else {
+        let root = packages.get(service.unwrap()).unwrap();
+        let root_meta: PsibaseMetadata = serde_json::from_value(
+            root.metadata
+                .as_object()
+                .and_then(|m| m.get("psibase"))
+                .unwrap_or(&json!({}))
+                .clone(),
+        )?;
+        if let Some(name) = root_meta.package_name {
+            (name, root.version.to_string(), root.description.clone())
+        } else {
+            (
+                root.name.clone(),
+                root.version.to_string(),
+                root.description.clone(),
+            )
+        }
+    };
 
     let meta = Meta {
         name: package_name.to_string(),
-        version: root.version.to_string(),
-        description: root
-            .description
-            .clone()
-            .unwrap_or_else(|| package_name.to_string()),
+        version: package_version.to_string(),
+        description: package_description.unwrap_or_else(|| package_name.to_string()),
         depends,
         accounts,
     };

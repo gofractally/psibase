@@ -537,18 +537,20 @@ async fn main2() -> Result<(), Error> {
     };
 
     let metadata = get_metadata(&args)?;
-    let root = &metadata
+    let root = metadata
         .resolve
         .as_ref()
         .unwrap()
         .root
         .as_ref()
-        .unwrap()
-        .repr;
+        .map(|r| r.repr.as_str());
     check_psibase_version(&metadata);
 
     match &args.command {
         Command::Build {} => {
+            let Some(root) = root else {
+                Err(anyhow!("Don't know how to build workspace"))?
+            };
             build(&args, &[root], vec![], SERVICE_ARGS, Some(SERVICE_POLYFILL)).await?;
             pretty("Done", "");
         }
@@ -557,10 +559,16 @@ async fn main2() -> Result<(), Error> {
             pretty("Done", "");
         }
         Command::Test(opts) => {
+            let Some(root) = root else {
+                Err(anyhow!("Don't know how to test workspace"))?
+            };
             test(&args, opts, &metadata, root).await?;
             pretty("Done", "All tests passed");
         }
         Command::Deploy(opts) => {
+            let Some(root) = root else {
+                Err(anyhow!("Don't know how to deploy workspace"))?
+            };
             deploy(&args, opts, root).await?;
         }
     };
