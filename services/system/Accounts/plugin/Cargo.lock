@@ -17,6 +17,8 @@ name = "accounts"
 version = "0.1.0"
 dependencies = [
  "psibase",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 
@@ -2530,9 +2532,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.26.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
+checksum = "d7a37bd9274cb2d4754b915d624447ec0dce9105d174361841c0826efc79ceb9"
 dependencies = [
  "bitflags 2.6.0",
 ]
