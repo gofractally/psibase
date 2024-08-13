@@ -1,4 +1,10 @@
-use crate::tests::test_helpers::*;
+use crate::tests::helpers::{
+    query_builders::get_gql_query_attestation_stats_no_args,
+    test_helpers::{
+        are_equal_vecs_of_attestations_stats, init_identity_svc, push_attest,
+        query_attestation_stats,
+    },
+};
 use psibase::AccountNumber;
 
 #[psibase::test_case(services("identity"))]
@@ -55,12 +61,15 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
     chain.finish_block();
 
     let exp_results = vec![];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
 
@@ -79,12 +88,15 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
     }
 
     let exp_results = vec![];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     Ok(())
 }

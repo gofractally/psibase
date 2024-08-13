@@ -1,8 +1,11 @@
 use psibase::AccountNumber;
 
-use crate::tests::test_helpers::{
-    expect_from_attestation_stats_query, get_gql_query_attestation_stats_no_args,
-    init_identity_svc, push_attest, PartialAttestationStats,
+use crate::tests::helpers::{
+    query_builders::get_gql_query_attestation_stats_no_args,
+    test_helpers::{
+        are_equal_vecs_of_attestations_stats, init_identity_svc, push_attest,
+        query_attestation_stats, PartialAttestationStats,
+    },
 };
 
 // TODO: issued field update; maybe my query functions should *return* PartialX objects and let the test do the assertion to handle special cases like this?
@@ -66,12 +69,15 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
         uniqueAttesters: 1,
         numHighConfAttestations: 0,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
     chain.new_account(AccountNumber::from("alice"))?;
@@ -89,12 +95,15 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
         uniqueAttesters: 1,
         numHighConfAttestations: 1,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
     push_attest(
@@ -109,12 +118,15 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
         uniqueAttesters: 1,
         numHighConfAttestations: 0,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
     Ok(())
 }
 
@@ -135,12 +147,15 @@ pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psi
         uniqueAttesters: 1,
         numHighConfAttestations: 0,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
     chain.new_account(AccountNumber::from("carol"))?;
@@ -158,12 +173,15 @@ pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psi
         uniqueAttesters: 2,
         numHighConfAttestations: 1,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
     chain.new_account(AccountNumber::from("david"))?;
@@ -181,12 +199,15 @@ pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psi
         uniqueAttesters: 3,
         numHighConfAttestations: 2,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     chain.start_block();
     chain.new_account(AccountNumber::from("ed"))?;
@@ -204,12 +225,15 @@ pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psi
         uniqueAttesters: 4,
         numHighConfAttestations: 2,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     Ok(())
 }

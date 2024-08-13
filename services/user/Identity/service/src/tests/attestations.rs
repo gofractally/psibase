@@ -1,9 +1,12 @@
 use psibase::AccountNumber;
 
-use crate::tests::test_helpers::{
-    expect_from_attestation_query, expect_from_attestation_stats_query,
-    get_gql_query_attestation_stats_no_args, get_gql_query_attestations_one_arg, init_identity_svc,
-    push_attest, PartialAttestation, PartialAttestationStats,
+use crate::tests::helpers::{
+    query_builders::{get_gql_query_attestation_stats_no_args, get_gql_query_attestations_one_arg},
+    test_helpers::{
+        are_equal_vecs_of_attestations, are_equal_vecs_of_attestations_stats, init_identity_svc,
+        push_attest, query_attestation_stats, query_attestations, PartialAttestation,
+        PartialAttestationStats,
+    },
 };
 
 #[psibase::test_case(services("identity"))]
@@ -24,24 +27,27 @@ pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase:
         95,
     )?;
 
-    expect_from_attestation_query(
+    let results = query_attestations(
         &chain,
-        "attestationsByAttestee",
-        get_gql_query_attestations_one_arg("attestationsByAttestee", "attestee", "bob"),
-        &exp_results,
+        "attestationsBySubject",
+        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "bob"),
     );
+    assert!(are_equal_vecs_of_attestations(&exp_results, &results));
 
     let exp_results = vec![PartialAttestationStats {
         subject: AccountNumber::from("bob"),
         uniqueAttesters: 1,
         numHighConfAttestations: 1,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     Ok(())
 }
@@ -63,24 +69,27 @@ pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::
         subject: AccountNumber::from("bob"),
         value: 75,
     }];
-    expect_from_attestation_query(
+    let results = query_attestations(
         &chain,
-        "attestationsByAttestee",
-        get_gql_query_attestations_one_arg("attestationsByAttestee", "attestee", "bob"),
-        &exp_results,
+        "attestationsBySubject",
+        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "bob"),
     );
+    assert!(are_equal_vecs_of_attestations(&exp_results, &results));
 
     let exp_results = vec![PartialAttestationStats {
         subject: AccountNumber::from("bob"),
         uniqueAttesters: 1,
         numHighConfAttestations: 0,
     }];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     Ok(())
 }

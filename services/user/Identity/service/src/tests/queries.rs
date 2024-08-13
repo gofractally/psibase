@@ -1,11 +1,15 @@
 use psibase::AccountNumber;
 
-use crate::tests::test_helpers::{
-    expect_from_attestation_query, expect_from_attestation_stats_query,
-    expect_from_subject_stats_query, get_gql_query_attestation_stats_no_args,
-    get_gql_query_attestations_no_args, get_gql_query_attestations_one_arg,
-    get_gql_query_subject_stats_one_arg, init_identity_svc, push_attest, PartialAttestation,
-    PartialAttestationStats,
+use crate::tests::helpers::{
+    query_builders::{
+        get_gql_query_attestation_stats_no_args, get_gql_query_attestations_no_args,
+        get_gql_query_attestations_one_arg, get_gql_query_subject_stats_one_arg,
+    },
+    test_helpers::{
+        are_equal_vecs_of_attestations, are_equal_vecs_of_attestations_stats, init_identity_svc,
+        push_attest, query_attestation_stats, query_attestations, query_subject_stats,
+        PartialAttestation, PartialAttestationStats,
+    },
 };
 
 #[psibase::test_case(services("identity"))]
@@ -54,35 +58,36 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
         },
     ];
 
-    expect_from_attestation_query(
+    let response = query_attestations(
         &chain,
         "allAttestations",
         get_gql_query_attestations_no_args(String::from("allAttestations")),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations(&exp_results, &response));
 
     let exp_result2 = exp_results
         .clone()
         .into_iter()
         .filter(|pa| pa.subject == AccountNumber::from("bob"))
         .collect::<Vec<PartialAttestation>>();
-    expect_from_attestation_query(
+
+    let response = query_attestations(
         &chain,
-        "attestationsByAttestee",
-        get_gql_query_attestations_one_arg("attestationsByAttestee", "attestee", "bob"),
-        &exp_result2,
+        "attestationsBySubject",
+        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "bob"),
     );
+    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
 
     let exp_result2 = exp_results
         .into_iter()
         .filter(|pa| pa.attester == AccountNumber::from("alice"))
         .collect::<Vec<PartialAttestation>>();
-    expect_from_attestation_query(
+    let response = query_attestations(
         &chain,
         "attestationsByAttester",
         get_gql_query_attestations_one_arg("attestationsByAttester", "attester", "alice"),
-        &exp_result2,
     );
+    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
 
     let exp_results = vec![
         PartialAttestationStats {
@@ -96,22 +101,30 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
             numHighConfAttestations: 1,
         },
     ];
-    expect_from_attestation_stats_query(
+    let response = query_attestation_stats(
         &chain,
         "allAttestationStats",
         get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     let exp_results2 = exp_results
         .iter()
         .find(|pa| pa.subject == AccountNumber::from("bob"))
         .unwrap();
-    expect_from_subject_stats_query(
+    let response = query_subject_stats(
         &chain,
         "subjectStats",
         get_gql_query_subject_stats_one_arg("subjectStats", "subject", "bob"),
-        &exp_results2,
+    )
+    .unwrap();
+    assert!(
+        response.subject == exp_results2.subject
+            && response.uniqueAttesters == exp_results2.uniqueAttesters
+            && response.numHighConfAttestations == exp_results2.numHighConfAttestations
     );
 
     Ok(())
@@ -125,12 +138,23 @@ pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psiba
     chain.start_block();
 
     let exp_results = vec![];
-    expect_from_attestation_query(
+    let response = query_attestations(
         &chain,
         "allAttestations",
         get_gql_query_attestations_no_args(String::from("allAttestations")),
-        &exp_results,
     );
+    assert!(are_equal_vecs_of_attestations(&exp_results, &response));
+
+    let exp_results = vec![];
+    let response = query_attestation_stats(
+        &chain,
+        "allAttestationStats",
+        get_gql_query_attestation_stats_no_args("allAttestationStats"),
+    );
+    assert!(are_equal_vecs_of_attestations_stats(
+        &exp_results,
+        &response
+    ));
 
     let exp_results3 = vec![
         PartialAttestation {
@@ -175,31 +199,31 @@ pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psiba
         .into_iter()
         .filter(|pa| pa.attester == AccountNumber::from("bob"))
         .collect::<Vec<PartialAttestation>>();
-    expect_from_attestation_query(
+    let response = query_attestations(
         &chain,
         "attestationsByAttester",
         get_gql_query_attestations_one_arg("attestationsByAttester", "attester", "bob"),
-        &exp_result2,
     );
+    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
 
     let exp_result2 = exp_results3
         .into_iter()
         .filter(|pa| pa.subject == AccountNumber::from("alice"))
         .collect::<Vec<PartialAttestation>>();
-    expect_from_attestation_query(
+    let response = query_attestations(
         &chain,
-        "attestationsByAttestee",
-        get_gql_query_attestations_one_arg("attestationsByAttestee", "attestee", "alice"),
-        &exp_result2,
+        "attestationsBySubject",
+        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "alice"),
     );
+    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
 
-    let exp_results = vec![];
-    expect_from_attestation_stats_query(
+    let exp_results = None;
+    let response = query_subject_stats(
         &chain,
-        "allAttestationStats",
-        get_gql_query_attestation_stats_no_args("allAttestationStats"),
-        &exp_results,
+        "subjectStats",
+        get_gql_query_subject_stats_one_arg("subjectStats", "subject", "alice"),
     );
+    assert_eq!(exp_results, response);
 
     Ok(())
 }

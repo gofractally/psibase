@@ -37,7 +37,7 @@ mod service {
 
     impl Attestation {
         #[primary_key]
-        fn by_attestee(&self) -> (AccountNumber, AccountNumber) {
+        fn by_subject(&self) -> (AccountNumber, AccountNumber) {
             (self.subject, self.attester)
         }
 
@@ -68,7 +68,7 @@ mod service {
     #[table(name = "AttestationStatsTable", index = 1)]
     #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Eq)]
     pub struct AttestationStats {
-        /// The credential subject, in this case, the subject/attestee
+        /// The credential subject, in this case, the subject/subject
         #[primary_key]
         pub subject: AccountNumber,
 
@@ -193,15 +193,15 @@ mod service {
             .await
         }
 
-        async fn attestations_by_attestee(
+        async fn attestations_by_subject(
             &self,
-            attestee: AccountNumber,
+            subject: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Attestation>> {
-            TableQuery::subindex::<AccountNumber>(AttestationTable::new().get_index_pk(), &attestee)
+            TableQuery::subindex::<AccountNumber>(AttestationTable::new().get_index_pk(), &subject)
                 .first(first)
                 .last(last)
                 .before(before)
