@@ -4,6 +4,7 @@ use crate::bindings::host::common::types::{Error, PluginId};
 pub enum ErrorType {
     NotYetImplemented,
     AccountDNE,
+    InvalidAccountName,
     QueryError,
 }
 
@@ -22,10 +23,15 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Not yet implemented: {}", msg),
             },
+            ErrorType::InvalidAccountName => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Invalid account name: {}", msg),
+            },
             ErrorType::AccountDNE => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
-                message: format!("Account number DNE: {}", msg),
+                message: format!("Account DNE: {}", msg),
             },
             ErrorType::QueryError => Error {
                 code: self as u32,

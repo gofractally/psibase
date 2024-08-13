@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::accounts::plugin::types as AccountTypes;
+use bindings::accounts::plugin::types::{self as AccountTypes};
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::host::common::{server as Server, types as CommonTypes};
 use psibase::fracpack::Pack;
@@ -44,9 +44,11 @@ impl Accounts for AccountsPlugin {
     }
 
     fn get_account(name: String) -> Result<Option<AccountTypes::Account>, CommonTypes::Error> {
+        let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName.err(err.to_string().as_str()))?;
+
         let query = format!(
             "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
-            AccountNumber::from(name.as_str())
+            acct_num 
         );
 
         let account_result = Server::post_graphql_get_json(&query)
@@ -62,23 +64,19 @@ impl Accounts for AccountsPlugin {
                 .ok_or_else(|| AccountDNE.err(&name))
         })?;
 
-        if account.accountNum.value != AccountNumber::from_exact(&name).unwrap().value {
-            return Err(AccountDNE.err(&name));
-        } else {
-            return Ok(Some(AccountTypes::Account {
-                account_num: account.accountNum.to_string(),
-                auth_service: account.authService.to_string(),
-                resource_balance: Some(match account.resourceBalance {
-                    Some(val) => val.value,
-                    None => 0,
-                }),
-            }));
-        }
+        Ok(Some(AccountTypes::Account {
+            account_num: account.accountNum.to_string(),
+            auth_service: account.authService.to_string(),
+            resource_balance: Some(match account.resourceBalance {
+                Some(val) => val.value,
+                None => 0,
+            }),
+        }))
     }
 
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
-        let account_num: AccountNumber =
-            AccountNumber::from_exact(&service_name).map_err(|_| AccountDNE.err(&service_name))?;
+        let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
+            .map_err(|_| InvalidAccountName.err(&service_name))?;
         Server::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {
