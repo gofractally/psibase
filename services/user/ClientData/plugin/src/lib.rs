@@ -13,11 +13,7 @@ struct ClientData;
 
 fn get_sender() -> Result<String, CommonTypes::Error> {
     let sender_app = Client::get_sender_app();
-    let sender = sender_app.app;
-    if sender.is_none() {
-        return Err(InvalidSender.err(&sender_app.origin));
-    }
-    Ok(sender.unwrap())
+    Ok(sender_app.app.ok_or_else(|| InvalidSender.err(&sender_app.origin))?)
 }
 
 impl KeyValue for ClientData {
