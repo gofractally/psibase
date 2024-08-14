@@ -341,6 +341,7 @@ struct Queries
 {
    auto allCreatedInv() const
    {
+      // TODO: This isn't working
       std::string_view query{"SELECT * FROM \"history.invite.inviteCreated\" ORDER BY ROWID"};
       auto result = to<REvents>().sqlQuery(std::vector<char>(query.begin(), query.end()));
       return std::string{result.begin(), result.end()};
