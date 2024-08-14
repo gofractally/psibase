@@ -35,7 +35,7 @@ class TestTransactionQueue(unittest.TestCase):
         with self.assertRaises(TransactionError, msg="Transaction expired"):
             inc = Action('alice', 's-counter', 'inc', {"key":"","id":0})
             fail = Action('alice', 'tokens', 'credit', {"tokenId":1,"receiver":"bob","amount":{"value":100000000}, "memo":"fail"})
-            txqueue.push_transaction(Transaction(a.get_tapos(timeout=4), [inc, fail]))
+            txqueue.push_transaction(Transaction(a.get_tapos(timeout=4), [inc, fail], []))
         with a.get('/value', 's-counter') as response:
             response.raise_for_status()
             self.assertEqual(response.json(), 1)

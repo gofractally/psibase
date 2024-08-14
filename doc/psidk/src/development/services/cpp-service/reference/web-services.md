@@ -76,6 +76,7 @@ These help implement basic functionality:
 - [psibase::serveSimpleUI]
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
+- [psibase::serveSchema]
 - [psibase::WebContentRow]
 - [psibase::storeContent]
 - [psibase::serveContent]
@@ -117,6 +118,7 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveSimpleUI}}
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
+{{#cpp-doc ::psibase::serveSchema}}
 {{#cpp-doc ::psibase::WebContentRow}}
 {{#cpp-doc ::psibase::storeContent}}
 {{#cpp-doc ::psibase::serveContent}}
