@@ -330,6 +330,39 @@ async fn build(
     Ok(files)
 }
 
+async fn build_plugin(
+    args: &Args,
+    packages: &[&str],
+    extra_args: &[&str],
+) -> Result<Vec<PathBuf>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .arg("component")
+        .arg("build")
+        .args(extra_args)
+        .arg("--release")
+        .arg("--target=wasm32-wasi")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-render-diagnostics")
+        .arg("--color=always")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) =
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    Ok(files?)
+}
+
 async fn get_test_services(args: &Args) -> Result<Vec<(String, String)>, Error> {
     let mut command: tokio::process::Child = tokio::process::Command::new(get_cargo())
         .arg("test")

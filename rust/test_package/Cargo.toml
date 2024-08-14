@@ -1,12 +1,19 @@
 [workspace]
 resolver = "2"
-members = ["service", "query"]
+members = ["service", "query", "plugin"]
 
 [workspace.metadata.psibase]
 package-name = "TestPackage"
 version = "0.12.0"
 description = "Test for package building"
 services = ["tpack"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
 
 [workspace.package]
 version = "0.12.0"

@@ -1,4 +1,4 @@
-use crate::{build, Args, SERVICE_POLYFILL};
+use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{AccountNumber, Meta, PackageRef, ServiceInfo};
@@ -15,6 +15,7 @@ struct PsibaseMetadata {
     #[serde(rename = "package-name")]
     package_name: Option<String>,
     server: Option<String>,
+    plugin: Option<String>,
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
 }
@@ -57,6 +58,8 @@ pub async fn build_package(
     let mut queue = Vec::new();
     let mut packages: HashMap<&str, &Package> = HashMap::new();
     let mut services = Vec::new();
+    let mut plugins = Vec::new();
+    let mut data_files = Vec::new();
     let mut resolved: HashMap<&str, &Node> = HashMap::new();
     let mut package_info = None;
 
@@ -152,6 +155,12 @@ pub async fn build_package(
                     queue.push(&server_package);
                 }
             }
+            if let Some(plugin) = pmeta.plugin {
+                let Some(id) = find_dep(&packages, &metadata.workspace_members, &plugin) else {
+                    return Err(anyhow!("{} is not a workspace member", service,));
+                };
+                plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
+            }
             services.push((&package.name, info, &package.id.repr));
         }
     }
@@ -205,6 +214,17 @@ pub async fn build_package(
         service_wasms.push((service, info, paths.pop().unwrap()));
     }
 
+    for (plugin, service, path, id) in plugins {
+        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
+        if paths.len() != 1 {
+            Err(anyhow!(
+                "Plugin {} should produce exactly one wasm target",
+                plugin
+            ))?
+        };
+        data_files.push((service, path, paths.pop().unwrap()))
+    }
+
     let target_dir = args
         .target_dir
         .as_ref()
@@ -221,6 +241,10 @@ pub async fn build_package(
         std::io::copy(&mut File::open(path)?, &mut out)?;
         out.start_file(format!("service/{}.json", service), options)?;
         write!(out, "{}", &serde_json::to_string(&info)?)?;
+    }
+    for (service, dest, src) in data_files {
+        out.start_file(format!("data/{}{}", service, dest), options)?;
+        std::io::copy(&mut File::open(src)?, &mut out)?;
     }
     out.finish()?;
     Ok(())
