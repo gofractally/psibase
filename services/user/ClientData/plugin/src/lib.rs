@@ -34,11 +34,12 @@ impl KeyValue for ClientData {
         let record = bucket
             .get(&key)
             .map_err(|_| KvError.err("Failed to get record value"))?;
+        let value = record.unwrap();
 
         // An empty record is considered corrupt.
         // Auto-delete the record if this is detected, and treat this call as though an
         //   nonexistent key was accessed.
-        if record.is_none() {
+        if value.len() == 0 {
             bucket
                 .delete(&key)
                 .map_err(|_| KvError.err("Failed to recover from corruption"))?;
@@ -47,7 +48,7 @@ impl KeyValue for ClientData {
         }
 
         // Return the pre-existing nonempty record value
-        Ok(Some(record.unwrap()))
+        Ok(Some(value))
     }
 
     fn set(key: String, value: Vec<u8>) -> Result<(), CommonTypes::Error> {
