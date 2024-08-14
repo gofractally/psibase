@@ -72,14 +72,6 @@ impl KeyValue for ClientData {
         let bucket = Kv::store::open(&get_sender()?)
             .map_err(|_| KvError.err("Failed to open table in keyvalue store"))?;
 
-        // If the record already dne, do nothing
-        let exists = bucket
-            .exists(&key)
-            .map_err(|_| KvError.err("Error determining key existence"))?;
-        if !exists {
-            return Ok(());
-        }
-
         bucket
             .delete(&key)
             .map_err(|_| KvError.err("Error deleting key"))?;
