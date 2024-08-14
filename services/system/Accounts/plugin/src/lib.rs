@@ -21,7 +21,7 @@ struct AccountsPlugin;
 /****** Database
 [
     {
-        key: "<base64_app_domain>.logged-in",
+        key: "logged-in.<base64_app_domain>",
         description: "Account name of currently logged in user"
     },
 ]
@@ -39,8 +39,7 @@ fn login_key(origin: String) -> String {
     // Encode the origin as base64, URL_SAFE character set
     let encoded = URL_SAFE.encode(origin);
 
-    // Construct the key. The logged-in user is namespaced by origin,
-    //  so a new
+    // Construct the key. The logged-in user is namespaced by origin
     let key_pre: String = "logged-in".to_string();
     return key_pre + "." + &encoded;
 }
