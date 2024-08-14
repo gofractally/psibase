@@ -50,7 +50,7 @@ impl Admin for AccountsPlugin {
             return Err(Unauthorized.err("get_logged_in_user"));
         }
 
-        if let Some(user) = Keyvalue::get(&login_key(domain))? {
+        if let Some(user) = Keyvalue::get(&login_key(domain)) {
             Ok(Some(String::from_utf8(user).unwrap()))
         } else {
             Ok(None)

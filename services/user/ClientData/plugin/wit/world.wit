@@ -8,8 +8,8 @@ interface keyvalue {
     use host:common/types.{error};
 
     /// Gets the value of the record with the specified key.
-    /// If the record does not exist, Ok(None) is returned.
-    get: func(key: string) -> result<option<list<u8>>, error>;
+    /// If the record does not exist, None is returned.
+    get: func(key: string) -> option<list<u8>>;
 
     /// Stores the <key, value> record. 
     /// If a record with the specified key does not exist, it is created.
@@ -19,7 +19,7 @@ interface keyvalue {
 
     /// Deletes the record with the specified key.
     /// If the key does not exist, it does nothing.
-    delete: func(key: string) -> result<_, error>;
+    delete: func(key: string);
 }
 
 world imports {
