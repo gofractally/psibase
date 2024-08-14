@@ -8,6 +8,8 @@
 #include <services/user/Invite.hpp>
 #include <services/user/Nft.hpp>
 #include <services/user/Tokens.hpp>
+#include <services/user/Events.hpp>
+#include <services/user/REvents.hpp>
 
 #include <psibase/Bitset.hpp>
 #include <psibase/serveContent.hpp>
@@ -54,8 +56,12 @@ void Invite::init()
    // Create the invite payer account and set its auth contract
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, true);
 
-   // TODO - Set whitelist so only the fractally service can create invites.
-   // setWhitelist({"fractally"_m})
+   // Register event indices and schema
+   to<EventIndex>().setSchema(ServiceSchema::make<Invite>());
+
+   // Event indices:
+   to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "inviteCreated"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "inviteAccepted"_m, 1);
 }
 
 void Invite::createInvite(Spki inviteKey)
@@ -91,16 +97,7 @@ void Invite::createInvite(Spki inviteKey)
    };
    inviteTable.put(newInvite);
 
-   // Emit event
-   auto eventTable  = Tables().open<UserEventTable>();
-   auto eventRecord = eventTable.get(inviter).value_or(UserEventRecord{
-       .user      = inviter,
-       .eventHead = 0,
-   });
-
-   eventRecord.eventHead =
-       emit().history().inviteCreated(eventRecord.eventHead, inviteKey, inviter);
-   eventTable.put(eventRecord);
+   emit().history().inviteCreated(inviteKey, inviter);
 }
 
 void Invite::accept(Spki inviteKey)
@@ -124,15 +121,7 @@ void Invite::accept(Spki inviteKey)
    inviteTable.put(*invite);
 
    // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-   eventRecord.eventHead =
-       emit().history().inviteAccepted(eventRecord.eventHead, inviteKey, acceptedBy);
-   eventTable.put(eventRecord);
+   emit().history().inviteAccepted(inviteKey, acceptedBy);
 }
 
 void Invite::acceptCreate(Spki inviteKey, AccountNumber acceptedBy, Spki newAccountKey)
@@ -182,16 +171,7 @@ void Invite::acceptCreate(Spki inviteKey, AccountNumber acceptedBy, Spki newAcco
    check(not newAcc.has_value(), accAlreadyExists.data());
    newAccTable.put(NewAccountRecord{acceptedBy, invite->inviter});
 
-   // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-   eventRecord.eventHead =
-       emit().history().inviteAccepted(eventRecord.eventHead, inviteKey, acceptedBy);
-   eventTable.put(eventRecord);
+   emit().history().inviteAccepted(inviteKey, acceptedBy);
 }
 
 void Invite::reject(Spki inviteKey)
@@ -219,16 +199,7 @@ void Invite::reject(Spki inviteKey)
    invite->actor = sender;
    table.put(*invite);
 
-   // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-
-   eventRecord.eventHead = emit().history().inviteRejected(eventRecord.eventHead, inviteKey);
-   eventTable.put(eventRecord);
+   emit().history().inviteRejected(inviteKey);
 }
 
 void Invite::delInvite(Spki inviteKey)
@@ -240,15 +211,7 @@ void Invite::delInvite(Spki inviteKey)
    check(invite->inviter == sender, unauthDelete.data());
    inviteTable.remove(*invite);
 
-   // Emit event
-   auto eventTable  = Tables().open<UserEventTable>();
-   auto eventRecord = eventTable.get(sender).value_or(UserEventRecord{
-       .user      = sender,
-       .eventHead = 0,
-   });
-
-   eventRecord.eventHead = emit().history().inviteDeleted(eventRecord.eventHead, inviteKey);
-   eventTable.put(eventRecord);
+   emit().history().inviteDeleted(inviteKey);
 }
 
 void Invite::delExpired(uint32_t maxDeleted)
@@ -271,17 +234,7 @@ void Invite::delExpired(uint32_t maxDeleted)
       ++numChecked;
    }
 
-   // Emit event
-   auto sender      = getSender();
-   auto eventTable  = Tables().open<UserEventTable>();
-   auto eventRecord = eventTable.get(sender).value_or(UserEventRecord{
-       .user      = sender,
-       .eventHead = 0,
-   });
-
-   eventRecord.eventHead =
-       emit().history().expInvDeleted(eventRecord.eventHead, numChecked, numDeleted);
-   eventTable.put(eventRecord);
+   emit().history().expInvDeleted(numChecked, numDeleted);
 }
 
 void Invite::setWhitelist(vector<AccountNumber> accounts)
@@ -323,16 +276,7 @@ void Invite::setWhitelist(vector<AccountNumber> accounts)
    settings.whitelist = accounts;
    settingsTable.put(settings);
 
-   // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-
-   eventRecord.eventHead = emit().history().whitelistSet(eventRecord.eventHead, accounts);
-   eventTable.put(eventRecord);
+   emit().history().whitelistSet(accounts);
 }
 
 void Invite::setBlacklist(vector<AccountNumber> accounts)
@@ -366,16 +310,7 @@ void Invite::setBlacklist(vector<AccountNumber> accounts)
    settings.blacklist = accounts;
    settingsTable.put(settings);
 
-   // Emit event
-   auto eventTable  = Tables().open<ServiceEventTable>();
-   auto eventRecord = eventTable.get(SingletonKey{})
-                          .value_or(ServiceEventRecord{
-                              .key       = SingletonKey{},
-                              .eventHead = 0,
-                          });
-
-   eventRecord.eventHead = emit().history().blacklistSet(eventRecord.eventHead, accounts);
-   eventTable.put(eventRecord);
+   emit().history().blacklistSet(accounts);
 }
 
 optional<InviteRecord> Invite::getInvite(Spki pubkey)
@@ -402,12 +337,16 @@ void Invite::checkClaim(AccountNumber actor, Spki pubkey)
    check(not isExpired(pubkey), "this invite is expired");
 }
 
-auto invite = QueryableService<Invite::Tables, Invite::Events>{Invite::service};
 struct Queries
 {
-   auto getEventHead(AccountNumber user) const
-   {  //
-      return Invite::Tables(Invite::service).open<InviteNs::UserEventTable>().get(user);
+   auto allCreatedInv() const {
+      std::string_view query {"SELECT * FROM \"history.invite.inviteCreated\" ORDER BY ROWID"};
+      auto result = to<REvents>().sqlQuery(std::vector<char>(query.begin(), query.end()));
+      return std::string{result.begin(), result.end()};
+   }
+
+   auto getAllInvites() const {
+      return Invite::Tables{}.open<InviteTable>().getIndex<0>();
    }
 
    auto getInvite(string pubkey) const
@@ -417,35 +356,20 @@ struct Queries
           .get(Spki{AuthSig::parseSubjectPublicKeyInfo(pubkey)});
    }
 
+   // This is called getInviter because it's used to look up the new account `user`
+   //    in a table that tracks their original inviter.
    auto getInviter(psibase::AccountNumber user)
    {
       return Invite::Tables(Invite::service).open<InviteNs::NewAccTable>().get(user);
    }
 
-   auto events() const
-   {  //
-      return invite.allEvents();
-   }
-
-   auto userEvents(AccountNumber           user,
-                   optional<uint32_t>      first,
-                   const optional<string>& after) const
-   {
-      return invite.eventIndex<Invite::UserEvents>(user, first, after);
-   }
-
-   auto serviceEvents(optional<uint32_t> first, const optional<string>& after) const
-   {
-      return invite.eventIndex<Invite::ServiceEvents>(SingletonKey{}, first, after);
-   }
 };
 PSIO_REFLECT(Queries,
-             method(getEventHead, user),
+             method(allCreatedInv),
+             method(getAllInvites),
              method(getInvite, pubkey),
-             method(getInviter, user),
-             method(events),
-             method(userEvents, user, first, after),
-             method(serviceEvents, first, after));
+             method(getInviter, user)
+)
 
 auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {

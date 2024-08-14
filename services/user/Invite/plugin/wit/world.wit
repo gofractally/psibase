@@ -1,15 +1,32 @@
 package invite:plugin;
 
 interface types {
+
+    enum invite-state {
+        pending,
+        accepted,
+        rejected
+    }
+
     /// This is the information encoded into an invite URL.
     /// 
     /// Fields:
-    /// * Inviter - The account responsible for generating the invite
-    /// * App - The app responsible for generating the invite
-    /// * Callback - The link to which the user should be returned after responding to the invite
+    /// * `inviter` - The account responsible for generating the invite
+    /// * `app` - The app responsible for generating the invite
+    /// * `state` - The state of the invite
+    /// * `actor` - The name of the account to most recently accept or reject the invite
+    /// * `expiry` - The UTC timestamp of the invite's expiration
+    /// * `callback` - The link to which the user should be returned after responding to the invite
+    /// 
+    /// Other notes:
+    /// `actor` is useful primarily for displaying information about an invite that has already been
+    ///    used.
     record invite {
         inviter: string,
         app: string,
+        state: invite-state,
+        actor: string,
+        expiry: string,
         callback: string,
     }
 
@@ -17,22 +34,22 @@ interface types {
     type invite-id = string;
 }
 
-interface admin {
-    use host:common/types.{error};
+// interface admin {
+//     use host:common/types.{error};
 
-    /// Restricts the accounts that are able to create invites to those 
-    /// that exist in the whitelist.
-    /// 
-    /// This method may only be called by the service account on which the 
-    /// invite service is deployed.
-    set-whitelist: func(accounts: list<string>) -> result<_, error>;
+//     // Restricts the accounts that are able to create invites to those 
+//     // that exist in the whitelist.
+//     // 
+//     // This method may only be called by the service account on which the 
+//     // invite service is deployed.
+//     set-whitelist: func(accounts: list<string>) -> result<_, error>;
 
-    /// Prevents accounts that are in the blacklist from creating accounts.
-    /// 
-    /// This method may only be called by the service account on which the 
-    /// invite service is deployed.
-    set-blacklist: func(accounts: list<string>) -> result<_, error>;
-}
+//     // Prevents accounts that are in the blacklist from creating accounts.
+//     // 
+//     // This method may only be called by the service account on which the 
+//     // invite service is deployed.
+//     set-blacklist: func(accounts: list<string>) -> result<_, error>;
+// }
 
 /// Functionality exposed for the inviter
 interface inviter {
@@ -78,6 +95,12 @@ interface invitee {
     ///   invite ID.
     decode-invite: func(id: invite-id) -> result<invite, error>;
 
+    /// Similar to accounts->login-temp, this is a function that will be removed once 
+    /// windows can be spawned from plugins.
+    /// 
+    /// This function will acceptCreate an invite with the specified account name.
+    accept-temp: func(account: string, id: invite-id) -> result<_, error>;
+
     /// Call to accept an invite.
     /// 
     /// Parameters
@@ -94,7 +117,6 @@ interface invitee {
 }
 
 world imports {
-    //import admin; // Not importing the admin interface because it isn't needed by any invite plugin users
     import inviter;
     import invitee;
 }

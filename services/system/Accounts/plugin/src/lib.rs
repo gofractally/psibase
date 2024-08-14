@@ -45,17 +45,38 @@ fn login_key(origin: String) -> String {
     let key_pre: String = "logged-in".to_string();
     return key_pre + "." + &encoded;
 }
-impl Admin for AccountsPlugin {
-    fn get_logged_in_user(domain: String) -> Result<Option<String>, CommonTypes::Error> {
-        let sender = Client::get_sender_app().app;
-        if sender.is_none() || sender.unwrap() != "supervisor" {
-            return Err(Unauthorized.err("get_logged_in_user"));
-        }
 
-        if let Some(user) = Keyvalue::get(&login_key(domain))? {
-            Ok(Some(String::from_utf8(user).unwrap()))
+fn from_supervisor() -> bool {
+    Client::get_sender_app()
+        .app
+        .map_or(false, |app| app == "supervisor")
+}
+
+impl Admin for AccountsPlugin {
+    fn force_login(domain: String, user: String) {
+        assert!(from_supervisor(), "unauthorized");
+        Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
+    }
+
+    fn get_logged_in_user(caller_app: String, domain: String) -> Option<String> {
+        let sender = Client::get_sender_app().app;
+        assert!(
+            sender.is_some() && sender.as_ref().unwrap() == "supervisor",
+            "unauthorized"
+        );
+
+        // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
+        // Todo: This should not be an assert!, it should return a recoverable error type so it
+        //       propagates back to the caller plugins.
+        assert!(
+            caller_app == "transact" || caller_app == "supervisor",
+            "Temporarily, only transact can ask for the logged-in user."
+        );
+
+        if let Some(user) = Keyvalue::get(&login_key(domain)).unwrap() {
+            Some(String::from_utf8(user).unwrap())
         } else {
-            Ok(None)
+            None
         }
     }
 }
@@ -68,6 +89,7 @@ impl Accounts for AccountsPlugin {
 
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
+
         Keyvalue::set(&login_key(origin), &user.as_bytes())?;
         Ok(())
     }

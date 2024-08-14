@@ -1063,10 +1063,8 @@ void load_tables(sqlite3* db, std::string_view sql)
    }
 }
 
-std::optional<HttpReply> serveSql(const HttpRequest& request)
+std::vector<char> REvents::sqlQuery(const std::vector<char>& query)
 {
-   if (request.target != "/sql")
-      return {};
    sqlite3* db;
    if (int err = sqlite3_open(":memory:", &db))
    {
@@ -1080,12 +1078,12 @@ std::optional<HttpReply> serveSql(const HttpRequest& request)
    {
       abortMessage(std::string("sqlite3_collation_needed: ") + sqlite3_errstr(err));
    }
-   load_tables(db, {request.body.data(), request.body.size()});
+   load_tables(db, {query.data(), query.size()});
    std::vector<char> result;
    {
-      check(request.body.size() <= std::numeric_limits<int>::max(), "Query too large");
-      const char*         ptr = request.body.data();
-      const char*         end = request.body.data() + request.body.size();
+      check(query.size() <= std::numeric_limits<int>::max(), "Query too large");
+      const char*         ptr = query.data();
+      const char*         end = query.data() + query.size();
       psio::vector_stream stream{result};
       bool                firstRow = true;
       stream.write('[');
@@ -1131,12 +1129,16 @@ std::optional<HttpReply> serveSql(const HttpRequest& request)
       }
       stream.write(']');
    }
-   return HttpReply{.contentType = "application/json", .body = std::move(result)};
+
+   return result;
 }
 
 std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
 {
-   return serveSql(request);
+   if (request.target != "/sql")
+      return {};
+
+   return HttpReply{.contentType = "application/json", .body = sqlQuery(request.body)};
 }
 
 PSIBASE_DISPATCH(UserService::REvents)

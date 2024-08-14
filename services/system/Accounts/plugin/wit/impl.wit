@@ -1,7 +1,11 @@
 package accounts:plugin;
 
+/// This interface is only accessible to the supervisor.
 interface admin {
     use host:common/types.{error};
+
+    /// Forces `user` to get logged into the app at domain `domain`.
+    force-login: func(domain: string, user: string);
 
     /// Logins on a per-app basis break the ability for plugins to ask who is currently 
     ///   logged in. Therefore, they can only ask through the host, which is the entity 
