@@ -4,9 +4,6 @@ import {
     siblingUrl,
     FunctionCallArgs,
     buildFunctionCallResponse,
-    uint8ArrayToHex,
-    getTaposForHeadBlock,
-    signAndPushTransaction,
     PluginError,
 } from "@psibase/common-lib";
 
@@ -16,7 +13,6 @@ import {
     OriginationData,
     assert,
     assertTruthy,
-    isString,
     parser,
     serviceFromOrigin,
 } from "./utils";
@@ -24,11 +20,24 @@ import { Plugin } from "./plugin/plugin";
 import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
 import { isRecoverableError } from "./plugin/errors";
-import { Action } from "./action";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { isEqual } from "@psibase/common-lib/messaging/PluginId";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
+const supervisorOrigination = {
+    app: serviceFromOrigin(supervisorDomain),
+    origin: supervisorDomain,
+};
+const systemPlugins: Array<QualifiedPluginId> = [
+    {
+        service: "accounts",
+        plugin: "plugin",
+    },
+    {
+        service: "transact",
+        plugin: "plugin",
+    },
+];
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -130,6 +139,10 @@ export class Supervisor implements AppInterface {
         );
     }
 
+    private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
+        return this.call(supervisorOrigination, callArgs);
+    }
+
     constructor() {
         this.parser = parser();
     }
@@ -150,20 +163,21 @@ export class Supervisor implements AppInterface {
         return frame.caller;
     }
 
-    // Called by the active plugin to schedule an action for execution
-    addAction(sender: OriginationData, action: Action) {
-        assertTruthy(this.context, "Uninitialized call context");
+    getLoggedInUser(caller_app: string): string | undefined {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
 
-        const frame = this.context.stack.peek(0);
-        assertTruthy(
-            frame,
-            "Can only add actions during plugin call resolution",
+        let getLoggedInUser = getCallArgs(
+            "accounts",
+            "plugin",
+            "admin",
+            "getLoggedInUser",
+            [caller_app, this.parentOrigination.origin],
         );
-        assert(
-            frame.args.service === sender.app,
-            "Invalid service attempted to add action",
-        );
-        this.context.addAction(action);
+        return this.supervisorCall(getLoggedInUser);
+    }
+
+    isLoggedIn(): boolean {
+        return this.getLoggedInUser("supervisor") !== undefined;
     }
 
     // Manages callstack and calls plugins
@@ -180,7 +194,8 @@ export class Supervisor implements AppInterface {
         } else {
             assertTruthy(sender.app, "Cannot determine caller service");
             assert(
-                sender.app === this.context.stack.peek(0)!.args.service,
+                sender.app === this.context.stack.peek(0)!.args.service ||
+                    sender.app === "supervisor",
                 "Invalid sync call sender",
             );
         }
@@ -204,83 +219,12 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    // Temporary tx submission logic, until smart auth is implemented
-    // All transactions are sent by "alice"
-    async submitTx() {
-        assertTruthy(this.context, "Uninitialized call context");
-
-        const actions = this.context.actions;
-        if (actions.length <= 0) return;
-
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        await this.loadPlugins([
-            {
-                service: "accounts",
-                plugin: "plugin",
-            },
-        ]);
-
-        let getLoggedInUser: QualifiedFunctionCallArgs = getCallArgs(
-            "accounts",
-            "plugin",
-            "admin",
-            "getLoggedInUser",
-            [this.parentOrigination.origin],
-        );
-        let logInAlice: QualifiedFunctionCallArgs = getCallArgs(
-            "accounts",
-            "plugin",
-            "accounts",
-            "loginTemp",
-            ["alice"],
-        );
-        let supervisorOrigination = {
-            app: serviceFromOrigin(supervisorDomain),
-            origin: supervisorDomain,
-        };
-        let user = this.call(supervisorOrigination, getLoggedInUser);
-        if (user === null || user === undefined) {
-            alert("[Warning] No logged-in user. Alice will be auto-logged-in");
-            this.call(this.parentOrigination, logInAlice);
-
-            user = this.call(supervisorOrigination, getLoggedInUser);
-            if (user === null || user === undefined) {
-                throw new Error("[supervisor] Unable to log in alice");
-            }
-        }
-        if (!isString(user)) {
-            throw new Error(
-                "[supervisor] Malformed response from getLoggedInUser",
-            );
-        }
-
-        const formatted = actions.map((a: Action) => {
-            return {
-                sender: user,
-                service: a.service,
-                method: a.action,
-                rawData: uint8ArrayToHex(a.args),
-            };
-        });
-        const tenSeconds = 10000;
-        const transaction: any = {
-            tapos: {
-                ...(await getTaposForHeadBlock(supervisorDomain)),
-                expiration: new Date(Date.now() + tenSeconds),
-            },
-            actions: formatted,
-        };
-
-        await signAndPushTransaction(supervisorDomain, transaction, []);
-    }
-
     // This is an entrypoint for apps to preload plugins.
     // Intended to be used on pageload to prepare the plugins that an app requires,
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
-            this.preload(callerOrigin, plugins);
+            this.preload(callerOrigin, [...plugins, ...systemPlugins]);
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
@@ -303,6 +247,7 @@ export class Supervisor implements AppInterface {
                     service: args.service,
                     plugin: args.plugin,
                 },
+                ...systemPlugins,
             ]);
 
             this.context = new CallContext();
@@ -313,13 +258,24 @@ export class Supervisor implements AppInterface {
                 this.parentOrigination,
                 "Parent origination corrupted",
             );
+
+            // Starts the tx context.
+            this.supervisorCall(
+                getCallArgs("transact", "plugin", "admin", "startTx", []),
+            );
+
             const result = this.call(this.parentOrigination, args);
+
+            // Closes the current tx context. If actions were added, tx is submitted.
+            const txResult = this.supervisorCall(
+                getCallArgs("transact", "plugin", "admin", "finishTx", []),
+            );
+            if (txResult !== null && txResult !== undefined) {
+                console.warn(txResult);
+            }
 
             // Post execution assertions
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
-
-            // Pack any scheduled actions into a transaction and submit
-            await this.submitTx();
 
             // Send plugin result to parent window
             this.replyToParent(args, result);

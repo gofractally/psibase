@@ -2,6 +2,7 @@ package auth-sig:plugin;
 
 world impl {
     include accounts:plugin/imports;
+    include transact:plugin/imports;
     include host:common/imports;
     include clientdata:plugin/imports;
 

@@ -2,15 +2,13 @@
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
+use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::auth_sig::plugin::smart_auth;
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, keyvault::Guest as KeyVault, smart_auth::Guest as SmartAuth,
 };
-
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
-
-use bindings::host::common::server as Server;
 use bindings::host::common::types as CommonTypes;
+use bindings::transact::plugin::intf as Transact;
 
 mod errors;
 use errors::ErrorType::*;
@@ -93,7 +91,7 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
-        Server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "setKey",
             &MyService::setKey {
                 key: AuthSig::to_der(public_key)?,

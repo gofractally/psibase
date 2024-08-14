@@ -5,7 +5,8 @@ use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::exports::accounts::plugin::admin::Guest as Admin;
-use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
+use bindings::host::common::{client as Client, types as CommonTypes};
+use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::AccountNumber;
@@ -82,7 +83,7 @@ impl Accounts for AccountsPlugin {
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountNumber.err(&service_name))?;
-        Server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {
                 authService: account_num,

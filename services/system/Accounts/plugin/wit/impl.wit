@@ -4,16 +4,22 @@ interface admin {
     use host:common/types.{error};
 
     /// Logins on a per-app basis break the ability for plugins to ask who is currently 
-    ///   logged in. They can only ask through the host, which is the entity that reliably
-    ///   knows the domain of the top-level app into which the user is interacting. 
-    /// Therefore, the function to request a logged-in-user is restricted so it is only 
-    ///   available to the supervisor.
-    get-logged-in-user: func(domain: string) -> result<option<string>, error>;
+    ///   logged in. Therefore, they can only ask through the host, which is the entity 
+    ///   that reliably knows the domain of the top-level app into which the user is 
+    ///   interacting.
+    /// 
+    /// Parameters: 
+    ///  * `caller-app` - The supervisor will always be the actual caller of the function, 
+    ///                   but this parameter specifies the account of the app who originally 
+    ///                   prompted the supervisor to ask.
+    ///  * `domain`     - The domain of the app whose logged-in user is being requested.
+    get-logged-in-user: func(caller-app: string, domain: string) -> option<string>;
 }
 
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
+    include transact:plugin/imports;
 
     export admin;
     export accounts;

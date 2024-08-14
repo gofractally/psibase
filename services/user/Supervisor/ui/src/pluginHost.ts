@@ -1,5 +1,5 @@
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
-import { HostInterface, Result } from "./hostInterface";
+import { HostInterface, PluginPostDetails, Result } from "./hostInterface";
 import { Supervisor } from "./supervisor";
 import {
     assertTruthy,
@@ -12,13 +12,21 @@ interface HttpRequest {
     uri: string;
     method: string;
     headers: Record<string, string>;
-    body: string;
+    body?: string | Uint8Array;
 }
 
 interface HttpResponse {
     status: number;
     headers: Array<[string, string]>;
     body: string;
+}
+
+function convert(tuples: [string, string][]): Record<string, string> {
+    const record: Record<string, string> = {};
+    tuples.forEach(([key, value]) => {
+        record[key] = value;
+    });
+    return record;
 }
 
 // This host interface is given to each serviceContext, but each is given a host interface
@@ -32,15 +40,11 @@ export class PluginHost implements HostInterface {
         return {
             code: 0,
             producer: {
-                service: "common",
-                plugin: "plugin",
+                service: "host",
+                plugin: "common",
             },
             message,
         };
-    }
-
-    private isValidAction(actionName: string): boolean {
-        return /^[a-zA-Z0-9_]+$/.test(actionName);
     }
 
     // A synchronous web request.
@@ -61,7 +65,7 @@ export class PluginHost implements HostInterface {
             }
             xhr.send(req.body && req.body.length > 0 ? req.body : null);
             if (xhr.status === 500) {
-                return this.recoverableError(
+                throw this.recoverableError(
                     `Http request error: ${xhr.response}`,
                 );
             }
@@ -73,7 +77,7 @@ export class PluginHost implements HostInterface {
                 .forEach((line) => {
                     const parts = line.split(": ");
                     const key = parts.shift();
-                    assertTruthy(key, "Malformed graphql response headers");
+                    assertTruthy(key, "Malformed http response headers");
                     const value = parts.join(": ");
                     headers.push([key, value]);
                 });
@@ -83,8 +87,11 @@ export class PluginHost implements HostInterface {
                 body,
             };
         } catch (err: any) {
-            if (`message` in err) {
-                return this.recoverableError(
+            if (
+                `message` in err &&
+                !err.message.includes("Http request error")
+            ) {
+                throw this.recoverableError(
                     `Http request error: ${err.message}`,
                 );
             }
@@ -107,6 +114,18 @@ export class PluginHost implements HostInterface {
         });
     }
 
+    private getRequest(
+        url: string,
+    ): Result<HttpResponse, RecoverableErrorPayload> {
+        return this.syncSend({
+            uri: url,
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+            },
+        });
+    }
+
     constructor(supervisor: Supervisor, self: QualifiedOriginationData) {
         this.supervisor = supervisor;
         this.self = self;
@@ -117,22 +136,21 @@ export class PluginHost implements HostInterface {
         return this.supervisor.call(this.self, args);
     }
 
-    // Server interface
-    addActionToTransaction(
-        action: string,
-        args: Array<number>,
-    ): Result<void, RecoverableErrorPayload> {
-        if (!this.isValidAction(action)) {
-            return this.recoverableError(
-                `Invalid action name: ${JSON.stringify(action)}`,
-            );
-        }
-
-        this.supervisor.addAction(this.self, {
-            service: this.self.app,
-            action,
-            args: Uint8Array.from(args),
+    postBytes(
+        request: PluginPostDetails,
+    ): Result<string, RecoverableErrorPayload> {
+        const endpoint = request.endpoint.replace(/^\/+/, "");
+        const url = `${this.self.origin}/${endpoint}`;
+        const res = this.syncSend({
+            uri: url,
+            method: "POST",
+            headers: convert([["Content-Type", "application/octet-stream"]]),
+            body: request.body.val,
         });
+        if ("body" in res) {
+            return res.body;
+        }
+        return res;
     }
 
     postGraphqlGetJson(
@@ -145,9 +163,27 @@ export class PluginHost implements HostInterface {
         return res;
     }
 
+    getJson(endpoint: string): Result<string, RecoverableErrorPayload> {
+        // Strip leading "/"
+        endpoint = endpoint.replace(/^\/+/, "");
+        const res = this.getRequest(`${this.self.origin}/${endpoint}`);
+        if ("body" in res) {
+            return res.body;
+        }
+        return res;
+    }
+
     // Client interface
     getSenderApp(): OriginationData {
         return this.supervisor.getCaller(this.self);
+    }
+
+    getLoggedInUser(): string | undefined {
+        return this.supervisor.getLoggedInUser(this.self.app);
+    }
+
+    isLoggedIn(): boolean {
+        return this.supervisor.isLoggedIn();
     }
 
     myServiceAccount(): string {
