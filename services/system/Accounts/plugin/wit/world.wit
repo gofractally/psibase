@@ -1,7 +1,16 @@
 package accounts:plugin;
 
+interface types {
+    record account {
+        account-num: string,
+        auth-service: string,
+        resource-balance: option<u64>,
+    }
+}
+
 interface accounts {
     use host:common/types.{error};
+    use types.{account};
 
     /// Creates a login popup allowing the user to log into an account.
     login: func() -> result<_, error>;
@@ -12,6 +21,9 @@ interface accounts {
 
     /// Retrieves a list of accounts to which the user can log in.
     get-available-accounts: func() -> result<list<string>, error>;
+
+    /// Verifies an account name corresponds with an existing account
+    get-account: func(name: string) -> result<option<account>, error>;
 
     /// Adds a new auth service locally that can be used to authenticate
     /// a user.

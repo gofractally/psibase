@@ -111,9 +111,12 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     chain.finish_block();
     let reply: Value = chain.graphql(
         SERVICE,
-        r#"query { answer(account: "example") { result } }"#,
+        r#"query { answer(account: "example") { id result } }"#,
     )?;
-    assert_eq!(reply, json!({ "data": { "answer": {"result": 7} } }));
+    assert_eq!(
+        reply,
+        json!({ "data": { "answer": {"id": "example", "result": 7} } })
+    );
 
     let reply = chain
         .post(

@@ -3346,7 +3346,7 @@ waait@^1.0.5:
   integrity sha512-wp+unA4CpqxvBUKHHv8D86fK4jWByHAWyhEXXVHfVUZfK+16ylpj7hjQ58Z8j9ntu8XNukRQT8Fi5qbyJ8rkyw==
 
 "wasm-psibase@file:./wasm-psibase":
-  version "0.11.0"
+  version "0.12.0"
 
 which-boxed-primitive@^1.0.2:
   version "1.0.2"
