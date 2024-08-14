@@ -52,26 +52,15 @@ impl KeyValue for ClientData {
     }
 
     fn set(key: String, value: Vec<u8>) -> Result<(), CommonTypes::Error> {
+        // Don't set empty records
+        if value.len() == 0 {
+            return Err(EmptyValue.err(&key));
+        }
+
         let bucket = Kv::store::open(&get_sender()?)
             .map_err(|_| KvError.err("Failed to open table in keyvalue store"))?;
 
-        // If passed an empty value
-        if value.len() == 0 {
-            let exists = bucket
-                .exists(&key)
-                .map_err(|_| KvError.err("Error determining key existence"))?;
-            if !exists {
-                // Don't add a new empty record. Return an error.
-                return Err(EmptyValue.err(&key));
-            } else {
-                // If the record already exists, treat this call as a delete
-                bucket
-                    .delete(&key)
-                    .map_err(|_| KvError.err("Error deleting key"))?;
-            }
-        }
-
-        // Set the non-empty value on the key
+        // Set the value on the key
         bucket
             .set(&key, &value)
             .map_err(|e| KvError.err(&format!("Error setting value on key: {}", e.to_string())))?;
