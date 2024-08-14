@@ -5,11 +5,11 @@
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
 #include <services/user/AuthInvite.hpp>
+#include <services/user/Events.hpp>
 #include <services/user/Invite.hpp>
 #include <services/user/Nft.hpp>
-#include <services/user/Tokens.hpp>
-#include <services/user/Events.hpp>
 #include <services/user/REvents.hpp>
+#include <services/user/Tokens.hpp>
 
 #include <psibase/Bitset.hpp>
 #include <psibase/serveContent.hpp>
@@ -339,15 +339,14 @@ void Invite::checkClaim(AccountNumber actor, Spki pubkey)
 
 struct Queries
 {
-   auto allCreatedInv() const {
-      std::string_view query {"SELECT * FROM \"history.invite.inviteCreated\" ORDER BY ROWID"};
+   auto allCreatedInv() const
+   {
+      std::string_view query{"SELECT * FROM \"history.invite.inviteCreated\" ORDER BY ROWID"};
       auto result = to<REvents>().sqlQuery(std::vector<char>(query.begin(), query.end()));
       return std::string{result.begin(), result.end()};
    }
 
-   auto getAllInvites() const {
-      return Invite::Tables{}.open<InviteTable>().getIndex<0>();
-   }
+   auto getAllInvites() const { return Invite::Tables{}.open<InviteTable>().getIndex<0>(); }
 
    auto getInvite(string pubkey) const
    {
@@ -358,18 +357,16 @@ struct Queries
 
    // This is called getInviter because it's used to look up the new account `user`
    //    in a table that tracks their original inviter.
-   auto getInviter(psibase::AccountNumber user)
+   auto getInviter(psibase::AccountNumber user) const
    {
       return Invite::Tables(Invite::service).open<InviteNs::NewAccTable>().get(user);
    }
-
 };
 PSIO_REFLECT(Queries,
              method(allCreatedInv),
              method(getAllInvites),
              method(getInvite, pubkey),
-             method(getInviter, user)
-)
+             method(getInviter, user))
 
 auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {
