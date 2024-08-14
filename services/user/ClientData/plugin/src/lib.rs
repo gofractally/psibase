@@ -22,32 +22,21 @@ impl KeyValue for ClientData {
         let bucket =
             Kv::store::open(&get_sender()).expect("Failed to open table in keyvalue store");
 
-        // Check that it exists before getting it, because get on a non-existent record
-        // will create an empty record. That's not what we want.
-        let exists = bucket
-            .exists(&key)
-            .expect("Error determining key existence");
-        if !exists {
-            return None;
-        }
-
-        // It exists, so get it
         let record = bucket.get(&key).expect("Failed to get record value");
-        let value = record.unwrap();
 
-        // An empty record is considered corrupt.
-        // Auto-delete the record if this is detected, and treat this call as though an
-        //   nonexistent key was accessed.
-        if value.len() == 0 {
-            bucket
-                .delete(&key)
-                .expect("Failed to recover from corruption");
-
-            return None;
+        if let Some(value) = record {
+            // An empty record is considered corrupt.
+            // Auto-delete the record if this is detected, and treat this call as though an
+            //   nonexistent key was accessed.
+            if value.len() == 0 {
+                bucket
+                    .delete(&key)
+                    .expect("Failed to recover from corruption");
+                return None;
+            }
+            return Some(value);
         }
-
-        // Return the pre-existing nonempty record value
-        Some(value)
+        None
     }
 
     fn set(key: String, value: Vec<u8>) -> Result<(), CommonTypes::Error> {
