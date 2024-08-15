@@ -820,7 +820,6 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/services/user/Invite/include"),
         &("-I".to_owned() + repo_path + "/services/user/Sites/include"),
         &("-I".to_owned() + repo_path + "/external/rapidjson/include"),
-        &("-I".to_owned() + repo_path + "/external/simdjson/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/common/include"),
         &("-I".to_owned() + repo_path + "/libraries/psibase/service/include"),
         &("-I".to_owned() + repo_path + "/libraries/psio/consthash/include"),

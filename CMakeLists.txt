@@ -363,7 +363,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.11.0")
+set(PSIBASE_VERSION "0.12.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi

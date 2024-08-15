@@ -14,12 +14,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1.0"
-async-graphql = "4.0"
+async-graphql = "7.0.6"
 async-trait = "0.1.77"
 chrono = "0.4"
 const_format = "0.2"
 custom_error = "1.9"
-fracpack = { version = "0.11.0", path = "../fracpack" }
+fracpack = { version = "0.12.0", path = "../fracpack" }
 flate2 = "1.0"
 futures = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
@@ -28,8 +28,8 @@ indexmap = { version = "2.2.6", features = ["std", "serde"] }
 sha2 = "0.10"
 mime_guess = "2.0"
 percent-encoding = "2.3"
-psibase_macros = { version = "0.11.0", path = "../psibase_macros" }
-psibase_names = { version = "0.11.0", path = "../psibase_names" }
+psibase_macros = { version = "0.12.0", path = "../psibase_macros" }
+psibase_names = { version = "0.12.0", path = "../psibase_names" }
 regex = "1"
 ripemd = "0.1"
 scopeguard = "1.2"
@@ -45,6 +45,7 @@ sec1 = "0.7"
 spki = "0.7"
 der = { version = "0.7", features = ["alloc", "pem", "std"] }
 url = "2.4"
+toml = "0.8.19"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "4.5", features = ["derive", "env"]}

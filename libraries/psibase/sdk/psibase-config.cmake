@@ -30,20 +30,12 @@ function(add_libs suffix)
         set(lib-suffix $<$<CONFIG:Debug>:-debug>)
     endif()
 
-    add_library(simdjson${suffix} INTERFACE)
-    target_include_directories(simdjson${suffix} INTERFACE ${root}/include)
-    target_link_libraries(simdjson${suffix} INTERFACE
-        -L${root}/lib
-        -lsimdjson # TODO: ${suffix}
-    )
-
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE ${root}/include)
     target_link_libraries(psio${suffix} INTERFACE
         -L${root}/lib
         -lpsio
         boost
-        simdjson${suffix}
         wasm-base${suffix}
     )
     target_compile_features(psio${suffix} INTERFACE cxx_std_20)

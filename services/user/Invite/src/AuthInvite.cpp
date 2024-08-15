@@ -79,6 +79,9 @@ namespace UserService
       if (auto result = psibase::servePackAction<AuthInvite>(request))
          return result;
 
+      if (auto result = psibase::serveSchema<AuthInvite>(request))
+         return result;
+
       if (auto result = psibase::serveContent(request, Tables{}))
          return result;
 

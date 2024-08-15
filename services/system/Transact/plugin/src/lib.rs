@@ -65,7 +65,7 @@ impl Intf for TransactPlugin {
             rawData: Hex::from(packed_args),
         };
 
-        let actions = match Keyvalue::get("actions")? {
+        let actions = match Keyvalue::get("actions") {
             Some(a) => {
                 let mut existing = <Vec<Action>>::unpacked(&a).expect("Failed to unpack");
                 existing.push(new_action);
@@ -87,10 +87,10 @@ impl Admin for TransactPlugin {
             .expect("Sender app not set");
         assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
 
-        let actions = Keyvalue::get("actions").expect("Db read fail");
+        let actions = Keyvalue::get("actions");
         if actions.is_some() {
             println!("[Warning] Transaction list should already have been cleared.");
-            Keyvalue::delete("actions").expect("");
+            Keyvalue::delete("actions");
         }
     }
 
@@ -100,17 +100,16 @@ impl Admin for TransactPlugin {
             .expect("Sender app not set");
         assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
 
-        let actions: Vec<Action> =
-            match Keyvalue::get("actions").expect("[finish_tx] Failed to get actions") {
-                Some(a) => <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"),
-                None => vec![],
-            };
+        let actions: Vec<Action> = match Keyvalue::get("actions") {
+            Some(a) => <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"),
+            None => vec![],
+        };
 
         if actions.len() == 0 {
             return Ok(());
         }
 
-        Keyvalue::delete("actions").expect("[finish_tx] Failed to delete");
+        Keyvalue::delete("actions");
 
         // TODO: Maybe I don't need to check whether anyone is logged in?
         let _ = Host::client::get_logged_in_user()

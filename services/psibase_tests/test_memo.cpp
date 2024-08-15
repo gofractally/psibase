@@ -31,6 +31,8 @@ TEST_CASE("memo")
    std::string longData =
        "000000000011111111112222222222333333333344444444445555555555666666666677777777778";
 
+   std::string invalidData = "abcdef\xFF";
+
    DefaultTestChain t;
    auto             test_service = t.addService("memo-service"_a, "memo-service.wasm");
 
@@ -57,4 +59,9 @@ TEST_CASE("memo")
              .to<MemoService>()
              .testConstruct(longData)
              .failed("Memo exceeds 80 bytes"));
+
+   CHECK(t.from("memo-service"_a)
+             .to<MemoService>()
+             .testConstruct(invalidData)
+             .failed("Memo must be valid UTF-8"));
 }

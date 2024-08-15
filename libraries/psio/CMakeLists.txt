@@ -1,7 +1,7 @@
 enable_testing()
 
 add_library( psio src/fpconv.c src/schema.cpp)
-target_link_libraries( psio PUBLIC rapidjson simdjson consthash boost )
+target_link_libraries( psio PUBLIC rapidjson boost )
 target_include_directories( psio PUBLIC include )
 add_compile_options( -Wall -Wstrict-aliasing )
 
@@ -38,14 +38,11 @@ target_sources( psio INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/psio/bytes.hpp
 )
 
-add_subdirectory( consthash )
 add_subdirectory(tests)
 
 if(IS_WASM)
     target_link_libraries(psio PUBLIC wasm-base)
     target_include_directories(psio PUBLIC ../psibase/common/include)
-    install(DIRECTORY consthash/include/consthash TYPE INCLUDE COMPONENT libpsibase)
-    install(FILES consthash/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.consthash COMPONENT libpsibase)
     install(DIRECTORY include/psio TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
     install(TARGETS psio ARCHIVE COMPONENT libpsibase)
 endif()
