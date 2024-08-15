@@ -1,24 +1,20 @@
 #[allow(warnings)]
 mod bindings;
+mod errors;
 
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::transact::plugin::{admin::Guest as Admin, intf::Guest as Intf};
-
 use bindings::host::common as Host;
 use bindings::host::common::types::{self as CommonTypes, BodyTypes::Bytes, PostRequest};
-
-use psibase::fracpack::{Pack, Unpack};
-use regex::Regex;
-mod errors;
 use errors::ErrorType::*;
+use psibase::fracpack::{Pack, Unpack};
 use psibase::{
     AccountNumber, Action, MethodNumber, Tapos, TimePointSec, Transaction, TransactionTrace,
 };
 use psibase::{Hex, SignedTransaction};
-
+use regex::Regex;
 use serde::Deserialize;
 use serde_json;
-//use sha2::{Digest, Sha256};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn validate_action(action_name: &str) -> Result<(), CommonTypes::Error> {
@@ -40,6 +36,23 @@ struct PartialTapos {
 struct SignedTransactionAlt {
     pub transaction: Vec<u8>,
     pub proofs: Vec<Vec<u8>>,
+}
+
+fn assert_from_supervisor() {
+    let sender_app = Host::client::get_sender_app()
+        .app
+        .expect("Sender app not set");
+    assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
+}
+
+fn ten_second_expiration() -> TimePointSec {
+    let expiration_time = SystemTime::now() + Duration::from_secs(10);
+    let expiration = expiration_time
+        .duration_since(UNIX_EPOCH)
+        .expect("Failed to get time")
+        .as_secs();
+    assert!(expiration <= u32::MAX as u64, "expiration out of range");
+    TimePointSec::from(expiration as u32)
 }
 
 struct TransactPlugin;
@@ -65,14 +78,9 @@ impl Intf for TransactPlugin {
             rawData: Hex::from(packed_args),
         };
 
-        let actions = match Keyvalue::get("actions") {
-            Some(a) => {
-                let mut existing = <Vec<Action>>::unpacked(&a).expect("Failed to unpack");
-                existing.push(new_action);
-                existing
-            }
-            None => vec![new_action],
-        };
+        let actions = Keyvalue::get("actions")
+            .map(|a| <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"))
+            .unwrap_or(vec![new_action]);
 
         Keyvalue::set("actions", &actions.packed())?;
 
@@ -82,11 +90,7 @@ impl Intf for TransactPlugin {
 
 impl Admin for TransactPlugin {
     fn start_tx() {
-        let sender_app = Host::client::get_sender_app()
-            .app
-            .expect("Sender app not set");
-        assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
-
+        assert_from_supervisor();
         let actions = Keyvalue::get("actions");
         if actions.is_some() {
             println!("[Warning] Transaction list should already have been cleared.");
@@ -95,15 +99,11 @@ impl Admin for TransactPlugin {
     }
 
     fn finish_tx() -> Result<(), CommonTypes::Error> {
-        let sender_app = Host::client::get_sender_app()
-            .app
-            .expect("Sender app not set");
-        assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
+        assert_from_supervisor();
 
-        let actions: Vec<Action> = match Keyvalue::get("actions") {
-            Some(a) => <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"),
-            None => vec![],
-        };
+        let actions = Keyvalue::get("actions")
+            .map(|a| <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"))
+            .unwrap_or_default();
 
         if actions.len() == 0 {
             return Ok(());
@@ -113,37 +113,27 @@ impl Admin for TransactPlugin {
 
         let tapos_str =
             Host::server::get_json("/common/tapos/head").expect("[finish_tx] Failed to get TaPoS");
-        let tapos = serde_json::from_str::<PartialTapos>(&tapos_str)
+        let PartialTapos {
+            refBlockSuffix,
+            refBlockIndex,
+        } = serde_json::from_str::<PartialTapos>(&tapos_str)
             .expect("[finish_tx] Failed to deserialize TaPoS");
-
-        let ten_seconds = Duration::from_secs(10);
-        let expiration_time = SystemTime::now() + ten_seconds;
-        let expiration = expiration_time
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get time")
-            .as_secs();
-        assert!(expiration <= u32::MAX as u64, "expiration out of range");
-        let expiration = expiration as u32;
 
         let t = Transaction {
             tapos: Tapos {
-                expiration: TimePointSec::from(expiration),
-                refBlockSuffix: tapos.refBlockSuffix,
+                expiration: ten_second_expiration(),
+                refBlockSuffix,
                 flags: 0,
-                refBlockIndex: tapos.refBlockIndex,
+                refBlockIndex,
             },
             actions,
             claims: vec![],
         };
+
         println!(
             "Publishing transaction: \n{}",
             serde_json::to_string_pretty(&t).expect("Can't format transaction as string")
         );
-
-        // Sha256 needed for signing
-        // let mut hasher = Sha256::new();
-        // hasher.update(&t);
-        // let result = hasher.finalize();
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(t.packed()),
@@ -153,8 +143,7 @@ impl Admin for TransactPlugin {
         let response = Host::server::post_bytes(&PostRequest {
             endpoint: "/push_transaction".to_string(),
             body: Bytes(signed_tx.packed()),
-        })
-        .expect("Posting tx failed");
+        })?;
 
         let trace =
             serde_json::from_str::<TransactionTrace>(&response).expect("Failed to get trace");

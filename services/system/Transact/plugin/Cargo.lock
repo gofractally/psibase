@@ -2204,12 +2204,10 @@ name = "transact"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "digest",
  "psibase",
  "regex",
  "serde",
  "serde_json",
- "sha2",
  "wit-bindgen-rt",
 ]
 
