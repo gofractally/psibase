@@ -7,6 +7,6 @@ edition = "2021"
 psibase_macros = { version = "0.12.0", path = "../../../../rust/psibase_macros" }
 psibase = { version = "0.12.0", path = "../../../../rust/psibase" }
 serde = { version = "1", features = ["derive"] }
-async-graphql = "4.0"
+async-graphql = "7.0.7"
 serde_json = "1.0.120"
 # attestation = { version = "0.1.0", path = "../../Attestation/service" }

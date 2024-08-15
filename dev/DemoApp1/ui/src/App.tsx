@@ -274,7 +274,7 @@ function App() {
           <button onClick={getIdentitySummary}> get Summary </button>
         </div>
       </div>
-      <h3>{res}</h3>
+      <pre>{JSON.stringify(res, null, 2)}</pre>
       <div className="card">
         <button onClick={() => run()}>
           {"auth-sig:plugin->generateKeypair"}
