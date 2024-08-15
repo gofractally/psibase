@@ -32,11 +32,6 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Graphql query error: {}", msg),
             },
-            ErrorType::QueryError => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Failed to post graphql query: {}", msg),
-            },
         }
     }
 }

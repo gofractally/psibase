@@ -25,9 +25,6 @@ interface accounts {
     /// Verifies an account name corresponds with an existing account
     get-account: func(name: string) -> result<option<account>, error>;
 
-    /// Verifies an account name corresponds with an existing account
-    get-account: func(name: string) -> result<option<account>, error>;
-
     /// Adds a new auth service locally that can be used to authenticate
     /// a user.
     add-auth-service: func(service-name: string) -> result<_, error>;
