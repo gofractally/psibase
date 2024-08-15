@@ -251,14 +251,28 @@ pub async fn push_transactions(
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct GQLError {
+pub struct GQLError {
     message: String,
 }
 
 #[derive(Deserialize)]
-struct QueryRoot<T> {
+pub struct QueryRoot<T> {
     data: Option<T>,
     errors: Option<GQLError>,
+}
+
+impl<T> QueryRoot<T> {
+    pub fn data(self) -> Result<T, anyhow::Error> {
+        if let Some(error) = self.errors {
+            Err(Error::GraphQLError {
+                message: error.message,
+            })?
+        }
+        let Some(data) = self.data else {
+            Err(Error::GraphQLWrongResponse)?
+        };
+        Ok(data)
+    } 
 }
 
 pub trait ChainUrl {

@@ -89,6 +89,19 @@ impl Chain {
         Ok(())
     }
 
+    /*
+    pub fn install<T: PackageRegistry>(self, reg: &T, packages: &[String]) {
+        let ops = installed_packages().resolve_changes(reg, packages, false);
+        
+        let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
+        let mut new_accounts = vec![];
+        
+        let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+        apply_packages(self, reg, ops, &mut new_accounts, &mut trx_builder, account!("prod"), None).unwrap();
+        new_accounts = self.get_accounts_to_create(&new_accounts, sender).await?;
+        create_accounts(new_accounts, &mut account_builder, sender)?;
+    }*/
+
     /// Create a new chain and make it active for database native functions.
     ///
     /// The arguments are the file sizes in bytes for the database's

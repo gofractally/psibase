@@ -2,13 +2,13 @@ use crate::services::{accounts, auth_delegate, http_server, packages, setcode, s
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
+    GenesisService, Pack, PackageDisposition, PackageOp, SignedTransaction, ToSchema, TransactionBuilder, Unpack, Version, QueryRoot,
 };
 use anyhow::{anyhow, Context};
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
@@ -1089,6 +1089,97 @@ impl PackageList {
         self
     }
 }
+
+#[async_trait(?Send)]
+pub trait ChainClient {
+    async fn get<T: DeserializeOwned>(&self, service: AccountNumber, path: &str) -> Result<T, anyhow::Error>;
+    async fn post<T: DeserializeOwned>(&self, service: AccountNumber, path: &str, content_type: &str, body: String) -> Result<T, anyhow::Error>;
+    async fn graphql<T: DeserializeOwned>(&self, service: AccountNumber, body: String) -> Result<T, anyhow::Error> {
+        let result: QueryRoot<T> = self.post(service, "/graphql", "application/graphql", body).await?;
+        result.data()
+    }
+    async fn get_installed_manifest(&self, package: &str, owner: AccountNumber) -> Result<PackageManifest, anyhow::Error> {
+        self.get(packages::SERVICE, &format!("/manifest?package={}&owner={}", package, owner)).await
+    }
+    async fn get_accounts_to_create(&self,
+                                    accounts: &[AccountNumber],
+                                    sender: AccountNumber,
+    ) -> Result<Vec<AccountNumber>, anyhow::Error> {
+        let result: NewAccountsQuery = self.graphql(
+            packages::SERVICE,
+            format!(
+                "query {{ newAccounts(accounts: {}, owner: {}) }}",
+                serde_json::to_string(accounts)?,
+                serde_json::to_string(&sender)?,
+            ),
+        )
+            .await?;
+        Ok(result.newAccounts)
+    }
+
+}
+
+pub async fn apply_packages<
+    C: ChainClient,
+    R: PackageRegistry,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
+    client: &C,
+    reg: &R,
+    ops: Vec<PackageOp>,
+    accounts: &mut Vec<AccountNumber>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
+    key: &Option<AnyPublicKey>,
+) -> Result<(), anyhow::Error> {
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                // TODO: verify ownership of existing accounts
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Replace(meta, info) => {
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                // TODO: skip unmodified files (?)
+                out.set_label(format!(
+                    "Updating {}-{} -> {}-{}",
+                    &meta.name, &meta.version, &info.name, &info.version
+                ));
+                // Remove out-dated files. This needs to happen before installing
+                // new files, to handle the case where a service that stores
+                // data files is replaced by a service that does not provide
+                // removeSys.
+                let old_manifest =
+                    client.get_installed_manifest(&meta.name, sender).await?;
+                old_manifest.upgrade(package.manifest(), out)?;
+                // Install the new package
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Remove(meta) => {
+                out.set_label(format!("Removing {}", &meta.name));
+                let old_manifest =
+                    client.get_installed_manifest(&meta.name, sender).await?;
+                old_manifest.remove(out)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 
 fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
     result.map_err(|e| JsValue::from_str(&e.to_string()))

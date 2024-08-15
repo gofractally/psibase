@@ -8,24 +8,25 @@ use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, sites};
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
-    get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
+    account, apply_packages, apply_proxy, as_json, create_boot_transactions,
+    get_manifest, get_tapos_for_head, method, new_account_action,
     push_transaction, push_transactions, reg_server, set_auth_service_action, set_code_action,
     set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
     AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry,
-    Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
+    Meta, PackageDataFile, PackageList, PackageOrigin, PackageRegistry, ServiceInfo,
     SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
-    TransactionBuilder, TransactionTrace,
+    TransactionBuilder, TransactionTrace, ChainClient, ChainUrl
 };
 use regex::Regex;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::Sha256;
 use std::ffi::OsString;
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+use async_trait::async_trait;
 
 mod cli;
 use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
@@ -299,6 +300,31 @@ fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
         },
         actions,
         claims: vec![],
+    }
+}
+
+pub struct ReqwestClient {
+    base_url: reqwest::Url,
+    client: reqwest::Client,
+}
+
+impl ReqwestClient {
+    pub fn new(base_url: reqwest::Url, client: reqwest::Client) -> ReqwestClient {
+        ReqwestClient { base_url, client }
+    }
+}
+
+#[async_trait(?Send)]
+impl ChainClient for ReqwestClient {
+    async fn get<T: DeserializeOwned>(&self, service: AccountNumber, path: &str) -> Result<T, anyhow::Error> {
+        let url = service.url(&self.base_url)?.join(path)?;
+        Ok(crate::as_json(self.client.get(url)).await?)
+    }
+    async fn post<T: DeserializeOwned>(&self, service: AccountNumber, path: &str, content_type: &str, body: String) -> Result<T, anyhow::Error> {
+        let url = service.url(&self.base_url)?.join(path)?;
+        Ok(crate::as_json(self.client.post(url)
+            .header("Content-Type", content_type)
+            .body(body)).await?)
     }
 }
 
@@ -804,67 +830,6 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     Ok(())
 }
 
-async fn apply_packages<
-    R: PackageRegistry,
-    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
->(
-    base_url: &reqwest::Url,
-    client: &mut reqwest::Client,
-    reg: &R,
-    ops: Vec<PackageOp>,
-    accounts: &mut Vec<AccountNumber>,
-    out: &mut TransactionBuilder<F>,
-    sender: AccountNumber,
-    key: &Option<AnyPublicKey>,
-) -> Result<(), anyhow::Error> {
-    for op in ops {
-        match op {
-            PackageOp::Install(info) => {
-                // TODO: verify ownership of existing accounts
-                let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
-                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
-                let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
-                out.push_all(account_actions)?;
-                let mut actions = vec![];
-                package.install(&mut actions, sender, true)?;
-                out.push_all(actions)?;
-            }
-            PackageOp::Replace(meta, info) => {
-                let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
-                // TODO: skip unmodified files (?)
-                out.set_label(format!(
-                    "Updating {}-{} -> {}-{}",
-                    &meta.name, &meta.version, &info.name, &info.version
-                ));
-                // Remove out-dated files. This needs to happen before installing
-                // new files, to handle the case where a service that stores
-                // data files is replaced by a service that does not provide
-                // removeSys.
-                let old_manifest =
-                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.upgrade(package.manifest(), out)?;
-                // Install the new package
-                let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
-                out.push_all(account_actions)?;
-                let mut actions = vec![];
-                package.install(&mut actions, sender, true)?;
-                out.push_all(actions)?;
-            }
-            PackageOp::Remove(meta) => {
-                out.set_label(format!("Removing {}", &meta.name));
-                let old_manifest =
-                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.remove(out)?;
-            }
-        }
-    }
-    Ok(())
-}
-
 async fn install(
     args: &Args,
     mut client: reqwest::Client,
@@ -902,13 +867,14 @@ async fn install(
 
     let action_limit: usize = 64 * 1024;
 
+    let chain_client = ReqwestClient::new(args.api.clone(), client.clone());
+    
     let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
     let mut new_accounts = vec![];
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
-        &args.api,
-        &mut client,
+        &chain_client,
         &package_registry,
         to_install,
         &mut new_accounts,
@@ -918,7 +884,7 @@ async fn install(
     )
     .await?;
 
-    new_accounts = get_accounts_to_create(&args.api, &mut client, &new_accounts, sender).await?;
+    new_accounts = chain_client.get_accounts_to_create(&new_accounts, sender).await?;
     create_accounts(new_accounts, &mut account_builder, sender)?;
 
     let account_transactions = account_builder.finish()?;
