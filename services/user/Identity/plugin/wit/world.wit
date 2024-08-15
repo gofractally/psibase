@@ -34,8 +34,8 @@ interface api {
 
     /// Attest to another Account's identity
     ///  @subject: the username being attested to
-    ///  @score: float, the percentage confidence in attestee's identity.
-    ///   The score answers: How confident are you that this is a real person and that they are the person they claim to be?
+    ///  @score: float (2 decimals of precision), the percentage confidence in subject's identity.
+    ///   The score answers: How confident the attester is that the subject is a real person and that they are the person they claim to be?
     attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
 }
 
@@ -43,7 +43,6 @@ interface queries {
     use host:common/types.{error};
     use types.{attestation-graph, identity-summary, identity-attestation};
 
-    
     summary: func(subject: string) -> result<option<identity-summary>, error>;
     // Future implementations (for attestation graphs)
     // graph: func() -> result<attestation-graph, error>;
