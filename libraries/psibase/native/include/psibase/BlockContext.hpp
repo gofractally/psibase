@@ -37,15 +37,16 @@ namespace psibase
 
       void checkActive() { check(active, "block is not active"); }
 
-      StatusRow                                start(std::optional<TimePointSec> time     = {},
-                                                     AccountNumber               producer = {},
-                                                     TermNum                     term     = {},
-                                                     BlockNum                    irr      = {});
-      void                                     start(Block&& src);
-      void                                     callStartBlock();
-      void                                     callOnBlock();
-      Checksum256                              makeEventMerkleRoot();
-      Checksum256                              makeTransactionMerkle();
+      StatusRow   start(std::optional<TimePointSec> time     = {},
+                        AccountNumber               producer = {},
+                        TermNum                     term     = {},
+                        BlockNum                    irr      = {});
+      void        start(Block&& src);
+      void        callStartBlock();
+      void        callOnBlock();
+      void        callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
+      Checksum256 makeEventMerkleRoot();
+      Checksum256 makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);
 
       void verifyProof(const SignedTransaction&                 trx,
@@ -62,6 +63,16 @@ namespace psibase
                            std::optional<std::chrono::microseconds> initialWatchdogLimit,
                            bool                                     enableUndo = true,
                            bool                                     commit     = true);
+
+      // The action is not allowed to modify any consensus state.
+      // It is allowed to read and write subjective tables.
+      void execNonTrxAction(Action&& action, ActionTrace& trace);
+      auto execExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+          -> ActionTrace&;
+      // The action has the same database access rules as queries
+      void execAsyncAction(Action&& action);
+      auto execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
+          -> ActionTrace&;
 
       void execAllInBlock();
 

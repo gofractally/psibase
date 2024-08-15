@@ -19,8 +19,6 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
-            "@psibase/supervisor-lib": ["../lib/src"],
-            "@psibase/supervisor-lib/*": ["../lib/src/*"]
         },
 
         /* Linting */

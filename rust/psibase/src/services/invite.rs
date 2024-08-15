@@ -1,13 +1,12 @@
-use crate::{AccountNumber, PublicKey, Reflect};
+use crate::{AccountNumber, PublicKey};
 use async_graphql::{InputObject, SimpleObject};
-use fracpack::{Pack, Unpack};
+use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
+    Debug, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject, ToSchema,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "InviteRecordInput")]
 pub struct InviteRecord {
     pubkey: PublicKey,
@@ -18,11 +17,8 @@ pub struct InviteRecord {
     state: u8,
 }
 
-#[derive(
-    Debug, Copy, Clone, Pack, Unpack, Reflect, Serialize, Deserialize, SimpleObject, InputObject,
-)]
+#[derive(Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[graphql(input_name = "NewAccountRecordInput")]
 pub struct NewAccountRecord {
     name: AccountNumber,

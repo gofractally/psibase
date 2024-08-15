@@ -64,7 +64,7 @@ namespace SystemService
 
       auto key() const { return accountNum; }
    };
-   PSIO_REFLECT(Account, accountNum, authService)
+   PSIO_REFLECT(Account, accountNum, authService, resourceBalance)
    using AccountTable = psibase::Table<Account, &Account::key>;
 
    /// This service facilitates the creation of new accounts
@@ -107,19 +107,6 @@ namespace SystemService
       /// Reduces the account balance. Aborts the transaction if the
       /// account does not have sufficient resources.
       void billCpu(psibase::AccountNumber name, std::chrono::nanoseconds amount);
-
-      struct Events
-      {
-         struct History
-         {
-         };
-         struct Ui
-         {
-         };
-         struct Merkle
-         {
-         };
-      };
    };
 
    PSIO_REFLECT(Accounts,

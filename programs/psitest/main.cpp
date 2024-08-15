@@ -4,6 +4,7 @@
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 #include <psibase/log.hpp>
 #include <psibase/prefix.hpp>
@@ -77,6 +78,7 @@ inline constexpr int32_t polyfill_root_dir_fd = 3;
 
 /** WASI Types */
 using wasi_errno_t                                = uint16_t;
+inline constexpr wasi_errno_t wasi_errno_again    = 6;
 inline constexpr wasi_errno_t wasi_errno_badf     = 8;
 inline constexpr wasi_errno_t wasi_errno_fault    = 21;
 inline constexpr wasi_errno_t wasi_errno_inval    = 28;
@@ -178,6 +180,7 @@ struct NullProver : psibase::Prover
 };
 
 struct file;
+struct HttpSocket;
 struct test_chain;
 
 struct state
@@ -189,9 +192,9 @@ struct state
    std::vector<std::string>                 args;
    cl_flags_t                               additional_args;
    std::vector<file>                        files;
+   std::vector<std::shared_ptr<HttpSocket>> sockets;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::shared_ptr<WatchdogManager>         watchdogManager = std::make_shared<WatchdogManager>();
-   std::optional<uint32_t>                  selected_chain_index;
    std::vector<char>                        result_key;
    std::vector<char>                        result_value;
 };
@@ -254,8 +257,8 @@ struct test_chain
       dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
       db     = {dir, hot_bytes, warm_bytes, cool_bytes, cold_bytes};
       writer = db.createWriter();
-      sys    = std::make_unique<psibase::SystemContext>(
-          psibase::SystemContext{db, {128}, {}, state.watchdogManager});
+      sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{
+          db, {128}, {}, state.watchdogManager, std::make_shared<psibase::Sockets>()});
    }
 
    test_chain(const test_chain&)            = delete;
@@ -481,6 +484,83 @@ struct wasi_filestat_t
    wasi_timestamp_t ctim;
 };
 static_assert(sizeof(wasi_filestat_t) == 64);
+
+struct QueryTimes
+{
+   std::chrono::microseconds             packTime;
+   std::chrono::microseconds             serviceLoadTime;
+   std::chrono::microseconds             databaseTime;
+   std::chrono::microseconds             wasmExecTime;
+   std::chrono::steady_clock::time_point startTime;
+};
+
+struct HttpSocket : psibase::AutoCloseSocket
+{
+   HttpSocket() { this->once = true; }
+   void autoClose(const std::optional<std::string>& message) noexcept override
+   {
+      psibase::HttpReply reply{.status      = psibase::HttpStatus::internalServerError,
+                               .contentType = "text/html"};
+      if (message)
+      {
+         reply.body = std::vector(message->begin(), message->end());
+      }
+      else
+      {
+         constexpr char defaultMessage[] = "service did not send a response";
+         reply.body = std::vector(&defaultMessage[0], defaultMessage + sizeof(defaultMessage) - 1);
+      }
+      sendImpl(psio::to_frac(reply));
+   }
+   void send(std::span<const char> data) override
+   {
+      auto reply  = psio::view<const psibase::HttpReply>{data};
+      auto status = reply.status().unpack();
+      switch (status)
+      {
+         case psibase::HttpStatus::ok:
+         case psibase::HttpStatus::notFound:
+            break;
+         default:
+            psibase::check(false, "HTTP response code not allowed: " +
+                                      std::to_string(static_cast<std::uint16_t>(status)));
+      }
+      sendImpl(std::vector(data.begin(), data.end()));
+   }
+   void sendImpl(std::vector<char>&& reply)
+   {
+      response = std::move(reply);
+      if (chain)
+         logResponse();
+   }
+   void logResponse()
+   {
+      auto view    = psio::view<const psibase::HttpReply>(psio::prevalidated{response});
+      auto endTime = std::chrono::steady_clock::now();
+
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "Trace", std::move(trace));
+
+      // TODO: consider bundling into a single attribute
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "PackTime", queryTimes.packTime);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "ServiceLoadTime", queryTimes.serviceLoadTime);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "DatabaseTime", queryTimes.databaseTime);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "WasmExecTime", queryTimes.wasmExecTime);
+      BOOST_LOG_SCOPED_LOGGER_TAG(
+          chain->logger, "ResponseTime",
+          std::chrono::duration_cast<std::chrono::microseconds>(endTime - queryTimes.startTime));
+
+      auto status = static_cast<unsigned>(view.status().unpack());
+      auto nBytes = static_cast<std::size_t>(view.body().size());
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "ResponseStatus", status);
+      BOOST_LOG_SCOPED_LOGGER_TAG(chain->logger, "ReponseBytes", nBytes);
+
+      PSIBASE_LOG(chain->logger, info) << "Handled HTTP request";
+   }
+   std::vector<char>         response;
+   psibase::TransactionTrace trace;
+   QueryTimes                queryTimes;
+   test_chain*               chain = nullptr;
+};
 
 struct callbacks
 {
@@ -983,16 +1063,12 @@ struct callbacks
    {
       state.chains.push_back(
           std::make_unique<test_chain>(state, hot_bytes, warm_bytes, cool_bytes, cold_bytes));
-      if (state.chains.size() == 1)
-         state.selected_chain_index = 0;
       return state.chains.size() - 1;
    }
 
    void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
-      if (state.selected_chain_index && *state.selected_chain_index == chain)
-         state.selected_chain_index.reset();
       state.chains[chain].reset();
       while (!state.chains.empty() && !state.chains.back())
       {
@@ -1086,7 +1162,7 @@ struct callbacks
       return state.result_value.size();
    }
 
-   std::uint32_t testerHttpRequest(uint32_t chain_index, span<const char> args_packed)
+   std::int32_t testerHttpRequest(uint32_t chain_index, span<const char> args_packed)
    {
       auto& chain = assert_chain(chain_index);
 
@@ -1100,108 +1176,89 @@ struct callbacks
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
 
       psibase::TransactionTrace trace;
-      psibase::ActionTrace      atrace;
+      psibase::ActionTrace&     atrace = trace.actionTraces.emplace_back();
 
-      constexpr auto nullTime      = std::chrono::steady_clock::time_point::min();
-      auto           startExecTime = nullTime;
-      auto           endExecTime   = nullTime;
-      unsigned       status        = 500;
-      std::uint64_t  nBytes        = 0;
-      auto           billableTime  = std::chrono::nanoseconds(0);
-      auto           databaseTime  = std::chrono::steady_clock::duration(0);
+      psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead(), chain.writer, true};
+      bc.start();
+      psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
+      psibase::SignedTransaction  trx;
+      psibase::TransactionContext tc{bc, trx, trace, true, false, true};
+
+      std::int32_t fd;
+
+      auto socket = std::make_shared<HttpSocket>();
+      chain.sys->sockets->add(socket, &tc.ownedSockets);
+      if (auto pos = std::ranges::find(state.sockets, nullptr); pos != state.sockets.end())
+      {
+         *pos = socket;
+         fd   = pos - state.sockets.begin();
+      }
+      else
+      {
+         psibase::check(state.sockets.size() <= 0x7fffffff, "Too many open sockets");
+         fd = state.sockets.size();
+         state.sockets.push_back(socket);
+      }
+
+      auto startExecTime = std::chrono::steady_clock::now();
+
       try
       {
-         psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead(), chain.writer,
-                                  true};
-         bc.start();
-         psibase::check(!bc.needGenesisAction,
-                        "Need genesis block; use 'psibase boot' to boot chain");
-         psibase::SignedTransaction trx;
-         psibase::Action            action{
-                        .sender  = psibase::AccountNumber(),
-                        .service = psibase::proxyServiceNum,
-                        .rawData = std::vector(args_packed.begin(), args_packed.end()),
+         auto setStatus = psio::finally(
+             [&]
+             {
+                auto endExecTime = std::chrono::steady_clock::now();
+
+                socket->trace = std::move(trace);
+
+                socket->queryTimes.packTime = std::chrono::duration_cast<std::chrono::microseconds>(
+                    startExecTime - startTime);
+                socket->queryTimes.serviceLoadTime =
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        endExecTime - startExecTime - tc.getBillableTime());
+                socket->queryTimes.databaseTime =
+                    std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
+                socket->queryTimes.wasmExecTime =
+                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
+                                                                          tc.databaseTime);
+                socket->queryTimes.startTime = startTime;
+             });
+         psibase::Action action{
+             .sender  = psibase::AccountNumber(),
+             .service = psibase::proxyServiceNum,
+             .rawData = psio::convert_to_frac(std::tuple(socket->id, req.unpack())),
          };
-         psibase::TransactionContext tc{bc, trx, trace, true, false, true};
-         psio::finally               recordBillableTime{[&]()
-                                          {
-                                             billableTime = tc.getBillableTime();
-                                             databaseTime = tc.databaseTime;
-                                          }};
-         startExecTime = std::chrono::steady_clock::now();
          tc.execServe(action, atrace);
-         endExecTime = std::chrono::steady_clock::now();
-         if (psio::fracpack_validate<std::optional<psibase::HttpReply>>(atrace.rawRetval))
-         {
-            auto result =
-                psio::view<std::optional<psibase::HttpReply>>(psio::prevalidated{atrace.rawRetval});
-            if (result)
-            {
-               status = 200;
-               nBytes = result->body().size();
-            }
-            else
-            {
-               status = 404;
-            }
-         }
       }
-      catch (std::exception& e)
+      catch (...)
       {
-         if (!trace.error)
-         {
-            trace.error = e.what();
-         }
       }
-      auto endTime = std::chrono::steady_clock::now();
-      if (startExecTime == nullTime)
-         startExecTime = endTime;
-      if (endExecTime == nullTime)
-         endExecTime = endTime;
 
-      trace.actionTraces.push_back(std::move(atrace));
+      socket->chain = &chain;
+      if (!socket->response.empty())
+      {
+         socket->logResponse();
+      }
 
-      state.result_value = psio::convert_to_frac(trace);
+      return fd;
+   }
+
+   std::uint32_t testerSocketRecv(std::int32_t fd, wasm_ptr<wasi_size_t> nbytes)
+   {
+      if (fd < 0 || fd >= state.sockets.size() || !state.sockets[fd])
+         return wasi_errno_badf;
+      if (state.sockets[fd]->response.empty())
+         return wasi_errno_again;
+      state.result_value = std::move(state.sockets[fd]->response);
       state.result_key.clear();
-      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
-
-      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "Trace", std::move(trace));
-
-      BOOST_LOG_SCOPED_LOGGER_TAG(
-          chain.logger, "PackTime",
-          std::chrono::duration_cast<std::chrono::microseconds>(startExecTime - startTime));
-      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ServiceLoadTime",
-                                  std::chrono::duration_cast<std::chrono::microseconds>(
-                                      endExecTime - startExecTime - billableTime));
-      BOOST_LOG_SCOPED_LOGGER_TAG(
-          chain.logger, "DatabaseTime",
-          std::chrono::duration_cast<std::chrono::microseconds>(databaseTime));
-      BOOST_LOG_SCOPED_LOGGER_TAG(
-          chain.logger, "WasmExecTime",
-          std::chrono::duration_cast<std::chrono::microseconds>(billableTime - databaseTime));
-      BOOST_LOG_SCOPED_LOGGER_TAG(
-          chain.logger, "ResponseTime",
-          std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime));
-
-      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ResponseStatus", status);
-      BOOST_LOG_SCOPED_LOGGER_TAG(chain.logger, "ReponseBytes", nBytes);
-
-      PSIBASE_LOG(chain.logger, info) << "Handled HTTP request";
-
-      return state.result_value.size();
+      *nbytes = state.result_value.size();
+      state.sockets[fd].reset();
+      return 0;
    }
 
-   void testerSelectChainForDb(uint32_t chain_index)
+   psibase::NativeFunctions& native(std::uint32_t chain_index)
    {
-      assert_chain(chain_index);
-      state.selected_chain_index = chain_index;
-   }
-
-   psibase::NativeFunctions& native()
-   {
-      if (!state.selected_chain_index)
-         throw std::runtime_error("no chain is selected");
-      return assert_chain(*state.selected_chain_index).native();
+      return assert_chain(chain_index).native();
    }
 
    void setResult(psibase::NativeFunctions& n)
@@ -1226,49 +1283,55 @@ struct callbacks
       return state.result_key.size();
    }
 
-   uint32_t kvGet(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGet(db, key);
       setResult(n);
       return result;
    }
 
-   uint32_t getSequential(uint32_t db, uint64_t indexNumber)
+   uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.getSequential(db, indexNumber);
       setResult(n);
       return result;
    }
 
-   uint32_t kvGreaterEqual(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   uint32_t kvGreaterEqual(std::uint32_t               chain_index,
+                           uint32_t                    db,
+                           eosio::vm::span<const char> key,
+                           uint32_t                    matchKeySize)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGreaterEqual(db, key, matchKeySize);
       setResult(n);
       return result;
    }
 
-   uint32_t kvLessThan(uint32_t db, eosio::vm::span<const char> key, uint32_t matchKeySize)
+   uint32_t kvLessThan(std::uint32_t               chain_index,
+                       uint32_t                    db,
+                       eosio::vm::span<const char> key,
+                       uint32_t                    matchKeySize)
    {
-      auto& n      = native();
-      auto  result = native().kvLessThan(db, key, matchKeySize);
+      auto& n      = native(chain_index);
+      auto  result = n.kvLessThan(db, key, matchKeySize);
       setResult(n);
       return result;
    }
 
-   uint32_t kvMax(uint32_t db, eosio::vm::span<const char> key)
+   uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvMax(db, key);
       setResult(n);
       return result;
    }
 
-   uint32_t kvGetTransactionUsage()
+   uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
    {
-      auto& n      = native();
+      auto& n      = native(chain_index);
       auto  result = n.kvGetTransactionUsage();
       setResult(n);
       return result;
@@ -1286,28 +1349,26 @@ void backtrace()
 void register_callbacks()
 {
    // Psibase Intrinsics
-   rhf_t::add<&callbacks::abortMessage>("env", "abortMessage");
-   rhf_t::add<&callbacks::writeConsole>("env", "writeConsole");
-   rhf_t::add<&callbacks::getResult>("env", "getResult");
-   rhf_t::add<&callbacks::getKey>("env", "getKey");
-   rhf_t::add<&callbacks::kvGet>("env", "kvGet");
-   rhf_t::add<&callbacks::getSequential>("env", "getSequential");
-   rhf_t::add<&callbacks::kvGreaterEqual>("env", "kvGreaterEqual");
-   rhf_t::add<&callbacks::kvLessThan>("env", "kvLessThan");
-   rhf_t::add<&callbacks::kvMax>("env", "kvMax");
-   rhf_t::add<&callbacks::kvGetTransactionUsage>("env", "kvGetTransactionUsage");
+   rhf_t::add<&callbacks::abortMessage>("psibase", "abortMessage");
+   rhf_t::add<&callbacks::getResult>("psibase", "getResult");
+   rhf_t::add<&callbacks::getKey>("psibase", "getKey");
+   rhf_t::add<&callbacks::kvGet>("psibase", "kvGet");
+   rhf_t::add<&callbacks::getSequential>("psibase", "getSequential");
+   rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
+   rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
+   rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
+   rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics
-   rhf_t::add<&callbacks::testerAbort>("env", "testerAbort");
-   rhf_t::add<&callbacks::testerCreateChain>("env", "testerCreateChain");
-   rhf_t::add<&callbacks::testerDestroyChain>("env", "testerDestroyChain");
-   rhf_t::add<&callbacks::testerShutdownChain>("env", "testerShutdownChain");
-   rhf_t::add<&callbacks::testerGetChainPath>("env", "testerGetChainPath");
-   rhf_t::add<&callbacks::testerStartBlock>("env", "testerStartBlock");
-   rhf_t::add<&callbacks::testerFinishBlock>("env", "testerFinishBlock");
-   rhf_t::add<&callbacks::testerPushTransaction>("env", "testerPushTransaction");
-   rhf_t::add<&callbacks::testerHttpRequest>("env", "testerHttpRequest");
-   rhf_t::add<&callbacks::testerSelectChainForDb>("env", "testerSelectChainForDb");
+   rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
+   rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
+   rhf_t::add<&callbacks::testerGetChainPath>("psibase", "getChainPath");
+   rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
+   rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
+   rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
+   rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
    rhf_t::add<&callbacks::testerExecute>("env", "testerExecute");
 
    // WASI functions

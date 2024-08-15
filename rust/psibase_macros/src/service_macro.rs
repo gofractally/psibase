@@ -160,7 +160,6 @@ fn process_mod(
 ) -> TokenStream {
     let mod_name = &impl_mod.ident;
     let service_account = &options.name;
-    let service_account_str = service_account.to_string();
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
     let history_events = proc_macro2::TokenStream::from_str(&options.history_events).unwrap();
@@ -169,7 +168,6 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
-    let psibase_mod_str = psibase_mod.to_string();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
@@ -226,15 +224,14 @@ fn process_mod(
         }
 
         let mut action_structs = proc_macro2::TokenStream::new();
+        let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
-        let mut reflect_methods = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
-                let mut reflect_args = quote! {};
                 process_action_args(
                     options,
                     false,
@@ -244,22 +241,15 @@ fn process_mod(
                     &mut action_structs,
                     &mut invoke_args,
                     &mut invoke_struct_args,
-                    &mut reflect_args,
                 );
+                process_action_schema(psibase_mod, &structs, f, &mut action_schema_init);
                 process_action_callers(psibase_mod, f, &mut action_callers, &invoke_args);
                 process_dispatch_body(psibase_mod, f, &mut dispatch_body, invoke_struct_args);
                 let name = &f.sig.ident;
                 let name_str = name.to_string();
-                let num_args = f.sig.inputs.len();
                 let output = match &f.sig.output {
                     ReturnType::Default => quote! {()},
                     ReturnType::Type(_, t) => quote! {#t},
-                };
-                reflect_methods = quote! {
-                    #reflect_methods
-                    .method::<#output>(#name_str.into(), #num_args)
-                    #reflect_args
-                    .end()
                 };
                 with_action_struct = quote! {
                     #with_action_struct
@@ -304,14 +294,11 @@ fn process_mod(
             .iter()
             .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
             .fold(quote! {}, |a, b| quote! {#a #b});
-        let static_type = quote! {#psibase_mod::JustSchema}.to_string();
         items.push(parse_quote! {
-            #[derive(Debug, Clone, #psibase_mod::Reflect)]
-            #[reflect(psibase_mod = #psibase_mod_str, static_type=#static_type)]
+            #[derive(Debug, Clone)]
             #[automatically_derived]
             #doc
             pub struct #actions <T: #psibase_mod::Caller> {
-                #[reflect(skip)]
                 pub caller: T,
             }
         });
@@ -329,6 +316,16 @@ fn process_mod(
             impl<T: #psibase_mod::Caller> From<T> for #actions<T> {
                 fn from(caller: T) -> Self {
                     Self{caller}
+                }
+            }
+        });
+        items.push(parse_quote! {
+            #[automatically_derived]
+            impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::FunctionType> {
+                    let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                    #action_schema_init
+                    actions
                 }
             }
         });
@@ -571,6 +568,7 @@ fn process_mod(
 
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
+                type Actions = #actions<#psibase_mod::JustSchema>;
                 type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
@@ -663,7 +661,6 @@ fn process_mod(
                 if let Item::Fn(f) = &items[fn_index] {
                     let mut invoke_args = quote! {};
                     let mut invoke_struct_args = quote! {};
-                    let mut reflect_args = quote! {};
                     process_action_args(
                         options,
                         options.gql,
@@ -673,7 +670,6 @@ fn process_mod(
                         &mut event_structs,
                         &mut invoke_args,
                         &mut invoke_struct_args,
-                        &mut reflect_args,
                     );
                     process_event_callers(psibase_mod, f, &mut event_callers, &invoke_args);
                     process_event_name(psibase_mod, f, &mut event_structs);
@@ -738,23 +734,6 @@ fn process_mod(
             });
         }
 
-        let num_actions = action_fns.len();
-        items.push(parse_quote! {
-            #[automatically_derived]
-            impl #psibase_mod::reflect::Reflect for #wrapper {
-                type StaticType = #wrapper;
-                fn reflect<V: #psibase_mod::reflect::Visitor>(visitor: V) -> V::Return {
-                    use #psibase_mod::reflect::StructVisitor;
-                    use #psibase_mod::reflect::MethodsVisitor;
-                    use #psibase_mod::reflect::ArgVisitor;
-                    visitor
-                        .struct_named::<#wrapper>(#service_account_str.into(), 0)
-                        .with_methods(#num_actions)
-                        #reflect_methods
-                        .end()
-                }
-            }
-        });
         items.push(parse_quote! {
             #[automatically_derived]
             impl #psibase_mod::WithActionStruct for #wrapper {
@@ -844,6 +823,7 @@ fn process_mod(
     } else {
         quote! {#[allow(dead_code)]}
     };
+    let polyfill = gen_polyfill(psibase_mod);
     quote! {
         #silence
         #impl_mod
@@ -857,6 +837,8 @@ fn process_mod(
 
         #[automatically_derived]
         pub use #mod_name::#structs;
+
+        #polyfill
     }
     .into()
 } // process_mod
@@ -1203,7 +1185,6 @@ fn process_action_args(
     new_items: &mut proc_macro2::TokenStream,
     invoke_args: &mut proc_macro2::TokenStream,
     invoke_struct_args: &mut proc_macro2::TokenStream,
-    reflect_args: &mut proc_macro2::TokenStream,
 ) {
     let mut struct_members = proc_macro2::TokenStream::new();
     for input in f.sig.inputs.iter() {
@@ -1211,7 +1192,6 @@ fn process_action_args(
             FnArg::Receiver(_) => (), // Compiler generates errors on self args
             FnArg::Typed(pat_type) => match &*pat_type.pat {
                 Pat::Ident(name) => {
-                    let name_str = name.ident.to_string();
                     let ty = &*pat_type.ty;
                     struct_members = quote! {
                         #struct_members
@@ -1224,10 +1204,6 @@ fn process_action_args(
                     *invoke_struct_args = quote! {
                         #invoke_struct_args
                         args.#name,
-                    };
-                    *reflect_args = quote! {
-                        #reflect_args
-                        .arg::<#ty>(#name_str.into())
                     };
                 }
                 _ => abort!(*pat_type.pat, "expected identifier"),
@@ -1250,9 +1226,8 @@ fn process_action_args(
 
     *new_items = quote! {
         #new_items
-        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::Reflect, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
+        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
         #[fracpack(fracpack_mod = #fracpack_mod)]
-        #[reflect(psibase_mod = #psibase_mod_str)]
         #[doc = #doc]
         pub struct #fn_name {
             #struct_members
@@ -1319,6 +1294,30 @@ fn process_action_callers(
             self.caller.#call(#method_number, (#invoke_args))
         }
     };
+}
+
+fn process_action_schema(
+    psibase_mod: &proc_macro2::TokenStream,
+    action_mod: &proc_macro2::TokenStream,
+    f: &ItemFn,
+    insertions: &mut proc_macro2::TokenStream,
+) {
+    let name = &f.sig.ident;
+    let name_str = name.to_string();
+    let method_number =
+        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
+
+    let ret = match &f.sig.output {
+        ReturnType::Default => quote! { None },
+        ReturnType::Type(_, ty) => {
+            quote! { Some(builder.insert::<#ty>() ) }
+        }
+    };
+
+    *insertions = quote! {
+        #insertions
+        actions.insert(#method_number, #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+    }
 }
 
 fn process_dispatch_body(
@@ -1502,4 +1501,66 @@ fn process_gql_union(
             }
         }
     };
+}
+
+fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        #[cfg(all(test, target_family="wasm"))]
+        mod psibase_tester_polyfill {
+            #![allow(non_snake_case)]
+            use #psibase_mod::tester_raw;
+            use #psibase_mod::DbId;
+            use tester_raw::get_selected_chain;
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getResult(dest: *mut u8, dest_size: u32, offset: u32) -> u32 {
+                tester_raw::getResult(dest, dest_size, offset)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
+                tester_raw::getKey(dest, dest_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn writeConsole(message: *const u8, len: u32) {
+                print!("{}", std::str::from_utf8(std::slice::from_raw_parts(message, len as usize)).unwrap());
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn abortMessage(message: *const u8, len: u32) -> ! {
+                tester_raw::abortMessage(message, len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGet(db: DbId, key: *const u8, key_len: u32) -> u32 {
+                tester_raw::kvGet(get_selected_chain(), db, key, key_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
+                tester_raw::getSequential(get_selected_chain(), db, id)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGreaterEqual(
+                db: DbId,
+                key: *const u8,
+                key_len: u32,
+                match_key_size: u32,
+            ) -> u32 {
+                tester_raw::kvGreaterEqual(get_selected_chain(), db, key, key_len, match_key_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvLessThan(db: DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
+                tester_raw::kvLessThan(get_selected_chain(), db, key, key_len, match_key_size)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
+                tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            }
+        }
+    }
 }

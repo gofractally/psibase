@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path="../../../../rust/psibase/" }
+wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
+psibase = { path = "../../../../rust/psibase/" }
+serde = "1.0.204"
+serde_json = "1.0.120"
 
 [profile.release]
 codegen-units = 1
@@ -21,4 +23,7 @@ crate-type = ["cdylib"]
 package = "accounts:plugin"
 
 [package.metadata.component.target.dependencies]
-"common:plugin" = { path = "../../../user/CommonApi/common/packages/wit/plugin.wit" }
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+
+[package.metadata.component.bindings]
+derives = ["serde::Deserialize"]

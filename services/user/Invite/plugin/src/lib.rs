@@ -3,10 +3,10 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::accounts::plugin::accounts;
 use bindings::auth_sig::plugin::keyvault;
-use bindings::common::plugin::{client as Client, server as Server, types as CommonTypes};
 use bindings::exports::invite::plugin::{
     admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
 };
+use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteId, Url};
 use fracpack::Pack;
 use psibase::services::invite as InviteService;
@@ -89,7 +89,6 @@ impl Invitee for Component {
                 })
             })?;
 
-        let url = format!("{}/graphql", Client::my_service_origin()?);
         let pubkey = &decoded.pk;
         let query = format!(
             r#"query {{
@@ -101,7 +100,7 @@ impl Invitee for Component {
             pubkey = pubkey
         );
 
-        let invite: GetInvite = Server::post_graphql_get_json(&url, &query)
+        let invite: GetInvite = Server::post_graphql_get_json(&query)
             .map_err(|e| QueryError.err(&e.message))
             .and_then(|result| {
                 serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
@@ -147,9 +146,9 @@ impl Inviter for Component {
             .packed(),
         )?;
 
-        let link_root = format!("{}{}", Client::my_service_origin()?, "/invited");
+        let link_root = format!("{}{}", Client::my_service_origin(), "/invited");
 
-        let orig_data = Client::get_sender_app()?;
+        let orig_data = Client::get_sender_app();
         let orig_domain = orig_data.origin;
         let originator = orig_data.app.unwrap_or(orig_domain.clone());
 

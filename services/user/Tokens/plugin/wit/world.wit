@@ -27,7 +27,7 @@ interface types {
 
 
 interface intf {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{precision, quantity, token-id, account-number};
     
     create: func(precision: precision, max-supply: quantity) -> result<_, error>;
@@ -36,13 +36,13 @@ interface intf {
 }
 
 interface queries {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{token-id, token-detail};
     token-owner: func(token-id: token-id) -> result<token-detail, error>;
 }
 
 interface transfer {
-    use common:plugin/types.{error};
+    use host:common/types.{error};
     use types.{token-id, account-number, quantity, balance, token-detail};
 
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
@@ -52,8 +52,8 @@ interface transfer {
 /// An example world for the component to target.
 world example {
 
-    import common:plugin/server;
-    import common:plugin/client;
+    import host:common/server;
+    import host:common/client;
 
 
 

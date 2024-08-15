@@ -1,5 +1,7 @@
 #include "test_fracpack.hpp"
 
+#include "expand_json.hpp"
+
 TEST_CASE("roundtrip")
 {
    test<std::string>({"", "Lorem ipsum dolor sit amet"});
@@ -7,35 +9,6 @@ TEST_CASE("roundtrip")
    test<std::variant<std::int32_t, double, std::string>>(
        {1, 2.0, "Although I am an old man, night is generally my time for walking."});
 }
-
-namespace psio
-{
-
-   template <typename S>
-   struct expand_shared_view_ptr_stream : S
-   {
-      using S::S;
-   };
-
-   template <typename T, typename S>
-   void to_json(const shared_view_ptr<T>& obj, expand_shared_view_ptr_stream<S>& stream)
-   {
-      to_json(obj->unpack(), stream);
-   }
-
-   std::string expand_json(const auto& t)
-   {
-      expand_shared_view_ptr_stream<size_stream> ss;
-      to_json(t, ss);
-      std::string                                     result(ss.size, 0);
-      expand_shared_view_ptr_stream<fixed_buf_stream> fbs(result.data(), result.size());
-      to_json(t, fbs);
-      if (fbs.pos != fbs.end)
-         abort_error(stream_error::underrun);
-      return result;
-   }
-
-}  // namespace psio
 
 template <typename T, typename U>
 void test_compat(const T& t, const U& u, bool expect_unknown)

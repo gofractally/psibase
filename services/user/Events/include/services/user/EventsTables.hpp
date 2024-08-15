@@ -1,127 +1,18 @@
 #pragma once
 
-#include <algorithm>
-#include <map>
+#include <cstdint>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
-#include <psibase/Rpc.hpp>
-#include <psibase/Service.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/db.hpp>
+#include <psibase/schema.hpp>
 #include <psio/reflect.hpp>
-#include <psio/schema.hpp>
-#include <string>
+#include <span>
 #include <vector>
 
 namespace UserService
 {
-
-   /// Represents the schema for a service
-   struct ServiceSchema
-   {
-      psibase::AccountNumber service;
-      psio::Schema           types;
-      using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
-      EventMap ui;
-      EventMap history;
-      EventMap merkle;
-
-     private:
-      template <typename T>
-      static void makeEvents(psio::SchemaBuilder&                       builder,
-                             EventMap&                                  out,
-                             std::vector<psio::schema_types::AnyType*>& eventTypes)
-      {
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
-             {
-                using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
-                if constexpr (m::isFunction)
-                {
-                   psio::schema_types::Object type;
-                   auto                       nameIter = ref.param_names.begin();
-                   auto                       nameEnd  = ref.param_names.end();
-                   auto                       i        = ref.param_names.size();
-                   forEachType(typename m::SimplifiedArgTypes{},
-                               [&](auto* t)
-                               {
-                                  std::string name =
-                                      nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
-                                  type.members.push_back(
-                                      {std::move(name),
-                                       builder.insert<std::remove_pointer_t<decltype(t)>>()});
-                               });
-                   auto [pos, inserted] =
-                       out.try_emplace(psibase::MethodNumber{ref.name}, std::move(type));
-                   if (inserted)
-                   {
-                      eventTypes.push_back(&pos->second);
-                   }
-                }
-             });
-      }
-
-     public:
-      /// Constructs a schema for a service.
-      template <typename T>
-      static ServiceSchema make()
-      {
-         ServiceSchema                             result{.service = T::service};
-         std::vector<psio::schema_types::AnyType*> eventTypes;
-         psio::SchemaBuilder                       builder;
-         if constexpr (requires { typename T::Events::Ui; })
-         {
-            makeEvents<typename T::Events::Ui>(builder, result.ui, eventTypes);
-         }
-         if constexpr (requires { typename T::Events::History; })
-         {
-            makeEvents<typename T::Events::History>(builder, result.history, eventTypes);
-         }
-         if constexpr (requires { typename T::Events::Merkle; })
-         {
-            makeEvents<typename T::Events::Merkle>(builder, result.merkle, eventTypes);
-         }
-         result.types = std::move(builder).build(eventTypes);
-         return result;
-      }
-
-     private:
-      const EventMap* getDb(psibase::DbId db) const
-      {
-         switch (db)
-         {
-            case psibase::DbId::uiEvent:
-               return &ui;
-            case psibase::DbId::merkleEvent:
-               return &merkle;
-            case psibase::DbId::historyEvent:
-               return &history;
-            default:
-               return nullptr;
-         }
-      }
-
-     public:
-      const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
-      {
-         if (const auto* dbTypes = getDb(db))
-            if (auto pos = dbTypes->find(event); pos != dbTypes->end())
-               return pos->second.resolve(types);
-         return nullptr;
-      }
-      std::vector<const psio::schema_types::AnyType*> eventTypes() const
-      {
-         std::vector<const psio::schema_types::AnyType*> result;
-         for (const auto* m : {&ui, &history, &merkle})
-         {
-            for (const auto& [_, type] : *m)
-            {
-               result.push_back(&type);
-            }
-         }
-         return result;
-      }
-   };
-   PSIO_REFLECT(ServiceSchema, service, types, ui, history, merkle)
+   using psibase::ServiceSchema;
 
    struct SecondaryIndexInfo
    {

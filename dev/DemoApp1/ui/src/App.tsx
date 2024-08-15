@@ -13,7 +13,9 @@ interface Invite {
   callback: string;
 }
 
-const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad }) => {
+const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
+  onLoad,
+}) => {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files ? event.target.files[0] : null;
 
@@ -27,12 +29,8 @@ const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({ onLoad 
     }
   };
 
-  return (
-    <input type="file" accept=".pem" onChange={handleFileChange} />
-  );
+  return <input type="file" accept=".pem" onChange={handleFileChange} />;
 };
-
-
 
 function App() {
   const [res, setRes] = useState("Empty");
@@ -160,9 +158,7 @@ function App() {
         method: "generateUnmanagedKeypair",
         params: [],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Keypair written to console`);
     } catch (e) {
       if (e instanceof Error) {
@@ -181,9 +177,7 @@ function App() {
         method: "setKey",
         params: [c],
       });
-      console.log(
-        `Decoded response: ${JSON.stringify(res, null, 2)}`
-      );
+      console.log(`Decoded response: ${JSON.stringify(res, null, 2)}`);
       setRes(`Res: ${res}`);
     } catch (e) {
       if (e instanceof Error) {
@@ -193,7 +187,6 @@ function App() {
       }
     }
   };
-
 
   const [a, setA] = useState("");
   const [b, setB] = useState("");

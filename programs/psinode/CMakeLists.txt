@@ -32,6 +32,18 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
     add_test(
+        NAME py_test_fracpack
+        COMMAND ${Python_EXECUTABLE} test_fracpack.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(
+        NAME py_test_name
+        COMMAND ${Python_EXECUTABLE} test_name.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(
+        NAME py_test_psibase_types
+        COMMAND ${Python_EXECUTABLE} test_psibase_types.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(
         NAME psinode_test_routing
         COMMAND ${Python_EXECUTABLE} test_routing.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
@@ -50,6 +62,14 @@ if(Python_Interpreter_FOUND)
         COMMAND ${Python_EXECUTABLE} test_subjective.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     set_tests_properties(psinode_test_subjective PROPERTIES PROCESSORS 4)
+    add_test(
+        NAME psinode_test_txqueue
+        COMMAND ${Python_EXECUTABLE} test_txqueue.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(
+        NAME psinode_test_query
+        COMMAND ${Python_EXECUTABLE} test_query.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
 include(GNUInstallDirs)
