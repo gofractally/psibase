@@ -8,8 +8,8 @@ wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 psibase = { path = "../../../../rust/psibase" }
-pem = "3.0.4"
-base64 = "0.22"
+pem = "3"
+md5 = "0.7"
 
 [profile.release]
 codegen-units = 1

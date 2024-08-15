@@ -1,6 +1,5 @@
 #[allow(warnings)]
 mod bindings;
-use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::auth_sig::plugin::smart_auth;
@@ -20,15 +19,25 @@ use rand_core::OsRng;
 use psibase::fracpack::Pack;
 use psibase::services::auth_sig::action_structs as MyService;
 
+use md5;
+
 trait TryFromPemStr: Sized {
-    fn try_from_pem_str(p: Pem) -> Result<Self, CommonTypes::Error>;
+    fn try_from_pem_str(p: &Pem) -> Result<Self, CommonTypes::Error>;
 }
 
 impl TryFromPemStr for pem::Pem {
-    fn try_from_pem_str(key_string: Pem) -> Result<Self, CommonTypes::Error> {
+    fn try_from_pem_str(key_string: &Pem) -> Result<Self, CommonTypes::Error> {
         Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError.err(&e.to_string()))?)
     }
 }
+
+// Uses md5 because it's short, this doesn't need to be cryptographically secure.
+fn get_hash(key: &Pem) -> Result<String, CommonTypes::Error> {
+    let pem = pem::Pem::try_from_pem_str(&key)?;
+    let digest = md5::compute(pem.contents().to_vec());
+    Ok(format!("{:x}", digest))
+}
+
 struct AuthSig;
 
 impl SmartAuth for AuthSig {
@@ -44,13 +53,8 @@ impl SmartAuth for AuthSig {
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
         let keypair = AuthSig::generate_unmanaged_keypair()?;
-        let b64 = URL_SAFE.encode(&AuthSig::to_der(keypair.public_key.clone())?);
-
-        // Trim off the DER metadata, and then take the first 32 characters as a key
-        let trimmed = b64.get(36..).unwrap_or("").get(..32).unwrap_or("");
-        assert!(trimmed.len() == 32, "Error generating new keypair");
-
-        Keyvalue::set(trimmed, &AuthSig::to_der(keypair.private_key)?)?;
+        let hash = get_hash(&keypair.public_key)?;
+        Keyvalue::set(&hash, &AuthSig::to_der(keypair.private_key)?)?;
         Ok(keypair.public_key)
     }
 
@@ -73,7 +77,7 @@ impl KeyVault for AuthSig {
     }
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
-        let pem = pem::Pem::try_from_pem_str(private_key)?;
+        let pem = pem::Pem::try_from_pem_str(&private_key)?;
         let signing_key = SigningKey::from_pkcs8_der(&pem.contents())
             .map_err(|e| CryptoError.err(&e.to_string()))?;
         let verifying_key = signing_key.verifying_key();
@@ -84,7 +88,7 @@ impl KeyVault for AuthSig {
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
-        let pem = pem::Pem::try_from_pem_str(key)?;
+        let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
     }
 }
