@@ -31,9 +31,11 @@ export interface HostInterface {
     ) => Result<string, RecoverableErrorPayload>;
 
     // Client interface
+    loginTemp: (appOrigin: string, user: string) => Result<void, RecoverableErrorPayload>;
+
     getSenderApp: () => OriginationData;
 
-    getLoggedInUser: () => string | undefined;
+    getLoggedInUser: () => Result<string | undefined, RecoverableErrorPayload>;
 
     isLoggedIn: () => boolean;
 

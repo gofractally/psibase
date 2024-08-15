@@ -174,11 +174,18 @@ export class PluginHost implements HostInterface {
     }
 
     // Client interface
+    loginTemp(
+        appOrigin: string,
+        user: string,
+    ): Result<void, RecoverableErrorPayload> {
+        this.supervisor.loginTemp(appOrigin, user, this.self);
+    }
+
     getSenderApp(): OriginationData {
         return this.supervisor.getCaller(this.self);
     }
 
-    getLoggedInUser(): string | undefined {
+    getLoggedInUser(): Result<string | undefined, RecoverableErrorPayload> {
         return this.supervisor.getLoggedInUser(this.self.app);
     }
 

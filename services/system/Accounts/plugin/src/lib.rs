@@ -3,18 +3,14 @@ mod bindings;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
-
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::exports::accounts::plugin::admin::Guest as Admin;
 use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
 use bindings::transact::plugin::intf as Transact;
 use bindings::accounts::plugin::types::{self as AccountTypes};
-
 use psibase::fracpack::Pack;
 use psibase::services::accounts::{self as AccountsService};
 use psibase::AccountNumber;
-
-extern crate url;
 use url::Url;
 use serde::Deserialize;
 
@@ -72,7 +68,7 @@ impl Admin for AccountsPlugin {
         Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
     }
 
-    fn get_logged_in_user(caller_app: String, domain: String) -> Option<String> {
+    fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
         let sender = Client::get_sender_app().app;
         assert!(
             sender.is_some() && sender.as_ref().unwrap() == "supervisor",
@@ -80,17 +76,14 @@ impl Admin for AccountsPlugin {
         );
 
         // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
-        // Todo: This should not be an assert!, it should return a recoverable error type so it
-        //       propagates back to the caller plugins.
-        assert!(
-            caller_app == "transact" || caller_app == "supervisor",
-            "Temporarily, only transact can ask for the logged-in user."
-        );
+        if caller_app != "transact" && caller_app != "supervisor" {
+            return Err(Unauthorized.err("Temporarily, only transact can ask for the logged-in user."));
+        }
 
         if let Some(user) = Keyvalue::get(&login_key(domain)) {
-            Some(String::from_utf8(user).unwrap())
+            Ok(Some(String::from_utf8(user).unwrap()))
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -104,7 +97,7 @@ impl Accounts for AccountsPlugin {
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
 
-        Keyvalue::set(&login_key(origin), &user.as_bytes())?;
+        Client::login_temp(&origin, &user)?;
         Ok(())
     }
 

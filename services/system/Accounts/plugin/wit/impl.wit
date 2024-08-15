@@ -17,7 +17,7 @@ interface admin {
     ///                   but this parameter specifies the account of the app who originally 
     ///                   prompted the supervisor to ask.
     ///  * `domain`     - The domain of the app whose logged-in user is being requested.
-    get-logged-in-user: func(caller-app: string, domain: string) -> option<string>;
+    get-logged-in-user: func(caller-app: string, domain: string) -> result<option<string>, error>;
 }
 
 world impl {

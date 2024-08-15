@@ -55,7 +55,7 @@ impl Intf for TransactPlugin {
             .app
             .ok_or_else(|| OnlyAvailableToPlugins.err("add_action_to_transaction"))?;
 
-        let sender = Host::client::get_logged_in_user()
+        let sender = Host::client::get_logged_in_user()?
             .ok_or_else(|| NotLoggedIn.err("add_action_to_transaction"))?;
 
         let new_action = Action {
@@ -110,10 +110,6 @@ impl Admin for TransactPlugin {
         }
 
         Keyvalue::delete("actions");
-
-        // TODO: Maybe I don't need to check whether anyone is logged in?
-        let _ = Host::client::get_logged_in_user()
-            .expect("[finish_tx] Cannot submit tx: no user logged in");
 
         let tapos_str =
             Host::server::get_json("/common/tapos/head").expect("[finish_tx] Failed to get TaPoS");

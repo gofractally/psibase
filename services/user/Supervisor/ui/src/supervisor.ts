@@ -147,6 +147,30 @@ export class Supervisor implements AppInterface {
         this.parser = parser();
     }
 
+    // Temporary function to allow apps to directly log a user in
+    loginTemp(appOrigin: string, user: string, sender: OriginationData) {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        assertTruthy(
+            sender.app,
+            "[supervisor:loginTemp] only callable by Accounts plugin",
+        );
+
+        assert(
+            sender.app === "accounts",
+            "[supervisor:loginTemp] Unauthorized",
+        );
+        assert(
+            appOrigin === this.parentOrigination.origin,
+            "[supervisor:loginTemp] Unauthorized. Can only login to top-level app.",
+        );
+
+        let login = getCallArgs("accounts", "plugin", "admin", "forceLogin", [
+            appOrigin,
+            user,
+        ]);
+        this.supervisorCall(login);
+    }
+
     // Called by the current plugin looking to identify its caller
     getCaller(currentPlugin: OriginationData): OriginationData {
         assertTruthy(this.context, "Uninitialized call context");
