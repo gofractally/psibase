@@ -314,6 +314,7 @@ add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wa
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
+add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -395,6 +396,17 @@ psibase_package(
     DEPENDS wasm
     DEPENDS ${AccountsPlugin_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/ClientData.psi
+    NAME ClientData
+    DESCRIPTION "Plugin for enabling simpler interactions with client-side data storage"
+    VERSION ${PSIBASE_VERSION}
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    SERVICE clientdata
+        DATA ${COMPONENT_BIN_DIR}/${ClientDataPlugin_OUTPUT_FILE} /plugin.wasm
+    DEPENDS ${ClientDataPlugin_DEP}
 )
 
 psibase_package(
@@ -739,7 +751,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit Docs
                     Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
@@ -767,7 +779,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig AuthK1 CommonApi CpuLimit Default
+    Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit Default
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
@@ -778,6 +790,7 @@ install(
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthK1.psi
+          ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Default.psi
           ${SERVICE_DIR}/CpuLimit.psi
