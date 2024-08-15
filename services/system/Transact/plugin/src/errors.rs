@@ -2,7 +2,6 @@ use crate::bindings::host::common::types::{Error, PluginId};
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
-    Unauthorized,
     OnlyAvailableToPlugins,
     InvalidActionName,
     NotLoggedIn,
@@ -19,11 +18,6 @@ fn my_plugin_id() -> PluginId {
 impl ErrorType {
     pub fn err(self, msg: &str) -> Error {
         match self {
-            ErrorType::Unauthorized => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Unauthorized access: {}", msg),
-            },
             ErrorType::OnlyAvailableToPlugins => Error {
                 code: self as u32,
                 producer: my_plugin_id(),

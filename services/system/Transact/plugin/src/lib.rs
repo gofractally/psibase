@@ -12,7 +12,7 @@ use regex::Regex;
 mod errors;
 use errors::ErrorType::*;
 use psibase::{
-    AccountNumber, Action, Claim, MethodNumber, Tapos, TimePointSec, Transaction, TransactionTrace,
+    AccountNumber, Action, MethodNumber, Tapos, TimePointSec, Transaction, TransactionTrace,
 };
 use psibase::{Hex, SignedTransaction};
 
