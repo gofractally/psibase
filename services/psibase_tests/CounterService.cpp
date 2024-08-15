@@ -4,6 +4,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serveSchema.hpp>
 #include <string>
 
 using namespace psibase;
@@ -40,6 +41,8 @@ std::uint32_t CounterService::inc(std::string key, std::uint32_t id)
 
 std::optional<HttpReply> CounterService::serveSys(const HttpRequest& req)
 {
+   if (auto result = serveSchema<CounterService>(req))
+      return result;
    return servePackAction<CounterService>(req);
 }
 

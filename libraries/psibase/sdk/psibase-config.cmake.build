@@ -33,7 +33,6 @@ function(add_libs suffix)
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psio/include
-        @ROOT_SOURCE_DIR@/libraries/psio/consthash/include
         @ROOT_SOURCE_DIR@/external/rapidjson/include
     )
     target_link_libraries(psio${suffix} INTERFACE

@@ -1,5 +1,6 @@
 use anyhow::Error;
 use anyhow::{anyhow, Context};
+use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
 use cargo_metadata::Metadata;
 use clap::{Parser, Subcommand};
@@ -13,12 +14,14 @@ use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
-use url::Url;
 use walrus::Module;
 use wasm_opt::OptimizationOptions;
 
 mod link;
 use link::link_module;
+
+/// The version of the cargo-psibase crate at compile time
+const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
 const SERVICE_ARGS_RUSTC: &[&str] = &["--", "-C", "target-feature=+simd128,+bulk-memory,+sign-ext"];
@@ -43,16 +46,6 @@ enum PsibaseCommand {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    // TODO: load default from environment variable
-    /// API Endpoint
-    #[clap(
-        short = 'a',
-        long,
-        value_name = "URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
-    )]
-    api: Url,
-
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
@@ -71,6 +64,15 @@ struct Args {
 
 #[derive(Parser, Debug)]
 struct DeployCommand {
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
+    #[clap(
+        short = 'a',
+        long,
+        value_name = "URL_OR_HOST_ALIAS",
+        env = "PSINODE_URL"
+    )]
+    api: Option<String>,
+
     /// Account to deploy service on
     account: Option<ExactAccountNumber>,
 
@@ -116,6 +118,15 @@ enum Command {
 
 fn pretty(label: &str, message: &str) {
     println!("{:>12} {}", style(label).bold().green(), message);
+}
+
+fn warn(label: &str, message: &str) {
+    println!(
+        "{}: {} {}",
+        style("warning").bold().yellow(),
+        style(label).bold().yellow(),
+        message
+    );
 }
 
 fn pretty_path(label: &str, filename: &Path) {
@@ -166,8 +177,6 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
         let polyfill_source_module = config.parse(polyfill)?;
         pretty_path("Polyfilling", filename);
         link_module(&polyfill_source_module, &mut dest_module)?;
-    } else {
-        pretty("Polyfilling", "SKIPPED! No polyfill functions found");
     }
 
     pretty_path("Reoptimizing", filename);
@@ -253,6 +262,26 @@ fn get_metadata(args: &Args) -> Result<Metadata, Error> {
         exit(output.status.code().unwrap());
     }
     Ok(serde_json::from_slice::<Metadata>(&output.stdout)?)
+}
+
+/// Check the psibase dependency version against cargo-psibase
+fn check_psibase_version(metadata: &Metadata) {
+    let psibase_version = &metadata
+        .packages
+        .iter()
+        .find(|pkg| pkg.name == "psibase")
+        .expect("psibase dependency not found")
+        .version;
+
+    let cargo_psibase_version = Version::parse(CARGO_PSIBASE_VERSION).unwrap();
+
+    if *psibase_version != cargo_psibase_version {
+        let version_mismatch_msg = format!(
+            "The version of `cargo-psibase` used (v{}) and the version of `psibase` on which your service depends (v{}) should match",
+            CARGO_PSIBASE_VERSION, psibase_version
+        );
+        warn("Version Mismatch", &version_mismatch_msg);
+    }
 }
 
 async fn build(
@@ -345,6 +374,8 @@ async fn test(
     services.sort();
     services.dedup();
 
+    pretty("Services", "building dependencies...");
+
     pretty(
         "Services",
         &services
@@ -393,7 +424,12 @@ async fn test(
         service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
     }
 
-    // println!("CARGO_PSIBASE_SERVICE_LOCATIONS={:?}", service_wasms);
+    if service_wasms.len() > 0 {
+        pretty("Services", "compiled and included successfully");
+    }
+
+    pretty("Test", "building unit tests...");
+
     let tests = build(
         args,
         &[root],
@@ -447,7 +483,12 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["--suppress-ok".into(), "deploy".into()];
+    let mut args = vec!["--suppress-ok".into()];
+    if let Some(api) = &opts.api {
+        args.push("--api".into());
+        args.push(api.to_string());
+    }
+    args.push("deploy".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
@@ -499,6 +540,7 @@ async fn main2() -> Result<(), Error> {
         .as_ref()
         .unwrap()
         .repr;
+    check_psibase_version(&metadata);
 
     match &args.command {
         Command::Build {} => {
