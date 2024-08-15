@@ -30,7 +30,7 @@ export type PsinodeConfigUI = {
     loggers: { [index: string]: LogConfig };
 };
 
-const port = z.number();
+const port = z.coerce.number();
 
 const LogConfigSchema = z.object({
     type: z.string(),

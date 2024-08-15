@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
     RegisterOptions,
     useFieldArray,
@@ -8,15 +7,12 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Service } from "../components";
-import { PsinodeConfigUI, ServiceConfig } from "./interfaces";
 import {
-    defaultService,
-    emptyService,
-    initialConfigForm,
-    resolveConfigFormDiff,
-    writeConfig,
-    newId,
-} from "./utils";
+    PsinodeConfigUI,
+    PsinodeConfigUpdate,
+    ServiceConfig,
+} from "./interfaces";
+import { defaultService, writeConfig, newId } from "./utils";
 import { Logger } from "../log/logger";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,11 +30,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash } from "lucide-react";
 
 export const ConfigurationPage = () => {
-    const { data: config, isLoading } = useConfig();
+    const { data: config, isLoading, isError } = useConfig();
 
+    const { mutateAsync } = useConfigUpdate();
+
+    const handleSubmit = async (config: PsinodeConfigUpdate) => {
+        void (await mutateAsync(config));
+        return config;
+    };
+
+    if (isLoading) return <div>Loading..</div>;
+    if (!config || isError) return <div>Error loading config</div>;
+
+    return <ConfigurationForm config={config} onSubmit={handleSubmit} />;
+};
+export const ConfigurationForm = ({
+    config,
+    onSubmit,
+}: {
+    config: PsinodeConfigUI;
+    onSubmit: (config: PsinodeConfigUpdate) => Promise<PsinodeConfigUpdate>;
+}) => {
     const configForm = useForm<PsinodeConfigUI>({
-        defaultValues: initialConfigForm(),
+        defaultValues: config,
     });
+
+    console.log(configForm.formState, "is state.");
 
     const listeners = useFieldArray({
         control: configForm.control,
@@ -50,43 +67,22 @@ export const ConfigurationPage = () => {
         name: "services",
     });
 
-    useEffect(() => {
-        if (config) {
-            resolveConfigFormDiff(config, configForm);
-        }
-    }, [config]);
-
-    // Fix up the default value of the key after deleting the last row
-    // This is strictly to keep the form's dirty state correct.
-    useEffect(() => {
-        const fields = services.fields;
-        if (fields !== undefined) {
-            const defaultValues = configForm.formState
-                .defaultValues as PsinodeConfigUI;
-            if (
-                fields.length != 0 &&
-                fields.length == defaultValues.services.length &&
-                emptyService(fields.at(-1)!) &&
-                emptyService(defaultValues.services.at(-1)!)
-            ) {
-                const index = fields.length - 1;
-                const key: `services.${number}.key` = `services.${index}.key`;
-                configForm.resetField(key, {
-                    defaultValue: configForm.getValues(key),
-                });
-            }
-        }
-    });
-
-    const { mutateAsync, error: configPutError } = useConfigUpdate();
-
     const onConfig = async (input: PsinodeConfigUI) => {
         for (let service of input.services) {
             if (service.host == "") {
                 service.host = defaultService(service.root);
             }
         }
-        mutateAsync(writeConfig(input));
+        void (await onSubmit(writeConfig(input)));
+        configForm.reset(input);
+    };
+
+    const addNewService = () => {
+        services.append({
+            host: "",
+            key: Math.floor(Math.random() * 100000).toString(),
+            root: "",
+        });
     };
 
     const onAddNewLoggerClick = () => {
@@ -145,8 +141,6 @@ export const ConfigurationPage = () => {
     const onAddNewListenerClick = () => {
         listeners.append({ key: newId(), text: "", protocol: "http" });
     };
-
-    if (isLoading) return <div>Loading...</div>;
 
     return (
         <>
@@ -229,7 +223,7 @@ export const ConfigurationPage = () => {
                                                         <Input
                                                             type="number"
                                                             {...configForm.register(
-                                                                `listen.${idx}.text`
+                                                                `listen.${idx}.port`
                                                             )}
                                                         />
                                                     </td>
@@ -340,9 +334,23 @@ export const ConfigurationPage = () => {
                             )}
                         </TabsContent>
                         <TabsContent value="services">
-                            <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                                Built-in Services
-                            </h2>
+                            <div className="flex justify-between">
+                                <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+                                    Built-in Services
+                                </h2>
+                                <div>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            addNewService();
+                                        }}
+                                    >
+                                        <Plus size={20} className="" />
+                                    </Button>
+                                </div>
+                            </div>
+
                             <fieldset>
                                 <table className="w-full">
                                     <thead>
@@ -433,13 +441,17 @@ export const ConfigurationPage = () => {
                         className="my-4"
                         size="lg"
                         type="submit"
-                        disabled={!configForm.formState.isDirty}
+                        disabled={
+                            !configForm.formState.isDirty ||
+                            configForm.formState.isLoading
+                        }
                     >
-                        Save Changes
+                        {configForm.formState.isLoading
+                            ? "Saving"
+                            : "Save changes"}
                     </Button>
                 </form>
             )}
-            {configPutError && <div>{configPutError}</div>}
         </>
     );
 };

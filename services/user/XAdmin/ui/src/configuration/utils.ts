@@ -232,6 +232,13 @@ function readListen(listen: ListenConfig): ListenConfig {
 
 function writeListen(listen: ListenConfig): any {
     if (listen.protocol == "http" || listen.protocol == "https") {
+        if (listen.port && listen.address) {
+            return {
+                protocol: listen.protocol,
+                address: listen.address,
+                port: listen.port,
+            };
+        }
         const ipv4 = listen.text?.match(/^(\d+\.\d+.\d+.\d+)(?::(\d+))$/);
         if (ipv4) {
             return {
@@ -313,44 +320,4 @@ export const resolveListDiff = <T>(
         const old: any = base.find(compare) || user.find(compare);
         return { key: old ? old.key : newId(), ...s };
     });
-};
-
-export const resolveConfigFormDiff = (
-    config: PsinodeConfigUI,
-    configForm: UseFormReturn<PsinodeConfigUI, any>
-) => {
-    const result = { ...config };
-    const oldDefaults = configForm.formState.defaultValues as PsinodeConfigUI;
-    const userValues = configForm.getValues();
-    result.services = resolveListDiff(
-        oldDefaults.services,
-        result.services,
-        userValues.services,
-        (lhs, rhs) => lhs.host == rhs.host && lhs.root == rhs.root
-    );
-    result.listen = resolveListDiff(
-        oldDefaults.listen,
-        result.listen.map(readListen),
-        userValues.listen,
-        (lhs, rhs) => lhs.protocol == rhs.protocol && lhs.text == rhs.text
-    );
-    result.loggers = readLoggers(result.loggers);
-    result.admin = result.admin ? result.admin : "";
-    let newState = mergeConfig(oldDefaults, result, userValues);
-    if (
-        userValues.services.length > 0 &&
-        emptyService(userValues.services.at(-1)!)
-    ) {
-        result.services = [...result.services, userValues.services.at(-1)!];
-    } else {
-        result.services = [
-            ...result.services,
-            { host: "", root: "", key: newId() },
-        ];
-    }
-    configForm.reset(result, {
-        keepDirty: true,
-        keepValues: true,
-    });
-    configForm.reset(newState, { keepDefaultValues: true });
 };
