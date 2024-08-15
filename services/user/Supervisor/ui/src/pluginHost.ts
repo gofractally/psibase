@@ -140,9 +140,9 @@ export class PluginHost implements HostInterface {
     ): Result<string, RecoverableErrorPayload> {
         const res = this.postGraphQL(`${this.self.origin}/graphql`, graphql);
         if ("body" in res) {
-            if (res.body.includes("errors")) {
-                const json = JSON.parse(res.body);
-                return this.recoverableError(json.errors.message);
+            const json = JSON.parse(res.body);
+            if (json.errors?.length) {
+                throw this.recoverableError(JSON.stringify(json.errors));
             } else {
                 return res.body;
             }
