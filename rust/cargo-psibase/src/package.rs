@@ -28,19 +28,6 @@ impl PsibaseMetadata {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
-struct PsibaseWorkspaceMetadata {
-    #[serde(rename = "package-name")]
-    package_name: String,
-    version: String,
-    #[serde(default)]
-    description: Option<String>,
-    #[serde(default)]
-    services: Vec<String>,
-    #[serde(default)]
-    dependencies: HashMap<String, String>,
-}
-
 fn find_dep<'a>(
     packages: &HashMap<&str, &Package>,
     ids: &'a [PackageId],
@@ -112,7 +99,6 @@ pub async fn build_package(
     let mut services = Vec::new();
     let mut plugins = Vec::new();
     let mut data_files = Vec::new();
-    let package_info = None;
 
     let get_dep = get_dep_type(|service, dep| {
         let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
@@ -191,9 +177,7 @@ pub async fn build_package(
         }
     }
 
-    let (package_name, package_version, package_description) = if let Some(info) = package_info {
-        info
-    } else {
+    let (package_name, package_version, package_description) = {
         let root = metadata.packages.get(service.unwrap()).unwrap();
         let root_meta: PsibaseMetadata = get_metadata(root)?;
         if let Some(name) = root_meta.package_name {
