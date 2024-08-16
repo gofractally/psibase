@@ -32,7 +32,7 @@ mod service {
     }
 }
 
-#[psibase::test_case(services("test_contract"))]
+#[psibase::test_case(packages("test_contract"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
     assert_eq!(Wrapper::push(&chain).multiply(3, 4).get()?, 12);

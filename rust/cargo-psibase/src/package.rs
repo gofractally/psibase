@@ -1,7 +1,9 @@
 use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
-use psibase::{AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, ServiceInfo};
+use psibase::{
+    AccountNumber, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef, ServiceInfo,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -93,7 +95,7 @@ pub async fn build_package(
     service: Option<&str>,
 ) -> Result<PackageInfo, anyhow::Error> {
     let mut depends = vec![];
-    let mut accounts = vec![];
+    let mut accounts: Vec<AccountNumber> = Vec::new();
     let mut visited = HashSet::new();
     let mut queue = Vec::new();
     let mut services = Vec::new();
@@ -143,8 +145,8 @@ pub async fn build_package(
             let Some(package) = metadata.packages.get(service) else {
                 Err(anyhow!("Cannot find crate for service {}", service))?
             };
-            let account: AccountNumber = package.name.parse()?;
-            accounts.push(account);
+            let account: ExactAccountNumber = package.name.parse()?;
+            accounts.push(account.into());
             let pmeta: PsibaseMetadata = get_metadata(package)?;
             for (k, v) in pmeta.dependencies {
                 depends.push(PackageRef {

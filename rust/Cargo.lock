@@ -3308,7 +3308,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_contract"
+name = "test-contract"
 version = "0.12.0"
 dependencies = [
  "psibase",
