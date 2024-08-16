@@ -2,13 +2,13 @@ use anyhow::Error;
 use anyhow::{anyhow, Context};
 use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
-use cargo_metadata::Metadata;
+use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
 use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
-use regex::Regex;
+use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
-use std::fs::{read, write, OpenOptions};
+use std::fs::{read, write, File, OpenOptions};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
@@ -20,7 +20,7 @@ use wasm_opt::OptimizationOptions;
 mod link;
 use link::link_module;
 mod package;
-use package::build_package;
+use package::*;
 
 /// The version of the cargo-psibase crate at compile time
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -363,108 +363,127 @@ async fn build_plugin(
     Ok(files?)
 }
 
-async fn get_test_services(args: &Args) -> Result<Vec<(String, String)>, Error> {
-    let mut command: tokio::process::Child = tokio::process::Command::new(get_cargo())
-        .arg("test")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--color=always")
-        .arg("--")
-        .arg("--show-output")
-        .arg("_psibase_test_get_needed_services")
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let status = command.wait();
-
-    let (status, lines) = tokio::join!(
-        status, //
-        async {
-            let mut lines = Vec::new();
-            while let Some(line) = stdout.next_line().await? {
-                lines.push(line);
-            }
-            Ok::<_, Error>(lines)
-        },
-    );
-
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
+fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
+    if let Some(platform) = &dep.target {
+        if platform.matches("wasm32-wasi", &[]) {
+            true
+        } else {
+            false
+        }
+    } else {
+        true
     }
+}
 
-    let re = Regex::new(r"^psibase-test-need-service +([^ ]+) +([^ ]+)$").unwrap();
-    Ok(lines?
-        .iter()
-        .filter_map(|line| re.captures(line))
-        .map(|cap| (cap[1].to_owned(), cap[2].to_owned()))
-        .collect())
+fn is_test_dependency(dep: &NodeDep) -> bool {
+    for kind in &dep.dep_kinds {
+        if matches!(
+            kind.kind,
+            DependencyKind::Normal | DependencyKind::Development
+        ) && is_wasm32_wasi(kind)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_normal_dependency(dep: &NodeDep) -> bool {
+    for kind in &dep.dep_kinds {
+        if matches!(kind.kind, DependencyKind::Normal) && is_wasm32_wasi(kind) {
+            return true;
+        }
+    }
+    false
+}
+
+fn get_test_packages<'a>(
+    metadata: &'a MetadataIndex,
+    root: &str,
+) -> Result<Vec<&'a PackageId>, anyhow::Error> {
+    let node = metadata.resolved.get(root).unwrap();
+    let mut visited = HashSet::new();
+    let mut packages = Vec::new();
+    if package::get_metadata(metadata.packages.get(root).unwrap())?.is_package() {
+        let root = &metadata.packages.get(root).unwrap().id;
+        if visited.insert(root) {
+            packages.push(root);
+        }
+    }
+    // get packages that are dependencies and dev-dependencies of the root package
+    for dep in &node.deps {
+        if is_test_dependency(dep)
+            && package::get_metadata(metadata.packages.get(&dep.pkg.repr.as_str()).unwrap())?
+                .is_package()
+        {
+            if visited.insert(&dep.pkg) {
+                packages.push(&dep.pkg);
+            }
+        }
+    }
+    // get the transitive closure of packages in dependencies
+    for i in 0.. {
+        if i == packages.len() {
+            break;
+        }
+        let id = &packages[i];
+        let node = metadata.resolved.get(&id.repr.as_str()).unwrap();
+        for dep in &node.deps {
+            if is_normal_dependency(dep)
+                && package::get_metadata(metadata.packages.get(&dep.pkg.repr.as_str()).unwrap())?
+                    .is_package()
+            {
+                if visited.insert(&dep.pkg) {
+                    packages.push(&dep.pkg);
+                }
+            }
+        }
+    }
+    Ok(packages)
 }
 
 async fn test(
     args: &Args,
     opts: &TestCommand,
-    metadata: &Metadata,
+    metadata: &MetadataIndex<'_>,
     root: &str,
 ) -> Result<(), Error> {
-    let mut services = get_test_services(args).await?;
-    services.sort();
-    services.dedup();
+    //
+    let packages = get_test_packages(metadata, root)?;
 
-    pretty("Services", "building dependencies...");
+    pretty("Packages", "building dependencies...");
 
     pretty(
-        "Services",
-        &services
+        "Packages",
+        &packages
             .iter()
-            .map(|(s, _)| s.to_owned())
+            .map(|item| {
+                metadata
+                    .packages
+                    .get(&item.repr.as_str())
+                    .unwrap()
+                    .name
+                    .to_string()
+            })
             .reduce(|acc, item| acc + ", " + &item)
             .unwrap_or_default(),
     );
 
-    let mut service_wasms = String::new();
-    for (service, src) in services {
-        pretty("Service", &format!("{} needed by {}", service, src));
-        let mut id = None;
-        for package in &metadata.packages {
-            if package.name == service {
-                // TODO: detect multiple versions
-                id = Some(&package.id.repr);
-            }
-        }
-        if id.is_none() {
-            return Err(anyhow!(
-                "can not find package {service}; try: cargo add {service}"
-            ));
-        }
+    let mut index = Vec::new();
 
-        let wasms = build(
-            args,
-            &[id.unwrap()],
-            vec![],
-            &["--lib", "--crate-type=cdylib", "-p", &service],
-            Some(SERVICE_POLYFILL),
-        )
-        .await?;
-        if wasms.is_empty() {
-            return Err(anyhow!("Service {} produced no wasm targets", service));
-        }
-        if wasms.len() > 1 {
-            return Err(anyhow!(
-                "Service {} produced multiple wasm targets",
-                service
-            ));
-        }
-        if !service_wasms.is_empty() {
-            service_wasms += ";";
-        }
-        service_wasms += &(service + ";" + &wasms.into_iter().next().unwrap().to_string_lossy());
+    for p in &packages {
+        index.push(build_package(args, metadata, Some(&p.repr)).await?);
     }
 
-    if service_wasms.len() > 0 {
-        pretty("Services", "compiled and included successfully");
-    }
+    // Write a package index specific to the crate
+    let target_dir = args.target_dir.as_ref().map_or_else(
+        || metadata.metadata.target_directory.as_std_path(),
+        |p| p.as_path(),
+    );
+    let out_dir = target_dir.join("wasm32-wasi/release/packages");
+    let index_file =
+        out_dir.join(metadata.packages.get(root).unwrap().name.clone() + "-index.json");
+    serde_json::to_writer(File::create(&index_file)?, &index)?;
 
     pretty("Test", "building unit tests...");
 
@@ -473,7 +492,10 @@ async fn test(
         &[root],
         vec![
             ("CARGO_PSIBASE_TEST", ""),
-            ("CARGO_PSIBASE_SERVICE_LOCATIONS", &service_wasms),
+            (
+                "CARGO_PSIBASE_PACKAGE_PATH",
+                index_file.canonicalize()?.to_str().unwrap(),
+            ),
         ],
         &["--tests"],
         None,
@@ -588,14 +610,14 @@ async fn main2() -> Result<(), Error> {
             pretty("Done", "");
         }
         Command::Package {} => {
-            build_package(&args, &metadata, root).await?;
+            build_package(&args, &MetadataIndex::new(&metadata), root).await?;
             pretty("Done", "");
         }
         Command::Test(opts) => {
             let Some(root) = root else {
                 Err(anyhow!("Don't know how to test workspace"))?
             };
-            test(&args, opts, &metadata, root).await?;
+            test(&args, opts, &MetadataIndex::new(&metadata), root).await?;
             pretty("Done", "All tests passed");
         }
         Command::Deploy(opts) => {

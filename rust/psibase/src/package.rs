@@ -632,11 +632,18 @@ pub trait PackageRegistry {
 
 pub struct DirectoryRegistry {
     dir: PathBuf,
+    index: PathBuf,
 }
 
 impl DirectoryRegistry {
-    pub fn new(dir: PathBuf) -> Self {
-        DirectoryRegistry { dir }
+    pub fn new(path: PathBuf) -> Self {
+        if path.is_dir() {
+            let index = path.join("index.json");
+            DirectoryRegistry { dir: path, index }
+        } else {
+            let dir = path.parent().unwrap().to_path_buf();
+            DirectoryRegistry { dir, index: path }
+        }
     }
 }
 
@@ -644,9 +651,8 @@ impl DirectoryRegistry {
 impl PackageRegistry for DirectoryRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let path = self.dir.join("index.json");
-        let f =
-            File::open(&path).with_context(|| format!("Cannot open {}", path.to_string_lossy()))?;
+        let f = File::open(&self.index)
+            .with_context(|| format!("Cannot open {}", self.index.to_string_lossy()))?;
         let contents = std::io::read_to_string(f)?;
         let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         Ok(result)

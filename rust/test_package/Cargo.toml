@@ -2,11 +2,19 @@
 resolver = "2"
 members = ["service", "query", "plugin"]
 
-[workspace.metadata.psibase]
+[package]
+name = "test_package"
+version = "0.12.0"
+
+[package.metadata.psibase]
 package-name = "TestPackage"
 version = "0.12.0"
 description = "Test for package building"
 services = ["tpack"]
+
+[dependencies]
+tpack = { path = "service", version = "0.12.0" }
+r-tpack = { path = "query", version = "0.12.0" }
 
 [profile.release]
 codegen-units = 1

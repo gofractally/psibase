@@ -1,23 +1,31 @@
 use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
-use psibase::{AccountNumber, Meta, PackageRef, ServiceInfo};
+use psibase::{AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, ServiceInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::io::{Seek, Write};
 use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
-struct PsibaseMetadata {
+pub struct PsibaseMetadata {
     #[serde(rename = "package-name")]
     package_name: Option<String>,
     server: Option<String>,
     plugin: Option<String>,
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
+    services: Option<Vec<String>>,
+}
+
+impl PsibaseMetadata {
+    pub fn is_package(&self) -> bool {
+        self.package_name.is_some()
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -47,93 +55,111 @@ fn find_dep<'a>(
     None
 }
 
+pub fn get_metadata(package: &Package) -> Result<PsibaseMetadata, anyhow::Error> {
+    Ok(serde_json::from_value(
+        package
+            .metadata
+            .as_object()
+            .and_then(|m| m.get("psibase"))
+            .unwrap_or(&json!({}))
+            .clone(),
+    )?)
+}
+
+fn get_dep_type<'a, F>(f: F) -> F
+where
+    F: Fn(&'a Package, &str) -> Result<&'a PackageId, anyhow::Error> + 'a,
+{
+    f
+}
+
+pub struct MetadataIndex<'a> {
+    pub metadata: &'a Metadata,
+    pub packages: HashMap<&'a str, &'a Package>,
+    pub resolved: HashMap<&'a str, &'a Node>,
+}
+
+impl<'a> MetadataIndex<'a> {
+    pub fn new(metadata: &'a Metadata) -> MetadataIndex<'a> {
+        let mut packages: HashMap<&str, &Package> = HashMap::new();
+        let mut resolved: HashMap<&str, &Node> = HashMap::new();
+        for package in &metadata.packages {
+            packages.insert(&package.id.repr, &package);
+        }
+
+        if let Some(resolve) = &metadata.resolve {
+            for package in &resolve.nodes {
+                resolved.insert(&package.id.repr, &package);
+            }
+        }
+        MetadataIndex {
+            metadata,
+            packages,
+            resolved,
+        }
+    }
+}
+
 pub async fn build_package(
     args: &Args,
-    metadata: &Metadata,
+    metadata: &MetadataIndex<'_>,
     service: Option<&str>,
-) -> Result<(), anyhow::Error> {
+) -> Result<PackageInfo, anyhow::Error> {
     let mut depends = vec![];
     let mut accounts = vec![];
     let mut visited = HashSet::new();
     let mut queue = Vec::new();
-    let mut packages: HashMap<&str, &Package> = HashMap::new();
     let mut services = Vec::new();
     let mut plugins = Vec::new();
     let mut data_files = Vec::new();
-    let mut resolved: HashMap<&str, &Node> = HashMap::new();
-    let mut package_info = None;
+    let package_info = None;
 
-    for package in &metadata.packages {
-        packages.insert(&package.id.repr, &package);
-    }
-
-    if let Some(resolve) = &metadata.resolve {
-        for package in &resolve.nodes {
-            resolved.insert(&package.id.repr, &package);
-        }
-    }
-
-    if let Some(root) = service {
-        visited.insert(root);
-        queue.push(root);
-    } else {
-        let work_meta: PsibaseWorkspaceMetadata = serde_json::from_value(
-            metadata
-                .workspace_metadata
-                .as_object()
-                .and_then(|m| m.get("psibase"))
-                .unwrap_or(&json!({}))
-                .clone(),
-        )?;
-        package_info = Some((
-            work_meta.package_name,
-            work_meta.version,
-            work_meta.description,
-        ));
-        for service in work_meta.services {
-            let Some(id) = find_dep(&packages, &metadata.workspace_members, &service) else {
-                return Err(anyhow!("{} is not a workspace member", service,));
-            };
-            visited.insert(&id.repr);
-            queue.push(&id.repr);
-        }
-        for (k, v) in work_meta.dependencies {
-            depends.push(PackageRef {
-                name: k,
-                version: v,
-            })
-        }
-    }
-    let get_dep = |service: &str, dep: &str| {
-        let r = resolved.get(service).unwrap();
-        if let Some(id) = find_dep(&packages, &r.dependencies, dep) {
+    let get_dep = get_dep_type(|service, dep| {
+        let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
+        if dep == &service.name {
+            Ok(&service.id)
+        } else if let Some(id) = find_dep(&metadata.packages, &r.dependencies, dep) {
             Ok(id)
-        } else if let Some(id) = find_dep(&packages, &metadata.workspace_members, dep) {
+        } else if let Some(id) = find_dep(
+            &metadata.packages,
+            &metadata.metadata.workspace_members,
+            dep,
+        ) {
             Ok(id)
         } else {
-            Err(anyhow!(
-                "{} is not a dependency of {}",
-                dep,
-                packages.get(service).unwrap().name
-            ))
+            Err(anyhow!("{} is not a dependency of {}", dep, service.name))
         }
-    };
+    });
+
+    if let Some(root) = service {
+        let package = metadata.packages.get(root).unwrap();
+        let meta = get_metadata(package)?;
+        if !meta.is_package() {
+            Err(anyhow!("{} is not a psibase package because it does not define package.metadata.psibase.package_name", package.name))?
+        }
+        if let Some(services) = &meta.services {
+            for s in services {
+                let id: &str = &get_dep(package, &s)?.repr;
+                if visited.insert(id) {
+                    queue.push(id);
+                }
+            }
+        } else {
+            visited.insert(root);
+            queue.push(root);
+        }
+    } else {
+        Err(anyhow!("Cannot package a virtual workspace"))?
+    }
 
     while !queue.is_empty() {
         for service in std::mem::take(&mut queue) {
-            let Some(package) = packages.get(service) else {
+            let Some(package) = metadata.packages.get(service) else {
                 Err(anyhow!("Cannot find crate for service {}", service))?
             };
             let account: AccountNumber = package.name.parse()?;
             accounts.push(account);
-            let pmeta: PsibaseMetadata = serde_json::from_value(
-                package
-                    .metadata
-                    .as_object()
-                    .and_then(|m| m.get("psibase"))
-                    .unwrap_or(&json!({}))
-                    .clone(),
-            )?;
+            let pmeta: PsibaseMetadata = get_metadata(package)?;
             for (k, v) in pmeta.dependencies {
                 depends.push(PackageRef {
                     name: k,
@@ -146,17 +172,17 @@ pub async fn build_package(
             };
             if let Some(server) = pmeta.server {
                 info.server = Some(server.parse()?);
-                let server_package = if &server == &package.name {
-                    service
-                } else {
-                    &get_dep(&service, &server)?.repr
-                };
+                let server_package = &get_dep(package, &server)?.repr;
                 if visited.insert(server_package) {
                     queue.push(&server_package);
                 }
             }
             if let Some(plugin) = pmeta.plugin {
-                let Some(id) = find_dep(&packages, &metadata.workspace_members, &plugin) else {
+                let Some(id) = find_dep(
+                    &metadata.packages,
+                    &metadata.metadata.workspace_members,
+                    &plugin,
+                ) else {
                     return Err(anyhow!("{} is not a workspace member", service,));
                 };
                 plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
@@ -168,14 +194,8 @@ pub async fn build_package(
     let (package_name, package_version, package_description) = if let Some(info) = package_info {
         info
     } else {
-        let root = packages.get(service.unwrap()).unwrap();
-        let root_meta: PsibaseMetadata = serde_json::from_value(
-            root.metadata
-                .as_object()
-                .and_then(|m| m.get("psibase"))
-                .unwrap_or(&json!({}))
-                .clone(),
-        )?;
+        let root = metadata.packages.get(service.unwrap()).unwrap();
+        let root_meta: PsibaseMetadata = get_metadata(root)?;
         if let Some(name) = root_meta.package_name {
             (name, root.version.to_string(), root.description.clone())
         } else {
@@ -225,14 +245,21 @@ pub async fn build_package(
         data_files.push((service, path, paths.pop().unwrap()))
     }
 
-    let target_dir = args
-        .target_dir
-        .as_ref()
-        .map_or_else(|| metadata.target_directory.as_std_path(), |p| p.as_path());
+    let target_dir = args.target_dir.as_ref().map_or_else(
+        || metadata.metadata.target_directory.as_std_path(),
+        |p| p.as_path(),
+    );
     let out_dir = target_dir.join("wasm32-wasi/release/packages");
     let out_path = out_dir.join(package_name.clone() + ".psi");
     std::fs::create_dir_all(&out_dir)?;
-    let mut out = ZipWriter::new(File::create(&out_path)?);
+    let mut out = ZipWriter::new(
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&out_path)?,
+    );
     let options: FileOptions = FileOptions::default();
     out.start_file("meta.json", options)?;
     write!(out, "{}", &serde_json::to_string(&meta)?)?;
@@ -246,6 +273,11 @@ pub async fn build_package(
         out.start_file(format!("data/{}{}", service, dest), options)?;
         std::io::copy(&mut File::open(src)?, &mut out)?;
     }
-    out.finish()?;
-    Ok(())
+    let mut file = out.finish()?;
+    // Calculate the package checksum
+    file.rewind()?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher)?;
+    let hash: [u8; 32] = hasher.finalize().into();
+    Ok(meta.info(Checksum256::from(hash), package_name.clone() + ".psi"))
 }

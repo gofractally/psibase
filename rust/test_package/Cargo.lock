@@ -2052,6 +2052,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_package"
+version = "0.12.0"
+dependencies = [
+ "r-tpack",
+ "tpack",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2195,6 +2203,7 @@ version = "0.12.0"
 dependencies = [
  "psibase",
  "serde",
+ "test_package",
 ]
 
 [[package]]

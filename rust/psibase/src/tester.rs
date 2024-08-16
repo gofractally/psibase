@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, PackageRegistry, SignedTransaction, StatusRow, TimePointSec,
-    Transaction, TransactionTrace,
+    InnerTraceEnum, PackageRegistry, SignedTransaction, StatusRow, TimePointSec, Transaction,
+    TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -60,14 +60,18 @@ impl Chain {
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec!["Default".to_string()];
+        self.boot_with(&Self::default_registry(), &default_services[..])
+    }
 
+    pub fn default_registry() -> DirectoryRegistry {
         let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
             .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
         let packages_dir = Path::new(&psibase_data_dir).join("packages");
+        DirectoryRegistry::new(packages_dir)
+    }
 
-        let mut result = JointRegistry::new();
-        result.push(DirectoryRegistry::new(packages_dir))?;
-        let mut services = block_on(result.resolve(&default_services[..]))?;
+    pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
+        let mut services = block_on(reg.resolve(services))?;
 
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
