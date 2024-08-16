@@ -6,9 +6,14 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
+#include <services/system/PrivateKeyInfo.hpp>
+#include <services/system/Spki.hpp>
 
 namespace psibase
 {
+   using KeyList = std::vector<std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
+                                         SystemService::AuthSig::PrivateKeyInfo>>;
+
    inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
@@ -62,11 +67,6 @@ namespace psibase
     * part of the error message.
     */
    void expect(TransactionTrace t, const std::string& expected = "", bool always_show = false);
-
-   /**
-    * Sign a digest
-    */
-   Signature sign(const PrivateKey& key, const Checksum256& digest);
 
    class TraceResult
    {
@@ -125,8 +125,6 @@ namespace psibase
       Result(TransactionTrace&& t) : TraceResult(std::forward<TransactionTrace>(t)) {}
    };
 
-   using KeyList = std::vector<std::pair<psibase::PublicKey, psibase::PrivateKey>>;
-
    struct DatabaseConfig
    {
       std::uint64_t hotBytes  = 1ull << 27;
@@ -159,8 +157,8 @@ namespace psibase
       bool                              isAutoBlockStart = true;
 
      public:
-      static const PublicKey  defaultPubKey;
-      static const PrivateKey defaultPrivKey;
+      static const SystemService::AuthSig::SubjectPublicKeyInfo defaultPubKey;
+      static const SystemService::AuthSig::PrivateKeyInfo       defaultPrivKey;
 
       static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
 

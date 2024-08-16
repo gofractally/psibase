@@ -1,5 +1,6 @@
 #pragma once
 #include <psibase/Table.hpp>
+#include <psibase/crypto.hpp>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,11 @@ namespace SystemService
          };
       };
       // Takes a private key in PEM format encoded as a PKCS8 PrivateKeyInfo
-      std::vector<unsigned char> parsePrivateKeyInfoFromPem(std::string_view s);
+      std::vector<unsigned char> parsePrivateKeyInfo(std::string_view s);
       std::string                to_string(const PrivateKeyInfo&);
+
+      psibase::Signature sign(const PrivateKeyInfo&       private_key,
+                              const psibase::Checksum256& checksum);
+
    }  // namespace AuthSig
 }  // namespace SystemService

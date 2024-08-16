@@ -21,11 +21,11 @@ using namespace SystemService;
 namespace
 {
    auto pubFromPem = [](std::string param) {  //
-      return Spki{AuthSig::parseSubjectPublicKeyInfo(param)};
+      return AuthSig::SubjectPublicKeyInfo{AuthSig::parseSubjectPublicKeyInfo(param)};
    };
 
    auto privFromPem = [](std::string param) {  //
-      return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfoFromPem(param)};
+      return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfo(param)};
    };
 
    auto invPub = pubFromPem(
@@ -139,7 +139,6 @@ SCENARIO("Creating an invite")
    }
 }
 
-// TODO: Uncomment when tester supports AuthSig
 // - Rejecting an invite
 //    - Invitee can reject an invite as invited-sys
 //    - Invitee can reject an invite as a normal user
@@ -147,62 +146,62 @@ SCENARIO("Creating an invite")
 //       - It is already rejected
 //       - It is already accepted
 //       - Transaction is not signed with invite pubkey
-// SCENARIO("Rejecting an invite")
-// {
-//    GIVEN("Chain with initialized invite system")
-//    {
-//       DefaultTestChain t;
+SCENARIO("Rejecting an invite")
+{
+   GIVEN("Chain with initialized invite system")
+   {
+      DefaultTestChain t;
 
-//       auto alice   = t.from(t.addAccount("alice"_a));
-//       auto bob     = t.from(t.addAccount("bob"_a));
-//       auto invited = t.from(Invite::payerAccount);
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"_a));
+      auto invited = t.from(Invite::payerAccount);
 
-//       setAuth<AuthSig::AuthSig, Accounts>(alice.id, userPub);
-//       setAuth<AuthSig::AuthSig, Accounts>(bob.id, userPub);
+      t.setAuth<AuthSig::AuthSig>(alice.id, userPub);
+      t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
 
-//       WHEN("Alice creates an invite")
-//       {
-//          alice.to<Invite>().createInvite(invPub);
+      WHEN("Alice creates an invite")
+      {
+         alice.to<Invite>().createInvite(invPub);
 
-//          THEN("Invitee can reject an invite as invited-sys")
-//          {
-//             KeyList keys   = {{invPub, invPriv}};
-//             auto    reject = invited.with(keys).to<Invite>().reject(invPub);
-//             CHECK(reject.succeeded());
-//          }
-//          THEN("Invitee can reject an invite as a normal user")
-//          {
-//             KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-//             auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-//             CHECK(reject.succeeded());
-//          }
-//          THEN("Reject fails if it is already rejected")
-//          {
-//             KeyList keys = {{invPub, invPriv}};
-//             invited.with(keys).to<Invite>().reject(invPub);
-//             auto reject = invited.with(keys).to<Invite>().reject(invPub);
-//             CHECK(reject.failed(alreadyRejected));
-//          }
-//          THEN("Reject fails if it is already accepted")
-//          {
-//             KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-//             auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-//             CHECK(accept.succeeded());
-//             auto reject = bob.with(keys).to<Invite>().reject(invPub);
-//             CHECK(reject.failed(alreadyAccepted));
-//          }
-//          THEN("Reject fails if transaction isn't signed with the invite public key")
-//          {
-//             KeyList keys   = {{userPub, userPriv}};
-//             auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-//             CHECK(reject.failed(missingInviteSig));
+         THEN("Invitee can reject an invite as invited-sys")
+         {
+            KeyList keys   = {{invPub, invPriv}};
+            auto    reject = invited.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.succeeded());
+         }
+         THEN("Invitee can reject an invite as a normal user")
+         {
+            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
+            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.succeeded());
+         }
+         THEN("Reject fails if it is already rejected")
+         {
+            KeyList keys = {{invPub, invPriv}};
+            invited.with(keys).to<Invite>().reject(invPub);
+            auto reject = invited.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.failed(alreadyRejected));
+         }
+         THEN("Reject fails if it is already accepted")
+         {
+            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
+            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
+            CHECK(accept.succeeded());
+            auto reject = bob.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.failed(alreadyAccepted));
+         }
+         THEN("Reject fails if transaction isn't signed with the invite public key")
+         {
+            KeyList keys   = {{userPub, userPriv}};
+            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.failed(missingInviteSig));
 
-//             auto reject2 = invited.with({}).to<Invite>().reject(invPub);
-//             CHECK(reject2.failed(missingInviteSig));
-//          }
-//       }
-//    }
-// }
+            auto reject2 = invited.with({}).to<Invite>().reject(invPub);
+            CHECK(reject2.failed(missingInviteSig));
+         }
+      }
+   }
+}
 
 // - Deleting an invite
 //    - An invite can only be deleted by the creator
@@ -274,31 +273,29 @@ SCENARIO("Expired invites")
          // Add another invite that is not close to expiring
          b.createInvite(thrdPub);
 
-         // TODO: Uncomment when tester supports AuthSig
-         // THEN("It can be rejected")
-         // {
-         //    KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-         //    auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-         //    CHECK(reject.succeeded());
-         // }
+         THEN("It can be rejected")
+         {
+            KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
+            auto    reject = bob.with(keys).to<Invite>().reject(invPub);
+            CHECK(reject.succeeded());
+         }
 
          AND_WHEN("It expires")
          {
             t.startBlock(1000);
 
-            // TODO: Uncomment when tester supports AuthSig
-            // THEN("It cannot be rejected")
-            // {
-            //    KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-            //    auto    reject = bob.with(keys).to<Invite>().reject(invPub);
-            //    CHECK(reject.failed(inviteExpired));
-            // }
-            // THEN("It cannot be accepted")
-            // {
-            //    KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
-            //    auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-            //    CHECK(accept.failed(inviteExpired));
-            // }
+            THEN("It cannot be rejected")
+            {
+               KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
+               auto    reject = bob.with(keys).to<Invite>().reject(invPub);
+               CHECK(reject.failed(inviteExpired));
+            }
+            THEN("It cannot be accepted")
+            {
+               KeyList keys   = {{userPub, userPriv}, {invPub, invPriv}};
+               auto    accept = bob.with(keys).to<Invite>().accept(invPub);
+               CHECK(accept.failed(inviteExpired));
+            }
             THEN("It can be deleted by the creator")
             {
                auto delInvite = a.delInvite(invPub);
@@ -505,7 +502,6 @@ SCENARIO("Setting a blacklist", "[whiteblack]")
    }
 }
 
-// TODO: Uncomment when tester supports AuthSig
 // - Accepting invites
 //    - An invite can be accepted by a normal user
 //    - An invite can be accepted by invited-sys in order to create a new account
@@ -520,156 +516,161 @@ SCENARIO("Setting a blacklist", "[whiteblack]")
 //       - the invite is rejected
 //       - the inviteKey matches the newAccountKey
 //       - it attempts to create 2 accounts from the same invite
-// SCENARIO("Accepting an invite")
-// {
-//    GIVEN("Chain with initialized invite system")
-//    {
-//       DefaultTestChain t;
+SCENARIO("Accepting an invite")
+{
+   GIVEN("Chain with initialized invite system")
+   {
+      DefaultTestChain t;
 
-//       t.setAuth<AuthSig::AuthSig, Accounts>(bob.id, userPub);
-//       t.setAuth<AuthSig::AuthSig, Accounts>(charlie.id, userPub);
+      auto alice   = t.from(t.addAccount("alice"_a));
+      auto bob     = t.from(t.addAccount("bob"_a));
+      auto charlie = t.from(t.addAccount("charlie"_a));
+      auto invited = t.from(Invite::payerAccount);
 
-//       WHEN("Alice creates an invite")
-//       {
-//          alice.to<Invite>().createInvite(invPub);
+      t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
+      t.setAuth<AuthSig::AuthSig>(charlie.id, userPub);
 
-//          THEN("The invite can be accepted by a normal user")
-//          {
-//             KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-//             auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-//             CHECK(accept.succeeded());
-//          }
-//          THEN("An invite can be accepted by invited-sys in order to create a new account")
-//          {
-//             KeyList keys{{invPub, invPriv}};
-//             auto    acceptCreate =
-//                 invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-//             CHECK(acceptCreate.succeeded());
-//          }
-//          THEN("A normal user may not create a new account")
-//          {
-//             KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-//             auto    acceptCreate =
-//                 bob.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-//             CHECK(acceptCreate.failed(mustUseInvitedSys));
-//          }
-//          THEN("Invited-sys may not accept without also creating a new account")
-//          {
-//             KeyList keys{{invPub, invPriv}};
-//             auto    accept = invited.with(keys).to<Invite>().accept(invPub);
-//             CHECK(accept.failed(restrictedActions));
-//          }
-//          WHEN("An invite is accepted with an existing account")
-//          {
-//             KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-//             bob.with(keys).to<Invite>().accept(invPub);
+      WHEN("Alice creates an invite")
+      {
+         alice.to<Invite>().createInvite(invPub);
 
-//             THEN("An accepted invite can be accepted again with a different account")
-//             {
-//                auto accept = charlie.with(keys).to<Invite>().accept(invPub);
-//                CHECK(accept.succeeded());
-//             }
-//             THEN("An accepted invite can be accepted again with a created account")
-//             {
-//                KeyList invitedKeys{{invPub, invPriv}};
-//                auto    acceptCreate = invited.with(invitedKeys)
-//                                        .to<Invite>()
-//                                        .acceptCreate(invPub, "rebecca"_a, userPub);
-//                CHECK(acceptCreate.succeeded());
-//             }
-//          }
-//          THEN("Accepting fails if the inviteKey doesn't exist")
-//          {
-//             auto accept = alice.to<Invite>().accept(thrdPub);
-//             CHECK(accept.failed(inviteDNE));
-//          }
-//          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
-//          {
-//             KeyList keys{{userPub, userPriv}};
-//             auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-//             CHECK(accept.failed(missingInviteSig));
-//          }
-//          THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
-//          {
-//             KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
+         THEN("The invite can be accepted by a normal user")
+         {
+            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
+            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
+            CHECK(accept.succeeded());
+         }
+         THEN("An invite can be accepted by invited-sys in order to create a new account")
+         {
+            KeyList keys{{invPub, invPriv}};
+            auto    acceptCreate =
+                invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
+            CHECK(acceptCreate.succeeded());
+         }
+         THEN("A normal user may not create a new account")
+         {
+            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
+            auto    acceptCreate =
+                bob.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
+            CHECK(acceptCreate.failed(mustUseInvitedSys));
+         }
+         THEN("Invited-sys may not accept without also creating a new account")
+         {
+            KeyList keys{{invPub, invPriv}};
+            auto    accept = invited.with(keys).to<Invite>().accept(invPub);
+            CHECK(accept.failed(restrictedActions));
+         }
+         WHEN("An invite is accepted with an existing account")
+         {
+            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
+            bob.with(keys).to<Invite>().accept(invPub);
 
-//             // Manually constructing the transaction to avoid adding the proper proof
-//             transactor<Invite> service(bob, Invite::service);
-//             auto               trx = t.makeTransaction({service.accept(invPub)});
-//             for (const auto& key : keys)
-//             {
-//                trx.claims.push_back({
-//                    .service = VerifySig::service,
-//                    .rawData = psio::convert_to_frac(key.first),
-//                });
-//             }
-//             SignedTransaction signedTrx;
-//             signedTrx.transaction = trx;
-//             auto hash = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
-//             auto key  = keys[0];
-//             signedTrx.proofs.push_back(psio::convert_to_frac(sign(key.second, hash)));
-//             auto accept = t.pushTransaction(signedTrx);
+            THEN("An accepted invite can be accepted again with a different account")
+            {
+               auto accept = charlie.with(keys).to<Invite>().accept(invPub);
+               CHECK(accept.succeeded());
+            }
+            THEN("An accepted invite can be accepted again with a created account")
+            {
+               KeyList invitedKeys{{invPub, invPriv}};
+               auto    acceptCreate = invited.with(invitedKeys)
+                                       .to<Invite>()
+                                       .acceptCreate(invPub, "rebecca"_a, userPub);
+               CHECK(acceptCreate.succeeded());
+            }
+         }
+         THEN("Accepting fails if the inviteKey doesn't exist")
+         {
+            auto accept = alice.to<Invite>().accept(thrdPub);
+            CHECK(accept.failed(inviteDNE));
+         }
+         THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
+         {
+            KeyList keys{{userPub, userPriv}};
+            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
+            CHECK(accept.failed(missingInviteSig));
+         }
+         THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
+         {
+            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
 
-//             auto failed = [&](TransactionTrace& _t, std::string_view expected) -> bool
-//             {
-//                bool failed = (_t.error != std::nullopt);
-//                if (!failed)
-//                {
-//                   UNSCOPED_INFO("transaction succeeded, but was expected to fail");
-//                   return false;
-//                }
+            // Manually constructing the transaction to avoid adding the proper proof
+            transactor<Invite> service(bob, Invite::service);
+            auto               trx = t.makeTransaction({service.accept(invPub)});
+            for (const auto& key : keys)
+            {
+               trx.claims.push_back({
+                   .service = VerifySig::service,
+                   .rawData = psio::convert_to_frac(key.first),
+               });
+            }
+            SignedTransaction signedTrx;
+            signedTrx.transaction = trx;
+            auto hash = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
+            auto key  = keys[0];
+            signedTrx.proofs.push_back(psio::convert_to_frac(sign(key.second, hash)));
+            auto accept = t.pushTransaction(signedTrx);
 
-//                bool hasException = (failed && _t.error.has_value());
-//                if (hasException)
-//                {
-//                   if (_t.error->find(expected.data()) != std::string::npos)
-//                   {
-//                      return true;
-//                   }
-//                   else
-//                   {
-//                      UNSCOPED_INFO("transaction was expected to fail with: \""
-//                                    << expected << "\", but it failed with: \"" << *_t.error
-//                                    << "\"\n");
-//                   }
-//                }
+            auto failed = [&](TransactionTrace& _t, std::string_view expected) -> bool
+            {
+               bool failed = (_t.error != std::nullopt);
+               if (!failed)
+               {
+                  UNSCOPED_INFO("transaction succeeded, but was expected to fail");
+                  return false;
+               }
 
-//                return false;
-//             };
+               bool hasException = (failed && _t.error.has_value());
+               if (hasException)
+               {
+                  if (_t.error->find(expected.data()) != std::string::npos)
+                  {
+                     return true;
+                  }
+                  else
+                  {
+                     UNSCOPED_INFO("transaction was expected to fail with: \""
+                                   << expected << "\", but it failed with: \"" << *_t.error
+                                   << "\"\n");
+                  }
+               }
 
-//             CHECK(failed(accept, "proofs and claims must have same size"));
-//          }
-//          THEN("Accepting fails if the invite is rejected")
-//          {
-//             // Reject the invite
-//             KeyList invitedKeys{{invPub, invPriv}};
-//             invited.with(invitedKeys).to<Invite>().reject(invPub);
+               return false;
+            };
 
-//             // Try accept with create
-//             auto acceptCreate =
-//                 invited.with(invitedKeys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-//             CHECK(acceptCreate.failed(alreadyRejected));
+            CHECK(failed(accept, "proofs and claims must have same size"));
+         }
+         THEN("Accepting fails if the invite is rejected")
+         {
+            // Reject the invite
+            KeyList invitedKeys{{invPub, invPriv}};
+            invited.with(invitedKeys).to<Invite>().reject(invPub);
 
-//             // Try accept with existing user
-//             KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
-//             auto    accept = bob.with(keys).to<Invite>().accept(invPub);
-//             CHECK(accept.failed(alreadyRejected));
-//          }
-//          THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
-//          {
-//             KeyList keys{{invPub, invPriv}};
-//             auto    acceptCreate =
-//                 invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, invPub);
-//             CHECK(acceptCreate.failed(needUniquePubkey));
-//          }
-//          THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
-//          {
-//             KeyList keys{{invPub, invPriv}};
-//             invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
-//             auto acceptCreate =
-//                 invited.with(keys).to<Invite>().acceptCreate(invPub, "jonathan"_a, userPub);
-//             CHECK(acceptCreate.failed(noNewAccToken));
-//          }
-//       }
-//    }
-// }
+            // Try accept with create
+            auto acceptCreate =
+                invited.with(invitedKeys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
+            CHECK(acceptCreate.failed(alreadyRejected));
+
+            // Try accept with existing user
+            KeyList keys{{userPub, userPriv}, {invPub, invPriv}};
+            auto    accept = bob.with(keys).to<Invite>().accept(invPub);
+            CHECK(accept.failed(alreadyRejected));
+         }
+         THEN("Accepting with create fails if the inviteKey matches the newAccountKey")
+         {
+            KeyList keys{{invPub, invPriv}};
+            auto    acceptCreate =
+                invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, invPub);
+            CHECK(acceptCreate.failed(needUniquePubkey));
+         }
+         THEN("Accepting fails if it would attempt to create 2 accounts from the same invite")
+         {
+            KeyList keys{{invPub, invPriv}};
+            invited.with(keys).to<Invite>().acceptCreate(invPub, "rebecca"_a, userPub);
+            auto acceptCreate =
+                invited.with(keys).to<Invite>().acceptCreate(invPub, "jonathan"_a, userPub);
+            CHECK(acceptCreate.failed(noNewAccToken));
+         }
+      }
+   }
+}
