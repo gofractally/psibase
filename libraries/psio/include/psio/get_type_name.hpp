@@ -9,7 +9,6 @@
 #include <variant>
 #include <vector>
 
-#include <consthash/cityhash64.hxx>
 #include <psio/compress_name.hpp>
 
 namespace psio
@@ -221,38 +220,16 @@ namespace psio
       return get_type_name((const T*)nullptr);
    }
 
-   inline constexpr uint64_t city_hash_name(std::string_view str)
-   {
-      return consthash::city64(str.data(), str.size()) | (uint64_t(0x01) << (64 - 8));
-   }
-
    // TODO: rename. "hash_name" implies it's always a hash and
    //       doesn't indicate which name format
    inline constexpr uint64_t hash_name(std::string_view str)
    {
-      uint64_t n = detail::method_to_number(str);
-      if (n)
-      {
-         return n;
-      }
-      else
-      {
-         // TODO: replace with hash function which has been ported to other languages
-         // TODO: redundant with hashing within method_to_number? But also somewhat different?
-         return city_hash_name(str);
-      }
+      return detail::method_to_number(str);
    }
 
-   // TODO: rename; doesn't indicate which name format
    inline constexpr bool is_compressed_name(uint64_t c)
    {
       return not detail::is_hash_name(c);
    }
 
-   // TODO: rename; doesn't indicate which name format
-   template <typename T>
-   constexpr uint64_t get_type_hashname()
-   {
-      return hash_name(get_type_name<T>());
-   }
 }  // namespace psio

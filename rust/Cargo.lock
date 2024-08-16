@@ -2828,9 +2828,9 @@ dependencies = [
 
 [[package]]
 name = "seahash"
-version = "2.4.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6361289ce24413f5d608ca31c66fb1c9ce78df14e1f86488f7f8d6f14398e8ea"
+checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "sec1"

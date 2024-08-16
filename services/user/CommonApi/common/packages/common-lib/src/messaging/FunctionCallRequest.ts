@@ -12,6 +12,22 @@ export interface QualifiedFunctionCallArgs extends FunctionCallArgs {
     plugin: string;
 }
 
+export function getCallArgs(
+    service: string,
+    plugin: string,
+    intf: string,
+    method: string,
+    params: any[],
+): QualifiedFunctionCallArgs {
+    return {
+        service,
+        plugin,
+        intf,
+        method,
+        params,
+    };
+}
+
 export const isQualifiedFunctionCallArgs = (
     obj: any,
 ): obj is QualifiedFunctionCallArgs => {
