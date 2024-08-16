@@ -1,6 +1,6 @@
 #include <psibase/DefaultTestChain.hpp>
-#include <services/system/AuthK1.hpp>
-#include <services/system/VerifyK1.hpp>
+#include <services/system/AuthSig.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <psibase/nativeTables.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -10,26 +10,49 @@
 
 using namespace psibase;
 
-static auto priv_key1 =
-    privateKeyFromString("PVT_K1_KSm1gXENJdNCG9tJRErpZpdhut7NQDThVvkLQ3XYW5VksjPKV");
-static auto pub_key1 =
-    publicKeyFromString("PUB_K1_67w57254khWfNoinC8A3AsRVh2jncUgMDcC6JGNZyERHz9TteV");
+auto pubFromPem = [](std::string param) {  //
+   return SystemService::AuthSig::SubjectPublicKeyInfo{
+       SystemService::AuthSig::parseSubjectPublicKeyInfo(param)};
+};
 
-static auto priv_key2 =
-    privateKeyFromString("PVT_K1_KuuEeDKvFC6dSh7S5ACbkZPuxuvbU3J4buyEcjvg73NBxqdQz");
-static auto pub_key2 =
-    publicKeyFromString("PUB_K1_5NpiqhMbcHQGUXbVbn2TfYVHKkF7LfSiGp1HLx6qw31Np8ttcD");
+auto privFromPem = [](std::string param) {  //
+   return SystemService::AuthSig::PrivateKeyInfo{
+       SystemService::AuthSig::parsePrivateKeyInfo(param)};
+};
+
+auto priv_key1 = privFromPem(
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg9h35bFuOZyB8i+GT\n"
+    "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
+    "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
+    "-----END PRIVATE KEY-----\n");
+auto pub_key1 = pubFromPem(
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWdALpn+cGuD1klsSRXTdapYlG5mu\n"
+    "WgoALofZYufL838GRUo43UuoGzxu/mW5T6r9Ix4/qc4gH2B+Zc6VYw/pKQ==\n"
+    "-----END PUBLIC KEY-----\n");
+auto priv_key2 = privFromPem(
+    "-----BEGIN PRIVATE KEY-----\n"
+    "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgEbcmTuUFGjyAn0zd\n"
+    "7VKhIDZpswsI3m/5bMV+XoBQNTGhRANCAAQzeyU+Sa3KSwreirHYVfyB0jNMaNWt\n"
+    "GjyjVxTbjHHHyq96f3lqGlbApIe9u1CUDng/qlj0jGbuz5sOeeIY/DWJ\n"
+    "-----END PRIVATE KEY-----\n");
+auto pub_key2 = pubFromPem(
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEM3slPkmtyksK3oqx2FX8gdIzTGjV\n"
+    "rRo8o1cU24xxx8qven95ahpWwKSHvbtQlA54P6pY9Ixm7s+bDnniGPw1iQ==\n"
+    "-----END PUBLIC KEY-----\n");
 
 TEST_CASE("ec")
 {
    DefaultTestChain t;
    auto             test_service = t.addService("test-service"_a, "test-service.wasm");
 
-   transactor<SystemService::AuthK1::AuthK1> ecsys(SystemService::AuthK1::AuthK1::service,
-                                                   SystemService::AuthK1::AuthK1::service);
+   transactor<SystemService::AuthSig::AuthSig> authsig(SystemService::AuthSig::AuthSig::service,
+                                                       SystemService::AuthSig::AuthSig::service);
 
    auto alice = t.from(t.addAccount(AccountNumber("alice")));
-   auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-k1")));
+   auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-sig")));
    auto sue   = t.addAccount("sue", pub_key1);
 
    expect(t.pushTransaction(t.makeTransaction({{
@@ -49,7 +72,7 @@ TEST_CASE("ec")
        .rawData = psio::convert_to_frac(test_cntr::payload{}),
    }});
    ec_trx.claims.push_back({
-       .service = SystemService::VerifyK1::service,
+       .service = SystemService::VerifySig::service,
        .rawData = psio::convert_to_frac(pub_key1),
    });
    expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");
@@ -91,7 +114,7 @@ TEST_CASE("ec")
                             {{pub_key1, priv_key2}}),
           "incorrect signature");
 
-   expect(t.pushTransaction(t.makeTransaction({ecsys.from(sue).setKey(pub_key2)}),
+   expect(t.pushTransaction(t.makeTransaction({authsig.from(sue).setKey(pub_key2)}),
                             {{pub_key1, priv_key1}}));
 
    expect(t.pushTransaction(t.makeTransaction({{

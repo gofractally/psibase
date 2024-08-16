@@ -146,7 +146,7 @@ export async function getAccountsByKey(pubKey) {
     try {
         const host = window.location.host.replace(
             "explorer.",
-            "auth-k1."
+            "auth-sig."
         );
         const url = `${window.location.protocol}//${host}/accwithkey/${pubKey}`;
         const result = await getJson(url);
@@ -163,7 +163,7 @@ export async function getPubKeyByAccountName(account) {
     try {
         const host = window.location.host.replace(
             "explorer.",
-            "auth-k1."
+            "auth-sig."
         );
         const url = `${window.location.protocol}//${host}/account/${account}`;
         const result = await getJson(url);

@@ -111,7 +111,6 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
         BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
@@ -129,7 +128,6 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
@@ -141,7 +139,6 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
@@ -475,23 +472,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthK1.psi
-    NAME AuthK1
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Auth service using secp256k1 to verify signatures"
-    SERVICE auth-k1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
-        SERVER r-auth-k1
-    SERVICE r-auth-k1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
-    SERVICE verifyk1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
-        FLAGS isAuthService
-    DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthAny.psi
     NAME AuthAny
     VERSION ${PSIBASE_VERSION}
@@ -754,7 +734,7 @@ psibase_package(
     NAME Default
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit Docs
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit Docs
                     Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
@@ -782,7 +762,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit Default
+    Accounts AuthAny AuthSig ClientData CommonApi CpuLimit Default
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
@@ -792,7 +772,6 @@ install(
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
-          ${SERVICE_DIR}/AuthK1.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Default.psi

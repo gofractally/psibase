@@ -147,13 +147,11 @@ function(add suffix)
             ../../services/system/Producers/include
             ../../services/system/AuthDelegate/include
             ../../services/system/AuthSig/include
-            ../../services/system/AuthK1/include
             ../../services/system/AuthAny/include
             ../../services/system/CpuLimit/include
             ../../services/system/HttpServer/include
             ../../services/system/SetCode/include
             ../../services/system/Transact/include
-            ../../services/system/VerifyK1/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
             ../../services/user/Fractal/include
@@ -165,7 +163,6 @@ function(add suffix)
             ../../services/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../services/system/VerifyK1/include
             ../../services/system/VerifySig/include
         )
         target_link_options(psitestlib${suffix} PUBLIC

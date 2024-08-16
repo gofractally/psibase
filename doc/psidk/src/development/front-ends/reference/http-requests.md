@@ -113,15 +113,15 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 `Claim` has these fields. See [Signing (js)](#signing-js) to fill claims and proofs.
 ```json
 {
-  "service": "...",     // The service which verifies the proof meets
-                        // the claim, e.g. "verifyk1"
+  "service": "...",     // The service which verifies the transactions contains the
+                        // necessary claims, e.g. "auth-sig"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verifyk1` expects a public key
+                        // e.g. `auth-sig` expects a SubjectPublicKeyInfo
                         // in fracpack format.
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verifyk1` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verify-sig` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ### Pack signed transaction
 

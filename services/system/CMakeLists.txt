@@ -10,7 +10,6 @@ function(add suffix)
     target_mapped_include_directories(services_system${suffix} INTERFACE
         Accounts/include
         AuthDelegate/include
-        AuthK1/include
         AuthAny/include
         AuthSig/include
         CpuLimit/include
@@ -18,7 +17,6 @@ function(add suffix)
         HttpServer/include
         SetCode/include
         Transact/include
-        VerifyK1/include
         VerifySig/include
     )
 endfunction(add)
@@ -29,7 +27,6 @@ add("-debug")
 if(DEFINED IS_WASM)
     add_subdirectory(Accounts)
     add_subdirectory(AuthDelegate)
-    add_subdirectory(AuthK1)
     add_subdirectory(AuthAny)
     add_subdirectory(AuthSig)
     add_subdirectory(CpuLimit)
@@ -37,6 +34,5 @@ if(DEFINED IS_WASM)
     add_subdirectory(HttpServer)
     add_subdirectory(SetCode)
     add_subdirectory(Transact)
-    add_subdirectory(VerifyK1)
     add_subdirectory(VerifySig)
 endif()

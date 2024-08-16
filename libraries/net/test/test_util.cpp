@@ -8,7 +8,7 @@
 #include <services/system/CpuLimit.hpp>
 #include <services/system/Producers.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -104,9 +104,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
    if (ec)
    {
       services.push_back({
-          .service = VerifyK1::service,
-          .flags   = VerifyK1::serviceFlags,
-          .code    = readWholeFile("VerifyK1.wasm"),
+          .service = VerifySig::service,
+          .flags   = VerifySig::serviceFlags,
+          .code    = readWholeFile("VerifySig.wasm"),
       });
    }
    // Transact + Producers + AuthAny + Accounts

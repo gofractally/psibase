@@ -79,7 +79,6 @@
 - [Default apps](default-apps/README.md)
   - [accounts](default-apps/accounts.md)
   - [x-admin](default-apps/x-admin.md)
-  - [auth-k1](default-apps/auth-k1.md)
   - [auth-sig](default-apps/auth-sig.md)
   - [common-api](default-apps/common-api.md)
   - [cpu-limit]()

@@ -43,7 +43,10 @@ namespace psibase
    using EccSignature = std::array<uint8_t, 64>;
    struct Signature
    {
-      using variant_type = std::variant<EccSignature, EccSignature>;  // k1, r1
+      using variant_type       = std::variant<EccSignature, EccSignature>;  // k1, r1
+      constexpr static auto k1 = std::in_place_index<0>;
+      constexpr static auto r1 = std::in_place_index<1>;
+
       variant_type data;
    };
    PSIO_REFLECT(Signature, definitionWillNotChange(), data)
