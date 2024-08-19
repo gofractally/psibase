@@ -21,7 +21,7 @@ interface accounts {
 
     /// Retrieves a list of accounts to which the user can log in.
     get-available-accounts: func() -> result<list<string>, error>;
-    
+
     /// Verifies an account name corresponds with an existing account
     get-account: func(name: string) -> result<option<account>, error>;
 
