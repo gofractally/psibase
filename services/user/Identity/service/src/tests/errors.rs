@@ -1,8 +1,8 @@
 use crate::tests::helpers::{
     query_builders::get_gql_query_attestation_stats_no_args,
     test_helpers::{
-        are_equal_vecs_of_attestations_stats, assert_test_failed, init_identity_svc, push_attest,
-        query_attestation_stats,
+        are_equal_vecs_of_attestations_stats, init_identity_svc, push_attest,
+        query_attestation_stats, verify_failed,
     },
 };
 use psibase::AccountNumber;
@@ -46,7 +46,7 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
         AccountNumber::from("bob"),
         101,
     );
-    assert_test_failed(&res, expected_err);
+    verify_failed(&res, expected_err);
 
     chain.finish_block();
 
@@ -70,7 +70,7 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
         255,
     );
 
-    assert_test_failed(&res, expected_err);
+    verify_failed(&res, expected_err);
 
     let exp_results = vec![];
     let response = query_attestation_stats(

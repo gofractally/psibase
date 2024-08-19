@@ -111,7 +111,7 @@ pub fn are_equal_vecs_of_attestations(
     true
 }
 
-pub fn assert_test_failed(res: &Result<(), psibase::Error>, expected_err: &str) {
+pub fn verify_failed(res: &Result<(), psibase::Error>, expected_err: &str) {
     match res {
         Err(e) => assert_eq!(
             e.to_string(),
