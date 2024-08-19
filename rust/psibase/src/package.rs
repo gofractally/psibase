@@ -143,7 +143,7 @@ pub struct PackageManifest {
     pub data: Vec<PackageDataFile>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServiceInfo {
     pub flags: Vec<String>,
     pub server: Option<AccountNumber>,
@@ -243,6 +243,9 @@ impl<R: Read + Seek> PackagedService<R> {
     }
     pub fn name(&self) -> &str {
         &self.meta.name
+    }
+    pub fn meta(&self) -> &Meta {
+        &self.meta
     }
     pub fn get_genesis(&mut self, services: &mut Vec<GenesisService>) -> Result<(), anyhow::Error> {
         for (account, index, info) in &self.services {

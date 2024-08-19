@@ -2,15 +2,16 @@ use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef, ServiceInfo,
+    AccountNumber, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef, PackagedService,
+    ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
-use std::io::{Seek, Write};
-use std::path::PathBuf;
+use std::io::{BufReader, Seek, Write};
+use std::path::{Path, PathBuf};
 use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -96,6 +97,63 @@ pub fn get_package_dir(args: &Args, metadata: &MetadataIndex) -> PathBuf {
         |p| p.as_path(),
     );
     target_dir.join("wasm32-wasi/release/packages")
+}
+
+fn should_build_package(
+    filename: &Path,
+    meta: &Meta,
+    services: &[(&String, ServiceInfo, PathBuf)],
+    data: &[(&String, &str, PathBuf)],
+) -> Result<bool, anyhow::Error> {
+    let timestamp = if let Ok(metadata) = filename.metadata() {
+        metadata.modified()?
+    } else {
+        return Ok(true);
+    };
+    let mut existing = PackagedService::new(BufReader::new(File::open(filename)?))?;
+    if existing.meta() != meta {
+        return Ok(true);
+    }
+    let manifest = existing.manifest();
+    // Check services
+    if manifest.services.len() != services.len() {
+        return Ok(true);
+    }
+    for (name, info, path) in services {
+        if path.metadata()?.modified()? > timestamp {
+            return Ok(true);
+        }
+        let account: AccountNumber = name.parse()?;
+        if let Some(existing_info) = manifest.services.get(&account) {
+            if info != existing_info {
+                return Ok(true);
+            }
+        } else {
+            return Ok(true);
+        }
+    }
+    // check data
+    if manifest.data.len() != data.len() {
+        return Ok(true);
+    }
+    let mut existing_data = Vec::new();
+    for data in &manifest.data {
+        existing_data.push((data.service.value, data.filename.as_str()));
+    }
+    let mut new_data = Vec::new();
+    for (service, dest, src) in data {
+        if src.metadata()?.modified()? > timestamp {
+            return Ok(true);
+        }
+        let account: AccountNumber = service.parse()?;
+        new_data.push((account.value, *dest));
+    }
+    existing_data.sort();
+    new_data.sort();
+    if existing_data != new_data {
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 pub async fn build_package(
@@ -242,31 +300,36 @@ pub async fn build_package(
 
     let out_dir = get_package_dir(args, metadata);
     let out_path = out_dir.join(package_name.clone() + ".psi");
-    std::fs::create_dir_all(&out_dir)?;
-    let mut out = ZipWriter::new(
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&out_path)?,
-    );
-    let options: FileOptions = FileOptions::default();
-    out.start_file("meta.json", options)?;
-    write!(out, "{}", &serde_json::to_string(&meta)?)?;
-    for (service, info, path) in service_wasms {
-        out.start_file(format!("service/{}.wasm", service), options)?;
-        std::io::copy(&mut File::open(path)?, &mut out)?;
-        out.start_file(format!("service/{}.json", service), options)?;
-        write!(out, "{}", &serde_json::to_string(&info)?)?;
-    }
-    for (service, dest, src) in data_files {
-        out.start_file(format!("data/{}{}", service, dest), options)?;
-        std::io::copy(&mut File::open(src)?, &mut out)?;
-    }
-    let mut file = out.finish()?;
+    let mut file = if should_build_package(&out_path, &meta, &service_wasms, &data_files)? {
+        std::fs::create_dir_all(&out_dir)?;
+        let mut out = ZipWriter::new(
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&out_path)?,
+        );
+        let options: FileOptions = FileOptions::default();
+        out.start_file("meta.json", options)?;
+        write!(out, "{}", &serde_json::to_string(&meta)?)?;
+        for (service, info, path) in service_wasms {
+            out.start_file(format!("service/{}.wasm", service), options)?;
+            std::io::copy(&mut File::open(path)?, &mut out)?;
+            out.start_file(format!("service/{}.json", service), options)?;
+            write!(out, "{}", &serde_json::to_string(&info)?)?;
+        }
+        for (service, dest, src) in data_files {
+            out.start_file(format!("data/{}{}", service, dest), options)?;
+            std::io::copy(&mut File::open(src)?, &mut out)?;
+        }
+        let mut file = out.finish()?;
+        file.rewind()?;
+        file
+    } else {
+        File::open(out_path)?
+    };
     // Calculate the package checksum
-    file.rewind()?;
     let mut hasher = Sha256::new();
     std::io::copy(&mut file, &mut hasher)?;
     let hash: [u8; 32] = hasher.finalize().into();
