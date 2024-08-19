@@ -12,7 +12,7 @@ use psibase::AccountNumber;
 use serde::{Deserialize, Serialize};
 
 mod errors;
-use errors::ErrorType::*;
+use errors::ErrorType::{self, *};
 
 struct IdentityPlugin;
 
@@ -69,21 +69,18 @@ impl QueriesApi for IdentityPlugin {
             "query {{ subjectStats(subject:\"{}\") {{ numHighConfAttestations, uniqueAttesters }} }}",
             subject
         );
-        let summary_wrapped = serde_json::from_str::<IdentitySummaryResponse>(
+        let summary_val = serde_json::from_str::<IdentitySummaryResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-        if summary_wrapped.is_ok() {
-            let summary_val = summary_wrapped.unwrap();
-            Ok(Some(IdentityTypes::IdentitySummary {
-                perc_high_confidence: (summary_val.data.subjectStats.numHighConfAttestations as f32
-                    / summary_val.data.subjectStats.uniqueAttesters as f32
-                    * 100.0)
-                    .round() as u8,
-                num_unique_attestations: summary_val.data.subjectStats.uniqueAttesters,
-            }))
-        } else {
-            Ok(None)
-        }
+        )
+        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+
+        Ok(Some(IdentityTypes::IdentitySummary {
+            perc_high_confidence: (summary_val.data.subjectStats.numHighConfAttestations as f32
+                / summary_val.data.subjectStats.uniqueAttesters as f32
+                * 100.0)
+                .round() as u8,
+            num_unique_attestations: summary_val.data.subjectStats.uniqueAttesters,
+        }))
     }
 }
 

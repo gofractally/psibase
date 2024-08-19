@@ -1,7 +1,7 @@
 use crate::tests::helpers::{
     query_builders::get_gql_query_attestation_stats_no_args,
     test_helpers::{
-        are_equal_vecs_of_attestations_stats, init_identity_svc, push_attest,
+        are_equal_vecs_of_attestations_stats, assert_test_failed, init_identity_svc, push_attest,
         query_attestation_stats,
     },
 };
@@ -40,24 +40,14 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
     init_identity_svc(&chain)?;
 
     let expected_err = "service 'identity' aborted with message: bad confidence score";
-    match push_attest(
+    let res = push_attest(
         &chain,
         AccountNumber::from("alice"),
         AccountNumber::from("bob"),
         101,
-    ) {
-        Err(e) => assert_eq!(
-            e.to_string(),
-            expected_err,
-            "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
-            e.to_string(),
-            expected_err
-        ),
-        _ => panic!(
-            "Transaction succeeded, but was expected to fail with: \"{}\"",
-            expected_err
-        ),
-    }
+    );
+    assert_test_failed(&res, expected_err);
+
     chain.finish_block();
 
     let exp_results = vec![];
@@ -73,19 +63,14 @@ pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), psibase::
 
     chain.start_block();
 
-    match push_attest(
+    let res = push_attest(
         &chain,
         AccountNumber::from("alice"),
         AccountNumber::from("bob"),
         255,
-    ) {
-        Ok(_) => {
-            return Err(psibase::Error::msg(
-                "Confidence scores <0 should not have been accepted.",
-            ))
-        }
-        Err(_) => (), // This is expected
-    }
+    );
+
+    assert_test_failed(&res, expected_err);
 
     let exp_results = vec![];
     let response = query_attestation_stats(

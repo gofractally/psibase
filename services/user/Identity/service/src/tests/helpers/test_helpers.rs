@@ -110,3 +110,19 @@ pub fn are_equal_vecs_of_attestations(
     }
     true
 }
+
+pub fn assert_test_failed(res: &Result<(), psibase::Error>, expected_err: &str) {
+    match res {
+        Err(e) => assert_eq!(
+            e.to_string(),
+            expected_err,
+            "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
+            e.to_string(),
+            expected_err
+        ),
+        _ => panic!(
+            "Transaction succeeded, but was expected to fail with: \"{}\"",
+            expected_err
+        ),
+    }
+}
