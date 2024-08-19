@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, Write};
+use std::path::PathBuf;
 use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -87,6 +88,14 @@ impl<'a> MetadataIndex<'a> {
             resolved,
         }
     }
+}
+
+pub fn get_package_dir(args: &Args, metadata: &MetadataIndex) -> PathBuf {
+    let target_dir = args.target_dir.as_ref().map_or_else(
+        || metadata.metadata.target_directory.as_std_path(),
+        |p| p.as_path(),
+    );
+    target_dir.join("wasm32-wasi/release/packages")
 }
 
 pub async fn build_package(
@@ -231,11 +240,7 @@ pub async fn build_package(
         data_files.push((service, path, paths.pop().unwrap()))
     }
 
-    let target_dir = args.target_dir.as_ref().map_or_else(
-        || metadata.metadata.target_directory.as_std_path(),
-        |p| p.as_path(),
-    );
-    let out_dir = target_dir.join("wasm32-wasi/release/packages");
+    let out_dir = get_package_dir(args, metadata);
     let out_path = out_dir.join(package_name.clone() + ".psi");
     std::fs::create_dir_all(&out_dir)?;
     let mut out = ZipWriter::new(

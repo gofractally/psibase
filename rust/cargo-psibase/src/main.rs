@@ -5,7 +5,7 @@ use cargo_metadata::Message;
 use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
-use psibase::{ExactAccountNumber, PrivateKey, PublicKey};
+use psibase::{ExactAccountNumber, PackageInfo, PrivateKey, PublicKey};
 use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File, OpenOptions};
@@ -100,6 +100,23 @@ struct DeployCommand {
 }
 
 #[derive(Parser, Debug)]
+struct InstallCommand {
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
+    #[clap(
+        short = 'a',
+        long,
+        value_name = "URL_OR_HOST_ALIAS",
+        env = "PSINODE_URL"
+    )]
+    api: Option<String>,
+
+    /// Sender to use for installing. The packages and all accounts
+    /// that they create will be owned by this account.
+    #[clap(short = 'S', long, value_name = "SENDER")]
+    sender: Option<ExactAccountNumber>,
+}
+
+#[derive(Parser, Debug)]
 struct TestCommand {
     /// Path to psitest executable
     #[clap(long, default_value = "psitest")]
@@ -111,7 +128,7 @@ enum Command {
     /// Build a service
     Build {},
 
-    /// Package a service
+    /// Build a psibase package
     Package {},
 
     /// Build and run tests
@@ -119,6 +136,9 @@ enum Command {
 
     /// Build and deploy a service
     Deploy(DeployCommand),
+
+    /// Build and install a psibase package
+    Install(InstallCommand),
 }
 
 fn pretty(label: &str, message: &str) {
@@ -397,48 +417,88 @@ fn is_normal_dependency(dep: &NodeDep) -> bool {
     false
 }
 
-fn get_test_packages<'a>(
-    metadata: &'a MetadataIndex,
-    root: &str,
-) -> Result<Vec<&'a PackageId>, anyhow::Error> {
-    let node = metadata.resolved.get(root).unwrap();
-    let mut visited = HashSet::new();
-    let mut packages = Vec::new();
-    if package::get_metadata(metadata.packages.get(root).unwrap())?.is_package() {
-        let root = &metadata.packages.get(root).unwrap().id;
-        if visited.insert(root) {
-            packages.push(root);
+struct PackageSet<'a> {
+    packages: Vec<&'a PackageId>,
+    visited: HashSet<&'a PackageId>,
+    metadata: &'a MetadataIndex<'a>,
+}
+
+impl<'a> PackageSet<'a> {
+    fn new(metadata: &'a MetadataIndex) -> Self {
+        PackageSet {
+            packages: Vec::new(),
+            visited: HashSet::new(),
+            metadata,
         }
     }
-    // get packages that are dependencies and dev-dependencies of the root package
-    for dep in &node.deps {
-        if is_test_dependency(dep)
-            && package::get_metadata(metadata.packages.get(&dep.pkg.repr.as_str()).unwrap())?
-                .is_package()
+    fn try_insert(&mut self, id: &'a PackageId) -> Result<bool, anyhow::Error> {
+        if package::get_metadata(self.metadata.packages.get(id.repr.as_str()).unwrap())?
+            .is_package()
         {
-            if visited.insert(&dep.pkg) {
-                packages.push(&dep.pkg);
+            if self.visited.insert(id) {
+                self.packages.push(id);
+                return Ok(true);
             }
         }
+        Ok(false)
     }
-    // get the transitive closure of packages in dependencies
-    for i in 0.. {
-        if i == packages.len() {
-            break;
-        }
-        let id = &packages[i];
-        let node = metadata.resolved.get(&id.repr.as_str()).unwrap();
-        for dep in &node.deps {
-            if is_normal_dependency(dep)
-                && package::get_metadata(metadata.packages.get(&dep.pkg.repr.as_str()).unwrap())?
-                    .is_package()
-            {
-                if visited.insert(&dep.pkg) {
-                    packages.push(&dep.pkg);
+    fn resolve_dependencies(&mut self) -> Result<(), anyhow::Error> {
+        for i in 0.. {
+            if i == self.packages.len() {
+                break;
+            }
+            let id = &self.packages[i];
+            let node = self.metadata.resolved.get(&id.repr.as_str()).unwrap();
+            for dep in &node.deps {
+                if is_normal_dependency(dep) {
+                    self.try_insert(&dep.pkg)?;
                 }
             }
         }
+        Ok(())
     }
+    async fn build(&self, args: &Args) -> Result<Vec<PackageInfo>, Error> {
+        pretty(
+            "Packages",
+            &self
+                .packages
+                .iter()
+                .map(|item| {
+                    self.metadata
+                        .packages
+                        .get(&item.repr.as_str())
+                        .unwrap()
+                        .name
+                        .to_string()
+                })
+                .reduce(|acc, item| acc + ", " + &item)
+                .unwrap_or_default(),
+        );
+
+        let mut index = Vec::new();
+
+        for p in &self.packages {
+            index.push(build_package(args, self.metadata, Some(&p.repr)).await?);
+        }
+        Ok(index)
+    }
+}
+
+fn get_test_packages<'a>(
+    metadata: &'a MetadataIndex,
+    root: &str,
+) -> Result<PackageSet<'a>, anyhow::Error> {
+    let node = metadata.resolved.get(root).unwrap();
+    let mut packages = PackageSet::new(metadata);
+    let root = &metadata.packages.get(root).unwrap().id;
+    packages.try_insert(root)?;
+    // get packages that are dependencies and dev-dependencies of the root package
+    for dep in &node.deps {
+        if is_test_dependency(dep) {
+            packages.try_insert(&dep.pkg)?;
+        }
+    }
+    packages.resolve_dependencies()?;
     Ok(packages)
 }
 
@@ -450,30 +510,8 @@ async fn test(
 ) -> Result<(), Error> {
     //
     let packages = get_test_packages(metadata, root)?;
-
     pretty("Packages", "building dependencies...");
-
-    pretty(
-        "Packages",
-        &packages
-            .iter()
-            .map(|item| {
-                metadata
-                    .packages
-                    .get(&item.repr.as_str())
-                    .unwrap()
-                    .name
-                    .to_string()
-            })
-            .reduce(|acc, item| acc + ", " + &item)
-            .unwrap_or_default(),
-    );
-
-    let mut index = Vec::new();
-
-    for p in &packages {
-        index.push(build_package(args, metadata, Some(&p.repr)).await?);
-    }
+    let index = packages.build(args).await?;
 
     // Write a package index specific to the crate
     let target_dir = args.target_dir.as_ref().map_or_else(
@@ -577,6 +615,49 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
     Ok(())
 }
 
+async fn install(
+    args: &Args,
+    opts: &InstallCommand,
+    metadata: &MetadataIndex<'_>,
+    root: &str,
+) -> Result<(), Error> {
+    let root = &metadata.packages.get(root).unwrap().id;
+
+    let mut packages = PackageSet::new(metadata);
+    let root = &metadata.packages.get(&root.repr.as_str()).unwrap().id;
+    if !packages.try_insert(root)? {
+        Err(anyhow!(
+            "{} is not a psibase package",
+            &metadata.packages.get(&root.repr.as_str()).unwrap().name
+        ))?
+    }
+    packages.resolve_dependencies()?;
+    let index = packages.build(args).await?;
+
+    let mut command = std::process::Command::new("psibase");
+
+    command.arg("--suppress-ok");
+    if let Some(api) = &opts.api {
+        command.args(["--api", api.as_str()]);
+    }
+    command.arg("install");
+    if let Some(sender) = &opts.sender {
+        command.args(["--sender", &sender.to_string()]);
+    }
+
+    // Get package files
+    let out_dir = get_package_dir(args, metadata);
+    for info in index {
+        command.arg(out_dir.join(&info.file));
+    }
+
+    let msg = format!("Failed running: {:?}", command);
+    if !command.status().context(msg.clone())?.success() {
+        Err(anyhow! {msg})?;
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main2() -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
@@ -625,6 +706,12 @@ async fn main2() -> Result<(), Error> {
                 Err(anyhow!("Don't know how to deploy workspace"))?
             };
             deploy(&args, opts, root).await?;
+        }
+        Command::Install(opts) => {
+            let Some(root) = root else {
+                Err(anyhow!("Don't know how to install workspace"))?
+            };
+            install(&args, opts, &MetadataIndex::new(&metadata), root).await?;
         }
     };
 
