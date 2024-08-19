@@ -12,7 +12,7 @@ class Func {
     };
 
     private post = (): string => {
-        return `    }\n`;
+        return `    },\n`;
     };
 
     code = (proxy: string): string => {

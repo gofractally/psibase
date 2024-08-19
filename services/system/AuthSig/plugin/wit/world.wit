@@ -64,11 +64,8 @@ interface actions {
     set-key: func(pub-pem: string) -> result<_, error>;
 }
 
-world psibase-plugin {
-    import accounts:plugin/accounts;
-    import host:common/server;
-
-    export smart-auth;
-    export keyvault;
-    export actions;
+world imports {
+    import smart-auth;
+    import keyvault;
+    import actions;
 }

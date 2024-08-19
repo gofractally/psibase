@@ -6,13 +6,10 @@ interface intf {
     multiply: func(a: u32, b: u32) -> result<string, error>;
 }
 
-world example {
+world impl {
     import invite:plugin/inviter;
-    import host:common/server;
-    import host:common/client;
+    include host:common/imports;
 
     export helloworld: func() -> string;
     export intf;
-
-
 }

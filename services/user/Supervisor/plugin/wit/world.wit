@@ -5,7 +5,7 @@ interface tests {
     kv-test: func() -> result<_, error>;
 }
 
-world example {
+world impl {
     include wasi:keyvalue/imports@0.2.0-draft;
     include host:common/imports;
     export tests;
