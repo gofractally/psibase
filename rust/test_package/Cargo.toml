@@ -1,30 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["service", "query", "plugin"]
-
 [package]
 name = "test_package"
 version = "0.12.0"
 
 [package.metadata.psibase]
 package-name = "TestPackage"
-version = "0.12.0"
 description = "Test for package building"
 services = ["tpack"]
 
 [dependencies]
 tpack = { path = "service", version = "0.12.0" }
 r-tpack = { path = "query", version = "0.12.0" }
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
-
-[workspace.package]
-version = "0.12.0"
-rust-version = "1.64"
-repository = "https://github.com/gofractally/psibase"
-homepage = "https://psibase.io"
