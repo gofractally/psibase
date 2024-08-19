@@ -1,0 +1,6 @@
+package component:plugin;
+
+/// An example world for the component to target.
+world branding {
+    export hello-world: func() -> string;
+}
