@@ -15,9 +15,9 @@ interface accounts {
     /// Creates a login popup allowing the user to log into an account.
     login: func() -> result<_, error>;
 
-    /// Gets the name of the currently logged in user, if there is one.
-    /// Returned option can be empty if there is no currently logged in user.
-    get-logged-in-user: func() -> result<option<string>, error>;
+    /// Temporary function that will be deprecated once popup login windows are supported.
+    /// This function will log in the specified user with zero error checking.
+    login-temp: func(user: string) -> result<_, error>;
 
     /// Retrieves a list of accounts to which the user can log in.
     get-available-accounts: func() -> result<list<string>, error>;
@@ -33,8 +33,6 @@ interface accounts {
     set-auth-service: func(service-name: string) -> result<_, error>;
 }
 
-world psibase-plugin {
-    import host:common/server;
-    export accounts;
+world imports {
+    import accounts;
 }
-

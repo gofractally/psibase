@@ -1,0 +1,10 @@
+package auth-sig:plugin;
+
+world impl {
+    include accounts:plugin/imports;
+    include host:common/imports;
+
+    export smart-auth;
+    export keyvault;
+    export actions;
+}

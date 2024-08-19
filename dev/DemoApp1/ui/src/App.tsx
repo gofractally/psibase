@@ -195,6 +195,45 @@ function App() {
     }
   };
 
+  const run8 = async () => {
+    try {
+      await supervisor.functionCall({
+        service: "accounts",
+        intf: "accounts",
+        method: "loginTemp",
+        params: ["alice"],
+      });
+
+      await supervisor.functionCall({
+        service: "tokens",
+        intf: "transfer",
+        method: "credit",
+        params: ["1", "bob", "12.0000", ""],
+      });
+
+      await supervisor.functionCall({
+        service: "accounts",
+        intf: "accounts",
+        method: "loginTemp",
+        params: ["bob"],
+      });
+
+      await supervisor.functionCall({
+        service: "tokens",
+        intf: "transfer",
+        method: "credit",
+        params: ["1", "alice", "6.0000", ""],
+      });
+
+    } catch (e) {
+      if (e instanceof Error) {
+        console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+      } else {
+        console.error(`Caught exception: ${JSON.stringify(e, null, 2)}`);
+      }
+    }
+  };
+
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [c, setC] = useState("");
@@ -308,6 +347,10 @@ function App() {
       <div className="card">
         <button onClick={() => run7()}>{"Set key"}</button>
         <FileSelector onLoad={setC} />
+      </div>
+
+      <div className="card">
+        <button onClick={() => run8()}>{"Example login functionality"}</button>
       </div>
     </>
   );
