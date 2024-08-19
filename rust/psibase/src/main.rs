@@ -643,7 +643,7 @@ async fn boot(
     let expiration = TimePointSec {
         seconds: now_plus_120secs.timestamp() as u32,
     };
-    let default_services = vec!["Default".to_string()];
+    let default_services = vec!["DevDefault".to_string()];
     let package_registry = get_package_registry(package_source, client.clone()).await?;
     let mut packages = package_registry
         .resolve(if services.is_empty() {
