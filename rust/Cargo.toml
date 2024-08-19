@@ -19,6 +19,17 @@ members = [
     "test_subjective"
 ]
 
+default-members = [
+    "burst-transfer",
+    "cargo-psibase",
+    "fracpack",
+    "gen-cpp-doc",
+    "md2man",
+    "psibase_macros",
+    "psibase",
+    "test_fracpack"
+]
+
 [workspace.package]
 version = "0.12.0"
 rust-version = "1.64"
