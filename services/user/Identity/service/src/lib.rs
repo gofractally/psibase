@@ -92,17 +92,6 @@ mod service {
         }
     }
 
-    impl Default for AttestationStats {
-        fn default() -> Self {
-            AttestationStats {
-                subject: AccountNumber::from(0),
-                numHighConfAttestations: 0,
-                uniqueAttesters: 0,
-                mostRecentAttestation: TimePointSec::from(0),
-            }
-        }
-    }
-
     #[table(record = "WebContentRow", index = 2)]
     struct WebContentTable;
 
