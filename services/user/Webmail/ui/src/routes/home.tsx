@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import {
     ResizableHandle,
     ResizablePanel,
@@ -13,9 +15,8 @@ import { Dialog } from "@shadcn/dialog";
 import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
+    EmptyBox,
 } from "@components";
-
-import { useEffect } from "react";
 
 export function Home() {
     const { query, selectedMessage, setSelectedMessageId } =
@@ -53,13 +54,17 @@ export function Home() {
                         </div>
                     </form>
                 </div> */}
-                <div className="py-4">
-                    <MailList
-                        mailbox="inbox"
-                        messages={query.data ?? []}
-                        selectedMessage={selectedMessage}
-                        setSelectedMessageId={setSelectedMessageId}
-                    />
+                <div className="h-full py-4">
+                    {query.data?.length ? (
+                        <MailList
+                            mailbox="inbox"
+                            messages={query.data ?? []}
+                            selectedMessage={selectedMessage}
+                            setSelectedMessageId={setSelectedMessageId}
+                        />
+                    ) : (
+                        <EmptyBox>No messages</EmptyBox>
+                    )}
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />

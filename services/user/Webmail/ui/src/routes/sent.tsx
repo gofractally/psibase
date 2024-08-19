@@ -10,6 +10,7 @@ import { MailList } from "@components/mail-list";
 
 import { useSentMessages } from "@hooks";
 import { useEffect } from "react";
+import { EmptyBox } from "@components";
 
 export function Sent() {
     const { query, selectedMessage, setSelectedMessageId } = useSentMessages();
@@ -37,13 +38,17 @@ export function Sent() {
                         </div>
                     </form>
                 </div> */}
-                <div className="py-4">
-                    <MailList
-                        mailbox="sent"
-                        messages={query.data ?? []}
-                        selectedMessage={selectedMessage}
-                        setSelectedMessageId={setSelectedMessageId}
-                    />
+                <div className="h-full py-4">
+                    {query.data?.length ? (
+                        <MailList
+                            mailbox="sent"
+                            messages={query.data ?? []}
+                            selectedMessage={selectedMessage}
+                            setSelectedMessageId={setSelectedMessageId}
+                        />
+                    ) : (
+                        <EmptyBox>No sent messages</EmptyBox>
+                    )}
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />

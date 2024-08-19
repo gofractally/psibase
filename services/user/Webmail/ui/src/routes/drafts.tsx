@@ -10,6 +10,7 @@ import { MailList } from "@components/mail-list";
 
 import { useDraftMessages } from "@hooks";
 import { useEffect } from "react";
+import { EmptyBox } from "@components";
 
 export function Drafts() {
     const { drafts, selectedMessage, setSelectedMessageId } =
@@ -38,13 +39,17 @@ export function Drafts() {
                         </div>
                     </form>
                 </div> */}
-                <div className="py-4">
-                    <MailList
-                        mailbox="drafts"
-                        messages={drafts ?? []}
-                        selectedMessage={selectedMessage}
-                        setSelectedMessageId={setSelectedMessageId}
-                    />
+                <div className="h-full py-4">
+                    {drafts?.length ? (
+                        <MailList
+                            mailbox="drafts"
+                            messages={drafts ?? []}
+                            selectedMessage={selectedMessage}
+                            setSelectedMessageId={setSelectedMessageId}
+                        />
+                    ) : (
+                        <EmptyBox>No drafts</EmptyBox>
+                    )}
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />

@@ -17,6 +17,7 @@ import {
     ComposeDialog,
     EditSendDialogTriggerIconWithTooltip,
     MarkdownEditor,
+    NoMessageSelected,
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
@@ -31,8 +32,6 @@ export function MailDisplay({
     message?: Message;
     mailbox: Mailbox;
 }) {
-    if (!message) return null;
-
     return (
         <div className="flex h-full max-h-full flex-col">
             {message ? (
@@ -54,9 +53,7 @@ export function MailDisplay({
                     </ScrollArea>
                 </>
             ) : (
-                <div className="flex flex-1 items-center justify-center text-muted-foreground">
-                    No post selected
-                </div>
+                <NoMessageSelected>Select a message</NoMessageSelected>
             )}
         </div>
     );
