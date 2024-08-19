@@ -747,14 +747,25 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Default.psi
-    NAME Default
+    OUTPUT ${SERVICE_DIR}/DevDefault.psi
+    NAME DevDefault
     VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "All default services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit Docs
+    DESCRIPTION "All development services"
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
                     Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/ProdDefault.psi
+    NAME ProdDefault
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "All production services"
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
+                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Sites SetCode Supervisor Symbol Tokens Transact
+)
+
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
@@ -779,7 +790,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit Default
+    Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
 
@@ -792,7 +803,8 @@ install(
           ${SERVICE_DIR}/AuthK1.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
-          ${SERVICE_DIR}/Default.psi
+          ${SERVICE_DIR}/DevDefault.psi
+          ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
           ${SERVICE_DIR}/Events.psi
