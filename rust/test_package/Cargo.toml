@@ -1,11 +1,19 @@
 [package]
 name = "test_package"
-version = "0.12.0"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
 
 [package.metadata.psibase]
 package-name = "TestPackage"
 description = "Test for package building"
 services = ["tpack"]
+
+[lib]
+crate-type = ["rlib"]
 
 [dependencies]
 tpack = { path = "service", version = "0.12.0" }
