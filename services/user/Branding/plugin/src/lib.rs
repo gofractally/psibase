@@ -6,6 +6,8 @@ use bindings::exports::branding::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 
+use psibase::fracpack::Pack;
+
 mod errors;
 use errors::ErrorType;
 
@@ -13,12 +15,14 @@ struct BrandingPlugin;
 
 impl Api for BrandingPlugin {
     fn set_chain_name(name: String) {
-        // store name in singleton
-        println!("set_chain_name({})", name);
+        let packed_chain_name_args = branding::action_structs::set_chain_name { name }.packed();
+        CommonServer::add_action_to_transaction("set_chain_name", &packed_chain_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
         // push logo to sites in root so others can reach it by url
         println!("set_chain_logo({:#?})", logo);
+        let packed_logo_args = branding::action_structs::set_logo { img: logo }.packed();
+        CommonServer::add_action_to_transaction("set_logo", &packed_logo_args).unwrap();
     }
 }
 
