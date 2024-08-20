@@ -2,10 +2,11 @@
 mod service {
     use async_graphql::SimpleObject;
     // fix psibase::service macro to use this (for decode in events)
-    use psibase::{anyhow, Fracpack, SingletonKey, ToSchema, WebContentRow};
+    // fix 2: I've gotta explicitly use Table, even though *all* uses of Table expand in this macro and require the Table trait to be imported
+    use psibase::{anyhow, Fracpack, SingletonKey, Table, ToSchema, WebContentRow};
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "ChainNameTable", index = 0)]
+    #[table(name = "ChainNameTable")]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize)]
     pub struct ChainName {
         pub name: String,
@@ -25,7 +26,9 @@ mod service {
     fn set_chain_name(name: String) {
         // save name to singleton
         let chain_name_table = ChainNameTable::new();
-        // chain_name_table.g
+        chain_name_table
+            .put(&ChainName { name: name.clone() })
+            .unwrap();
 
         Wrapper::emit().history().set_chain_name(name);
     }
