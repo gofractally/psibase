@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
 
 [lib]
@@ -17,6 +19,12 @@ strip = true
 lto = true
 
 [package.metadata.component]
-package = "component:plugin"
+# this name must match the package name in world.wit
+# However, it is not authoritative in the operation of the component
+package = "identity:psibase-plugin"
 
 [package.metadata.component.dependencies]
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }

@@ -1,6 +1,17 @@
-package component:plugin;
+package branding:plugin;
 
-/// An example world for the component to target.
-world branding {
-    export hello-world: func() -> string;
+interface api {
+    set-chain-name: func(name: string);
+    set-logo: func(logo: list<u8>);
+}
+
+interface queries {
+    use host:common/types.{error};
+    get-chain-name: func() -> result<string, error>;
+}
+
+world psibase-plugin {
+    import host:common/server;
+    export api;
+    export queries;
 }
