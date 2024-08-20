@@ -53,11 +53,11 @@ const getIncomingMessages = async (account: string) => {
 
 const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
-    const [selectedAccount] = useUser();
+    const { user } = useUser();
     const query = useQuery({
-        queryKey: ["incoming", selectedAccount.account],
-        queryFn: () => getIncomingMessages(selectedAccount.account),
-        enabled: Boolean(selectedAccount.account),
+        queryKey: ["incoming", user.account],
+        queryFn: () => getIncomingMessages(user.account),
+        enabled: Boolean(user.account),
     });
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
@@ -80,11 +80,11 @@ const getSentMessages = async (account: string) => {
 
 const sentMsgAtom = atom<Message["id"]>("");
 export function useSentMessages() {
-    const [selectedAccount] = useUser();
+    const { user } = useUser();
     const query = useQuery({
-        queryKey: ["sent", selectedAccount.account],
-        queryFn: () => getSentMessages(selectedAccount.account),
-        enabled: Boolean(selectedAccount.account),
+        queryKey: ["sent", user.account],
+        queryFn: () => getSentMessages(user.account),
+        enabled: Boolean(user.account),
     });
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
@@ -101,7 +101,7 @@ export function useSentMessages() {
 
 const draftMsgAtom = atom<Message["id"]>("");
 export function useDraftMessages() {
-    const [selectedAccount] = useUser();
+    const { user } = useUser();
 
     const [allDrafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
         "drafts",
@@ -115,7 +115,7 @@ export function useDraftMessages() {
         setDrafts(remainingDrafts);
     };
 
-    const drafts = allDrafts?.filter((d) => d.from === selectedAccount.account);
+    const drafts = allDrafts?.filter((d) => d.from === user.account);
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
     const selectedMessage = drafts?.find((msg) => msg.id === selectedMessageId);

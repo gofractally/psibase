@@ -15,17 +15,14 @@ interface AccountSwitcherProps {
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
     const { setSelectedMessageId } = useIncomingMessages();
-    const [selectedAccount, setSelectedAccount] = useUser();
+    const { user, setUser } = useUser();
 
     return (
         <Select
-            defaultValue={selectedAccount.account}
+            defaultValue={user.account}
             onValueChange={(value) => {
                 setSelectedMessageId("");
-                setSelectedAccount(
-                    accounts.find((acct) => acct.account === value) ??
-                        accounts[0],
-                );
+                setUser(value);
             }}
         >
             <SelectTrigger
@@ -38,7 +35,7 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
             >
                 <SelectValue placeholder="Select an account">
                     <span className={cn("ml-2", isCollapsed && "hidden")}>
-                        {selectedAccount.name}
+                        {user.name}
                     </span>
                 </SelectValue>
             </SelectTrigger>

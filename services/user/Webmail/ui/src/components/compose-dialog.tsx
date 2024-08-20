@@ -35,7 +35,7 @@ import {
 } from "@shadcn/form";
 import { Input } from "@shadcn/input";
 
-const supervisor = new Supervisor();
+// const supervisor = new Supervisor();
 interface SupervisorError {
     code: number;
     producer: PluginId;
@@ -55,7 +55,7 @@ export const ComposeDialog = ({
     message?: Message;
 }) => {
     const [open, setOpen] = useState(false);
-    const [selectedAccount] = useUser();
+    const { user } = useUser();
     const { drafts, setDrafts, getDrafts, deleteDraftById } =
         useDraftMessages();
 
@@ -84,7 +84,7 @@ export const ComposeDialog = ({
     const createDraft = (value: string) => {
         const draft = {
             id: id.current,
-            from: selectedAccount.account,
+            from: user.account,
             to: form.getValues().to || "recipient",
             datetime: Date.now(),
             status: "draft",
@@ -119,12 +119,12 @@ export const ComposeDialog = ({
         }
 
         try {
-            await supervisor.functionCall({
-                service: "webmail",
-                intf: "api",
-                method: "send",
-                params: [draft.to, draft.subject, draft.body],
-            });
+            // await supervisor.functionCall({
+            //     service: "webmail",
+            //     intf: "api",
+            //     method: "send",
+            //     params: [draft.to, draft.subject, draft.body],
+            // });
             if (!id.current) return;
             deleteDraftById(id.current);
         } catch (e: unknown) {
