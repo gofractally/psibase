@@ -3,6 +3,7 @@
 #include <botan/auto_rng.h>
 #include <botan/ber_dec.h>
 #include <botan/der_enc.h>
+#include <botan/entropy_src.h>
 #include <botan/pem.h>
 #include <botan/pk_keys.h>
 #include <botan/pkcs8.h>
@@ -44,15 +45,17 @@ namespace SystemService
 
          auto key = Botan::PKCS8::load_key({private_key.data.data(), private_key.data.size()});
 
-         Botan::AutoSeeded_RNG rng;
+         auto sources = Botan::Entropy_Sources();
+         sources.add_source(Botan::Entropy_Source::create("getentropy"));
+
+         Botan::AutoSeeded_RNG rng(sources);
          Botan::PK_Signer      signer(*key, rng, "Raw", Botan::Signature_Format::Standard);
 
-         signer.update(checksum.data(), checksum.size());
-         std::vector<uint8_t> s = signer.signature(rng);
+         std::vector<uint8_t> msg = signer.sign_message({checksum.data(), checksum.size()}, rng);
 
-         psibase::check(s.size() == 64, "Signing failed");
+         psibase::check(msg.size() == 64, "Signing failed");
 
-         std::copy(s.begin(), s.end(), signature.begin());
+         std::copy(msg.begin(), msg.end(), signature.begin());
 
          return psibase::Signature{
              psibase::Signature::variant_type{psibase::Signature::r1, signature}};
