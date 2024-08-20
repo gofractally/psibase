@@ -217,13 +217,12 @@ pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psiba
     );
     assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
 
-    let exp_results = None;
     let response = query_subject_stats(
         &chain,
         "subjectStats",
         get_gql_query_subject_stats_one_arg("subjectStats", "subject", "alice"),
     );
-    assert_eq!(exp_results, response);
+    assert!(response.is_none());
 
     Ok(())
 }

@@ -19,7 +19,7 @@ mod service {
     use crate::stats::update_attestation_stats;
 
     #[table(name = "AttestationTable", index = 0)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Attestation {
         /// The attesting account / the issuer
         pub attester: AccountNumber,
@@ -55,16 +55,8 @@ mod service {
         }
     }
 
-    impl PartialEq for AttestationStats {
-        fn eq(&self, other: &Self) -> bool {
-            self.subject == other.subject
-                && self.numHighConfAttestations == other.numHighConfAttestations
-                && self.uniqueAttesters == other.uniqueAttesters
-        }
-    }
-
     #[table(name = "AttestationStatsTable", index = 1)]
-    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, Debug, Clone, Eq)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
         #[primary_key]
