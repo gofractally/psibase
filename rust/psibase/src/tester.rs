@@ -59,7 +59,7 @@ impl Chain {
 
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
-        let default_services: Vec<String> = vec!["Default".to_string()];
+        let default_services: Vec<String> = vec!["DevDefault".to_string()];
         self.boot_with(&Self::default_registry(), &default_services[..])
     }
 

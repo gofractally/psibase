@@ -655,7 +655,7 @@ async fn boot(
     };
     let mut package_registry = JointRegistry::new();
     let package_names = if services.is_empty() {
-        vec!["Default".to_string()]
+        vec!["DevDefault".to_string()]
     } else {
         let (files, packages) = FileSetRegistry::from_files(services)?;
         package_registry.push(files)?;

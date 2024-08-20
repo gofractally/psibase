@@ -1,9 +1,15 @@
 import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
 import { readLoggers } from "../log/utils";
-import { PsinodeConfig, ServiceConfig, ListenConfig } from "./interfaces";
+import {
+    PsinodeConfigUI,
+    ServiceConfig,
+    ListenConfig,
+    PsinodeConfigSelect,
+    PsinodeConfigUpdate,
+} from "./interfaces";
 
-export const initialConfigForm = (): PsinodeConfig => ({
+export const initialConfigForm = (): PsinodeConfigUI => ({
     p2p: false,
     producer: "",
     host: "",
@@ -226,6 +232,13 @@ function readListen(listen: ListenConfig): ListenConfig {
 
 function writeListen(listen: ListenConfig): any {
     if (listen.protocol == "http" || listen.protocol == "https") {
+        if (listen.port && listen.address) {
+            return {
+                protocol: listen.protocol,
+                address: listen.address,
+                port: listen.port,
+            };
+        }
         const ipv4 = listen.text?.match(/^(\d+\.\d+.\d+.\d+)(?::(\d+))$/);
         if (ipv4) {
             return {
@@ -255,10 +268,10 @@ function writeListen(listen: ListenConfig): any {
 
 // On conflict, updated overrides user
 export const mergeConfig = (
-    prev: PsinodeConfig,
-    updated: PsinodeConfig,
-    user: PsinodeConfig
-): PsinodeConfig => {
+    prev: PsinodeConfigUI,
+    updated: PsinodeConfigUI,
+    user: PsinodeConfigUI
+): PsinodeConfigUI => {
     return {
         ...updated,
         p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
@@ -275,28 +288,21 @@ export const mergeConfig = (
     };
 };
 
-export const writeConfig = (input: PsinodeConfig) => {
-    return {
-        ...input,
-        listen: input.listen.map(writeListen),
-        services: input.services
-            .filter((s) => !emptyService(s))
-            .map((s) => ({
-                host: s.host,
-                root: s.root,
-            })),
-        admin: input.admin != "" ? input.admin : null,
-        loggers: writeLoggers(input.loggers),
-    };
-};
+export const writeConfig = (input: PsinodeConfigUI): PsinodeConfigUpdate => ({
+    ...input,
+    listen: input.listen.map(writeListen),
+    services: input.services
+        .filter((s) => !emptyService(s))
+        .map((s) => ({
+            host: s.host,
+            root: s.root,
+        })),
+    admin: input.admin != "" ? input.admin : null,
+    loggers: writeLoggers(input.loggers),
+});
 
-export const defaultService = (root: string) => {
-    if (root) {
-        return root.substring(root.lastIndexOf("/") + 1) + ".";
-    } else {
-        return "";
-    }
-};
+export const defaultService = (root: string) =>
+    root ? root.substring(root.lastIndexOf("/") + 1) + "." : "";
 
 let nextId = 1;
 export const newId = (): string => {
@@ -314,44 +320,4 @@ export const resolveListDiff = <T>(
         const old: any = base.find(compare) || user.find(compare);
         return { key: old ? old.key : newId(), ...s };
     });
-};
-
-export const resolveConfigFormDiff = (
-    config: PsinodeConfig,
-    configForm: UseFormReturn<PsinodeConfig, any>
-) => {
-    const result = { ...config };
-    const oldDefaults = configForm.formState.defaultValues as PsinodeConfig;
-    const userValues = configForm.getValues();
-    result.services = resolveListDiff(
-        oldDefaults.services,
-        result.services,
-        userValues.services,
-        (lhs, rhs) => lhs.host == rhs.host && lhs.root == rhs.root
-    );
-    result.listen = resolveListDiff(
-        oldDefaults.listen,
-        result.listen.map(readListen),
-        userValues.listen,
-        (lhs, rhs) => lhs.protocol == rhs.protocol && lhs.text == rhs.text
-    );
-    result.loggers = readLoggers(result.loggers);
-    result.admin = result.admin ? result.admin : "";
-    let newState = mergeConfig(oldDefaults, result, userValues);
-    if (
-        userValues.services.length > 0 &&
-        emptyService(userValues.services.at(-1)!)
-    ) {
-        result.services = [...result.services, userValues.services.at(-1)!];
-    } else {
-        result.services = [
-            ...result.services,
-            { host: "", root: "", key: newId() },
-        ];
-    }
-    configForm.reset(result, {
-        keepDirty: true,
-        keepValues: true,
-    });
-    configForm.reset(newState, { keepDefaultValues: true });
 };
