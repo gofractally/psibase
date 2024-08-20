@@ -41,7 +41,7 @@ target_sources( psio INTERFACE
 add_subdirectory(tests)
 
 if(IS_WASM)
-    target_link_libraries(psio PUBLIC wasm-base)
+    target_link_libraries(psio PRIVATE wasm-base)
     target_include_directories(psio PUBLIC ../psibase/common/include)
     install(DIRECTORY include/psio TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
     install(TARGETS psio ARCHIVE COMPONENT libpsibase)
