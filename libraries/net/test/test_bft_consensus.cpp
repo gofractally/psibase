@@ -434,6 +434,34 @@ TEST_CASE("return to previous fork", "[bft]")
    CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
 }
 
+TEST_CASE("highest view change inconsistent with commit", "[bft]")
+{
+   TEST_START(logger);
+   SingleNode<node_type> node({"a", "b", "c", "d"});
+
+   auto root  = node.head();
+   auto fork1 = makeBlock(root, "b", 4);
+   auto fork2 = makeBlock(root, "c", 5);
+   // Make sure that we're on term 5
+   node.send(makeViewChange("a", 5));
+   node.send(makeViewChange("b", 5));
+   node.send(makeViewChange("c", 5));
+   node.send(fork1);
+   node.send(fork2);
+   // Commit fork2
+   node.send(makePrepare(fork2, "b"));
+   node.send(makePrepare(fork2, "c"));
+   node.send(makeCommit(fork2, "b"));
+   node.send(makeCommit(fork2, "c"));
+
+   // This view change refers to a block which conflicts with the committed fork2,
+   // but is better than any block referenced by any other view change.
+   node.send(makeViewChange("d", 5, BlockInfo{fork1.block->block()}, {"a", "b", "d"}));
+   // this view change makes term 5 non-viable
+   node.send(makeViewChange("b", 6, BlockInfo{fork2.block->block()}, {"a", "b", "c"}));
+   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
+}
+
 TEST_CASE("new consensus at view change", "[bft]")
 {
    TEST_START(logger);
