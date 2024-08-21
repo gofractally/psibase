@@ -1,20 +1,20 @@
 import { createBrowserRouter } from "react-router-dom";
-
-import App from "./App";
-
-const Page = () => <div className="bg-red-500">hello world</div>;
+import Dashboard from "./pages/Dashboard";
+import { Invite } from "./pages/Invite";
+import { Root } from "./layout";
 
 export default createBrowserRouter([
     {
+        path: "/",
+        element: <Root />,
         children: [
             {
                 path: "/",
-                element: <App />,
+                element: <Dashboard />,
             },
             {
-                path: "team",
-
-                element: <Page />,
+                path: "invite",
+                element: <Invite />,
             },
         ],
     },
