@@ -734,8 +734,8 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate CommonApi CpuLimit Docs
-                    Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
+                    Docs Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
 )
 
@@ -744,8 +744,8 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate CommonApi CpuLimit Docs
-                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact
 )
 
