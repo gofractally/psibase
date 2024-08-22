@@ -1,9 +1,6 @@
 use crate::tests::helpers::test_helpers::HasQueryFields;
 
-pub fn get_query<T>(returns_list: bool, query_name: &str, params: &[(&str, &str)]) -> String
-where
-    T: HasQueryFields,
-{
+fn format_params(params: &[(&str, &str)]) -> String {
     let formatted_params = if params.is_empty() {
         String::new()
     } else {
@@ -14,22 +11,28 @@ where
             .join(", ")
     };
 
-    let params_part = if formatted_params.is_empty() {
+    if formatted_params.is_empty() {
         String::new()
     } else {
         format!("({})", formatted_params)
-    };
+    }
+}
 
-    let fields_part = if returns_list {
-        format!("nodes {{ {} }}", T::QUERY_FIELDS)
-    } else {
-        format!("{}", T::QUERY_FIELDS)
-    };
+fn execute_query(
+    chain: &psibase::Chain,
+    service: psibase::AccountNumber,
+    query_name: &str,
+    params: &[(&str, &str)],
+    query_fields: &str,
+) -> serde_json::Value {
+    let params_part = format_params(params);
 
-    format!(
+    let query = format!(
         "query {{ {}{} {{ {} }} }}",
-        query_name, params_part, fields_part
-    )
+        query_name, params_part, query_fields
+    );
+
+    chain.graphql(service, &query).unwrap()
 }
 
 pub trait Queryable {
@@ -54,10 +57,10 @@ where
         query_name: &str,
         params: &[(&str, &str)],
     ) -> Self::Output {
-        let is_list = true;
-        let query = get_query::<T>(is_list, query_name, params);
-        let res: serde_json::Value = chain.graphql(service, &query).unwrap();
-        serde_json::from_value::<Self::Output>(res["data"][query_name]["nodes"].clone()).unwrap()
+        let fields_part = format!("nodes {{ {} }}", T::QUERY_FIELDS);
+        let res = execute_query(chain, service, query_name, params, &fields_part);
+        let data = res["data"][query_name]["nodes"].clone();
+        serde_json::from_value::<Self::Output>(data).unwrap()
     }
 }
 impl<T> Queryable for Option<T>
@@ -72,9 +75,9 @@ where
         query_name: &str,
         params: &[(&str, &str)],
     ) -> Self::Output {
-        let is_list = false;
-        let query = get_query::<T>(is_list, query_name, params);
-        let res: serde_json::Value = chain.graphql(service, &query).unwrap();
-        serde_json::from_value::<Self::Output>(res["data"][query_name].clone()).unwrap()
+        let fields_part = format!("{}", T::QUERY_FIELDS);
+        let res = execute_query(chain, service, query_name, params, &fields_part);
+        let data = res["data"][query_name].clone();
+        serde_json::from_value::<Self::Output>(data).unwrap()
     }
 }
