@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -18,12 +17,13 @@ import {
 
 export const Invite = () => {
     const [searchParams] = useSearchParams();
-    const inviteId = searchParams.get("inviteId");
+    const token = searchParams.get("token");
 
     const { data, isError, isLoading } = useQuery({
-        enabled: !!inviteId,
-        queryKey: ["invite", inviteId],
+        enabled: !!token,
+        queryKey: ["invite", token],
         queryFn: async () => {
+            await wait(1000);
             return {
                 chainName: "psibase",
                 inviter: "purplebear",

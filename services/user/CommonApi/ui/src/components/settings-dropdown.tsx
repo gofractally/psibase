@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import {
     Dialog,
@@ -44,7 +44,12 @@ import { Input } from "./ui/input";
 import { useMutation } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { siblingUrl } from "@psibase/common-lib";
+import { siblingUrl, Supervisor } from "@psibase/common-lib";
+import { useNavigate } from "react-router-dom";
+
+const supervisor = new Supervisor({
+    supervisorSrc: siblingUrl(undefined, "supervisor", undefined, false),
+});
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -56,6 +61,8 @@ const generateInvite = async (): Promise<string> => {
 };
 
 export const SettingsDropdown = () => {
+    const navigate = useNavigate();
+
     const {
         data: inviteLink,
         isPending,
@@ -66,16 +73,35 @@ export const SettingsDropdown = () => {
         },
     });
 
+    const init = async () => {
+        await supervisor.onLoaded();
+        supervisor.preLoadPlugins([{ service: "accounts" }]);
+    };
+
+    const generatePair = async () => {
+        console.log("generating pair");
+        const res = await supervisor.functionCall({
+            service: "invite",
+            intf: "inviter",
+            method: "generateInvite",
+            params: [""],
+        });
+        console.log(res, "was the pair.");
+    };
+
     useEffect(() => {
         mutate();
+        init();
     }, []);
 
     const onCopyClick = async () => {
+        navigate("invite");
         if ("clipboard" in navigator) {
             await navigator.clipboard.writeText("test");
             toast("Copied to clipboard.");
         } else {
             toast("Copying failed, not in secure context?");
+            generatePair();
         }
     };
 
