@@ -125,18 +125,6 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
-const SubjectPublicKeyInfo psibase::TestChain::defaultPubKey{
-    parseSubjectPublicKeyInfo("-----BEGIN PUBLIC KEY-----\n"
-                              "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0Y/LdRPRDayPJJkPUGgsYYZgRNBw"
-                              "\n8oampPAitNUtMUtbNO45VEopGYL7FCkYj6Pzxl1vu1NugJnhKzkUz6pyZg==\n"
-                              "-----END PUBLIC KEY-----\n")};
-const PrivateKeyInfo psibase::TestChain::defaultPrivKey{
-    parsePrivateKeyInfo("-----BEGIN PRIVATE KEY-----"
-                        "\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgCaFdnj7fklpBTzzN\niQbcF3"
-                        "RiMthAHpQDf4BwdHyfhYyhRANCAATRj8t1E9ENrI8kmQ9QaCxhhmBE0HDy\nhqak8CK01S0xS1"
-                        "s07jlUSikZgvsUKRiPo/PGXW+7U26AmeErORTPqnJm\n"
-                        "-----END PRIVATE KEY-----\n")};
-
 psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
     : id{::testerCreateChain(dbconfig.hotBytes,
                              dbconfig.warmBytes,

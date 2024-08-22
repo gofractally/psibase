@@ -157,11 +157,6 @@ namespace psibase
       bool                              isAutoBlockStart = true;
 
      public:
-      static const SystemService::AuthSig::SubjectPublicKeyInfo defaultPubKey;
-      static const SystemService::AuthSig::PrivateKeyInfo       defaultPrivKey;
-
-      static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
-
       explicit TestChain(const DatabaseConfig&);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
@@ -229,7 +224,7 @@ namespace psibase
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
-                                                     const KeyList& keys = defaultKeys());
+                                                     const KeyList& keys = {});
 
       /**
        * Creates a POST request with a JSON body
@@ -324,7 +319,7 @@ namespace psibase
       }
 
       template <typename Action>
-      auto trace(Action&& a, const KeyList& keyList = defaultKeys())
+      auto trace(Action&& a, const KeyList& keyList = {})
       {
          return pushTransaction(makeTransaction({a}), keyList);
       }
@@ -388,7 +383,7 @@ namespace psibase
          operator AccountNumber() { return id; }
       };
 
-      auto from(AccountNumber id) { return UserContext{*this, id, defaultKeys()}; }
+      auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
    };  // TestChain
 
 }  // namespace psibase
