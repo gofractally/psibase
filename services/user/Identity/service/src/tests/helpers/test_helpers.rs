@@ -1,6 +1,13 @@
+use super::gql::Queryable;
 use crate::service::{Attestation, AttestationStats};
-use crate::SERVICE;
+use crate::Wrapper as Service;
+use psibase::services::http_server;
 use psibase::AccountNumber;
+use std::fmt::Debug;
+
+pub trait HasQueryFields {
+    const QUERY_FIELDS: &'static str;
+}
 
 #[derive(Clone, Debug)]
 pub struct PartialAttestation {
@@ -8,121 +15,156 @@ pub struct PartialAttestation {
     pub subject: AccountNumber,
     pub value: u8,
 }
+impl PartialAttestation {
+    pub fn new(attester: &str, subject: &str, value: u8) -> Self {
+        Self {
+            attester: attester.into(),
+            subject: subject.into(),
+            value,
+        }
+    }
+}
+impl HasQueryFields for Attestation {
+    const QUERY_FIELDS: &'static str = "attester, subject, value, issued { seconds }";
+}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(non_snake_case)]
 pub struct PartialAttestationStats {
     pub subject: AccountNumber,
     pub uniqueAttesters: u16,
     pub numHighConfAttestations: u16,
 }
-
-pub fn init_identity_svc(chain: &psibase::Chain) -> Result<(), psibase::Error> {
-    use crate::SERVICE;
-    use psibase::services::http_server;
-
-    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
-
-    return Ok(());
-}
-
-pub fn push_attest(
-    chain: &psibase::Chain,
-    attester: AccountNumber,
-    subject: AccountNumber,
-    conf: u8,
-) -> Result<(), psibase::Error> {
-    crate::Wrapper::push_from(&chain, attester)
-        .attest(subject.clone(), conf)
-        .get()?;
-
-    chain.finish_block();
-    Ok(())
-}
-
-pub fn query_attestations(
-    chain: &psibase::Chain,
-    query_name: &str,
-    graphql_query: String,
-) -> Vec<Attestation> {
-    let res: serde_json::Value = chain.graphql(SERVICE, &graphql_query).unwrap();
-    serde_json::from_value::<Vec<Attestation>>(res["data"][query_name]["nodes"].clone()).unwrap()
-}
-
-pub fn query_subject_stats(
-    chain: &psibase::Chain,
-    query_name: &str,
-    graphql_query: String,
-) -> Option<AttestationStats> {
-    let res: serde_json::Value = chain.graphql(SERVICE, &graphql_query).unwrap();
-    match serde_json::from_value::<AttestationStats>(res["data"][query_name].clone()) {
-        Ok(val) => return Some(val),
-        Err(_) => return None,
-    }
-}
-
-pub fn query_attestation_stats(
-    chain: &psibase::Chain,
-    query_name: &str,
-    graphql_query: String,
-) -> Vec<AttestationStats> {
-    let res: serde_json::Value = chain.graphql(SERVICE, &graphql_query).unwrap();
-    serde_json::from_value::<Vec<AttestationStats>>(res["data"][query_name]["nodes"].clone())
-        .unwrap()
-}
-
-pub fn are_equal_vecs_of_attestations_stats(
-    exp_results: &Vec<PartialAttestationStats>,
-    results: &Vec<AttestationStats>,
-) -> bool {
-    if results.len() != exp_results.len() {
-        return false;
-    }
-    for exp_rec in exp_results {
-        match results.iter().find(|rec| {
-            rec.subject == exp_rec.subject
-                && rec.uniqueAttesters == exp_rec.uniqueAttesters
-                && rec.numHighConfAttestations == exp_rec.numHighConfAttestations
-        }) {
-            Some(_) => continue,
-            None => return false,
+impl PartialAttestationStats {
+    pub fn new(subject: &str, unique_attesters: u16, num_high_conf_attestations: u16) -> Self {
+        Self {
+            subject: subject.into(),
+            uniqueAttesters: unique_attesters,
+            numHighConfAttestations: num_high_conf_attestations,
         }
     }
-    true
+}
+impl HasQueryFields for AttestationStats {
+    const QUERY_FIELDS: &'static str =
+        "subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds }";
 }
 
-pub fn are_equal_vecs_of_attestations(
-    exp_results: &Vec<PartialAttestation>,
-    results: &Vec<Attestation>,
-) -> bool {
-    if results.len() != exp_results.len() {
-        return false;
+// Todo: implement a ServiceWrapper trait on the Wrapper itself, instead of needing a wrapper object
+pub trait IsServiceWrapper {
+    const SERVICE: psibase::AccountNumber;
+    fn push_from(
+        chain: &psibase::Chain,
+        account: AccountNumber,
+    ) -> crate::Actions<psibase::ChainPusher>;
+}
+impl IsServiceWrapper for Service {
+    const SERVICE: psibase::AccountNumber = Service::SERVICE;
+    fn push_from(
+        chain: &psibase::Chain,
+        account: AccountNumber,
+    ) -> crate::Actions<psibase::ChainPusher> {
+        Service::push_from(chain, account)
     }
-    for exp_rec in exp_results {
-        match results.iter().find(|rec| {
-            rec.attester == exp_rec.attester
-                && rec.subject == exp_rec.subject
-                && rec.value == exp_rec.value
-        }) {
-            Some(_) => continue,
-            None => return false,
+}
+
+pub struct ChainPusher<'a, T: IsServiceWrapper> {
+    chain: &'a psibase::Chain,
+    _marker: core::marker::PhantomData<T>,
+}
+
+impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
+    fn new(chain: &'a psibase::Chain) -> Self {
+        ChainPusher::<T> {
+            chain,
+            _marker: core::marker::PhantomData,
         }
     }
-    true
+
+    /// Push an action from the specified account
+    pub fn from(&self, account: &str) -> crate::Actions<psibase::ChainPusher> {
+        T::push_from(self.chain, account.into())
+    }
+
+    /// Make the specified graphql query on this service.
+    /// It will attempt to unpack into the specified template type
+    pub fn query<U>(&self, query_name: &str, params: &[(&str, &str)]) -> U::Output
+    where
+        U: Queryable,
+    {
+        U::query(self.chain, T::SERVICE, query_name, params)
+    }
 }
 
-pub fn verify_failed(res: &Result<(), psibase::Error>, expected_err: &str) {
-    match res {
-        Err(e) => assert_eq!(
-            e.to_string(),
-            expected_err,
-            "Transaction failed with \"{}\", but was expected to fail with: \"{}\"",
-            e.to_string(),
-            expected_err
-        ),
-        _ => panic!(
-            "Transaction succeeded, but was expected to fail with: \"{}\"",
-            expected_err
-        ),
+pub fn init_svc<ActionService: IsServiceWrapper, HttpServer: IsServiceWrapper>(
+    chain: &psibase::Chain,
+) -> ChainPusher<ActionService> {
+    http_server::Wrapper::push_from(&chain, ActionService::SERVICE)
+        .registerServer(HttpServer::SERVICE);
+    ChainPusher::<ActionService>::new(&chain)
+}
+
+impl PartialEq<PartialAttestationStats> for AttestationStats {
+    fn eq(&self, other: &PartialAttestationStats) -> bool {
+        self.subject == other.subject
+            && self.uniqueAttesters == other.uniqueAttesters
+            && self.numHighConfAttestations == other.numHighConfAttestations
+    }
+}
+impl PartialEq<AttestationStats> for PartialAttestationStats {
+    fn eq(&self, other: &AttestationStats) -> bool {
+        other == self
+    }
+}
+impl PartialEq<PartialAttestation> for Attestation {
+    fn eq(&self, other: &PartialAttestation) -> bool {
+        self.attester == other.attester
+            && self.subject == other.subject
+            && self.value == other.value
+    }
+}
+impl PartialEq<Attestation> for PartialAttestation {
+    fn eq(&self, other: &Attestation) -> bool {
+        other == self
+    }
+}
+
+pub fn assert_equal<T, U>(expected: &[T], actual: &[U])
+where
+    T: PartialEq<U> + Debug,
+    U: Debug,
+{
+    assert!(
+        expected.iter().all(|a| actual.iter().any(|b| a == b)),
+        "Assertion failed.\nexpected: {:?}\nactual: {:?}",
+        expected,
+        actual
+    );
+    assert!(
+        expected.len() == actual.len(),
+        "lengths not equal, {} ne {}\nexpected {:?}\nactual {:?}",
+        expected.len(),
+        actual.len(),
+        expected,
+        actual
+    );
+}
+
+pub trait VerifyFailed {
+    fn fails(&self, expected_err: &str);
+}
+impl VerifyFailed for Result<(), psibase::Error> {
+    fn fails(&self, expected_err: &str) {
+        match self {
+            Err(e) => assert!(
+                e.to_string().contains(expected_err),
+                "Transaction failed with \"{}\", but failure was expected to contain: \"{}\"",
+                e.to_string(),
+                expected_err
+            ),
+            _ => panic!(
+                "Transaction succeeded, but was expected to fail with: \"{}\"",
+                expected_err
+            ),
+        }
     }
 }

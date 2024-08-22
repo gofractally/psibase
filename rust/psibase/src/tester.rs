@@ -392,6 +392,7 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
+        self.chain.start_block();
         ChainEmptyResult { trace }
     }
 
@@ -419,6 +420,7 @@ impl<'a> Caller for ChainPusher<'a> {
             trace,
             _marker: Default::default(),
         };
+        self.chain.start_block();
         ret
     }
 }
