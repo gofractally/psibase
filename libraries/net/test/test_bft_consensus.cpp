@@ -417,12 +417,12 @@ TEST_CASE("return to previous fork", "[bft]")
    // return to the worse fork
    node.send(fork1b);
    node.send(makeViewChange("b", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
-   node.send(makeViewChange("c", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
+   node.send(makeViewChange("d", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
    node.send(makePrepare(fork1b, "b"));
-   node.send(makePrepare(fork1b, "c"));
+   node.send(makePrepare(fork1b, "d"));
    CHECK(node.head().blockId == BlockInfo{fork1b.block->block()}.blockId);
    // Must not generate commit for fork1b because this conflicts
-   // with the view change.  Note that c's commit also violates
+   // with the view change.  Note that d's commit also violates
    // the protocol, so we have to consider it to be the one adversary node..
    node.send(makeCommit(fork1b, "c"));
    node.send(makeCommit(fork1b, "d"));
