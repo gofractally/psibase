@@ -52,6 +52,7 @@ bool psibase::TraceResult::succeeded()
    bool failed    = hasErrObj && (*_t.error) != "";
    if (failed)
    {
+      std::cout << prettyTrace(trimRawData(_t)).c_str();
       UNSCOPED_INFO("transaction failed: " << *_t.error << "\n");
    }
 
@@ -230,13 +231,20 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
           .service = SystemService::VerifySig::service,
-          .rawData = psio::convert_to_frac(pub),
+          .rawData = {pub.data.begin(), pub.data.end()},
       });
    SignedTransaction signedTrx;
    signedTrx.transaction = trx;
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
-      signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
+   {
+      auto              sig  = sign(priv, hash);
+      auto              data = std::get<1>(sig.data);
+      std::vector<char> proof(reinterpret_cast<char*>(data.begin()),
+                              reinterpret_cast<char*>(data.end()));
+      signedTrx.proofs.push_back(proof);
+   }
+
    return pushTransaction(signedTrx);
 }
 
