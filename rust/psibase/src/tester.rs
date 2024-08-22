@@ -34,6 +34,7 @@ pub struct Chain {
     chain_handle: u32,
     status: RefCell<Option<StatusRow>>,
     producing: Cell<bool>,
+    is_auto_block_start: bool,
 }
 
 impl Default for Chain {
@@ -103,6 +104,7 @@ impl Chain {
             chain_handle,
             status: None.into(),
             producing: false.into(),
+            is_auto_block_start: true,
         }
     }
 
@@ -157,6 +159,13 @@ impl Chain {
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
         }
+    }
+
+    /// By default, the TestChain will automatically advance blocks.
+    /// When disabled, the the chain will only advance blocks manually.
+    /// To manually advance a block, call start_block.
+    pub fn set_auto_block_start(&mut self, enable: bool) {
+        self.is_auto_block_start = enable;
     }
 
     /// Push a transaction
@@ -240,9 +249,9 @@ impl Chain {
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
-        //if producing.get() && is_auto_block_start {
-        //    finishBlock();
-        //}
+        if self.producing.get() && self.is_auto_block_start {
+            self.finish_block();
+        }
 
         let packed_request = request.packed();
         let fd = unsafe {
@@ -392,7 +401,11 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
-        self.chain.start_block();
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
+        }
+
         ChainEmptyResult { trace }
     }
 
@@ -420,7 +433,11 @@ impl<'a> Caller for ChainPusher<'a> {
             trace,
             _marker: Default::default(),
         };
-        self.chain.start_block();
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
+        }
+
         ret
     }
 }
