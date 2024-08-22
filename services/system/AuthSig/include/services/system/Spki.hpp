@@ -35,10 +35,8 @@ namespace SystemService
          return SubjectPublicKeyInfo::validate(obj.data);
       }
 
-      // Takes a public key in any of the following formats
-      // - EOS Base58 encoded public key beginning PUB_K1 or PUB_R1
-      // - PEM encoded X.509 SubjectPublicKeyInfo
-      // Returns DER encoded SubjectPublicKeyInfo
+      // Takes a public key as a PEM encoded X.509 SubjectPublicKeyInfo
+      // Returns a DER encoded SubjectPublicKeyInfo
       std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view);
       std::string                to_string(const SubjectPublicKeyInfo&);
 
