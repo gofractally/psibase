@@ -1,5 +1,5 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib";
+import { PluginId, Supervisor } from "@psibase/common-lib";
 import React, { ChangeEvent, useEffect, useState } from "react";
 
 import { fetchAnswers } from "./utils/fetchAnswers";
@@ -19,6 +19,12 @@ interface Invite {
   actor: string,
   expiry: string,
   callback: string,
+}
+
+interface ErrorType {
+  code: number;
+  producer: PluginId;
+  message: string;
 }
 
 const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
@@ -50,6 +56,7 @@ function App() {
       { service: "accounts" },
       { service: "auth-sig" },
       { service: "demoapp1" },
+      { service: "identity" },
     ]);
   };
 
@@ -231,10 +238,81 @@ function App() {
   const [d, setD] = useState("");
   const [answer, setAnswer] = useState("?");
 
+  const [claim, setClaim] = useState<number>(0.95);
+  const [attestee, setAttestee] = useState<string>("bob");
+  useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
+`);
+  const attestIdentity = async () => {
+    try {
+      console.info("attest().calling identity.api.attest()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "api",
+        method: "attestIdentityClaim",
+        params: [attestee, claim],
+      });
+      console.info("returned from Identity.api.attest()");
+      setRes(res as string);
+      console.info("Res:", res);
+    } catch (e) {
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
+    }
+  };
+  const getIdentitySummary = async () => {
+    try {
+      console.info("attest().calling identity.queries.summary()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "queries",
+        method: "summary",
+        params: [attestee],
+      });
+      console.info("typeof res:", typeof res);
+      console.info("returned from Identity.queries.summary()");
+      setRes(res as string);
+      console.info("Res:", res);
+      // console.info(`${res.percHighConfidence}% of ${res.uniqueAttestations}`);
+    } catch (e) {
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
+    }
+  };
   return (
     <>
       <h1>Psibase Demo App 1</h1>
-      <h3>{res}</h3>
+      <h3>Attestation</h3>
+      <div>
+        <h4>Identity Claim:</h4>
+        <div>
+          <span>Attestee:</span>
+          <input
+            id="attestee"
+            type="text"
+            onChange={(e) => {
+              setAttestee(e.target.value);
+            }}
+            value={attestee}
+          />
+        </div>
+        <div>
+          <input
+            id="claim"
+            type="text"
+            onChange={(e) => {
+              if (!/^[0-9.]*$/.test(e.target.value)) {
+                e.preventDefault();
+              } else {
+                setClaim(parseFloat(e.target.value));
+              }
+            }}
+            value={claim}
+          />
+          <button onClick={attestIdentity}> Attest </button>
+          <button onClick={getIdentitySummary}> get Summary </button>
+        </div>
+      </div>
+      <pre>{JSON.stringify(res, null, 2)}</pre>
       <div className="card">
         <button onClick={() => run()}>
           {"auth-sig:plugin->generateKeypair"}

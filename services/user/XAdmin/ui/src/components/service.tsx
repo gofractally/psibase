@@ -18,53 +18,23 @@ export type ServiceProps = {
     services: any;
 };
 
-function emptyService(s: ServiceConfig) {
-    return s.host == "" && s.root == "";
-}
-
-export const Service = ({
-    register,
-    getValues,
-    index,
-    services,
-}: ServiceProps) => {
-    const isEnd = index == services.fields.length - 1;
-    const fixLastRow = (e: any) => {
-        if (index == services.fields.length - 1) {
-            services.append(
-                { host: "", root: "", key: newId() },
-                { shouldFocus: false }
-            );
-        } else if (
-            index == services.fields.length - 2 &&
-            emptyService(services.fields.at(-1)!) &&
-            emptyService(getValues())
-        ) {
-            services.remove(services.fields.length - 1);
-        }
-    };
+export const Service = ({ register, index, services }: ServiceProps) => {
     return (
         <tr className="w-full">
             <td>
-                <Input
-                    {...register(`${index}.host`, { onChange: fixLastRow })}
-                />
+                <Input {...register(`${index}.host`)} />
             </td>
             <td>
-                <Input
-                    {...register(`${index}.root`, { onChange: fixLastRow })}
-                />
+                <Input {...register(`${index}.root`)} />
             </td>
-            {!isEnd && (
-                <td>
-                    <Button
-                        variant="secondary"
-                        onClick={() => services.remove(index)}
-                    >
-                        Remove
-                    </Button>
-                </td>
-            )}
+            <td>
+                <Button
+                    variant="secondary"
+                    onClick={() => services.remove(index)}
+                >
+                    Remove
+                </Button>
+            </td>
         </tr>
     );
 };
