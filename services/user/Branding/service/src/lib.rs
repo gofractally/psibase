@@ -4,9 +4,9 @@ mod service {
     // fix psibase::service macro to use this (for decode in events)
     // fix 2: I've gotta explicitly use Table, even though *all* uses of Table expand in this macro and require the Table trait to be imported
     use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_simple_ui,
-        store_content, Fracpack, Hex, HexBytes, HttpReply, HttpRequest, SingletonKey, Table,
-        ToSchema, WebContentRow,
+        anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_graphql,
+        serve_simple_ui, store_content, Fracpack, HexBytes, HttpReply, HttpRequest, SingletonKey,
+        Table, ToSchema, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
@@ -37,33 +37,21 @@ mod service {
         Wrapper::emit().history().set_chain_name(name);
     }
 
-    #[action]
-    fn set_logo(img: Vec<u8>) {
-        // store logo to accessible url
-        let url = String::from("/chain_logo");
-        let content_type = String::from("image/svg+xml");
-
-        Wrapper::call().storeSys(url.clone(), content_type, Hex(img));
-
-        Wrapper::emit().history().set_logo(url);
-    }
-
     #[event(history)]
     pub fn set_chain_name(name: String) {}
-
-    #[event(history)]
-    pub fn set_logo(url: String) {}
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn logo(&self) -> async_graphql::Result<String, async_graphql::Error> {
-            Ok(ChainNameTable::new()
-                .get_index_pk()
-                .get(&SingletonKey {})
-                .unwrap()
-                .name)
+        async fn chain_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
+            // let n = ChainNameTable::new()
+            //     .get_index_pk()
+            //     .get(&SingletonKey {})
+            //     .unwrap()
+            //     .name;
+            // println!("Returning name: {}", n);
+            Ok(String::from("psibasename"))
         }
     }
 
@@ -71,7 +59,7 @@ mod service {
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            // .or_else(|| serve_graphql(&request, Query))
+            .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
