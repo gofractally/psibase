@@ -161,7 +161,7 @@ SCENARIO("Rejecting an invite")
 
       WHEN("Alice creates an invite")
       {
-         alice.to<Invite>().createInvite(invPub);
+         alice.with({{userPub, userPriv}}).to<Invite>().createInvite(invPub);
 
          THEN("Invitee can reject an invite as invited-sys")
          {
