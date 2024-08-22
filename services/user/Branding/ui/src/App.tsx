@@ -11,7 +11,9 @@ const supervisor = new Supervisor();
 export const App = () => {
     const [chainName, setChainName] = useState<string>("");
     const [logo, setLogo] = useState<string>("");
+    const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const [res, setRes] = useState<string>("");
+    const [queriedChainName, setQueriedChainName] = useState<string>("");
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -22,13 +24,50 @@ export const App = () => {
         init();
     }, []);
 
-    const uploadLogo = async () => {
+    const getChainName: React.MouseEventHandler<HTMLButtonElement> = async (
+        e,
+    ) => {
+        const queriedChainName = (await supervisor.functionCall({
+            service: "branding",
+            intf: "queries",
+            method: "getChainName",
+            params: [],
+        })) as string;
+        setQueriedChainName(queriedChainName);
+        setChainName(queriedChainName);
+    };
+    const pushNewStuff: React.MouseEventHandler<HTMLButtonElement> = async (
+        e,
+    ) => {
+        e.preventDefault();
         try {
-            const res = await supervisor.functionCall({
+            console.info("ui: calling setLogo with arg:");
+            console.info(
+                logoBytes.length,
+                "; ",
+                logoBytes.slice(0, 10).toString(),
+            );
+            let res = await supervisor.functionCall({
+                service: "accounts",
+                intf: "accounts",
+                method: "loginTemp",
+                params: ["branding"],
+            });
+
+            if (chainName) {
+                res = await supervisor.functionCall({
+                    service: "branding",
+                    intf: "api",
+                    method: "setChainName",
+                    params: [chainName],
+                });
+            }
+
+            res = await supervisor.functionCall({
                 service: "branding",
                 intf: "api",
-                method: "set-logo",
-                params: [logo],
+                method: "setLogo",
+                params: [logoBytes],
             });
             setRes(res as string);
         } catch (e) {
@@ -42,10 +81,6 @@ export const App = () => {
         }
     };
 
-    const handleSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
-        e.preventDefault();
-        console.info("submitting");
-    };
     const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (
         event,
     ) => {
@@ -58,6 +93,7 @@ export const App = () => {
                 return;
             }
             const bytes = new Uint8Array(reader.result as ArrayBuffer);
+            setLogoBytes(bytes);
             // Convert the byte data to hexadecimal string
             const hexString: string = Array.from(bytes)
                 .map((x) => x.toString(16).padStart(2, "0"))
@@ -66,6 +102,7 @@ export const App = () => {
             // const readerResult = reader.result?.toString() || "";
             // const buffer = Buffer.from(readerResult, "hex");
             // const encodedHexString = buffer.toString("base64");
+            // console.info("ui: hexString:", hexString);
             setLogo(hexString);
         };
         reader.readAsArrayBuffer(file);
@@ -74,7 +111,7 @@ export const App = () => {
     return (
         <>
             <div>Branding Page</div>
-            <form onSubmit={handleSubmit}>
+            <form>
                 <Label htmlFor="chainName">Chain Name:</Label>
                 <Input
                     id="chainName"
@@ -88,10 +125,13 @@ export const App = () => {
                     value={logo}
                 />
                 <Input type="file" onChange={handleFileChange} />
-                <Button type="submit" onClick={uploadLogo}>
+                <Button type="submit" onClick={pushNewStuff}>
                     Save
                 </Button>
             </form>
+            <Button type="button" onClick={getChainName}>
+                getChainName
+            </Button>
         </>
     );
 };
