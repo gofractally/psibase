@@ -60,13 +60,14 @@ namespace UserService
    {
       auto claims = to<SystemService::Transact>().getTransaction().claims;
       bool found =
-          std::find_if(claims.begin(), claims.end(),
-                       [&](auto claim)
-                       {
-                          return claim.service == SystemService::VerifySig::service &&
-                                 psio::from_frac<SystemService::AuthSig::SubjectPublicKeyInfo>(
-                                     claim.rawData) == pubkey;
-                       }) != claims.end();
+          std::find_if(
+              claims.begin(), claims.end(),
+              [&](auto claim)
+              {
+                 std::vector<unsigned char> data{claim.rawData.begin(), claim.rawData.end()};
+                 return claim.service == SystemService::VerifySig::service &&
+                        SystemService::AuthSig::SubjectPublicKeyInfo{data} == pubkey;
+              }) != claims.end();
 
       std::string err = "requireAuth: ";
       err += missingInviteSig;
