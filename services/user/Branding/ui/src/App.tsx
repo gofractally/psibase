@@ -11,31 +11,31 @@ const supervisor = new Supervisor();
 
 export const App = () => {
     const [chainName, setChainName] = useState<string>("");
-    const [logo, setLogo] = useState<string>("");
+    // const [logo, setLogo] = useState<string>("");
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
-    const [res, setRes] = useState<string>("");
-    const [queriedChainName, setQueriedChainName] = useState<string>("");
+    // const [res, setRes] = useState<string>("");
+    // const [queriedChainName, setQueriedChainName] = useState<string>("");
     const fileInput = useRef<HTMLInputElement>(null);
 
     const init = async () => {
         await supervisor.onLoaded();
-        supervisor.preLoadPlugins([{ service: "branding" }]);
+        // supervisor.preLoadPlugins([{ service: "branding" }]);
+        getChainName();
     };
 
     useEffect(() => {
         init();
     }, []);
 
-    const getChainName: React.MouseEventHandler<HTMLButtonElement> = async (
-        e,
-    ) => {
+    const getChainName = async () => {
         const queriedChainName = (await supervisor.functionCall({
             service: "branding",
             intf: "queries",
             method: "getChainName",
             params: [],
         })) as string;
-        setQueriedChainName(queriedChainName);
+        console.info("ui: queried chain and got name:", queriedChainName);
+        // setQueriedChainName(queriedChainName);
         setChainName(queriedChainName);
     };
     const pushNewStuff: React.MouseEventHandler<HTMLButtonElement> = async (
@@ -72,7 +72,7 @@ export const App = () => {
                 method: "setLogo",
                 params: [logoBytes],
             });
-            setRes(res as string);
+            // setRes(res as string);
         } catch (e) {
             if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
@@ -106,7 +106,7 @@ export const App = () => {
             // const buffer = Buffer.from(readerResult, "hex");
             // const encodedHexString = buffer.toString("base64");
             // console.info("ui: hexString:", hexString);
-            setLogo(hexString);
+            // setLogo(hexString);
         };
         reader.readAsArrayBuffer(file);
     };
@@ -140,18 +140,18 @@ export const App = () => {
                             className="b-1 h-24 w-24 border-solid border-gray-200"
                             onClick={openFileClick}
                         />
-                        <Input
+                        {/* <Input
                             id="logoPath"
                             onChange={(e) => setLogo(e.target.value)}
                             value={logo}
-                        />
+                        /> */}
                     </div>
                     <div>Size: 96px x 96px</div>
 
                     <Input
                         id="logo-file"
                         type="file"
-                        className="invisible"
+                        className="invisible absolute"
                         onChange={handleFileChange}
                         ref={fileInput}
                     />
@@ -162,9 +162,9 @@ export const App = () => {
                     </Button>
                 </div>
             </form>
-            <Button type="button" onClick={getChainName}>
+            {/* <Button type="button" onClick={() => getChainName()}>
                 getChainName
-            </Button>
+            </Button> */}
         </div>
     );
 };
