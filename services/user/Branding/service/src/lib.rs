@@ -23,6 +23,14 @@ mod service {
         }
     }
 
+    impl Default for ChainName {
+        fn default() -> Self {
+            ChainName {
+                name: String::from("psibase"),
+            }
+        }
+    }
+
     #[table(record = "WebContentRow", index = 1)]
     struct WebContentTable;
 
@@ -43,11 +51,11 @@ mod service {
     #[Object]
     impl Query {
         async fn chain_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
-            Ok(ChainNameTable::new()
-                .get_index_pk()
-                .get(&SingletonKey {})
-                .unwrap()
-                .name)
+            let curr_val = ChainNameTable::new().get_index_pk().get(&SingletonKey {});
+            Ok(match curr_val {
+                Some(val) => val.name,
+                None => String::from("psibase"),
+            })
         }
     }
 

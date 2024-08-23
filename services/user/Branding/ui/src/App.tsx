@@ -10,17 +10,15 @@ import { Nav } from "@components/nav";
 const supervisor = new Supervisor();
 
 export const App = () => {
+    const [changesMade, setChangesMade] = useState<boolean>(false);
     const [chainName, setChainName] = useState<string>("");
-    // const [logo, setLogo] = useState<string>("");
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
-    // const [res, setRes] = useState<string>("");
-    // const [queriedChainName, setQueriedChainName] = useState<string>("");
     const fileInput = useRef<HTMLInputElement>(null);
 
     const init = async () => {
         await supervisor.onLoaded();
-        // supervisor.preLoadPlugins([{ service: "branding" }]);
-        getChainName();
+        supervisor.preLoadPlugins([{ service: "branding" }]);
+        setTimeout(getChainName, 1000);
     };
 
     useEffect(() => {
@@ -35,20 +33,13 @@ export const App = () => {
             params: [],
         })) as string;
         console.info("ui: queried chain and got name:", queriedChainName);
-        // setQueriedChainName(queriedChainName);
         setChainName(queriedChainName);
     };
-    const pushNewStuff: React.MouseEventHandler<HTMLButtonElement> = async (
+    const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
         e,
     ) => {
         e.preventDefault();
         try {
-            // console.info("ui: calling setLogo with arg:");
-            // console.info(
-            //     logoBytes.length,
-            //     "; ",
-            //     logoBytes.slice(0, 10).toString(),
-            // );
             let res = await supervisor.functionCall({
                 service: "accounts",
                 intf: "accounts",
@@ -56,7 +47,6 @@ export const App = () => {
                 params: ["branding"],
             });
 
-            // console.info("ui:chainName: ", chainName);
             if (chainName) {
                 res = await supervisor.functionCall({
                     service: "branding",
@@ -66,13 +56,14 @@ export const App = () => {
                 });
             }
 
-            res = await supervisor.functionCall({
-                service: "branding",
-                intf: "api",
-                method: "setLogo",
-                params: [logoBytes],
-            });
-            // setRes(res as string);
+            if (logoBytes.length) {
+                res = await supervisor.functionCall({
+                    service: "branding",
+                    intf: "api",
+                    method: "setLogo",
+                    params: [logoBytes],
+                });
+            }
         } catch (e) {
             if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
@@ -97,18 +88,9 @@ export const App = () => {
             }
             const bytes = new Uint8Array(reader.result as ArrayBuffer);
             setLogoBytes(bytes);
-            // Convert the byte data to hexadecimal string
-            const hexString: string = Array.from(bytes)
-                .map((x) => x.toString(16).padStart(2, "0"))
-                .join("");
-
-            // const readerResult = reader.result?.toString() || "";
-            // const buffer = Buffer.from(readerResult, "hex");
-            // const encodedHexString = buffer.toString("base64");
-            // console.info("ui: hexString:", hexString);
-            // setLogo(hexString);
         };
         reader.readAsArrayBuffer(file);
+        setChangesMade(true);
     };
 
     const openFileClick = () => {
@@ -118,35 +100,27 @@ export const App = () => {
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Branding Page" />
-            <form>
-                <div className="mt-6 font-medium">
-                    <Label htmlFor="chainName">Chain Name</Label>
-                    <Input
-                        id="chainName"
-                        onChange={(e) => setChainName(e.target.value)}
-                        value={chainName}
-                    />
-                </div>
-                <div className="mt-6 font-medium">
-                    <Label htmlFor="logoPath">Logo</Label>
-                    <div>
+            <Nav title="Chain Branding Page" />
+            <form className="mx-auto grid max-w-screen-md grid-cols-6">
+                <div className="col-span-6 mt-6 grid grid-cols-6">
+                    <div className="col-span-2">
+                        <Label htmlFor="logoPath">Logo</Label>
+                        <div>Size: 96px x 96px</div>
+                    </div>
+                    <div className="col-span-4">
                         <img
                             src={siblingUrl(
                                 null,
                                 "branding",
                                 "/chain_logo.svg",
                             )}
-                            className="b-1 h-24 w-24 border-solid border-gray-200"
+                            className="b-1 col-span-3 h-24 w-24 border-solid border-gray-200"
                             onClick={openFileClick}
                         />
-                        {/* <Input
-                            id="logoPath"
-                            onChange={(e) => setLogo(e.target.value)}
-                            value={logo}
-                        /> */}
+                        <div className="text-extralight text-sm">
+                            Click logo to replace.
+                        </div>
                     </div>
-                    <div>Size: 96px x 96px</div>
 
                     <Input
                         id="logo-file"
@@ -156,15 +130,31 @@ export const App = () => {
                         ref={fileInput}
                     />
                 </div>
-                <div className="mt-6 font-medium">
-                    <Button type="submit" onClick={pushNewStuff}>
+                <div className="col-span-6 mt-6 grid grid-cols-6">
+                    <Label htmlFor="chainName" className="col-span-2">
+                        Chain name
+                    </Label>
+                    <Input
+                        id="chainName"
+                        className="col-span-4"
+                        onChange={(e) => {
+                            setChainName(e.target.value);
+                            setChangesMade(true);
+                        }}
+                        value={chainName}
+                    />
+                </div>
+                <div className="relative col-span-6 mt-6 font-medium">
+                    <Button
+                        type="submit"
+                        className="absolute right-0"
+                        disabled={!changesMade}
+                        onClick={updateAssets}
+                    >
                         Save
                     </Button>
                 </div>
             </form>
-            {/* <Button type="button" onClick={() => getChainName()}>
-                getChainName
-            </Button> */}
         </div>
     );
 };

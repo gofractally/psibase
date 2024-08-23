@@ -24,7 +24,7 @@ export const Nav = ({ title }: { title?: string }) => {
                 <HoverBorderGradientDemo />
             </a>
             {title && (
-                <div className="font-xl flex flex-col justify-center font-semibold">
+                <div className="flex flex-col justify-center text-2xl font-semibold">
                     {title}
                 </div>
             )}

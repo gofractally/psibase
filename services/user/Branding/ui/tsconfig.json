@@ -34,18 +34,6 @@
             "@lib/*": [
                 "src/lib/*"
             ],
-            "@hooks": [
-                "src/hooks"
-            ],
-            "@hooks/*": [
-                "src/hooks/*"
-            ],
-            "@routes": [
-                "src/routes"
-            ],
-            "@routes/*": [
-                "src/routes/*"
-            ],
             "@/*": [
                 "./src/*"
             ]
