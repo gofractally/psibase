@@ -7,6 +7,7 @@
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
 #include <services/system/Producers.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifyK1.hpp>
 
@@ -82,9 +83,14 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
                                                .code    = readWholeFile("Transact.wasm"),
                                            },
                                            {
+                                               .service = RTransact::service,
+                                               .flags   = 0,
+                                               .code    = readWholeFile("RTransact.wasm"),
+                                           },
+                                           {
                                                .service = CpuLimit::service,
                                                .flags   = CpuLimit::serviceFlags,
-                                               .code    = readWholeFile("CpuLimit.wasm"),
+                                               .code    = readWholeFile("MockCpuLimit.wasm"),
                                            },
                                            {
                                                .service = Accounts::service,
