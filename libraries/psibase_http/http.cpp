@@ -1473,13 +1473,14 @@ namespace psibase::http
                   // Capture only the stream, not self, because after returning, there is
                   // no longer anything keeping the session alive
                   p->stream.async_accept(p->request,
-                                         [ptr = std::move(ptr)](const std::error_code& ec)
-                                         {
-                                            if (!ec)
-                                            {
-                                               ptr->next(std::move(ptr->stream));
-                                            }
-                                         });
+                                         std::function<void(const std::error_code&)>(
+                                             [ptr = std::move(ptr)](const std::error_code& ec)
+                                             {
+                                                if (!ec)
+                                                {
+                                                   ptr->next(std::move(ptr->stream));
+                                                }
+                                             }));
                }
             };
 
