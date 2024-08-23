@@ -14,6 +14,10 @@ const psibase = (service: string, isServing?: boolean) => {
             find: /^\/common(?!\/(?:fonts))(.*)$/,
             replacement: path.resolve("../../CommonApi/common/resources$1"),
         },
+        {
+            find: "@",
+            replacement: path.resolve(__dirname, "./src"),
+        }
     ];
 
     // if we're in dev mode, we need to alias the common-lib to the local source

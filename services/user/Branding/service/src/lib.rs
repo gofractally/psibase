@@ -11,7 +11,7 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ChainNameTable")]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ChainName {
         pub name: String,
     }
@@ -28,9 +28,7 @@ mod service {
 
     #[action]
     fn set_chain_name(name: String) {
-        // save name to singleton
-        let chain_name_table = ChainNameTable::new();
-        chain_name_table
+        ChainNameTable::new()
             .put(&ChainName { name: name.clone() })
             .unwrap();
 
@@ -45,13 +43,11 @@ mod service {
     #[Object]
     impl Query {
         async fn chain_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
-            // let n = ChainNameTable::new()
-            //     .get_index_pk()
-            //     .get(&SingletonKey {})
-            //     .unwrap()
-            //     .name;
-            // println!("Returning name: {}", n);
-            Ok(String::from("psibasename"))
+            Ok(ChainNameTable::new()
+                .get_index_pk()
+                .get(&SingletonKey {})
+                .unwrap()
+                .name)
         }
     }
 

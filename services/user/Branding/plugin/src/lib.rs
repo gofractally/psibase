@@ -30,23 +30,18 @@ impl Api for BrandingPlugin {
     }
 }
 
-// #[derive(serde::Deserialize)]
-// struct ChainName {
-//     name: String,
-// }
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 #[allow(non_snake_case)]
 struct ChainNameData {
     chainName: String,
 }
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct ChainNameResponse {
     data: ChainNameData,
 }
 
 impl Queries for BrandingPlugin {
     fn get_chain_name() -> Result<String, Error> {
-        // return String::from("chainName");
         let graphql_str = format!("query {{ chainName }}");
         let summary_val = serde_json::from_str::<ChainNameResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,

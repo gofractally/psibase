@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@shadcn/button";
 import { Label } from "@shadcn/label";
 import { Input } from "@shadcn/input";
 
-import { Supervisor } from "@psibase/common-lib";
+import { siblingUrl, Supervisor } from "@psibase/common-lib";
+import { Nav } from "@components/nav";
 
 const supervisor = new Supervisor();
 
@@ -14,6 +15,7 @@ export const App = () => {
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const [res, setRes] = useState<string>("");
     const [queriedChainName, setQueriedChainName] = useState<string>("");
+    const fileInput = useRef<HTMLInputElement>(null);
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -41,12 +43,12 @@ export const App = () => {
     ) => {
         e.preventDefault();
         try {
-            console.info("ui: calling setLogo with arg:");
-            console.info(
-                logoBytes.length,
-                "; ",
-                logoBytes.slice(0, 10).toString(),
-            );
+            // console.info("ui: calling setLogo with arg:");
+            // console.info(
+            //     logoBytes.length,
+            //     "; ",
+            //     logoBytes.slice(0, 10).toString(),
+            // );
             let res = await supervisor.functionCall({
                 service: "accounts",
                 intf: "accounts",
@@ -54,6 +56,7 @@ export const App = () => {
                 params: ["branding"],
             });
 
+            // console.info("ui:chainName: ", chainName);
             if (chainName) {
                 res = await supervisor.functionCall({
                     service: "branding",
@@ -108,30 +111,60 @@ export const App = () => {
         reader.readAsArrayBuffer(file);
     };
 
+    const openFileClick = () => {
+        if (!fileInput.current) return;
+        fileInput.current.click();
+    };
+
     return (
-        <>
-            <div>Branding Page</div>
+        <div className="mx-auto h-screen w-screen max-w-screen-lg">
+            <Nav title="Branding Page" />
             <form>
-                <Label htmlFor="chainName">Chain Name:</Label>
-                <Input
-                    id="chainName"
-                    onChange={(e) => setChainName(e.target.value)}
-                    value={chainName}
-                />
-                <Label htmlFor="logoPath">Logo:</Label>
-                <Input
-                    id="logoPath"
-                    onChange={(e) => setLogo(e.target.value)}
-                    value={logo}
-                />
-                <Input type="file" onChange={handleFileChange} />
-                <Button type="submit" onClick={pushNewStuff}>
-                    Save
-                </Button>
+                <div className="mt-6 font-medium">
+                    <Label htmlFor="chainName">Chain Name</Label>
+                    <Input
+                        id="chainName"
+                        onChange={(e) => setChainName(e.target.value)}
+                        value={chainName}
+                    />
+                </div>
+                <div className="mt-6 font-medium">
+                    <Label htmlFor="logoPath">Logo</Label>
+                    <div>
+                        <img
+                            src={siblingUrl(
+                                null,
+                                "branding",
+                                "/chain_logo.svg",
+                            )}
+                            className="b-1 h-24 w-24 border-solid border-gray-200"
+                            onClick={openFileClick}
+                        />
+                        <Input
+                            id="logoPath"
+                            onChange={(e) => setLogo(e.target.value)}
+                            value={logo}
+                        />
+                    </div>
+                    <div>Size: 96px x 96px</div>
+
+                    <Input
+                        id="logo-file"
+                        type="file"
+                        className="invisible"
+                        onChange={handleFileChange}
+                        ref={fileInput}
+                    />
+                </div>
+                <div className="mt-6 font-medium">
+                    <Button type="submit" onClick={pushNewStuff}>
+                        Save
+                    </Button>
+                </div>
             </form>
             <Button type="button" onClick={getChainName}>
                 getChainName
             </Button>
-        </>
+        </div>
     );
 };

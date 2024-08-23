@@ -1,96 +1,36 @@
-import { LucideIcon } from "lucide-react";
+import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { SettingsDropdown } from "@/components/settings-dropdown";
+import { siblingUrl } from "@psibase/common-lib";
 
-import { cn } from "../lib/utils";
-import { buttonVariants } from "../shad/components/ui/button";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "../shad/components/ui/tooltip";
-
-interface NavProps {
-    isCollapsed: boolean;
-    links: {
-        title: string;
-        label?: string;
-        icon: LucideIcon;
-        variant: "default" | "ghost";
-        href: string;
-    }[];
-}
-
-export function Nav({ links, isCollapsed }: NavProps) {
+function HoverBorderGradientDemo() {
     return (
-        <div
-            data-collapsed={isCollapsed}
-            className="group flex flex-col gap-4 py-2 data-[collapsed=true]:py-2"
-        >
-            <nav className="grid gap-1 px-2 group-[[data-collapsed=true]]:justify-center group-[[data-collapsed=true]]:px-2">
-                {links.map((link, index) =>
-                    isCollapsed ? (
-                        <Tooltip key={index} delayDuration={0}>
-                            <TooltipTrigger asChild>
-                                <a
-                                    href={link.href}
-                                    className={cn(
-                                        buttonVariants({
-                                            variant: link.variant,
-                                            size: "icon",
-                                        }),
-                                        "h-9 w-9",
-                                        link.variant === "default" &&
-                                            "dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white",
-                                    )}
-                                >
-                                    <link.icon className="h-4 w-4" />
-                                    <span className="sr-only">
-                                        {link.title}
-                                    </span>
-                                </a>
-                            </TooltipTrigger>
-                            <TooltipContent
-                                side="right"
-                                className="flex items-center gap-4"
-                            >
-                                {link.title}
-                                {link.label && (
-                                    <span className="ml-auto text-muted-foreground">
-                                        {link.label}
-                                    </span>
-                                )}
-                            </TooltipContent>
-                        </Tooltip>
-                    ) : (
-                        <a
-                            key={index}
-                            href={link.href}
-                            className={cn(
-                                buttonVariants({
-                                    variant: link.variant,
-                                    size: "sm",
-                                }),
-                                link.variant === "default" &&
-                                    "dark:bg-muted dark:text-white dark:hover:bg-muted dark:hover:text-white",
-                                "justify-start",
-                            )}
-                        >
-                            <link.icon className="mr-2 h-4 w-4" />
-                            {link.title}
-                            {link.label && (
-                                <span
-                                    className={cn(
-                                        "ml-auto",
-                                        link.variant === "default" &&
-                                            "text-background dark:text-white",
-                                    )}
-                                >
-                                    {link.label}
-                                </span>
-                            )}
-                        </a>
-                    ),
-                )}
-            </nav>
+        <div className=" flex justify-center text-center">
+            <HoverBorderGradient
+                as="div"
+                containerClassName="rounded-full"
+                className="flex items-center space-x-2 bg-white text-black dark:bg-black dark:text-white"
+            >
+                <span>psibase</span>
+            </HoverBorderGradient>
         </div>
     );
 }
+
+export const Nav = ({ title }: { title?: string }) => {
+    const home = siblingUrl();
+    return (
+        <div className="mt-4 flex w-full justify-between px-2">
+            <a href={home}>
+                <HoverBorderGradientDemo />
+            </a>
+            {title && (
+                <div className="font-xl flex flex-col justify-center font-semibold">
+                    {title}
+                </div>
+            )}
+            <div>
+                <SettingsDropdown />
+            </div>
+        </div>
+    );
+};
