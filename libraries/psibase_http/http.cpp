@@ -156,14 +156,14 @@ namespace psibase::http
    }
 
    // This queue is used for HTTP pipelining.
-   class queue_base
+   class http_session_base : public std::enable_shared_from_this<http_session_base>
    {
      protected:
-      using message_type = bhttp::response<bhttp::vector_body<char>>;
-      using request_type = bhttp::request<bhttp::vector_body<char>>;
-      ~queue_base()      = default;
+      using message_type   = bhttp::response<bhttp::vector_body<char>>;
+      using request_type   = bhttp::request<bhttp::vector_body<char>>;
+      ~http_session_base() = default;
 
-      queue_base()
+      http_session_base(server_impl& server) : server(server)
       {
          static_assert(limit > 0, "queue limit must be positive");
          items.reserve(limit);
@@ -184,6 +184,63 @@ namespace psibase::http
 
       std::vector<std::unique_ptr<work>> items;
 
+      void start_socket_timer()
+      {
+         auto self = shared_from_this();
+         auto usec = server.http_config->idle_timeout_us.load();
+         if (usec < 0)
+            return;
+         _expiration = steady_clock::now() + std::chrono::microseconds{usec};
+         _timer->expires_at(_expiration);
+         _timer->async_wait(
+             [this, self = std::move(self)](beast::error_code ec) mutable
+             {
+                if (ec || _closed)
+                {
+                   return;
+                }
+                if (steady_clock::now() >= _expiration)
+                {
+                   beast::error_code ec;
+                   close_impl(ec);
+                   if (ec)
+                   {
+                      PSIBASE_LOG(logger, warning) << "close: " << ec.message();
+                   }
+                   else
+                   {
+                      PSIBASE_LOG(logger, info) << "Idle connection closed";
+                   }
+                   _closed = true;
+                }
+             });
+      }
+
+      void stop_socket_timer()
+      {
+         _expiration = steady_clock::time_point::max();
+         _timer->cancel();
+      }
+
+      beast::flat_buffer                 buffer;
+      std::unique_ptr<net::steady_timer> _timer;
+      bool                               _closed = false;
+      steady_clock::time_point           _expiration;
+
+      // The parser is stored in an optional container so we can
+      // construct it from scratch it at the beginning of each new message.
+      boost::optional<bhttp::request_parser<bhttp::vector_body<char>>> parser;
+
+     public:
+      server_impl& server;
+
+      psibase::loggers::common_logger logger;
+      using scoped_attribute = decltype(boost::log::add_scoped_logger_attribute(
+          logger,
+          std::string(),
+          boost::log::attributes::constant{std::string()}));
+      std::optional<std::tuple<scoped_attribute, scoped_attribute, scoped_attribute>> request_attrs;
+
      public:
       bool pause_read = false;
 
@@ -192,14 +249,96 @@ namespace psibase::http
       bool can_read() const { return !is_full() && !pause_read; }
       bool is_empty() const { return items.empty(); }
 
-      virtual void do_read()                                                                   = 0;
-      virtual void operator()(message_type&& msg)                                              = 0;
-      virtual void operator()(websocket_upgrade, request_type&& msg, accept_p2p_websocket_t f) = 0;
-      virtual std::shared_ptr<queue_base> shared_from_this()                                   = 0;
-      virtual bool                        check_access(const authz_loopback&) const            = 0;
-      virtual bool                        check_access(const authz_ip&) const                  = 0;
-      virtual loggers::common_logger&     logger()                                             = 0;
-      virtual void                        post(std::function<void()>)                          = 0;
+      // Called when a message finishes sending
+      // Returns `true` if the caller should initiate a read
+      bool on_write()
+      {
+         BOOST_ASSERT(!items.empty());
+         const auto was_full = is_full();
+         items.erase(items.begin());
+         if (items.empty() && pause_read)
+            stop_socket_timer();
+         else
+            start_socket_timer();
+         if (!items.empty())
+            (*items.front())();
+         return was_full && !pause_read;
+      }
+
+      // Called by the HTTP handler to send a response.
+      void operator()(message_type&& msg)
+      {
+         // This holds a work item
+         struct work_impl : work
+         {
+            http_session_base& self;
+            message_type       msg;
+
+            work_impl(http_session_base& self, message_type&& msg) : self(self), msg(std::move(msg))
+            {
+            }
+
+            void operator()() { self.write_response(std::move(msg)); }
+         };
+
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseStatus",
+                                        static_cast<unsigned>(msg.result_int()));
+            BOOST_LOG_SCOPED_LOGGER_ATTR(logger, "ResponseBytes",
+                                         boost::log::attributes::constant<std::uint64_t>(
+                                             msg.payload_size() ? *msg.payload_size() : 0));
+            PSIBASE_LOG(logger, info) << "Handled HTTP request";
+            request_attrs.reset();
+         }
+
+         // Allocate and store the work
+         items.push_back(boost::make_unique<work_impl>(*this, std::move(msg)));
+
+         // If there was no previous work, start this one
+         if (items.size() == 1)
+         {
+            start_socket_timer();
+            (*items.front())();
+         }
+      }
+
+      void operator()(websocket_upgrade, request_type&& msg, accept_p2p_websocket_t f)
+      {
+         struct work_impl : work
+         {
+            http_session_base&     self;
+            request_type           request;
+            accept_p2p_websocket_t next;
+
+            work_impl(http_session_base& self, request_type&& msg, accept_p2p_websocket_t&& f)
+                : self(self), request(std::move(msg)), next(std::move(f))
+            {
+            }
+            void operator()() { self.accept_websocket(std::move(request), std::move(next)); }
+         };
+
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseStatus",
+                                        static_cast<unsigned>(bhttp::status::switching_protocols));
+            PSIBASE_LOG(logger, info) << "Handled HTTP request";
+            request_attrs.reset();
+         }
+
+         // Allocate and store the work
+         items.push_back(boost::make_unique<work_impl>(*this, std::move(msg), std::move(f)));
+
+         // If there was no previous work, start this one
+         if (items.size() == 1)
+            (*items.front())();
+      }
+
+      virtual void write_response(message_type&& msg)                                      = 0;
+      virtual void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) = 0;
+      virtual void do_read()                                                               = 0;
+      virtual bool check_access(const authz_loopback&) const                               = 0;
+      virtual bool check_access(const authz_ip&) const                                     = 0;
+      virtual void post(std::function<void()>)                                             = 0;
+      virtual void close_impl(beast::error_code& ec)                                       = 0;
    };
 
    template <typename T>
@@ -267,10 +406,10 @@ namespace psibase::http
    // Returns the access mode and an indication of whether the request contains
    // an explicit authorization. The result access mode will not be greater than
    // the argument.
-   std::pair<authz::mode_type, bool> get_access_impl(const auto&       req,
-                                                     const queue_base& session,
-                                                     const auto&       auth,
-                                                     authz::mode_type  mode)
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&              req,
+                                                     const http_session_base& session,
+                                                     const auto&              auth,
+                                                     authz::mode_type         mode)
    {
       if constexpr (requires { session.check_access(auth); })
       {
@@ -288,17 +427,17 @@ namespace psibase::http
          return {authz::none, false};
       }
    }
-   std::pair<authz::mode_type, bool> get_access_impl(const auto&       req,
-                                                     const queue_base& session,
-                                                     const authz_any&  auth,
-                                                     authz::mode_type  mode)
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&              req,
+                                                     const http_session_base& session,
+                                                     const authz_any&         auth,
+                                                     authz::mode_type         mode)
    {
       return {mode, false};
    }
-   std::pair<authz::mode_type, bool> get_access_impl(const auto&         req,
-                                                     const queue_base&   session,
-                                                     const authz_bearer& auth,
-                                                     authz::mode_type    mode)
+   std::pair<authz::mode_type, bool> get_access_impl(const auto&              req,
+                                                     const http_session_base& session,
+                                                     const authz_bearer&      auth,
+                                                     authz::mode_type         mode)
    {
       auto             authorization_b = req[bhttp::field::authorization];
       std::string_view authorization{authorization_b.data(), authorization_b.size()};
@@ -323,7 +462,9 @@ namespace psibase::http
       return {authz::none, false};
    }
 
-   std::pair<authz::mode_type, bool> get_access(server_impl& server, auto& req, queue_base& session)
+   std::pair<authz::mode_type, bool> get_access(server_impl&       server,
+                                                auto&              req,
+                                                http_session_base& session)
    {
       std::pair<authz::mode_type, bool> result{authz::none, false};
       for (const authz& auth : server.http_config->admin_authz)
@@ -431,7 +572,7 @@ namespace psibase::http
    template <typename F, typename E>
    struct HttpSocket : AutoCloseSocket, std::enable_shared_from_this<HttpSocket<F, E>>
    {
-      explicit HttpSocket(std::shared_ptr<queue_base>&& session, F&& f, E&& err)
+      explicit HttpSocket(std::shared_ptr<http_session_base>&& session, F&& f, E&& err)
           : session(std::move(session)), callback(std::forward<F>(f)), err(std::forward<E>(err))
       {
          this->session->pause_read = true;
@@ -461,7 +602,7 @@ namespace psibase::http
                 session->pause_read = false;
                 {
                    auto  endTime = steady_clock::now();
-                   auto& logger  = session->logger();
+                   auto& logger  = session->logger;
                    BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
 
                    // TODO: consider bundling into a single attribute
@@ -480,15 +621,15 @@ namespace psibase::http
                    session->do_read();
              });
       }
-      std::shared_ptr<queue_base> session;
-      F                           callback;
-      E                           err;
-      TransactionTrace            trace;
-      QueryTimes                  queryTimes;
+      std::shared_ptr<http_session_base> session;
+      F                                  callback;
+      E                                  err;
+      TransactionTrace                   trace;
+      QueryTimes                         queryTimes;
    };
 
    template <typename F, typename E>
-   auto makeHttpSocket(queue_base& send, F&& f, E&& e)
+   auto makeHttpSocket(http_session_base& send, F&& f, E&& e)
    {
       return std::make_shared<HttpSocket<std::decay_t<F>, std::decay_t<E>>>(
           send.shared_from_this(), std::forward<F>(f), std::forward<E>(e));
@@ -501,7 +642,7 @@ namespace psibase::http
    template <class Body, class Allocator>
    void handle_request(server_impl&                                           server,
                        bhttp::request<Body, bhttp::basic_fields<Allocator>>&& req,
-                       queue_base&                                            send)
+                       http_session_base&                                     send)
    {
       auto [req_host, req_target] = parse_request_target(req);
       unsigned req_version        = req.version();
@@ -917,7 +1058,7 @@ namespace psibase::http
             if (!tc.ownedSockets.owns(*system->sockets, *socket))
             {
                auto  error  = trace.error;
-               auto& logger = send.logger();
+               auto& logger = send.logger;
                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
                if (error)
                   PSIBASE_LOG(logger, warning)
@@ -1385,176 +1526,55 @@ namespace psibase::http
 
    // Handles an HTTP server connection
    template <typename SessionType>
-   class http_session
+   class http_session : public http_session_base
    {
-      // This queue is used for HTTP pipelining.
-      class queue : public queue_base
-      {
-        public:
-         http_session& self;
-
-         explicit queue(http_session& self) : self(self) {}
-
-         // Called when a message finishes sending
-         // Returns `true` if the caller should initiate a read
-         bool on_write()
-         {
-            BOOST_ASSERT(!items.empty());
-            const auto was_full = is_full();
-            items.erase(items.begin());
-            if (items.empty() && pause_read)
-               self.stop_socket_timer();
-            else
-               self.start_socket_timer(self.derived_session().shared_from_this());
-            if (!items.empty())
-               (*items.front())();
-            return was_full && !pause_read;
-         }
-
-         virtual void do_read() override { self.do_read(); }
-
-         virtual std::shared_ptr<queue_base> shared_from_this() override
-         {
-            return std::shared_ptr<queue_base>(self.derived_session().shared_from_this(), this);
-         }
-
-         virtual bool check_access(const authz_loopback& addr) const override
-         {
-            return self.derived_session().check_access(addr);
-         }
-         virtual bool check_access(const authz_ip& addr) const override
-         {
-            return self.derived_session().check_access(addr);
-         }
-         virtual loggers::common_logger& logger() override { return self.logger; }
-         virtual void                    post(std::function<void()> f) override
-         {
-            net::post(self.derived_session().stream.get_executor(), std::move(f));
-         }
-
-         // Called by the HTTP handler to send a response.
-         void operator()(message_type&& msg) override
-         {
-            // This holds a work item
-            struct work_impl : work
-            {
-               http_session& self;
-               message_type  msg;
-
-               work_impl(http_session& self, message_type&& msg) : self(self), msg(std::move(msg))
-               {
-               }
-
-               void operator()()
-               {
-                  bhttp::async_write(
-                      self.derived_session().stream, msg,
-                      beast::bind_front_handler(&http_session::on_write,
-                                                self.derived_session().shared_from_this(),
-                                                msg.need_eof()));
-               }
-            };
-
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(self.logger, "ResponseStatus",
-                                           static_cast<unsigned>(msg.result_int()));
-               BOOST_LOG_SCOPED_LOGGER_ATTR(self.logger, "ResponseBytes",
-                                            boost::log::attributes::constant<std::uint64_t>(
-                                                msg.payload_size() ? *msg.payload_size() : 0));
-               PSIBASE_LOG(self.logger, info) << "Handled HTTP request";
-               self.request_attrs.reset();
-            }
-
-            // Allocate and store the work
-            items.push_back(boost::make_unique<work_impl>(self, std::move(msg)));
-
-            // If there was no previous work, start this one
-            if (items.size() == 1)
-            {
-               self.start_socket_timer(self.derived_session().shared_from_this());
-               (*items.front())();
-            }
-         }
-         void operator()(websocket_upgrade, request_type&& msg, accept_p2p_websocket_t f) override
-         {
-            struct work_impl : work
-            {
-               http_session&          self;
-               request_type           request;
-               accept_p2p_websocket_t next;
-
-               work_impl(http_session& self, request_type&& msg, accept_p2p_websocket_t&& f)
-                   : self(self), request(std::move(msg)), next(std::move(f))
-               {
-               }
-               void operator()()
-               {
-                  struct op
-                  {
-                     request_type                                               request;
-                     websocket::stream<decltype(self.derived_session().stream)> stream;
-                     accept_p2p_websocket_t                                     next;
-                  };
-
-                  auto ptr =
-                      std::make_shared<op>(op{std::move(request),
-                                              websocket::stream<decltype(self.move_stream())>{
-                                                  std::move(self.move_stream())},
-                                              std::move(next)});
-
-                  auto p = ptr.get();
-                  // Capture only the stream, not self, because after returning, there is
-                  // no longer anything keeping the session alive
-                  p->stream.async_accept(p->request,
-                                         std::function<void(const std::error_code&)>(
-                                             [ptr = std::move(ptr)](const std::error_code& ec)
-                                             {
-                                                if (!ec)
-                                                {
-                                                   ptr->next(std::move(ptr->stream));
-                                                }
-                                             }));
-               }
-            };
-
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(
-                   self.logger, "ResponseStatus",
-                   static_cast<unsigned>(bhttp::status::switching_protocols));
-               PSIBASE_LOG(self.logger, info) << "Handled HTTP request";
-               self.request_attrs.reset();
-            }
-
-            // Allocate and store the work
-            items.push_back(boost::make_unique<work_impl>(self, std::move(msg), std::move(f)));
-
-            // If there was no previous work, start this one
-            if (items.size() == 1)
-               (*items.front())();
-         }
-      };
-
-      beast::flat_buffer                 buffer;
-      std::unique_ptr<net::steady_timer> _timer;
-      bool                               _closed = false;
-      steady_clock::time_point           _expiration;
-
-      // The parser is stored in an optional container so we can
-      // construct it from scratch it at the beginning of each new message.
-      boost::optional<bhttp::request_parser<bhttp::vector_body<char>>> parser;
-
      public:
-      server_impl& server;
-      queue        queue_;
+      std::shared_ptr<SessionType> shared_from_this()
+      {
+         return std::static_pointer_cast<SessionType>(http_session_base::shared_from_this());
+      }
 
-      psibase::loggers::common_logger logger;
-      using scoped_attribute = decltype(boost::log::add_scoped_logger_attribute(
-          logger,
-          std::string(),
-          boost::log::attributes::constant{std::string()}));
-      std::optional<std::tuple<scoped_attribute, scoped_attribute, scoped_attribute>> request_attrs;
+      virtual void post(std::function<void()> f) override
+      {
+         net::post(derived_session().stream.get_executor(), std::move(f));
+      }
 
-      http_session(server_impl& server) : server(server), queue_(*this)
+      void write_response(message_type&& msg) override
+      {
+         bhttp::async_write(
+             derived_session().stream, msg,
+             beast::bind_front_handler(&http_session::on_write,
+                                       derived_session().shared_from_this(), msg.need_eof()));
+      }
+      void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) override
+      {
+         using ws_type = websocket::stream<decltype(derived_session().stream)>;
+         struct op
+         {
+            request_type           request;
+            ws_type                stream;
+            accept_p2p_websocket_t next;
+         };
+
+         auto ptr = std::make_shared<op>(
+             op{std::move(request),
+                websocket::stream<decltype(move_stream())>{std::move(move_stream())},
+                std::move(next)});
+
+         auto p = ptr.get();
+         // Capture only the stream, not self, because after returning, there is
+         // no longer anything keeping the session alive
+         p->stream.async_accept(p->request, std::function<void(const std::error_code&)>(
+                                                [ptr = std::move(ptr)](const std::error_code& ec)
+                                                {
+                                                   if (!ec)
+                                                   {
+                                                      ptr->next(std::move(ptr->stream));
+                                                   }
+                                                }));
+      }
+
+      http_session(server_impl& server) : http_session_base(server)
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
       }
@@ -1566,7 +1586,7 @@ namespace psibase::http
       {
          PSIBASE_LOG(logger, debug) << "Accepted connection";
          _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
-         start_socket_timer(derived_session().shared_from_this());
+         start_socket_timer();
          do_read();
       }
 
@@ -1580,45 +1600,8 @@ namespace psibase::http
          return result;
       }
 
-      void start_socket_timer(std::shared_ptr<SessionType>&& self)
-      {
-         auto usec = server.http_config->idle_timeout_us.load();
-         if (usec < 0)
-            return;
-         _expiration = steady_clock::now() + std::chrono::microseconds{usec};
-         _timer->expires_at(_expiration);
-         _timer->async_wait(
-             [this, self = std::move(self)](beast::error_code ec) mutable
-             {
-                if (ec || _closed)
-                {
-                   return;
-                }
-                if (steady_clock::now() >= _expiration)
-                {
-                   beast::error_code ec;
-                   derived_session().close_impl(ec);
-                   if (ec)
-                   {
-                      PSIBASE_LOG(logger, warning) << "close: " << ec.message();
-                   }
-                   else
-                   {
-                      PSIBASE_LOG(logger, info) << "Idle connection closed";
-                   }
-                   _closed = true;
-                }
-             });
-      }
-
-      void stop_socket_timer()
-      {
-         _expiration = steady_clock::time_point::max();
-         _timer->cancel();
-      }
-
      public:
-      void do_read()
+      void do_read() override
       {
          // Construct a new parser for each message
          parser.emplace();
@@ -1666,19 +1649,19 @@ namespace psibase::http
          }
 
          // Send the response
-         handle_request(server, parser->release(), queue_);
+         handle_request(server, parser->release(), *this);
 
          // The queue being empty means that we're waiting for the
          // request to be processed asynchronously, and there are
          // no pending writes.
-         if (queue_.is_empty())
+         if (is_empty())
          {
-            assert(!queue_.can_read());
+            assert(!can_read());
             stop_socket_timer();
          }
 
          // If we aren't at the queue limit, try to pipeline another request
-         if (queue_.can_read())
+         if (can_read())
             do_read();
       }
 
@@ -1703,7 +1686,7 @@ namespace psibase::http
          }
 
          // Inform the queue that a write completed
-         if (queue_.on_write())
+         if (http_session_base::on_write())
          {
             // Read another request
             do_read();
@@ -1752,11 +1735,9 @@ namespace psibase::http
             PSIBASE_LOG(logger, warning) << "close: " << ec.message();
          }
       }
-      void close_impl(beast::error_code& ec) { derived_session().stream.socket().close(ec); }
    };  // http_session
 
-   struct tcp_http_session : public http_session<tcp_http_session>,
-                             public std::enable_shared_from_this<tcp_http_session>
+   struct tcp_http_session : public http_session<tcp_http_session>
    {
       tcp_http_session(server_impl& server, tcp::socket&& socket)
           : http_session<tcp_http_session>(server), stream(std::move(socket))
@@ -1777,12 +1758,13 @@ namespace psibase::http
          return stream.socket().remote_endpoint().address() == addr.address;
       }
 
+      void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
+
       beast::tcp_stream stream;
    };
 
 #ifdef PSIBASE_ENABLE_SSL
-   struct tls_http_session : public http_session<tls_http_session>,
-                             public std::enable_shared_from_this<tls_http_session>
+   struct tls_http_session : public http_session<tls_http_session>
    {
       tls_http_session(server_impl& server, tcp::socket&& socket)
           : http_session<tls_http_session>(server),
@@ -1829,8 +1811,7 @@ namespace psibase::http
    };
 #endif
 
-   struct unix_http_session : public http_session<unix_http_session>,
-                              public std::enable_shared_from_this<unix_http_session>
+   struct unix_http_session : public http_session<unix_http_session>
    {
       unix_http_session(server_impl& server, unixs::socket&& socket)
           : http_session<unix_http_session>(server), stream(std::move(socket))
@@ -1841,6 +1822,8 @@ namespace psibase::http
 
       bool check_access(const authz_loopback& addr) const { return true; }
       bool check_access(const authz_ip& addr) const { return false; }
+
+      void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
 
       beast::basic_stream<unixs,
 #if BOOST_VERSION >= 107400
