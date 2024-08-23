@@ -11,6 +11,8 @@
 #include "psibase/log.hpp"
 #include "psibase/serviceEntry.hpp"
 
+#include "websocket_log_session.hpp"
+
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
@@ -158,99 +160,6 @@ namespace psibase::http
 
    template <typename R, typename... T>
    constexpr std::size_t function_arg_count<std::function<R(T...)>> = sizeof...(T);
-
-   // Reads log records from the queue and writes them to a websocket
-   template <typename StreamType>
-   class websocket_log_session
-   {
-     public:
-      explicit websocket_log_session(StreamType&& stream)
-          : reader(stream.get_executor()), stream(std::move(stream))
-      {
-      }
-      static void write(std::shared_ptr<websocket_log_session>&& self)
-      {
-         auto p = self.get();
-         p->reader.async_read(
-             [self = std::move(self)](const std::error_code& ec, std::span<const char> data) mutable
-             {
-                if (!ec && !self->closed)
-                {
-                   auto p = self.get();
-                   p->stream.async_write(
-                       boost::asio::buffer(data.data(), data.size()),
-                       [self = std::move(self)](const std::error_code& ec, std::size_t) mutable
-                       {
-                          if (!ec && !self->closed)
-                          {
-                             auto p = self.get();
-                             write(std::move(self));
-                          }
-                       });
-                }
-             });
-      }
-      static void read(std::shared_ptr<websocket_log_session>&& self)
-      {
-         auto p = self.get();
-         p->buffer.clear();
-         p->stream.async_read(
-             p->buffer,
-             [self = std::move(self)](const std::error_code& ec, std::size_t) mutable
-             {
-                if (!ec)
-                {
-                   auto data = self->buffer.cdata();
-                   try
-                   {
-                      self->reader.config({static_cast<const char*>(data.data()), data.size()});
-                   }
-                   catch (std::exception& e)
-                   {
-                      close(std::move(self), {websocket::close_code::policy_error, e.what()});
-                      return;
-                   }
-                   read(std::move(self));
-                }
-             });
-      }
-      static void run(std::shared_ptr<websocket_log_session>&& self)
-      {
-         read(std::shared_ptr(self));
-         write(std::move(self));
-      }
-
-      static void close(std::shared_ptr<websocket_log_session>&& self,
-                        websocket::close_reason                  reason)
-      {
-         if (!self->closed)
-         {
-            self->closed = true;
-            self->reader.cancel();
-            auto p = self.get();
-            p->stream.async_close(reason, [self = std::move(self)](const std::error_code&) {});
-         }
-      }
-
-      static void close(std::shared_ptr<websocket_log_session>&& self, bool restart)
-      {
-         auto p = self.get();
-         boost::asio::dispatch(
-             p->stream.get_executor(),
-             [restart, self = std::move(self)]() mutable
-             {
-                close(std::move(self),
-                      websocket::close_reason{restart ? websocket::close_code::service_restart
-                                                      : websocket::close_code::going_away});
-             });
-      }
-
-     private:
-      bool                        closed = false;
-      psibase::loggers::LogReader reader;
-      StreamType                  stream;
-      beast::flat_buffer          buffer;
-   };
 
    beast::string_view remove_scheme(beast::string_view origin)
    {
