@@ -141,6 +141,12 @@ namespace psibase::http
       }
    };  // server_impl
 
+   class http_session_base;
+   template <class Body, class Allocator>
+   void handle_request(server_impl&                                           server,
+                       bhttp::request<Body, bhttp::basic_fields<Allocator>>&& req,
+                       http_session_base&                                     send);
+
    void server_service::async_close(bool restart, std::function<void()> callback)
    {
       impl->thread_count.async_wait(std::move(callback));
@@ -220,6 +226,81 @@ namespace psibase::http
       {
          _expiration = steady_clock::time_point::max();
          _timer->cancel();
+      }
+
+      void on_read(beast::error_code ec, std::size_t bytes_transferred)
+      {
+         boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
+
+         // This means they closed the connection
+         if (ec == bhttp::error::end_of_stream)
+            return do_close();
+
+         if (ec)
+         {
+            fail(logger, ec, "read");
+            return close_on_error();
+         }
+
+         {
+            const auto& req = parser->get();
+            request_attrs.emplace(std::tuple{
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestMethod",
+                    boost::log::attributes::constant{std::string(req.method_string())}),
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestTarget",
+                    boost::log::attributes::constant{std::string(req.target())}),
+                boost::log::add_scoped_logger_attribute(
+                    logger, "RequestHost",
+                    boost::log::attributes::constant{std::string(req[bhttp::field::host])})});
+            PSIBASE_LOG(logger, debug) << "Received HTTP request";
+         }
+
+         // Send the response
+         handle_request(server, parser->release(), *this);
+
+         // The queue being empty means that we're waiting for the
+         // request to be processed asynchronously, and there are
+         // no pending writes.
+         if (is_empty())
+         {
+            assert(!can_read());
+            stop_socket_timer();
+         }
+
+         // If we aren't at the queue limit, try to pipeline another request
+         if (can_read())
+            do_read();
+      }
+
+      void do_close()
+      {
+         // Send a TCP shutdown
+         if (!_closed)
+         {
+            shutdown_impl();
+            _timer->cancel();  // cancel connection timer.
+            _closed = true;
+         }
+         // At this point the connection is closed gracefully
+      }
+      void close_on_error()
+      {
+         if (!_closed)
+         {
+            _timer->cancel();
+            beast::error_code ec;
+            close_impl(ec);
+            if (ec)
+            {
+               PSIBASE_LOG(logger, warning) << "close: " << ec.message();
+            }
+            _closed = true;
+         }
       }
 
       beast::flat_buffer                 buffer;
@@ -339,6 +420,7 @@ namespace psibase::http
       virtual bool check_access(const authz_ip&) const                                     = 0;
       virtual void post(std::function<void()>)                                             = 0;
       virtual void close_impl(beast::error_code& ec)                                       = 0;
+      virtual void shutdown_impl()                                                         = 0;
    };
 
    template <typename T>
@@ -1616,55 +1698,6 @@ namespace psibase::http
       }
 
      private:
-      void on_read(beast::error_code ec, std::size_t bytes_transferred)
-      {
-         boost::ignore_unused(bytes_transferred);
-
-         if (_closed)
-            return;
-
-         // This means they closed the connection
-         if (ec == bhttp::error::end_of_stream)
-            return do_close();
-
-         if (ec)
-         {
-            fail(logger, ec, "read");
-            return close_on_error();
-         }
-
-         {
-            const auto& req = parser->get();
-            request_attrs.emplace(std::tuple{
-                boost::log::add_scoped_logger_attribute(
-                    logger, "RequestMethod",
-                    boost::log::attributes::constant{std::string(req.method_string())}),
-                boost::log::add_scoped_logger_attribute(
-                    logger, "RequestTarget",
-                    boost::log::attributes::constant{std::string(req.target())}),
-                boost::log::add_scoped_logger_attribute(
-                    logger, "RequestHost",
-                    boost::log::attributes::constant{std::string(req[bhttp::field::host])})});
-            PSIBASE_LOG(logger, debug) << "Received HTTP request";
-         }
-
-         // Send the response
-         handle_request(server, parser->release(), *this);
-
-         // The queue being empty means that we're waiting for the
-         // request to be processed asynchronously, and there are
-         // no pending writes.
-         if (is_empty())
-         {
-            assert(!can_read());
-            stop_socket_timer();
-         }
-
-         // If we aren't at the queue limit, try to pipeline another request
-         if (can_read())
-            do_read();
-      }
-
       void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred)
       {
          boost::ignore_unused(bytes_transferred);
@@ -1694,34 +1727,8 @@ namespace psibase::http
       }
 
      public:
-      void do_close()
-      {
-         // Send a TCP shutdown
-         if (!_closed)
-         {
-            derived_session().shutdown_impl();
-            _timer->cancel();  // cancel connection timer.
-            _closed = true;
-         }
-         // At this point the connection is closed gracefully
-      }
-      void close_on_error()
-      {
-         if (!_closed)
-         {
-            _timer->cancel();
-            beast::error_code ec;
-            derived_session().close_impl(ec);
-            if (ec)
-            {
-               PSIBASE_LOG(logger, warning) << "close: " << ec.message();
-            }
-            _closed = true;
-         }
-      }
-
      protected:
-      void shutdown_impl()
+      void common_shutdown_impl()
       {
          beast::error_code ec;
          derived_session().stream.socket().shutdown(tcp::socket::shutdown_both, ec);
@@ -1759,6 +1766,7 @@ namespace psibase::http
       }
 
       void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
+      void shutdown_impl() { common_shutdown_impl(); }
 
       beast::tcp_stream stream;
    };
@@ -1824,6 +1832,7 @@ namespace psibase::http
       bool check_access(const authz_ip& addr) const { return false; }
 
       void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
+      void shutdown_impl() { common_shutdown_impl(); }
 
       beast::basic_stream<unixs,
 #if BOOST_VERSION >= 107400
