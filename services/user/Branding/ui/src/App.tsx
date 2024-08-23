@@ -14,6 +14,8 @@ export const App = () => {
     const [chainName, setChainName] = useState<string>("");
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const fileInput = useRef<HTMLInputElement>(null);
+    const [previewImgUrl, setPreviewImgUrl] = useState<string>("");
+    const [uploadStatus, setUploadStatus] = useState<string>("");
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -64,11 +66,17 @@ export const App = () => {
                     params: [logoBytes],
                 });
             }
+
+            setUploadStatus("Successful");
         } catch (e) {
             if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);
+                setUploadStatus(`Error: ${e.message}`);
             } else {
                 console.error(
+                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
+                );
+                setUploadStatus(
                     `Caught exception: ${JSON.stringify(e, null, 2)}`,
                 );
             }
@@ -90,6 +98,17 @@ export const App = () => {
             setLogoBytes(bytes);
         };
         reader.readAsArrayBuffer(file);
+
+        const reader2 = new FileReader();
+        reader2.onload = () => {
+            if (!reader2.result) {
+                console.error("no image selected");
+                return;
+            }
+            setPreviewImgUrl(reader2.result as string);
+        };
+        reader2.readAsDataURL(file);
+
         setChangesMade(true);
     };
 
@@ -102,23 +121,54 @@ export const App = () => {
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav title="Chain Branding Page" />
             <form className="mx-auto grid max-w-screen-md grid-cols-6">
+                <div
+                    className={
+                        uploadStatus === "Successful"
+                            ? "text-green-500"
+                            : "text-red-500"
+                    }
+                >
+                    {uploadStatus}
+                </div>
                 <div className="col-span-6 mt-6 grid grid-cols-6">
                     <div className="col-span-2">
-                        <Label htmlFor="logoPath">Logo</Label>
-                        <div>Size: 96px x 96px</div>
+                        <Label htmlFor="logoPath" className="block h-24 w-24">
+                            Logo
+                        </Label>
+                        <div className="text-extralight text-sm">
+                            Size: 96px x 96px
+                        </div>
                     </div>
-                    <div className="col-span-4">
+                    <div className="col-span-2">
                         <img
                             src={siblingUrl(
                                 null,
                                 "branding",
                                 "/chain_logo.svg",
                             )}
-                            className="b-1 col-span-3 h-24 w-24 border-solid border-gray-200"
+                            height="96"
+                            width="96"
+                            className="b-1 col-span-3 h-24 w-24 object-cover"
                             onClick={openFileClick}
                         />
                         <div className="text-extralight text-sm">
                             Click logo to replace.
+                        </div>
+                    </div>
+                    <div
+                        className={
+                            "col-span-2" +
+                            (previewImgUrl.length ? "" : " invisible")
+                        }
+                    >
+                        <img
+                            src={previewImgUrl}
+                            height="96"
+                            width="96"
+                            className="block h-24 w-24 object-cover"
+                        />
+                        <div className="text-extralight align-bottom text-sm">
+                            Preview
                         </div>
                     </div>
 
