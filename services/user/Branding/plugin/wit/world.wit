@@ -1,13 +1,13 @@
 package branding:plugin;
 
 interface api {
-    set-chain-name: func(name: string);
+    set-network-name: func(name: string);
     set-logo: func(logo: list<u8>);
 }
 
 interface queries {
     use host:common/types.{error};
-    get-chain-name: func() -> result<string, error>;
+    get-network-name: func() -> result<string, error>;
 }
 
 world psibase-plugin {

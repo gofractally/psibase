@@ -21,8 +21,6 @@ strip = true
 lto = true
 
 [package.metadata.component]
-# this name must match the package name in world.wit
-# However, it is not authoritative in the operation of the component
 package = "branding:psibase-plugin"
 
 [package.metadata.component.dependencies]

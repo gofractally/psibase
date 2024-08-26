@@ -1,8 +1,6 @@
 #[psibase::service(name = "branding")]
 mod service {
     use async_graphql::{Object, SimpleObject};
-    // fix psibase::service macro to use this (for decode in events)
-    // fix 2: I've gotta explicitly use Table, even though *all* uses of Table expand in this macro and require the Table trait to be imported
     use psibase::{
         anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_graphql,
         serve_simple_ui, store_content, Fracpack, HexBytes, HttpReply, HttpRequest, SingletonKey,
@@ -10,22 +8,22 @@ mod service {
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "ChainNameTable")]
+    #[table(name = "NetworkNameTable")]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ChainName {
+    pub struct NetworkName {
         pub name: String,
     }
 
-    impl ChainName {
+    impl NetworkName {
         #[primary_key]
         fn by_key(&self) -> SingletonKey {
             SingletonKey {}
         }
     }
 
-    impl Default for ChainName {
+    impl Default for NetworkName {
         fn default() -> Self {
-            ChainName {
+            NetworkName {
                 name: String::from("psibase"),
             }
         }
@@ -35,23 +33,23 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    fn set_chain_name(name: String) {
-        ChainNameTable::new()
-            .put(&ChainName { name: name.clone() })
+    fn set_network_name(name: String) {
+        NetworkNameTable::new()
+            .put(&NetworkName { name: name.clone() })
             .unwrap();
 
-        Wrapper::emit().history().set_chain_name(name);
+        Wrapper::emit().history().set_network_name(name);
     }
 
     #[event(history)]
-    pub fn set_chain_name(name: String) {}
+    pub fn set_network_name(name: String) {}
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn chain_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
-            let curr_val = ChainNameTable::new().get_index_pk().get(&SingletonKey {});
+        async fn network_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
+            let curr_val = NetworkNameTable::new().get_index_pk().get(&SingletonKey {});
             Ok(match curr_val {
                 Some(val) => val.name,
                 None => String::from("psibase"),

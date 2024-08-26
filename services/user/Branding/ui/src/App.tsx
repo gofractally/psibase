@@ -11,7 +11,7 @@ const supervisor = new Supervisor();
 
 export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
-    const [chainName, setChainName] = useState<string>("");
+    const [networkName, setNetworkName] = useState<string>("");
     const [logoBytes, setLogoBytes] = useState<Uint8Array>(new Uint8Array());
     const fileInput = useRef<HTMLInputElement>(null);
     const [previewImgUrl, setPreviewImgUrl] = useState<string>("");
@@ -20,22 +20,22 @@ export const App = () => {
     const init = async () => {
         await supervisor.onLoaded();
         supervisor.preLoadPlugins([{ service: "branding" }]);
-        setTimeout(getChainName, 1000);
+        setTimeout(getNetworkName, 1000);
     };
 
     useEffect(() => {
         init();
     }, []);
 
-    const getChainName = async () => {
-        const queriedChainName = (await supervisor.functionCall({
+    const getNetworkName = async () => {
+        const queriedNetworkName = (await supervisor.functionCall({
             service: "branding",
             intf: "queries",
-            method: "getChainName",
+            method: "getNetworkName",
             params: [],
         })) as string;
-        console.info("ui: queried chain and got name:", queriedChainName);
-        setChainName(queriedChainName);
+        console.info("ui: queried network and got name:", queriedNetworkName);
+        setNetworkName(queriedNetworkName);
     };
     const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
         e,
@@ -49,12 +49,12 @@ export const App = () => {
                 params: ["branding"],
             });
 
-            if (chainName) {
+            if (networkName) {
                 res = await supervisor.functionCall({
                     service: "branding",
                     intf: "api",
-                    method: "setChainName",
-                    params: [chainName],
+                    method: "setNetworkName",
+                    params: [networkName],
                 });
             }
 
@@ -144,7 +144,7 @@ export const App = () => {
                             src={siblingUrl(
                                 null,
                                 "branding",
-                                "/chain_logo.svg",
+                                "/network_logo.svg",
                             )}
                             height="96"
                             width="96"
@@ -181,17 +181,17 @@ export const App = () => {
                     />
                 </div>
                 <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <Label htmlFor="chainName" className="col-span-2">
+                    <Label htmlFor="networkName" className="col-span-2">
                         Network name
                     </Label>
                     <Input
-                        id="chainName"
+                        id="networkName"
                         className="col-span-4"
                         onChange={(e) => {
-                            setChainName(e.target.value);
+                            setNetworkName(e.target.value);
                             setChangesMade(true);
                         }}
-                        value={chainName}
+                        value={networkName}
                     />
                 </div>
                 <div className="relative col-span-6 mt-6 font-medium">

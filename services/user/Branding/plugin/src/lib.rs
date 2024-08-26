@@ -15,13 +15,14 @@ use psibase::Hex;
 struct BrandingPlugin;
 
 impl Api for BrandingPlugin {
-    fn set_chain_name(name: String) {
-        let packed_chain_name_args = branding::action_structs::set_chain_name { name }.packed();
-        CommonServer::add_action_to_transaction("set_chain_name", &packed_chain_name_args).unwrap();
+    fn set_network_name(name: String) {
+        let packed_network_name_args = branding::action_structs::set_network_name { name }.packed();
+        CommonServer::add_action_to_transaction("set_network_name", &packed_network_name_args)
+            .unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
         let packed_logo_args = branding::action_structs::storeSys {
-            path: String::from("/chain_logo.svg"),
+            path: String::from("/network_logo.svg"),
             contentType: String::from("image/svg+xml"),
             content: Hex(logo),
         }
@@ -32,23 +33,23 @@ impl Api for BrandingPlugin {
 
 #[derive(serde::Deserialize, Debug)]
 #[allow(non_snake_case)]
-struct ChainNameData {
-    chainName: String,
+struct NetworkNameData {
+    networkName: String,
 }
 #[derive(serde::Deserialize, Debug)]
-struct ChainNameResponse {
-    data: ChainNameData,
+struct NetworkNameResponse {
+    data: NetworkNameData,
 }
 
 impl Queries for BrandingPlugin {
-    fn get_chain_name() -> Result<String, Error> {
-        let graphql_str = format!("query {{ chainName }}");
-        let summary_val = serde_json::from_str::<ChainNameResponse>(
+    fn get_network_name() -> Result<String, Error> {
+        let graphql_str = format!("query {{ networkName }}");
+        let summary_val = serde_json::from_str::<NetworkNameResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         )
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-        Ok(summary_val.data.chainName)
+        Ok(summary_val.data.networkName)
     }
 }
 
