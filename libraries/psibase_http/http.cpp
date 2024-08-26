@@ -8,8 +8,11 @@
 #include "psibase/http.hpp"
 #include "psibase/log.hpp"
 
-#include "http_session_base.hpp"
+#include "http_session.hpp"
 #include "server_state.hpp"
+#include "tcp_http_session.hpp"
+#include "tls_http_session.hpp"
+#include "unix_http_session.hpp"
 
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/io_service.hpp>
@@ -18,20 +21,13 @@
 #include <boost/asio/strand.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#ifdef PSIBASE_ENABLE_SSL
-#include <boost/beast/ssl.hpp>
-#endif
 #include <boost/beast/version.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/make_unique.hpp>
-#include <boost/optional.hpp>
-#include <boost/signals2/signal.hpp>
 
 #include <algorithm>
 #include <charconv>
 #include <cstdlib>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -40,11 +36,10 @@
 
 #include <pthread.h>
 
-namespace beast     = boost::beast;  // from <boost/beast.hpp>
-namespace websocket = beast::websocket;
-namespace bhttp     = beast::http;                  // from <boost/beast/http.hpp>
-namespace net       = boost::asio;                  // from <boost/asio.hpp>
-using tcp           = boost::asio::ip::tcp;         // from <boost/asio/ip/tcp.hpp>
+namespace beast = boost::beast;                     // from <boost/beast.hpp>
+namespace bhttp = beast::http;                      // from <boost/beast/http.hpp>
+namespace net   = boost::asio;                      // from <boost/asio.hpp>
+using tcp       = boost::asio::ip::tcp;             // from <boost/asio/ip/tcp.hpp>
 using unixs = boost::asio::local::stream_protocol;  // from <boost/asio/local/stream_protocol.hpp>
 
 using namespace std::literals;
@@ -94,8 +89,7 @@ namespace psibase::http
    {
       net::io_service          ioc;
       std::vector<std::thread> threads = {};
-      using signal_type                = boost::signals2::signal<void(bool)>;
-      shutdown_tracker thread_count;
+      shutdown_tracker         thread_count;
 
       server_impl(const std::shared_ptr<const http::http_config>& http_config,
                   const std::shared_ptr<psibase::SharedState>&    sharedState)
@@ -132,216 +126,6 @@ namespace psibase::http
          impl->stop();
       }
    }
-
-   // Handles an HTTP server connection
-   template <typename SessionType>
-   class http_session : public http_session_base
-   {
-     public:
-      std::shared_ptr<SessionType> shared_from_this()
-      {
-         return std::static_pointer_cast<SessionType>(http_session_base::shared_from_this());
-      }
-
-      virtual void post(std::function<void()> f) override
-      {
-         net::post(derived_session().stream.get_executor(), std::move(f));
-      }
-
-      void write_response(message_type&& msg) override
-      {
-         bhttp::async_write(
-             derived_session().stream, msg,
-             beast::bind_front_handler(&http_session::on_write,
-                                       derived_session().shared_from_this(), msg.need_eof()));
-      }
-      void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) override
-      {
-         using ws_type = websocket::stream<decltype(derived_session().stream)>;
-         struct op
-         {
-            request_type           request;
-            ws_type                stream;
-            accept_p2p_websocket_t next;
-         };
-
-         auto ptr = std::make_shared<op>(
-             op{std::move(request),
-                websocket::stream<decltype(move_stream())>{std::move(move_stream())},
-                std::move(next)});
-
-         auto p = ptr.get();
-         // Capture only the stream, not self, because after returning, there is
-         // no longer anything keeping the session alive
-         p->stream.async_accept(p->request, std::function<void(const std::error_code&)>(
-                                                [ptr = std::move(ptr)](const std::error_code& ec)
-                                                {
-                                                   if (!ec)
-                                                   {
-                                                      ptr->next(std::move(ptr->stream));
-                                                   }
-                                                }));
-      }
-
-      http_session(server_impl& server) : http_session_base(server)
-      {
-         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
-      }
-
-      ~http_session() { PSIBASE_LOG(logger, debug) << "Connection closed"; }
-
-      // Start the session
-      void run()
-      {
-         PSIBASE_LOG(logger, debug) << "Accepted connection";
-         _timer.reset(new boost::asio::steady_timer(derived_session().stream.get_executor()));
-         start_socket_timer();
-         do_read();
-      }
-
-      SessionType& derived_session() { return static_cast<SessionType&>(*this); }
-
-      auto move_stream()
-      {
-         auto result = std::move(derived_session().stream);
-         _closed     = true;
-         _timer->cancel();
-         return result;
-      }
-
-     public:
-      void do_read() override
-      {
-         // Construct a new parser for each message
-         parser.emplace();
-
-         // Apply a reasonable limit to the allowed size
-         // of the body in bytes to prevent abuse.
-         parser->body_limit(server.http_config->max_request_size);
-         // Read a request using the parser-oriented interface
-         bhttp::async_read(derived_session().stream, buffer, *parser,
-                           beast::bind_front_handler(&http_session::on_read,
-                                                     derived_session().shared_from_this()));
-      }
-
-     private:
-     public:
-     protected:
-      void common_shutdown_impl()
-      {
-         beast::error_code ec;
-         derived_session().stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-         if (ec)
-         {
-            PSIBASE_LOG(logger, warning) << "shutdown: " << ec.message();
-         }
-         derived_session().stream.socket().close(ec);
-         if (ec)
-         {
-            PSIBASE_LOG(logger, warning) << "close: " << ec.message();
-         }
-      }
-   };  // http_session
-
-   struct tcp_http_session : public http_session<tcp_http_session>
-   {
-      tcp_http_session(server_impl& server, tcp::socket&& socket)
-          : http_session<tcp_http_session>(server), stream(std::move(socket))
-      {
-         std::ostringstream ss;
-         ss << stream.socket().remote_endpoint();
-         logger.add_attribute("RemoteEndpoint",
-                              boost::log::attributes::constant<std::string>(ss.str()));
-      }
-
-      bool check_access(const authz_loopback&) const
-      {
-         return stream.socket().remote_endpoint().address().is_loopback();
-      }
-
-      bool check_access(const authz_ip& addr) const
-      {
-         return stream.socket().remote_endpoint().address() == addr.address;
-      }
-
-      void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
-      void shutdown_impl() { common_shutdown_impl(); }
-
-      beast::tcp_stream stream;
-   };
-
-#ifdef PSIBASE_ENABLE_SSL
-   struct tls_http_session : public http_session<tls_http_session>
-   {
-      tls_http_session(server_impl& server, tcp::socket&& socket)
-          : http_session<tls_http_session>(server),
-            context(server.http_config->tls_context),
-            stream(std::move(socket), *context)
-      {
-         std::ostringstream ss;
-         ss << stream.next_layer().socket().remote_endpoint();
-         logger.add_attribute("RemoteEndpoint",
-                              boost::log::attributes::constant<std::string>(ss.str()));
-      }
-
-      bool check_access(const authz_loopback& addr) const
-      {
-         return stream.next_layer().socket().remote_endpoint().address().is_loopback();
-      }
-
-      bool check_access(const authz_ip& addr) const
-      {
-         return stream.next_layer().socket().remote_endpoint().address() == addr.address;
-      }
-
-      void shutdown_impl()
-      {
-         stream.async_shutdown([self = shared_from_this()](const std::error_code& ec) {});
-      }
-
-      void close_impl(beast::error_code& ec) { stream.next_layer().socket().close(ec); }
-
-      void run()
-      {
-         stream.async_handshake(boost::asio::ssl::stream_base::server,
-                                [self = shared_from_this()](const std::error_code& ec)
-                                {
-                                   if (!ec)
-                                   {
-                                      self->http_session<tls_http_session>::run();
-                                   }
-                                });
-      }
-
-      tls_context_ptr                             context;
-      boost::beast::ssl_stream<beast::tcp_stream> stream;
-   };
-#endif
-
-   struct unix_http_session : public http_session<unix_http_session>
-   {
-      unix_http_session(server_impl& server, unixs::socket&& socket)
-          : http_session<unix_http_session>(server), stream(std::move(socket))
-      {
-         logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
-                                                    stream.socket().remote_endpoint().path()));
-      }
-
-      bool check_access(const authz_loopback& addr) const { return true; }
-      bool check_access(const authz_ip& addr) const { return false; }
-
-      void close_impl(beast::error_code& ec) { stream.socket().close(ec); }
-      void shutdown_impl() { common_shutdown_impl(); }
-
-      beast::basic_stream<unixs,
-#if BOOST_VERSION >= 107400
-                          boost::asio::any_io_executor,
-#else
-                          boost::asio::executor,
-#endif
-                          beast::unlimited_rate_policy>
-          stream;
-   };
 
    // Accepts incoming connections and launches the sessions
    template <typename Acceptor>
