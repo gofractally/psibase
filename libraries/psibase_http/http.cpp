@@ -332,7 +332,7 @@ namespace psibase::http
 
       // Called when a message finishes sending
       // Returns `true` if the caller should initiate a read
-      bool on_write()
+      bool pop_queue()
       {
          BOOST_ASSERT(!items.empty());
          const auto was_full = is_full();
@@ -344,6 +344,34 @@ namespace psibase::http
          if (!items.empty())
             (*items.front())();
          return was_full && !pause_read;
+      }
+
+      void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred)
+      {
+         boost::ignore_unused(bytes_transferred);
+
+         if (_closed)
+            return;
+
+         if (ec)
+         {
+            fail(logger, ec, "write");
+            return close_on_error();
+         }
+
+         if (close)
+         {
+            // This means we should close the connection, usually because
+            // the response indicated the "Connection: close" semantic.
+            return do_close();
+         }
+
+         // Inform the queue that a write completed
+         if (pop_queue())
+         {
+            // Read another request
+            do_read();
+         }
       }
 
       // Called by the HTTP handler to send a response.
@@ -1698,34 +1726,6 @@ namespace psibase::http
       }
 
      private:
-      void on_write(bool close, beast::error_code ec, std::size_t bytes_transferred)
-      {
-         boost::ignore_unused(bytes_transferred);
-
-         if (_closed)
-            return;
-
-         if (ec)
-         {
-            fail(logger, ec, "write");
-            return close_on_error();
-         }
-
-         if (close)
-         {
-            // This means we should close the connection, usually because
-            // the response indicated the "Connection: close" semantic.
-            return do_close();
-         }
-
-         // Inform the queue that a write completed
-         if (http_session_base::on_write())
-         {
-            // Read another request
-            do_read();
-         }
-      }
-
      public:
      protected:
       void common_shutdown_impl()
