@@ -119,7 +119,7 @@ export const App = () => {
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Chain Branding Page" />
+            <Nav title="Network Branding Page" />
             <form className="mx-auto grid max-w-screen-md grid-cols-6">
                 <div
                     className={
@@ -182,7 +182,7 @@ export const App = () => {
                 </div>
                 <div className="col-span-6 mt-6 grid grid-cols-6">
                     <Label htmlFor="chainName" className="col-span-2">
-                        Chain name
+                        Network name
                     </Label>
                     <Input
                         id="chainName"
