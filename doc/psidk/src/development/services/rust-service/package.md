@@ -23,9 +23,13 @@ version = "0.1.0"
 [package.metadata.psibase]
 # Builds example.psi
 package-name = "example"
+# Most services besides the core system services don't need extra flags.
+flags = []
 # This service handles its own HTTP requests
 server = "example"
+# Plugin for the front end
+plugin = "example-plugin"
 
 [package.metadata.psibase.dependencies]
-HttpServer = 0.12.0
+HttpServer = "0.12.0"
 ```
