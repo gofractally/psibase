@@ -1,10 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { AlarmClockMinus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { z } from "zod";
@@ -34,7 +33,23 @@ import {
 import debounce from "debounce";
 import { Button } from "./ui/button";
 
+import { Separator } from "@/components/ui/separator";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 import { Check, UserX, LoaderCircle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
 
 enum Status {
   Loading,
@@ -109,6 +124,15 @@ const hardCodedAccounts: AccountType[] = [
 const formSchema = z.object({
   username: z.string().min(3).max(50),
 });
+
+const randomDate = (): Date => {
+  const inFuture = Math.random() > 0.5;
+  const oneWeek = 1000 * 60 * 60 * 24 * 7;
+
+  return inFuture
+    ? new Date(new Date().valueOf() + oneWeek)
+    : new Date(new Date().valueOf() - oneWeek);
+};
 
 const isAccountAvailable = async (accountName: string): Promise<boolean> => {
   await wait(1000);
@@ -193,9 +217,97 @@ export const AccountSelection = () => {
     (account) => account.id == selectedAccountId
   );
 
+  const chainName = "fwe";
+
+  const token = "TOKEN_FROM_QUERY_PARAM_HERE";
+
+  const { data: invite, isLoading: isLoadingInvite } = useQuery({
+    queryKey: ["invite", token],
+    queryFn: async () => {
+      return {
+        inviter: "Barry",
+        expiry: randomDate(),
+      };
+    },
+  });
+
+  const inviter = invite?.inviter;
+  const isExpired = invite
+    ? invite.expiry.valueOf() < new Date().valueOf()
+    : false;
+
+  const notFound = false;
+
+  const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
+    mutationFn: async () => {
+      // TODO: reject the invite
+    },
+  });
+
+  const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation({
+    mutationFn: async () => {
+      // TODO: reject the invite
+    },
+  });
+
+  const isTxInProgress = isRejecting || isAccepting;
+
+  if (isLoadingInvite) {
+    return (
+      <Card className="w-[350px] mx-auto mt-4">
+        <CardHeader>
+          <div className="mx-auto">
+            <LoaderCircle className="w-12 h-12 animate-spin" />
+          </div>
+          <CardTitle className="text-center">Loading...</CardTitle>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <Card className="w-[350px] mx-auto mt-4">
+        <CardHeader>
+          <div className="mx-auto">
+            <TriangleAlert className="w-12 h-12" />
+          </div>
+          <CardTitle>Invitation not found.</CardTitle>
+          <CardDescription>
+            The invitation token is either invalid or has already been used.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const expiryMessage =
+    invite &&
+    `This invitation expired ${dayjs().to(invite.expiry)} (${dayjs(
+      invite.expiry
+    ).format("DD/MM/YYYY HH:mm")}).`;
+
+  if (isExpired) {
+    return (
+      <Card className="w-[350px] mx-auto mt-4">
+        <CardHeader>
+          <div className="mx-auto">
+            <AlarmClockMinus className="w-12 h-12" />
+          </div>
+          <CardTitle>Expired invitation</CardTitle>
+          <CardDescription>{expiryMessage}</CardDescription>
+          <CardDescription>
+            Please ask the sender{" "}
+            <span className="text-primary">{inviter}</span> for a new one.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Dialog>
-      <div className="grid grid-cols-2 mt-6">
+      <div className="mt-6">
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create an account</DialogTitle>
@@ -266,7 +378,13 @@ export const AccountSelection = () => {
           </DialogHeader>
         </DialogContent>
 
-        <div>
+        <div className="max-w-lg mx-auto">
+          <div className="text-center text-muted-foreground py-2">
+            <span>
+              Select an account to accept invite to{" "}
+              <span className="text-primary">{appName}</span>
+            </span>
+          </div>
           <div className="relative ml-auto flex-1 md:grow-0 mb-3">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -278,7 +396,7 @@ export const AccountSelection = () => {
             />
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 ">
             <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
               {isAccountsLoading
                 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
@@ -307,49 +425,22 @@ export const AccountSelection = () => {
               </button>
             </DialogTrigger>
           </div>
-        </div>
-
-        <div
-          className={cn("my-auto flex flex-col gap-3", {
-            "opacity-50": !selectedAccount,
-          })}
-        >
-          <div className="flex justify-center">
-            <div className="flex gap-4">
-              <Avatar>
-                <AvatarFallback>
-                  {selectedAccount
-                    ? selectedAccount.account.slice(0, 2).toUpperCase()
-                    : "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col justify-center">
-                <ArrowRight />
-              </div>
-              <Avatar>
-                <AvatarFallback>
-                  {appName.toUpperCase().slice(0, 3)}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+          <div className="w-full justify-center flex my-3">
+            <Button
+              className="w-full"
+              disabled={!selectedAccount || form.formState.isLoading}
+            >
+              {isSubmitting ? "Loading..." : "Accept invite"}
+            </Button>
           </div>
-          <div className="text-center text-muted-foreground">
-            {selectedAccount ? (
-              <span>
-                Connect{" "}
-                <span className="text-primary ">{selectedAccount.account}</span>{" "}
-                to <span className="text-primary ">{appName}</span>
-              </span>
-            ) : (
-              <span>
-                Select an <span className="text-primary">account</span> to
-                connect to <span className="text-primary">{appName}</span>
-              </span>
-            )}
-          </div>
-          <div className="w-full flex justify-center">
-            <Button disabled={!selectedAccount || form.formState.isLoading}>
-              {isSubmitting ? "Loading..." : "Connect"}
+          <Separator className="my-8 " />
+          <div className="w-full justify-center flex">
+            <Button
+              onClick={() => rejectInvite()}
+              variant="link"
+              className="text-muted-foreground"
+            >
+              Reject invite
             </Button>
           </div>
         </div>
