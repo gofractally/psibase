@@ -121,7 +121,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
 
                 #deploy_services
 
-                println!("\n\n>>> {}: Chain Tester Booted & Services Deployed - Running test...", #name);
+                println!("\n\n>>> [{}]", #name);
                 Ok(chain)
             }
             let chain = create_chain();
