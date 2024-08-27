@@ -32,48 +32,42 @@ fn execute_query(
 }
 
 pub trait Queryable {
-    type Output;
-
     fn query(
         chain: &psibase::Chain,
         service: psibase::AccountNumber,
         query_name: &str,
         params: &[(&str, &str)],
-    ) -> Self::Output;
+    ) -> Self;
 }
 impl<T> Queryable for Vec<T>
 where
     T: serde::de::DeserializeOwned + HasQueryFields,
 {
-    type Output = Vec<T>;
-
     fn query(
         chain: &psibase::Chain,
         service: psibase::AccountNumber,
         query_name: &str,
         params: &[(&str, &str)],
-    ) -> Self::Output {
+    ) -> Self {
         let fields_part = format!("nodes {{ {} }}", T::QUERY_FIELDS);
         let res = execute_query(chain, service, query_name, params, &fields_part);
         let data = res["data"][query_name]["nodes"].clone();
-        serde_json::from_value::<Self::Output>(data).unwrap()
+        serde_json::from_value::<Self>(data).unwrap()
     }
 }
 impl<T> Queryable for Option<T>
 where
     T: serde::de::DeserializeOwned + HasQueryFields,
 {
-    type Output = Option<T>;
-
     fn query(
         chain: &psibase::Chain,
         service: psibase::AccountNumber,
         query_name: &str,
         params: &[(&str, &str)],
-    ) -> Self::Output {
+    ) -> Self {
         let fields_part = format!("{}", T::QUERY_FIELDS);
         let res = execute_query(chain, service, query_name, params, &fields_part);
         let data = res["data"][query_name].clone();
-        serde_json::from_value::<Self::Output>(data).unwrap()
+        serde_json::from_value::<Self>(data).unwrap()
     }
 }
