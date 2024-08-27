@@ -7,6 +7,9 @@ homepage.workspace = true
 edition = "2021"
 publish = false
 
+[package.metadata.psibase]
+package-name = "TestSubjective"
+
 [lib]
 path = "src/lib.rs"
 crate-type = ["cdylib"]

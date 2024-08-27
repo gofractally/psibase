@@ -10,10 +10,24 @@ members = [
     "psibase",
     "test_contract",
     "test_contract_2",
+    "test_package/plugin",
+    "test_package/query",
+    "test_package/service",
     "test_service_elections",
     "test_service_sites",
     "test_fracpack",
     "test_subjective"
+]
+
+default-members = [
+    "burst-transfer",
+    "cargo-psibase",
+    "fracpack",
+    "gen-cpp-doc",
+    "md2man",
+    "psibase_macros",
+    "psibase",
+    "test_fracpack"
 ]
 
 [workspace.package]
