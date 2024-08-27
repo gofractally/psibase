@@ -1,6 +1,5 @@
 import { useIncomingMessages, useUser } from "@hooks";
 import { cn } from "@lib/utils";
-import { accounts } from "src/fixtures/data";
 import {
     Select,
     SelectContent,
@@ -15,7 +14,7 @@ interface AccountSwitcherProps {
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
     const { setSelectedMessageId } = useIncomingMessages();
-    const { user, setUser } = useUser();
+    const { availableAccounts, user, setUser } = useUser();
 
     return (
         <Select
@@ -40,7 +39,7 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
                 </SelectValue>
             </SelectTrigger>
             <SelectContent>
-                {accounts.map((account) => (
+                {availableAccounts.map((account) => (
                     <SelectItem key={account.account} value={account.account}>
                         <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
                             {account.account}

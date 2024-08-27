@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { atom, useAtom, useAtomValue } from "jotai";
+import { useEffect } from "react";
+import { atom, useAtom } from "jotai";
 
-import { type PluginId, Supervisor } from "@psibase/common-lib";
+import { type PluginId } from "@psibase/common-lib";
+
+import { getSupervisor } from "@lib/supervisor";
 
 import { accounts } from "src/fixtures/data";
 
@@ -15,32 +17,28 @@ interface SupervisorError {
     message: string;
 }
 
-const supervisor = new Supervisor();
-const getSupervisor = async () => {
-    if (supervisor.isSupervisorInitialized) return supervisor;
-    await supervisor.onLoaded();
-    // TODO: preloadPlugins appears to not work at all via vite proxy; investigate
-    // supervisor.preLoadPlugins([
-    //     { service: "accounts" },
-    //     { service: "webmail" },
-    // ]);
-    return supervisor;
-};
-
 // TODO: Get rid of pretty names for now
+const accountsAtom = atom<Account[]>([]);
 const userAtom = atom<Account>(accounts[0]);
 export function useUser() {
+    const [availableAccounts, setAvailableAccounts] = useAtom(accountsAtom);
     const [user, setUser] = useAtom<Account>(userAtom);
 
-    const getLoggedInUser = async () => {
+    const getAvailableAccounts = async () => {
         const supervisor = await getSupervisor();
         try {
-            return supervisor.functionCall({
+            const res = (await supervisor.functionCall({
                 service: "accounts",
                 intf: "accounts",
-                method: "getLoggedInUser",
-                params: [window.origin],
-            });
+                method: "getAvailableAccounts",
+                params: [],
+            })) as string[];
+            const accountsAsUsers = res
+                .map((a) => {
+                    return accounts.find((one) => one.account === a);
+                })
+                .filter(Boolean) as Account[];
+            setAvailableAccounts(accountsAsUsers);
         } catch (e: unknown) {
             console.error(`${(e as SupervisorError).message}`);
         }
@@ -48,29 +46,28 @@ export function useUser() {
 
     const logInAs = async (accountName: string) => {
         const supervisor = await getSupervisor();
-        const res = await supervisor.functionCall({
-            service: "accounts",
-            intf: "accounts",
-            method: "loginTemp",
-            params: [accountName],
-        });
-        console.log(res);
-        await getLoggedInAccount();
-    };
-
-    const getLoggedInAccount = async () => {
-        const account = await getLoggedInUser();
-        console.log("USER:", account);
-        const user = accounts.find((a) => a.account === account) ?? accounts[0];
-        setUser(user);
+        try {
+            await supervisor.functionCall({
+                service: "accounts",
+                intf: "accounts",
+                method: "loginTemp",
+                params: [accountName],
+            });
+            const user = accounts.find((a) => a.account === accountName);
+            if (!user) return;
+            setUser(user);
+        } catch (e: unknown) {
+            console.error("ERROR setting user:");
+            console.log(e);
+        }
     };
 
     useEffect(() => {
-        console.log("useEffect");
-        getLoggedInAccount();
+        getAvailableAccounts();
     }, []);
 
     return {
+        availableAccounts,
         user,
         setUser: logInAs,
     };

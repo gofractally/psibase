@@ -6,6 +6,8 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from "@shadcn/resizable";
+import { Toaster } from "@shadcn/sonner";
+
 import { NavMenu } from "@components";
 import { cn } from "@lib/utils";
 
@@ -38,6 +40,7 @@ export default function DefaultLayout() {
                     <Outlet />
                 </ResizablePanel>
             </ResizablePanelGroup>
+            <Toaster />
         </div>
     );
 }

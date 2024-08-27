@@ -1,10 +1,8 @@
 import type { Mailbox } from "src/types";
 
-import { ComponentProps } from "react";
 import { formatDistanceToNow } from "date-fns";
 
 import { cn } from "@lib/utils";
-import { Badge } from "@shadcn/badge";
 import { ScrollArea } from "@shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { type Message } from "@hooks";
@@ -59,10 +57,10 @@ const MailItem = ({
     const fromAccount = accounts.find((a) => a.account === item.from);
     const toAccount = accounts.find((a) => a.account === item.to);
     return (
-        <button
+        <div
             key={item.id}
             className={cn(
-                "flex flex-col items-start gap-2 rounded-lg border p-3 text-left text-sm transition-all hover:bg-accent",
+                "flex cursor-pointer flex-col items-start gap-2 rounded-lg border p-3 text-left text-sm transition-all hover:bg-accent",
                 selectedMessage?.id === item.id && "bg-muted",
             )}
             onClick={() => {
@@ -109,34 +107,6 @@ const MailItem = ({
             <div className="line-clamp-2 text-xs text-muted-foreground">
                 {item.body.substring(0, 300)}
             </div>
-            {/* {item.labels.length ? (
-                            <div className="flex items-center gap-2">
-                                {item.labels.map((label) => (
-                                    <Badge
-                                        key={label}
-                                        variant={getBadgeVariantFromLabel(
-                                            label,
-                                        )}
-                                    >
-                                        {label}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : null} */}
-        </button>
+        </div>
     );
 };
-
-function getBadgeVariantFromLabel(
-    label: string,
-): ComponentProps<typeof Badge>["variant"] {
-    if (["work"].includes(label.toLowerCase())) {
-        return "default";
-    }
-
-    if (["personal"].includes(label.toLowerCase())) {
-        return "outline";
-    }
-
-    return "secondary";
-}
