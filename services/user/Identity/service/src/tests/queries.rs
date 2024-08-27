@@ -12,7 +12,6 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
     chain.new_account("carol".into())?;
 
     svc.from("carol").attest("bob".into(), 76).get()?;
-    svc.from("alice").attest("carol".into(), 76).get()?;
     svc.from("alice").attest("carol".into(), 77).get()?;
     svc.from("alice").attest("bob".into(), 75).get()?;
 
