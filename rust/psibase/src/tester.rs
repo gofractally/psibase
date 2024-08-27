@@ -249,10 +249,6 @@ impl Chain {
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
-        if self.producing.get() && self.is_auto_block_start {
-            self.finish_block();
-        }
-
         let packed_request = request.packed();
         let fd = unsafe {
             tester_raw::httpRequest(
