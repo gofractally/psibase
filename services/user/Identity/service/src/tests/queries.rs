@@ -1,7 +1,7 @@
 use crate::{
     service::{Attestation, AttestationStats},
     tests::helpers::test_helpers::{
-        assert_equal, init_identity_svc, PartialAttestation, PartialAttestationStats,
+        init_identity_svc, PartialAttestation, PartialAttestationStats,
     },
 };
 
@@ -19,24 +19,24 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
     let all = svc.query::<Vec<Attestation>>("allAttestations", &[]);
     let all_expected = vec![
         PartialAttestation::new("alice", "bob", 75),
-        PartialAttestation::new("alice", "carol", 77),
         PartialAttestation::new("carol", "bob", 76),
+        PartialAttestation::new("alice", "carol", 77),
     ];
-    assert_equal(&all_expected, &all);
+    assert_eq!(&all_expected, &all);
 
     let all_stats = svc.query::<Vec<AttestationStats>>("allAttestationStats", &[]);
     let all_stats_expected = vec![
         PartialAttestationStats::new("bob", 2, 1),
         PartialAttestationStats::new("carol", 1, 1),
     ];
-    assert_equal(&all_stats_expected, &all_stats);
+    assert_eq!(&all_stats_expected, &all_stats);
 
     let by_subject = svc.query::<Vec<Attestation>>("attestationsBySubject", &[("subject", "bob")]);
     let by_subject_expected = vec![
         PartialAttestation::new("alice", "bob", 75),
         PartialAttestation::new("carol", "bob", 76),
     ];
-    assert_equal(&by_subject_expected, &by_subject);
+    assert_eq!(&by_subject_expected, &by_subject);
 
     let by_subject_stats = svc
         .query::<Option<AttestationStats>>("subjectStats", &[("subject", "bob")])
@@ -50,7 +50,7 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
         PartialAttestation::new("alice", "bob", 75),
         PartialAttestation::new("alice", "carol", 77),
     ];
-    assert_equal(&by_attester_expected, &by_attester);
+    assert_eq!(&by_attester_expected, &by_attester);
 
     Ok(())
 }

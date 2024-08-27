@@ -125,27 +125,6 @@ impl PartialEq<Attestation> for PartialAttestation {
     }
 }
 
-pub fn assert_equal<T, U>(expected: &[T], actual: &[U])
-where
-    T: PartialEq<U> + Debug,
-    U: Debug,
-{
-    assert!(
-        expected.iter().all(|a| actual.iter().any(|b| a == b)),
-        "Assertion failed.\nexpected: {:?}\nactual: {:?}",
-        expected,
-        actual
-    );
-    assert!(
-        expected.len() == actual.len(),
-        "lengths not equal, {} ne {}\nexpected {:?}\nactual {:?}",
-        expected.len(),
-        actual.len(),
-        expected,
-        actual
-    );
-}
-
 pub trait VerifyFailed {
     fn fails(&self, expected_err: &str);
 }
