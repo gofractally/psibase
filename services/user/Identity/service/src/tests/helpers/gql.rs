@@ -1,15 +1,11 @@
 use crate::tests::helpers::test_helpers::HasQueryFields;
 
 fn format_params(params: &[(&str, &str)]) -> String {
-    let formatted_params = if params.is_empty() {
-        String::new()
-    } else {
-        params
-            .iter()
-            .map(|(name, value)| format!("{}: \"{}\"", name, value))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
+    let formatted_params = params
+        .iter()
+        .map(|(name, value)| format!("{}: \"{}\"", name, value))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     if formatted_params.is_empty() {
         String::new()
