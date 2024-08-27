@@ -124,23 +124,3 @@ impl PartialEq<Attestation> for PartialAttestation {
         other == self
     }
 }
-
-pub trait VerifyFailed {
-    fn fails(&self, expected_err: &str);
-}
-impl VerifyFailed for Result<(), psibase::Error> {
-    fn fails(&self, expected_err: &str) {
-        match self {
-            Err(e) => assert!(
-                e.to_string().contains(expected_err),
-                "Transaction failed with \"{}\", but failure was expected to contain: \"{}\"",
-                e.to_string(),
-                expected_err
-            ),
-            _ => panic!(
-                "Transaction succeeded, but was expected to fail with: \"{}\"",
-                expected_err
-            ),
-        }
-    }
-}
