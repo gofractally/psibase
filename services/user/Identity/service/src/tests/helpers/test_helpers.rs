@@ -87,11 +87,11 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
 
     /// Make the specified graphql query on this service.
     /// It will attempt to unpack into the specified template type
-    pub fn query<U>(&self, query_name: &str, params: &[(&str, &str)]) -> U
+    pub fn query<U>(&self, query_name: &str) -> U
     where
         U: Queryable,
     {
-        U::query(self.chain, T::SERVICE, query_name, params)
+        U::query(self.chain, T::SERVICE, query_name)
     }
 }
 
