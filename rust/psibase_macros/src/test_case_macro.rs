@@ -123,7 +123,6 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 let mut chain = psibase::Chain::new();
                 chain.boot_with(&#reg, &[#packages])?;
 
-                println!("\n\n>>> {}: Chain Tester Booted & Services Deployed - Running test...", #name);
                 Ok(chain)
             }
             let chain = create_chain();
