@@ -1,6 +1,6 @@
 use super::gql::Queryable;
 use crate::service::{Attestation, AttestationStats};
-use crate::Wrapper as Service;
+use crate::Wrapper as Identity;
 use psibase::services::http_server;
 use psibase::AccountNumber;
 use std::fmt::Debug;
@@ -57,13 +57,13 @@ pub trait IsServiceWrapper {
         account: AccountNumber,
     ) -> crate::Actions<psibase::ChainPusher>;
 }
-impl IsServiceWrapper for Service {
-    const SERVICE: psibase::AccountNumber = Service::SERVICE;
+impl IsServiceWrapper for Identity {
+    const SERVICE: psibase::AccountNumber = Identity::SERVICE;
     fn push_from(
         chain: &psibase::Chain,
         account: AccountNumber,
     ) -> crate::Actions<psibase::ChainPusher> {
-        Service::push_from(chain, account)
+        Identity::push_from(chain, account)
     }
 }
 
@@ -95,12 +95,9 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
     }
 }
 
-pub fn init_svc<ActionService: IsServiceWrapper, HttpServer: IsServiceWrapper>(
-    chain: &psibase::Chain,
-) -> ChainPusher<ActionService> {
-    http_server::Wrapper::push_from(&chain, ActionService::SERVICE)
-        .registerServer(HttpServer::SERVICE);
-    ChainPusher::<ActionService>::new(&chain)
+pub fn init_identity_svc(chain: &psibase::Chain) -> ChainPusher<Identity> {
+    http_server::Wrapper::push_from(&chain, Identity::SERVICE).registerServer(Identity::SERVICE);
+    ChainPusher::<Identity>::new(&chain)
 }
 
 impl PartialEq<PartialAttestationStats> for AttestationStats {

@@ -1,15 +1,14 @@
-use crate::Wrapper as Identity;
 use crate::{
     service::{Attestation, AttestationStats},
     tests::helpers::test_helpers::{
-        assert_equal, init_svc, PartialAttestation, PartialAttestationStats,
+        assert_equal, init_identity_svc, PartialAttestation, PartialAttestationStats,
     },
 };
 
 #[psibase::test_case(services("identity"))]
 // ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
     chain.new_account("carol".into())?;
 
     svc.from("carol").attest("bob".into(), 76).get()?;
@@ -59,7 +58,7 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
 #[psibase::test_case(services("identity"))]
 // ATTEST QUERY: verify empty query responses are correct
 pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
     chain.new_account("carol".into())?;
 
     let response = svc.query::<Vec<Attestation>>("allAttestations", &[]);

@@ -1,12 +1,13 @@
 use crate::service::AttestationStats;
-use crate::tests::helpers::test_helpers::{assert_equal, init_svc, PartialAttestationStats};
-use crate::Wrapper as Identity;
+use crate::tests::helpers::test_helpers::{
+    assert_equal, init_identity_svc, PartialAttestationStats,
+};
 use psibase::AccountNumber;
 
 #[psibase::test_case(services("identity"))]
 // STATS: Verify that issued gets updated when a more recent attestation comes in
 pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
     svc.from("alice").attest("bob".into(), 75).get()?;
 
     let response = svc.query::<Vec<AttestationStats>>("allAttestationStats", &[]);
@@ -25,7 +26,7 @@ pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::E
 #[psibase::test_case(services("identity"))]
 // STATS: 3 attestations attesting to same subject; check that stats are updated properly as more recent attestations come in
 pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
 
     svc.from("alice").attest("bob".into(), 75).get()?;
 
@@ -51,7 +52,7 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
 #[psibase::test_case(services("identity"))]
 // STATS: 4 different attesters attesting to same subject; check that stats are updated properly as new attestations come in
 pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
 
     svc.from("alice").attest("bob".into(), 75).get()?;
 

@@ -1,13 +1,12 @@
 use crate::service::{Attestation, AttestationStats};
 use crate::tests::helpers::test_helpers::{
-    assert_equal, init_svc, PartialAttestation, PartialAttestationStats,
+    assert_equal, init_identity_svc, PartialAttestation, PartialAttestationStats,
 };
-use crate::Wrapper as Identity;
 
 #[psibase::test_case(services("identity"))]
 // ATTEST: verify first *high* confidence attestation is saved properly to table
 pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
 
     svc.from("alice").attest("bob".into(), 95).get()?;
 
@@ -25,7 +24,7 @@ pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase:
 #[psibase::test_case(services("identity"))]
 // ATTEST: verify first *low* confidence attestation is saved properly to table
 pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    let svc = init_svc::<Identity, Identity>(&chain);
+    let svc = init_identity_svc(&chain);
 
     svc.from("alice").attest("bob".into(), 75).get()?;
 
