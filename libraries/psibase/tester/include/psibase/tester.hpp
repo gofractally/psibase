@@ -191,8 +191,8 @@ namespace psibase
        * Start a new pending block.  If a block is currently pending, finishes it first.
        * May push additional blocks if any time is skipped.
        *
-       * @param skip_milliseconds The amount of time to skip in addition to the 500 ms block time.
-       * truncated to a multiple of 500 ms.
+       * @param skip_milliseconds The amount of time to skip in addition to the 1s block time.
+       * truncated to a multiple of 1s.
        */
       void startBlock(int64_t skip_miliseconds = 0);
 
@@ -223,8 +223,7 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
-                                                     const KeyList& keys = {});
+      [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
 
       /**
        * Creates a POST request with a JSON body

@@ -1119,6 +1119,10 @@ struct callbacks
          proofBC.start(chain.blockContext->current.header.time);
          psibase::check(!proofBC.isGenesisBlock || signedTrx.proofs.empty(),
                         "Genesis block may not have proofs");
+
+         psibase::check(signedTrx.proofs.size() == signedTrx.transaction->claims().size(),
+                        "proofs and claims must have same size");
+
          for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
             proofBC.verifyProof(signedTrx, trace, i, std::nullopt);
 
