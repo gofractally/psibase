@@ -234,7 +234,7 @@ ExternalProject_Add(
 
 # UIs built with yarn
 set(JS_DIRS
-    services/user/CommonApi/ui:CommonApi_js
+    services/user/Homepage/ui:Homepage_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
@@ -452,10 +452,8 @@ psibase_package(
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
-        DATA GLOB ${COMMON_API}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
-    DEPENDS ${CommonApi_js_DEP}
     DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
@@ -519,6 +517,19 @@ psibase_package(
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Homepage.psi
+    NAME Homepage
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Network homepage"
+    SERVICE homepage
+    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    DEPENDS ${Homepage_js_DEP}
+    
 )
 
 psibase_package(
@@ -752,9 +763,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit 
+                    Docs Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
 )
 
 psibase_package(
@@ -762,9 +773,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 CommonApi CpuLimit Docs
-                    Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol Tokens Transact
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
 
 
@@ -793,7 +804,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
+    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -808,6 +819,7 @@ install(
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
+          ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi

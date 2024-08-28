@@ -30,6 +30,13 @@ namespace SystemService
    PSIO_REFLECT(SitesContentRow, account, path, contentType, content)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
+   struct SiteConfigRow {
+      psibase::AccountNumber account;
+      bool spa = false;
+   };
+   PSIO_REFLECT(SiteConfigRow, account, spa)
+   using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
+
    /// Provide web hosting
    ///
    /// This service provides web hosting to non-service accounts. It supports both an
@@ -55,15 +62,20 @@ namespace SystemService
    struct Sites : psibase::Service<Sites>
    {
       static constexpr auto service = psibase::AccountNumber("sites");
-      using Tables                  = psibase::ServiceTables<SitesContentTable>;
+      using Tables                  = psibase::ServiceTables<SitesContentTable, SiteConfigTable>;
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       void storeSys(std::string path, std::string contentType, std::vector<char> content);
       void removeSys(std::string path);
+
+      /// Enables/disables single-page application mode.
+      /// When enabled, all content requests return the root document.
+      void enableSpa(bool enable);
    };
 
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, content),
-                method(removeSys, path))
+                method(removeSys, path),
+                method(enableSpa, enable))
 }  // namespace SystemService
