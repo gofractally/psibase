@@ -34,7 +34,6 @@ export const App = () => {
             method: "getNetworkName",
             params: [],
         })) as string;
-        console.info("ui: queried network and got name:", queriedNetworkName);
         setNetworkName(queriedNetworkName);
     };
     const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
