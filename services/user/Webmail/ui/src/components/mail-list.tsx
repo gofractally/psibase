@@ -7,8 +7,6 @@ import { ScrollArea } from "@shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { type Message } from "@hooks";
 
-import { accounts } from "../fixtures/data";
-
 interface SharedProps {
     mailbox: Mailbox;
     selectedMessage?: Message;
@@ -54,8 +52,6 @@ const MailItem = ({
     selectedMessage,
     setSelectedMessageId,
 }: MailItemProps) => {
-    const fromAccount = accounts.find((a) => a.account === item.from);
-    const toAccount = accounts.find((a) => a.account === item.to);
     return (
         <div
             key={item.id}
@@ -71,13 +67,13 @@ const MailItem = ({
             <div className="flex w-full flex-col gap-1">
                 <div className="flex items-center">
                     <div className="flex items-center gap-2">
-                        {fromAccount && toAccount ? (
+                        {item.from && item.to ? (
                             <Tooltip>
                                 <TooltipTrigger>
                                     <div className="font-semibold">
                                         {mailbox === "inbox"
-                                            ? fromAccount?.name
-                                            : `To: ${toAccount.name}`}
+                                            ? item.from
+                                            : `To: ${item.to}`}
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="right">

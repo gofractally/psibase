@@ -55,9 +55,9 @@ const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
     const { user } = useUser();
     const query = useQuery({
-        queryKey: ["incoming", user.account],
-        queryFn: () => getIncomingMessages(user.account),
-        enabled: Boolean(user.account),
+        queryKey: ["incoming", user],
+        queryFn: () => getIncomingMessages(user),
+        enabled: Boolean(user),
     });
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
@@ -82,9 +82,9 @@ const sentMsgAtom = atom<Message["id"]>("");
 export function useSentMessages() {
     const { user } = useUser();
     const query = useQuery({
-        queryKey: ["sent", user.account],
-        queryFn: () => getSentMessages(user.account),
-        enabled: Boolean(user.account),
+        queryKey: ["sent", user],
+        queryFn: () => getSentMessages(user),
+        enabled: Boolean(user),
     });
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
@@ -115,7 +115,7 @@ export function useDraftMessages() {
         setDrafts(remainingDrafts);
     };
 
-    const drafts = allDrafts?.filter((d) => d.from === user.account);
+    const drafts = allDrafts?.filter((d) => d.from === user);
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
     const selectedMessage = drafts?.find((msg) => msg.id === selectedMessageId);

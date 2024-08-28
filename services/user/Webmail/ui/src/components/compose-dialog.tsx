@@ -88,7 +88,7 @@ export const ComposeDialog = ({
     const createDraft = (value: string) => {
         const draft = {
             id: id.current,
-            from: user.account,
+            from: user,
             to: form.getValues().to || "recipient",
             datetime: Date.now(),
             status: "draft",

@@ -18,7 +18,7 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
 
     return (
         <Select
-            defaultValue={user.account}
+            defaultValue={user}
             onValueChange={(value) => {
                 setSelectedMessageId("");
                 setUser(value);
@@ -34,15 +34,15 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
             >
                 <SelectValue placeholder="Select an account">
                     <span className={cn("ml-2", isCollapsed && "hidden")}>
-                        {user.name}
+                        {user}
                     </span>
                 </SelectValue>
             </SelectTrigger>
             <SelectContent>
                 {availableAccounts.map((account) => (
-                    <SelectItem key={account.account} value={account.account}>
+                    <SelectItem key={account} value={account}>
                         <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
-                            {account.account}
+                            {account}
                         </div>
                     </SelectItem>
                 ))}

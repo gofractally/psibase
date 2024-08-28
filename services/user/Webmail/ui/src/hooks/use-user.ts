@@ -4,25 +4,18 @@ import { atom, useAtom } from "jotai";
 import { type PluginId } from "@psibase/common-lib";
 
 import { getSupervisor } from "@lib/supervisor";
-
-import { accounts } from "src/fixtures/data";
-
-interface Account {
-    name: string;
-    account: string;
-}
 interface SupervisorError {
     code: number;
     producer: PluginId;
     message: string;
 }
 
-// TODO: Get rid of pretty names for now
-const accountsAtom = atom<Account[]>([]);
-const userAtom = atom<Account>(accounts[0]);
+const accountsAtom = atom<string[]>([]);
+// TODO: get rid of hard-coded alice
+const userAtom = atom<string>("alice");
 export function useUser() {
     const [availableAccounts, setAvailableAccounts] = useAtom(accountsAtom);
-    const [user, setUser] = useAtom<Account>(userAtom);
+    const [user, setUser] = useAtom(userAtom);
 
     const getAvailableAccounts = async () => {
         const supervisor = await getSupervisor();
@@ -33,12 +26,7 @@ export function useUser() {
                 method: "getAvailableAccounts",
                 params: [],
             })) as string[];
-            const accountsAsUsers = res
-                .map((a) => {
-                    return accounts.find((one) => one.account === a);
-                })
-                .filter(Boolean) as Account[];
-            setAvailableAccounts(accountsAsUsers);
+            setAvailableAccounts(res);
         } catch (e: unknown) {
             console.error(`${(e as SupervisorError).message}`);
         }
@@ -53,9 +41,7 @@ export function useUser() {
                 method: "loginTemp",
                 params: [accountName],
             });
-            const user = accounts.find((a) => a.account === accountName);
-            if (!user) return;
-            setUser(user);
+            setUser(accountName);
         } catch (e: unknown) {
             console.error("ERROR setting user:");
             console.log(e);
