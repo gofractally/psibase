@@ -55,16 +55,16 @@ TEST_CASE("ec")
    auto bob   = t.from(t.addAccount(AccountNumber("bob"), AccountNumber("auth-sig")));
    auto sue   = t.addAccount("sue", pub_key1);
 
-   expect(t.pushTransaction(t.makeTransaction({{
-              .sender  = bob,
-              .service = test_service,
-          }})),
-          "sender does not have a public key");
-   expect(t.pushTransaction(t.makeTransaction({{
-              .sender  = sue,
-              .service = test_service,
-          }})),
-          "transaction does not include a claim for the key");
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                         .sender  = bob,
+                         .service = test_service,
+                     }})))
+             .failed("sender does not have a public key"));
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                         .sender  = sue,
+                         .service = test_service,
+                     }})))
+             .failed("transaction does not include a claim for the key"));
 
    auto ec_trx = t.makeTransaction({{
        .sender  = sue,
@@ -73,54 +73,62 @@ TEST_CASE("ec")
    }});
    ec_trx.claims.push_back({
        .service = SystemService::VerifySig::service,
-       .rawData = psio::convert_to_frac(pub_key1),
+       .rawData = {pub_key1.data.begin(), pub_key1.data.end()},
    });
-   expect(t.pushTransaction(ec_trx), "proofs and claims must have same size");
 
-   auto packed_ec_trx = psio::convert_to_frac(ec_trx);
+   SignedTransaction signedTrx;
+   signedTrx.transaction = ec_trx;
+   CHECK(TraceResult(t.pushTransaction(signedTrx)).failed("proofs and claims must have same size"));
 
+   auto              packed_ec_trx = psio::convert_to_frac(ec_trx);
+   auto              sig  = sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
+   auto              data = std::get<1>(sig.data);
    SignedTransaction ec_signed = {
        .transaction = ec_trx,
-       .proofs      = {psio::convert_to_frac(
-           sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size())))},
+       .proofs = {{reinterpret_cast<char*>(data.begin()), reinterpret_cast<char*>(data.end())}},
    };
-   expect(t.pushTransaction(ec_signed), "incorrect signature");
+   CHECK(TraceResult(t.pushTransaction(ec_signed)).failed("signature invalid"));
 
+   sig              = sign(priv_key1, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
+   data             = std::get<1>(sig.data);
    ec_signed.proofs = {
-       psio::convert_to_frac(sign(priv_key1, sha256(packed_ec_trx.data(), packed_ec_trx.size())))};
-   expect(t.pushTransaction(ec_signed));
+       {reinterpret_cast<char*>(data.begin()), reinterpret_cast<char*>(data.end())}};
+   CHECK(TraceResult(t.pushTransaction(ec_signed)).succeeded());
 
    t.startBlock();
-   expect(t.pushTransaction(t.makeTransaction({{
-                                .sender  = sue,
-                                .service = test_service,
-                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
-                            }}),
-                            {{pub_key1, priv_key1}}));
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                                           .sender  = sue,
+                                           .service = test_service,
+                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                       }}),
+                                       {{pub_key1, priv_key1}}))
+             .succeeded());
 
-   expect(t.pushTransaction(t.makeTransaction({{
-                                .sender  = sue,
-                                .service = test_service,
-                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
-                            }}),
-                            {{pub_key2, priv_key2}}),
-          "transaction does not include a claim for the key");
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                                           .sender  = sue,
+                                           .service = test_service,
+                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                       }}),
+                                       {{pub_key2, priv_key2}}))
+             .failed("transaction does not include a claim for the key"));
 
-   expect(t.pushTransaction(t.makeTransaction({{
-                                .sender  = sue,
-                                .service = test_service,
-                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
-                            }}),
-                            {{pub_key1, priv_key2}}),
-          "incorrect signature");
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                                           .sender  = sue,
+                                           .service = test_service,
+                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                       }}),
+                                       {{pub_key1, priv_key2}}))
+             .failed("signature invalid"));
 
-   expect(t.pushTransaction(t.makeTransaction({authsig.from(sue).setKey(pub_key2)}),
-                            {{pub_key1, priv_key1}}));
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({authsig.from(sue).setKey(pub_key2)}),
+                                       {{pub_key1, priv_key1}}))
+             .succeeded());
 
-   expect(t.pushTransaction(t.makeTransaction({{
-                                .sender  = sue,
-                                .service = test_service,
-                                .rawData = psio::convert_to_frac(test_cntr::payload{}),
-                            }}),
-                            {{pub_key2, priv_key2}}));
+   CHECK(TraceResult(t.pushTransaction(t.makeTransaction({{
+                                           .sender  = sue,
+                                           .service = test_service,
+                                           .rawData = psio::convert_to_frac(test_cntr::payload{}),
+                                       }}),
+                                       {{pub_key2, priv_key2}}))
+             .succeeded());
 }  // ec

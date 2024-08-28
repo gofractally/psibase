@@ -52,7 +52,6 @@ bool psibase::TraceResult::succeeded()
    bool failed    = hasErrObj && (*_t.error) != "";
    if (failed)
    {
-      std::cout << prettyTrace(trimRawData(_t)).c_str();
       UNSCOPED_INFO("transaction failed: " << *_t.error << "\n");
    }
 
