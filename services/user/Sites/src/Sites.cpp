@@ -71,6 +71,14 @@ namespace SystemService
          auto pos    = target.find('?');
          if (pos != target.npos)
             target.resize(pos);
+         
+         auto siteConfig = tables.open<SiteConfigTable>().get(account);
+         if (siteConfig) {
+            if (siteConfig->spa) {
+               target = "/";
+            }
+         }
+
          auto content = index.get(SitesContentKey{account, target});
          if (!content)
          {
