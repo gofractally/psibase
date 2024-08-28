@@ -4,6 +4,7 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
+#include <psibase/serveSimpleUI.hpp>
 #include <psibase/serveSchema.hpp>
 
 using namespace psibase;
@@ -28,11 +29,21 @@ namespace SystemService
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
    {
-      check(request.host.size() > request.rootHost.size(), "oops");
+      if (request.host.size() < request.rootHost.size())
+      {
+         check(false, "request host invalid: \"" + request.host + "\"");
+      }
 
-      std::string_view accountName{request.host.data(),
+      auto account = AccountNumber{0};
+      if (request.host == request.rootHost)
+      {
+         account = AccountNumber{"homepage"};
+      }
+      else {
+         std::string_view accountName{request.host.data(),
                                    request.host.size() - request.rootHost.size() - 1};
-      auto             account = AccountNumber(accountName);
+         account = AccountNumber(accountName);
+      }
 
       if (account == Sites::service)
       {
@@ -46,6 +57,9 @@ namespace SystemService
             return result;
 
          if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
+            return result;
+
+         if (auto result = psibase::serveSimpleUI<Sites, true>(request))
             return result;
       }
 
@@ -104,8 +118,19 @@ namespace SystemService
    void Sites::removeSys(std::string path)
    {
       Tables tables{getReceiver()};
-      auto   table = tables.template open<SitesContentTable>();
+      auto   table = tables.open<SitesContentTable>();
       table.erase(SitesContentKey{getSender(), path});
+   }
+
+   void Sites::enableSpa(bool enable)
+   {
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row = table.get(getSender()).value_or(SiteConfigRow{
+         .account = getSender(),
+         .spa = enable,
+      });
+      row.spa = enable;
+      table.put(row);
    }
 }  // namespace SystemService
 
