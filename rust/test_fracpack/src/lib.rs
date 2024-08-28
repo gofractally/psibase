@@ -204,3 +204,47 @@ pub struct TrailingWithAliasedOptionType {
     pub opt_y: MyOpt<String>,
     pub opt_z: MyOpt<u64>,
 }
+
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructU32OptU8 {
+    pub a: u32,
+    pub b: Option<u8>,
+}
+
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructU32 {
+    pub a: u32,
+}
+
+#[derive(Pack, Unpack, ToSchema, Debug, PartialEq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructStU32StU32OptU8 {
+    pub a: StructU32,
+    pub b: StructU32OptU8,
+}
+
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub enum EnumU8 {
+    A(u8),
+}
+
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructOptU8 {
+    pub a: Option<u8>,
+}
+
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructString {
+    pub a: String,
+}
+
+#[derive(Pack, Unpack, ToSchema, PartialEq, Eq, Debug)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StructVecU8 {
+    pub a: Vec<u8>,
+}

@@ -1,4 +1,4 @@
-use fracpack::{Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use fracpack::{Pack, Result, SchemaBuilder, ToSchema, Unpack, UnpackOwned};
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -733,6 +733,108 @@ fn test_trailing_options_unextensible() {
         &empty_trailing_options,
         "01000000020000000000000010000000010000000100000001000000020000006869",
     );
+}
+
+#[test]
+fn invalid_cases() {
+    // bool is 0 or 1
+    // test_invalid::<bool>(&["02", "03", "FF"]);
+
+    // optional must be 1 or an offset pointer
+    // test_invalid::<Option<u8>>(&["00000000", "02000000", "03000000", "05000000FFFF"]);
+
+    // vector byte size must be a multiple of the element size
+    test_invalid::<Vec<u16>>(&["03000000FFFFFFFFFFFF"]);
+
+    // negative offset
+    test_invalid::<(u32, Option<u8>)>(&["0800CCCCCCCCFFFFFFFF"]);
+    test_invalid::<StructU32OptU8>(&["0800CCCCCCCCFFFFFFFF"]);
+
+    // gaps after unknown fields
+    test_invalid::<((u32,), (u32, Option<u8>))>(&[
+        "0800",
+        "08000000",
+        "0F000000",
+        "0800CCCCCCCC04000000FF",
+        "0800DDDDDDDD05000000EEEE",
+    ]);
+    test_invalid::<StructStU32StU32OptU8>(&[
+        "0800",
+        "08000000",
+        "0F000000",
+        "0800CCCCCCCC04000000FF",
+        "0800DDDDDDDD05000000EEEE",
+    ]);
+
+    // (Skipped) Malformed extensions - we dont support unit structs and unit type (empty tuple)
+
+    // Enum/Variant cannot unpack unknown alternatives; known alternatives must have the correct size
+    // test_invalid::<EnumU8>(&["0002000000FFFF", "0101000000FF"]);
+
+    // No trailing empty optionals
+    // test_invalid::<(Option<u8>,)>(&[
+    //     "040001000000",
+    //     "08000100000001000000",
+    //     "08000800000001000000FF",
+    // ]);
+    // test_invalid::<StructOptU8>(&[
+    //     "040001000000",
+    //     "08000100000001000000",
+    //     "08000800000001000000FF",
+    // ]);
+
+    // Offset pointer to empty container must use compression
+    // test_invalid::<Option<String>>(&["0400000000000000"]);
+    // test_invalid::<Option<Vec<u8>>>(&["0400000000000000"]);
+    // test_invalid::<(String,)>(&["0400000000000000"]);
+    // test_invalid::<(Vec<u8>,)>(&["0400000000000000"]);
+    // test_invalid::<StructString>(&["0400000000000000"]);
+    // test_invalid::<StructVecU8>(&["0400000000000000"]);
+}
+
+fn test_invalid<T>(hex_list: &[&str])
+where
+    T: Pack + UnpackOwned + std::fmt::Debug,
+{
+    for &h in hex_list {
+        test_invalid_item::<T>(h);
+    }
+}
+
+fn test_invalid_item<T>(hex: &str)
+where
+    T: Pack + UnpackOwned + std::fmt::Debug,
+{
+    println!("data: {}", hex);
+    println!("type: {}", std::any::type_name::<T>());
+
+    let data = hex::decode(hex).expect("Invalid hex string");
+
+    // Test unpacking with verification
+    {
+        let result = T::unpack(&data, &mut 0);
+        let _ = result
+            .as_ref()
+            .inspect(|x| println!("unexpected unpack: '{:?}'", x))
+            .inspect_err(|x| println!("unpack error: '{:?}'", x));
+        assert!(result.is_err(), "Unpacking should fail for invalid data");
+    }
+
+    // Test verification without unpacking
+    {
+        let result = T::verify(&data, &mut 0);
+        assert!(result.is_err(), "Verification should fail for invalid data");
+    }
+
+    // // Test schema validation
+    // {
+    //     let mut builder = SchemaBuilder::new();
+    //     builder.insert_named::<T>("T".to_string());
+    //     let schema = builder.build().packed();
+
+    //     let result = test_fracpack::bridge::ffi::validate_with_schema(&schema, &data);
+    //     assert!(!result, "Schema validation should fail for invalid data");
+    // }
 }
 
 fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>
