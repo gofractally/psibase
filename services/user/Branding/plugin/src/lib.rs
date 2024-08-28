@@ -32,24 +32,25 @@ impl Api for BrandingPlugin {
 }
 
 #[derive(serde::Deserialize, Debug)]
-#[allow(non_snake_case)]
+#[serde(rename_all = "camelCase")]
 struct NetworkNameData {
-    networkName: String,
+    network_name: String,
 }
 #[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct NetworkNameResponse {
     data: NetworkNameData,
 }
 
 impl Queries for BrandingPlugin {
     fn get_network_name() -> Result<String, Error> {
-        let graphql_str = format!("query {{ networkName }}");
+        let graphql_str = "query {{ networkName }}";
         let summary_val = serde_json::from_str::<NetworkNameResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         )
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-        Ok(summary_val.data.networkName)
+        Ok(summary_val.data.network_name)
     }
 }
 

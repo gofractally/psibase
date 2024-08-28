@@ -205,9 +205,7 @@ pub trait Table<Record: TableRecord>: Sized {
 pub struct SingletonKey {}
 
 impl ToKey for SingletonKey {
-    fn append_key(&self, _key: &mut Vec<u8>) {
-        ()
-    }
+    fn append_key(&self, _key: &mut Vec<u8>) {}
 }
 
 #[derive(Clone)]

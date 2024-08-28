@@ -135,7 +135,7 @@ export const App = () => {
                             Logo
                         </Label>
                         <div className="text-extralight text-sm">
-                            Size: 96px x 96px
+                            Size: 96x96 px
                         </div>
                     </div>
                     <div className="col-span-2">

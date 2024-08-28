@@ -33,16 +33,17 @@ mod service {
     struct WebContentTable;
 
     #[action]
-    fn set_network_name(name: String) {
+    #[allow(non_snake_case)]
+    fn networkNameChanged(name: String) {
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();
 
-        Wrapper::emit().history().set_network_name(name);
+        Wrapper::emit().history().networkNameChanged(name);
     }
 
     #[event(history)]
-    pub fn set_network_name(name: String) {}
+    pub fn networkNameChanged(name: String) {}
 
     struct Query;
 
