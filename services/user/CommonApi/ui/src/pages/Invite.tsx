@@ -3,8 +3,6 @@ import { useSearchParams } from "react-router-dom";
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
-import * as React from "react";
-
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -65,13 +63,7 @@ export const Invite = () => {
                         <CardContent></CardContent>
                         {!isExpired && (
                             <CardFooter className="flex justify-between">
-                                <Button
-                                    variant="link"
-                                    className="text-muted-foreground"
-                                >
-                                    Reject
-                                </Button>
-                                <Button>Accept</Button>
+                                <Button>Continue</Button>
                             </CardFooter>
                         )}
                     </Card>

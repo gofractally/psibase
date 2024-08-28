@@ -203,7 +203,7 @@ export const AccountSelection = () => {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const appName = "Invite";
+  const appName = "Dashboard";
 
   const [activeSearch, setActiveSearch] = useState("");
 
@@ -287,7 +287,7 @@ export const AccountSelection = () => {
       invite.expiry
     ).format("DD/MM/YYYY HH:mm")}).`;
 
-  if (isExpired) {
+  if (isExpired && false) {
     return (
       <Card className="w-[350px] mx-auto mt-4">
         <CardHeader>
@@ -371,7 +371,7 @@ export const AccountSelection = () => {
                     )
                   }
                 >
-                  {isSubmitting ? "Connecting" : "Connect"} to {appName}
+                  {isSubmitting ? "Accepting" : "Accept"} invite
                 </Button>
               </form>
             </Form>
