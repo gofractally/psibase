@@ -6,6 +6,7 @@ use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
 use bindings::host::common::{server as CommonServer, types as CommonTypes};
+use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 
@@ -39,7 +40,7 @@ impl Api for IdentityPlugin {
         }
         .packed();
 
-        CommonServer::add_action_to_transaction("attest", &packed_a)
+        Transact::add_action_to_transaction("attest", &packed_a)
     }
 }
 
