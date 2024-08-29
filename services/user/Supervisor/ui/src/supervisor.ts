@@ -19,7 +19,7 @@ import {
 import { Plugin } from "./plugin/plugin";
 import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
-import { isRecoverableError } from "./plugin/errors";
+import { isRecoverableError, PluginDownloadFailed } from "./plugin/errors";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { isEqual } from "@psibase/common-lib/messaging/PluginId";
 
@@ -89,8 +89,16 @@ export class Supervisor implements AppInterface {
     private async getDependencies(
         plugin: Plugin,
     ): Promise<QualifiedPluginId[]> {
-        const dependencies = await plugin.getDependencies();
-        return dependencies.filter((id) => this.validated(id));
+        try {
+            const dependencies = await plugin.getDependencies();
+            return dependencies.filter((id) => this.validated(id));
+        } catch (e: any) {
+            if (e instanceof PluginDownloadFailed) {
+                return [];
+            } else {
+                throw e;
+            }
+        }
     }
 
     private async preload(callerOrigin: string, plugins: QualifiedPluginId[]) {
