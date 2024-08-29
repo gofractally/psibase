@@ -42,7 +42,7 @@ fn assert_from_supervisor() {
     let sender_app = Host::client::get_sender_app()
         .app
         .expect("Sender app not set");
-    assert!(sender_app == "supervisor", "[finish_tx] Unauthorized");
+    assert!(sender_app == "supervisor", "Unauthorized");
 }
 
 fn ten_second_expiration() -> TimePointSec {
@@ -78,9 +78,10 @@ impl Intf for TransactPlugin {
             rawData: Hex::from(packed_args),
         };
 
-        let actions = Keyvalue::get("actions")
-            .map(|a| <Vec<Action>>::unpacked(&a).expect("[finish_tx] Failed to unpack"))
-            .unwrap_or(vec![new_action]);
+        let mut actions = Keyvalue::get("actions")
+            .map(|a| <Vec<Action>>::unpacked(&a).expect("Failed to unpack Vec<Action>"))
+            .unwrap_or(vec![]);
+        actions.push(new_action);
 
         Keyvalue::set("actions", &actions.packed())?;
 
