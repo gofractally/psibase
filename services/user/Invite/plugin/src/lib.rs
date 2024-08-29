@@ -1,6 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
+use bindings::accounts::plugin as Accounts;
 use bindings::auth_sig::plugin::keyvault;
 use bindings::auth_sig::plugin::types::Pem;
 use bindings::exports::invite;
@@ -24,15 +25,6 @@ use errors::ErrorType::*;
     /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
     /// can be deleted by calling this action
     void delExpired(uint32_t maxDeleted);
-
-
-    Add a registration service that allows an app to specify subpage links:
-     * TOS subpage
-     * Privacy policy subpage
-     * App homepage subpage
-     * Brief description (<= 200 characters)
-    These can be used on the login page, when logging into a particular app, there can be links
-        that can help verify that you're logging into what you think you're logging into.
 */
 
 #[derive(Serialize, Deserialize)]
@@ -60,7 +52,7 @@ struct InviteRecordSubset {
     state: u8,
 }
 
-//                                           ...Such that the below code is generated:
+//                                           ...Such that something like the below code is generated:
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 struct GetInviteResponse {
@@ -107,18 +99,14 @@ impl TryFromInviteId for InviteParams {
 }
 
 impl Invitee for Component {
-    fn accept(_id: InviteId) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("accept_with_existing_account"))
-        // The thinking for only a single accept method is that the invite ID is passed
-        // to the account plugin. If the invite contains a valid invite private key
-        // then the login page can also show a Create Account button.
-    }
-
-    fn accept_temp(account: String, id: InviteId) -> Result<(), CommonTypes::Error> {
+    fn accept_with_new_account(account: String, id: InviteId) -> Result<(), CommonTypes::Error> {
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount.err(&account));
         })?;
-        // Todo: Check that the account does not already exist.
+
+        if Accounts::accounts::get_account(&account)?.is_some() {
+            return Err(AccountExists.err("accept_with_new_account"));
+        }
 
         let invite_params = InviteParams::try_from_invite_id(id)?;
         let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
@@ -181,7 +169,6 @@ impl Invitee for Component {
 
 impl Inviter for Component {
     fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
-        //       Todo: update decode with the new key types
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         Transact::add_action_to_transaction(

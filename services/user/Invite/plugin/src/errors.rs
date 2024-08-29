@@ -8,6 +8,7 @@ pub enum ErrorType {
     DatetimeError,
     InvalidInviteState,
     InvalidAccount,
+    AccountExists,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -50,6 +51,11 @@ impl ErrorType {
                 producer: my_plugin_id(),
                 message: format!("Invalid account name: {}", msg),
             },
+            ErrorType::AccountExists => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("[{}] Error: Account already exists", msg),
+            }
         }
     }
 }

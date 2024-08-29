@@ -95,17 +95,12 @@ interface invitee {
     ///   invite ID.
     decode-invite: func(id: invite-id) -> result<invite, error>;
 
-    /// Similar to accounts->login-temp, this is a function that will be removed once 
-    /// windows can be spawned from plugins.
-    /// 
-    /// This function will acceptCreate an invite with the specified account name.
-    accept-temp: func(account: string, id: invite-id) -> result<_, error>;
-
-    /// Call to accept an invite.
+    /// Call to accept an invite with a new account.
     /// 
     /// Parameters
+    /// * `account`: The name of the new account being created
     /// * `id`: The id from the invite URL query parameter
-    accept: func(id: invite-id) -> result<_, error>;
+    accept-with-new-account: func(account: string, id: invite-id) -> result<_, error>;
 
     /// Called by existing accounts or the system account "invited-sys" to reject
     /// an invite. Once an invite is rejected, it cannot be accepted or used to
