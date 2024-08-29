@@ -50,6 +50,7 @@
       - [Environment setup](development/services/rust-service/setup.md)
       - [Basic Service](development/services/rust-service/basic/README.md)
       - [Testing Services](development/services/rust-service/testing.md)
+      - [Building Packages](development/services/rust-service/package.md)
       - [Calling Others](development/services/rust-service/calling.md)
       - [Minimal UI](development/services/rust-service/minimal-ui.md)
       - [Tables](development/services/rust-service/tables.md)

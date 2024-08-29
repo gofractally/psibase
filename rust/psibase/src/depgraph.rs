@@ -16,6 +16,8 @@ custom_error! {
     pub Error
         CannotResolvePackages          = "Cannot resolve packages",
     DependencyCycle = "Cycle in service dependencies",
+    PackageNotFound{name: String} = "Package {name} not found",
+    PackageVersionNotFound{name: String, version: String} = "No suitable version for {name} ({version})"
 }
 
 #[derive(Serialize, Deserialize)]
@@ -407,6 +409,16 @@ impl<'a> DepGraph<'a> {
                 name: name.clone(),
                 version: version.clone(),
             })?;
+            if group.is_empty() {
+                if self.packages.get(name).is_some() {
+                    Err(Error::PackageVersionNotFound {
+                        name: name.clone(),
+                        version: version.clone(),
+                    })?
+                } else {
+                    Err(Error::PackageNotFound { name: name.clone() })?
+                }
+            }
             any(&mut self.solver, &group);
         }
         Ok(())

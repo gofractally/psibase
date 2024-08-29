@@ -4,11 +4,12 @@ use crate::{
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
     GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::str::FromStr;
@@ -16,14 +17,13 @@ use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
 
 use async_trait::async_trait;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
-#[cfg(not(target_family = "wasm"))]
-use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
 use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
@@ -143,7 +143,7 @@ pub struct PackageManifest {
     pub data: Vec<PackageDataFile>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServiceInfo {
     pub flags: Vec<String>,
     pub server: Option<AccountNumber>,
@@ -243,6 +243,9 @@ impl<R: Read + Seek> PackagedService<R> {
     }
     pub fn name(&self) -> &str {
         &self.meta.name
+    }
+    pub fn meta(&self) -> &Meta {
+        &self.meta
     }
     pub fn get_genesis(&mut self, services: &mut Vec<GenesisService>) -> Result<(), anyhow::Error> {
         for (account, index, info) in &self.services {
@@ -632,11 +635,18 @@ pub trait PackageRegistry {
 
 pub struct DirectoryRegistry {
     dir: PathBuf,
+    index: PathBuf,
 }
 
 impl DirectoryRegistry {
-    pub fn new(dir: PathBuf) -> Self {
-        DirectoryRegistry { dir }
+    pub fn new(path: PathBuf) -> Self {
+        if path.is_dir() {
+            let index = path.join("index.json");
+            DirectoryRegistry { dir: path, index }
+        } else {
+            let dir = path.parent().unwrap().to_path_buf();
+            DirectoryRegistry { dir, index: path }
+        }
     }
 }
 
@@ -644,9 +654,8 @@ impl DirectoryRegistry {
 impl PackageRegistry for DirectoryRegistry {
     type R = BufReader<File>;
     fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
-        let path = self.dir.join("index.json");
-        let f =
-            File::open(&path).with_context(|| format!("Cannot open {}", path.to_string_lossy()))?;
+        let f = File::open(&self.index)
+            .with_context(|| format!("Cannot open {}", self.index.to_string_lossy()))?;
         let contents = std::io::read_to_string(f)?;
         let result: Vec<PackageInfo> = serde_json::de::from_str(&contents)?;
         Ok(result)
@@ -658,6 +667,74 @@ impl PackageRegistry for DirectoryRegistry {
         let path = self.dir.join(&info.file);
         let f =
             File::open(&path).with_context(|| format!("Cannot open {}", path.to_string_lossy()))?;
+        PackagedService::new(BufReader::new(f))
+    }
+}
+
+// A virtual registry that contains packages from a set of files
+pub struct FileSetRegistry {
+    info: Vec<PackageInfo>,
+    by_hash: HashMap<Checksum256, PathBuf>,
+}
+
+impl FileSetRegistry {
+    // Splits string that are paths to existing files from ones that are package names
+    pub fn from_files(
+        packages: &[OsString],
+    ) -> Result<(FileSetRegistry, Vec<String>), anyhow::Error> {
+        let mut not_files = Vec::new();
+        let mut result = FileSetRegistry {
+            info: Vec::new(),
+            by_hash: HashMap::new(),
+        };
+        for package in packages {
+            let path: &Path = package.as_ref();
+            if path.exists() {
+                let mut f =
+                    File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+                let mut hasher = Sha256::new();
+                std::io::copy(&mut f, &mut hasher)?;
+                let hash: [u8; 32] = hasher.finalize().into();
+                f.rewind()?;
+                let mut archive = ZipArchive::new(f)?;
+
+                let meta_contents = std::io::read_to_string(archive.by_name("meta.json")?)?;
+                let meta: Meta = serde_json::de::from_str(&meta_contents)?;
+                let sha256 = Checksum256::from(hash);
+                not_files.push(format!("{}-{}", meta.name, meta.version));
+                if result
+                    .by_hash
+                    .insert(sha256.clone(), PathBuf::from(path))
+                    .is_none()
+                {
+                    result
+                        .info
+                        .push(meta.info(sha256, path.display().to_string()));
+                }
+            } else {
+                not_files.push(
+                    path.to_str()
+                        .ok_or_else(|| anyhow!("{} is not valid UTF8", path.display()))?
+                        .to_string(),
+                );
+            }
+        }
+        Ok((result, not_files))
+    }
+}
+
+#[async_trait(?Send)]
+impl PackageRegistry for FileSetRegistry {
+    type R = BufReader<File>;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        Ok(self.info.clone())
+    }
+    async fn get_by_info(
+        &self,
+        info: &PackageInfo,
+    ) -> Result<PackagedService<Self::R>, anyhow::Error> {
+        let path = self.by_hash.get(&info.sha256).unwrap();
+        let f = File::open(&path).with_context(|| format!("Cannot open {}", info.file))?;
         PackagedService::new(BufReader::new(f))
     }
 }

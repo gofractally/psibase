@@ -3,19 +3,19 @@
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/TransactionContext.hpp>
-#include <psibase/bft.hpp>
-#include <psibase/cft.hpp>
 #include <psibase/http.hpp>
 #include <psibase/log.hpp>
 #include <psibase/node.hpp>
-#include <psibase/peer_manager.hpp>
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <psibase/shortest_path_routing.hpp>
 #include <psibase/version.hpp>
 #include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
+
+#include "connect.hpp"
+#include "connection.hpp"
+#include "psinode.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/core/core.hpp>
@@ -25,7 +25,6 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include <boost/asio/ssl/host_name_verification.hpp>
-#include <boost/asio/system_timer.hpp>
 
 #include <charconv>
 #include <filesystem>
@@ -792,62 +791,6 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
    return false;
 }  // pushTransaction
 
-enum class socket_type
-{
-   unknown,
-   tcp,
-   tls,
-   local
-};
-
-std::tuple<socket_type, std::string_view, std::string_view> parse_endpoint(std::string_view peer)
-{
-   auto type = socket_type::unknown;
-   if (peer.starts_with("ws://"))
-   {
-      type = socket_type::tcp;
-      peer = peer.substr(5);
-   }
-   else if (peer.starts_with("http://"))
-   {
-      type = socket_type::tcp;
-      peer = peer.substr(7);
-   }
-   else if (peer.starts_with("wss://"))
-   {
-      type = socket_type::tls;
-      peer = peer.substr(6);
-   }
-   else if (peer.starts_with("https://"))
-   {
-      type = socket_type::tls;
-      peer = peer.substr(8);
-   }
-   if (type == socket_type::unknown)
-   {
-      if (peer.find('/') != std::string::npos)
-      {
-         return {socket_type::local, peer, ""};
-      }
-   }
-   else
-   {
-      if (peer.ends_with('/'))
-      {
-         peer = peer.substr(0, peer.size() - 1);
-      }
-   }
-   auto pos = peer.find(':');
-   if (pos == std::string_view::npos)
-   {
-      return {type, peer, type == socket_type::tls ? "443" : "80"};
-   }
-   else
-   {
-      return {type, peer.substr(0, pos), peer.substr(pos + 1)};
-   }
-}
-
 std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
    for (auto& url : urls)
@@ -1543,21 +1486,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    to_config(config.loggers, file);
 }
 
-using timer_type = boost::asio::system_timer;
-
-template <typename Derived>
-using cft_consensus = basic_cft_consensus<blocknet<Derived, timer_type>, timer_type>;
-
-template <typename Derived>
-using bft_consensus = basic_bft_consensus<blocknet<Derived, timer_type>, timer_type>;
-
-template <typename Derived, typename Timer>
-using basic_consensus =
-    basic_bft_consensus<basic_cft_consensus<blocknet<Derived, Timer>, Timer>, Timer>;
-
-template <typename Derived>
-using consensus = basic_consensus<Derived, timer_type>;
-
 void run(const std::string&              db_path,
          const DbConfig&                 db_conf,
          AccountNumber                   producer,
@@ -1748,7 +1676,7 @@ void run(const std::string&              db_path,
    }
 #endif
 
-   using node_type = node<peer_manager, shortest_path_routing, consensus, ForkDb>;
+   using node_type = psinode;
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
@@ -1756,62 +1684,19 @@ void run(const std::string&              db_path,
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one = [&resolver, &node, &chainContext, &http_config, &runResult](
-                          const std::string& peer, auto&& f)
-   {
-      auto [proto, host, service] = parse_endpoint(peer);
-      auto on_connect = [&node, &http_config, &runResult, f = static_cast<decltype(f)>(f)](
-                            const std::error_code& ec, auto&& conn) mutable
-      {
-         if (!ec)
-         {
-            if (http_config->status.load().shutdown)
-            {
-               conn->close(runResult.shouldRestart ? connection_base::close_code::restart
-                                                   : connection_base::close_code::shutdown);
-               f(make_error_code(boost::asio::error::operation_aborted));
-               return;
-            }
-            node.add_connection(std::move(conn));
-         }
-         f(ec);
-      };
-      auto do_connect = [&](auto&& conn)
-      {
-         conn->url = peer;
-         async_connect(std::move(conn), resolver, host, service, std::move(on_connect));
-      };
-      if (proto == socket_type::local)
-      {
-         auto conn = std::make_shared<
-             websocket_connection<boost::beast::basic_stream<boost::asio::local::stream_protocol>>>(
-             chainContext);
-         conn->url = peer;
-         async_connect(std::move(conn), host, std::move(on_connect));
-      }
-      else if (proto == socket_type::tls)
-      {
-#if PSIBASE_ENABLE_SSL
-         auto conn = std::make_shared<
-             websocket_connection<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(
-             chainContext, *http_config->tls_context);
-         conn->stream.next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
-         conn->stream.next_layer().set_verify_callback(
-             boost::asio::ssl::host_name_verification(std::string(host)));
-         do_connect(std::move(conn));
-#else
-         PSIBASE_LOG(psibase::loggers::generic::get(), warning)
-             << "Connection to " << peer
-             << " not attempted because psinode was built without TLS support";
-         boost::asio::post(chainContext, [f = static_cast<decltype(f)>(f)]
-                           { f(std::error_code(EPROTONOSUPPORT, std::generic_category())); });
-#endif
-      }
-      else
-      {
-         do_connect(std::make_shared<websocket_connection<boost::beast::tcp_stream>>(chainContext));
-      }
-   };
+   auto connect_one = make_connect_one(
+       resolver, chainContext, http_config,
+       [&http_config, &node, &runResult](auto&& conn) -> std::error_code
+       {
+          if (http_config->status.load().shutdown)
+          {
+             conn->close(runResult.shouldRestart ? connection_base::close_code::restart
+                                                 : connection_base::close_code::shutdown);
+             return make_error_code(boost::asio::error::operation_aborted);
+          }
+          node.add_connection(std::move(conn));
+          return {};
+       });
 
    timer_type timer(chainContext);
 

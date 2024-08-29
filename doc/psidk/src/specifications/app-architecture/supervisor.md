@@ -14,7 +14,7 @@ The supervisor gives plugins their capabilities. These capabilities could includ
 
 ## Architecture
 
-The libary used by apps to access plugins will instantiate the supervisor in a hidden iframe within the app. This allows the browser to give the supervisor its own namespace that ensures any browser storage requirements are namespaced according to the supervisor domain rather than the app's domain.
+The library used by apps to access plugins will instantiate the supervisor in a hidden iframe within the app. This allows the browser to give the supervisor its own namespace that ensures any browser storage requirements are namespaced according to the supervisor domain rather than the app's domain.
 
 ```svgbob
 .-------------------------------------------.

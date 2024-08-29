@@ -1,131 +1,54 @@
-use psibase::AccountNumber;
-
-use crate::tests::helpers::{
-    query_builders::{
-        get_gql_query_attestation_stats_no_args, get_gql_query_attestations_no_args,
-        get_gql_query_attestations_one_arg, get_gql_query_subject_stats_one_arg,
-    },
-    test_helpers::{
-        are_equal_vecs_of_attestations, are_equal_vecs_of_attestations_stats, init_identity_svc,
-        push_attest, query_attestation_stats, query_attestations, query_subject_stats,
-        PartialAttestation, PartialAttestationStats,
+use crate::{
+    service::{Attestation, AttestationStats},
+    tests::helpers::test_helpers::{
+        init_identity_svc, PartialAttestation, PartialAttestationStats,
     },
 };
 
 #[psibase::test_case(services("identity"))]
 // ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    init_identity_svc(&chain)?;
+    let svc = init_identity_svc(&chain);
+    chain.new_account("carol".into())?;
 
-    chain.new_account(AccountNumber::from("carol"))?;
-    chain.start_block();
-    push_attest(
-        &chain,
-        AccountNumber::from("carol"),
-        AccountNumber::from("bob"),
-        76,
-    )?;
-    push_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("carol"),
-        77,
-    )?;
-    push_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("bob"),
-        75,
-    )?;
+    svc.from("carol").attest("bob".into(), 76).get()?;
+    svc.from("alice").attest("carol".into(), 77).get()?;
+    svc.from("alice").attest("bob".into(), 75).get()?;
 
-    chain.start_block();
-
-    let exp_results = vec![
-        PartialAttestation {
-            attester: AccountNumber::from("alice"),
-            subject: AccountNumber::from("bob"),
-            value: 75,
-        },
-        PartialAttestation {
-            attester: AccountNumber::from("alice"),
-            subject: AccountNumber::from("carol"),
-            value: 77,
-        },
-        PartialAttestation {
-            attester: AccountNumber::from("carol"),
-            subject: AccountNumber::from("bob"),
-            value: 76,
-        },
+    let all = svc.query::<Vec<Attestation>>("allAttestations");
+    let all_expected = vec![
+        PartialAttestation::new("alice", "bob", 75),
+        PartialAttestation::new("carol", "bob", 76),
+        PartialAttestation::new("alice", "carol", 77),
     ];
+    assert_eq!(&all_expected, &all);
 
-    let response = query_attestations(
-        &chain,
-        "allAttestations",
-        get_gql_query_attestations_no_args(String::from("allAttestations")),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_results, &response));
-
-    let exp_result2 = exp_results
-        .clone()
-        .into_iter()
-        .filter(|pa| pa.subject == AccountNumber::from("bob"))
-        .collect::<Vec<PartialAttestation>>();
-
-    let response = query_attestations(
-        &chain,
-        "attestationsBySubject",
-        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "bob"),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
-
-    let exp_result2 = exp_results
-        .into_iter()
-        .filter(|pa| pa.attester == AccountNumber::from("alice"))
-        .collect::<Vec<PartialAttestation>>();
-    let response = query_attestations(
-        &chain,
-        "attestationsByAttester",
-        get_gql_query_attestations_one_arg("attestationsByAttester", "attester", "alice"),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
-
-    let exp_results = vec![
-        PartialAttestationStats {
-            subject: AccountNumber::from("bob"),
-            uniqueAttesters: 2,
-            numHighConfAttestations: 1,
-        },
-        PartialAttestationStats {
-            subject: AccountNumber::from("carol"),
-            uniqueAttesters: 1,
-            numHighConfAttestations: 1,
-        },
+    let all_stats = svc.query::<Vec<AttestationStats>>("allAttestationStats");
+    let all_stats_expected = vec![
+        PartialAttestationStats::new("bob", 2, 1),
+        PartialAttestationStats::new("carol", 1, 1),
     ];
-    let response = query_attestation_stats(
-        &chain,
-        "allAttestationStats",
-        get_gql_query_attestation_stats_no_args("allAttestationStats"),
-    );
-    assert!(are_equal_vecs_of_attestations_stats(
-        &exp_results,
-        &response
-    ));
+    assert_eq!(&all_stats_expected, &all_stats);
 
-    let exp_results2 = exp_results
-        .iter()
-        .find(|pa| pa.subject == AccountNumber::from("bob"))
+    let by_subject = svc.query::<Vec<Attestation>>(r#"attestationsBySubject(subject: "bob")"#);
+    let by_subject_expected = vec![
+        PartialAttestation::new("alice", "bob", 75),
+        PartialAttestation::new("carol", "bob", 76),
+    ];
+    assert_eq!(&by_subject_expected, &by_subject);
+
+    let by_subject_stats = svc
+        .query::<Option<AttestationStats>>(r#"subjectStats(subject: "bob")"#)
         .unwrap();
-    let response = query_subject_stats(
-        &chain,
-        "subjectStats",
-        get_gql_query_subject_stats_one_arg("subjectStats", "subject", "bob"),
-    )
-    .unwrap();
-    assert!(
-        response.subject == exp_results2.subject
-            && response.uniqueAttesters == exp_results2.uniqueAttesters
-            && response.numHighConfAttestations == exp_results2.numHighConfAttestations
-    );
+    let by_subject_stats_expected = PartialAttestationStats::new("bob", 2, 1);
+    assert!(by_subject_stats_expected == by_subject_stats);
+
+    let by_attester = svc.query::<Vec<Attestation>>(r#"attestationsByAttester(attester: "alice")"#);
+    let by_attester_expected = vec![
+        PartialAttestation::new("alice", "bob", 75),
+        PartialAttestation::new("alice", "carol", 77),
+    ];
+    assert_eq!(&by_attester_expected, &by_attester);
 
     Ok(())
 }
@@ -133,95 +56,26 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
 #[psibase::test_case(services("identity"))]
 // ATTEST QUERY: verify empty query responses are correct
 pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    init_identity_svc(&chain)?;
-    chain.new_account(AccountNumber::from("carol"))?;
-    chain.start_block();
+    let svc = init_identity_svc(&chain);
+    chain.new_account("carol".into())?;
 
-    let exp_results = vec![];
-    let response = query_attestations(
-        &chain,
-        "allAttestations",
-        get_gql_query_attestations_no_args(String::from("allAttestations")),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_results, &response));
+    let response = svc.query::<Vec<Attestation>>("allAttestations");
+    assert!(response.len() == 0);
 
-    let exp_results = vec![];
-    let response = query_attestation_stats(
-        &chain,
-        "allAttestationStats",
-        get_gql_query_attestation_stats_no_args("allAttestationStats"),
-    );
-    assert!(are_equal_vecs_of_attestations_stats(
-        &exp_results,
-        &response
-    ));
+    let response = svc.query::<Vec<AttestationStats>>("allAttestationStats");
+    assert!(response.len() == 0);
 
-    let exp_results3 = vec![
-        PartialAttestation {
-            attester: AccountNumber::from("alice"),
-            subject: AccountNumber::from("bob"),
-            value: 75,
-        },
-        PartialAttestation {
-            attester: AccountNumber::from("alice"),
-            subject: AccountNumber::from("carol"),
-            value: 77,
-        },
-        PartialAttestation {
-            attester: AccountNumber::from("carol"),
-            subject: AccountNumber::from("bob"),
-            value: 76,
-        },
-    ];
-    push_attest(
-        &chain,
-        AccountNumber::from("carol"),
-        AccountNumber::from("bob"),
-        76,
-    )?;
-    push_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("carol"),
-        77,
-    )?;
-    push_attest(
-        &chain,
-        AccountNumber::from("alice"),
-        AccountNumber::from("bob"),
-        75,
-    )?;
+    svc.from("carol").attest("bob".into(), 76).get()?;
+    svc.from("alice").attest("carol".into(), 77).get()?;
+    svc.from("alice").attest("bob".into(), 75).get()?;
 
-    chain.start_block();
+    let response = svc.query::<Vec<Attestation>>(r#"attestationsByAttester(attester: "bob")"#);
+    assert!(response.len() == 0);
 
-    let exp_result2 = exp_results3
-        .clone()
-        .into_iter()
-        .filter(|pa| pa.attester == AccountNumber::from("bob"))
-        .collect::<Vec<PartialAttestation>>();
-    let response = query_attestations(
-        &chain,
-        "attestationsByAttester",
-        get_gql_query_attestations_one_arg("attestationsByAttester", "attester", "bob"),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
+    let response = svc.query::<Vec<Attestation>>(r#"attestationsBySubject(subject: "alice")"#);
+    assert!(response.len() == 0);
 
-    let exp_result2 = exp_results3
-        .into_iter()
-        .filter(|pa| pa.subject == AccountNumber::from("alice"))
-        .collect::<Vec<PartialAttestation>>();
-    let response = query_attestations(
-        &chain,
-        "attestationsBySubject",
-        get_gql_query_attestations_one_arg("attestationsBySubject", "subject", "alice"),
-    );
-    assert!(are_equal_vecs_of_attestations(&exp_result2, &response));
-
-    let response = query_subject_stats(
-        &chain,
-        "subjectStats",
-        get_gql_query_subject_stats_one_arg("subjectStats", "subject", "alice"),
-    );
+    let response = svc.query::<Option<AttestationStats>>(r#"subjectStats(subject: "alice")"#);
     assert!(response.is_none());
 
     Ok(())
