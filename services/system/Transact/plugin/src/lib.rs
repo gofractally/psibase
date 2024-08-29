@@ -5,7 +5,7 @@ mod errors;
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::transact::plugin::{admin::Guest as Admin, intf::Guest as Intf};
 use bindings::host::common as Host;
-use bindings::host::common::types::{self as CommonTypes, BodyTypes::Bytes, PostRequest};
+use bindings::host::common::types::{self as CommonTypes, BodyTypes::*, PostRequest};
 use errors::ErrorType::*;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::{
@@ -141,7 +141,7 @@ impl Admin for TransactPlugin {
             proofs: vec![],
         };
 
-        let response = Host::server::post_bytes(&PostRequest {
+        let response = Host::server::post(&PostRequest {
             endpoint: "/push_transaction".to_string(),
             body: Bytes(signed_tx.packed()),
         })?;

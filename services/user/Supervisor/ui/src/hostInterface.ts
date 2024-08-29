@@ -6,7 +6,7 @@ export type Result<T, E> = T | E;
 
 export interface BodyType {
     tag: string;
-    val: Uint8Array;
+    val: Uint8Array | string;
 }
 
 export interface PluginPostDetails {
@@ -22,7 +22,7 @@ export interface HostInterface {
 
     getJson: (endpoint: string) => Result<string, RecoverableErrorPayload>;
 
-    postBytes: (
+    post: (
         request: PluginPostDetails,
     ) => Result<string, RecoverableErrorPayload>;
 
@@ -31,7 +31,10 @@ export interface HostInterface {
     ) => Result<string, RecoverableErrorPayload>;
 
     // Client interface
-    loginTemp: (appOrigin: string, user: string) => Result<void, RecoverableErrorPayload>;
+    loginTemp: (
+        appOrigin: string,
+        user: string,
+    ) => Result<void, RecoverableErrorPayload>;
 
     getSenderApp: () => OriginationData;
 

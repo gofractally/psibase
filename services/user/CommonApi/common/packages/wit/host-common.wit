@@ -67,7 +67,7 @@ interface server {
     /// 
     /// Parameters
     /// * `request`: The required details of the post request
-    post-bytes: func(request: post-request) -> result<string, error>;
+    post: func(request: post-request) -> result<string, error>;
 
     /// Used to call a GET endpoint on the app's own http server to retrieve a JSON
     /// payload.

@@ -3,8 +3,8 @@ export const server = {
         return host.postGraphqlGetJson(graphQL);
     },
 
-    postBytes(request) {
-        return host.postBytes(request);
+    post(request) {
+        return host.post(request);
     },
 
     getJson(endpoint) {

@@ -136,15 +136,17 @@ export class PluginHost implements HostInterface {
         return this.supervisor.call(this.self, args);
     }
 
-    postBytes(
-        request: PluginPostDetails,
-    ): Result<string, RecoverableErrorPayload> {
+    post(request: PluginPostDetails): Result<string, RecoverableErrorPayload> {
         const endpoint = request.endpoint.replace(/^\/+/, "");
         const url = `${this.self.origin}/${endpoint}`;
+        const contentType =
+            request.body.tag === "bytes"
+                ? "application/octet-stream"
+                : "application/json";
         const res = this.syncSend({
             uri: url,
             method: "POST",
-            headers: convert([["Content-Type", "application/octet-stream"]]),
+            headers: convert([["Content-Type", contentType]]),
             body: request.body.val,
         });
         if ("body" in res) {
