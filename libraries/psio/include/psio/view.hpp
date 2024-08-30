@@ -142,13 +142,13 @@ namespace psio
    struct make_reflect_proxy
    {
       template <typename T>
-      using fn = typename reflect<T>::template proxy<frac_proxy_view<char_t<T>>>;
+      using fn = typename reflect<std::remove_cv_t<T>>::template proxy<frac_proxy_view<char_t<T>>>;
    };
 
    struct make_wrapper_proxy
    {
       template <typename T>
-      using fn = typename reflect<T>::template proxy<frac_wrap_view<char_t<T>>>;
+      using fn = typename reflect<std::remove_cv_t<T>>::template proxy<frac_wrap_view<char_t<T>>>;
    };
 
    struct not_reflected

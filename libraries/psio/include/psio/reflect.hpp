@@ -185,15 +185,15 @@ namespace psio
    reflect_undefined<QueryClass> psio_get_reflect_impl(const QueryClass&, ReflectDummyParam*);
 
    template <typename QueryClass>
-   concept ReflectedAsMember = requires(QueryClass& v) { v.psio_get_reflect_impl(v, nullptr); };
+   concept ReflectedAsMember = requires(QueryClass* v) { v->psio_get_reflect_impl(v, nullptr); };
 
    template <ReflectedAsMember QueryClass>
-   auto psio_get_reflect_impl(const QueryClass& v, ReflectDummyParam*)
-       -> decltype(std::declval<QueryClass>().psio_get_reflect_impl(v, nullptr));
+   auto psio_get_reflect_impl(QueryClass* v, ReflectDummyParam*)
+       -> decltype(v->psio_get_reflect_impl(v, nullptr));
 
    template <typename QueryClass>
-   using reflect = std::decay_t<decltype(psio_get_reflect_impl(std::declval<QueryClass>(),
-                                                               (ReflectDummyParam*)nullptr))>;
+   using reflect =
+       decltype(psio_get_reflect_impl((QueryClass*)nullptr, (ReflectDummyParam*)nullptr));
 
    template <typename>
    struct is_std_vector : std::false_type
@@ -873,7 +873,7 @@ namespace psio
    };                                                                                                             \
    PSIO_REFLECT_TEMPLATE_DECL(STRUCT)                                                                             \
    BOOST_PP_CAT(psio_reflect_impl_, PSIO_REFLECT_NAME(STRUCT))<PSIO_REFLECT_TYPE(STRUCT)>                         \
-   psio_get_reflect_impl(const PSIO_REFLECT_TYPE(STRUCT)&, ::psio::ReflectDummyParam*);
+   psio_get_reflect_impl(PSIO_REFLECT_TYPE(STRUCT)*, ::psio::ReflectDummyParam*);
 
 namespace psio::reflection_impl
 {
