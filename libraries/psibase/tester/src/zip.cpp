@@ -52,8 +52,8 @@ namespace psibase::zip
    bool readStruct(auto& iter, auto end, T& obj)
    {
       bool ok = true;
-      psio::reflect<T>::for_each([&](const psio::meta&, auto member)
-                                 { ok = ok && read(iter, end, obj.*member(&obj)); });
+      psio::for_each_member(&obj, (typename psio::reflect<T>::data_members*)nullptr,
+                            [&](auto& member) { ok = ok && read(iter, end, member); });
       return ok;
    }
 

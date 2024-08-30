@@ -41,26 +41,26 @@ namespace psibase
       std::vector<char>   json;
       psio::vector_stream s{json};
       s.write('{');
-      bool needComma = false;
-      psio::reflect<T>::for_each(
-          [&](const psio::meta& meta, auto member)
-          {
-             using MemPtr = decltype(member(std::declval<T*>()));
-             if constexpr (std::is_member_function_pointer_v<MemPtr>)
-             {
-                if (needComma)
-                   s.write(',');
-                needComma = true;
-                to_json(meta.name, s);
-                s.write(':');
-                s.write('{');
-                generateActionJsonTemplate(
-                    (decltype(psio::tuple_remove_view(
-                        psio::args_as_tuple(std::declval<MemPtr>())))*)nullptr,
-                    false, meta.param_names.begin(), meta.param_names.end(), s);
-                s.write('}');
-             }
-          });
+      bool        needComma = false;
+      std::size_t i         = 0;
+      psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
+                                 [&](auto member)
+                                 {
+                                    using MemPtr = decltype(member);
+                                    auto names   = psio::reflect<T>::member_function_names[i];
+                                    if (needComma)
+                                       s.write(',');
+                                    needComma = true;
+                                    to_json(*names.begin(), s);
+                                    s.write(':');
+                                    s.write('{');
+                                    generateActionJsonTemplate(
+                                        (decltype(psio::tuple_remove_view(
+                                            psio::args_as_tuple(std::declval<MemPtr>())))*)nullptr,
+                                        false, names.begin() + 1, names.end(), s);
+                                    s.write('}');
+                                    ++i;
+                                 });
       s.write('}');
       return json;
    }

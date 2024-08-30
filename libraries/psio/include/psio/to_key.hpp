@@ -349,14 +349,8 @@ namespace psio
       }
       else
       {
-         psio::reflect<T>::for_each(
-             [&](const psio::meta&, auto member)
-             {
-                if constexpr (std::is_member_pointer_v<decltype(member(&obj))>)
-                {
-                   to_key(obj.*member(&obj), stream);
-                }
-             });
+         psio::apply_members((typename reflect<T>::data_members*)nullptr,
+                             [&](auto... member) { (to_key(obj.*member, stream), ...); });
       }
    }
 

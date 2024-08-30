@@ -27,13 +27,13 @@ namespace psibase
 
      private:
       template <typename M>
-      static auto makeParams(psio::SchemaBuilder& builder, const psio::meta& ref)
+      static auto makeParams(psio::SchemaBuilder& builder, std::span<const char* const> ref)
           -> psio::schema_types::Object
       {
          psio::schema_types::Object type;
-         auto                       nameIter = ref.param_names.begin();
-         auto                       nameEnd  = ref.param_names.end();
-         auto                       i        = ref.param_names.size();
+         auto                       nameIter = ref.begin();
+         auto                       nameEnd  = ref.end();
+         auto                       i        = ref.size();
          forEachType(
              typename M::SimplifiedArgTypes{},
              [&](auto* t)
@@ -62,24 +62,24 @@ namespace psibase
                               ActionMap&                                 out,
                               std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
+         std::size_t i = 0;
+         psio::for_each_member_type(
+             (typename psio::reflect<T>::member_functions*)nullptr,
+             [&](auto member)
              {
-                using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
-                if constexpr (m::isFunction)
+                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+                using m                            = psio::MemberPtrType<decltype(member)>;
+                auto [pos, inserted]               = out.try_emplace(
+                    psibase::MethodNumber{names[0]},
+                    psio::schema_types::FunctionType{makeParams<m>(builder, names.subspan(1)),
+                                                     makeResult<typename m::ReturnType>(builder)});
+                if (inserted)
                 {
-                   auto [pos, inserted] =
-                       out.try_emplace(psibase::MethodNumber{ref.name},
-                                       psio::schema_types::FunctionType{
-                                           makeParams<m>(builder, ref),
-                                           makeResult<typename m::ReturnType>(builder)});
-                   if (inserted)
-                   {
-                      eventTypes.push_back(&pos->second.params);
-                      if (pos->second.result)
-                         eventTypes.push_back(&*pos->second.result);
-                   }
+                   eventTypes.push_back(&pos->second.params);
+                   if (pos->second.result)
+                      eventTypes.push_back(&*pos->second.result);
                 }
+                ++i;
              });
       }
       template <typename T>
@@ -87,19 +87,23 @@ namespace psibase
                              EventMap&                                  out,
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
-         psio::reflect<T>::for_each(
-             [&](const psio::meta& ref, auto member)
+         std::size_t i = 0;
+         psio::for_each_member_type(
+             (typename psio::reflect<T>::member_functions*)nullptr,
+             [&](auto member)
              {
-                using m = psio::MemberPtrType<decltype(member(std::declval<T*>()))>;
+                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+                using m                            = psio::MemberPtrType<decltype(member)>;
                 if constexpr (m::isFunction)
                 {
-                   auto [pos, inserted] = out.try_emplace(psibase::MethodNumber{ref.name},
-                                                          makeParams<m>(builder, ref));
+                   auto [pos, inserted] = out.try_emplace(psibase::MethodNumber{names[0]},
+                                                          makeParams<m>(builder, names.subspan(1)));
                    if (inserted)
                    {
                       eventTypes.push_back(&pos->second);
                    }
                 }
+                ++i;
              });
       }
 

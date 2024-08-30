@@ -266,46 +266,49 @@ template <typename S> void to_json(float value, S& stream)              { return
       return stream.write(']');
    }
 
+   namespace detail
+   {
+      template <typename S>
+      struct add_field_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            //if constexpr (is_std_optional<T>::value)
+            //{
+            //   if (!member)
+            //      return;
+            //}
+            if (first)
+            {
+               increase_indent(stream);
+               first = false;
+            }
+            else
+            {
+               stream.write(',');
+            }
+            write_newline(stream);
+            to_json(field_names[i], stream);
+            write_colon(stream);
+            to_json(member, stream);
+            ++i;
+         }
+         const char* const* field_names;
+         S&                 stream;
+         std::size_t        i     = 0;
+         bool               first = true;
+      };
+   }  // namespace detail
+
    template <typename T, typename S>
    void to_json(const T& t, S& stream)
    {
-      bool first = true;
       stream.write('{');
-      reflect<T>::for_each(
-          [&](const psio::meta& ref, auto member)
-          {
-             if constexpr (not std::is_member_function_pointer_v<
-                               std::remove_cvref_t<decltype(member(&t))>>)
-             {
-                auto addfield = [&]()
-                {
-                   if (first)
-                   {
-                      increase_indent(stream);
-                      first = false;
-                   }
-                   else
-                   {
-                      stream.write(',');
-                   }
-                   write_newline(stream);
-                   to_json(ref.name, stream);
-                   write_colon(stream);
-                   to_json(t.*member(&t), stream);
-                };
-
-                using member_type = std::remove_cvref_t<decltype(member(&t))>;
-                if constexpr (not is_std_optional<member_type>::value)
-                {
-                   addfield();
-                }
-                else
-                {
-                   if (!!(t.*member(&t)))
-                      addfield();
-                }
-             }
-          });
+      bool first =
+          psio::for_each_member(&t, (typename reflect<T>::data_members*)nullptr,
+                                detail::add_field_fn<S>{reflect<T>::data_member_names, stream})
+              .first;
       if (!first)
       {
          decrease_indent(stream);
