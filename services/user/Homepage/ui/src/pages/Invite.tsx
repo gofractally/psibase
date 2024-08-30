@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -12,63 +12,148 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import dayjs from "dayjs";
+
+import relativeTime from "dayjs/plugin/relativeTime";
+import {
+    AlarmClockMinus,
+    LoaderCircle,
+    TicketCheck,
+    TriangleAlert,
+} from "lucide-react";
+import { siblingUrl } from "@psibase/common-lib";
+import { modifyUrlParams } from "@/lib/modifyUrlParams";
+
+dayjs.extend(relativeTime);
+
+const fetchInvite = async () => {
+    await wait(800);
+    return {
+        chainName: "psibase",
+        inviter: "purplebear",
+        expiry: new Date(new Date().valueOf() + 1000 * 60 * 60 * 24 * 7),
+    };
+};
 
 export const Invite = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token");
 
-    const { data, isError, isLoading } = useQuery({
+    console.log({ token }, "is the token");
+
+    const {
+        data: invite,
+        isError,
+        isLoading,
+    } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
-        queryFn: async () => {
-            await wait(1000);
-            return {
-                chainName: "psibase",
-                inviter: "purplebear",
-            };
-        },
+        queryFn: async () => fetchInvite(),
     });
 
-    console.log({ data });
-
-    if (isError) {
-        // render error looking card
-        return <div>loading</div>;
-    } else if (isLoading) {
-        /// render loading card...
-        return <div>loading</div>;
-    } else {
-        const isExpired = false;
-
-        const inviter = data?.inviter;
-        const chainName = data?.chainName;
-
+    if (!token) {
         return (
-            <div className="flex h-full justify-center">
-                <div className="flex h-full flex-col justify-center ">
-                    <Card className="w-[350px]">
-                        <CardHeader>
-                            <CardTitle>
-                                {isExpired
-                                    ? "Expired invitation"
-                                    : `You're invited to ${chainName}`}
-                            </CardTitle>
-                            <CardDescription>
-                                {isExpired
-                                    ? "This invitation expired at 21/2032, please ask the sender for a new one."
-                                    : `${inviter} has invited you to create an account
-                                on the ${chainName} platform.`}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent></CardContent>
-                        {!isExpired && (
-                            <CardFooter className="flex justify-between">
-                                <Button>Continue</Button>
-                            </CardFooter>
-                        )}
-                    </Card>
-                </div>
-            </div>
+            <Card className="mx-auto mt-4 w-[350px]">
+                <CardHeader>
+                    <div className="mx-auto">
+                        <TriangleAlert className="h-12 w-12" />
+                    </div>
+                    <CardTitle>Token not found.</CardTitle>
+                    <CardDescription>
+                        The invitation token is either invalid or does not
+                        exist.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
         );
+    } else if (isError) {
+        return (
+            <Card className="mx-auto mt-4 w-[350px]">
+                <CardHeader>
+                    <div className="mx-auto">
+                        <TriangleAlert className="h-12 w-12" />
+                    </div>
+                    <CardTitle>Error.</CardTitle>
+                    <CardDescription>
+                        The invitation token is either invalid or has already
+                        been used.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+        );
+    } else if (isLoading) {
+        return (
+            <Card className="mx-auto mt-4 w-[350px]">
+                <CardHeader>
+                    <div className="mx-auto">
+                        <LoaderCircle className="h-12 w-12 animate-spin" />
+                    </div>
+                    <CardTitle className="text-center">Loading...</CardTitle>
+                </CardHeader>
+            </Card>
+        );
+    } else {
+        const now = new Date().valueOf();
+        const isExpired = invite!.expiry.valueOf() < now;
+
+        const inviter = invite?.inviter;
+        const chainName = invite?.chainName;
+
+        const description = isExpired
+            ? `This invitation expired ${dayjs().to(invite!.expiry)} (${dayjs(
+                  invite!.expiry
+              ).format("YYYY/MM/DD HH:mm")}).`
+            : `${inviter} has invited you to create an account
+        on the ${chainName} platform.`;
+
+        const accountsUrl = siblingUrl(undefined, "accounts", undefined, false);
+        const redirect = siblingUrl(
+            undefined,
+            undefined,
+            "invite-response",
+            false
+        );
+
+        const link = modifyUrlParams(accountsUrl, {
+            token,
+            redirect,
+        });
+
+        if (isExpired) {
+            return (
+                <Card className="mx-auto mt-4 w-[350px]">
+                    <CardHeader>
+                        <div className="mx-auto">
+                            <AlarmClockMinus className="h-12 w-12" />
+                        </div>
+                        <CardTitle>Expired invitation</CardTitle>
+                        <CardDescription>{description}</CardDescription>
+                        <CardDescription>
+                            Please ask the sender{" "}
+                            <span className="text-primary">{inviter}</span> for
+                            a new one.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            );
+        } else {
+            return (
+                <Card className="mx-auto mt-4 w-[350px]">
+                    <CardHeader>
+                        <div className="mx-auto">
+                            <TicketCheck className="h-12 w-12" />
+                        </div>
+                        <CardTitle>{`You're invited to ${chainName}`}</CardTitle>
+                        <CardDescription>{description}</CardDescription>
+                    </CardHeader>
+                    <CardContent></CardContent>
+                    <CardFooter className="flex justify-between">
+                        <Link to={link}>
+                            <Button>Continue</Button>
+                        </Link>
+                    </CardFooter>
+                </Card>
+            );
+        }
     }
 };

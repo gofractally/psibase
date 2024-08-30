@@ -7,9 +7,13 @@
         "baseUrl": ".",
         "paths": {
             "@/*": ["./src/*"],
-            "/common": ["../common"],
-            "@psibase/common-lib": ["../common/packages/common-lib/src"],
-            "@psibase/common-lib/*": ["../common/packages/common-lib/src/*"]
+            "/common": ["../../CommonApi/common"],
+            "@psibase/common-lib": [
+                "../../CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../CommonApi/common/packages/common-lib/src/*"
+            ]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,

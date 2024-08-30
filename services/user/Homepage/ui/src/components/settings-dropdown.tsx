@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { siblingUrl, Supervisor } from "@psibase/common-lib";
 import { useNavigate } from "react-router-dom";
+import { modifyUrlParams } from "@/lib/modifyUrlParams";
 
 const supervisor = new Supervisor({
     supervisorSrc: siblingUrl(undefined, "supervisor", undefined, false),
@@ -56,8 +57,14 @@ const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 const generateInvite = async (): Promise<string> => {
     await wait(2000);
 
-    console.log({ siblingUrl: siblingUrl() });
-    return `${siblingUrl(undefined, undefined, undefined, false)}/derp/fwe`;
+    const res = modifyUrlParams(
+        siblingUrl(undefined, undefined, "invite", false),
+        {
+            token: "THISISTHETOKEN",
+        }
+    );
+
+    return res;
 };
 
 export const SettingsDropdown = () => {

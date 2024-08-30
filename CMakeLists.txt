@@ -234,6 +234,7 @@ ExternalProject_Add(
 
 # UIs built with yarn
 set(JS_DIRS
+    services/system/Accounts/ui:Accounts_js
     services/user/Homepage/ui:Homepage_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
@@ -392,7 +393,7 @@ psibase_package(
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
-        # DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
         DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${AccountsPlugin_DEP}

@@ -73,9 +73,9 @@ namespace SystemService
             target.resize(pos);
          
          auto siteConfig = tables.open<SiteConfigTable>().get(account);
-         if (siteConfig) {
-            if (siteConfig->spa) {
-               target = "/";
+         if (siteConfig && siteConfig->spa) {
+            if (target.ends_with(".html") || target == "/" || target.find('.') == target.npos) {
+                  target = "/";
             }
          }
 

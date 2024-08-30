@@ -37,9 +37,7 @@ import { Separator } from "@/components/ui/separator";
 
 import {
   Card,
-  CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -48,6 +46,8 @@ import { Check, UserX, LoaderCircle } from "lucide-react";
 import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 dayjs.extend(relativeTime);
 
@@ -147,6 +147,8 @@ export const AccountSelection = () => {
     },
   });
 
+  const navigate = useNavigate();
+
   const { mutateAsync } = useMutation<number, Error, string>({
     mutationFn: async (params) => {
       console.log(params, "are to create a blockchain account");
@@ -156,11 +158,10 @@ export const AccountSelection = () => {
 
   const { isDirty, isValid, isSubmitting } = form.formState;
 
-  console.log({ isDirty, isValid, isSubmitting });
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     console.log("submitting account", values);
     await wait(2000);
-    const res = await mutateAsync(values.username);
+    void (await mutateAsync(values.username));
   };
 
   const username = form.watch("username");
@@ -219,7 +220,10 @@ export const AccountSelection = () => {
 
   const chainName = "fwe";
 
-  const token = "TOKEN_FROM_QUERY_PARAM_HERE";
+  const [searchParams] = useSearchParams();
+
+  const token = searchParams.get("token");
+  const redirect = searchParams.get("redirect");
 
   const { data: invite, isLoading: isLoadingInvite } = useQuery({
     queryKey: ["invite", token],
@@ -240,17 +244,24 @@ export const AccountSelection = () => {
 
   const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
     mutationFn: async () => {
+      console.log("hit reject");
       // TODO: reject the invite
     },
   });
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation({
     mutationFn: async () => {
-      // TODO: reject the invite
+      // TODO: accept the invite
+
+      console.log("meant to move to ", redirect);
+      if (window.location && window.location.href && redirect) {
+        window.location.href = redirect;
+      }
     },
   });
 
   const isTxInProgress = isRejecting || isAccepting;
+  console.log({ chainName, isTxInProgress });
 
   if (isLoadingInvite) {
     return (
@@ -287,7 +298,7 @@ export const AccountSelection = () => {
       invite.expiry
     ).format("DD/MM/YYYY HH:mm")}).`;
 
-  if (isExpired && false) {
+  if (isExpired) {
     return (
       <Card className="w-[350px] mx-auto mt-4">
         <CardHeader>
@@ -306,145 +317,151 @@ export const AccountSelection = () => {
   }
 
   return (
-    <Dialog>
-      <div className="mt-6">
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create an account</DialogTitle>
-            <DialogDescription>
-              Use this invitation to create an on-chain account and use it to
-              connect to the {appName} app.
-            </DialogDescription>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="w-full mt-2 space-y-6"
-              >
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="w-full flex justify-between ">
-                        <FormLabel>Username</FormLabel>
-                        {isDirty && (
-                          <FormLabel className="text-muted-foreground">
-                            {status === Status.Available ? (
-                              <div className="flex gap-1">
-                                <div className="text-sm">Available</div>
-                                <Check size={15} className="my-auto" />{" "}
-                              </div>
-                            ) : status === Status.Unavailable ? (
-                              <div className="flex gap-1">
-                                {" "}
-                                <div className="text-sm">Taken</div>
-                                <UserX size={15} className=" my-auto" />{" "}
-                              </div>
-                            ) : (
-                              <div className="flex gap-1">
-                                {" "}
-                                <div className="text-sm">Loading</div>
-                                <LoaderCircle
-                                  size={15}
-                                  className="animate animate-spin my-auto"
-                                />{" "}
-                              </div>
-                            )}
-                          </FormLabel>
-                        )}
-                      </div>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="submit"
-                  disabled={
-                    !(
-                      isValid &&
-                      !isProcessing &&
-                      accountIsAvailable &&
-                      !isSubmitting
-                    )
-                  }
+    <>
+      <Dialog>
+        <div className="mt-6">
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create an account</DialogTitle>
+              <DialogDescription>
+                Use this invitation to create an on-chain account and use it to
+                connect to the {appName} app.
+              </DialogDescription>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="w-full mt-2 space-y-6"
                 >
-                  {isSubmitting ? "Accepting" : "Accept"} invite
-                </Button>
-              </form>
-            </Form>
-          </DialogHeader>
-        </DialogContent>
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="w-full flex justify-between ">
+                          <FormLabel>Username</FormLabel>
+                          {isDirty && (
+                            <FormLabel className="text-muted-foreground">
+                              {status === Status.Available ? (
+                                <div className="flex gap-1">
+                                  <div className="text-sm">Available</div>
+                                  <Check size={15} className="my-auto" />{" "}
+                                </div>
+                              ) : status === Status.Unavailable ? (
+                                <div className="flex gap-1">
+                                  {" "}
+                                  <div className="text-sm">Taken</div>
+                                  <UserX size={15} className=" my-auto" />{" "}
+                                </div>
+                              ) : (
+                                <div className="flex gap-1">
+                                  {" "}
+                                  <div className="text-sm">Loading</div>
+                                  <LoaderCircle
+                                    size={15}
+                                    className="animate animate-spin my-auto"
+                                  />{" "}
+                                </div>
+                              )}
+                            </FormLabel>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    disabled={
+                      !(
+                        isValid &&
+                        !isProcessing &&
+                        accountIsAvailable &&
+                        !isSubmitting
+                      )
+                    }
+                  >
+                    {isSubmitting ? "Accepting" : "Accept"} invite
+                  </Button>
+                </form>
+              </Form>
+            </DialogHeader>
+          </DialogContent>
 
-        <div className="max-w-lg mx-auto">
-          <div className="text-center text-muted-foreground py-2">
-            <span>
-              Select an account to accept invite to{" "}
-              <span className="text-primary">{appName}</span>
-            </span>
-          </div>
-          <div className="relative ml-auto flex-1 md:grow-0 mb-3">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={activeSearch}
-              type="search"
-              onChange={(e) => setActiveSearch(e.target.value)}
-              placeholder="Search..."
-              className="w-full rounded-lg bg-background pl-8 "
-            />
-          </div>
-
-          <div className="flex flex-col gap-3 ">
-            <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
-              {isAccountsLoading
-                ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
-                    (_, index) => (
-                      <Account
-                        onSelected={() => {}}
-                        isSelected={false}
-                        key={index}
-                      />
-                    )
-                  )
-                : accountsToRender.map((account) => (
-                    <Account
-                      onSelected={() => {
-                        setSelectedAccountId(account.id);
-                      }}
-                      isSelected={selectedAccountId == account.id}
-                      key={account.id}
-                      name={account.account}
-                    />
-                  ))}
+          <div className="max-w-lg mx-auto">
+            <div className="text-center text-muted-foreground py-2">
+              <span>
+                Select an account to accept invite to{" "}
+                <span className="text-primary">{appName}</span>
+              </span>
             </div>
-            <DialogTrigger asChild>
-              <button className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed">
-                Create a new account
-              </button>
-            </DialogTrigger>
-          </div>
-          <div className="w-full justify-center flex my-3">
-            <Button
-              className="w-full"
-              disabled={!selectedAccount || form.formState.isLoading}
-            >
-              {isSubmitting ? "Loading..." : "Accept invite"}
-            </Button>
-          </div>
-          <Separator className="my-8 " />
-          <div className="w-full justify-center flex">
-            <Button
-              onClick={() => rejectInvite()}
-              variant="link"
-              className="text-muted-foreground"
-            >
-              Reject invite
-            </Button>
+            <div className="relative ml-auto flex-1 md:grow-0 mb-3">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={activeSearch}
+                type="search"
+                onChange={(e) => setActiveSearch(e.target.value)}
+                placeholder="Search..."
+                className="w-full rounded-lg bg-background pl-8 "
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 ">
+              <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
+                {isAccountsLoading
+                  ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(
+                      (_, index) => (
+                        <Account
+                          onSelected={() => {}}
+                          isSelected={false}
+                          key={index}
+                        />
+                      )
+                    )
+                  : accountsToRender.map((account) => (
+                      <Account
+                        onSelected={() => {
+                          setSelectedAccountId(account.id);
+                        }}
+                        isSelected={selectedAccountId == account.id}
+                        key={account.id}
+                        name={account.account}
+                      />
+                    ))}
+              </div>
+              <DialogTrigger asChild>
+                <button className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed">
+                  Create a new account
+                </button>
+              </DialogTrigger>
+            </div>
+            <div className=" my-3">
+              <Button
+                onClick={() => {
+                  console.log("pressed");
+                  acceptInvite();
+                }}
+                className="w-full"
+                disabled={!selectedAccount || form.formState.isLoading}
+              >
+                {isSubmitting ? "Loading..." : "Accept invite"}
+              </Button>
+            </div>
+            {/* <Separator className="my-8 " /> */}
+            <div className="w-full justify-center flex">
+              <Button
+                onClick={() => rejectInvite()}
+                variant="link"
+                className="text-muted-foreground"
+              >
+                Reject invite
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </Dialog>
+      </Dialog>
+    </>
   );
 };
