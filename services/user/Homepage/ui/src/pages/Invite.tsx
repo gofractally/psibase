@@ -39,8 +39,6 @@ export const Invite = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token");
 
-    console.log({ token }, "is the token");
-
     const {
         data: invite,
         isError,

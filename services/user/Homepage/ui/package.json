@@ -25,6 +25,7 @@
         "lucide-react": "^0.436.0",
         "next-themes": "^0.3.0",
         "react": "^18.2.0",
+        "react-confetti-explosion": "^2.1.2",
         "react-dom": "^18.2.0",
         "react-router-dom": "^6.26.1",
         "sonner": "^1.5.0",
