@@ -464,6 +464,23 @@ namespace psio
       return static_cast<F&&>(f);
    }
 
+   template <auto... M, typename F>
+   constexpr bool get_member(MemberList<M...>*,
+                             const char* const* names,
+                             std::string_view   name,
+                             F&&                f)
+   {
+      std::size_t i = 0;
+      return (false || ... || (name == names[i++] && (f(M), true)));
+   }
+
+   template <typename T, typename F>
+   constexpr bool get_data_member(std::string_view name, F&& f)
+   {
+      return get_member((typename reflect<T>::data_members*)nullptr, reflect<T>::data_member_names,
+                        name, f);
+   }
+
 }  // namespace psio
 
 #define PSIO_EMPTY(...)
@@ -777,14 +794,6 @@ namespace psio
                                 ReflectedType,                                                                    \
                                 PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
       using struct_tuple_type = typename ::psio::get_struct_tuple_impl<data_members>::type;                       \
-      template <typename L>                                                                                       \
-      inline static constexpr bool get(const std::string_view& m, L&& lambda)                                     \
-      {                                                                                                           \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, ReflectedType,                                                    \
-                               PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                                            \
-         BOOST_PP_SEQ_FOR_EACH(PSIO_GET_BY_STR, ReflectedType, PSIO_REFLECT_METHODS(__VA_ARGS__))                 \
-         return false;                                                                                            \
-      }                                                                                                           \
       template <typename L>                                                                                       \
       inline static constexpr bool get(int64_t m, L&& lambda)                                                     \
       {                                                                                                           \

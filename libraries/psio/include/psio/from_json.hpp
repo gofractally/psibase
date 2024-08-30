@@ -741,29 +741,16 @@ namespace psio
    {
       if constexpr (reflect<T>::is_struct)
       {
-         from_json_object(
-             stream,
-             [&](std::string_view key) -> void
-             {
-                bool found = false;
-                reflect<T>::get(
-                    key,
-                    [&](auto member)
-                    {
-                       if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
-                       {
-                          from_json(obj.*member, stream);
-                          found = true;
-                       }
-                       else
-                       {
-                       }
-                    });
-                if (not found)
-                {
-                   from_json_skip_value(stream);
-                }
-             });
+         from_json_object(stream,
+                          [&](std::string_view key) -> void
+                          {
+                             bool found = psio::get_data_member<T>(
+                                 key, [&](auto member) { from_json(obj.*member, stream); });
+                             if (not found)
+                             {
+                                from_json_skip_value(stream);
+                             }
+                          });
 
          if constexpr (PackValidatable<T>)
          {
