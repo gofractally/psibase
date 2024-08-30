@@ -31,7 +31,7 @@ namespace psibase
       AccountNumber receiver;
 
       // TODO: remove idx (unused)
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
          using member_class = decltype(psio::class_of_member(MemberPtr));
@@ -42,8 +42,10 @@ namespace psibase
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "too many arguments passed to method");
 
-         return psibase::Action{sender, receiver, MethodNumber(Name),
-                                psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
+         return psibase::Action{
+             sender, receiver,
+             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
+             psio::convert_to_frac(param_tuple(std::forward<Args>(args)...))};
       }
    };
 
@@ -72,11 +74,11 @@ namespace psibase
       AccountNumber receiver;
 
       // TODO: remove idx (unused)
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
          auto act = action_builder_proxy(sender, receiver)
-                        .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+                        .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
          {
@@ -97,11 +99,11 @@ namespace psibase
       AccountNumber receiver;
 
       // TODO: remove idx (unused)
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
          auto act = action_builder_proxy(sender, receiver)
-                        .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+                        .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
             return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(act)
@@ -125,15 +127,18 @@ namespace psibase
       DbId          event_log;
 
       // TODO: remove idx (unused)
-      template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+      template <uint32_t idx, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
-         using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+         using member_class = decltype(psio::class_of_member(MemberPtr));
+         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 
-         return psibase::putSequential(event_log, sender, Name,
-                                       param_tuple(std::forward<Args>(args)...));
+         return psibase::putSequential(
+             event_log, sender,
+             MethodNumber{*psio::reflect<member_class>::member_function_names[idx].begin()},
+             param_tuple(std::forward<Args>(args)...));
       }
    };
 
@@ -148,18 +153,20 @@ namespace psibase
       DbId          event_log;
 
       // TODO: remove idx (unused)
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      template <uint32_t idx, auto MemberPtr>
       auto call(EventNumber n) const
       {
-         using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+         using member_class = decltype(psio::class_of_member(MemberPtr));
+         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
          AccountNumber service;
          MethodNumber  type;
-         MethodNumber  expected_type{Name};
+         MethodNumber  expected_type{
+             *psio::reflect<member_class>::member_function_names[idx].begin()};
          auto result = psibase::getSequential<param_tuple>(event_log, n, &sender, &expected_type,
                                                            &service, &type);
          if (!result)
          {
-            psibase::check(type == MethodNumber{Name}, "unexpected event type");
+            psibase::check(type == expected_type, "unexpected event type");
             psibase::check(service == sender, "unexpected event sender");
             psibase::check(false, "event not found");
          }

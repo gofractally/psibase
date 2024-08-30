@@ -777,28 +777,22 @@ namespace psio
    BOOST_PP_IIF(BOOST_PP_CHECK_EMPTY(members), PSIO_EMPTY, PSIO_MEMBER_POINTER_IMPL2) \
    (STRUCT, members)
 
-#define PSIO_PROXY_DATA(r, STRUCT, i, elem)                                           \
-   decltype(auto) PSIO_GET_IDENT(elem)()                                              \
-   {                                                                                  \
-      return _psio_proxy_obj                                                          \
-          .template get<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
-                                           &STRUCT::PSIO_GET_IDENT(elem)>();          \
-   }                                                                                  \
-   decltype(auto) PSIO_GET_IDENT(elem)() const                                        \
-   {                                                                                  \
-      return _psio_proxy_obj                                                          \
-          .template get<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
-                                           &STRUCT::PSIO_GET_IDENT(elem)>();          \
+#define PSIO_PROXY_DATA(r, STRUCT, i, elem)                                    \
+   decltype(auto) PSIO_GET_IDENT(elem)()                                       \
+   {                                                                           \
+      return _psio_proxy_obj.template get<i, &STRUCT::PSIO_GET_IDENT(elem)>(); \
+   }                                                                           \
+   decltype(auto) PSIO_GET_IDENT(elem)() const                                 \
+   {                                                                           \
+      return _psio_proxy_obj.template get<i, &STRUCT::PSIO_GET_IDENT(elem)>(); \
    }
 
-#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                          \
-   template <typename... Args>                                                         \
-   decltype(auto) PSIO_GET_IDENT(elem)(Args... args)                                   \
-   {                                                                                   \
-      return _psio_proxy_obj                                                           \
-          .template call<i, psio::hash_name(BOOST_PP_STRINGIZE(PSIO_GET_IDENT(elem))), \
-                                            &STRUCT::PSIO_GET_IDENT(elem)>(            \
-              std::forward<decltype(args)>(args)...);                                  \
+#define PSIO_PROXY_METHOD(r, STRUCT, i, elem)                                 \
+   template <typename... Args>                                                \
+   decltype(auto) PSIO_GET_IDENT(elem)(Args... args)                          \
+   {                                                                          \
+      return _psio_proxy_obj.template call<i, &STRUCT::PSIO_GET_IDENT(elem)>( \
+          std::forward<decltype(args)>(args)...);                             \
    }
 
 /**

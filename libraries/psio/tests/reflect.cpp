@@ -22,7 +22,7 @@ struct sync_call_proxy
    uint32_t sender;
    uint32_t receiver;
 
-   template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+   template <uint32_t idx, auto MemberPtr, typename... Args>
    auto call(Args&&... args) const
    {
       std::cout << "call sender: " << sender << "  receiver: " << receiver << "\n";

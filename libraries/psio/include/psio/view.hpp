@@ -77,7 +77,7 @@ namespace psio
    struct frac_proxy_view : view_base<Ch>
    {
       explicit constexpr frac_proxy_view(char_ptr<Ch> ptr) : view_base<Ch>{ptr} {}
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      template <uint32_t idx, auto MemberPtr>
       auto get()
       {
          using class_type  = decltype(psio::class_of_member(MemberPtr));
@@ -129,7 +129,7 @@ namespace psio
    struct frac_wrap_view : view_base<Ch>
    {
       explicit constexpr frac_wrap_view(char_ptr<Ch> ptr) : view_base<Ch>{ptr} {}
-      template <uint32_t idx, uint64_t Name, auto MemberPtr>
+      template <uint32_t idx, auto MemberPtr>
       auto get()
       {
          using member_type = decltype(psio::result_of_member(MemberPtr));
