@@ -481,6 +481,60 @@ namespace psio
                         name, f);
    }
 
+   template <auto... M, typename F>
+   constexpr bool get_member(MemberList<M...>*,
+                             const std::initializer_list<const char*>* names,
+                             std::string_view                          name,
+                             F&&                                       f)
+   {
+      std::size_t i = 0;
+      return (false || ... || (name == *names[i++].begin() && (f(M, names[i - 1]), true)));
+   }
+
+   template <typename T, typename F>
+   constexpr bool get_member_function(std::string_view name, F&& f)
+   {
+      return get_member((typename reflect<T>::member_functions*)nullptr,
+                        reflect<T>::member_function_names, name, f);
+   }
+
+   template <auto... M, typename F>
+   constexpr bool get_member(MemberList<M...>*,
+                             const std::initializer_list<const char*>* names,
+                             std::uint64_t                             name,
+                             F&&                                       f)
+   {
+      std::size_t i = 0;
+      return (false || ... ||
+              (name == psio::hash_name(*names[i++].begin()) && (f(M, names[i - 1]), true)));
+   }
+
+   template <typename T, typename F>
+   constexpr bool get_member_function(std::uint64_t name, F&& f)
+   {
+      return get_member((typename reflect<T>::member_functions*)nullptr,
+                        reflect<T>::member_function_names, name, f);
+   }
+
+   template <auto... M, typename F>
+   constexpr bool get_member_type(MemberList<M...>*,
+                                  const std::initializer_list<const char*>* names,
+                                  std::uint64_t                             name,
+                                  F&&                                       f)
+   {
+      std::size_t i = 0;
+      return (false || ... ||
+              (name == psio::hash_name(*names[i++].begin()) &&
+               (f(static_cast<decltype(M)>(nullptr), names[i - 1]), true)));
+   }
+
+   template <typename T, typename F>
+   constexpr bool get_member_function_type(std::uint64_t name, F&& f)
+   {
+      return get_member_type((typename reflect<T>::member_functions*)nullptr,
+                             reflect<T>::member_function_names, name, f);
+   }
+
 }  // namespace psio
 
 #define PSIO_EMPTY(...)
@@ -794,18 +848,6 @@ namespace psio
                                 ReflectedType,                                                                    \
                                 PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
       using struct_tuple_type = typename ::psio::get_struct_tuple_impl<data_members>::type;                       \
-      template <typename L>                                                                                       \
-      inline static bool get_by_name(uint64_t n, L&& lambda)                                                      \
-      {                                                                                                           \
-         switch (n)                                                                                               \
-         {                                                                                                        \
-            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_MEMBER_BY_NAME, ReflectedType,                                       \
-                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                                       \
-            BOOST_PP_SEQ_FOR_EACH(PSIO_GET_METHOD_BY_NAME, ReflectedType,                                         \
-                                  PSIO_REFLECT_METHODS(__VA_ARGS__))                                              \
-         }                                                                                                        \
-         return false;                                                                                            \
-      }                                                                                                           \
       static constexpr auto member_pointers()                                                                     \
       {                                                                                                           \
          return std::make_tuple(                                                                                  \

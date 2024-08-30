@@ -783,11 +783,11 @@ namespace psibase
 
       bool ok    = true;
       bool found = false;
-      psio::reflect<Events>::get_by_name(
+      psio::get_member_function_type<Events>(
           header.type->value,
-          [&](auto meta, auto member)
+          [&](auto member, std::span<const char* const> names)
           {
-             using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+             using MT = psio::MemberPtrType<decltype(member)>;
              static_assert(MT::isFunction);
              using TT                                     = decltype(psio::tuple_remove_view(
                  std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
@@ -796,8 +796,7 @@ namespace psibase
              {
                 found = true;
                 ok = gql_query_decoder_value(decoder, *header.type, *eventData.value, input_stream,
-                                             output_stream, error,
-                                             {meta.param_names.begin(), meta.param_names.end()});
+                                             output_stream, error, names.subspan(1));
              }
           });
 
@@ -1131,11 +1130,11 @@ namespace psibase
          }
 
          bool found = false;
-         psio::reflect<Events>::get_by_name(
+         psio::get_member_function_type<Events>(
              header.type->value,
-             [&](auto meta, auto member)
+             [&](auto member, std::span<const char* const> names)
              {
-                using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+                using MT = psio::MemberPtrType<decltype(member)>;
                 static_assert(MT::isFunction);
                 using TT = decltype(psio::tuple_remove_view(
                     std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
@@ -1144,8 +1143,7 @@ namespace psibase
                 if (psio::from_frac(eventData, *v))
                 {
                    get_event_field<0>(  //
-                       *eventData.value, fieldName, {},
-                       {meta.param_names.begin(), meta.param_names.end()},
+                       *eventData.value, fieldName, {}, names.subspan(1),
                        [&](auto _, const auto& field)
                        {
                           if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)

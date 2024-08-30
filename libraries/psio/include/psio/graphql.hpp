@@ -629,9 +629,8 @@ namespace psio
             return error("expected :");
          input_stream.skip();
 
-         bool found =
-             reflect<T>::get_by_name(hash_name(field_name), [&](const meta& m, auto member)
-                                     { gql_parse_arg(arg.*member(&arg), input_stream, error); });
+         bool found = psio::get_data_member<T>(
+             field_name, [&](auto member) { gql_parse_arg(arg.*member, input_stream, error); });
 
          if (!ok)
             return false;
@@ -999,6 +998,26 @@ namespace psio
       }
    }  // gql_query_fn
 
+   namespace detail
+   {
+      template <typename OS>
+      void write_field_name(std::string_view name, bool& first, OS& output_stream)
+      {
+         if (first)
+         {
+            increase_indent(output_stream);
+            first = false;
+         }
+         else
+         {
+            output_stream.write(',');
+         }
+         write_newline(output_stream);
+         to_json(name, output_stream);
+         write_colon(output_stream);
+      }
+   }  // namespace detail
+
    // T is the actual type
    // ContextT is the type declared in the GraphQL document
    template <typename ContextT, typename T, typename OS, typename E>
@@ -1044,7 +1063,6 @@ namespace psio
          {
             break;
          }
-         bool found      = false;
          bool ok         = true;
          auto alias      = input_stream.current_value;
          auto field_name = alias;
@@ -1058,39 +1076,29 @@ namespace psio
             input_stream.skip();
          }
 
-         reflect<T>::get_by_name(
-             hash_name(field_name),
-             [&](const meta& m, auto member)
-             {
-                using MemPtr = MemberPtrType<decltype(member(std::declval<T*>()))>;
-                if (first)
+         bool found =
+             psio::get_data_member<T>(field_name,
+                                      [&](auto member)
+                                      {
+                                         detail::write_field_name(alias, first, output_stream);
+                                         ok &= gql_query(value.*member, input_stream, output_stream,
+                                                         error, allow_unknown_members);
+                                      });
+         if (!found)
+         {
+            psio::get_member_function<T>(
+                field_name,
+                [&](auto member, std::span<const char* const> names)
                 {
-                   increase_indent(output_stream);
-                   first = false;
-                }
-                else
-                {
-                   output_stream.write(',');
-                }
-                write_newline(output_stream);
-                to_json(alias, output_stream);
-                write_colon(output_stream);
-
-                // TODO: enforce that member is defined in ContextT
-
-                if constexpr (!MemPtr::isFunction)
-                {
-                   found = true;
-                   ok &= gql_query(value.*member(&value), input_stream, output_stream, error,
-                                   allow_unknown_members);
-                }
-                else if constexpr (MemPtr::isConstFunction)
-                {
-                   found = true;
-                   ok &= gql_query_fn(value, m.param_names, member(&value), input_stream,
-                                      output_stream, error, allow_unknown_members);
-                }
-             });
+                   if constexpr (psio::MemberPtrType<decltype(member)>::isConstFunction)
+                   {
+                      found = true;
+                      detail::write_field_name(alias, first, output_stream);
+                      ok &= gql_query_fn(value, names.subspan(1), member, input_stream,
+                                         output_stream, error, allow_unknown_members);
+                   }
+                });
+         }
 
          if (!ok)
             return false;

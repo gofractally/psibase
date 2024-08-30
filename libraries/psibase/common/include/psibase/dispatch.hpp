@@ -89,14 +89,12 @@ namespace psibase
       };
       auto service{makeService()};
 
-      bool called = psio::reflect<Service>::get_by_name(
+      bool called = psio::get_member_function<Service>(
           act->method().value(),
-          [&](auto meta, auto member)
+          [&](auto member, auto /*names*/)
           {
-             auto member_func  = member(&service);
-             using result_type = decltype(psio::result_of(member_func));
-             using param_tuple =
-                 decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
+             using result_type = decltype(psio::result_of(member));
+             using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(member)));
 
              auto param_data = std::span{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
@@ -109,12 +107,12 @@ namespace psibase
                  {
                     if constexpr (std::is_same_v<void, result_type>)
                     {
-                       (service.*member_func)(std::forward<decltype(args)>(args)...);
+                       (service.*member)(std::forward<decltype(args)>(args)...);
                     }
                     else
                     {
-                       callMethod<result_type, Service, decltype(member_func), decltype(args)...>(
-                           service, member_func, std::forward<decltype(args)>(args)...);
+                       callMethod<result_type, Service, decltype(member), decltype(args)...>(
+                           service, member, std::forward<decltype(args)>(args)...);
                     }
                  },
                  param_view);
