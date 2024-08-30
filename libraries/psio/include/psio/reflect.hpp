@@ -795,16 +795,6 @@ namespace psio
                                 PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
       using struct_tuple_type = typename ::psio::get_struct_tuple_impl<data_members>::type;                       \
       template <typename L>                                                                                       \
-      inline static constexpr bool get(int64_t m, L&& lambda)                                                     \
-      {                                                                                                           \
-         switch (m)                                                                                               \
-         {                                                                                                        \
-            BOOST_PP_SEQ_FOR_EACH_I(PSIO_GET_BY_NUMBER, ReflectedType,                                            \
-                                    PSIO_REFLECT_DATA_MEMBERS(__VA_ARGS__))                                       \
-         }                                                                                                        \
-         return false;                                                                                            \
-      }                                                                                                           \
-      template <typename L>                                                                                       \
       inline static bool get_by_name(uint64_t n, L&& lambda)                                                      \
       {                                                                                                           \
          switch (n)                                                                                               \
