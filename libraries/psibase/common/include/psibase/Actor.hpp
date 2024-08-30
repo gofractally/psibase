@@ -30,7 +30,6 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      // TODO: remove idx (unused)
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
@@ -73,7 +72,6 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      // TODO: remove idx (unused)
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
@@ -98,7 +96,6 @@ namespace psibase
       AccountNumber sender;
       AccountNumber receiver;
 
-      // TODO: remove idx (unused)
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
@@ -126,7 +123,6 @@ namespace psibase
       AccountNumber sender;
       DbId          event_log;
 
-      // TODO: remove idx (unused)
       template <uint32_t idx, auto MemberPtr, typename... Args>
       EventNumber call(Args&&... args) const
       {
@@ -152,7 +148,6 @@ namespace psibase
       AccountNumber sender;
       DbId          event_log;
 
-      // TODO: remove idx (unused)
       template <uint32_t idx, auto MemberPtr>
       auto call(EventNumber n) const
       {
