@@ -7,7 +7,9 @@ function(add suffix)
     add_library(psibase${suffix})
     target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto)
     target_sources(psibase${suffix} PRIVATE
+        common/src/block.cpp
         common/src/crypto.cpp
+        common/src/nativeTables.cpp
         common/src/time.cpp
         common/src/trace.cpp
     )

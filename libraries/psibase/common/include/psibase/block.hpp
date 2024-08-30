@@ -280,11 +280,7 @@ namespace psibase
       }
 
       BlockInfo(const Block& b) : BlockInfo{b.header} {}
-      static Checksum256 makeBlockId(BlockHeader header)
-      {
-         header.authCode.reset();
-         return sha256(header);
-      }
+      static Checksum256 makeBlockId(BlockHeader header);
    };
    PSIO_REFLECT(BlockInfo, header, blockId)
 

@@ -3,8 +3,6 @@
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
-#include <algorithm>
-
 namespace psibase
 {
    using NativeTableNum = uint16_t;
@@ -145,17 +143,8 @@ namespace psibase
    };
    PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
 
-   inline auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
-   {
-      std::vector<decltype(codeByHashKey(Checksum256(), 0, 0))> result;
-      for (const auto& s : services)
-      {
-         result.push_back(codeByHashKey(s.codeHash, s.vmType, s.vmVersion));
-      }
-      std::sort(result.begin(), result.end());
-      result.erase(std::unique(result.begin(), result.end()), result.end());
-      return result;
-   }
+   auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
+       -> std::vector<decltype(codeByHashKey(Checksum256(), 0, 0))>;
 
    inline auto databaseStatusKey()
    {
