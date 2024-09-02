@@ -1,65 +1,74 @@
 use psibase::services::accounts::Wrapper as AccountsSvc;
+use psibase::AccountNumber;
+
+fn validate_user(user: String) -> bool {
+    let acc = AccountNumber::from(user.as_str());
+    if acc.to_string() != user {
+        return false;
+    }
+
+    AccountsSvc::call().exists(acc)
+}
 
 #[psibase::service]
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow,
-        check,
-        get_sender,
-        get_service,
-        serve_content,
-        serve_graphiql,
-        serve_graphql,
-        serve_simple_ui,
-        store_content,
-        Fracpack,
-        HexBytes,
-        HttpReply,
-        HttpRequest, // SingletonKey,
-        Table,
-        ToSchema,
-        WebContentRow,
+        anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_graphql,
+        serve_simple_ui, store_content, AccountNumber, Fracpack, HexBytes, HttpReply, HttpRequest,
+        SingletonKey, Table, ToSchema, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "InitTable")]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Init {
-        inited: bool,
-    }
+    use crate::validate_user;
 
-    impl Init {
-        #[primary_key]
-        fn by_key(&self) -> SingletonKey {
-            SingletonKey {}
-        }
-    }
+    // #[table(name = "InitTable")]
+    // #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    // pub struct Init {
+    //     inited: bool,
+    // }
 
-    impl Default for Init {
-        fn default() -> Self {
-            Init { inited: false }
-        }
-    }
+    // impl Init {
+    //     #[primary_key]
+    //     fn by_key(&self) -> SingletonKey {
+    //         SingletonKey {}
+    //     }
+    // }
 
-    #[table(record = "WebContentRow", index = 1)]
+    // impl Default for Init {
+    //     fn default() -> Self {
+    //         Init { inited: false }
+    //     }
+    // }
+
+    #[table(record = "WebContentRow")]
     struct WebContentTable;
 
     #[action]
-    fn send(receiver: psibase::AccountNumber, subject: String, body: String) {
-        // emit().history().sent(getSender(), receiver, subject, body);
+    fn send(receiver: AccountNumber, subject: String, body: String) {
+        check(
+            validate_user(receiver.to_string()),
+            &format!("receiver account {} doesn't exist", receiver),
+        );
+        Wrapper::emit()
+            .history()
+            .sent(get_sender(), receiver, subject, body);
     }
+
+    #[event(history)]
+    pub fn sent(sender: AccountNumber, receiver: AccountNumber, subject: String, body: String) {}
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn network_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
-            let curr_val = InitTable::new().get_index_pk().get(&SingletonKey {});
-            Ok(match curr_val {
-                Some(val) => val.name,
-                None => String::from("psibase"),
-            })
+        async fn getMessages(&self) -> async_graphql::Result<String, async_graphql::Error> {
+            // let curr_val = InitTable::new().get_index_pk().get(&SingletonKey {});
+            // Ok(match curr_val {
+            //     Some(val) => val.name,
+            //     None => String::from("psibase"),
+            // })
+            Ok(String::from("placeholder"))
         }
     }
 
@@ -70,6 +79,7 @@ mod service {
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
+        // .or_else(|| serve_rest_api)
     }
 
     #[action]

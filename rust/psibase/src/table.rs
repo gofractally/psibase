@@ -202,6 +202,12 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 }
 
+pub struct SingletonKey {}
+
+impl ToKey for SingletonKey {
+    fn append_key(&self, _key: &mut Vec<u8>) {}
+}
+
 #[derive(Clone)]
 pub struct TableIndex<Key: ToKey, Record: TableRecord> {
     pub db_id: DbId,

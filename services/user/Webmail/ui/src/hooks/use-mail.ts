@@ -3,6 +3,7 @@ import { atom, useAtom } from "jotai";
 import { useUser } from "./use-user";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalStorage } from "./use-local-storage";
+import { Supervisor } from "@psibase/common-lib/supervisor";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -28,6 +29,8 @@ type RawMessage = {
     body: string;
 };
 
+const supervisor = new Supervisor();
+
 const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
     return rawMessages.reverse().map(
         (msg, i) =>
@@ -46,13 +49,28 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 };
 
 const getIncomingMessages = async (account: string) => {
-    const res = await fetch(`/messages?receiver=${account}`);
-    const rawMessages = (await res.json()) as RawMessage[];
-    return transformRawMessagesToMessages(rawMessages);
+    console.info("getIncomingMessages.top()");
+    let resp;
+    try {
+        await supervisor.onLoaded();
+        resp = await supervisor.functionCall({
+            service: "webmail",
+            intf: "queries",
+            method: "getMessages",
+            params: ["", account],
+        });
+    } catch (e) {
+        console.info("e:", e);
+    }
+    console.info("resp:", resp);
+    // const res = await fetch(`/messages?receiver=${account}`);
+    // const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(resp as RawMessage[]);
 };
 
 const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
+    console.info("useIncomingMessages().top");
     const [selectedAccount] = useUser();
     const query = useQuery({
         queryKey: ["incoming", selectedAccount.account],
@@ -73,9 +91,20 @@ export function useIncomingMessages() {
 }
 
 const getSentMessages = async (account: string) => {
-    const res = await fetch(`/messages?sender=${account}`);
-    const rawMessages = (await res.json()) as RawMessage[];
-    return transformRawMessagesToMessages(rawMessages);
+    console.info("getSentMessages.top()")
+    await supervisor.onLoaded();
+    const resp = await supervisor.functionCall({
+                service: "webmail",
+                intf: "queries",
+                method: "getMessages",
+                params: [account, ""],
+            });
+    console.info("resp:");
+    console.info(resp);
+
+    // const res = await fetch(`/messages?sender=${account}`);
+    // const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(resp as RawMessage[]);
 };
 
 const sentMsgAtom = atom<Message["id"]>("");

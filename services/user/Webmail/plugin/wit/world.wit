@@ -1,5 +1,21 @@
 package webmail:plugin;
 
+interface types {
+    record message {
+        receiver: string,
+        sender: string,
+        subject: string,
+        content: string,
+    }
+}
+
+interface queries {
+    use types.{message};
+    use host:common/types.{error};
+
+    get-messages: func(sender: string, receiver: string) -> result<list<message>, error>;
+}
+
 interface api {
     use host:common/types.{error};
 
@@ -8,5 +24,6 @@ interface api {
 }
 
 world imports {
+    import queries;
     import api;
 }
