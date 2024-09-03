@@ -237,11 +237,8 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
    {
-      auto              sig  = sign(priv, hash);
-      auto              data = std::get<1>(sig.data);
-      std::vector<char> proof(reinterpret_cast<char*>(data.begin()),
-                              reinterpret_cast<char*>(data.end()));
-      signedTrx.proofs.push_back(proof);
+      auto proof = sign(priv, hash);
+      signedTrx.proofs.push_back({proof.begin(), proof.end()});
    }
 
    return pushTransaction(signedTrx);

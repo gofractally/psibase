@@ -87,11 +87,10 @@ TEST_CASE("ec")
    t.startBlock(0);
 
    auto              packed_ec_trx = psio::convert_to_frac(ec_trx);
-   auto              sig  = sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
-   auto              data = std::get<1>(sig.data);
+   auto              data = sign(priv_key2, sha256(packed_ec_trx.data(), packed_ec_trx.size()));
    SignedTransaction ec_signed = {
        .transaction = ec_trx,
-       .proofs = {{reinterpret_cast<char*>(data.begin()), reinterpret_cast<char*>(data.end())}},
+       .proofs      = {{data.begin(), data.end()}},
    };
 
    CHECK(TraceResult(t.pushTransaction(ec_signed)).failed("signature invalid"));

@@ -8,7 +8,6 @@
 #include <botan/pk_keys.h>
 #include <botan/pkcs8.h>
 #include <botan/pubkey.h>
-#include <psibase/crypto.hpp>
 
 namespace SystemService
 {
@@ -38,27 +37,21 @@ namespace SystemService
                                         key.data.size(), "PRIVATE KEY");
       }
 
-      psibase::Signature sign(const PrivateKeyInfo&       private_key,
-                              const psibase::Checksum256& checksum)
+      std::vector<uint8_t> sign(const PrivateKeyInfo&       private_key,
+                                const psibase::Checksum256& checksum)
       {
-         psibase::EccSignature signature = {};
-
          auto key = Botan::PKCS8::load_key({private_key.data.data(), private_key.data.size()});
 
          auto sources = Botan::Entropy_Sources();
          sources.add_source(Botan::Entropy_Source::create("getentropy"));
-
          Botan::AutoSeeded_RNG rng(sources);
-         Botan::PK_Signer      signer(*key, rng, "Raw", Botan::Signature_Format::Standard);
 
+         Botan::PK_Signer     signer(*key, rng, "Raw", Botan::Signature_Format::Standard);
          std::vector<uint8_t> msg = signer.sign_message({checksum.data(), checksum.size()}, rng);
 
          psibase::check(msg.size() == 64, "Signing failed");
 
-         std::copy(msg.begin(), msg.end(), signature.begin());
-
-         return psibase::Signature{
-             psibase::Signature::variant_type{psibase::Signature::r1, signature}};
+         return msg;
       }
 
    }  // namespace AuthSig

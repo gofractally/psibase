@@ -24,8 +24,8 @@ namespace SystemService
       std::vector<unsigned char> parsePrivateKeyInfo(std::string_view s);
       std::string                to_string(const PrivateKeyInfo&);
 
-      psibase::Signature sign(const PrivateKeyInfo&       private_key,
-                              const psibase::Checksum256& checksum);
+      std::vector<uint8_t> sign(const PrivateKeyInfo&       private_key,
+                                const psibase::Checksum256& checksum);
 
    }  // namespace AuthSig
 }  // namespace SystemService
