@@ -2,9 +2,9 @@
 mod bindings;
 
 use bindings::exports::webmail::plugin::api::{Error, Guest as API};
-use bindings::exports::webmail::plugin::queries::Guest as Query;
-use bindings::exports::webmail::plugin::types::Message;
-use bindings::host::common::server::Error as CommonError;
+// use bindings::exports::webmail::plugin::queries::Guest as Query;
+// use bindings::exports::webmail::plugin::types::Message;
+// use bindings::host::common::server::Error as CommonError;
 use bindings::host::common::server::*;
 use psibase::fracpack::Pack;
 use psibase::services::webmail;
@@ -34,10 +34,10 @@ impl API for WebmailPlugin {
     }
 }
 
-impl Query for WebmailPlugin {
-    fn get_messages(sender: String, receiver: String) -> Result<Vec<Message>, CommonError> {
-        Ok(vec![])
-    }
-}
+// impl Query for WebmailPlugin {
+//     fn get_messages(sender: String, receiver: String) -> Result<Vec<Message>, CommonError> {
+//         Ok(vec![])
+//     }
+// }
 
 bindings::export!(WebmailPlugin with_types_in bindings);
