@@ -796,7 +796,7 @@ namespace psibase
    // An empty key that can be used for any singleton table
    struct SingletonKey
    {
+      PSIO_REFLECT(SingletonKey);
    };
-   PSIO_REFLECT(SingletonKey);
 
 }  // namespace psibase

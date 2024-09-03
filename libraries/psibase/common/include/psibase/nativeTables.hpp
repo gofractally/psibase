@@ -31,8 +31,8 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
       static auto           key() -> KeyPrefixType;
+      PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
    };
-   PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
 
    struct ConfigRow
    {
@@ -42,8 +42,8 @@ namespace psibase
       static constexpr auto db = psibase::DbId::nativeConstrained;
 
       static auto key() -> KeyPrefixType;
+      PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
    };
-   PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
 
    // The existing eos-vm implementation limits are:
    // - branch offsets, and stack offsets must fit in a signed 32-bit int
@@ -67,8 +67,12 @@ namespace psibase
       std::uint32_t max_stack_bytes = 1024 * 1024;
 
       friend auto operator<=>(const VMOptions&, const VMOptions&) = default;
+      PSIO_REFLECT(VMOptions,
+                   max_mutable_global_bytes,
+                   max_pages,
+                   max_table_elements,
+                   max_stack_bytes)
    };
-   PSIO_REFLECT(VMOptions, max_mutable_global_bytes, max_pages, max_table_elements, max_stack_bytes)
 
    struct WasmConfigRow
    {
@@ -78,8 +82,8 @@ namespace psibase
       static constexpr auto db = psibase::DbId::nativeConstrained;
 
       static auto key(NativeTableNum TableNum) -> KeyPrefixType;
+      PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
    };
-   PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
 
    using CodeKeyType = std::tuple<std::uint16_t, std::uint8_t, AccountNumber>;
    auto codePrefix() -> KeyPrefixType;
@@ -106,8 +110,8 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const -> CodeKeyType;
+      PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
    };
-   PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
 
    using CodeByHashKeyType =
        std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
@@ -130,8 +134,8 @@ namespace psibase
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const -> CodeByHashKeyType;
+      PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
    };
-   PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
        -> std::vector<CodeByHashKeyType>;
@@ -149,8 +153,11 @@ namespace psibase
       // from writing to this since it could break backing stores.
       static constexpr auto db = psibase::DbId::nativeConstrained;
       static auto           key() -> KeyPrefixType;
+      PSIO_REFLECT(DatabaseStatusRow,
+                   nextHistoryEventNumber,
+                   nextUIEventNumber,
+                   nextMerkleEventNumber)
    };
-   PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber, nextMerkleEventNumber)
 
    // Notifications are sent by native code
    //
@@ -178,7 +185,7 @@ namespace psibase
       // TODO: we need a native subjective table
       static constexpr auto db = psibase::DbId::nativeConstrained;
       auto                  key() const -> NotifyKeyType;
+      PSIO_REFLECT(NotifyRow, type, actions)
    };
-   PSIO_REFLECT(NotifyRow, type, actions)
 
 }  // namespace psibase

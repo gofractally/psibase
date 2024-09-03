@@ -173,8 +173,8 @@ namespace psibase
          }
          return result;
       }
+      PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
    };
-   PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
 
    inline psio::schema_types::CustomTypes psibase_types()
    {

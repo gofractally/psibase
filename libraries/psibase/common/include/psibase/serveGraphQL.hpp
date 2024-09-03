@@ -10,8 +10,8 @@ namespace psibase
    struct GraphQLQuery
    {
       std::string query;
+      PSIO_REFLECT(GraphQLQuery, query);
    };
-   PSIO_REFLECT(GraphQLQuery, query);
 
    /// Handle `/graphql` request
    ///
@@ -82,8 +82,8 @@ namespace psibase
       bool        hasNextPage     = false;
       std::string startCursor;
       std::string endCursor;
+      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
    };
-   PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 
    /// GraphQL support for paging
    ///
@@ -485,15 +485,15 @@ namespace psibase
       bool          event_supported_service;
       MethodNumber  event_type;
       bool          event_unpack_ok;
+      PSIO_REFLECT(EventDecoderStatus,
+                   event_db,
+                   event_id,
+                   event_found,
+                   event_service,
+                   event_supported_service,
+                   event_type,
+                   event_unpack_ok)
    };
-   PSIO_REFLECT(EventDecoderStatus,
-                event_db,
-                event_id,
-                event_found,
-                event_service,
-                event_supported_service,
-                event_type,
-                event_unpack_ok)
 
    /// GraphQL support for decoding an event
    ///

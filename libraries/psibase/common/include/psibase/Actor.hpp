@@ -461,8 +461,8 @@ namespace psibase
 
    struct EmptyService
    {
+      PSIO_REFLECT(EmptyService)
    };
-   PSIO_REFLECT(EmptyService)
 
    /// Call a service
    ///
