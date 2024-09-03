@@ -158,11 +158,13 @@ namespace psio
    };
 
    template <typename T>
-   using view_interface_impl = typename std::conditional_t<
-       Reflected<std::remove_cv_t<T>> && !PackableWrapper<std::remove_cv_t<T>>,
-       make_reflect_proxy,
-       std::conditional_t<SimplePackableWrapper<T>, make_wrapper_proxy, not_reflected>>::
-       template fn<T>;
+   using view_interface_impl =
+       typename std::conditional_t<Reflected<std::remove_cv_t<T>> &&
+                                       !PackableWrapper<std::remove_cv_t<T>>,
+                                   make_reflect_proxy,
+                                   std::conditional_t<SimplePackableWrapper<std::remove_cv_t<T>>,
+                                                      make_wrapper_proxy,
+                                                      not_reflected>>::template fn<T>;
 
    template <typename T>
    struct view_interface : view_interface_impl<T>
