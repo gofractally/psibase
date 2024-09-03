@@ -1451,8 +1451,8 @@ namespace psio
    template <Packable T>
    std::vector<char> to_frac(const T& value)
    {
-      std::vector<char> result(psio::fracpack_size(value));
-      fast_buf_stream   s(result.data(), result.size());
+      std::vector<char>   result;
+      psio::vector_stream s{result};
       psio::to_frac(value, s);
       return result;
    }
