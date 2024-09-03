@@ -18,10 +18,8 @@ namespace psibase
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
-   inline auto statusKey()
-   {
-      return std::tuple{statusTable, nativeTablePrimaryIndex};
-   }
+   using KeyPrefixType = std::tuple<std::uint16_t, std::uint8_t>;
+   auto statusKey() -> KeyPrefixType;
    struct StatusRow
    {
       Checksum256                                    chainId;
@@ -32,7 +30,7 @@ namespace psibase
       std::vector<BlockHeaderAuthAccount>            authServices;
 
       static constexpr auto db = psibase::DbId::nativeUnconstrained;
-      static auto           key() { return statusKey(); }
+      static auto           key() -> KeyPrefixType;
    };
    PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
 
@@ -43,7 +41,7 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeConstrained;
 
-      static auto key() { return std::tuple{configTable, nativeTablePrimaryIndex}; }
+      static auto key() -> KeyPrefixType;
    };
    PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
 
@@ -79,21 +77,13 @@ namespace psibase
 
       static constexpr auto db = psibase::DbId::nativeConstrained;
 
-      static auto key(NativeTableNum TableNum)
-      {
-         return std::tuple{TableNum, nativeTablePrimaryIndex};
-      }
+      static auto key(NativeTableNum TableNum) -> KeyPrefixType;
    };
    PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
 
-   inline auto codePrefix()
-   {
-      return std::tuple{codeTable, nativeTablePrimaryIndex};
-   }
-   inline auto codeKey(AccountNumber codeNum)
-   {
-      return std::tuple{codeTable, nativeTablePrimaryIndex, codeNum};
-   }
+   using CodeKeyType = std::tuple<std::uint16_t, std::uint8_t, AccountNumber>;
+   auto codePrefix() -> KeyPrefixType;
+   auto codeKey(AccountNumber codeNum) -> CodeKeyType;
    struct CodeRow
    {
       // Constants for flags
@@ -115,14 +105,14 @@ namespace psibase
       uint8_t     vmVersion = 0;
 
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return codeKey(codeNum); }
+      auto                  key() const -> CodeKeyType;
    };
    PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
 
-   inline auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
-   {
-      return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
-   }
+   using CodeByHashKeyType =
+       std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
+   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
+       -> CodeByHashKeyType;
 
    /// where code is actually stored, duplicate services are reused
    struct CodeByHashRow
@@ -139,17 +129,14 @@ namespace psibase
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return codeByHashKey(codeHash, vmType, vmVersion); }
+      auto                  key() const -> CodeByHashKeyType;
    };
    PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
 
    auto getCodeKeys(const std::vector<BlockHeaderAuthAccount>& services)
-       -> std::vector<decltype(codeByHashKey(Checksum256(), 0, 0))>;
+       -> std::vector<CodeByHashKeyType>;
 
-   inline auto databaseStatusKey()
-   {
-      return std::tuple{databaseStatusTable, nativeTablePrimaryIndex};
-   }
+   auto databaseStatusKey() -> KeyPrefixType;
    struct DatabaseStatusRow
    {
       uint64_t nextHistoryEventNumber = 1;
@@ -161,7 +148,7 @@ namespace psibase
       // This table is in nativeConstrained. The native code blocks services
       // from writing to this since it could break backing stores.
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      static auto           key() { return databaseStatusKey(); }
+      static auto           key() -> KeyPrefixType;
    };
    PSIO_REFLECT(DatabaseStatusRow, nextHistoryEventNumber, nextUIEventNumber, nextMerkleEventNumber)
 
@@ -181,10 +168,8 @@ namespace psibase
       rejectTransaction,
    };
 
-   inline auto notifyKey(NotifyType type)
-   {
-      return std::tuple{notifyTable, nativeTablePrimaryIndex, type};
-   }
+   using NotifyKeyType = std::tuple<std::uint16_t, std::uint8_t, NotifyType>;
+   auto notifyKey(NotifyType type) -> NotifyKeyType;
    struct NotifyRow
    {
       NotifyType          type;
@@ -192,7 +177,7 @@ namespace psibase
 
       // TODO: we need a native subjective table
       static constexpr auto db = psibase::DbId::nativeConstrained;
-      auto                  key() const { return notifyKey(type); }
+      auto                  key() const -> NotifyKeyType;
    };
    PSIO_REFLECT(NotifyRow, type, actions)
 
