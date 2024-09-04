@@ -1,11 +1,24 @@
-[package]
-name = "branding_package"
-version.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.12.0"
+rust-version = "1.64"
 edition = "2021"
 publish = false
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
+
+[package]
+name = "branding_package"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
 
 [package.metadata.psibase]
 package-name = "branding"
