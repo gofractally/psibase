@@ -34,7 +34,7 @@ mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn networkNameChanged(name: String) {
+    fn setNetworkName(name: String) {
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();
@@ -49,12 +49,12 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn network_name(&self) -> async_graphql::Result<String, async_graphql::Error> {
+        async fn network_name(&self) -> String {
             let curr_val = NetworkNameTable::new().get_index_pk().get(&SingletonKey {});
-            Ok(match curr_val {
+            match curr_val {
                 Some(val) => val.name,
                 None => String::from("psibase"),
-            })
+            }
         }
     }
 

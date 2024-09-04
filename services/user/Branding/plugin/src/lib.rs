@@ -16,8 +16,8 @@ struct BrandingPlugin;
 
 impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
-        let packed_network_name_args = branding::action_structs::set_network_name { name }.packed();
-        CommonServer::add_action_to_transaction("set_network_name", &packed_network_name_args)
+        let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
+        CommonServer::add_action_to_transaction("setNetworkName", &packed_network_name_args)
             .unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
@@ -44,13 +44,17 @@ struct NetworkNameResponse {
 
 impl Queries for BrandingPlugin {
     fn get_network_name() -> Result<String, Error> {
-        let graphql_str = "query {{ networkName }}";
-        let summary_val = serde_json::from_str::<NetworkNameResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        )
-        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+        let graphql_str = "query { networkName }";
 
-        Ok(summary_val.data.network_name)
+        let netname_val = serde_json::from_str::<NetworkNameResponse>(
+            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+        );
+
+        let netname_val = netname_val
+            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))
+            .unwrap();
+
+        Ok(netname_val.data.network_name)
     }
 }
 

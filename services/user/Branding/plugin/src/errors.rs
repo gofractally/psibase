@@ -7,7 +7,7 @@ pub enum ErrorType {
 
 fn my_plugin_id() -> PluginId {
     return PluginId {
-        service: "identity".to_string(),
+        service: "branding".to_string(),
         plugin: "plugin".to_string(),
     };
 }
