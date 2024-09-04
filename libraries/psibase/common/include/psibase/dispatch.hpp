@@ -69,7 +69,15 @@ namespace psibase
    template <typename R, typename C, typename... A>
    struct make_action_param_tuple<R (C::*)(A...)>
    {
-      using type = std::tuple<typename psio::remove_view_t<typename std::remove_cvref_t<A>>...>;
+      using type = std::tuple<
+          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
+   };
+
+   template <typename R, typename C, typename... A>
+   struct make_action_param_tuple<R (C::*)(A...) const>
+   {
+      using type = std::tuple<
+          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
    };
 
    /**
