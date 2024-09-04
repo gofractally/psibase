@@ -1,20 +1,16 @@
 [package]
-name = "app_registry"
-version.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
+name = "app_registry_package"
 edition = "2021"
-publish = false
+version = "0.1.0"
 
 [package.metadata.psibase]
 package-name = "AppRegistry"
 description = "Registry for psibase apps"
-services = ["tpack"]
+services = ["app-registry"]
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-tpack = { path = "service", version = "0.12.0" }
-r-tpack = { path = "query", version = "0.12.0" }
+app-registry = { path = "service", version = "0.1.0" }
+r-app-reg = { path = "query", version = "0.1.0" }

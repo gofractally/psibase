@@ -12,6 +12,7 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
+            "@types": ["src/types"],
             "@components": ["src/components"],
             "@components/*": ["src/components/*"],
             "@shadcn": ["src/shad/components/ui"],

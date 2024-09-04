@@ -1,15 +1,15 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::test_package::plugin::test::Guest as Test;
+use bindings::exports::app_registry::plugin::test::Guest as Test;
 use bindings::host::common::types as CommonTypes;
 
-struct TestPlugin;
+struct AppRegistryPlugin;
 
-impl Test for TestPlugin {
+impl Test for AppRegistryPlugin {
     fn foo() -> Result<(), CommonTypes::Error> {
         Ok(())
     }
 }
 
-bindings::export!(TestPlugin with_types_in bindings);
+bindings::export!(AppRegistryPlugin with_types_in bindings);

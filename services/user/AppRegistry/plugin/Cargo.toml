@@ -1,17 +1,20 @@
 [package]
-name = "tpack-plugin"
+name = "app-registry-plugin"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path="../../psibase/" }
+psibase = { path="../../../../rust/psibase" }
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "tpack:plugin"
+package = "app-registry:plugin"
+
+[package.metadata.component.target]
+world = "psibase-plugin"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../services/user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }

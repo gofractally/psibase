@@ -1,2 +1,2 @@
-pub use r_tpack;
-pub use tpack;
+pub use r_app_reg;
+pub use app_registry;

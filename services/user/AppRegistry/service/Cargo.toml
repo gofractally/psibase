@@ -1,12 +1,8 @@
 [package]
-name = "tpack"
-description = "Test service for package building"
-version.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
+name = "app-registry"
+description = "App Registry Service"
 edition = "2021"
-publish = false
+version = "0.1.0"
 
 [package.metadata.psibase]
 server = "r-tpack"
@@ -14,9 +10,15 @@ server = "r-tpack"
 [package.metadata.psibase.dependencies]
 HttpServer = "0.12.0"
 
+# [lib]
+# path = "src/lib.rs"
+# crate-type = ["cdylib"]
+
 [dependencies]
-psibase = { path = "../../psibase", version = "0.12.0" }
-serde = "1.0"
+psibase = { path = "../../../../rust/psibase" }
+serde = { version = "1", features = ["derive"] }
+async-graphql = "7.0.7"
+serde_json = "1.0.120"
 
 [dev-dependencies]
-test_package = { path = "..", version = "0.12.0" }
+app_registry_package = { path = "..", version = "0.1.0" }

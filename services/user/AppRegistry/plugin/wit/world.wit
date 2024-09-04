@@ -1,4 +1,4 @@
-package test-package:plugin;
+package app-registry:plugin;
 
 interface test {
     use host:common/types.{error};

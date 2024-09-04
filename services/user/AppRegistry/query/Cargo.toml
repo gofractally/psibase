@@ -1,17 +1,15 @@
 [package]
-name = "r-tpack"
-description = "Query service for package building test"
-version.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
+name = "r-app-reg"
+description = "Query service for AppRegistry"
 edition = "2021"
+version = "0.1.0"
 publish = false
 
 [package.metadata.psibase]
-plugin = "tpack-plugin"
+plugin = "app-registry-plugin"
 
 [dependencies]
-psibase = { path = "../../psibase", version = "0.12.0" }
+psibase = { path = "../../../../rust/psibase" }
 serde = "1.0"
-tpack = { path = "../service", version = "0.12.0" }
+app-registry = { path = "../service", version = "0.1.0" }
+async-graphql = "7.0.7"
