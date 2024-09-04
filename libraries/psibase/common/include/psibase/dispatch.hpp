@@ -38,14 +38,14 @@ namespace psibase
    {
       if constexpr (is_view_v<R>)
       {
-         R    v((service.*method)(std::forward<decltype(args)>(args)...));
+         R    v((service.*method)(static_cast<decltype(args)>(args)...));
          auto s = find_view_span(v);
          check(s.data() != nullptr, "Cannot handle extensions in returned view");
          raw::setRetval(s.data(), s.size());
       }
       else
       {
-         psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
+         psio::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
          raw::setRetval(p.data(), p.size());
       }
    }
@@ -53,7 +53,7 @@ namespace psibase
    template <typename F, typename T, std::size_t... I>
    decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
    {
-      return f(get<I>(std::forward<T>(t))...);
+      return f(psio::get<I>(std::forward<T>(t))...);
    }
 
    template <typename F, typename T>
