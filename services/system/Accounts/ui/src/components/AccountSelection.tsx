@@ -33,8 +33,6 @@ import {
 import debounce from "debounce";
 import { Button } from "./ui/button";
 
-import { Separator } from "@/components/ui/separator";
-
 import {
   Card,
   CardDescription,
@@ -47,7 +45,7 @@ import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 dayjs.extend(relativeTime);
 
@@ -146,8 +144,6 @@ export const AccountSelection = () => {
       username: "",
     },
   });
-
-  const navigate = useNavigate();
 
   const { mutateAsync } = useMutation<number, Error, string>({
     mutationFn: async (params) => {
@@ -253,7 +249,6 @@ export const AccountSelection = () => {
     mutationFn: async () => {
       // TODO: accept the invite
 
-      console.log("meant to move to ", redirect);
       if (window.location && window.location.href && redirect) {
         window.location.href = redirect;
       }
@@ -437,7 +432,7 @@ export const AccountSelection = () => {
                 </button>
               </DialogTrigger>
             </div>
-            <div className=" my-3">
+            <div className="my-3">
               <Button
                 onClick={() => {
                   console.log("pressed");
