@@ -19,7 +19,7 @@ use rand_core::OsRng;
 use psibase::fracpack::Pack;
 use psibase::services::auth_sig::action_structs as MyService;
 
-use md5;
+use seahash;
 
 trait TryFromPemStr: Sized {
     fn try_from_pem_str(p: &Pem) -> Result<Self, CommonTypes::Error>;
@@ -31,10 +31,9 @@ impl TryFromPemStr for pem::Pem {
     }
 }
 
-// Uses md5 because it's short, this doesn't need to be cryptographically secure.
 fn get_hash(key: &Pem) -> Result<String, CommonTypes::Error> {
     let pem = pem::Pem::try_from_pem_str(&key)?;
-    let digest = md5::compute(pem.contents().to_vec());
+    let digest = seahash::hash(&pem.contents().to_vec());
     Ok(format!("{:x}", digest))
 }
 
