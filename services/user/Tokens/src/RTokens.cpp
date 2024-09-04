@@ -92,7 +92,7 @@ struct SplitKey
 };
 
 template <typename Rest, typename T>
-void to_key(SplitKey<Rest, T>& obj, auto& stream)
+void to_key(const SplitKey<Rest, T>& obj, auto& stream)
 {
    to_key(obj.value, stream);
 }
