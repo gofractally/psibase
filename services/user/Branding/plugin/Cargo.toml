@@ -1,7 +1,11 @@
 [package]
 name = "plugin"
-version = "0.1.0"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 edition = "2021"
+publish = false
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/" }
@@ -13,13 +17,6 @@ branding = { path = "../service/" }
 [lib]
 crate-type = ["cdylib"]
 
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
-
 [package.metadata.component]
 package = "branding:psibase-plugin"
 
@@ -27,3 +24,6 @@ package = "branding:psibase-plugin"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+
+[dev-dependencies]
+branding_package = { path = ".." }
