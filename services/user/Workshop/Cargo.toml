@@ -1,0 +1,16 @@
+[package]
+name = "workshop_package"
+edition = "2021"
+version = "0.1.0"
+
+[package.metadata.psibase]
+package-name = "Workshop"
+description = "Workshop for psibase apps"
+services = ["workshop"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+workshop = { path = "service", version = "0.1.0" }
+r-workshop = { path = "query", version = "0.1.0" }

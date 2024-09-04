@@ -1,0 +1,13 @@
+package workshop:plugin;
+
+interface test {
+    use host:common/types.{error};
+
+    foo: func() -> result<_, error>;
+}
+
+world psibase-plugin {
+    import host:common/server;
+    export test;
+}
+

@@ -1,0 +1,15 @@
+[package]
+name = "r-workshop"
+description = "Query service for Workshop"
+edition = "2021"
+version = "0.1.0"
+publish = false
+
+[package.metadata.psibase]
+plugin = "workshop-plugin"
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase" }
+serde = "1.0"
+workshop = { path = "../service", version = "0.1.0" }
+async-graphql = "7.0.7"
