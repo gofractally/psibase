@@ -159,11 +159,14 @@ optional<HttpReply> serveRestApi(const HttpRequest& request)
 
 optional<HttpReply> Webmail::serveSys(HttpRequest request)
 {
-   if (auto result = serveContent(request, Tables{}))
-      return result;
-   if (auto result = serveSimpleUI<Webmail, true>(request))
-      return result;
    if (auto result = serveRestApi(request))
+      return result;
+   if (auto result = serveSimpleUI<Webmail, false>(request))
+      return result;
+   if (request.target.ends_with(".html") || request.target == "/" || request.target.find('.') == request.target.npos) {
+      request.target = "/";
+   }
+   if (auto result = serveContent(request, Tables{}))
       return result;
 
    return nullopt;
