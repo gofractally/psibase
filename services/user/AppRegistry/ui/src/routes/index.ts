@@ -1,3 +1,3 @@
 export * from "./home";
 export * from "./about";
-export * from "./register";
+export * from "./manage-metadata";

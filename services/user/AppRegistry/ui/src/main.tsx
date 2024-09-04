@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { createHashRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { Home, About, AppRegistryPage } from "@routes";
+import { Home, About, ManageAppMetadataPage } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
 
 import DefaultLayout from "./layouts/default";
@@ -24,12 +24,12 @@ const router = createHashRouter([
             },
             {
                 path: "/register",
-                element: <AppRegistryPage />,
+                element: <ManageAppMetadataPage />,
                 children: [],
             },
             {
                 path: "/register/:id",
-                element: <AppRegistryPage />,
+                element: <ManageAppMetadataPage />,
                 children: [],
             },
             {

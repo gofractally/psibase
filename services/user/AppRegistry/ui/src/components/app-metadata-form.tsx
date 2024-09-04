@@ -26,7 +26,7 @@ import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
 
 const slugifyOptions = { lower: true, strict: true };
 
-const AppRegistrySchema = z.object({
+const AppMetadataSchema = z.object({
     icon: z.instanceof(File).nullable(),
     name: z.string().min(1, "Name is required"),
     shortDescription: z
@@ -60,9 +60,9 @@ const AppRegistrySchema = z.object({
     status: z.enum(["DRAFT", "PUBLISHED", "UNPUBLISHED"]),
 });
 
-export type AppRegistryFormData = z.infer<typeof AppRegistrySchema>;
+export type AppMetadataFormData = z.infer<typeof AppMetadataSchema>;
 
-export function AppRegistryForm() {
+export function AppMetadataForm() {
     const navigate = useNavigate();
     const location = useLocation() as { state?: { app: RegisteredApp } };
     const id = location.state?.app?.id;
@@ -75,8 +75,8 @@ export function AppRegistryForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isUpdating = !!id;
 
-    const form = useForm<AppRegistryFormData>({
-        resolver: zodResolver(AppRegistrySchema),
+    const form = useForm<AppMetadataFormData>({
+        resolver: zodResolver(AppMetadataSchema),
         defaultValues: {
             icon: null,
             name: "",
@@ -117,7 +117,7 @@ export function AppRegistryForm() {
         }
     }, [isUpdating, location.state, form, selectedAccount, navigate]);
 
-    const onSubmit = async (data: AppRegistryFormData) => {
+    const onSubmit = async (data: AppMetadataFormData) => {
         setIsSubmitting(true);
 
         try {
