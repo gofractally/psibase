@@ -128,34 +128,39 @@ namespace psibase
             return activeProducers.size() * 2 / 3 + 1;
          }
       }
+      std::string to_string() const
+      {
+         std::string result;
+         if (algorithm == ConsensusAlgorithm::cft)
+         {
+            result += "CFT:";
+         }
+         else if (algorithm == ConsensusAlgorithm::bft)
+         {
+            result += "BFT:";
+         }
+         result += '[';
+         bool first = true;
+         for (const auto& [name, auth] : activeProducers)
+         {
+            if (first)
+            {
+               first = false;
+            }
+            else
+            {
+               result += ',';
+            }
+            result += name.str();
+         }
+         result += ']';
+         return result;
+      }
    };
 
    inline std::ostream& operator<<(std::ostream& os, const ProducerSet& prods)
    {
-      if (prods.algorithm == ConsensusAlgorithm::cft)
-      {
-         os << "CFT:";
-      }
-      else if (prods.algorithm == ConsensusAlgorithm::bft)
-      {
-         os << "BFT:";
-      }
-      os << '[';
-      bool first = true;
-      for (const auto& [name, auth] : prods.activeProducers)
-      {
-         if (first)
-         {
-            first = false;
-         }
-         else
-         {
-            os << ',';
-         }
-         os << name.str();
-      }
-      os << ']';
-      return os;
+      return os << prods.to_string();
    }
 
    struct BlockAuthState
@@ -614,12 +619,13 @@ namespace psibase
       void set_subtree(const BlockHeaderState* root, const char* reason)
       {
          assert(root->info.header.term <= currentTerm);
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, root->info.header, root->blockId());
          if (root->invalid)
          {
-            PSIBASE_LOG_CONTEXT_BLOCK(logger, root->info.header, root->blockId());
             PSIBASE_LOG(logger, critical) << "Consensus failure: invalid block " << reason;
             throw consensus_failure{};
          }
+         PSIBASE_LOG(logger, debug) << "Setting subtree " << reason;
          if (byOrderIndex.find(root->order()) == byOrderIndex.end())
          {
             // The new root is not a descendant of the current root.
@@ -891,6 +897,8 @@ namespace psibase
       {
          auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
          auto result         = newCommitIndex != commitIndex;
+         if (result)
+            PSIBASE_LOG(logger, debug) << "Committing block " << newCommitIndex;
          for (auto i = commitIndex; i < newCommitIndex; ++i)
          {
             auto id    = get_block_id(i);
@@ -915,7 +923,7 @@ namespace psibase
          {
             // no error is possible, because the committed block is in the
             // current chain.
-            set_subtree(get_state(get_block_id(newCommitIndex)), "");
+            set_subtree(get_state(get_block_id(newCommitIndex)), "commitIndex");
          }
          commitIndex = newCommitIndex;
          return result;
@@ -938,13 +946,26 @@ namespace psibase
       {
          for (auto iter = blocks.begin(), end = blocks.end(); iter != end;)
          {
-            auto blockNum = getBlockNum(iter->first);
-            if (blockNum < commitIndex ||
-                (blockNum == commitIndex &&
-                 !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
-                (blockNum > commitIndex &&
-                 states.find(iter->second->block().header().previous()) == states.end()))
+            auto        blockNum = getBlockNum(iter->first);
+            bool        remove   = false;
+            const char* msg      = nullptr;
+            if (blockNum < commitIndex)
             {
+               msg    = "block before irreversible";
+               remove = true;
+            }
+            else if ((blockNum == commitIndex &&
+                      !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
+                     (blockNum > commitIndex &&
+                      states.find(iter->second->block().header().previous()) == states.end()))
+            {
+               msg    = "forked block";
+               remove = true;
+            }
+            if (remove)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, iter->second->block().header(), iter->first);
+               PSIBASE_LOG(blockLogger, debug) << "GC " << msg;
                f(iter->first);
                auto state_iter = states.find(iter->first);
                if (state_iter != states.end())

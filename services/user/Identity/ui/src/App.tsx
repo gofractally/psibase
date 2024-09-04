@@ -36,7 +36,7 @@ function App() {
   const opt1 = true; // false => Links; true => no Links
   const opt2 = !opt1;
 
-  const [rerenderSidebar, setTerenderSidebar] = useState<boolean>(false);
+  const [rerenderSidebar, setRerenderSidebar] = useState<boolean>(false);
   const simulation = useRef<
     d3.Simulation<AttestationGraphNode, AttestationGraphLink>
   >(d3.forceSimulation<AttestationGraphNode, AttestationGraphLink>());
@@ -93,7 +93,6 @@ function App() {
       .selectAll<SVGGElement, AttestationGraphNode>(".node")
       .data()
       .find((n) => n.id === uiOptions.current.centeredNodeIdx);
-    // console.info("centeredNode:", centeredNode);
     if (centeredNode) {
       centeredNode.x = 0;
       centeredNode.y = 0;
@@ -120,7 +119,7 @@ function App() {
           if (uiOptions.current.centeredNodeIdx === -1)
             uiOptions.current.graphMode = "fullGraph";
           else uiOptions.current.graphMode = "subGraph";
-          setTerenderSidebar((prev) => !prev);
+          setRerenderSidebar((prev) => !prev);
 
           d3.select("#canvas")
             .selectAll<SVGGElement, AttestationGraphNode>(".node")
@@ -151,12 +150,9 @@ function App() {
 
   const handleLinkColorChange =
     (selector: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      console.info(
-        `handleLinkColorChange(${selector}) newvalue:${e.target.value}`
-      );
       const selectedColor = e!.target.value;
       uiOptions.current.colors[selector] = selectedColor;
-      setTerenderSidebar((prev) => !prev);
+      setRerenderSidebar((prev) => !prev);
       const checked =
         (selector === SELECTOR.LINK && uiOptions.current.checkAttestations) ||
         (selector === SELECTOR.BACK_LINK &&
@@ -168,14 +164,13 @@ function App() {
 
   const handleGraphDepthChange = (newDepthStr: number) => {
     uiOptions.current.dagDepth = newDepthStr;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     deployNewGraph();
   };
 
   const handleCouncilDistanceChange = (newDistance: number) => {
-    // console.info("handleCouncilDistanceChange().top newDistance", newDistance);
     uiOptions.current.councilDistance = newDistance;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     applyCouncilDistance(
       JSON.parse(JSON.stringify(rawData[dataSetName])),
       uiOptions.current
@@ -185,7 +180,7 @@ function App() {
   const handleCheckAttestations = (e: React.MouseEvent<HTMLInputElement>) => {
     const checked = e.currentTarget.checked;
     uiOptions.current.checkAttestations = checked;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     applyLinkColors(uiOptions.current, SELECTOR.LINK, checked);
   };
 
@@ -194,7 +189,7 @@ function App() {
   ) => {
     const checked = e.currentTarget.checked;
     uiOptions.current.checkBackAttestations = checked;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     applyLinkColors(uiOptions.current, SELECTOR.BACK_LINK, checked);
   };
 
@@ -203,7 +198,7 @@ function App() {
   ) => {
     const checked = e.currentTarget.checked;
     uiOptions.current.checkAccountCreations = checked;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     applyLinkColors(uiOptions.current, SELECTOR.ACCOUNT_CREATION_LINK, checked);
   };
 
@@ -213,7 +208,7 @@ function App() {
 
       uiOptions.current.graphMode = "fullGraph";
       uiOptions.current.centeredNodeIdx = -1;
-      setTerenderSidebar((prev) => !prev);
+      setRerenderSidebar((prev) => !prev);
       deployNewGraph();
     }
   };
@@ -221,9 +216,8 @@ function App() {
     e: React.MouseEvent<HTMLInputElement>
   ) => {
     const checked = e.currentTarget.checked;
-    // console.info("handleApplyCouncilDistance().top");
     uiOptions.current.checkCouncilDistance = checked;
-    setTerenderSidebar((prev) => !prev);
+    setRerenderSidebar((prev) => !prev);
     applyLinkColors(
       uiOptions.current,
       SELECTOR.LINK,
@@ -231,7 +225,6 @@ function App() {
     );
   };
 
-  //console.info("render()...");
   return (
     <div>
       <Sidebar

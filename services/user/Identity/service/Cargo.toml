@@ -1,0 +1,12 @@
+[package]
+name = "identity"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+psibase_macros = { path = "../../../../rust/psibase_macros" }
+psibase = { path = "../../../../rust/psibase" }
+serde = { version = "1", features = ["derive"] }
+async-graphql = "7.0.7"
+serde_json = "1.0.120"
+# attestation = { version = "0.1.0", path = "../../Attestation/service" }

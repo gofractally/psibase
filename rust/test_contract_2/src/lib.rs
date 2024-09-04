@@ -98,7 +98,7 @@ mod service {
     }
 }
 
-#[psibase::test_case(services("example"))]
+#[psibase::test_case(packages("TestContract2"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
     use psibase::HttpBody;

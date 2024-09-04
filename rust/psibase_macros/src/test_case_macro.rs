@@ -1,12 +1,10 @@
-use darling::{FromMeta, ToTokens};
+use darling::FromMeta;
 use proc_macro::TokenStream;
-use proc_macro_error::{abort, emit_error};
+use proc_macro2::Span;
+use proc_macro_error::abort;
 use quote::quote;
-use std::collections::{HashMap, HashSet};
-use syn::{
-    parse, parse_macro_input, parse_quote, visit_mut::VisitMut, Expr, Ident, Item, ItemFn, Lit,
-    LitStr, Macro, NestedMeta, ReturnType,
-};
+use std::collections::HashSet;
+use syn::{parse_macro_input, parse_quote, Item, ItemFn, Lit, LitStr, NestedMeta, ReturnType};
 
 #[derive(Debug)]
 struct Services(HashSet<LitStr>);
@@ -34,12 +32,14 @@ impl FromMeta for Services {
 #[darling(default)]
 struct Options {
     services: Services,
+    packages: Services,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Options {
             services: Services(HashSet::new()),
+            packages: Services(HashSet::new()),
         }
     }
 }
@@ -77,51 +77,52 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     func.sig.inputs = Default::default();
     func.sig.output = ReturnType::Default;
 
-    let mut load_services = LoadServices {
-        requests: options.services.0,
-        locations: None,
+    let reg = if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
+        let mut load_registry = quote! {
+            let mut registry = psibase::JointRegistry::new();
+        };
+        for path in std::env::split_paths(&local_packages) {
+            let path = LitStr::new(path.as_os_str().to_str().unwrap(), Span::mixed_site());
+            load_registry = quote! {
+                #load_registry
+                registry.push(psibase::DirectoryRegistry::new(std::path::Path::new(#path).to_path_buf()))?;
+            }
+        }
+        quote! {
+            {
+                #load_registry
+                registry.push(psibase::Chain::default_registry())?;
+                registry
+            }
+        }
+    } else {
+        quote! {
+            psibase::Chain::default_registry()
+        }
     };
-
-    let env = std::env::var("CARGO_PSIBASE_SERVICE_LOCATIONS");
-    if let Ok(locations) = env {
-        load_services.locations = Some(
-            locations
-                .split(';')
-                .collect::<Vec<_>>()
-                .chunks(2)
-                .filter_map(|x| {
-                    if x.len() == 2 {
-                        Some((x[0].to_owned(), x[1].to_owned()))
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
-        );
-    }
 
     let mut block = *func.block;
 
     if !inputs.is_empty() {
         let name = func.sig.ident.to_string();
-        let deploy_services = load_services.requests.iter().fold(quote! {}, |acc, s| {
-            let ss = s.value().replace('_', "-");
-            quote! {
-                #acc
-                chain.deploy_service(psibase::account!(#ss), include_service!(#s))?;
-            }
-        });
+        let packages =
+            options
+                .packages
+                .0
+                .iter()
+                .fold(quote! { "DevDefault".to_string() }, |acc, p| {
+                    quote! {
+                        #acc, #p.to_string()
+                    }
+                });
         block = parse_quote! {{
             fn with_chain(#inputs) #output #block
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
                 use psibase::*;
 
                 let mut chain = psibase::Chain::new();
-                chain.boot()?;
+                chain.boot_with(&#reg, &[#packages])?;
 
-                #deploy_services
-
-                println!("\n\n>>> {}: Chain Tester Booted & Services Deployed - Running test...", #name);
                 Ok(chain)
             }
             let chain = create_chain();
@@ -142,69 +143,10 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
         }};
     }
 
-    load_services.visit_block_mut(&mut block);
-
-    if load_services.locations.is_none() {
-        func.sig.ident = Ident::new(
-            &(func.sig.ident.to_string() + "_psibase_test_get_needed_services"),
-            func.sig.ident.span(),
-        );
-        let prints = load_services.requests.iter().fold(
-            quote! {},
-            |acc, x| quote! {#acc println!("psibase-test-need-service {} {}:{}", #x, file!(), line!());},
-        );
-        // Preserves the original code to enable rust-analyzer and other tools to function
-        block = parse_quote! {{
-            #[allow(unused_macros)]
-            macro_rules! include_service {
-                ($service:expr) => {
-                    &[] as &[u8]
-                };
-            }
-            fn skip_so_cargo_psibase_can_get_deps() #block
-            if false {
-                skip_so_cargo_psibase_can_get_deps()
-            } else {
-                #prints
-            }
-        }};
-    }
-
     func.block = block.into();
     quote! {
         #[::std::prelude::v1::test]
         #func
     }
     .into()
-}
-
-struct LoadServices {
-    requests: HashSet<LitStr>,
-    locations: Option<HashMap<String, String>>,
-}
-
-impl VisitMut for LoadServices {
-    fn visit_macro_mut(&mut self, node: &mut Macro) {
-        if node.path.to_token_stream().to_string() == "include_service" {
-            let expr = parse::<Expr>(node.tokens.clone().into());
-            if let Ok(Expr::Lit(lit)) = expr {
-                if let Lit::Str(lit) = lit.lit {
-                    let service = lit.value();
-                    if let Some(locations) = &mut self.locations {
-                        if let Some(path) = locations.get(service.as_str()) {
-                            node.path = parse_quote! {::std::prelude::v1::include_bytes};
-                            node.tokens = parse_quote! {#path};
-                            return;
-                        }
-                        emit_error! {node, "Service \"{}\" not present", service};
-                        return;
-                    } else {
-                        self.requests.insert(lit);
-                        return;
-                    }
-                }
-            }
-            emit_error! {node, "Expected service name. e.g. include_service!(\"example\")"};
-        }
-    }
 }

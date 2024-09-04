@@ -47,11 +47,7 @@
 
 ## Registration
 
-Services which wish to serve HTTP requests need to register using the [SystemService::HttpServer] service's [SystemService::HttpServer::registerServer] action. There are multiple ways to do this:
-
-- `psibase deploy` and `cargo psibase deploy` have a `--register-proxy` option (shortcut `-p`) that can do this while deploying the service.
-- `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
-- A service may call `registerServer` during its own initialization action.
+Services which wish to serve HTTP requests need to register using the [SystemService::HttpServer] service's [SystemService::HttpServer::registerServer] action. This is usually done by setting the `package.metadata.psibase.server` field in `Cargo.toml` to add this action to the package installation process.
 
 A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 

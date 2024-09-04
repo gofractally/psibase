@@ -1,11 +1,14 @@
 [package]
-name = "test_contract"
+name = "test-contract"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
 publish = false
+
+[package.metadata.psibase]
+package-name = "test_contract"
 
 [lib]
 crate-type = ["cdylib"]

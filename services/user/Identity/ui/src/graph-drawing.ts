@@ -195,6 +195,7 @@ export const applyCouncilDistance = (graph: AttestationGraph, {checkCouncilDista
 
     // existing highlighting already removed, so just apply new highlighting
     // remove any inline styling so we can apply classes and get special class-styling
+    const existing_stroke = Ls.style("stroke");
     Ls.style("stroke", "");
     Ls.attr("class", (L, idx, El) => {
       if (
@@ -206,6 +207,7 @@ export const applyCouncilDistance = (graph: AttestationGraph, {checkCouncilDista
       ) {
         return El[idx].classList.toString() + " red-highlight";
       } else {
+        El[idx].style.stroke = existing_stroke;
         return El[idx].classList.toString();
       }
     });

@@ -1,13 +1,10 @@
 #pragma once
 
 #include <psibase/authz.hpp>
+#include <psibase/http_types.hpp>
 
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/asio/ssl/context.hpp>
-#include <boost/beast/core/tcp_stream.hpp>
-#ifdef PSIBASE_ENABLE_SSL
-#include <boost/beast/ssl.hpp>
-#endif
 #include <boost/beast/websocket/stream_fwd.hpp>
 #include <boost/type_erasure/any.hpp>
 #include <boost/type_erasure/callable.hpp>
@@ -29,13 +26,11 @@ namespace psibase::http
 
    using shutdown_t = std::function<void(std::vector<char>)>;
 
-   using accept_p2p_websocket1 = boost::beast::websocket::stream<boost::beast::tcp_stream>;
+   using accept_p2p_websocket1 = boost::beast::websocket::stream<tcp_stream>;
 #ifdef PSIBASE_ENABLE_SSL
-   using accept_p2p_websocket2 =
-       boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>;
+   using accept_p2p_websocket2 = boost::beast::websocket::stream<ssl_stream>;
 #endif
-   using accept_p2p_websocket3 = boost::beast::websocket::stream<
-       boost::beast::basic_stream<boost::asio::local::stream_protocol>>;
+   using accept_p2p_websocket3 = boost::beast::websocket::stream<local_stream>;
 
    using accept_p2p_websocket_t = boost::type_erasure::any<
        boost::mpl::vector<boost::type_erasure::relaxed,

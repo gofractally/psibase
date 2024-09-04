@@ -16,6 +16,7 @@ function(add suffix)
     service(clock-service "${suffix}" clock-service.cpp)
     service(subjective-service "${suffix}" subjective-service.cpp)
 
+    service(MockCpuLimit "${suffix}" MockCpuLimit.cpp)
     service(PSubjectiveService "${suffix}" ParallelSubjectiveService.cpp)
     service(CounterService "${suffix}" CounterService.cpp)
     service(AsyncQueryService "${suffix}" AsyncQueryService.cpp)
