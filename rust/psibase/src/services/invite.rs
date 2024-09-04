@@ -1,4 +1,4 @@
-use crate::services::auth_sig::Spki;
+pub use crate::services::auth_sig::SubjectPublicKeyInfo;
 use crate::AccountNumber;
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
@@ -10,12 +10,11 @@ use serde::{Deserialize, Serialize};
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "InviteRecordInput")]
 
-
 /// An invite object
 pub struct InviteRecord {
-    /// The public key of the invite. This uniquely identifies an invite and 
+    /// The public key of the invite. This uniquely identifies an invite and
     ///   may also used to authenticate the transaction accepting the invite.
-    pubkey: Spki,
+    pubkey: SubjectPublicKeyInfo,
 
     /// The creator of the invite object
     inviter: AccountNumber,
@@ -26,7 +25,7 @@ pub struct InviteRecord {
     /// The time in seconds at which this invite expires
     expiry: u32,
 
-    /// A flag that represents whether a new account may still be created by 
+    /// A flag that represents whether a new account may still be created by
     ///   redeeming this invite
     newAccountToken: bool,
 
@@ -48,7 +47,7 @@ pub struct NewAccountRecord {
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::services::auth_sig::Spki;
+    use crate::services::auth_sig::SubjectPublicKeyInfo;
     use crate::{http::HttpRequest, AccountNumber, Hex};
 
     #[action]
@@ -62,27 +61,31 @@ mod service {
     }
 
     #[action]
-    fn createInvite(inviteKey: Spki) {
+    fn createInvite(inviteKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
     #[action]
-    fn accept(inviteKey: Spki) {
+    fn accept(inviteKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
     #[action]
-    fn acceptCreate(inviteKey: Spki, acceptedBy: AccountNumber, newAccountKey: Spki) {
+    fn acceptCreate(
+        inviteKey: SubjectPublicKeyInfo,
+        acceptedBy: AccountNumber,
+        newAccountKey: SubjectPublicKeyInfo,
+    ) {
         unimplemented!()
     }
 
     #[action]
-    fn reject(inviteKey: Spki) {
+    fn reject(inviteKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
     #[action]
-    fn delInvite(inviteKey: Spki) {
+    fn delInvite(inviteKey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 
@@ -103,15 +106,15 @@ mod service {
 
     // For synchronous calls between services:
     #[action]
-    fn getInvite(pubkey: Spki) -> Option<super::InviteRecord> {
+    fn getInvite(pubkey: SubjectPublicKeyInfo) -> Option<super::InviteRecord> {
         unimplemented!()
     }
     #[action]
-    fn isExpired(pubkey: Spki) -> bool {
+    fn isExpired(pubkey: SubjectPublicKeyInfo) -> bool {
         unimplemented!()
     }
     #[action]
-    fn checkClaim(actor: AccountNumber, pubkey: Spki) {
+    fn checkClaim(actor: AccountNumber, pubkey: SubjectPublicKeyInfo) {
         unimplemented!()
     }
 }

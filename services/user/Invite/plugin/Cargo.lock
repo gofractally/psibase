@@ -1484,6 +1484,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "pem",
  "percent-encoding",
  "pkcs8",
  "psibase_macros",

@@ -2,8 +2,7 @@
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::accounts::plugin as Accounts;
-use bindings::auth_sig::plugin::keyvault;
-use bindings::auth_sig::plugin::types::Pem;
+use bindings::auth_sig::plugin::{keyvault, types::Pem};
 use bindings::exports::invite;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteId, InviteState, Url};
@@ -114,9 +113,9 @@ impl Invitee for Component {
         Transact::add_action_to_transaction(
             "acceptCreate",
             &InviteService::action_structs::acceptCreate {
-                inviteKey: keyvault::to_der(&invite_pubkey)?,
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
                 acceptedBy: accepted_by,
-                newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?,
+                newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
             }
             .packed(),
         )?;
@@ -174,7 +173,7 @@ impl Inviter for Component {
         Transact::add_action_to_transaction(
             "createInvite",
             &InviteService::action_structs::createInvite {
-                inviteKey: keyvault::to_der(&keypair.public_key)?,
+                inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
             }
             .packed(),
         )?;
@@ -198,7 +197,7 @@ impl Inviter for Component {
         Transact::add_action_to_transaction(
             "delInvite",
             &InviteService::action_structs::delInvite {
-                inviteKey: invite_public_key,
+                inviteKey: invite_public_key.into(),
             }
             .packed(),
         )?;

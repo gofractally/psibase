@@ -13,7 +13,7 @@ pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Acti
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
     if key.key.service == account!("verify-sig") {
-        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
+        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec().into())
     } else {
         panic!("unknown account service");
     }

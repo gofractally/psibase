@@ -98,7 +98,7 @@ impl Actions for AuthSig {
         Transact::add_action_to_transaction(
             "setKey",
             &MyService::setKey {
-                key: AuthSig::to_der(public_key)?,
+                key: AuthSig::to_der(public_key)?.into(),
             }
             .packed(),
         )?;
