@@ -1063,8 +1063,9 @@ void load_tables(sqlite3* db, std::string_view sql)
    }
 }
 
-std::vector<char> REvents::sqlQuery(const std::vector<char>& query)
+std::vector<char> REvents::sqlQuery(const std::string& squery)
 {
+   std::vector<char> query = {squery.begin(), squery.end()};
    sqlite3* db;
    if (int err = sqlite3_open(":memory:", &db))
    {
@@ -1138,7 +1139,7 @@ std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
    if (request.target != "/sql")
       return {};
 
-   return HttpReply{.contentType = "application/json", .body = sqlQuery(request.body)};
+   return HttpReply{.contentType = "application/json", .body = sqlQuery({request.body.begin(), request.body.end()})};
 }
 
 PSIBASE_DISPATCH(UserService::REvents)

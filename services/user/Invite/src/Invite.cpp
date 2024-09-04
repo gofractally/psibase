@@ -342,8 +342,7 @@ struct Queries
    auto allCreatedInv() const
    {
       // Todo: pagination?
-      std::string_view query{"SELECT * FROM \"history.invite.invitecreated\" ORDER BY ROWID"};
-      auto result = to<REvents>().sqlQuery(std::vector<char>(query.begin(), query.end()));
+      auto result = to<REvents>().sqlQuery("SELECT * FROM \"history.invite.invitecreated\" ORDER BY ROWID");
       return std::string{result.begin(), result.end()};
    }
 

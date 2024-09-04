@@ -13,7 +13,7 @@ namespace UserService
       static constexpr psibase::AccountNumber service{"r-events"};
 
       // Synchronous calls between other services
-      std::vector<char> sqlQuery(const std::vector<char>& query);
+      std::vector<char> sqlQuery(const std::string& query);
 
       // Standard HTTP API
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
