@@ -63,6 +63,15 @@ namespace psibase
                         std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
    }
 
+   template <typename T>
+   struct make_action_param_tuple;
+
+   template <typename R, typename C, typename... A>
+   struct make_action_param_tuple<R (C::*)(A...)>
+   {
+      using type = std::tuple<typename psio::remove_view_t<typename std::remove_cvref_t<A>>...>;
+   };
+
    /**
     *  This method is called when a service receives a call and will
     *  and will call the proper method on Contact assuming Service has
@@ -94,9 +103,9 @@ namespace psibase
           [&](auto member, auto /*names*/)
           {
              using result_type = decltype(psio::result_of(member));
-             using param_tuple = decltype(psio::tuple_remove_view(psio::args_as_tuple(member)));
+             using param_tuple = typename make_action_param_tuple<decltype(member)>::type;
 
-             auto param_data = std::span{act->rawData().data(), act->rawData().size()};
+             auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
                             "invalid argument encoding for " + act->method().unpack().str());
 

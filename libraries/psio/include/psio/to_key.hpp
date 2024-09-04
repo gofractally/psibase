@@ -375,4 +375,12 @@ namespace psio
       return result;
    }
 
+   template <typename... T>
+   std::vector<char> composite_key(const T&... t)
+   {
+      std::vector<char> result;
+      (convert_to_key(t, result), ...);
+      return result;
+   }
+
 }  // namespace psio

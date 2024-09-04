@@ -402,7 +402,7 @@ namespace psio
       {
          auto orig_pos = pos;
          bool result   = is_p::template unpack<Unpack, Verify>(ptr<Unpack>(value), has_unknown,
-                                                             known_end, src, pos, end_pos);
+                                                               known_end, src, pos, end_pos);
          if constexpr (Verify && (PackableValidatedObject<T> || PackableValidatedView<T>))
          {
             return result && user_validate<Unpack, false>(value, src, orig_pos);
@@ -1082,7 +1082,7 @@ namespace psio
          pos = heap_pos;
          return true;
       }  // unpack
-   };    // is_packable<std::tuple<Ts...>>
+   };  // is_packable<std::tuple<Ts...>>
 
    template <bool Unpack, bool Verify, size_t I, typename... Ts>
    [[nodiscard]] bool unpack_variant_impl(size_t               tag,
@@ -1141,8 +1141,7 @@ namespace psio
          is_packable<uint32_t>::pack(0, stream);
          uint32_t content_pos = stream.written();
          std::visit([&](const auto& x)
-                    { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); },
-                    value);
+                    { is_packable<std::remove_cvref_t<decltype(x)>>::pack(x, stream); }, value);
          stream.rewrite_raw(size_pos, uint32_t(stream.written() - content_pos));
       }
 
@@ -1432,7 +1431,7 @@ namespace psio
             return ok;
          }
       }  // unpack
-   };    // is_packable_reflected
+   };  // is_packable_reflected
 
    template <Packable T, typename S>
    void to_frac(const T& value, S& stream)
@@ -1511,8 +1510,8 @@ namespace psio
    template <typename T>
    prevalidated(T&&) -> prevalidated<T>;
    template <typename T, typename U>
-   prevalidated(T&& t, U&& u)
-       -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
+   prevalidated(T&& t,
+                U&& u) -> prevalidated<decltype(std::span{std::forward<T>(t), std::forward<U>(u)})>;
    struct input_stream;
    prevalidated(input_stream) -> prevalidated<std::span<const char>>;
 
@@ -1591,7 +1590,7 @@ namespace psio
       bool                  known_end;
       std::uint32_t         pos = 0;
       T                     result;
-      std::span<const char> actual(data.data);
+      std::span<const char> actual(data.data.data(), data.data.size());
       (void)is_packable<T>::template unpack<true, false>(&result, has_unknown, known_end,
                                                          actual.data(), pos, actual.size());
       return result;
