@@ -49,13 +49,7 @@ namespace psio
       std::array<std::uint32_t, sizeof...(T)> result;
       std::uint32_t                           pos = initial;
       std::size_t                             idx = 0;
-      psio::tuple_foreach_type((std::tuple<T...>*)nullptr,
-                               [&](auto* t)
-                               {
-                                  result[idx++] = pos;
-                                  pos +=
-                                      is_packable<std::remove_pointer_t<decltype(t)>>::fixed_size;
-                               });
+      ((result[idx++] = pos, pos += is_packable<T>::fixed_size), ...);
       return result;
    }
 
@@ -67,9 +61,9 @@ namespace psio
        get_packed_offsets((std::tuple<T...>*)nullptr, 2);
 
    template <Reflected T>
-   constexpr auto fixed_offsets<T> =
-       get_packed_offsets((typename psio::reflect<T>::struct_tuple_type*)nullptr,
-                          psio::reflect<T>::definitionWillNotChange ? 0 : 2);
+   constexpr auto fixed_offsets<T> = get_packed_offsets(
+       (typename get_struct_tuple_impl<typename psio::reflect<T>::data_members>::type*)nullptr,
+       psio::reflect<T>::definitionWillNotChange ? 0 : 2);
 
    inline const char empty_optional[4] = {1, 0, 0, 0};
 
@@ -117,13 +111,20 @@ namespace psio
       }
    };
 
+   template <typename T, typename M>
+   constexpr bool is_simple_packable_wrapper = false;
+
+   template <typename T, auto M>
+   constexpr bool is_simple_packable_wrapper<T, MemberList<M>> =
+       std::is_same_v<typename std::remove_cvref_t<typename MemberPtrType<decltype(M)>::ValueType>,
+                      T>;
+
    template <typename T>
    concept SimplePackableWrapper =
        Reflected<T> && PackableWrapper<T> &&
-       (std::tuple_size_v<typename reflect<T>::struct_tuple_type> == 1 &&
-        std::is_same_v<
-            std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>,
-            std::remove_cvref_t<std::tuple_element_t<0, typename reflect<T>::struct_tuple_type>>>);
+       is_simple_packable_wrapper<
+           std::remove_cvref_t<decltype(clio_unwrap_packable(std::declval<T&>()))>,
+           typename reflect<T>::data_members>;
 
    template <typename Ch>
    struct frac_wrap_view : view_base<Ch>

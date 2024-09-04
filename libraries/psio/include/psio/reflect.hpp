@@ -188,8 +188,8 @@ namespace psio
    concept ReflectedAsMember = requires(QueryClass* v) { v->psio_get_reflect_impl(v, nullptr); };
 
    template <ReflectedAsMember QueryClass>
-   auto psio_get_reflect_impl(QueryClass* v, ReflectDummyParam*)
-       -> decltype(v->psio_get_reflect_impl(v, nullptr));
+   auto psio_get_reflect_impl(QueryClass* v,
+                              ReflectDummyParam*) -> decltype(v->psio_get_reflect_impl(v, nullptr));
 
    template <typename QueryClass>
    using reflect =
@@ -841,7 +841,6 @@ namespace psio
           BOOST_PP_SEQ_FOR_EACH(PSIO_REFLECT_MEMBER_FUNCTION_NAME,                                                \
                                 ReflectedType,                                                                    \
                                 PSIO_REFLECT_METHODS(__VA_ARGS__))};                                              \
-      using struct_tuple_type = typename ::psio::get_struct_tuple_impl<data_members>::type;                       \
       static constexpr auto member_pointers()                                                                     \
       {                                                                                                           \
          return std::make_tuple(                                                                                  \
