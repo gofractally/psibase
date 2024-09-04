@@ -8,7 +8,6 @@ edition = "2021"
 publish = false
 
 [package.metadata.psibase]
-# These must match package names of component projects
 server = "branding"
 plugin = "plugin"
 

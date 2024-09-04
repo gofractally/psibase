@@ -1,10 +1,6 @@
 [workspace]
 resolver = "2"
-# each proj must be listed (can't combine via a cargo.toml
-# `user/Branding` didn't need to be referenced
 members = ["user/Branding/service", "user/Branding/plugin"]
-
-#Package names of component projects
 default-members = ["branding", "plugin"]
 
 [workspace.package]

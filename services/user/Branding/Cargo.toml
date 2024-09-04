@@ -1,6 +1,4 @@
 [package]
-# only a convenience for referencing this service/plugin from other serivces
-# This is used by cargo-psibase package (even though the workspace Cargo.toml doesn't reference it)
 name = "branding_package"
 version.workspace = true
 rust-version.workspace = true
@@ -13,10 +11,6 @@ publish = false
 package-name = "branding"
 description = "Allow operators to rebrand their network easily"
 services = ["branding"]
-# Need to be on the /service; not package-global
-# flags = []
-# server = "branding"
-# plugin = "branding-plugin"
 
 [lib]
 crate-type = ["rlib"]
