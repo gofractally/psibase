@@ -213,7 +213,7 @@ export class Supervisor implements AppInterface {
     }
 
     // Manages callstack and calls plugins
-    async call(sender: OriginationData, args: QualifiedFunctionCallArgs): Promise<any> {
+    call(sender: OriginationData, args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
         assertTruthy(this.parentOrigination, "Uninitialized call origination");
 
@@ -238,8 +238,6 @@ export class Supervisor implements AppInterface {
             p.new === false,
             `Tried to call plugin ${service}:${plugin} before initialization`,
         );
-
-        await p.plugin.ready;
 
         this.context.stack.push(sender, args);
 
