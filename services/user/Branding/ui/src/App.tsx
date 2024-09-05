@@ -87,6 +87,10 @@ export const App = () => {
     ) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        if (file.type != "image/svg+xml") {
+            alert("Only SVGs are supported.");
+            return;
+        }
         const reader = new FileReader();
         reader.onloadend = () => {
             if (!reader.result) {
