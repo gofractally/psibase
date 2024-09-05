@@ -178,6 +178,7 @@ export const App = () => {
                     <Input
                         id="logo-file"
                         type="file"
+                        accept=".svg"
                         className="invisible absolute"
                         onChange={handleFileChange}
                         ref={fileInput}
