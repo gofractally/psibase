@@ -227,7 +227,7 @@ namespace SystemService
 
       // root domain
       else
-         serviceName = "common-api";
+         serviceName = "homepage";
 
       auto service = AccountNumber(serviceName);
       auto reg     = kvGet<RegisteredServiceRow>(registeredServiceKey(act.service, service));

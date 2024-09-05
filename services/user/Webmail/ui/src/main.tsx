@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createHashRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
@@ -14,7 +14,7 @@ import "./styles/globals.css";
 
 const queryClient = new QueryClient();
 
-const router = createHashRouter([
+const router = createBrowserRouter([
     {
         element: <DefaultLayout />,
         children: [
