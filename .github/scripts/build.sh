@@ -27,6 +27,7 @@ export SCCACHE_DIR=${WORKSPACE_ROOT}/.caches/sccache
 export CCACHE_CONFIGPATH=${WORKSPACE_ROOT}/ccache.conf
 echo max_size = 600M >${WORKSPACE_ROOT}/ccache.conf
 echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
+export SCCACHE_IDLE_TIMEOUT=0
 export SCCACHE_CACHE_SIZE=200M
 export RUSTC_WRAPPER=sccache
 DOCKER="docker run --rm \
@@ -35,6 +36,7 @@ DOCKER="docker run --rm \
   -e CCACHE_DIR \
   -e CCACHE_CONFIGPATH \
   -e SCCACHE_DIR \
+  -e SCCACHE_IDLE_TIMEOUT \
   -e SCCACHE_CACHE_SIZE \
   -e RUSTC_WRAPPER \
   -e WASM_PACK_CACHE=.wasm-pack-cache \
