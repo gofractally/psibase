@@ -52,7 +52,7 @@ echo =====
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
 echo =====
-${DOCKER} bash -c "cd build && make -j $(nproc)"
+${DOCKER} bash -c "cd build && make -j $(nproc) && sccache -s"
 echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
 echo =====
