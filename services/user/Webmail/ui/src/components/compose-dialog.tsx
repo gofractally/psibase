@@ -124,6 +124,7 @@ export const ComposeDialog = ({
 
         try {
             const supervisor = await getSupervisor();
+            // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
                 service: "webmail",
                 intf: "api",
@@ -132,8 +133,12 @@ export const ComposeDialog = ({
             });
             if (!id.current) return;
             deleteDraftById(id.current);
+            isSent.current = true;
+            form.reset();
+            toast.success("Your message has been sent");
+            setOpen(false);
         } catch (e: unknown) {
-            alert(`${(e as SupervisorError).message}`);
+            toast.error(`${(e as SupervisorError).message}`);
             console.error(`${(e as SupervisorError).message}`);
         }
     };
@@ -141,10 +146,6 @@ export const ComposeDialog = ({
     async function onSubmit(values: z.infer<typeof formSchema>) {
         toast("Sending...");
         await sendMessage(values);
-        isSent.current = true;
-        form.reset();
-        toast.success("Your message has been sent");
-        setOpen(false);
     }
 
     return (
@@ -185,7 +186,7 @@ export const ComposeDialog = ({
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className="flex flex-1 flex-col space-y-2"
+                        className="flex h-[80dvh] flex-1 flex-grow flex-col space-y-2 bg-green-200"
                     >
                         <FormField
                             control={form.control}
@@ -214,7 +215,7 @@ export const ComposeDialog = ({
                                 </FormItem>
                             )}
                         />
-                        <ScrollArea className="flex-1">
+                        <ScrollArea className="h-full flex-1 overflow-y-auto">
                             <MilkdownProvider>
                                 <ProsemirrorAdapterProvider>
                                     <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
