@@ -1,6 +1,6 @@
 #[psibase::service]
 #[allow(non_snake_case)]
-pub mod service {
+mod service {
     use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ pub mod service {
     /// Holds metadata for a registered app
     #[table(name = "AppMetadataTable", index = 0)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
-    pub struct AppMetadata {
+    struct AppMetadata {
         /// The unique identifier for the app
         #[primary_key]
         account_id: AccountNumber,
@@ -39,10 +39,16 @@ pub mod service {
     }
 
     #[table(record = "WebContentRow", index = 1)]
-    pub struct WebContentTable;
+    struct WebContentTable;
 
     #[action]
-    pub fn setAppMetadata(
+    fn getAppMetadata(account_id: AccountNumber) -> Option<AppMetadata> {
+        AppMetadataTable::new().get_index_pk().get(&account_id)
+    }
+
+    #[action]
+    fn setAppMetadata(
+        // todo: make all fields optional
         name: String,
         short_description: String,
         long_description: String,
@@ -79,7 +85,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn setAppMetadata(app_metadata: AppMetadata) {}  
+    fn setAppMetadata(app_metadata: AppMetadata) {}
 
     // #[action]
     // fn serveSys(request: HttpRequest) -> Option<HttpReply> {
@@ -87,9 +93,8 @@ pub mod service {
     //         .or_else(|| serve_simple_ui::<Wrapper>(&request))
     //         .or_else(|| serve_graphql(&request, Query))
     //         .or_else(|| serve_graphiql(&request))
-    // } 
+    // }
 }
-
 
 #[psibase::test_case(packages("Workshop"))]
 fn test_set_app_metadata(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -111,8 +116,6 @@ fn test_set_app_metadata(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert!(result.get().is_ok());
 
     // chain.finish_block();
-
-    
 
     // http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
 

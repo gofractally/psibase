@@ -1,13 +1,34 @@
 package workshop:plugin;
 
-interface test {
+interface types {
+    type account-id = string;
+    type bytes = list<u8>;
+}
+
+interface developer {
     use host:common/types.{error};
+    use types.{account-id, bytes};
 
-    foo: func() -> result<_, error>;
+    set-app-metadata: func(
+        account: account-id, 
+        name: string, 
+        short-description: string, 
+        long-description: string, 
+        icon: bytes, 
+        tos-subpage: string, 
+        privacy-policy-subpage: string, 
+        app-homepage-subpage: string, 
+        status: string
+    ) -> result<_, error>;
 }
 
-world psibase-plugin {
-    import host:common/server;
-    export test;
+interface consumer {
+    use host:common/types.{error};
+    use types.{account-id};
+    get-app-metadata: func(account: account-id) -> result<_, error>;
 }
 
+world imports {
+    import developer;
+    import consumer;
+}

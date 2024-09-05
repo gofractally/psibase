@@ -2701,11 +2701,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "workshop"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "workshop-plugin"
 version = "0.1.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt",
+ "workshop",
 ]
 
 [[package]]

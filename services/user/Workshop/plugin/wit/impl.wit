@@ -1,0 +1,8 @@
+package workshop:plugin;
+
+world impl {
+    include host:common/imports;
+
+    export developer;
+    export consumer;
+}
