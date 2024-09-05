@@ -1,42 +1,58 @@
+use async_graphql::SimpleObject;
+use psibase::{AccountNumber, Fracpack, TableRecord, ToSchema};
+use serde::{Deserialize, Serialize};
+pub use service::AppMetadataTable;
+
+impl TableRecord for AppMetadata {
+    type PrimaryKey = AccountNumber;
+
+    const SECONDARY_KEYS: u8 = 0;
+
+    fn get_primary_key(&self) -> Self::PrimaryKey {
+        self.account_id
+    }
+}
+#[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+pub struct AppMetadata {
+    /// The unique identifier for the app
+    account_id: AccountNumber,
+
+    /// The name of the app
+    name: String,
+
+    /// A short description of the app
+    short_description: String,
+
+    /// A detailed description of the app
+    long_description: String,
+
+    /// The icon of the app (stored as a base64 string)
+    icon: Option<String>,
+
+    /// The subpage for Terms of Service
+    tos_subpage: String,
+
+    /// The subpage for Privacy Policy
+    privacy_policy_subpage: String,
+
+    /// The subpage for the app's homepage
+    app_homepage_subpage: String,
+
+    /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
+    status: String, // todo: change to enum
+}
+
 #[psibase::service]
 #[allow(non_snake_case)]
-pub mod service {
+mod service {
+    use crate::AppMetadata;
     use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
     /// Holds metadata for a registered app
-    #[table(name = "AppMetadataTable", index = 0)]
-    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
-    pub struct AppMetadata {
-        /// The unique identifier for the app
-        #[primary_key]
-        account_id: AccountNumber,
-
-        /// The name of the app
-        name: String,
-
-        /// A short description of the app
-        short_description: String,
-
-        /// A detailed description of the app
-        long_description: String,
-
-        /// The icon of the app (stored as a base64 string)
-        icon: Option<String>,
-
-        /// The subpage for Terms of Service
-        tos_subpage: String,
-
-        /// The subpage for Privacy Policy
-        privacy_policy_subpage: String,
-
-        /// The subpage for the app's homepage
-        app_homepage_subpage: String,
-
-        /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
-        status: String, // todo: change to enum
-    }
+    #[table(name = "AppMetadataTable", record = "AppMetadata", index = 0)]
+    pub struct AppMetadataTable;
 
     #[table(record = "WebContentRow", index = 1)]
     pub struct WebContentTable;
@@ -79,7 +95,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn setAppMetadata(app_metadata: AppMetadata) {}  
+    pub fn setAppMetadata(app_metadata: AppMetadata) {}
 
     // #[action]
     // fn serveSys(request: HttpRequest) -> Option<HttpReply> {
@@ -87,9 +103,8 @@ pub mod service {
     //         .or_else(|| serve_simple_ui::<Wrapper>(&request))
     //         .or_else(|| serve_graphql(&request, Query))
     //         .or_else(|| serve_graphiql(&request))
-    // } 
+    // }
 }
-
 
 #[psibase::test_case(packages("Workshop"))]
 fn test_set_app_metadata(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -111,8 +126,6 @@ fn test_set_app_metadata(chain: psibase::Chain) -> Result<(), psibase::Error> {
     assert!(result.get().is_ok());
 
     // chain.finish_block();
-
-    
 
     // http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
 

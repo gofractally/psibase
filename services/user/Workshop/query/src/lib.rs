@@ -1,20 +1,17 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use workshop;
     use async_graphql::*;
     use psibase::*;
+    use workshop;
 
     pub struct Query;
 
     #[Object]
     impl Query {
         /// Get the app metadata for a specific app ID
-        async fn app_metadata(
-            &self,
-            account_id: AccountNumber,
-        ) -> Option<workshop::service::AppMetadata> {
-            workshop::service::AppMetadataTable::new()
+        async fn app_metadata(&self, account_id: AccountNumber) -> Option<workshop::AppMetadata> {
+            workshop::AppMetadataTable::new()
                 .get_index_pk()
                 .get(&account_id)
         }
