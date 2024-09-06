@@ -10,6 +10,7 @@ publish = false
 
 [package.metadata.psibase]
 plugin = "tpack-plugin"
+data = [{src = "../ui", dst = "/"}]
 
 [dependencies]
 psibase = { path = "../../psibase", version = "0.12.0" }

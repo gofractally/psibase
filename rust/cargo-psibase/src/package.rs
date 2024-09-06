@@ -15,6 +15,12 @@ use std::path::{Path, PathBuf};
 use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Default)]
+struct DataFiles {
+    src: String,
+    dst: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct PsibaseMetadata {
     #[serde(rename = "package-name")]
@@ -25,6 +31,7 @@ pub struct PsibaseMetadata {
     dependencies: HashMap<String, String>,
     services: Option<Vec<String>>,
     postinstall: Option<Vec<Action>>,
+    data: Vec<DataFiles>,
 }
 
 impl PsibaseMetadata {
@@ -104,7 +111,7 @@ fn should_build_package(
     filename: &Path,
     meta: &Meta,
     services: &[(&String, ServiceInfo, PathBuf)],
-    data: &[(&String, &str, PathBuf)],
+    data: &[(&String, String, PathBuf)],
     postinstall: &[Action],
 ) -> Result<bool, anyhow::Error> {
     let timestamp = if let Ok(metadata) = filename.metadata() {
@@ -148,7 +155,7 @@ fn should_build_package(
             return Ok(true);
         }
         let account: AccountNumber = service.parse()?;
-        new_data.push((account.value, *dest));
+        new_data.push((account.value, dest.as_str()));
     }
     existing_data.sort();
     new_data.sort();
@@ -162,6 +169,35 @@ fn should_build_package(
         return Ok(true);
     }
     Ok(false)
+}
+
+fn add_files<'a>(
+    service: &'a String,
+    src: &Path,
+    dest: &String,
+    out: &mut Vec<(&'a String, String, PathBuf)>,
+) -> Result<(), anyhow::Error> {
+    if src.is_file() {
+        out.push((service, dest.clone(), src.to_path_buf()));
+    } else if src.is_dir() {
+        for entry in src.read_dir()? {
+            let entry = entry?;
+            add_files(
+                service,
+                &entry.path(),
+                &(dest.clone()
+                    + "/"
+                    + entry.file_name().to_str().ok_or_else(|| {
+                        anyhow!(
+                            "non-unicode file name: {}",
+                            entry.file_name().to_string_lossy()
+                        )
+                    })?),
+                out,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn build_package(
@@ -257,6 +293,17 @@ pub async fn build_package(
                 };
                 plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
             }
+            for data in &pmeta.data {
+                let src = package.manifest_path.parent().unwrap().join(&data.src);
+                let mut dest = data.dst.clone();
+                if !dest.starts_with('/') {
+                    dest = "/".to_string() + &dest;
+                }
+                if dest.ends_with('/') {
+                    dest.pop();
+                }
+                add_files(&package.name, src.as_std_path(), &dest, &mut data_files)?;
+            }
             services.push((&package.name, info, &package.id.repr));
             if let Some(actions) = &pmeta.postinstall {
                 postinstall.extend_from_slice(actions.as_slice());
@@ -313,7 +360,7 @@ pub async fn build_package(
                 plugin
             ))?
         };
-        data_files.push((service, path, paths.pop().unwrap()))
+        data_files.push((service, path.to_string(), paths.pop().unwrap()))
     }
 
     let out_dir = get_package_dir(args, metadata);
