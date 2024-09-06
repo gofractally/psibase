@@ -22,7 +22,8 @@ mod to_key_macro;
 // TODO: remove
 #[proc_macro_derive(Fracpack, attributes(fracpack))]
 pub fn derive_fracpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, true, true)
+    let input = parse_macro_input!(input as DeriveInput);
+    fracpack_macro_impl(input, true, true).into()
 }
 
 #[proc_macro_derive(Pack, attributes(fracpack))]
