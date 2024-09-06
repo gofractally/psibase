@@ -1,0 +1,14 @@
+[package]
+name = "macro_pub"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+# [lib]
+# crate-type = ["rlib"]
+
+[dependencies]
+macro_derive = { path = "../macro_derive" }
+# macro_pub = { path = "macro_pub" }

@@ -1,4 +1,4 @@
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use proc_macro_error::emit_error;
 use psibase_names::{account_number_from_str, account_number_to_string, method_number_from_str};
 use quote::quote;

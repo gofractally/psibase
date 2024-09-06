@@ -1,0 +1,13 @@
+[package]
+name = "macro_derive"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+macro_core = { path = "../macro_core" }

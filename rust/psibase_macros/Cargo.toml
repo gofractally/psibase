@@ -1,20 +1,16 @@
-[package]
+[workspace]
+resolver = "2"
+members = ["macro_core", "macro_derive", "macro_pub"]
+
+[workspace.package]
 name = "psibase_macros"
-version.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
-edition = "2021"
 description = "Macros to support psibase development"
+version = "0.1.0"
+rust-version = "1.64.0"
+edition = "2021"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
 license = "MIT"
 
-[lib]
-proc-macro = true
-
-[dependencies]
-darling = "0.14"
-proc-macro-error = "1.0.4"
-proc-macro2 = "1.0.36"
-psibase_names = { version = "0.12.0", path = "../psibase_names" }
-quote = "1.0.15"
-syn = {version = "1.0.86", features = ["full", "visit-mut"] }
+# [lib]
+# proc-macro = true
