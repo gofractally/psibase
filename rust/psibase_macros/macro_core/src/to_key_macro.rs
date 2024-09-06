@@ -1,5 +1,5 @@
 use darling::FromDeriveInput;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields};

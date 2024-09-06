@@ -1,5 +1,5 @@
 use darling::{FromDeriveInput, FromVariant};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 use std::str::FromStr;
 use syn::{

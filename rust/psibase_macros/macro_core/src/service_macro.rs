@@ -1,5 +1,5 @@
 use darling::FromMeta;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use proc_macro2::{Ident, Span};
 use proc_macro_error::{abort, emit_error};
 use quote::{quote, ToTokens};

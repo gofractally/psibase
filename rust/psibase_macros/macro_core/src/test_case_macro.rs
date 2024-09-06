@@ -1,6 +1,6 @@
 use darling::FromMeta;
-use proc_macro::TokenStream;
 use proc_macro2::Span;
+use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
 use std::collections::HashSet;

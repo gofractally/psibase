@@ -1,6 +1,6 @@
 use crate::fracpack_macro::Options as FracpackOptions;
 use darling::{error::Accumulator, FromDeriveInput, FromVariant};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::str::FromStr;
