@@ -1,7 +1,11 @@
 [package]
-name = "webmail-plugin"
-version = "0.1.0"
-edition = "2021"
+name = "plugin"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
 
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
@@ -11,13 +15,6 @@ webmail = { path = "../service/" }
 [lib]
 crate-type = ["cdylib"]
 
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
-
 [package.metadata.component]
 package = "webmail:plugin"
 
@@ -26,3 +23,6 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+
+[dev-dependencies]
+webmail_package = { path = ".." }
