@@ -1409,6 +1409,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugin"
+version = "0.1.0"
+dependencies = [
+ "psibase",
+ "wit-bindgen-rt",
+ "workshop",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1544,6 +1553,7 @@ dependencies = [
  "psibase",
  "serde",
  "workshop",
+ "workshop_package",
 ]
 
 [[package]]
@@ -2702,6 +2712,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wit-bindgen-rt"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
+dependencies = [
+ "bitflags 2.6.0",
+]
+
+[[package]]
 name = "workshop"
 version = "0.1.0"
 dependencies = [
@@ -2709,11 +2728,12 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
+ "workshop_package",
 ]
 
 [[package]]
 name = "workshop_package"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "r-workshop",
  "workshop",

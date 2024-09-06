@@ -1,16 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["service", "query", "plugin"]
+
 [package]
 name = "workshop_package"
-edition = "2021"
+
+[workspace.package]
 version = "0.1.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
 
 [package.metadata.psibase]
-package-name = "Workshop"
+package-name = "workshop"
 description = "Workshop for psibase apps"
 services = ["workshop"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-workshop = { path = "service", version = "0.1.0" }
-r-workshop = { path = "query", version = "0.1.0" }
+workshop = { path = "service" }
+r-workshop = { path = "query" }

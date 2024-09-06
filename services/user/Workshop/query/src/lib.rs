@@ -1,9 +1,18 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use workshop;
     use async_graphql::*;
     use psibase::*;
+    use workshop;
+
+    #[table(record = "WebContentRow", index = 0)]
+    struct WebContentTable;
+
+    #[action]
+    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
+        println!("{} {}", path, contentType);
+        store_content(path, contentType, content, &WebContentTable::new()).unwrap()
+    }
 
     pub struct Query;
 
@@ -14,22 +23,14 @@ mod service {
             &self,
             account_id: AccountNumber,
         ) -> Option<workshop::service::AppMetadata> {
-            workshop::service::AppMetadataTable::new()
-                .get_index_pk()
-                .get(&account_id)
-        }
-
-        async fn event(
-            &self,
-            id: u64,
-        ) -> Result<workshop::service::event_structs::HistoryEvents, anyhow::Error> {
-            get_event(id)
+            let x = workshop::Wrapper::call().getAppMetadata(account_id);
+            x
         }
     }
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &workshop::service::WebContentTable::new()))
+        None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_simple_ui::<workshop::Wrapper>(&request))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))

@@ -1,6 +1,6 @@
 #[psibase::service]
 #[allow(non_snake_case)]
-mod service {
+pub mod service {
     use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ mod service {
     /// Holds metadata for a registered app
     #[table(name = "AppMetadataTable", index = 0)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
-    struct AppMetadata {
+    pub struct AppMetadata {
         /// The unique identifier for the app
         #[primary_key]
         account_id: AccountNumber,
@@ -38,9 +38,6 @@ mod service {
         status: String, // todo: change to enum
     }
 
-    #[table(record = "WebContentRow", index = 1)]
-    struct WebContentTable;
-
     #[action]
     fn getAppMetadata(account_id: AccountNumber) -> Option<AppMetadata> {
         AppMetadataTable::new().get_index_pk().get(&account_id)
@@ -61,6 +58,8 @@ mod service {
         let app_metadata_table = AppMetadataTable::new();
         let account_id = get_sender();
 
+        // todo: read the app metadata first and only update the fields that are passed in
+
         let app_metadata = AppMetadata {
             account_id,
             name,
@@ -75,25 +74,11 @@ mod service {
 
         app_metadata_table.put(&app_metadata).unwrap();
 
-        Wrapper::emit().history().setAppMetadata(app_metadata);
-    }
-
-    #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
-        println!("{} {}", path, contentType);
-        store_content(path, contentType, content, &WebContentTable::new()).unwrap()
+        Wrapper::emit().history().appMetaChanged(app_metadata);
     }
 
     #[event(history)]
-    fn setAppMetadata(app_metadata: AppMetadata) {}
-
-    // #[action]
-    // fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-    //     None.or_else(|| serve_content(&request, &WebContentTable::new()))
-    //         .or_else(|| serve_simple_ui::<Wrapper>(&request))
-    //         .or_else(|| serve_graphql(&request, Query))
-    //         .or_else(|| serve_graphiql(&request))
-    // }
+    fn appMetaChanged(app_metadata: AppMetadata) {}
 }
 
 #[psibase::test_case(packages("Workshop"))]
