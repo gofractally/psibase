@@ -11,6 +11,7 @@ The available fields are:
 - `server`: May be present on any crate that builds a service. The value is a crate which will handle HTTP requests sent to this service. The other crate will be built and included in the current package.
 - `plugin`: May be present on any crate that builds a service. The value is a crate that should be built with `cargo component` and uploaded as `/plugin.wasm`
 - `flags`: [Flags](../../../specifications/data-formats/package.md#serviceservicejson) for the service.
+- `postinstall`: An array of actions to run when the package is installed. May be specified on the top-level crate or on any service. Actions from a single `postinstall` will be run in order. The order of actions from multiple crates is unspecified.
 - `dependencies`: Additional packages, not build by cargo, that the package depends on.
 
 Example:
@@ -29,6 +30,8 @@ flags = []
 server = "example"
 # Plugin for the front end
 plugin = "example-plugin"
+# Run the service's init action
+postinstall = [{sender="tpack", service="tpack", method="init", rawData="0000"}]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.12.0"

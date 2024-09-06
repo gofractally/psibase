@@ -2,8 +2,8 @@ use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef, PackagedService,
-    ServiceInfo,
+    AccountNumber, Action, Checksum256, ExactAccountNumber, Meta, PackageInfo, PackageRef,
+    PackagedService, ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -24,6 +24,7 @@ pub struct PsibaseMetadata {
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
     services: Option<Vec<String>>,
+    postinstall: Option<Vec<Action>>,
 }
 
 impl PsibaseMetadata {
@@ -104,6 +105,7 @@ fn should_build_package(
     meta: &Meta,
     services: &[(&String, ServiceInfo, PathBuf)],
     data: &[(&String, &str, PathBuf)],
+    postinstall: &[Action],
 ) -> Result<bool, anyhow::Error> {
     let timestamp = if let Ok(metadata) = filename.metadata() {
         metadata.modified()?
@@ -153,6 +155,12 @@ fn should_build_package(
     if existing_data != new_data {
         return Ok(true);
     }
+    // check postinstall
+    let mut existing_postinstall = Vec::new();
+    existing.postinstall(&mut existing_postinstall)?;
+    if &existing_postinstall[..] != postinstall {
+        return Ok(true);
+    }
     Ok(false)
 }
 
@@ -168,6 +176,7 @@ pub async fn build_package(
     let mut services = Vec::new();
     let mut plugins = Vec::new();
     let mut data_files = Vec::new();
+    let mut postinstall: Vec<Action> = Vec::new();
 
     let get_dep = get_dep_type(|service, dep| {
         let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
@@ -202,6 +211,12 @@ pub async fn build_package(
         } else {
             visited.insert(root);
             queue.push(root);
+        }
+        // Add postinstall from the root whether it is a service or not
+        if !visited.contains(root) {
+            if let Some(actions) = &meta.postinstall {
+                postinstall.extend_from_slice(actions.as_slice());
+            }
         }
     } else {
         Err(anyhow!("Cannot package a virtual workspace"))?
@@ -243,6 +258,9 @@ pub async fn build_package(
                 plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
             }
             services.push((&package.name, info, &package.id.repr));
+            if let Some(actions) = &pmeta.postinstall {
+                postinstall.extend_from_slice(actions.as_slice());
+            }
         }
     }
 
@@ -300,35 +318,40 @@ pub async fn build_package(
 
     let out_dir = get_package_dir(args, metadata);
     let out_path = out_dir.join(package_name.clone() + ".psi");
-    let mut file = if should_build_package(&out_path, &meta, &service_wasms, &data_files)? {
-        std::fs::create_dir_all(&out_dir)?;
-        let mut out = ZipWriter::new(
-            OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&out_path)?,
-        );
-        let options: FileOptions = FileOptions::default();
-        out.start_file("meta.json", options)?;
-        write!(out, "{}", &serde_json::to_string(&meta)?)?;
-        for (service, info, path) in service_wasms {
-            out.start_file(format!("service/{}.wasm", service), options)?;
-            std::io::copy(&mut File::open(path)?, &mut out)?;
-            out.start_file(format!("service/{}.json", service), options)?;
-            write!(out, "{}", &serde_json::to_string(&info)?)?;
-        }
-        for (service, dest, src) in data_files {
-            out.start_file(format!("data/{}{}", service, dest), options)?;
-            std::io::copy(&mut File::open(src)?, &mut out)?;
-        }
-        let mut file = out.finish()?;
-        file.rewind()?;
-        file
-    } else {
-        File::open(out_path)?
-    };
+    let mut file =
+        if should_build_package(&out_path, &meta, &service_wasms, &data_files, &postinstall)? {
+            std::fs::create_dir_all(&out_dir)?;
+            let mut out = ZipWriter::new(
+                OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&out_path)?,
+            );
+            let options: FileOptions = FileOptions::default();
+            out.start_file("meta.json", options)?;
+            write!(out, "{}", &serde_json::to_string(&meta)?)?;
+            for (service, info, path) in service_wasms {
+                out.start_file(format!("service/{}.wasm", service), options)?;
+                std::io::copy(&mut File::open(path)?, &mut out)?;
+                out.start_file(format!("service/{}.json", service), options)?;
+                write!(out, "{}", &serde_json::to_string(&info)?)?;
+            }
+            for (service, dest, src) in data_files {
+                out.start_file(format!("data/{}{}", service, dest), options)?;
+                std::io::copy(&mut File::open(src)?, &mut out)?;
+            }
+            if !postinstall.is_empty() {
+                out.start_file("script/postinstall.json", options)?;
+                write!(out, "{}", &serde_json::to_string(&postinstall)?)?;
+            }
+            let mut file = out.finish()?;
+            file.rewind()?;
+            file
+        } else {
+            File::open(out_path)?
+        };
     // Calculate the package checksum
     let mut hasher = Sha256::new();
     std::io::copy(&mut file, &mut hasher)?;
