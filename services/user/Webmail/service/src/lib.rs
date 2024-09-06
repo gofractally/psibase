@@ -22,7 +22,7 @@ fn make_query(req: &HttpRequest, sql: &str) -> HttpRequest {
         method: String::from("POST"),
         target: String::from("/sql"),
         contentType: String::from("application/sql"),
-        body: psibase::Hex(sql.as_bytes().to_vec()),
+        body: sql.to_string().into(), // sql.chars().collect()), // sql.into()), // sql.as_bytes().to_vec(),
     };
 }
 
