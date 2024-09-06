@@ -22,7 +22,7 @@ fn make_query(req: &HttpRequest, sql: &str) -> HttpRequest {
         method: String::from("POST"),
         target: String::from("/sql"),
         contentType: String::from("application/sql"),
-        body: sql.to_string().into(), // sql.chars().collect()), // sql.into()), // sql.as_bytes().to_vec(),
+        body: sql.to_string().into(),
     };
 }
 
@@ -39,25 +39,19 @@ fn parse_query(query: String) -> HashMap<String, String> {
 }
 
 fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
-    println!("serve_rest_api().top");
     if request.method == "GET" {
-        println!("GET");
         if !request.target.starts_with("/messages") {
             return None;
         }
-        println!("/messages");
 
         let query_start = request.target.find('?');
         if query_start.is_none() {
             return None;
         }
         let query_start = query_start.unwrap();
-        // println!("qs: {:#?}", query_start);
 
         let query = request.target.split_at(query_start + 1).1;
-        // println!("q: {:#?}", query);
         let params = crate::parse_query(String::from(query));
-        // println!("p: {:#?}", params);
 
         let mut s_clause = String::new();
         let s_opt = params.get(&String::from("sender"));
@@ -67,7 +61,6 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             }
             s_clause = format!("sender = '{}'", s);
         }
-        println!("sc: {:#?}", s_clause);
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
@@ -77,7 +70,6 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             }
             r_clause = format!("receiver = '{}'", r);
         }
-        println!("rc: {:#?}", r_clause);
 
         if s_opt.is_none() && r_opt.is_none() {
             return None;
@@ -93,12 +85,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         if r_opt.is_some() {
             where_clause += r_clause.as_str();
         }
-        // println!("w: {:#?}", where_clause);
 
-        println!(
-            "SELECT * FROM \"history.webmail.sent\" {} ORDER BY ROWID",
-            where_clause
-        );
         let mq = make_query(
             request,
             format!(
@@ -107,7 +94,6 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             )
             .as_str(),
         );
-        println!("mq: {:#?}", mq);
         return REventsSvc::call().serveSys(mq);
     }
     return None;
@@ -115,34 +101,12 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
-    use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_graphql,
-        serve_simple_ui, services, store_content, AccountNumber, Fracpack, HexBytes, HttpReply,
-        HttpRequest, SingletonKey, Table, ToSchema, WebContentRow,
+        anyhow, check, get_sender, get_service, serve_content, serve_simple_ui, store_content,
+        AccountNumber, HexBytes, HttpReply, HttpRequest, Table, WebContentRow,
     };
-    use serde::{Deserialize, Serialize};
 
     use crate::{serve_rest_api, validate_user};
-
-    // #[table(name = "InitTable")]
-    // #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    // pub struct Init {
-    //     inited: bool,
-    // }
-
-    // impl Init {
-    //     #[primary_key]
-    //     fn by_key(&self) -> SingletonKey {
-    //         SingletonKey {}
-    //     }
-    // }
-
-    // impl Default for Init {
-    //     fn default() -> Self {
-    //         Init { inited: false }
-    //     }
-    // }
 
     #[table(record = "WebContentRow")]
     struct WebContentTable;
@@ -161,27 +125,11 @@ mod service {
     #[event(history)]
     pub fn sent(sender: AccountNumber, receiver: AccountNumber, subject: String, body: String) {}
 
-    // struct Query;
-
-    // #[Object]
-    // impl Query {
-    //     async fn getMessages(&self) -> async_graphql::Result<Vec<Message>>, async_graphql::Error> {
-    //         // let curr_val = InitTable::new().get_index_pk().get(&SingletonKey {});
-    //         // Ok(match curr_val {
-    //         //     Some(val) => val.name,
-    //         //     None => String::from("psibase"),
-    //         // })
-    //         Ok(String::from("placeholder"))
-    //     }
-    // }
-
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_rest_api(&request))
-            // .or_else(|| serve_graphql(&request, Query))
-            // .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 
