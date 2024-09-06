@@ -50,22 +50,22 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 
 const getIncomingMessages = async (account: string) => {
     console.info("getIncomingMessages.top()");
-    let resp;
-    try {
-        await supervisor.onLoaded();
-        resp = await supervisor.functionCall({
-            service: "webmail",
-            intf: "queries",
-            method: "getMessages",
-            params: ["", account],
-        });
-    } catch (e) {
-        console.info("e:", e);
-    }
-    console.info("resp:", resp);
-    // const res = await fetch(`/messages?receiver=${account}`);
-    // const rawMessages = (await res.json()) as RawMessage[];
-    return transformRawMessagesToMessages(resp as RawMessage[]);
+    // let resp;
+    // try {
+    //     await supervisor.onLoaded();
+    //     resp = await supervisor.functionCall({
+    //         service: "webmail",
+    //         intf: "queries",
+    //         method: "getMessages",
+    //         params: ["", account],
+    //     });
+    // } catch (e) {
+    //     console.info("e:", e);
+    // }
+    // console.info("resp:", resp);
+    const res = await fetch(`/messages?receiver=${account}`);
+    const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(rawMessages);
 };
 
 const incomingMsgAtom = atom<Message["id"]>("");
@@ -92,19 +92,19 @@ export function useIncomingMessages() {
 
 const getSentMessages = async (account: string) => {
     console.info("getSentMessages.top()")
-    await supervisor.onLoaded();
-    const resp = await supervisor.functionCall({
-                service: "webmail",
-                intf: "queries",
-                method: "getMessages",
-                params: [account, ""],
-            });
-    console.info("resp:");
-    console.info(resp);
+    // await supervisor.onLoaded();
+    // const resp = await supervisor.functionCall({
+    //             service: "webmail",
+    //             intf: "queries",
+    //             method: "getMessages",
+    //             params: [account, ""],
+    //         });
+    // console.info("resp:");
+    // console.info(resp);
 
-    // const res = await fetch(`/messages?sender=${account}`);
-    // const rawMessages = (await res.json()) as RawMessage[];
-    return transformRawMessagesToMessages(resp as RawMessage[]);
+    const res = await fetch(`/messages?sender=${account}`);
+    const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(rawMessages);
 };
 
 const sentMsgAtom = atom<Message["id"]>("");
