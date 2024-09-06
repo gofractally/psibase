@@ -212,7 +212,8 @@ pub async fn build_package(
     let mut services = Vec::new();
     let mut plugins = Vec::new();
     let mut data_files = Vec::new();
-    let mut postinstall: Vec<Action> = Vec::new();
+    let mut postinstall = Vec::new();
+    let mut data_sources = Vec::new();
 
     let get_dep = get_dep_type(|service, dep| {
         let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
@@ -302,7 +303,7 @@ pub async fn build_package(
                 if dest.ends_with('/') {
                     dest.pop();
                 }
-                add_files(&package.name, src.as_std_path(), &dest, &mut data_files)?;
+                data_sources.push((&package.name, src, dest));
             }
             services.push((&package.name, info, &package.id.repr));
             if let Some(actions) = &pmeta.postinstall {
@@ -361,6 +362,10 @@ pub async fn build_package(
             ))?
         };
         data_files.push((service, path.to_string(), paths.pop().unwrap()))
+    }
+
+    for (service, src, dest) in data_sources {
+        add_files(service, src.as_std_path(), &dest, &mut data_files)?;
     }
 
     let out_dir = get_package_dir(args, metadata);
