@@ -33,25 +33,31 @@ fn parse_query(query: String) -> HashMap<String, String> {
     for p in itr {
         let idx = p.find("=").unwrap();
         let kv = p.split_at(idx);
-        params.insert(kv.0.to_string(), kv.1.to_string());
+        params.insert(kv.0.to_string(), kv.1.trim_start_matches('=').to_string());
     }
     params
 }
 
 fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
+    println!("serve_rest_api().top");
     if request.method == "GET" {
+        println!("GET");
         if !request.target.starts_with("/messages") {
             return None;
         }
+        println!("/messages");
 
-        let queryStart = request.target.find('?');
-        if queryStart.is_none() {
+        let query_start = request.target.find('?');
+        if query_start.is_none() {
             return None;
         }
-        let queryStart = queryStart.unwrap();
+        let query_start = query_start.unwrap();
+        // println!("qs: {:#?}", query_start);
 
-        let query = request.target.split_at(queryStart + 1).1;
+        let query = request.target.split_at(query_start + 1).1;
+        // println!("q: {:#?}", query);
         let params = crate::parse_query(String::from(query));
+        // println!("p: {:#?}", params);
 
         let mut s_clause = String::new();
         let s_opt = params.get(&String::from("sender"));
@@ -61,6 +67,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             }
             s_clause = format!("sender = '{}'", s);
         }
+        println!("sc: {:#?}", s_clause);
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
@@ -70,6 +77,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             }
             r_clause = format!("receiver = '{}'", r);
         }
+        println!("rc: {:#?}", r_clause);
 
         if s_opt.is_none() && r_opt.is_none() {
             return None;
@@ -85,15 +93,22 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         if r_opt.is_some() {
             where_clause += r_clause.as_str();
         }
+        // println!("w: {:#?}", where_clause);
 
-        return REventsSvc::call().serveSys(make_query(
+        println!(
+            "SELECT * FROM \"history.webmail.sent\" {} ORDER BY ROWID",
+            where_clause
+        );
+        let mq = make_query(
             request,
             format!(
                 "SELECT * FROM \"history.webmail.sent\" {} ORDER BY ROWID",
                 where_clause
             )
             .as_str(),
-        ));
+        );
+        println!("mq: {:#?}", mq);
+        return REventsSvc::call().serveSys(mq);
     }
     return None;
 }
