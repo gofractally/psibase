@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["macro_core", "macro_derive", "macro_pub"]
+members = ["macro_core", "macro_derive"]
 
 [workspace.package]
 name = "psibase_macros"
@@ -14,3 +14,6 @@ license = "MIT"
 
 # [lib]
 # proc-macro = true
+
+[dependencies]
+macro_derive = { path = "macro_derive" }
