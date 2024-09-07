@@ -4,6 +4,8 @@ members = ["service", "query", "plugin"]
 
 [package]
 name = "workshop_package"
+version = "0.1.0"
+edition = "2021"
 
 [workspace.package]
 version = "0.1.0"
@@ -24,9 +26,6 @@ opt-level = "s"
 debug = false
 strip = true
 lto = true
-
-[lib]
-crate-type = ["rlib"]
 
 [dependencies]
 workshop = { path = "service" }

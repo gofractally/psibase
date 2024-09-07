@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import slugify from "slugify";
+import { FunctionCallArgs } from "@psibase/common-lib";
+import { usePluginCall } from "@hooks/use-plugin";
 import { Button } from "@shadcn/button";
 import {
     Form,
@@ -23,6 +25,7 @@ import { useUser } from "@hooks";
 
 import { RegisteredApp } from "@types";
 import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
+import { workshopPlugin } from "src/plugin/plugin";
 
 const slugifyOptions = { lower: true, strict: true };
 
@@ -73,6 +76,9 @@ export function AppMetadataForm() {
 
     const [iconPreview, setIconPreview] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const { mutateAsync: pluginCall, isPending } = usePluginCall();
+
     const isUpdating = !!id;
 
     const form = useForm<AppMetadataFormData>({
@@ -120,16 +126,61 @@ export function AppMetadataForm() {
     const onSubmit = async (data: AppMetadataFormData) => {
         setIsSubmitting(true);
 
+        let args: FunctionCallArgs;
+
+        const iconBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                console.log("Icon read complete");
+                resolve(reader.result as string);
+            };
+            reader.readAsDataURL(data.icon as Blob);
+        });
+
+        console.log("Sending...", {
+            name: data.name,
+            shortDescription: data.shortDescription,
+            longDescription: data.longDescription,
+            iconBase64,
+            tosSubpage: data.tosSubpage,
+            privacyPolicySubpage: data.privacyPolicySubpage,
+            appHomepageSubpage: data.appHomepageSubpage,
+            status: data.status,
+        });
+
+        args = workshopPlugin.intf.setMetadata(
+            data.name,
+            data.shortDescription,
+            data.longDescription,
+            iconBase64,
+            data.tosSubpage,
+            data.privacyPolicySubpage,
+            data.appHomepageSubpage,
+            data.status,
+        );
+        // if (isTransfer) {
+        //   const recipient = form.watch("to")!;
+        //   args = tokenPlugin.transfer.credit(tokenId, recipient, amount, memo);
+        // } else if (isBurning) {
+        //   args = tokenPlugin.intf.burn(tokenId, amount);
+        // } else if (isMinting) {
+        //   args = tokenPlugin.intf.mint(tokenId, amount, memo);
+        // } else {
+        //   throw new Error(`Failed to identify args`);
+        // }
+
         try {
-            const result = await mockSubmitToAPI(
-                data,
-                isUpdating
-                    ? "App updated successfully!"
-                    : "App registered successfully!",
-                selectedAccount.account,
-                id,
-            );
-            toast.success(result.message);
+            await pluginCall(args);
+
+            // const result = await mockSubmitToAPI(
+            //     data,
+            //     isUpdating
+            //         ? "App updated successfully!"
+            //         : "App registered successfully!",
+            //     selectedAccount.account,
+            //     id,
+            // );
+            toast.success("App registered successfully!");
             navigate("/");
         } catch (error) {
             toast.error("An error occurred while submitting the form.");

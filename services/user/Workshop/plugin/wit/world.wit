@@ -10,15 +10,15 @@ interface developer {
     use types.{account-id, bytes};
 
     set-app-metadata: func(
-        account: account-id, 
         name: string, 
         short-description: string, 
         long-description: string, 
-        icon: bytes, 
+        icon: string, 
         tos-subpage: string, 
         privacy-policy-subpage: string, 
         app-homepage-subpage: string, 
-        status: string
+        status: string,
+        tags: list<string>
     ) -> result<_, error>;
 }
 

@@ -6,6 +6,7 @@ import { cn } from "@lib/utils";
 import { AccountSwitcher } from "./account-switcher";
 import { Nav } from "./nav";
 import { useLocation } from "react-router-dom";
+// import { useIncomingMessages } from "@hooks";
 
 interface Props {
     isCollapsed?: boolean;
@@ -14,6 +15,8 @@ interface Props {
 export const NavMenu = ({ isCollapsed = false }: Props) => {
     const location = useLocation();
     const at = location.pathname;
+
+    // const { query } = useIncomingMessages();
 
     return (
         <>
