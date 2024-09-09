@@ -70,19 +70,19 @@ namespace psio
       if constexpr (i < std::tuple_size_v<std::decay_t<T>>)
       {
          f(std::get<i>(t));
-         tuple_foreach_i<i + 1>(t, std::forward<S>(f));
+         tuple_foreach_i<i + 1>(t, f);
       }
    }
 
    template <typename... Ts, typename S>
    void tuple_foreach(const std::tuple<Ts...>& obj, S&& s)
    {
-      tuple_foreach_i<0>(obj, std::forward<S>(s));
+      tuple_foreach_i<0>(obj, s);
    }
    template <typename... Ts, typename S>
    void tuple_foreach(std::tuple<Ts...>& obj, S&& s)
    {
-      tuple_foreach_i<0>(obj, std::forward<S>(s));
+      tuple_foreach_i<0>(obj, s);
    }
 
    template <typename... T, typename F>
