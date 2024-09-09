@@ -1,9 +1,13 @@
+[data-milkdown-root] {
+    @apply min-h-0 flex-1;
+}
+
 .milkdown {
-    @apply p-4;
+    @apply h-full overflow-scroll p-4;
 }
 
 .prose.editor {
-    @apply mx-auto max-w-none;
+    @apply mx-auto h-full max-w-none;
 }
 
 /* list-item-block */

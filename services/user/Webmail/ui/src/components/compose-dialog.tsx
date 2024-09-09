@@ -24,7 +24,6 @@ import {
 } from "@shadcn/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { Separator } from "@shadcn/separator";
-import { ScrollArea } from "@shadcn/scroll-area";
 
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
@@ -186,7 +185,7 @@ export const ComposeDialog = ({
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className="flex h-[80dvh] flex-1 flex-grow flex-col space-y-2 bg-green-200"
+                        className="flex h-[80dvh] flex-1 flex-grow flex-col space-y-2"
                     >
                         <FormField
                             control={form.control}
@@ -215,24 +214,24 @@ export const ComposeDialog = ({
                                 </FormItem>
                             )}
                         />
-                        <ScrollArea className="h-full flex-1 overflow-y-auto">
-                            <MilkdownProvider>
-                                <ProsemirrorAdapterProvider>
-                                    <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
-                                        <ControlBar />
-                                        <Separator />
-                                    </div>
-                                    <MarkdownEditor
-                                        initialValue={
-                                            message?.status === "draft"
-                                                ? message.body
-                                                : ""
-                                        }
-                                        updateMarkdown={updateDraft}
-                                    />
-                                </ProsemirrorAdapterProvider>
-                            </MilkdownProvider>
-                        </ScrollArea>
+                        {/* <ScrollArea className="h-full flex-1 overflow-y-auto"> */}
+                        <MilkdownProvider>
+                            <ProsemirrorAdapterProvider>
+                                <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
+                                    <ControlBar />
+                                    <Separator />
+                                </div>
+                                <MarkdownEditor
+                                    initialValue={
+                                        message?.status === "draft"
+                                            ? message.body
+                                            : ""
+                                    }
+                                    updateMarkdown={updateDraft}
+                                />
+                            </ProsemirrorAdapterProvider>
+                        </MilkdownProvider>
+                        {/* </ScrollArea> */}
                         <DialogFooter>
                             <Button type="submit">Send</Button>
                         </DialogFooter>
