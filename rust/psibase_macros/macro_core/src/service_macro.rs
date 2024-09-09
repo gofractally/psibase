@@ -5,8 +5,8 @@ use proc_macro_error::{abort, emit_error};
 use quote::{quote, ToTokens};
 use std::{collections::HashMap, str::FromStr};
 use syn::{
-    parse_macro_input, parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
+    parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn, ItemImpl, ItemMod,
+    ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
 };
 
 #[derive(Debug, FromMeta)]
@@ -69,8 +69,7 @@ impl Default for Options {
     }
 }
 
-pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr = parse_macro_input!(attr as syn::AttributeArgs);
+pub fn service_macro_impl(attr: &[NestedMeta], item: Item) -> TokenStream {
     let mut options = match Options::from_list(&attr) {
         Ok(val) => val,
         Err(err) => {
@@ -87,7 +86,6 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         options.dispatch = Some(false);
     }
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
-    let item = parse_macro_input!(item as Item);
     match item {
         Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod),
         _ => {

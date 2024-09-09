@@ -66,13 +66,8 @@ name = "macro_derive"
 version = "0.1.0"
 dependencies = [
  "macro_core",
-]
-
-[[package]]
-name = "macro_pub"
-version = "0.1.0"
-dependencies = [
- "macro_derive",
+ "proc-macro-error",
+ "syn",
 ]
 
 [[package]]
@@ -106,6 +101,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "psibase_macros_package"
+version = "0.0.0"
+dependencies = [
+ "macro_core",
+ "macro_derive",
 ]
 
 [[package]]
