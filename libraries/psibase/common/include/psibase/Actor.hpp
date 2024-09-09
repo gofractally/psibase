@@ -127,7 +127,7 @@ namespace psibase
       EventNumber call(Args&&... args) const
       {
          using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+         using param_tuple  = psio::make_param_value_tuple<decltype(MemberPtr)>::type;
          static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
                        "insufficient arguments passed to method");
 

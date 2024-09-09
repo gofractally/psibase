@@ -28,6 +28,23 @@ namespace psio
    template <typename... T>
    std::tuple<std::remove_cv_t<remove_view_t<T>>...> tuple_remove_view(const std::tuple<T...>&);
 
+   template <typename T>
+   struct make_param_value_tuple;
+
+   template <typename R, typename C, typename... A>
+   struct make_param_value_tuple<R (C::*)(A...)>
+   {
+      using type = std::tuple<
+          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
+   };
+
+   template <typename R, typename C, typename... A>
+   struct make_param_value_tuple<R (C::*)(A...) const>
+   {
+      using type = std::tuple<
+          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
+   };
+
    template <typename P>
    struct view_buffer
    {

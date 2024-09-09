@@ -53,32 +53,15 @@ namespace psibase
    template <typename F, typename T, std::size_t... I>
    decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
    {
-      return f(psio::get<I>(std::forward<T>(t))...);
+      return f(psio::get<I>(t)...);
    }
 
    template <typename F, typename T>
    decltype(auto) tuple_call(F&& f, T&& t)
    {
-      return tuple_call(std::forward<F>(f), std::forward<T>(t),
+      return tuple_call(f, t,
                         std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
    }
-
-   template <typename T>
-   struct make_action_param_tuple;
-
-   template <typename R, typename C, typename... A>
-   struct make_action_param_tuple<R (C::*)(A...)>
-   {
-      using type = std::tuple<
-          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
-   };
-
-   template <typename R, typename C, typename... A>
-   struct make_action_param_tuple<R (C::*)(A...) const>
-   {
-      using type = std::tuple<
-          std::remove_cvref_t<typename psio::remove_view_t<typename std::remove_cvref_t<A>>>...>;
-   };
 
    /**
     *  This method is called when a service receives a call and will
@@ -111,7 +94,7 @@ namespace psibase
           [&](auto member, auto /*names*/)
           {
              using result_type = decltype(psio::result_of(member));
-             using param_tuple = typename make_action_param_tuple<decltype(member)>::type;
+             using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
 
              auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
