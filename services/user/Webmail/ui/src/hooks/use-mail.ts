@@ -3,7 +3,6 @@ import { atom, useAtom } from "jotai";
 import { useUser } from "./use-user";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalStorage } from "./use-local-storage";
-import { Supervisor } from "@psibase/common-lib/supervisor";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -28,8 +27,6 @@ type RawMessage = {
     subject: string;
     body: string;
 };
-
-const supervisor = new Supervisor();
 
 const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
     return rawMessages.reverse().map(
