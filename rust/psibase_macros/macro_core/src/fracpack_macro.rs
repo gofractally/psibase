@@ -2,10 +2,7 @@ use darling::{FromDeriveInput, FromVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::str::FromStr;
-use syn::{
-    parse_macro_input, Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed,
-    LitStr,
-};
+use syn::{Data, DataEnum, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, LitStr};
 
 /// Fracpack struct level options
 #[derive(Debug, FromDeriveInput, FromVariant)]
@@ -260,9 +257,7 @@ fn enum_fields<'a>(
         .collect()
 }
 
-pub fn fracpack_macro_impl(input: TokenStream, impl_pack: bool, impl_unpack: bool) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-
+pub fn fracpack_macro_impl(input: DeriveInput, impl_pack: bool, impl_unpack: bool) -> TokenStream {
     let opts = match Options::from_derive_input(&input) {
         Ok(val) => val,
         Err(err) => {

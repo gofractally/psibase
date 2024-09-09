@@ -1,9 +1,12 @@
+[package]
+name = "psibase_macros_package"
+
 [workspace]
 resolver = "2"
 members = ["macro_core", "macro_derive"]
 
 [workspace.package]
-name = "psibase_macros"
+# name = "psibase_macros"
 description = "Macros to support psibase development"
 version = "0.1.0"
 rust-version = "1.64.0"
@@ -17,3 +20,4 @@ license = "MIT"
 
 [dependencies]
 macro_derive = { path = "macro_derive" }
+macro_core = { path = "macro_core" }

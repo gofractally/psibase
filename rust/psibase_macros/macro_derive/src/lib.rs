@@ -1,50 +1,52 @@
 //! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
-use fracpack_macro::fracpack_macro_impl;
-use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
-use number_macro::{account_macro_impl, method_macro_impl};
+// use fracpack_macro::fracpack_macro_impl;
+// use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
+// use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
-use schema_macro::schema_derive_macro;
-use service_macro::service_macro_impl;
-use test_case_macro::test_case_macro_impl;
-use to_key_macro::to_key_macro_impl;
+use syn::{parse_macro_input, Item};
+// use schema_macro::schema_derive_macro;
+// use service_macro::service_macro_impl;
+// use test_case_macro::test_case_macro_impl;
+// use to_key_macro::to_key_macro_impl;
 
-mod fracpack_macro;
-mod graphql_macro;
-mod number_macro;
-mod schema_macro;
-mod service_macro;
-mod test_case_macro;
-mod to_key_macro;
+// mod fracpack_macro;
+// mod graphql_macro;
+// mod number_macro;
+// mod schema_macro;
+use macro_core::service_macro::service_macro_impl;
+// use macro_core::service_macro::account_macro_impl;
+// mod test_case_macro;
+// mod to_key_macro;
 
 // TODO: remove
-#[proc_macro_derive(Fracpack, attributes(fracpack))]
-pub fn derive_fracpack(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    fracpack_macro_impl(input, true, true).into()
-}
+// #[proc_macro_derive(Fracpack, attributes(fracpack))]
+// pub fn derive_fracpack(input: TokenStream) -> TokenStream {
+//     let input = parse_macro_input!(input as DeriveInput);
+//     fracpack_macro_impl(input, true, true).into()
+// }
 
-#[proc_macro_derive(Pack, attributes(fracpack))]
-pub fn derive_pack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, true, false)
-}
+// #[proc_macro_derive(Pack, attributes(fracpack))]
+// pub fn derive_pack(input: TokenStream) -> TokenStream {
+//     fracpack_macro_impl(input, true, false)
+// }
 
-#[proc_macro_derive(Unpack, attributes(fracpack))]
-pub fn derive_unpack(input: TokenStream) -> TokenStream {
-    fracpack_macro_impl(input, false, true)
-}
+// #[proc_macro_derive(Unpack, attributes(fracpack))]
+// pub fn derive_unpack(input: TokenStream) -> TokenStream {
+//     fracpack_macro_impl(input, false, true)
+// }
 
-#[proc_macro_derive(ToKey, attributes(to_key))]
-pub fn derive_to_key(input: TokenStream) -> TokenStream {
-    to_key_macro_impl(input)
-}
+// #[proc_macro_derive(ToKey, attributes(to_key))]
+// pub fn derive_to_key(input: TokenStream) -> TokenStream {
+//     to_key_macro_impl(input)
+// }
 
-#[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
-pub fn to_schema(input: TokenStream) -> TokenStream {
-    schema_derive_macro(input)
-}
+// #[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
+// pub fn to_schema(input: TokenStream) -> TokenStream {
+//     schema_derive_macro(input)
+// }
 
 /// Define a [psibase](https://psibase.io) service interface.
 ///
@@ -290,136 +292,141 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
-    service_macro_impl(attr, item)
+    let attr = parse_macro_input!(attr as syn::AttributeArgs);
+    let item = parse_macro_input!(item as Item);
+    service_macro_impl(&attr, item).into()
 }
 
-/// Define a [psibase](https://psibase.io) test case.
-///
-/// Psibase tests run in WASM. They create block chains, push transactions,
-/// and check the success or failure of those transactions to verify
-/// correct service operation.
-///
-/// # Example
-///
-/// ```ignore
-/// #[psibase::service]
-/// mod service {
-///     #[action]
-///     fn add(a: i32, b: i32) -> i32 {
-///         println!("Let's add {} and {}", a, b);
-///         println!("Hopefully the result is {}", a + b);
-///         a + b
-///     }
-/// }
-///
-/// #[psibase::test_case(services("example"))]
-/// fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
-///     // Verify the action works as expected.
-///     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
-///
-///     // Start a new block; this prevents the following transaction
-///     // from being rejected as a duplicate.
-///     chain.start_block();
-///
-///     // Print a trace; this allows us to see:
-///     // * The service call chain. Something calls our service;
-///     //   let's see what it is!
-///     // * The service's prints, which are normally invisible
-///     //   during testing
-///     println!(
-///         "\n\nHere is the trace:\n{}",
-///         Wrapper::push(&chain).add(3, 4).trace
-///     );
-///
-///     // If we got this far, then the test has passed
-///     Ok(())
-/// }
-/// ```
-///
-/// You may define unit tests within service sources, or define separate
-/// integration tests.
-///
-/// # Running tests
-///
-/// ```text
-/// cargo psibase test
-/// ```
-///
-/// This builds and runs both unit and integration tests. It also builds
-/// any services the tests depend on. These appear in the `test_case`
-/// macro's `services` parameter, or as arguments to the `include_service`
-/// macro.
-///
-/// # Loading services
-///
-/// Services in the `services` parameter or in the `include_service` macro
-/// reference packages which define services. They may be any of the
-/// following:
-///
-/// * The name of the current package
-/// * The name of any package the current package depends on
-/// * The name of any package in the current workspace, if any
-///
-/// If the test function has an argument, e.g. `my_test(chain: psibase::Chain)`,
-/// then the macro initializes a fresh chain, loads it with the requested
-/// services, and passes it to the function. If the test function doesn't
-/// have an argument, then the test may initialize a chain and load services
-/// itself, like the following example.
-///
-/// ```ignore
-/// #[psibase::test_case]
-/// fn my_test() -> Result<(), psibase::Error> {
-///     // TODO
-/// }
-/// ```
-///
-/// The `include_service` macro is only available to functions which have
-/// the `psibase::test_case` attribute. It's not defined outside of these
-/// functions.
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn test_case(attr: TokenStream, item: TokenStream) -> TokenStream {
-    test_case_macro_impl(attr, item)
-}
+// / Define a [psibase](https://psibase.io) test case.
+// /
+// / Psibase tests run in WASM. They create block chains, push transactions,
+// / and check the success or failure of those transactions to verify
+// / correct service operation.
+// /
+// / # Example
+// /
+// / ```ignore
+// / #[psibase::service]
+// / mod service {
+// /     #[action]
+// /     fn add(a: i32, b: i32) -> i32 {
+// /         println!("Let's add {} and {}", a, b);
+// /         println!("Hopefully the result is {}", a + b);
+// /         a + b
+// /     }
+// / }
+// /
+// / #[psibase::test_case(services("example"))]
+// / fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
+// /     // Verify the action works as expected.
+// /     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
+// /
+// /     // Start a new block; this prevents the following transaction
+// /     // from being rejected as a duplicate.
+// /     chain.start_block();
+// /
+// /     // Print a trace; this allows us to see:
+// /     // * The service call chain. Something calls our service;
+// /     //   let's see what it is!
+// /     // * The service's prints, which are normally invisible
+// /     //   during testing
+// /     println!(
+// /         "\n\nHere is the trace:\n{}",
+// /         Wrapper::push(&chain).add(3, 4).trace
+// /     );
+// /
+// /     // If we got this far, then the test has passed
+// /     Ok(())
+// / }
+// / ```
+// /
+// / You may define unit tests within service sources, or define separate
+// / integration tests.
+// /
+// / # Running tests
+// /
+// / ```text
+// / cargo psibase test
+// / ```
+// /
+// / This builds and runs both unit and integration tests. It also builds
+// / any services the tests depend on. These appear in the `test_case`
+// / macro's `services` parameter, or as arguments to the `include_service`
+// / macro.
+// /
+// / # Loading services
+// /
+// / Services in the `services` parameter or in the `include_service` macro
+// / reference packages which define services. They may be any of the
+// / following:
+// /
+// / * The name of the current package
+// / * The name of any package the current package depends on
+// / * The name of any package in the current workspace, if any
+// /
+// / If the test function has an argument, e.g. `my_test(chain: psibase::Chain)`,
+// / then the macro initializes a fresh chain, loads it with the requested
+// / services, and passes it to the function. If the test function doesn't
+// / have an argument, then the test may initialize a chain and load services
+// / itself, like the following example.
+// /
+// / ```ignore
+// / #[psibase::test_case]
+// / fn my_test() -> Result<(), psibase::Error> {
+// /     // TODO
+// / }
+// / ```
+// /
+// / The `include_service` macro is only available to functions which have
+// / the `psibase::test_case` attribute. It's not defined outside of these
+// / functions.
+// #[proc_macro_error]
+// #[proc_macro_attribute]
+// pub fn test_case(attr: TokenStream, item: TokenStream) -> TokenStream {
+//     test_case_macro_impl(attr, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn account(item: TokenStream) -> TokenStream {
-    account_macro_impl(true, item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn account(item: TokenStream) -> TokenStream {
+//     account_macro_impl(true, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn account_raw(item: TokenStream) -> TokenStream {
-    account_macro_impl(false, item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn account_raw(item: TokenStream) -> TokenStream {
+//     account_macro_impl(false, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn method(item: TokenStream) -> TokenStream {
-    method_macro_impl(true, item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn method(item: TokenStream) -> TokenStream {
+//     method_macro_impl(true, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn method_raw(item: TokenStream) -> TokenStream {
-    method_macro_impl(false, item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn method_raw(item: TokenStream) -> TokenStream {
+//     method_macro_impl(false, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro_attribute]
-pub fn queries(attr: TokenStream, item: TokenStream) -> TokenStream {
-    queries_macro_impl(attr, item)
-}
+// #[proc_macro_error]
+// #[proc_macro_attribute]
+// pub fn queries(attr: TokenStream, item: TokenStream) -> TokenStream {
+//     let item = parse_macro_input!(item as Item);
+//     queries_macro_impl(attr, item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn table_query(item: TokenStream) -> TokenStream {
-    table_query_macro_impl(item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn table_query(item: TokenStream) -> TokenStream {
+//     let item = parse_macro_input!(item as Item);
+//     table_query_macro_impl(item)
+// }
 
-#[proc_macro_error]
-#[proc_macro]
-pub fn table_query_subindex(item: TokenStream) -> TokenStream {
-    table_query_subindex_macro_impl(item)
-}
+// #[proc_macro_error]
+// #[proc_macro]
+// pub fn table_query_subindex(item: TokenStream) -> TokenStream {
+//     let args = parse_macro_input!(item as Args);
+//     table_query_subindex_macro_impl(args)
+// }

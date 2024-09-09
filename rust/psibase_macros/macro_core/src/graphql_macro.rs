@@ -5,7 +5,7 @@ use proc_macro_error::abort;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, AttrStyle, ImplItem, Item, Result, Token, TypeParam, TypeParamBound,
+    AttrStyle, ImplItem, Item, Result, Token, TypeParam, TypeParamBound,
 };
 
 #[derive(Debug)]
@@ -80,8 +80,6 @@ impl Parse for Args {
 }
 
 pub fn queries_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as Item);
-
     let mut queries = quote! {};
 
     match item {
@@ -176,9 +174,7 @@ pub fn table_query_macro_impl(item: TokenStream) -> TokenStream {
     TokenStream::from(query)
 }
 
-pub fn table_query_subindex_macro_impl(item: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(item as Args);
-
+pub fn table_query_subindex_macro_impl(item: Args) -> TokenStream {
     let query_name = args.query_name;
     let table = args.table;
 
