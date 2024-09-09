@@ -1,5 +1,10 @@
 [package]
 name = "psibase_macros_package"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [workspace]
 resolver = "2"
@@ -15,9 +20,11 @@ repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
 license = "MIT"
 
-# [lib]
-# proc-macro = true
+[lib]
+crate-type = ["rlib"]
 
 [dependencies]
 macro_derive = { path = "macro_derive" }
 macro_core = { path = "macro_core" }
+quote = "1.0.37"
+syn = "2.0.77"
