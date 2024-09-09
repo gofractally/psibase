@@ -789,8 +789,7 @@ namespace psibase
           {
              using MT = psio::MemberPtrType<decltype(member)>;
              static_assert(MT::isFunction);
-             using TT                                     = decltype(psio::tuple_remove_view(
-                 std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+             using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
              SequentialRecord<MethodNumber, TT> eventData = {};
              if (psio::from_frac(eventData, *v))
              {
@@ -1136,8 +1135,7 @@ namespace psibase
              {
                 using MT = psio::MemberPtrType<decltype(member)>;
                 static_assert(MT::isFunction);
-                using TT = decltype(psio::tuple_remove_view(
-                    std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+                using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
                 // TODO: EventDecoder validates and unpacks this again
                 SequentialRecord<MethodNumber, TT> eventData;
                 if (psio::from_frac(eventData, *v))

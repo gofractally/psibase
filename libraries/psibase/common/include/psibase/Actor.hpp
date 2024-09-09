@@ -34,7 +34,7 @@ namespace psibase
       auto call(Args&&... args) const
       {
          using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
 
          static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
                        "too few arguments passed to method");
@@ -152,7 +152,7 @@ namespace psibase
       auto call(EventNumber n) const
       {
          using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = decltype(psio::tuple_remove_view(psio::args_as_tuple(MemberPtr)));
+         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
          AccountNumber service;
          MethodNumber  type;
          MethodNumber  expected_type{

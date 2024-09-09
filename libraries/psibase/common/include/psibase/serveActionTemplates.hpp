@@ -43,24 +43,24 @@ namespace psibase
       s.write('{');
       bool        needComma = false;
       std::size_t i         = 0;
-      psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
-                                 [&](auto member)
-                                 {
-                                    using MemPtr = decltype(member);
-                                    auto names   = psio::reflect<T>::member_function_names[i];
-                                    if (needComma)
-                                       s.write(',');
-                                    needComma = true;
-                                    to_json(*names.begin(), s);
-                                    s.write(':');
-                                    s.write('{');
-                                    generateActionJsonTemplate(
-                                        (decltype(psio::tuple_remove_view(
-                                            psio::args_as_tuple(std::declval<MemPtr>())))*)nullptr,
-                                        false, names.begin() + 1, names.end(), s);
-                                    s.write('}');
-                                    ++i;
-                                 });
+      psio::for_each_member_type(
+          (typename psio::reflect<T>::member_functions*)nullptr,
+          [&](auto member)
+          {
+             using MemPtr = decltype(member);
+             auto names   = psio::reflect<T>::member_function_names[i];
+             if (needComma)
+                s.write(',');
+             needComma = true;
+             to_json(*names.begin(), s);
+             s.write(':');
+             s.write('{');
+             generateActionJsonTemplate(
+                 (typename psio::make_param_value_tuple<MemPtr>::type*)nullptr, false,
+                 names.begin() + 1, names.end(), s);
+             s.write('}');
+             ++i;
+          });
       s.write('}');
       return json;
    }

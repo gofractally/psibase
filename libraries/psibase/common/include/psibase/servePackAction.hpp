@@ -43,8 +43,7 @@ namespace psibase
              std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
              if (names[0] == name)
              {
-                using param_tuple =
-                    decltype(psio::tuple_remove_view(psio::args_as_tuple(std::declval<MemPtr>())));
+                using param_tuple = typename psio::make_param_value_tuple<MemPtr>::type;
                 param_tuple       params{};
                 std::vector<char> j{json.begin(), json.end()};
                 j.push_back(0);
