@@ -64,25 +64,21 @@ namespace psio
    template <typename... Ts>
    constexpr std::variant<Ts...> tuple_to_variant(std::tuple<Ts...>);
 
-   template <int i, typename T, typename S>
-   void tuple_foreach_i(T&& t, S&& f)
+   template <typename F, typename T, std::size_t... I>
+   void tuple_foreach_impl(T&& t, F&& f, std::index_sequence<I...>*)
    {
-      if constexpr (i < std::tuple_size_v<std::decay_t<T>>)
-      {
-         f(std::get<i>(t));
-         tuple_foreach_i<i + 1>(t, f);
-      }
+      (f(std::get<I>(t)), ...);
    }
 
    template <typename... Ts, typename S>
    void tuple_foreach(const std::tuple<Ts...>& obj, S&& s)
    {
-      tuple_foreach_i<0>(obj, s);
+      psio::tuple_foreach_impl(obj, s, (std::make_index_sequence<sizeof...(Ts)>*)nullptr);
    }
    template <typename... Ts, typename S>
    void tuple_foreach(std::tuple<Ts...>& obj, S&& s)
    {
-      tuple_foreach_i<0>(obj, s);
+      psio::tuple_foreach_impl(obj, s, (std::make_index_sequence<sizeof...(Ts)>*)nullptr);
    }
 
    template <typename... T, typename F>
