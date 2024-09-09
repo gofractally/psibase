@@ -1065,8 +1065,8 @@ void load_tables(sqlite3* db, std::string_view sql)
 
 std::vector<char> REvents::sqlQuery(const std::string& squery)
 {
-   std::vector<char> query = {squery.begin(), squery.end()};
-   sqlite3* db;
+   std::string_view query{squery};
+   sqlite3*         db;
    if (int err = sqlite3_open(":memory:", &db))
    {
       abortMessage(std::string("sqlite3_open: ") + sqlite3_errstr(err));
@@ -1079,7 +1079,7 @@ std::vector<char> REvents::sqlQuery(const std::string& squery)
    {
       abortMessage(std::string("sqlite3_collation_needed: ") + sqlite3_errstr(err));
    }
-   load_tables(db, {query.data(), query.size()});
+   load_tables(db, query);
    std::vector<char> result;
    {
       check(query.size() <= std::numeric_limits<int>::max(), "Query too large");
@@ -1139,7 +1139,8 @@ std::optional<HttpReply> REvents::serveSys(const HttpRequest& request)
    if (request.target != "/sql")
       return {};
 
-   return HttpReply{.contentType = "application/json", .body = sqlQuery({request.body.begin(), request.body.end()})};
+   return HttpReply{.contentType = "application/json",
+                    .body        = sqlQuery({request.body.begin(), request.body.end()})};
 }
 
 PSIBASE_DISPATCH(UserService::REvents)
