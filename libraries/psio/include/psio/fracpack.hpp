@@ -919,6 +919,102 @@ namespace psio
       return true;
    }
 
+   namespace detail
+   {
+      template <bool DefWillNotChange>
+      struct num_present_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            ++i;
+            if constexpr (is_packable<T>::is_optional)
+            {
+               if (is_packable<T>::has_value(member))
+                  num_present = i;
+            }
+            else
+            {
+               num_present = i;
+            }
+         }
+         int i           = 0;
+         int num_present = 0;
+      };
+      template <>
+      struct num_present_fn<true>
+      {
+         template <typename T>
+         void operator()(const T&)
+         {
+            ++num_present;
+         }
+         int num_present = 0;
+      };
+
+      struct fixed_size_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            if (i < num_present)
+               fixed_size += is_packable<T>::fixed_size;
+            ++i;
+         }
+         int           num_present;
+         int           i          = 0;
+         std::uint16_t fixed_size = 0;
+      };
+
+      template <typename S>
+      struct embedded_fixed_pack_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            if (i < num_present)
+               is_packable<T>::embedded_fixed_pack(member, stream);
+            ++i;
+         }
+         int num_present;
+         S&  stream;
+         int i = 0;
+      };
+
+      template <typename S>
+      struct embedded_variable_pack_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            if (i < num_present)
+            {
+               using is_p = is_packable<T>;
+               is_p::embedded_fixed_repack(member, fixed_pos, stream.written(), stream);
+               is_p::embedded_variable_pack(member, stream);
+               fixed_pos += is_p::fixed_size;
+            }
+            ++i;
+         }
+         int           num_present;
+         std::uint32_t fixed_pos;
+         S&            stream;
+         int           i = 0;
+      };
+
+      template <typename S>
+      struct pack_fn
+      {
+         template <typename T>
+         void operator()(const T& member)
+         {
+            is_packable<T>::pack(member, stream);
+         }
+         S& stream;
+      };
+
+   }  // namespace detail
+
    template <Packable... Ts>
    struct is_packable<std::tuple<Ts...>>
        : base_packable_impl<std::tuple<Ts...>, is_packable<std::tuple<Ts...>>>
@@ -932,61 +1028,20 @@ namespace psio
       static void pack(const std::tuple<Ts...>& value, S& stream)
       {
          // TODO: verify fixed_size doesn't overflow
-         int num_present = 0;
-         int i           = 0;
+         detail::num_present_fn<false> num_present_fn;
          tuple_foreach(  //
-             value,
-             [&](const auto& x)
-             {
-                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
-                ++i;
-                if constexpr (is_p::is_optional)
-                {
-                   if (is_p::has_value(x))
-                      num_present = i;
-                }
-                else
-                {
-                   num_present = i;
-                }
-             });
-         uint16_t fixed_size = 0;
-         i                   = 0;
+             value, num_present_fn);
+         auto                  num_present = num_present_fn.num_present;
+         detail::fixed_size_fn fixed_size_fn{num_present};
          tuple_foreach(  //
-             value,
-             [&](const auto& x)
-             {
-                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
-                if (i < num_present)
-                   fixed_size += is_p::fixed_size;
-                ++i;
-             });
+             value, fixed_size_fn);
+         auto fixed_size = fixed_size_fn.fixed_size;
          is_packable<uint16_t>::pack(fixed_size, stream);
          uint32_t fixed_pos = stream.written();
-         i                  = 0;
          tuple_foreach(  //
-             value,
-             [&](const auto& x)
-             {
-                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
-                if (i < num_present)
-                   is_p::embedded_fixed_pack(x, stream);
-                ++i;
-             });
-         i = 0;
+             value, detail::embedded_fixed_pack_fn<S>{num_present, stream});
          tuple_foreach(  //
-             value,
-             [&](const auto& x)
-             {
-                using is_p = is_packable<std::remove_cvref_t<decltype(x)>>;
-                if (i < num_present)
-                {
-                   is_p::embedded_fixed_repack(x, fixed_pos, stream.written(), stream);
-                   is_p::embedded_variable_pack(x, stream);
-                   fixed_pos += is_p::fixed_size;
-                }
-                ++i;
-             });
+             value, detail::embedded_variable_pack_fn<S>{num_present, fixed_pos, stream});
       }  // pack
 
       template <bool Unpack, bool Verify>
@@ -1181,102 +1236,6 @@ namespace psio
          return true;
       }
    };  // is_packable<std::variant<Ts...>>
-
-   namespace detail
-   {
-      template <bool DefWillNotChange>
-      struct num_present_fn
-      {
-         template <typename T>
-         void operator()(const T& member)
-         {
-            ++i;
-            if constexpr (is_packable<T>::is_optional)
-            {
-               if (is_packable<T>::has_value(member))
-                  num_present = i;
-            }
-            else
-            {
-               num_present = i;
-            }
-         }
-         int i           = 0;
-         int num_present = 0;
-      };
-      template <>
-      struct num_present_fn<true>
-      {
-         template <typename T>
-         void operator()(const T&)
-         {
-            ++num_present;
-         }
-         int num_present = 0;
-      };
-
-      struct fixed_size_fn
-      {
-         template <typename T>
-         void operator()(const T& member)
-         {
-            if (i < num_present)
-               fixed_size += is_packable<T>::fixed_size;
-            ++i;
-         }
-         int           num_present;
-         int           i          = 0;
-         std::uint16_t fixed_size = 0;
-      };
-
-      template <typename S>
-      struct embedded_fixed_pack_fn
-      {
-         template <typename T>
-         void operator()(const T& member)
-         {
-            if (i < num_present)
-               is_packable<T>::embedded_fixed_pack(member, stream);
-            ++i;
-         }
-         int num_present;
-         S&  stream;
-         int i = 0;
-      };
-
-      template <typename S>
-      struct embedded_variable_pack_fn
-      {
-         template <typename T>
-         void operator()(const T& member)
-         {
-            if (i < num_present)
-            {
-               using is_p = is_packable<T>;
-               is_p::embedded_fixed_repack(member, fixed_pos, stream.written(), stream);
-               is_p::embedded_variable_pack(member, stream);
-               fixed_pos += is_p::fixed_size;
-            }
-            ++i;
-         }
-         int           num_present;
-         std::uint32_t fixed_pos;
-         S&            stream;
-         int           i = 0;
-      };
-
-      template <typename S>
-      struct pack_fn
-      {
-         template <typename T>
-         void operator()(const T& member)
-         {
-            is_packable<T>::pack(member, stream);
-         }
-         S& stream;
-      };
-
-   }  // namespace detail
 
    template <typename T>
    struct is_packable_reflected<T, true> : base_packable_impl<T, is_packable<T>>
