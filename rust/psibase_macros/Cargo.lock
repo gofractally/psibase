@@ -23,7 +23,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -34,7 +34,7 @@ checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
 dependencies = [
  "darling_core",
  "quote",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -58,7 +58,7 @@ dependencies = [
  "proc-macro2",
  "psibase_names",
  "quote",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -67,7 +67,7 @@ version = "0.1.0"
 dependencies = [
  "macro_core",
  "proc-macro-error",
- "syn",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -79,7 +79,7 @@ dependencies = [
  "proc-macro-error-attr",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.109",
  "version_check",
 ]
 
@@ -105,10 +105,12 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros_package"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "macro_core",
  "macro_derive",
+ "quote",
+ "syn 2.0.77",
 ]
 
 [[package]]
@@ -144,6 +146,17 @@ name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
+name = "syn"
+version = "2.0.77"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
 dependencies = [
  "proc-macro2",
  "quote",
