@@ -214,10 +214,9 @@ export const ComposeDialog = ({
                                 </FormItem>
                             )}
                         />
-                        {/* <ScrollArea className="h-full flex-1 overflow-y-auto"> */}
                         <MilkdownProvider>
                             <ProsemirrorAdapterProvider>
-                                <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
+                                <div className="sticky top-0 z-10">
                                     <ControlBar />
                                     <Separator />
                                 </div>
@@ -231,7 +230,6 @@ export const ComposeDialog = ({
                                 />
                             </ProsemirrorAdapterProvider>
                         </MilkdownProvider>
-                        {/* </ScrollArea> */}
                         <DialogFooter>
                             <Button type="submit">Send</Button>
                         </DialogFooter>

@@ -7,7 +7,7 @@
 }
 
 .prose.editor {
-    @apply mx-auto h-full max-w-none;
+    @apply mx-auto h-full max-w-none dark:text-foreground;
 }
 
 /* list-item-block */
