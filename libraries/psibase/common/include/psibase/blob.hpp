@@ -2,37 +2,30 @@
 
 #include <string.h>
 #include <algorithm>
+#include <ranges>
 #include <type_traits>
 
 template <typename T>
-concept IsByteType =
-    std::is_same_v<std::decay_t<T>, char> || std::is_same_v<std::decay_t<T>, unsigned char>;
+concept IsByteType = std::is_same_v<T, char> || std::is_same_v<T, unsigned char>;
 
 template <typename T>
-concept IsContainerLike = requires(T t) {
-   {
-      t.data()
-   } -> std::convertible_to<const void*>;
-   {
-      t.size()
-   } -> std::convertible_to<std::size_t>;
-};
+concept IsByteRange = std::ranges::contiguous_range<T> && std::ranges::sized_range<T> &&
+                      IsByteType<std::remove_cvref_t<std::ranges::range_value_t<T>>>;
 
 namespace psibase
 {
    // Compare vector, string, string_view, shared_string (unsigned)
    template <typename A, typename B>
-      requires IsContainerLike<A> && IsContainerLike<B> &&
-               IsByteType<decltype(*std::declval<A>().data())> &&
-               IsByteType<decltype(*std::declval<B>().data())>
+      requires IsByteRange<A> && IsByteRange<B>
    int compare_blob(const A& a, const B& b)
    {
-      auto r = memcmp(a.data(), b.data(), std::min(a.size(), b.size()));
+      auto r = memcmp(std::ranges::data(a), std::ranges::data(b),
+                      std::min(std::ranges::size(a), std::ranges::size(b)));
       if (r)
          return r;
-      if (a.size() < b.size())
+      if (std::ranges::size(a) < std::ranges::size(b))
          return -1;
-      if (a.size() > b.size())
+      if (std::ranges::size(a) > std::ranges::size(b))
          return 1;
       return 0;
    }
