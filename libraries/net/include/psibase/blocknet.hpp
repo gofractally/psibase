@@ -202,9 +202,7 @@ namespace psibase::net
             }
          }
          assert(!"Unknown peer connection");
-
-         // Silence warning
-         return *std::make_unique<peer_connection>(0);
+         __builtin_unreachable();
       }
 
       void disconnect(peer_id id)
