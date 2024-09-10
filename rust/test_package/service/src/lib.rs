@@ -5,6 +5,8 @@ mod service {
     fn foo(value: i32) -> i32 {
         value
     }
+    #[action]
+    fn init() {}
 }
 
 #[psibase::test_case(packages("TestPackage"))]

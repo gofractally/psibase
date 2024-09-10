@@ -1,10 +1,12 @@
 #pragma once
 #include <psibase/Table.hpp>
+#include <services/system/Spki.hpp>
 
 namespace UserService
 {
    namespace FractalNs
    {
+      using PublicKey = SystemService::AuthSig::SubjectPublicKeyInfo;
 
       struct ServiceEventRecord
       {
@@ -83,7 +85,7 @@ namespace UserService
 
       struct InviteRecord
       {
-         psibase::PublicKey     key;
+         PublicKey              key;
          psibase::AccountNumber creator;
          psibase::AccountNumber fractal;
          psibase::AccountNumber recipient;

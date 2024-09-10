@@ -20,8 +20,8 @@ namespace psibase
    {
       uint32_t seconds                                = 0;
       auto     operator<=>(const TimePointSec&) const = default;
+      PSIO_REFLECT(TimePointSec, definitionWillNotChange(), seconds);
    };
-   PSIO_REFLECT(TimePointSec, definitionWillNotChange(), seconds);
 
    template <typename S>
    void from_json(TimePointSec& obj, S& stream)

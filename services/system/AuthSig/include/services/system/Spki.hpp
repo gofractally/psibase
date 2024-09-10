@@ -13,6 +13,8 @@ namespace SystemService
       {
          std::vector<unsigned char> data;
 
+         static bool validate(const std::vector<unsigned char>& data);
+
          friend bool operator==(const SubjectPublicKeyInfo&, const SubjectPublicKeyInfo&) = default;
          friend auto operator<=>(const SubjectPublicKeyInfo& lhs, const SubjectPublicKeyInfo& rhs)
          {
@@ -28,11 +30,13 @@ namespace SystemService
       {
          return obj.data;
       }
+      inline bool clio_validate_packable(const SubjectPublicKeyInfo& obj)
+      {
+         return SubjectPublicKeyInfo::validate(obj.data);
+      }
 
-      // Takes a public key in any of the following formats
-      // - EOS Base58 encoded public key beginning PUB_K1 or PUB_R1
-      // - PEM encoded X.509 SubjectPublicKeyInfo
-      // Returns DER encoded SubjectPublicKeyInfo
+      // Takes a public key as a PEM encoded X.509 SubjectPublicKeyInfo
+      // Returns a DER encoded SubjectPublicKeyInfo
       std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view);
       std::string                to_string(const SubjectPublicKeyInfo&);
 

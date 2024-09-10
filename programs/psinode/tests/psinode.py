@@ -544,6 +544,9 @@ class Node(API):
         while not self._is_ready():
             time.sleep(0.1)
     def _is_ready(self):
+        if self.child.poll() is not None:
+            self.print_log()
+            raise Exception("Failed to start psinode")
         try:
             with self.get('/native/admin/status', service='x-admin') as result:
                 return result.status_code == requests.codes.ok and 'startup' not in result.json()

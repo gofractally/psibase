@@ -31,8 +31,8 @@ namespace psibase
       // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
       //       implementations of this interface may, of course, use it.
       std::optional<HttpReply> serveSys(HttpRequest request, std::optional<std::int32_t> socket);
+      PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
    };
-   PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
 
    /// Interface for services which support storing files
    ///
@@ -63,6 +63,6 @@ namespace psibase
       // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
       //       implementations of this interface may, of course, use it.
       void storeSys(std::string_view path, std::string_view contentType, std::vector<char> content);
+      PSIO_REFLECT(StorageInterface, method(storeSys, path, contentType, content))
    };
-   PSIO_REFLECT(StorageInterface, method(storeSys, path, contentType, content))
 }  // namespace psibase

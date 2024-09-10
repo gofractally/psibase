@@ -5,7 +5,8 @@ use bindings::exports::tokens::plugin::types as Wit;
 use bindings::exports::tokens::plugin::{
     intf::Guest as Intf, queries::Guest as Queries, transfer::Guest as Transfer,
 };
-use bindings::host::common::{server, types as CommonTypes};
+use bindings::host::common::types as CommonTypes;
+use bindings::transact::plugin::intf as Transact;
 use psibase::services::tokens as Wrapper;
 use psibase::AccountNumber;
 use query::token_detail::fetch_token;
@@ -59,7 +60,7 @@ impl Intf for Component {
         precision: Wit::Precision,
         max_supply: Wit::Quantity,
     ) -> Result<(), CommonTypes::Error> {
-        server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "create",
             &Wrapper::action_structs::create {
                 precision: Wrapper::Precision::from(precision),
@@ -78,7 +79,7 @@ impl Intf for Component {
         let token = fetch_token(token_id_to_number(token_id)?)?;
 
         if (account.len() as u8) == 0 {
-            server::add_action_to_transaction(
+            Transact::add_action_to_transaction(
                 "burn",
                 &Wrapper::action_structs::burn {
                     tokenId: token.id,
@@ -87,7 +88,7 @@ impl Intf for Component {
                 .packed(),
             )
         } else {
-            server::add_action_to_transaction(
+            Transact::add_action_to_transaction(
                 "recall",
                 &Wrapper::action_structs::recall {
                     tokenId: token.id,
@@ -107,7 +108,7 @@ impl Intf for Component {
     ) -> Result<(), CommonTypes::Error> {
         let token = fetch_token(token_id_to_number(token_id)?)?;
 
-        server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "mint",
             &Wrapper::action_structs::mint {
                 amount: Wrapper::Quantity::new(amount.as_str(), token.precision),
@@ -143,7 +144,7 @@ impl Transfer for Component {
         let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
         let quantity = Wrapper::Quantity::new(amount.as_str(), fetched_token.precision);
 
-        server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "uncredit",
             &Wrapper::action_structs::uncredit {
                 tokenId: fetched_token.id,
@@ -166,7 +167,7 @@ impl Transfer for Component {
     ) -> Result<(), CommonTypes::Error> {
         let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
 
-        server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "credit",
             &Wrapper::action_structs::credit {
                 amount: Wrapper::Quantity::new(amount.as_str(), fetched_token.precision),

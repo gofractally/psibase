@@ -29,6 +29,8 @@ pub type BlockNum = u32;
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
+    Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

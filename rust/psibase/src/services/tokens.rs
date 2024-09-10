@@ -47,8 +47,6 @@ use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
 
-pub type NID = u32;
-
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, ToSchema, SimpleObject, InputObject,
 )]

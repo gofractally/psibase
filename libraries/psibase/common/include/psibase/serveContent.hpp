@@ -20,8 +20,8 @@ namespace psibase
       std::string       path        = {};  ///< Absolute path to content, e.g. "/index.mjs"
       std::string       contentType = {};  ///< "text/html", "text/javascript", ...
       std::vector<char> content     = {};  ///< Content body
+      PSIO_REFLECT(WebContentRow, path, contentType, content)
    };
-   PSIO_REFLECT(WebContentRow, path, contentType, content)
    using WebContentTable = Table<WebContentRow, &WebContentRow::path>;
 
    /// Store web content in table
