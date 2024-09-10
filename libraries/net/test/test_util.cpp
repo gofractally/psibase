@@ -224,7 +224,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
          if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
             using param_tuple =
-                decltype(psio::tuple_remove_view(psio::args_as_tuple(&Producers::setConsensus)));
+                psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
             auto params                        = psio::view<const param_tuple>(act.rawData());
             newBlock.block.header.newConsensus = get<0>(params);
          }

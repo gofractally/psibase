@@ -338,13 +338,13 @@ namespace psibase
          AccountNumber receiver;
          KeyList       keys;
 
-         template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+         template <uint32_t idx, auto MemberPtr, typename... Args>
          auto call(Args&&... args) const
          {
             using result_type = decltype(psio::result_of(MemberPtr));
 
             auto act = action_builder_proxy(sender, receiver)
-                           .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+                           .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
 
             if (chain.isAutoBlockStart)
             {

@@ -1116,17 +1116,15 @@ namespace psio
                }
                else if constexpr (reflect<T>::is_struct)
                {
-                  std::vector<Member> members;
-                  reflect<T>::for_each(
-                      [&](const meta& r, auto member)
+                  auto members = psio::apply_members(
+                      (typename reflect<T>::data_members*)nullptr,
+                      [this](auto... member)
                       {
-                         auto m = member((std::decay_t<T>*)nullptr);
-                         if constexpr (not std::is_member_function_pointer_v<decltype(m)>)
-                         {
-                            using member_type = std::remove_cvref_t<
-                                decltype(static_cast<std::decay_t<T>*>(nullptr)->*m)>;
-                            members.push_back({.name = r.name, .type = insert<member_type>()});
-                         }
+                         std::size_t i = 0;
+                         return std::vector<Member>{Member{
+                             .name = reflect<T>::data_member_names[i++],
+                             .type = insert<
+                                 std::remove_cvref_t<decltype(((T*)nullptr)->*member)>>()}...};
                       });
                   if constexpr (reflect<T>::definitionWillNotChange)
                   {
