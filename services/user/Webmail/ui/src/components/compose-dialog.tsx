@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-
-import { type PluginId, Supervisor } from "@psibase/common-lib";
-
 import { PencilIcon, Reply, SquarePen } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { MilkdownProvider } from "@milkdown/react";
+import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
+import { v4 as uuid } from "uuid";
+import { toast } from "sonner";
+
+import { type PluginId } from "@psibase/common-lib";
+
+import { getSupervisor } from "@lib/supervisor";
 
 import { Button } from "@shadcn/button";
 import {
@@ -19,13 +24,11 @@ import {
 } from "@shadcn/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { Separator } from "@shadcn/separator";
+
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
 import { type Message, useDraftMessages, useUser } from "@hooks";
-import { ScrollArea } from "@shadcn/scroll-area";
-import { MilkdownProvider } from "@milkdown/react";
-import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
-import { v4 as uuid } from "uuid";
+
 import {
     Form,
     FormControl,
@@ -35,7 +38,6 @@ import {
 } from "@shadcn/form";
 import { Input } from "@shadcn/input";
 
-const supervisor = new Supervisor();
 interface SupervisorError {
     code: number;
     producer: PluginId;
@@ -55,7 +57,8 @@ export const ComposeDialog = ({
     message?: Message;
 }) => {
     const [open, setOpen] = useState(false);
-    const [selectedAccount] = useUser();
+    const isSent = useRef(false);
+    const { user } = useUser();
     const { drafts, setDrafts, getDrafts, deleteDraftById } =
         useDraftMessages();
 
@@ -84,7 +87,7 @@ export const ComposeDialog = ({
     const createDraft = (value: string) => {
         const draft = {
             id: id.current,
-            from: selectedAccount.account,
+            from: user,
             to: form.getValues().to || "recipient",
             datetime: Date.now(),
             status: "draft",
@@ -119,6 +122,8 @@ export const ComposeDialog = ({
         }
 
         try {
+            const supervisor = await getSupervisor();
+            // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
                 service: "webmail",
                 intf: "api",
@@ -127,16 +132,19 @@ export const ComposeDialog = ({
             });
             if (!id.current) return;
             deleteDraftById(id.current);
+            isSent.current = true;
+            form.reset();
+            toast.success("Your message has been sent");
+            setOpen(false);
         } catch (e: unknown) {
-            alert(`${(e as SupervisorError).message}`);
+            toast.error(`${(e as SupervisorError).message}`);
             console.error(`${(e as SupervisorError).message}`);
         }
     };
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
+        toast("Sending...");
         await sendMessage(values);
-        form.reset();
-        setOpen(false);
     }
 
     return (
@@ -144,9 +152,14 @@ export const ComposeDialog = ({
             open={open}
             onOpenChange={(open) => {
                 setOpen(open);
-                if (!open) return;
+                if (!open) {
+                    // if closing
+                    if (isSent.current) return;
+                    return toast.success("Your draft has been saved");
+                }
 
                 // the ID should be (re)set each time this opens; remember, it stays mounted
+                isSent.current = false;
                 if (message?.status === "draft") {
                     id.current = message.id;
                 } else {
@@ -172,7 +185,7 @@ export const ComposeDialog = ({
                 <Form {...form}>
                     <form
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className="flex flex-1 flex-col space-y-2"
+                        className="flex h-[80dvh] flex-1 flex-grow flex-col space-y-2"
                     >
                         <FormField
                             control={form.control}
@@ -201,24 +214,22 @@ export const ComposeDialog = ({
                                 </FormItem>
                             )}
                         />
-                        <ScrollArea className="flex-1">
-                            <MilkdownProvider>
-                                <ProsemirrorAdapterProvider>
-                                    <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
-                                        <ControlBar />
-                                        <Separator />
-                                    </div>
-                                    <MarkdownEditor
-                                        initialValue={
-                                            message?.status === "draft"
-                                                ? message.body
-                                                : ""
-                                        }
-                                        updateMarkdown={updateDraft}
-                                    />
-                                </ProsemirrorAdapterProvider>
-                            </MilkdownProvider>
-                        </ScrollArea>
+                        <MilkdownProvider>
+                            <ProsemirrorAdapterProvider>
+                                <div className="sticky top-0 z-10">
+                                    <ControlBar />
+                                    <Separator />
+                                </div>
+                                <MarkdownEditor
+                                    initialValue={
+                                        message?.status === "draft"
+                                            ? message.body
+                                            : ""
+                                    }
+                                    updateMarkdown={updateDraft}
+                                />
+                            </ProsemirrorAdapterProvider>
+                        </MilkdownProvider>
                         <DialogFooter>
                             <Button type="submit">Send</Button>
                         </DialogFooter>

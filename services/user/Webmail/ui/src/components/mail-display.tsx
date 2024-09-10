@@ -17,11 +17,11 @@ import {
     ComposeDialog,
     EditSendDialogTriggerIconWithTooltip,
     MarkdownEditor,
+    NoMessageSelected,
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
 
-import { accounts } from "../fixtures/data";
 import { Dialog } from "@shadcn/dialog";
 
 export function MailDisplay({
@@ -31,8 +31,6 @@ export function MailDisplay({
     message?: Message;
     mailbox: Mailbox;
 }) {
-    if (!message) return null;
-
     return (
         <div className="flex h-full max-h-full flex-col">
             {message ? (
@@ -54,9 +52,7 @@ export function MailDisplay({
                     </ScrollArea>
                 </>
             ) : (
-                <div className="flex flex-1 items-center justify-center text-muted-foreground">
-                    No post selected
-                </div>
+                <NoMessageSelected>Select a message</NoMessageSelected>
             )}
         </div>
     );
@@ -184,21 +180,13 @@ const MessageHeader = ({
     mailbox: Mailbox;
     message: Message;
 }) => {
-    const fromAccount = accounts.find((a) => a.account === message.from);
-    const toAccount = accounts.find((a) => a.account === message.to);
-
-    const account = mailbox === "inbox" ? fromAccount : toAccount;
+    const account = mailbox === "inbox" ? message.from : message.to;
 
     return (
         <div className="flex items-center gap-4 p-4 text-sm">
             <Avatar>
-                <AvatarImage alt={account?.name} />
-                <AvatarFallback>
-                    {account?.name
-                        .split(" ")
-                        .map((chunk) => chunk[0])
-                        .join("")}
-                </AvatarFallback>
+                <AvatarImage alt={account} />
+                <AvatarFallback>{account[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
                 <h2 className="text-xl font-bold">{message.subject}</h2>
@@ -206,7 +194,7 @@ const MessageHeader = ({
                     {mailbox === "inbox" ? "From " : "To "}
                     <Tooltip delayDuration={700}>
                         <TooltipTrigger asChild>
-                            <span>{account?.name}</span>
+                            <span>{account}</span>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">
                             {message.from}

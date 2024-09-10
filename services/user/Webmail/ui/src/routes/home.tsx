@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import {
     ResizableHandle,
     ResizablePanel,
@@ -13,9 +15,9 @@ import { Dialog } from "@shadcn/dialog";
 import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
+    EmptyBox,
+    ModeToggle,
 } from "@components";
-
-import { useEffect } from "react";
 
 export function Home() {
     const { query, selectedMessage, setSelectedMessageId } =
@@ -42,24 +44,21 @@ export function Home() {
                                 }
                             />
                         </Dialog>
+                        <ModeToggle />
                     </div>
                 </div>
                 <Separator />
-                {/* <div className="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                    <form>
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search" className="pl-8" />
-                        </div>
-                    </form>
-                </div> */}
-                <div className="py-4">
-                    <MailList
-                        mailbox="inbox"
-                        messages={query.data ?? []}
-                        selectedMessage={selectedMessage}
-                        setSelectedMessageId={setSelectedMessageId}
-                    />
+                <div className="h-full py-4">
+                    {query.data?.length ? (
+                        <MailList
+                            mailbox="inbox"
+                            messages={query.data ?? []}
+                            selectedMessage={selectedMessage}
+                            setSelectedMessageId={setSelectedMessageId}
+                        />
+                    ) : (
+                        <EmptyBox>No messages</EmptyBox>
+                    )}
                 </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
