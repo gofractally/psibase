@@ -2,7 +2,6 @@
 
 #include <psibase/psibase.hpp>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthK1.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/CommonApi.hpp>
 #include <services/system/HttpServer.hpp>

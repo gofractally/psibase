@@ -1,16 +1,32 @@
 export const server = {
-    addActionToTransaction(action, args) {
-        return host.addActionToTransaction(action, args);
-    },
-
     postGraphqlGetJson(graphQL) {
         return host.postGraphqlGetJson(graphQL);
+    },
+
+    post(request) {
+        return host.post(request);
+    },
+
+    getJson(endpoint) {
+        return host.getJson(endpoint);
     },
 };
 
 export const client = {
+    loginTemp(appOrigin, user) {
+        return host.loginTemp(appOrigin, user);
+    },
+
     getSenderApp() {
         return host.getSenderApp();
+    },
+
+    getLoggedInUser() {
+        return host.getLoggedInUser();
+    },
+
+    isLoggedIn() {
+        return host.isLoggedIn();
     },
 
     myServiceAccount() {

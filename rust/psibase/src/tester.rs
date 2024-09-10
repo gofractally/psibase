@@ -91,6 +91,8 @@ impl Chain {
             self.push(&trx).ok()?;
         }
 
+        self.start_block();
+
         Ok(())
     }
 

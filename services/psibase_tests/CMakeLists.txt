@@ -22,7 +22,7 @@ function(add suffix)
     service(AsyncQueryService "${suffix}" AsyncQueryService.cpp)
     service(SubjectiveCounterService "${suffix}" SubjectiveCounterService.cpp)
 
-    add_executable(psibase-tests${suffix} test.cpp test-ec.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp)
+    add_executable(psibase-tests${suffix} test.cpp test-sig.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)
     target_link_libraries(psibase-tests${suffix} services_system${suffix} psitestlib${suffix} )
     set_target_properties(psibase-tests${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})

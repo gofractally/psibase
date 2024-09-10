@@ -25,8 +25,6 @@ namespace UserService
         public:
          using Tables = psibase::ServiceTables<InviteSettingsTable,
                                                InviteTable,
-                                               UserEventTable,
-                                               ServiceEventTable,
                                                InitTable,
                                                NewAccTable,
                                                psibase::WebContentTable>;
@@ -47,30 +45,28 @@ namespace UserService
          void init();
 
          /// Creates and stores an invite object with the specified public key
-         void createInvite(psibase::PublicKey inviteKey);
+         void createInvite(Spki inviteKey);
 
          /// Called by existing Psibase accounts to accept an invite without creating
          /// a new Psibase account
-         void accept(psibase::PublicKey inviteKey);
+         void accept(Spki inviteKey);
 
          /// Called by the system account "invited-sys" to accept an invite and
          /// simultaneously create the new account 'acceptedBy', which is
          /// authenticated by the provided 'newAccountKey' public key
          ///
          /// Each invite may be used to redeem a maximum of one new account.
-         void acceptCreate(psibase::PublicKey     inviteKey,
-                           psibase::AccountNumber acceptedBy,
-                           psibase::PublicKey     newAccountKey);
+         void acceptCreate(Spki inviteKey, psibase::AccountNumber acceptedBy, Spki newAccountKey);
 
          /// Called by existing accounts or the system account "invited-sys" to reject
          /// an invite. Once an invite is rejected, it cannot be accepted or used to
          /// create a new account
-         void reject(psibase::PublicKey inviteKey);
+         void reject(Spki inviteKey);
 
          /// Used by the creator of an invite to delete it. Deleted invites are removed
          /// from the database. An invite can be deleted regardless of whether it has been
          /// accepted, rejected, or is still pending
-         void delInvite(psibase::PublicKey inviteKey);
+         void delInvite(Spki inviteKey);
 
          /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
          /// can be deleted by calling this action
@@ -81,17 +77,17 @@ namespace UserService
          /// invites
          void setWhitelist(std::vector<psibase::AccountNumber> accounts);
 
-         /// Called by this service itself to restruct the accounts that are
+         /// Called by this service itself to restrict the accounts that are
          /// able to create invites. Blacklisted accounts may not create invites
          void setBlacklist(std::vector<psibase::AccountNumber> accounts);
 
          /// Called synchronously by other services to retrieve the invite
          /// record corresponding to the provided 'pubkey' public key
-         std::optional<InviteRecord> getInvite(psibase::PublicKey pubkey);
+         std::optional<InviteRecord> getInvite(Spki pubkey);
 
          /// Called synchronously by other services to query whether the invite
          /// record corresponding to the provided `pubkey` public key is expired
-         bool isExpired(psibase::PublicKey pubkey);
+         bool isExpired(Spki pubkey);
 
          /// Called synchronously by other services to query whether the specified
          /// actor should be allowed to claim the invite specified by the `pubkey`
@@ -102,7 +98,7 @@ namespace UserService
          /// * The invite must be in the accepted state
          /// * The invite actor must be the same as the specified `actor` parameter
          /// * The invite must not be expired
-         void checkClaim(psibase::AccountNumber actor, psibase::PublicKey pubkey);
+         void checkClaim(psibase::AccountNumber actor, Spki pubkey);
 
          /// Called by the http-server system service when an HttpRequest
          /// is directed at this invite service
@@ -114,32 +110,24 @@ namespace UserService
          // clang-format off
          struct Events
          {
+            using AccountNumber = psibase::AccountNumber;
             struct History
             {
-               void inviteCreated(uint64_t               prevEvent,
-                                 psibase::PublicKey     inviteKey,
-                                 psibase::AccountNumber inviter);
-               void inviteDeleted(uint64_t               prevEvent,
-                                 psibase::PublicKey     inviteKey);
-               void expInvDeleted(uint64_t               prevEvent,
-                                 uint32_t               numCheckedRows,
-                                 uint32_t               numDeleted);
-               void inviteAccepted(uint64_t              prevEvent,
-                                 psibase::PublicKey     inviteKey,
-                                 psibase::AccountNumber accepter);
-               void inviteRejected(uint64_t              prevEvent,
-                                 psibase::PublicKey     inviteKey);
-               void whitelistSet(uint64_t                prevEvent,
-                                 std::vector<psibase::AccountNumber> accounts);
-               void blacklistSet(uint64_t                prevEvent,
-                                 std::vector<psibase::AccountNumber> accounts);
+               void inviteCreated(Spki inviteKey,
+                                 AccountNumber inviter);
+               void inviteDeleted(Spki inviteKey);
+               void expInvDeleted(uint32_t  numCheckedRows,
+                                 uint32_t  numDeleted);
+               void inviteAccepted(Spki inviteKey,
+                                 AccountNumber accepter);
+               void inviteRejected(Spki     inviteKey);
+               void whitelistSet(std::vector<AccountNumber> accounts);
+               void blacklistSet(std::vector<AccountNumber> accounts);
             };
             struct Ui {};
             struct Merkle {};
          };
          // clang-format on
-         using UserEvents    = psibase::EventIndex<&UserEventRecord::eventHead, "prevEvent">;
-         using ServiceEvents = psibase::EventIndex<&ServiceEventRecord::eventHead, "prevEvent">;
       };
 
       // clang-format off
@@ -161,13 +149,13 @@ namespace UserService
       );
       PSIBASE_REFLECT_EVENTS(Invite);
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,
-         method(inviteCreated, prevEvent, inviteKey, inviter),
-         method(inviteDeleted, prevEvent, inviteKey),
-         method(expInvDeleted, prevEvent, numCheckedRows, numDeleted),
-         method(inviteAccepted, prevEvent, inviteKey, accepter),
-         method(inviteRejected, prevEvent, inviteKey),
-         method(whitelistSet, prevEvent, accounts),
-         method(blacklistSet, prevEvent, accounts)
+         method(inviteCreated, inviteKey, inviter),
+         method(inviteDeleted, inviteKey),
+         method(expInvDeleted, numCheckedRows, numDeleted),
+         method(inviteAccepted, inviteKey, accepter),
+         method(inviteRejected, inviteKey),
+         method(whitelistSet, accounts),
+         method(blacklistSet, accounts)
       );
       PSIBASE_REFLECT_UI_EVENTS(Invite);
       PSIBASE_REFLECT_MERKLE_EVENTS(Invite);

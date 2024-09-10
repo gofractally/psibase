@@ -9,6 +9,7 @@ interface intf {
 world impl {
     import invite:plugin/inviter;
     include host:common/imports;
+    include transact:plugin/imports;
 
     export helloworld: func() -> string;
     export intf;

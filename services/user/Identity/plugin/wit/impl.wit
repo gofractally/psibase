@@ -1,0 +1,10 @@
+package identity:plugin;
+
+world impl {
+    include host:common/imports;
+    include accounts:plugin/imports;
+    include transact:plugin/imports;
+    export api;
+    export queries;
+    export types;
+}

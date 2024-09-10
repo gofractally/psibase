@@ -2,7 +2,7 @@
 
 #include <secp256k1.h>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -19,6 +19,7 @@ namespace psibase::tester::raw
 }  // namespace psibase::tester::raw
 
 using psibase::tester::raw::selectedChain;
+using namespace SystemService::AuthSig;
 
 extern "C"
 {
@@ -124,28 +125,6 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
-psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& digest)
-{
-   static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
-   auto*       k1      = std::get_if<0>(&key.data);
-   check(k1, "only k1 currently supported");
-
-   secp256k1_ecdsa_signature sig;
-   check(secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
-                              k1->data(), nullptr, nullptr) == 1,
-         "sign failed");
-
-   EccSignature sigdata;
-   check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
-         "serialize signature failed");
-   return Signature{Signature::variant_type{std::in_place_index<0>, sigdata}};
-}
-
-const psibase::PublicKey psibase::TestChain::defaultPubKey =
-    psibase::publicKeyFromString("PUB_K1_8UUMcamEE6dnK4kyrSPnAEAPTWZduZtE9SuFvURr3UjGDpF9LX");
-const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
-    psibase::privateKeyFromString("PVT_K1_27Hseiioosmff4ue31Jv37pC1NWfhbjuKuSBxEkqCTzbJtxQD2");
-
 psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
     : id{::testerCreateChain(dbconfig.hotBytes,
                              dbconfig.warmBytes,
@@ -250,14 +229,18 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .service = SystemService::VerifyK1::service,
-          .rawData = psio::convert_to_frac(pub),
+          .service = SystemService::VerifySig::service,
+          .rawData = {pub.data.begin(), pub.data.end()},
       });
    SignedTransaction signedTrx;
    signedTrx.transaction = trx;
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
-      signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
+   {
+      auto proof = sign(priv, hash);
+      signedTrx.proofs.push_back({proof.begin(), proof.end()});
+   }
+
    return pushTransaction(signedTrx);
 }
 
