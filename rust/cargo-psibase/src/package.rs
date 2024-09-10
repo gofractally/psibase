@@ -290,7 +290,7 @@ pub async fn build_package(
                     &metadata.metadata.workspace_members,
                     &plugin,
                 ) else {
-                    return Err(anyhow!("{} is not a workspace member", service,));
+                    return Err(anyhow!("{} is not a workspace member", plugin,));
                 };
                 plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
             }
