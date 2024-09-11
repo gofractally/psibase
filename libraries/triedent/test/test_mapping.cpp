@@ -93,3 +93,21 @@ TEST_CASE("file access")
       mapping m2{dir.path, open_mode::read_only};
    }
 }
+
+TEST_CASE("file mode")
+{
+   temp_directory dir("triedent-test");
+   {
+      mapping m{dir.path, open_mode::create_new};
+      m.resize(256);
+   }
+   {
+      mapping m{dir.path, open_mode::create};
+      CHECK(m.size() == 256);
+   }
+   CHECK_THROWS((void)mapping{dir.path, open_mode::create_new});
+   {
+      mapping m{dir.path, open_mode::trunc};
+      CHECK(m.size() == 0);
+   }
+}
