@@ -414,11 +414,8 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
-      database(const std::filesystem::path& dir,
-               const config&                cfg,
-               access_mode                  mode,
-               bool                         allow_gc = false);
-      database(const std::filesystem::path& dir, access_mode mode, bool allow_gc = false);
+      database(const std::filesystem::path& dir, const config& cfg, open_mode mode);
+      database(const std::filesystem::path& dir, open_mode mode);
       ~database();
 
       static void create(std::filesystem::path dir, config);
@@ -1768,12 +1765,8 @@ namespace triedent
                                             std::unique_lock<gc_session>& l,
                                             std::string_view              key,
                                             database::id                  child) {
-         {
-            t.branches()
-         } -> std::same_as<std::uint64_t>;
-         {
-            t.children()
-         } -> std::ranges::input_range;
+         { t.branches() } -> std::same_as<std::uint64_t>;
+         { t.children() } -> std::ranges::input_range;
          t.clone_child(session, l, child);
          t.clone_child_with_prefix(session, l, key, child);
       };

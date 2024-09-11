@@ -39,7 +39,7 @@ std::vector<std::string> data = {
 TEST_CASE("ring_allocator")
 {
    temp_directory dir("triedent-test");
-   ring_allocator a{dir.path, 128, 0, access_mode::read_write, false};
+   ring_allocator a{dir.path, 128, 0, open_mode::read_write, false};
    dir.reset();
    std::vector<std::uint64_t> offsets;
    std::atomic<bool>          done{false};

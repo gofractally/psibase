@@ -11,7 +11,7 @@ using namespace triedent;
 TEST_CASE("mapping access")
 {
    temp_directory dir("triedent-test");
-   mapping        m{dir.path, read_write};
+   mapping        m{dir.path, open_mode::create};
    m.resize(4096);
    auto p1 = (char*)m.data();
    *p1     = 42;
@@ -28,7 +28,7 @@ TEST_CASE("mapping access")
 TEST_CASE("extend mapping aligned")
 {
    temp_directory dir("triedent-test");
-   mapping        m{dir.path, read_write};
+   mapping        m{dir.path, open_mode::create};
 
    for (std::size_t i = 1; i < 10; ++i)
    {
@@ -52,7 +52,7 @@ TEST_CASE("extend mapping aligned")
 TEST_CASE("extend mapping unaligned")
 {
    temp_directory dir("triedent-test");
-   mapping        m{dir.path, read_write};
+   mapping        m{dir.path, open_mode::create};
 
    std::size_t prev = 0;
    for (std::size_t i :
@@ -81,15 +81,15 @@ TEST_CASE("file access")
 {
    temp_directory dir("triedent-test");
    {
-      CHECK_THROWS(mapping(dir.path, read_only));
+      CHECK_THROWS(mapping(dir.path, open_mode::read_only));
    }
    {
-      mapping m{dir.path, read_write};
-      CHECK_THROWS(mapping{dir.path, read_write});
-      CHECK_THROWS(mapping{dir.path, read_only});
+      mapping m{dir.path, open_mode::create};
+      CHECK_THROWS(mapping{dir.path, open_mode::read_write});
+      CHECK_THROWS(mapping{dir.path, open_mode::read_only});
    }
    {
-      mapping m1{dir.path, read_only};
-      mapping m2{dir.path, read_only};
+      mapping m1{dir.path, open_mode::read_only};
+      mapping m2{dir.path, open_mode::read_only};
    }
 }

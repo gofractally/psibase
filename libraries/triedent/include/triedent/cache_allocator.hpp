@@ -14,6 +14,22 @@
 
 namespace triedent
 {
+   // cold_bytes can grow
+   // hot/warm/cool are fixed
+   // hot/warm/cool/cold MUST be more than twice the
+   // maximum allocation size.
+   struct database_config
+   {
+      uint64_t hot_bytes  = 1000 * 1000ull;
+      uint64_t warm_bytes = 1000 * 1000ull;
+      uint64_t cool_bytes = 1000 * 1000ull;
+      uint64_t cold_bytes = 1000 * 1000ull;
+   };
+
+   std::filesystem::path get_subpath(const std::filesystem::path& dir,
+                                     const char*                  name,
+                                     open_mode                    mode);
+
    // Cache allocator manages all storage for the database.
    //
    // It maintains multiple buffers and moves accessed data to the hot
@@ -29,22 +45,9 @@ namespace triedent
      public:
       using id = object_id;
 
-      // cold_bytes can grow
-      // hot/warm/cool are fixed
-      // hot/warm/cool/cold MUST be more than twice the
-      // maximum allocation size.
-      struct config
-      {
-         uint64_t hot_bytes  = 1000 * 1000ull;
-         uint64_t warm_bytes = 1000 * 1000ull;
-         uint64_t cool_bytes = 1000 * 1000ull;
-         uint64_t cold_bytes = 1000 * 1000ull;
-      };
+      using config = database_config;
 
-      cache_allocator(const std::filesystem::path& path,
-                      const config&                cfg,
-                      access_mode                  mode,
-                      bool                         allow_gc = false);
+      cache_allocator(const std::filesystem::path& path, const config& cfg, open_mode mode);
       ~cache_allocator();
 
       auto start_session() { return gc_queue::session{_gc}; }
