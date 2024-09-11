@@ -24,6 +24,7 @@ lto = true
 package-name = "Webmail"
 description = "Basic email app"
 services = ["webmail"]
+data = [{ src = "ui/dist/", dst = "/" }]
 
 [lib]
 crate-type = ["rlib"]
