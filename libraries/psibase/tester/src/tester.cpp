@@ -28,7 +28,6 @@ extern "C"
    TESTER_NATIVE(createChain)      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
    TESTER_NATIVE(destroyChain)     void     testerDestroyChain(uint32_t chain);
    TESTER_NATIVE(finishBlock)      void     testerFinishBlock(uint32_t chain_index);
-   TESTER_NATIVE(getChainPath)     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
    TESTER_NATIVE(pushTransaction)  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    TESTER_NATIVE(httpRequest)      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    TESTER_NATIVE(socketRecv)       uint32_t testerSocketRecv(int32_t fd, std::size_t* size);
@@ -153,14 +152,6 @@ psibase::TestChain::~TestChain()
 void psibase::TestChain::shutdown()
 {
    ::testerShutdownChain(id);
-}
-
-std::string psibase::TestChain::getPath()
-{
-   size_t      len = testerGetChainPath(id, nullptr, 0);
-   std::string result(len, 0);
-   testerGetChainPath(id, result.data(), len);
-   return result;
 }
 
 void psibase::TestChain::setAutoBlockStart(bool enable)

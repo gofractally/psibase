@@ -135,12 +135,8 @@ namespace psibase
 
    template <typename T>
    concept HttpRequestBody = requires(const T& t) {
-      {
-         t.contentType()
-      } -> std::convertible_to<std::string>;
-      {
-         t.body()
-      } -> std::convertible_to<std::vector<char>>;
+      { t.contentType() } -> std::convertible_to<std::string>;
+      { t.body() } -> std::convertible_to<std::vector<char>>;
    };
 
    /**
@@ -172,11 +168,6 @@ namespace psibase
        * live until this object destructs.
        */
       void shutdown();
-
-      /**
-       * Get the temporary path which contains the chain's blocks and states directories
-       */
-      std::string getPath();
 
       /**
        * By default, the TestChain will automatically advance blocks.

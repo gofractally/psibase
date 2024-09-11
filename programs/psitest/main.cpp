@@ -220,7 +220,6 @@ struct test_chain
 {
    ::state&                                     state;
    std::set<test_chain_ref*>                    refs;
-   boost::filesystem::path                      dir;
    psibase::SharedDatabase                      db;
    psibase::WriterPtr                           writer;
    std::unique_ptr<psibase::SystemContext>      sys;
@@ -247,15 +246,12 @@ struct test_chain
    }
    const std::string& getName() { return name; }
 
-   test_chain(::state& state,
-              uint64_t hot_bytes,
-              uint64_t warm_bytes,
-              uint64_t cool_bytes,
-              uint64_t cold_bytes)
-       : state{state}
+   test_chain(::state&                         state,
+              std::string                      path,
+              const triedent::database_config& config,
+              triedent::open_mode              mode)
+       : state{state}, db{path, config, mode}
    {
-      dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db     = {dir, {hot_bytes, warm_bytes, cool_bytes, cold_bytes}, triedent::open_mode::create};
       writer = db.createWriter();
       sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{
           db, {128}, {}, state.watchdogManager, std::make_shared<psibase::Sockets>()});
@@ -276,7 +272,6 @@ struct test_chain
       sys.reset();
       writer = {};
       db     = {};
-      boost::filesystem::remove_all(dir);
    }
 
    // TODO: Support sub-second block times
@@ -1061,8 +1056,10 @@ struct callbacks
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
    {
-      state.chains.push_back(
-          std::make_unique<test_chain>(state, hot_bytes, warm_bytes, cool_bytes, cold_bytes));
+      state.chains.push_back(std::make_unique<test_chain>(
+          state, std::filesystem::temp_directory_path().native(),
+          triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
+          triedent::open_mode::temporary));
       return state.chains.size() - 1;
    }
 
@@ -1083,13 +1080,6 @@ struct callbacks
       c.blockContext.reset();
       c.sys.reset();
       c.db = {};
-   }
-
-   uint32_t testerGetChainPath(uint32_t chain, span<char> dest)
-   {
-      auto& c = assert_chain(chain, false);
-      memcpy(dest.data(), c.dir.c_str(), std::min(dest.size(), c.dir.size()));
-      return c.dir.size();
    }
 
    // TODO: Support sub-second block times
@@ -1367,7 +1357,6 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
-   rhf_t::add<&callbacks::testerGetChainPath>("psibase", "getChainPath");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
