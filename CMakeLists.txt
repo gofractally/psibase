@@ -407,6 +407,12 @@ psibase_package(
     DEPENDS ${ClientDataPlugin_DEP}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Webmail.psi
+    PATH services/user/Webmail
+    # DEPENDS ${Webmail_js_DEP}
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
