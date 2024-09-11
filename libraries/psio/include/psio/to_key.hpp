@@ -349,14 +349,8 @@ namespace psio
       }
       else
       {
-         psio::reflect<T>::for_each(
-             [&](const psio::meta&, auto member)
-             {
-                if constexpr (std::is_member_pointer_v<decltype(member(&obj))>)
-                {
-                   to_key(obj.*member(&obj), stream);
-                }
-             });
+         psio::apply_members((typename reflect<T>::data_members*)nullptr,
+                             [&](auto... member) { (to_key(obj.*member, stream), ...); });
       }
    }
 
@@ -378,6 +372,14 @@ namespace psio
    {
       std::vector<char> result;
       convert_to_key(t, result);
+      return result;
+   }
+
+   template <typename... T>
+   std::vector<char> composite_key(const T&... t)
+   {
+      std::vector<char> result;
+      (convert_to_key(t, result), ...);
       return result;
    }
 

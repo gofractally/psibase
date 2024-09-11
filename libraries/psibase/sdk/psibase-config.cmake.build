@@ -50,12 +50,10 @@ function(add_libs suffix)
         @ROOT_SOURCE_DIR@/services/system/Accounts/include
         @ROOT_SOURCE_DIR@/services/system/AuthAny/include
         @ROOT_SOURCE_DIR@/services/system/AuthSig/include
-        @ROOT_SOURCE_DIR@/services/system/AuthK1/include
         @ROOT_SOURCE_DIR@/services/system/Producers/include
         @ROOT_SOURCE_DIR@/services/system/HttpServer/include
         @ROOT_SOURCE_DIR@/services/system/SetCode/include
         @ROOT_SOURCE_DIR@/services/system/Transact/include
-        @ROOT_SOURCE_DIR@/services/system/VerifyK1/include
         @ROOT_SOURCE_DIR@/services/user/CommonApi/include
         @ROOT_SOURCE_DIR@/services/user/Explorer/include
         @ROOT_SOURCE_DIR@/services/user/Nft/include

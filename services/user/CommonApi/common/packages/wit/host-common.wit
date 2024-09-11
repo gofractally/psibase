@@ -33,23 +33,28 @@ interface types {
         /// The domain origin responsible for the call.
         origin: string
     }
+
+    variant body-types {
+        bytes(list<u8>),
+        json(string),
+    }
+
+    /// The object needed to specify a post request
+    record post-request {
+
+        /// The endpoint being posted to (e.g. `/graphql`)
+        endpoint: string, 
+
+        /// The body of the post request
+        /// New `body` types can be added to enable posting different payloads
+        body: body-types,
+    }
 }
 
 /// Common calls related to interactions with the server
 interface server {
 
-    use types.{error};
-
-    /// Adds the specified service action to the current transaction.
-    /// 
-    /// No service is specified, as it is only possible for a plugin to call an
-    /// action on its own service. To call actions on another service, it must use
-    /// that service's plugin.
-    /// 
-    /// Parameters
-    /// * `action`: The name of the action being called
-    /// * `args`: The arguments for the action, packed into fracpack format
-    add-action-to-transaction: func(action: string, args: list<u8>) -> result<_, error>;
+    use types.{error, post-request};
 
     /// Used to post graphql to the server and get a JSON response back
     /// The graphql payload is automatically posted to the app's own `/graphql` endpoint.
@@ -57,6 +62,19 @@ interface server {
     /// Parameters
     /// * `graphql`: The graphql data for the request
     post-graphql-get-json: func(graphql: string) -> result<string, error>;
+
+    /// Used to make a post request to the app's own http server.
+    /// 
+    /// Parameters
+    /// * `request`: The required details of the post request
+    post: func(request: post-request) -> result<string, error>;
+
+    /// Used to call a GET endpoint on the app's own http server to retrieve a JSON
+    /// payload.
+    /// 
+    /// Parameters
+    /// * `endpoint` - The subpath being requested (e.g. `/common/tapos/head` or `/api/some-request`)
+    get-json: func(endpoint: string) -> result<string, error>;
 
     // Todo: Probably will need to implement most/all js library functionality:
     // https://docs.psibase.io/development/front-ends/reference/js-libraries.html
@@ -66,8 +84,18 @@ interface server {
 interface client {
     use types.{origination-data, error};
 
+    /// Temporarily facilitates login until we have popup windows to let the user decide
+    login-temp: func(app-origin: string, user: string) -> result<_, error>;
+
     /// Gets details about the app responsible for the call
     get-sender-app: func() -> origination-data;
+
+    /// Gets the account name of the user logged into the current top-level application
+    get-logged-in-user: func() -> result<option<string>, error>;
+
+    /// Returns `true` if any user is currently logged into the current top-level
+    /// application. Returns `false` otherwise.
+    is-logged-in: func() -> bool;
 
     /// Gets the account name of the service from which the currently running
     /// plugin was fetched.

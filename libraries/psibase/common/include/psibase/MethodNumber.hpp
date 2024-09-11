@@ -58,8 +58,8 @@ namespace psibase
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       auto operator<=>(const MethodNumber&) const = default;
+      PSIO_REFLECT(MethodNumber, definitionWillNotChange(), value)
    };
-   PSIO_REFLECT(MethodNumber, definitionWillNotChange(), value)
 
    template <typename S>
    void to_json(const MethodNumber& n, S& s)

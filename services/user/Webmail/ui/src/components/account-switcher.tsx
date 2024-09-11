@@ -1,6 +1,5 @@
 import { useIncomingMessages, useUser } from "@hooks";
 import { cn } from "@lib/utils";
-import { accounts } from "src/fixtures/data";
 import {
     Select,
     SelectContent,
@@ -15,17 +14,14 @@ interface AccountSwitcherProps {
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
     const { setSelectedMessageId } = useIncomingMessages();
-    const [selectedAccount, setSelectedAccount] = useUser();
+    const { availableAccounts, user, setUser } = useUser();
 
     return (
         <Select
-            defaultValue={selectedAccount.account}
+            defaultValue={user}
             onValueChange={(value) => {
                 setSelectedMessageId("");
-                setSelectedAccount(
-                    accounts.find((acct) => acct.account === value) ??
-                        accounts[0],
-                );
+                setUser(value);
             }}
         >
             <SelectTrigger
@@ -38,15 +34,15 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
             >
                 <SelectValue placeholder="Select an account">
                     <span className={cn("ml-2", isCollapsed && "hidden")}>
-                        {selectedAccount.name}
+                        {user}
                     </span>
                 </SelectValue>
             </SelectTrigger>
             <SelectContent>
-                {accounts.map((account) => (
-                    <SelectItem key={account.account} value={account.account}>
+                {availableAccounts.map((account) => (
+                    <SelectItem key={account} value={account}>
                         <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
-                            {account.account}
+                            {account}
                         </div>
                     </SelectItem>
                 ))}

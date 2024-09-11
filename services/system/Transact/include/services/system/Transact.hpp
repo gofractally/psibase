@@ -25,7 +25,7 @@ namespace SystemService
    /// this allows that service to act on the account's behalf and
    /// that service to authorize other accounts and services to
    /// act on the account's behalf. It can also can lock out that
-   /// account. See `AuthK1` for a canonical example of
+   /// account. See `AuthSig` for a canonical example of
    /// implementing this interface.
    ///
    /// This interface can't authenticate non-top-level actions other

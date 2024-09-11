@@ -6,9 +6,14 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/trace.hpp>
 #include <psio/to_hex.hpp>
+#include <services/system/PrivateKeyInfo.hpp>
+#include <services/system/Spki.hpp>
 
 namespace psibase
 {
+   using KeyList = std::vector<std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
+                                         SystemService::AuthSig::PrivateKeyInfo>>;
+
    inline std::string show(bool include, TransactionTrace t)
    {
       if (include || t.error)
@@ -62,11 +67,6 @@ namespace psibase
     * part of the error message.
     */
    void expect(TransactionTrace t, const std::string& expected = "", bool always_show = false);
-
-   /**
-    * Sign a digest
-    */
-   Signature sign(const PrivateKey& key, const Checksum256& digest);
 
    class TraceResult
    {
@@ -125,8 +125,6 @@ namespace psibase
       Result(TransactionTrace&& t) : TraceResult(std::forward<TransactionTrace>(t)) {}
    };
 
-   using KeyList = std::vector<std::pair<psibase::PublicKey, psibase::PrivateKey>>;
-
    struct DatabaseConfig
    {
       std::uint64_t hotBytes  = 1ull << 27;
@@ -159,11 +157,6 @@ namespace psibase
       bool                              isAutoBlockStart = true;
 
      public:
-      static const PublicKey  defaultPubKey;
-      static const PrivateKey defaultPrivKey;
-
-      static KeyList defaultKeys() { return {{defaultPubKey, defaultPrivKey}}; }
-
       explicit TestChain(const DatabaseConfig&);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
@@ -198,8 +191,8 @@ namespace psibase
        * Start a new pending block.  If a block is currently pending, finishes it first.
        * May push additional blocks if any time is skipped.
        *
-       * @param skip_milliseconds The amount of time to skip in addition to the 500 ms block time.
-       * truncated to a multiple of 500 ms.
+       * @param skip_milliseconds The amount of time to skip in addition to the 1s block time.
+       * truncated to a multiple of 1s.
        */
       void startBlock(int64_t skip_miliseconds = 0);
 
@@ -230,8 +223,7 @@ namespace psibase
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
-      [[nodiscard]] TransactionTrace pushTransaction(Transaction    trx,
-                                                     const KeyList& keys = defaultKeys());
+      [[nodiscard]] TransactionTrace pushTransaction(Transaction trx, const KeyList& keys = {});
 
       /**
        * Creates a POST request with a JSON body
@@ -326,7 +318,7 @@ namespace psibase
       }
 
       template <typename Action>
-      auto trace(Action&& a, const KeyList& keyList = defaultKeys())
+      auto trace(Action&& a, const KeyList& keyList = {})
       {
          return pushTransaction(makeTransaction({a}), keyList);
       }
@@ -346,13 +338,13 @@ namespace psibase
          AccountNumber receiver;
          KeyList       keys;
 
-         template <uint32_t idx, uint64_t Name, auto MemberPtr, typename... Args>
+         template <uint32_t idx, auto MemberPtr, typename... Args>
          auto call(Args&&... args) const
          {
             using result_type = decltype(psio::result_of(MemberPtr));
 
             auto act = action_builder_proxy(sender, receiver)
-                           .call<idx, Name, MemberPtr, Args...>(std::forward<Args>(args)...);
+                           .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
 
             if (chain.isAutoBlockStart)
             {
@@ -390,7 +382,7 @@ namespace psibase
          operator AccountNumber() { return id; }
       };
 
-      auto from(AccountNumber id) { return UserContext{*this, id, defaultKeys()}; }
+      auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
    };  // TestChain
 
 }  // namespace psibase

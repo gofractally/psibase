@@ -2,6 +2,7 @@
 
 #include <psibase/tester.hpp>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthSig.hpp>
 
 namespace psibase
 {
@@ -46,8 +47,12 @@ namespace psibase
          check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);
       }
 
-      AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
-      AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
+      AccountNumber addAccount(const char*                                         name,
+                               const SystemService::AuthSig::SubjectPublicKeyInfo& public_key,
+                               bool                                                show = false);
+      AccountNumber addAccount(AccountNumber                                       name,
+                               const SystemService::AuthSig::SubjectPublicKeyInfo& public_key,
+                               bool                                                show = false);
 
       AccountNumber addAccount(const char*   acc,
                                AccountNumber authService = AccountNumber("auth-any"),

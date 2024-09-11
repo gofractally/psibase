@@ -1,6 +1,5 @@
-use crate::services::{accounts, auth_k1, auth_sig, http_server, setcode};
-use crate::{account_raw, AccountNumber, Action, AnyPublicKey, PublicKey};
-use fracpack::Unpack;
+use crate::services::{accounts, auth_sig, http_server, setcode};
+use crate::{account_raw, AccountNumber, Action, AnyPublicKey};
 
 macro_rules! account {
     ($name:expr) => {
@@ -13,10 +12,8 @@ pub fn new_account_action(sender: AccountNumber, account: AccountNumber) -> Acti
 }
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
-    if key.key.service == account!("verifyk1") {
-        auth_k1::Wrapper::pack_from(account).setKey(PublicKey::unpacked(&key.key.rawData).unwrap())
-    } else if key.key.service == account!("verify-sig") {
-        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec())
+    if key.key.service == account!("verify-sig") {
+        auth_sig::Wrapper::pack_from(account).setKey(key.key.rawData.to_vec().into())
     } else {
         panic!("unknown account service");
     }

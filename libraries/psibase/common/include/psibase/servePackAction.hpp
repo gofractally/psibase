@@ -8,14 +8,14 @@
 namespace psibase
 {
    template <int i, typename... Ts>
-   bool fracpackActionFromJsonImpl(psio::json_token_stream& stream,
-                                   std::string_view         name,
-                                   const psio::meta&        meta,
-                                   std::tuple<Ts...>&       params)
+   bool fracpackActionFromJsonImpl(psio::json_token_stream&     stream,
+                                   std::string_view             name,
+                                   std::span<const char* const> meta,
+                                   std::tuple<Ts...>&           params)
    {
       if constexpr (i < std::tuple_size<std::tuple<Ts...>>())
       {
-         if (i < meta.param_names.size() && name == meta.param_names.begin()[i])
+         if (i < meta.size() && name == meta[i])
          {
             from_json(std::get<i>(params), stream);
             return true;
@@ -34,31 +34,31 @@ namespace psibase
                                                            std::string_view json)
    {
       std::optional<std::vector<char>> result;
-      psio::reflect<T>::for_each(
-          [&](const psio::meta& meta, auto member)
+      std::size_t                      i = 0;
+      psio::for_each_member_type(
+          (typename psio::reflect<T>::member_functions*)nullptr,
+          [&](auto member)
           {
-             using MemPtr = decltype(member(std::declval<T*>()));
-             if constexpr (std::is_member_function_pointer_v<MemPtr>)
+             using MemPtr                       = decltype(member);
+             std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
+             if (names[0] == name)
              {
-                if (meta.name == name)
-                {
-                   using param_tuple = decltype(psio::tuple_remove_view(
-                       psio::args_as_tuple(std::declval<MemPtr>())));
-                   param_tuple       params{};
-                   std::vector<char> j{json.begin(), json.end()};
-                   j.push_back(0);
-                   psio::json_token_stream stream{j.data()};
-                   from_json_object(  //
-                       stream,
-                       [&](std::string_view k)
-                       {
-                          if (!fracpackActionFromJsonImpl<0>(stream, k, meta, params))
-                             abortMessage("action '" + std::string(name) +
-                                          "' does not have argument '" + std::string(k) + "'");
-                       });
-                   result = psio::convert_to_frac(params);
-                }
+                using param_tuple = typename psio::make_param_value_tuple<MemPtr>::type;
+                param_tuple       params{};
+                std::vector<char> j{json.begin(), json.end()};
+                j.push_back(0);
+                psio::json_token_stream stream{j.data()};
+                from_json_object(  //
+                    stream,
+                    [&](std::string_view k)
+                    {
+                       if (!fracpackActionFromJsonImpl<0>(stream, k, names.subspan(1), params))
+                          abortMessage("action '" + std::string(name) +
+                                       "' does not have argument '" + std::string(k) + "'");
+                    });
+                result = psio::convert_to_frac(params);
              }
+             ++i;
           });
       return result;
    }

@@ -10,8 +10,8 @@ namespace psibase
    struct GraphQLQuery
    {
       std::string query;
+      PSIO_REFLECT(GraphQLQuery, query);
    };
-   PSIO_REFLECT(GraphQLQuery, query);
 
    /// Handle `/graphql` request
    ///
@@ -82,8 +82,8 @@ namespace psibase
       bool        hasNextPage     = false;
       std::string startCursor;
       std::string endCursor;
+      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
    };
-   PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 
    /// GraphQL support for paging
    ///
@@ -485,15 +485,15 @@ namespace psibase
       bool          event_supported_service;
       MethodNumber  event_type;
       bool          event_unpack_ok;
+      PSIO_REFLECT(EventDecoderStatus,
+                   event_db,
+                   event_id,
+                   event_found,
+                   event_service,
+                   event_supported_service,
+                   event_type,
+                   event_unpack_ok)
    };
-   PSIO_REFLECT(EventDecoderStatus,
-                event_db,
-                event_id,
-                event_found,
-                event_service,
-                event_supported_service,
-                event_type,
-                event_unpack_ok)
 
    /// GraphQL support for decoding an event
    ///
@@ -783,21 +783,19 @@ namespace psibase
 
       bool ok    = true;
       bool found = false;
-      psio::reflect<Events>::get_by_name(
+      psio::get_member_function_type<Events>(
           header.type->value,
-          [&](auto meta, auto member)
+          [&](auto member, std::span<const char* const> names)
           {
-             using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+             using MT = psio::MemberPtrType<decltype(member)>;
              static_assert(MT::isFunction);
-             using TT                                     = decltype(psio::tuple_remove_view(
-                 std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+             using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
              SequentialRecord<MethodNumber, TT> eventData = {};
              if (psio::from_frac(eventData, *v))
              {
                 found = true;
                 ok = gql_query_decoder_value(decoder, *header.type, *eventData.value, input_stream,
-                                             output_stream, error,
-                                             {meta.param_names.begin(), meta.param_names.end()});
+                                             output_stream, error, names.subspan(1));
              }
           });
 
@@ -1131,21 +1129,19 @@ namespace psibase
          }
 
          bool found = false;
-         psio::reflect<Events>::get_by_name(
+         psio::get_member_function_type<Events>(
              header.type->value,
-             [&](auto meta, auto member)
+             [&](auto member, std::span<const char* const> names)
              {
-                using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+                using MT = psio::MemberPtrType<decltype(member)>;
                 static_assert(MT::isFunction);
-                using TT = decltype(psio::tuple_remove_view(
-                    std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+                using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
                 // TODO: EventDecoder validates and unpacks this again
                 SequentialRecord<MethodNumber, TT> eventData;
                 if (psio::from_frac(eventData, *v))
                 {
                    get_event_field<0>(  //
-                       *eventData.value, fieldName, {},
-                       {meta.param_names.begin(), meta.param_names.end()},
+                       *eventData.value, fieldName, {}, names.subspan(1),
                        [&](auto _, const auto& field)
                        {
                           if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)

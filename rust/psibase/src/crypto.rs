@@ -348,16 +348,7 @@ pub trait Signer: std::fmt::Debug + Sync + Send {
 #[cfg(not(target_family = "wasm"))]
 impl Signer for PrivateKey {
     fn get_claim(&self) -> crate::Claim {
-        crate::Claim {
-            service: AccountNumber::new(account_raw!("verifyk1")),
-            rawData: fracpack::Pack::packed(&PublicKey::from(
-                &secp256k1::PublicKey::from_secret_key(
-                    secp256k1::SECP256K1,
-                    &self.into_k1().unwrap(),
-                ),
-            ))
-            .into(),
-        }
+        panic!("verify-k1 deprecated");
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         let digest = secp256k1::Message::from_hashed_data::<secp256k1::hashes::sha256::Hash>(data);
@@ -899,10 +890,10 @@ pub struct AnyPublicKey {
 
 impl AnyPublicKey {
     pub fn auth_service(&self) -> AccountNumber {
-        if self.key.service == AccountNumber::new(account_raw!("verifyk1")) {
-            AccountNumber::new(account_raw!("auth-k1"))
-        } else {
+        if self.key.service == AccountNumber::new(account_raw!("verify-sig")) {
             AccountNumber::new(account_raw!("auth-sig"))
+        } else {
+            panic!("Unknown verify service: {}", self.key.service.to_string());
         }
     }
 }
@@ -916,15 +907,6 @@ impl FromStr for AnyPublicKey {
                 key: crate::Claim {
                     service: AccountNumber::new(account_raw!("verify-sig")),
                     rawData: load_pkcs11_public_key(key)?.into(),
-                },
-            });
-        }
-
-        if let Ok(pkey) = PublicKey::from_str(key) {
-            return Ok(Self {
-                key: crate::Claim {
-                    service: AccountNumber::new(account_raw!("verifyk1")),
-                    rawData: fracpack::Pack::packed(&pkey).into(),
                 },
             });
         }

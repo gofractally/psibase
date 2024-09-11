@@ -2,32 +2,11 @@
 
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
-#include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthDelegate.hpp>
-#include <services/system/AuthK1.hpp>
-#include <services/system/CommonApi.hpp>
-#include <services/system/CpuLimit.hpp>
-#include <services/system/HttpServer.hpp>
 #include <services/system/Producers.hpp>
-#include <services/system/RAccounts.hpp>
-#include <services/system/RAuthK1.hpp>
-#include <services/system/RHttpServer.hpp>
-#include <services/system/RProducers.hpp>
 #include <services/system/SetCode.hpp>
-#include <services/system/Transact.hpp>
-#include <services/system/VerifyK1.hpp>
-#include <services/user/AuthInvite.hpp>
-#include <services/user/CoreFractal.hpp>
-#include <services/user/Explorer.hpp>
-#include <services/user/Fractal.hpp>
-#include <services/user/Invite.hpp>
-#include <services/user/Nft.hpp>
-#include <services/user/Packages.hpp>
-#include <services/user/RTokens.hpp>
-#include <services/user/Sites.hpp>
-#include <services/user/Symbol.hpp>
-#include <services/user/Tokens.hpp>
+
 #include <utility>
 #include <vector>
 
@@ -173,9 +152,9 @@ namespace
 
 std::vector<std::string> DefaultTestChain::defaultPackages()
 {
-   return {"Accounts",   "AuthAny",  "AuthDelegate", "AuthSig", "AuthK1", "CommonApi", "CpuLimit",
-           "Events",     "Explorer", "Fractal",      "Invite",  "Nft",    "Packages",  "Producers",
-           "HttpServer", "Sites",    "SetCode",      "Symbol",  "Tokens", "Transact"};
+   return {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "CommonApi", "CpuLimit",  "Events",
+           "Explorer", "Fractal", "Invite",       "Nft",     "Packages",  "Producers", "HttpServer",
+           "Sites",    "SetCode", "Symbol",       "Tokens",  "Transact"};
 }
 
 DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
@@ -232,26 +211,26 @@ AccountNumber DefaultTestChain::addAccount(
    return addAccount(AccountNumber(acc), authService, show);
 }
 
-AccountNumber DefaultTestChain::addAccount(AccountNumber    name,
-                                           const PublicKey& public_key,
-                                           bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(AccountNumber                        name,
+                                           const AuthSig::SubjectPublicKeyInfo& public_key,
+                                           bool                                 show /* = false */)
 {
-   transactor<Accounts>       asys(Accounts::service, Accounts::service);
-   transactor<AuthK1::AuthK1> ecsys(AuthK1::AuthK1::service, AuthK1::AuthK1::service);
+   transactor<Accounts>         accounts(Accounts::service, Accounts::service);
+   transactor<AuthSig::AuthSig> authsig(AuthSig::AuthSig::service, AuthSig::AuthSig::service);
 
    auto trace = pushTransaction(makeTransaction({
-       asys.newAccount(name, AuthAny::service, true),
-       ecsys.from(name).setKey(public_key),
-       asys.from(name).setAuthServ(AuthK1::AuthK1::service),
+       accounts.newAccount(name, AuthAny::service, true),
+       authsig.from(name).setKey(public_key),
+       accounts.from(name).setAuthServ(AuthSig::AuthSig::service),
    }));
 
-   check(psibase::show(show, trace) == "", "Failed to add ec account");
+   check(psibase::show(show, trace) == "", "Failed to add authenticated account");
    return name;
 }  // addAccount()
 
-AccountNumber DefaultTestChain::addAccount(const char*      name,
-                                           const PublicKey& public_key,
-                                           bool             show /* = false */)
+AccountNumber DefaultTestChain::addAccount(const char*                          name,
+                                           const AuthSig::SubjectPublicKeyInfo& public_key,
+                                           bool                                 show /* = false */)
 {
    return addAccount(AccountNumber(name), public_key, show);
 }
