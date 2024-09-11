@@ -34,4 +34,41 @@ namespace triedent
       std::uint64_t available_bytes;
       std::uint64_t num_objects;
    };
+
+   // cold_bytes can grow
+   // hot/warm/cool are fixed
+   // hot/warm/cool/cold MUST be more than twice the
+   // maximum allocation size.
+   struct database_config
+   {
+      std::uint64_t hot_bytes  = 1000 * 1000ull;
+      std::uint64_t warm_bytes = 1000 * 1000ull;
+      std::uint64_t cool_bytes = 1000 * 1000ull;
+      std::uint64_t cold_bytes = 1000 * 1000ull;
+   };
+
+   enum access_mode
+   {
+      read_only  = 0,
+      read_write = 1,
+   };
+
+   enum class open_mode
+   {
+      // Open an existing database
+      read_only  = 0,
+      read_write = 1,
+      // Create a new database if the database does not exist
+      create = 2,
+      // Create a new database, overwriting an existing database
+      trunc = 3,
+      // Create a new database. It is an error if the database already exists
+      create_new = 4,
+      // Create a unique temporary database which will be deleted when it is closed.
+      // The path should be an existing directory.
+      temporary = 5,
+      // Open an existing database for garbage collection
+      gc = 6,
+   };
+
 }  // namespace triedent

@@ -8,6 +8,7 @@
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
+#include <triedent/file_fwd.hpp>
 
 #include <boost/filesystem/path.hpp>
 
@@ -15,6 +16,7 @@ namespace triedent
 {
    class write_session;
    class root;
+   struct database_config;
 }  // namespace triedent
 
 namespace psibase
@@ -55,11 +57,9 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const boost::filesystem::path& dir,
-                     uint64_t                       hot_addr_bits  = 1ull << 32,
-                     uint64_t                       warm_addr_bits = 1ull << 32,
-                     uint64_t                       cool_addr_bits = 1ull << 32,
-                     uint64_t                       cold_addr_bits = 1ull << 32);
+      SharedDatabase(const boost::filesystem::path&   dir,
+                     const triedent::database_config& config,
+                     triedent::open_mode              mode = triedent::open_mode::create);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
@@ -190,8 +190,9 @@ namespace psibase
       std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kvPut(DbId db, const K& key, const V& value)
-          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+      auto kvPut(DbId     db,
+                 const K& key,
+                 const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
       }

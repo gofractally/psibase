@@ -100,16 +100,14 @@ struct WasmMemoryCache
 struct TempDatabase
 {
    TempDatabase()
-       : dir("psibase-test"),
-         sharedState{std::make_shared<psibase::SharedState>(
-             psibase::SharedDatabase{dir.path.native(), 1ull << 27, 1ull << 27, 1ull << 27,
-                                     1ull << 27},
+       : sharedState{std::make_shared<psibase::SharedState>(
+             psibase::SharedDatabase{std::filesystem::temp_directory_path().native(),
+                                     {1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27},
+                                     triedent::open_mode::temporary},
              psibase::WasmCache{16})}
    {
-      dir.reset();
    }
-   auto    getSystemContext() { return sharedState->getSystemContext(); }
-   TempDir dir;
+   auto getSystemContext() { return sharedState->getSystemContext(); }
    std::shared_ptr<psibase::SharedState> sharedState;
 };
 

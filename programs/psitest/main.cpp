@@ -255,7 +255,7 @@ struct test_chain
        : state{state}
    {
       dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db     = {dir, hot_bytes, warm_bytes, cool_bytes, cold_bytes};
+      db     = {dir, {hot_bytes, warm_bytes, cool_bytes, cold_bytes}, triedent::open_mode::create};
       writer = db.createWriter();
       sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{
           db, {128}, {}, state.watchdogManager, std::make_shared<psibase::Sockets>()});

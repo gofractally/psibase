@@ -1,5 +1,6 @@
 #pragma once
 
+#include <triedent/file_fwd.hpp>
 #include <triedent/gc_queue.hpp>
 #include <triedent/object_db.hpp>
 #include <triedent/region_allocator.hpp>
@@ -14,18 +15,6 @@
 
 namespace triedent
 {
-   // cold_bytes can grow
-   // hot/warm/cool are fixed
-   // hot/warm/cool/cold MUST be more than twice the
-   // maximum allocation size.
-   struct database_config
-   {
-      uint64_t hot_bytes  = 1000 * 1000ull;
-      uint64_t warm_bytes = 1000 * 1000ull;
-      uint64_t cool_bytes = 1000 * 1000ull;
-      uint64_t cold_bytes = 1000 * 1000ull;
-   };
-
    std::filesystem::path get_subpath(const std::filesystem::path& dir,
                                      const char*                  name,
                                      open_mode                    mode);

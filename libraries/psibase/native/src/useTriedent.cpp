@@ -278,37 +278,19 @@ namespace psibase
       std::mutex                      subjectiveMutex;
       std::shared_ptr<triedent::root> subjective;
 
-      SharedDatabaseImpl(const std::filesystem::path& dir,
-                         uint64_t                     hot_bytes,
-                         uint64_t                     warm_bytes,
-                         uint64_t                     cool_bytes,
-                         uint64_t                     cold_bytes)
+      SharedDatabaseImpl(const std::filesystem::path&     dir,
+                         const triedent::database_config& config,
+                         triedent::open_mode              mode)
       {
          // The largest object is 16 MiB
          // Each file must be at least double this
          constexpr std::uint64_t min_size = 32 * 1024 * 1024;
-         if (hot_bytes < min_size || warm_bytes < min_size || cool_bytes < min_size ||
-             cold_bytes < min_size)
+         if (config.hot_bytes < min_size || config.warm_bytes < min_size ||
+             config.cool_bytes < min_size || config.cold_bytes < min_size)
          {
             throw std::runtime_error("Requested database size is too small");
          }
-         if (!std::filesystem::exists(dir / "db"))
-         {
-            // std::cout << "Creating " << dir << "\n";
-            triedent::database::create(  //
-                dir,                     //
-                triedent::database::config{
-                    .hot_bytes  = hot_bytes,
-                    .warm_bytes = warm_bytes,
-                    .cool_bytes = cool_bytes,
-                    .cold_bytes = cold_bytes,
-                });
-         }
-         else
-         {
-            // std::cout << "Open existing " << dir << "\n";
-         }
-         trie = std::make_shared<triedent::database>(dir.c_str(), triedent::open_mode::read_write);
+         trie   = std::make_shared<triedent::database>(dir.c_str(), config, mode);
          auto s = trie->start_write_session();
          head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
       }
@@ -343,16 +325,10 @@ namespace psibase
       }
    };  // SharedDatabaseImpl
 
-   SharedDatabase::SharedDatabase(const boost::filesystem::path& dir,
-                                  uint64_t                       hot_bytes,
-                                  uint64_t                       warm_bytes,
-                                  uint64_t                       cool_bytes,
-                                  uint64_t                       cold_bytes)
-       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(),
-                                                   hot_bytes,
-                                                   warm_bytes,
-                                                   cool_bytes,
-                                                   cold_bytes)}
+   SharedDatabase::SharedDatabase(const boost::filesystem::path&   dir,
+                                  const triedent::database_config& config,
+                                  triedent::open_mode              mode)
+       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(), config, mode)}
    {
    }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <triedent/file_fwd.hpp>
+
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -7,30 +9,6 @@
 
 namespace triedent
 {
-
-   enum access_mode
-   {
-      read_only  = 0,
-      read_write = 1,
-   };
-
-   enum class open_mode
-   {
-      // Open an existing database
-      read_only  = 0,
-      read_write = 1,
-      // Create a new database if the database does not exist
-      create = 2,
-      // Create a new database, overwriting an existing database
-      trunc = 3,
-      // Create a new database. It is an error if the database already exists
-      create_new = 4,
-      // Create a unique temporary database which will be deleted when it is closed.
-      // The path should be an existing directory.
-      temporary = 5,
-      // Open an existing database for garbage collection
-      gc = 6,
-   };
 
    // Thread safety:
    //

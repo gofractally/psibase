@@ -1439,9 +1439,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (!config.tls.trustfiles.empty())
    {
       file.set(
-          "", "tls-trustfile", config.tls.trustfiles,
-          [](std::string_view text) { return std::string(text); },
-          "A file containing trusted certificate authorities");
+          "", "tls-trustfile", config.tls.trustfiles, [](std::string_view text)
+          { return std::string(text); }, "A file containing trusted certificate authorities");
    }
 #endif
    if (!config.services.empty())
@@ -1452,9 +1451,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
          services.push_back(to_string(service));
       }
       file.set(
-          "", "service", services,
-          [](std::string_view text) { return service_from_string(text).host; },
-          "Native service root directory");
+          "", "service", services, [](std::string_view text)
+          { return service_from_string(text).host; }, "Native service root directory");
    }
    if (!std::holds_alternative<http::admin_none>(config.admin))
    {
@@ -1510,8 +1508,10 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState = std::make_shared<psibase::SharedState>(
-       SharedDatabase{db_path, db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes,
-                      db_conf.cold_bytes},
+       SharedDatabase{
+           db_path,
+           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
+           triedent::open_mode::create},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
