@@ -234,6 +234,7 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
+    services/user/Webmail/ui:Webmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
