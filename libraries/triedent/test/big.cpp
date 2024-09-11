@@ -94,8 +94,8 @@ int main(int argc, char** argv)
    }
 
    uint64_t total = insert_count;  //2 * 1000 * 1000 * 1000;
-   auto  _db = std::make_shared<triedent::database>(db_dir.c_str(), triedent::database::read_write);
-   auto& db  = *_db;
+   auto _db = std::make_shared<triedent::database>(db_dir.c_str(), triedent::open_mode::read_write);
+   auto& db = *_db;
    db.print_stats(std::cerr);
    std::cerr << "\n";
    auto s    = db.start_write_session();
