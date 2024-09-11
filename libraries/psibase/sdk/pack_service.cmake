@@ -311,10 +311,8 @@ endfunction()
 #                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
 # OUTPUT <filename>         - [Required] The package file.
 # PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `services/user/Branding`).
-# POSTINSTALL <filename>    - [Optional] Additional actions that should be run at the end of installation (e.g. `services/user/Branding/postinstall.json`)
-# UI <service> <filepath>   - [Optional] A service to upload to, and a UI directory to build/upload. (e.g. `branding services/user/Branding/ui`)
 function(cargo_psibase_package)
-    cmake_parse_arguments(ARG "" "PATH;OUTPUT;POSTINSTALL" "UI" ${ARGN})
+    cmake_parse_arguments(ARG "" "PATH;OUTPUT" "" ${ARGN})
 
     if(NOT ARG_PATH OR NOT ARG_OUTPUT)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
@@ -323,48 +321,7 @@ function(cargo_psibase_package)
     # Set variables
     cmake_path(GET ARG_OUTPUT FILENAME PACKAGE_NAME)
     cmake_path(GET ARG_OUTPUT STEM TARGET_NAME)
-    set(PACKAGE_OUTPUT ${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
-    set(TMP_DIR ${CMAKE_CURRENT_BINARY_DIR}/tmp_${TARGET_NAME})
-    set(OUTPUT_DEPENDS)
-    set(POSTINSTALL_COMMAND)
-    if(ARG_POSTINSTALL)
-        set(ARG_POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_POSTINSTALL})
-        list(APPEND POSTINSTALL_COMMAND 
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${TMP_DIR}/script
-            COMMAND ${CMAKE_COMMAND} -E copy ${ARG_POSTINSTALL} ${TMP_DIR}/script/postinstall.json
-        )
-        list(APPEND OUTPUT_DEPENDS ${ARG_POSTINSTALL})
-    endif()
-    set(UI_COMMAND)
-    if (ARG_UI)
-        list(GET ARG_UI 0 SERVICE_NAME)
-        list(GET ARG_UI 1 UI_PATH)
-        set(UI_PATH ${CMAKE_CURRENT_SOURCE_DIR}/${UI_PATH})
-        list(APPEND UI_COMMAND
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${TMP_DIR}/data/${SERVICE_NAME}
-            COMMAND ${CMAKE_COMMAND} -E copy_directory ${UI_PATH}/dist ${TMP_DIR}/data/${SERVICE_NAME}
-        )
-        list(APPEND OUTPUT_DEPENDS ${TARGET_NAME}_UI_BUILT)
-    endif()
-    set(MERGE_COMMAND)
-    list(APPEND MERGE_COMMAND
-        COMMAND cd ${TMP_DIR} && zip -ur ${ARG_OUTPUT} . -x ${PACKAGE_NAME}
-    )
-
-    # Build the UI if needed
-    if (ARG_UI)
-        set(OUTPUT_PATH ${UI_PATH}/dist)
-        file(GLOB_RECURSE UI_SOURCES ${UI_PATH}/src/*)
-        list(APPEND UI_SOURCES ${UI_PATH}/package.json ${UI_PATH}/yarn.lock)
-        add_custom_command(
-            OUTPUT ${OUTPUT_PATH}/index.html
-            BYPRODUCTS ${OUTPUT_PATH}
-            DEPENDS ${UI_SOURCES}
-            COMMAND cd ${UI_PATH} && yarn --mutex network && yarn build
-            COMMENT "Building ${TARGET_NAME} UI"
-        )
-        add_custom_target(${TARGET_NAME}_UI_BUILT DEPENDS ${OUTPUT_PATH}/index.html)
-    endif()
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}
@@ -376,16 +333,12 @@ function(cargo_psibase_package)
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
     )
-    list(APPEND OUTPUT_DEPENDS ${TARGET_NAME})
 
     # Make the final output
     add_custom_command(
         OUTPUT ${ARG_OUTPUT}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PACKAGE_OUTPUT} ${ARG_OUTPUT}
-        ${POSTINSTALL_COMMAND}
-        ${UI_COMMAND}
-        ${MERGE_COMMAND}
-        DEPENDS ${OUTPUT_DEPENDS}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
+        DEPENDS ${TARGET_NAME}
         VERBATIM
     )
     add_custom_target(${TARGET_NAME}_output ALL DEPENDS ${ARG_OUTPUT})
