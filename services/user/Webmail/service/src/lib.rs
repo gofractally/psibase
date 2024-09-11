@@ -101,15 +101,37 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
-    use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_simple_ui, store_content,
-        AccountNumber, HexBytes, HttpReply, HttpRequest, Table, WebContentRow,
-    };
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
 
     use crate::{serve_rest_api, validate_user};
 
     #[table(record = "WebContentRow")]
     struct WebContentTable;
+
+    #[table(name = "InitTable", index = 1)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[action]
+    fn init() {
+        let table = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_none(),
+            "Service already initialized",
+        );
+        table.put(&InitRow {}).unwrap();
+
+        // TODO: Depends on #845
+        // use services::events::Wrapper as EventsSvc;
+        // EventsSvc::call().setSchema(&create_schema());
+        // EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
+        // EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
+    }
 
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
