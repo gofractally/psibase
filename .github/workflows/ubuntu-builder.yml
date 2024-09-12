@@ -41,6 +41,7 @@ jobs:
           name: psidk-ubuntu-${{ matrix.ubuntu-version }}
           path: build/psidk-ubuntu-${{ matrix.ubuntu-version }}.tar.gz
       - name: Upload psidk-book
+        if: ${{ matrix.ubuntu-version == "2404" }}
         uses: actions/upload-artifact@v4
         with:
           name: psidk-book
