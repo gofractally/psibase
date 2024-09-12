@@ -66,6 +66,11 @@ namespace psibase
       SharedDatabase& operator=(const SharedDatabase&) = default;
       SharedDatabase& operator=(SharedDatabase&&)      = default;
 
+      // Returns a fork of the database.
+      // Warning: this should only be used for temporary databases as
+      // the storage is shared.
+      SharedDatabase clone() const;
+
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
       WriterPtr        createWriter();

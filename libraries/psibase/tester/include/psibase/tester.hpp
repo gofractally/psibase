@@ -141,7 +141,6 @@ namespace psibase
 
    /**
     * Manages a chain.
-    * Only one TestChain can exist at a time.
     * The test chain uses simulated time.
     */
    class TestChain
@@ -151,14 +150,22 @@ namespace psibase
       std::optional<psibase::StatusRow> status;
       bool                              producing        = false;
       bool                              isAutoBlockStart = true;
+      bool                              isPublicChain;
+
+      explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
 
      public:
-      explicit TestChain(const DatabaseConfig&);
+      // Clones the chain
+      TestChain(const TestChain&, bool pub);
+      /**
+       * Creates a new chain. If this is a public chain and there are no
+       * other public chains, sets the selected database to this chain.
+       */
+      explicit TestChain(const DatabaseConfig&, bool pub = true);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,
                 uint64_t cold_bytes = 1ull << 27);
-      TestChain(const TestChain&) = delete;
       virtual ~TestChain();
 
       TestChain& operator=(const TestChain&) = delete;
@@ -374,6 +381,27 @@ namespace psibase
       };
 
       auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
+
+      /// Get a key-value pair, if any
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key);
+
+      /// Get a key-value pair, if any
+      template <typename V, typename K>
+      std::optional<V> kvGet(psibase::DbId db, const K& key)
+      {
+         auto v = kvGetRaw(db, psio::convert_to_key(key));
+         if (!v)
+            return std::nullopt;
+         // TODO: validate (allow opt-in or opt-out)
+         return psio::from_frac<V>(psio::prevalidated{*v});
+      }
+
+      /// Get a key-value pair, if any
+      template <typename V, typename K>
+      std::optional<V> kvGet(const K& key)
+      {
+         return kvGet<V>(psibase::DbId::service, key);
+      }
    };  // TestChain
 
 }  // namespace psibase

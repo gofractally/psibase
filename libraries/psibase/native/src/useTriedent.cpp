@@ -270,7 +270,8 @@ namespace psibase
    {
       std::shared_ptr<triedent::database> trie;
 
-      std::mutex topMutex;
+      std::mutex                      topMutex;
+      std::shared_ptr<triedent::root> topRoot;
 
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
@@ -290,9 +291,21 @@ namespace psibase
          {
             throw std::runtime_error("Requested database size is too small");
          }
-         trie   = std::make_shared<triedent::database>(dir.c_str(), config, mode);
-         auto s = trie->start_write_session();
-         head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
+         trie    = std::make_shared<triedent::database>(dir.c_str(), config, mode);
+         auto s  = trie->start_write_session();
+         topRoot = s->get_top_root();
+         head    = loadRevision(*s, topRoot, revisionHeadKey);
+      }
+
+      SharedDatabaseImpl(const SharedDatabaseImpl& other)
+          : trie(other.trie), topRoot(other.topRoot), head(other.head), subjective(other.subjective)
+      {
+      }
+
+      auto getTopRoot()
+      {
+         std::lock_guard lock{topMutex};
+         return topRoot;
       }
 
       auto getHead()
@@ -305,7 +318,6 @@ namespace psibase
       {
          {
             std::lock_guard lock{topMutex};
-            auto            topRoot = session.get_top_root();
             session.upsert(topRoot, revisionHeadKey, r->roots);
             session.set_top_root(topRoot);
          }
@@ -319,7 +331,6 @@ namespace psibase
                          const Revision&          r)
       {
          std::lock_guard lock{topMutex};
-         auto            topRoot = session.get_top_root();
          session.upsert(topRoot, revisionById(blockId), r.roots);
          session.set_top_root(topRoot);
       }
@@ -330,6 +341,13 @@ namespace psibase
                                   triedent::open_mode              mode)
        : impl{std::make_shared<SharedDatabaseImpl>(dir, config, mode)}
    {
+   }
+
+   SharedDatabase SharedDatabase::clone() const
+   {
+      SharedDatabase result{*this};
+      result.impl = std::make_shared<SharedDatabaseImpl>(*impl);
+      return result;
    }
 
    ConstRevisionPtr SharedDatabase::getHead()
@@ -354,7 +372,7 @@ namespace psibase
 
    ConstRevisionPtr SharedDatabase::getRevision(Writer& writer, const Checksum256& blockId)
    {
-      return loadRevision(writer, writer.get_top_root(), revisionById(blockId), true);
+      return loadRevision(writer, impl->getTopRoot(), revisionById(blockId), true);
    }
 
    // TODO: move triedent::root destruction to a gc thread
@@ -362,17 +380,16 @@ namespace psibase
    {
       // TODO: Reduce critical section
       std::lock_guard   lock{impl->topMutex};
-      auto              topRoot = writer.get_top_root();
       std::vector<char> key{revisionByIdPrefix};
 
       // Remove everything with a blockNum <= irreversible's, except irreversible.
-      while (writer.get_greater_equal(topRoot, key, &key, nullptr, nullptr))
+      while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, nullptr))
       {
          if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix ||
              memcmp(key.data() + 1, irreversible.data(), sizeof(BlockNum)) > 0)
             break;
          if (memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
-            writer.remove(topRoot, key);
+            writer.remove(impl->topRoot, key);
          key.push_back(0);
       }
 
@@ -381,7 +398,7 @@ namespace psibase
       std::vector<std::shared_ptr<triedent::root>> roots;
       std::vector<char>                            statusBytes;
       auto                                         sk = psio::convert_to_key(statusKey());
-      while (writer.get_greater_equal(topRoot, key, &key, nullptr, &roots))
+      while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, &roots))
       {
          if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
             break;
@@ -391,12 +408,13 @@ namespace psibase
          auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
          if (!status.head)
             throw std::runtime_error("Status row is missing head information in fork");
-         if (!writer.get(topRoot, revisionById(status.head->header.previous), nullptr, nullptr))
-            writer.remove(topRoot, key);
+         if (!writer.get(impl->topRoot, revisionById(status.head->header.previous), nullptr,
+                         nullptr))
+            writer.remove(impl->topRoot, key);
          key.push_back(0);
       }
 
-      writer.set_top_root(topRoot);
+      writer.set_top_root(impl->topRoot);
    }  // removeRevisions
 
    void SharedDatabase::setBlockData(Writer&               writer,
@@ -410,16 +428,15 @@ namespace psibase
       fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
       fullKey.insert(fullKey.end(), key.begin(), key.end());
       std::lock_guard lock{impl->topMutex};
-      auto            topRoot = writer.get_top_root();
-      writer.upsert(topRoot, fullKey, value);
-      writer.set_top_root(topRoot);
+      writer.upsert(impl->topRoot, fullKey, value);
+      writer.set_top_root(impl->topRoot);
    }
 
    std::optional<std::vector<char>> SharedDatabase::getBlockData(Writer&               reader,
                                                                  const Checksum256&    blockId,
                                                                  std::span<const char> key)
    {
-      auto              topRoot = reader.get_top_root();
+      auto              topRoot = impl->getTopRoot();
       std::vector<char> fullKey;
       fullKey.reserve(1 + blockId.size() + key.size());
       fullKey.push_back(blockDataPrefix);
@@ -462,9 +479,8 @@ namespace psibase
                writer.splice(impl->subjective, updated, dbKey(r.lower), dbKey(r.upper));
          }
          std::lock_guard lock{impl->topMutex};
-         auto            r = writer.get_top_root();
-         writer.upsert(r, subjectiveKey, {&impl->subjective, 1});
-         writer.set_top_root(std::move(r));
+         writer.upsert(impl->topRoot, subjectiveKey, {&impl->subjective, 1});
+         writer.set_top_root(impl->topRoot);
       }
       return true;
    }

@@ -148,6 +148,12 @@ namespace
       }
       return result;
    }
+
+   DefaultTestChain& defaultChainInstance()
+   {
+      static DefaultTestChain result{DefaultTestChain::defaultPackages(), false, {}, false};
+      return result;
+   }
 }  // namespace
 
 std::vector<std::string> DefaultTestChain::defaultPackages()
@@ -157,10 +163,16 @@ std::vector<std::string> DefaultTestChain::defaultPackages()
            "Sites",    "SetCode", "Symbol",       "Tokens",  "Transact"};
 }
 
+DefaultTestChain::DefaultTestChain() : TestChain(defaultChainInstance(), true)
+{
+   startBlock();
+}
+
 DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
                                    bool                            installUI,
-                                   const DatabaseConfig&           dbconfig)
-    : TestChain(dbconfig)
+                                   const DatabaseConfig&           dbconfig,
+                                   bool                            pub)
+    : TestChain(dbconfig, pub)
 {
    auto packageRoot = std::getenv("PSIBASE_DATADIR");
    check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
@@ -186,6 +198,7 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
       auto trace = pushTransaction(trx);
       check(psibase::show(false, trace) == "", "Failed to boot");
    }
+   startBlock();
 }
 
 AccountNumber DefaultTestChain::addAccount(

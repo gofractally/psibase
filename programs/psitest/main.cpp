@@ -183,6 +183,24 @@ struct file;
 struct HttpSocket;
 struct test_chain;
 
+struct WasmMemoryCache
+{
+   std::vector<std::vector<psibase::ExecutionMemory>> memories;
+   void                                               init(psibase::SystemContext& ctx)
+   {
+      if (!memories.empty())
+      {
+         ctx.executionMemories = std::move(memories.back());
+         memories.pop_back();
+      }
+   }
+   void cleanup(psibase::SystemContext& ctx)
+   {
+      if (!ctx.executionMemories.empty())
+         memories.push_back(std::move(ctx.executionMemories));
+   }
+};
+
 struct state
 {
    const char*                              wasm;
@@ -193,6 +211,8 @@ struct state
    cl_flags_t                               additional_args;
    std::vector<file>                        files;
    std::vector<std::shared_ptr<HttpSocket>> sockets;
+   psibase::WasmCache                       shared_wasm_cache{128};
+   WasmMemoryCache                          shared_memory_cache;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::shared_ptr<WatchdogManager>         watchdogManager = std::make_shared<WatchdogManager>();
    std::vector<char>                        result_key;
@@ -218,13 +238,15 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                                     state;
-   std::set<test_chain_ref*>                    refs;
-   psibase::SharedDatabase                      db;
-   psibase::WriterPtr                           writer;
-   std::unique_ptr<psibase::SystemContext>      sys;
-   std::shared_ptr<const psibase::Revision>     revisionAtBlockStart;
-   std::unique_ptr<psibase::BlockContext>       blockContext;
+   ::state&                                 state;
+   std::set<test_chain_ref*>                refs;
+   psibase::SharedDatabase                  db;
+   psibase::WriterPtr                       writer;
+   std::unique_ptr<psibase::SystemContext>  sys;
+   std::shared_ptr<const psibase::Revision> revisionAtBlockStart;
+   std::unique_ptr<psibase::BlockContext>   blockContext;
+   // altBlockContext is created on demand to handle db reads between blocks
+   std::unique_ptr<psibase::BlockContext>       altBlockContext;
    std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
    std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
@@ -246,18 +268,28 @@ struct test_chain
    }
    const std::string& getName() { return name; }
 
+   test_chain(::state& state, psibase::SharedDatabase&& db) : state{state}, db{std::move(db)}
+   {
+      writer = this->db.createWriter();
+      sys    = std::make_unique<psibase::SystemContext>(
+          psibase::SystemContext{this->db,
+                                 state.shared_wasm_cache,
+                                    {},
+                                 state.watchdogManager,
+                                 std::make_shared<psibase::Sockets>()});
+      state.shared_memory_cache.init(*sys);
+   }
+
    test_chain(::state&                         state,
               const std::filesystem::path&     path,
               const triedent::database_config& config,
               triedent::open_mode              mode)
-       : state{state}, db{path, config, mode}
+       : test_chain{state, {path, config, mode}}
    {
-      writer = db.createWriter();
-      sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{
-          db, {128}, {}, state.watchdogManager, std::make_shared<psibase::Sockets>()});
    }
 
-   test_chain(const test_chain&)            = delete;
+   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
+
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -269,6 +301,7 @@ struct test_chain
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
       revisionAtBlockStart.reset();
+      state.shared_memory_cache.cleanup(*sys);
       sys.reset();
       writer = {};
       db     = {};
@@ -280,6 +313,11 @@ struct test_chain
       // TODO: undo control
       finishBlock();
       revisionAtBlockStart = db.getHead();
+      nativeFunctions.reset();
+      nativeFunctionsActionContext.reset();
+      nativeFunctionsTransactionContext.reset();
+      altBlockContext.reset();
+
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
@@ -344,12 +382,26 @@ struct test_chain
       }
    }
 
+   psibase::BlockContext* readBlockContext()
+   {
+      if (blockContext)
+         return blockContext.get();
+      else
+      {
+         if (!altBlockContext)
+            altBlockContext = std::make_unique<psibase::BlockContext>(
+                *sys, sys->sharedDatabase.getHead(), writer, true);
+         return altBlockContext.get();
+      }
+   }
+
    psibase::NativeFunctions& native()
    {
       static const psibase::SignedTransaction dummyTransaction;
       static const psibase::Action            dummyAction;
       if (!nativeFunctions)
       {
+         auto* blockContext = readBlockContext();
          if (!blockContext)
             throw std::runtime_error("no block context to read database from");
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
@@ -1063,6 +1115,13 @@ struct callbacks
       return state.chains.size() - 1;
    }
 
+   uint32_t testerCloneChain(uint32_t chain)
+   {
+      auto& c = assert_chain(chain);
+      state.chains.push_back(std::make_unique<test_chain>(c));
+      return state.chains.size() - 1;
+   }
+
    void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
@@ -1355,6 +1414,7 @@ void register_callbacks()
 
    // Tester Intrinsics
    rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
