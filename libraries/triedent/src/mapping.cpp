@@ -77,7 +77,8 @@ namespace triedent
       {
          std::string filename = (file / "triedent-XXXXXX").native();
          _fd                  = ::mkstemp(filename.data());
-         ::unlink(filename.data());
+         if (_fd != -1)
+            ::unlink(filename.data());
       }
       if (_fd == -1)
       {
