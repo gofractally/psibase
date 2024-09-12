@@ -66,16 +66,19 @@ namespace triedent
    {
       int flags           = O_CLOEXEC | get_flags(mode);
       int flock_operation = mode == open_mode::read_only ? LOCK_SH : LOCK_EX;
-#ifndef O_TMPFILE
-      if (mode == open_mode::temporary)
+#ifdef O_TMPFILE
+      _fd = ::open(file.native().c_str(), flags, 0644);
+      if (_fd == -1 && mode == open_mode::temporary && errno == EOPNOTSUPP)
+#else
+      if (mode != open_mode::temporary)
+         _fd = ::open(file.native().c_str(), flags, 0644);
+      else
+#endif
       {
          std::string filename = (file / "triedent-XXXXXX").native();
          _fd                  = ::mkstemp(filename.data());
          ::unlink(filename.data());
       }
-      else
-#endif
-         _fd = ::open(file.native().c_str(), flags, 0644);
       if (_fd == -1)
       {
          throw std::system_error{errno, std::generic_category()};
