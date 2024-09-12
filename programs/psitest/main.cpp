@@ -247,7 +247,7 @@ struct test_chain
    const std::string& getName() { return name; }
 
    test_chain(::state&                         state,
-              std::string                      path,
+              const std::filesystem::path&     path,
               const triedent::database_config& config,
               triedent::open_mode              mode)
        : state{state}, db{path, config, mode}
@@ -1057,7 +1057,7 @@ struct callbacks
                               uint64_t cold_bytes)
    {
       state.chains.push_back(std::make_unique<test_chain>(
-          state, std::filesystem::temp_directory_path().native(),
+          state, std::filesystem::temp_directory_path(),
           triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
           triedent::open_mode::temporary));
       return state.chains.size() - 1;

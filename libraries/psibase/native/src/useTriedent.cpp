@@ -325,10 +325,10 @@ namespace psibase
       }
    };  // SharedDatabaseImpl
 
-   SharedDatabase::SharedDatabase(const boost::filesystem::path&   dir,
+   SharedDatabase::SharedDatabase(const std::filesystem::path&     dir,
                                   const triedent::database_config& config,
                                   triedent::open_mode              mode)
-       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(), config, mode)}
+       : impl{std::make_shared<SharedDatabaseImpl>(dir, config, mode)}
    {
    }
 

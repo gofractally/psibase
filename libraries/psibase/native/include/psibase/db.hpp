@@ -10,7 +10,7 @@
 #include <psio/to_key.hpp>
 #include <triedent/file_fwd.hpp>
 
-#include <boost/filesystem/path.hpp>
+#include <filesystem>
 
 namespace triedent
 {
@@ -57,7 +57,7 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const boost::filesystem::path&   dir,
+      SharedDatabase(const std::filesystem::path&     dir,
                      const triedent::database_config& config,
                      triedent::open_mode              mode = triedent::open_mode::create);
       SharedDatabase(const SharedDatabase&) = default;
