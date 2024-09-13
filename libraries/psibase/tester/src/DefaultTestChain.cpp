@@ -30,7 +30,7 @@ namespace
    InitCwd initCwd;
 #endif
 
-   void pushGenesisTransaction(DefaultTestChain& chain, std::span<PackagedService> service_packages)
+   void pushGenesisTransaction(TestChain& chain, std::span<PackagedService> service_packages)
    {
       std::vector<GenesisService> services;
       for (auto& s : service_packages)
@@ -138,13 +138,13 @@ namespace
          group.push_back(std::move(act));
          if (size >= 1024 * 1024)
          {
-            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
             size = 0;
          }
       }
       if (!group.empty())
       {
-         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
       }
       return result;
    }
@@ -155,6 +155,35 @@ namespace
       return result;
    }
 }  // namespace
+
+void TestChain::boot(const std::vector<std::string>& names, bool installUI)
+{
+   auto packageRoot = std::getenv("PSIBASE_DATADIR");
+   check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
+   auto packages = DirectoryRegistry(std::string(packageRoot) + "/packages").resolve(names);
+   setAutoBlockStart(false);
+   startBlock();
+   pushGenesisTransaction(*this, packages);
+   auto transactions = makeTransactions(*this, getInitialActions(packages, installUI));
+   std::vector<Checksum256> transactionIds;
+   for (const auto& trx : transactions)
+   {
+      transactionIds.push_back(sha256(trx.transaction.data(), trx.transaction.size()));
+   }
+   auto trace = pushTransaction(
+       makeTransaction(
+           {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
+       {});
+   check(psibase::show(false, trace) == "", "Failed to boot");
+   for (const auto& trx : transactions)
+   {
+      startBlock();
+      auto trace = pushTransaction(trx);
+      check(psibase::show(false, trace) == "", "Failed to boot");
+   }
+   setAutoBlockStart(true);
+   startBlock();
+}
 
 std::vector<std::string> DefaultTestChain::defaultPackages()
 {
@@ -174,31 +203,7 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
                                    bool                            pub)
     : TestChain(dbconfig, pub)
 {
-   auto packageRoot = std::getenv("PSIBASE_DATADIR");
-   check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
-   auto packages = DirectoryRegistry(std::string(packageRoot) + "/packages").resolve(names);
-   setAutoBlockStart(false);
-   startBlock();
-   pushGenesisTransaction(*this, packages);
-   auto transactions = makeTransactions(*this, getInitialActions(packages, installUI));
-   std::vector<Checksum256> transactionIds;
-   for (const auto& trx : transactions)
-   {
-      transactionIds.push_back(sha256(trx.transaction.data(), trx.transaction.size()));
-   }
-   auto trace = pushTransaction(
-       makeTransaction(
-           {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
-       {});
-   check(psibase::show(false, trace) == "", "Failed to boot");
-   startBlock();
-   setAutoBlockStart(true);
-   for (const auto& trx : transactions)
-   {
-      auto trace = pushTransaction(trx);
-      check(psibase::show(false, trace) == "", "Failed to boot");
-   }
-   startBlock();
+   boot(names, installUI);
 }
 
 AccountNumber DefaultTestChain::addAccount(

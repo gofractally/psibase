@@ -1115,6 +1115,42 @@ struct callbacks
       return state.chains.size() - 1;
    }
 
+   uint32_t testerOpenChain(span<const char>                          path,
+                            wasi_oflags_t                             oflags,
+                            wasi_rights_t                             fs_rights_base,
+                            wasm_ptr<const triedent::database_config> config)
+   {
+      bool read   = fs_rights_base & wasi_rights_fd_read;
+      bool write  = fs_rights_base & wasi_rights_fd_write;
+      bool create = oflags & wasi_oflags_creat;
+      bool excl   = oflags & wasi_oflags_excl;
+      bool trunc  = oflags & wasi_oflags_trunc;
+
+      psibase::check(read, "Chain cannot be opened without read access");
+
+      triedent::open_mode mode;
+      if (!write)
+      {
+         if (create || excl || trunc)
+            throw std::runtime_error("Unsupported combination of flags for openChain");
+         mode = triedent::open_mode::read_only;
+      }
+      else if (!create && !excl && !trunc)
+         mode = triedent::open_mode::read_write;
+      else if (create && !excl && !trunc)
+         mode = triedent::open_mode::create;
+      else if (create && excl && !trunc)
+         mode = triedent::open_mode::create_new;
+      else if (create && !excl && trunc)
+         mode = triedent::open_mode::trunc;
+      else
+         throw std::runtime_error("Unsupported combination of flags for openChain");
+
+      state.chains.push_back(std::make_unique<test_chain>(
+          state, std::string_view{path.data(), path.size()}, *config, mode));
+      return state.chains.size() - 1;
+   }
+
    uint32_t testerCloneChain(uint32_t chain)
    {
       auto& c = assert_chain(chain);
@@ -1414,6 +1450,7 @@ void register_callbacks()
 
    // Tester Intrinsics
    rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rhf_t::add<&callbacks::testerOpenChain>("psibase", "openChain");
    rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");

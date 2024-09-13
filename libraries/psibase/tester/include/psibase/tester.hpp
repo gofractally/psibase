@@ -9,6 +9,8 @@
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 
+#include <fcntl.h>
+
 namespace psibase
 {
    using KeyList = std::vector<std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
@@ -158,10 +160,19 @@ namespace psibase
       // Clones the chain
       TestChain(const TestChain&, bool pub);
       /**
-       * Creates a new chain. If this is a public chain and there are no
-       * other public chains, sets the selected database to this chain.
+       * Creates a new temporary chain.
        */
       explicit TestChain(const DatabaseConfig&, bool pub = true);
+      /**
+       * Opens a chain.
+       *
+       * @param flags must include at least either O_RDONLY or O_RDWR, and
+       * can also contain O_CREAT, O_EXCL, and O_TRUNC.
+       */
+      TestChain(std::string_view      path,
+                int                   flags = O_CREAT | O_RDWR,
+                const DatabaseConfig& cfg   = {},
+                bool                  pub   = true);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,
@@ -169,6 +180,11 @@ namespace psibase
       virtual ~TestChain();
 
       TestChain& operator=(const TestChain&) = delete;
+
+      /**
+       * Boots the chain.
+       */
+      void boot(const std::vector<std::string>& names, bool installUI);
 
       /**
        * Shuts down the chain to allow copying its state file. The chain's temporary path will
@@ -211,7 +227,8 @@ namespace psibase
       /*
        * Creates a transaction.
        */
-      Transaction makeTransaction(std::vector<Action>&& actions = {}) const;
+      Transaction makeTransaction(std::vector<Action>&& actions    = {},
+                                  uint32_t              expire_sec = 2) const;
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.

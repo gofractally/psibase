@@ -30,6 +30,26 @@ namespace
       ~ScopedSelectChain() { psibase::tester::raw::selectedChain = saved; }
       std::optional<std::uint32_t> saved;
    };
+   __wasi_oflags_t get_wasi_oflags(int flags)
+   {
+      __wasi_oflags_t result = 0;
+      if (flags & O_CREAT)
+         result |= __WASI_OFLAGS_CREAT;
+      if (flags & O_EXCL)
+         result |= __WASI_OFLAGS_EXCL;
+      if (flags & O_TRUNC)
+         result |= __WASI_OFLAGS_TRUNC;
+      return result;
+   }
+   __wasi_rights_t get_wasi_rights(int flags)
+   {
+      __wasi_rights_t result = 0;
+      if ((flags & O_RDONLY) == O_RDONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_READ;
+      if ((flags & O_WRONLY) == O_WRONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_WRITE;
+      return result;
+   }
 }  // namespace
 
 using psibase::tester::raw::selectedChain;
@@ -50,6 +70,12 @@ extern "C"
    TESTER_NATIVE(shutdownChain)    void     testerShutdownChain(uint32_t chain);
    TESTER_NATIVE(startBlock)       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
    TESTER_NATIVE(kvGet)            uint32_t testerKvGet(uint32_t chain, psibase::DbId db, const char* key, uint32_t keyLen);
+
+   TESTER_NATIVE(openChain) uint32_t testerOpenChain(const char*   path,
+                                                     uint32_t pathlen,
+                                                     uint16_t      oflags,
+                                                     uint64_t      fs_rights_base,
+                                                     const psibase::DatabaseConfig* config);
 
    // clang-format on
 #undef TESTER_NATIVE
@@ -170,6 +196,17 @@ psibase::TestChain::TestChain(uint64_t hot_bytes,
 {
 }
 
+psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseConfig& cfg, bool pub)
+    : TestChain(::testerOpenChain(path.data(),
+                                  path.size(),
+                                  get_wasi_oflags(flags),
+                                  get_wasi_rights(flags),
+                                  &cfg),
+                false,
+                pub)
+{
+}
+
 psibase::TestChain::~TestChain()
 {
    if (isPublicChain)
@@ -228,10 +265,11 @@ void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions) const
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions,
+                                                         uint32_t              expire_sec) const
 {
    Transaction t;
-   fillTapos(t);
+   fillTapos(t, expire_sec);
    t.actions = std::move(actions);
    return t;
 }
