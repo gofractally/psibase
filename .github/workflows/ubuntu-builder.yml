@@ -36,12 +36,13 @@ jobs:
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: psidk-ubuntu-${{ matrix.ubuntu-version }}
           path: build/psidk-ubuntu-${{ matrix.ubuntu-version }}.tar.gz
       - name: Upload psidk-book
-        uses: actions/upload-artifact@v1
+        if: ${{ matrix.ubuntu-version == '2404' }}
+        uses: actions/upload-artifact@v4
         with:
           name: psidk-book
           path: psidk-book.tar.gz

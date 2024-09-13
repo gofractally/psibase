@@ -125,7 +125,7 @@ jobs:
         run: |
           echo "${{ steps.build_changelog.outputs.changelog }}" > changelog.md
       - name: Upload changelog
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: changelog.md
           path: changelog.md
@@ -152,7 +152,7 @@ jobs:
         run: |
           echo "${{ steps.build_changelog.outputs.changelog }}" > changelog.md
       - name: Upload changelog
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: changelog.md
           path: changelog.md
