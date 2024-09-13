@@ -38,14 +38,14 @@ namespace psibase
    {
       if constexpr (is_view_v<R>)
       {
-         R    v((service.*method)(std::forward<decltype(args)>(args)...));
+         R    v((service.*method)(static_cast<decltype(args)>(args)...));
          auto s = find_view_span(v);
          check(s.data() != nullptr, "Cannot handle extensions in returned view");
          raw::setRetval(s.data(), s.size());
       }
       else
       {
-         psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
+         psio::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
          raw::setRetval(p.data(), p.size());
       }
    }
@@ -53,13 +53,13 @@ namespace psibase
    template <typename F, typename T, std::size_t... I>
    decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
    {
-      return f(get<I>(std::forward<T>(t))...);
+      return f(psio::get<I>(t)...);
    }
 
    template <typename F, typename T>
    decltype(auto) tuple_call(F&& f, T&& t)
    {
-      return tuple_call(std::forward<F>(f), std::forward<T>(t),
+      return tuple_call(f, t,
                         std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
    }
 
@@ -89,16 +89,14 @@ namespace psibase
       };
       auto service{makeService()};
 
-      bool called = psio::reflect<Service>::get_by_name(
+      bool called = psio::get_member_function<Service>(
           act->method().value(),
-          [&](auto meta, auto member)
+          [&](auto member, auto /*names*/)
           {
-             auto member_func  = member(&service);
-             using result_type = decltype(psio::result_of(member_func));
-             using param_tuple =
-                 decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
+             using result_type = decltype(psio::result_of(member));
+             using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
 
-             auto param_data = std::span{act->rawData().data(), act->rawData().size()};
+             auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
                             "invalid argument encoding for " + act->method().unpack().str());
 
@@ -109,12 +107,12 @@ namespace psibase
                  {
                     if constexpr (std::is_same_v<void, result_type>)
                     {
-                       (service.*member_func)(std::forward<decltype(args)>(args)...);
+                       (service.*member)(std::forward<decltype(args)>(args)...);
                     }
                     else
                     {
-                       callMethod<result_type, Service, decltype(member_func), decltype(args)...>(
-                           service, member_func, std::forward<decltype(args)>(args)...);
+                       callMethod<result_type, Service, decltype(member), decltype(args)...>(
+                           service, member, std::forward<decltype(args)>(args)...);
                     }
                  },
                  param_view);

@@ -7,6 +7,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "../shad/components/ui/tooltip";
+import { useNavigate } from "react-router-dom";
 
 interface NavProps {
     isCollapsed: boolean;
@@ -20,6 +21,7 @@ interface NavProps {
 }
 
 export function Nav({ links, isCollapsed }: NavProps) {
+    const navigate = useNavigate();
     return (
         <div
             data-collapsed={isCollapsed}
@@ -61,9 +63,11 @@ export function Nav({ links, isCollapsed }: NavProps) {
                             </TooltipContent>
                         </Tooltip>
                     ) : (
-                        <a
+                        <button
                             key={index}
-                            href={link.href}
+                            onClick={() => {
+                                navigate(link.href);
+                            }}
                             className={cn(
                                 buttonVariants({
                                     variant: link.variant,
@@ -87,7 +91,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                     {link.label}
                                 </span>
                             )}
-                        </a>
+                        </button>
                     ),
                 )}
             </nav>

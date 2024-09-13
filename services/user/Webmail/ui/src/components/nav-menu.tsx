@@ -5,7 +5,7 @@ import { cn } from "@lib/utils";
 
 import { AccountSwitcher } from "./account-switcher";
 import { Nav } from "./nav";
-import { useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useIncomingMessages } from "@hooks";
 
 interface Props {
@@ -13,9 +13,10 @@ interface Props {
 }
 
 export const NavMenu = ({ isCollapsed = false }: Props) => {
-    const location = useLocation();
-    const at = location.pathname;
+    const navigate = useNavigate();
 
+    const { pathname } = useLocation();
+    const at = pathname;
     const { query } = useIncomingMessages();
 
     return (
@@ -39,19 +40,19 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                             : undefined,
                         icon: Inbox,
                         variant: at === "/" ? "default" : "ghost",
-                        href: "#",
+                        href: "/",
                     },
                     {
                         title: "Drafts",
                         icon: PencilLine,
                         variant: at === "/drafts" ? "default" : "ghost",
-                        href: "#/drafts",
+                        href: "/drafts",
                     },
                     {
                         title: "Sent",
                         icon: Send,
                         variant: at === "/sent" ? "default" : "ghost",
-                        href: "#/sent",
+                        href: "/sent",
                     },
                 ]}
             />

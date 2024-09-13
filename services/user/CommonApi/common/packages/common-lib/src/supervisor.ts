@@ -17,18 +17,6 @@ import {
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
 
-const getSupervisorHref = (subDomain = "supervisor"): string => {
-    const currentUrl = window.location.href;
-    const url = new URL(currentUrl);
-    const hostnameParts = url.hostname.split(".");
-
-    hostnameParts.shift();
-    hostnameParts.unshift(subDomain);
-    url.hostname = hostnameParts.join(".");
-
-    return url.origin;
-};
-
 interface Options {
     supervisorSrc?: string;
 }
@@ -51,14 +39,13 @@ const setupSupervisorIFrame = (src: string) => {
     }
 };
 
-const supervisorOrigin = siblingUrl(null, "supervisor");
-
 const my = new URL(window.location.href);
 const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`;
 
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
     isSupervisorInitialized = false;
+    private supervisorSrc: string;
 
     private pendingRequest: {
         call: FunctionCallArgs;
@@ -69,9 +56,10 @@ export class Supervisor {
     private onLoadPromise?: (value?: unknown) => void;
 
     constructor(public options?: Options) {
-        const supervisorSrc = options?.supervisorSrc || getSupervisorHref();
+        this.supervisorSrc =
+            options?.supervisorSrc || siblingUrl(undefined, "supervisor");
         this.listenToRawMessages();
-        setupSupervisorIFrame(supervisorSrc);
+        setupSupervisorIFrame(this.supervisorSrc);
     }
 
     listenToRawMessages() {
@@ -83,13 +71,13 @@ export class Supervisor {
     handleRawEvent(messageEvent: MessageEvent) {
         if (
             messageEvent.origin !== myOrigin &&
-            messageEvent.origin !== supervisorOrigin
+            messageEvent.origin !== this.supervisorSrc
         ) {
             console.log("Received unauthorized message. Ignoring.");
             return;
         }
 
-        if (messageEvent.origin !== supervisorOrigin) {
+        if (messageEvent.origin !== this.supervisorSrc) {
             return;
         }
 
@@ -181,7 +169,7 @@ export class Supervisor {
                 args: fqArgs,
             };
             if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage(message, supervisorOrigin);
+                iframe.contentWindow.postMessage(message, this.supervisorSrc);
             } else {
                 reject("Failed to get supervisor iframe");
             }
@@ -209,6 +197,6 @@ export class Supervisor {
             throw new Error(
                 `Failed to get content window from supervisor iframe`,
             );
-        iframe.contentWindow.postMessage(message, supervisorOrigin);
+        iframe.contentWindow.postMessage(message, this.supervisorSrc);
     }
 }

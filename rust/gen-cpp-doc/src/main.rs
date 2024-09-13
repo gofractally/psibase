@@ -812,7 +812,6 @@ fn parse<'tu>(
         &("-I".to_owned() + repo_path + "/services/system/HttpServer/include"),
         &("-I".to_owned() + repo_path + "/services/system/Transact/include"),
         &("-I".to_owned() + repo_path + "/services/system/Accounts/include"),
-        &("-I".to_owned() + repo_path + "/services/system/AuthK1/include"),
         &("-I".to_owned() + repo_path + "/services/system/AuthSig/include"),
         &("-I".to_owned() + repo_path + "/services/system/SetCode/include"),
         &("-I".to_owned() + repo_path + "/services/user/CommonApi/include"),

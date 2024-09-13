@@ -70,7 +70,7 @@ if(DEFINED WASI_SDK_PREFIX)
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,raw_hash "--cxxflags=--target=wasm32-wasi -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,raw_hash,auto_rng,sha2_64,getentropy --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasi -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
     )
@@ -111,7 +111,6 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
         BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
@@ -129,7 +128,6 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
@@ -141,7 +139,6 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Symbol.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
@@ -234,7 +231,7 @@ ExternalProject_Add(
 
 # UIs built with yarn
 set(JS_DIRS
-    services/user/CommonApi/ui:CommonApi_js
+    services/user/Homepage/ui:Homepage_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
@@ -308,9 +305,10 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
+add_rs_component(services/system/Transact/plugin:TransactPlugin transact.wasm wasm32-wasi )
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wasm32-wasi )
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
-add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi  ${AuthPlugin_DEP})
+add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
@@ -376,8 +374,10 @@ psibase_package(
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         FLAGS allowWriteSubjective
+        DATA ${COMPONENT_BIN_DIR}/${TransactPlugin_OUTPUT_FILE} /plugin.wasm
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
+    DEPENDS ${TransactPlugin_DEP}
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})"
 )
 
@@ -451,10 +451,8 @@ psibase_package(
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
-        DATA GLOB ${COMMON_API}/ui/dist/*                                     /
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
-    DEPENDS ${CommonApi_js_DEP}
     DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
@@ -469,23 +467,6 @@ psibase_package(
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
     DEPENDS wasm
-)
-
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthK1.psi
-    NAME AuthK1
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Auth service using secp256k1 to verify signatures"
-    SERVICE auth-k1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthK1.wasm
-        SERVER r-auth-k1
-    SERVICE r-auth-k1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthK1.wasm
-    SERVICE verifyk1
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifyK1.wasm
-        FLAGS isAuthService
-    DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -518,6 +499,19 @@ psibase_package(
     DATA ${CMAKE_CURRENT_BINARY_DIR}/book/html /
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS doc ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Homepage.psi
+    NAME Homepage
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Network homepage"
+    SERVICE homepage
+    DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/ui/dist/*  /
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    DEPENDS ${Homepage_js_DEP}
+    
 )
 
 psibase_package(
@@ -619,7 +613,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "This service facilitates the creation and redemption of invites"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthK1(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SERVER invite
@@ -751,9 +745,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
                     Docs Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact
+                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
 )
 
 psibase_package(
@@ -761,9 +755,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate AuthK1 ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol Tokens Transact
+                    Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
 
 
@@ -790,9 +784,9 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig AuthK1 ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts AuthAny AuthSig ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact)
+    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -800,13 +794,13 @@ install(
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
-          ${SERVICE_DIR}/AuthK1.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
+          ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi

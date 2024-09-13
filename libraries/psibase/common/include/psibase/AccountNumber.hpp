@@ -49,8 +49,8 @@ namespace psibase
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       friend auto operator<=>(const AccountNumber&, const AccountNumber&) = default;
+      PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
    };
-   PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
 
    template <typename S>
    void to_json(const AccountNumber& n, S& s)

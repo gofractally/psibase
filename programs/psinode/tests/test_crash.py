@@ -10,7 +10,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_crash_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
-        a = testutil.boot_with_producers(prods)
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
         b = cluster.nodes['b']
 
         a.wait(new_block())
@@ -42,7 +42,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_shutdown_all_cft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(3))
-        a = testutil.boot_with_producers(prods)
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
 
@@ -76,7 +76,7 @@ class TestCrash(unittest.TestCase):
     @testutil.psinode_test
     def test_shutdown_all_bft(self, cluster):
         prods = cluster.complete(*testutil.generate_names(4))
-        a = testutil.boot_with_producers(prods, 'bft')
+        a = testutil.boot_with_producers(prods, 'bft', packages=['Minimal', 'Explorer'])
         b = prods[1]
         c = prods[2]
         d = prods[3]

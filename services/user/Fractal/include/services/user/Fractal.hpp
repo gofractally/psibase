@@ -34,7 +34,7 @@ namespace UserService
          void setDispName(std::string displayName);
 
          /// todo
-         void invite(psibase::AccountNumber fractal, psibase::PublicKey pubkey);
+         void invite(psibase::AccountNumber fractal, PublicKey pubkey);
 
          /// Allows a user to claim ownership of an invite.
          ///
@@ -42,13 +42,13 @@ namespace UserService
          /// the true recipient of the invite.
          ///
          /// A user may claim more than one invite without accepting or rejecting them.
-         void claim(psibase::PublicKey inviteKey);
+         void claim(PublicKey inviteKey);
 
          /// todo
-         void accept(psibase::PublicKey inviteKey);
+         void accept(PublicKey inviteKey);
 
          /// todo
-         void reject(psibase::PublicKey inviteKey);
+         void reject(PublicKey inviteKey);
 
          // todo - a pump to delete expired invites
 

@@ -7,10 +7,18 @@ import { wait } from "./utils/wait";
 
 const supervisor = new Supervisor();
 
+enum InviteState {
+  Pending = "Pending",
+  Accepted = "Accepted",
+  Rejected = "Rejected"
+}
 interface Invite {
-  inviter: string;
-  app: string;
-  callback: string;
+  inviter: string,
+  app: string,
+  state: InviteState,
+  actor: string,
+  expiry: string,
+  callback: string,
 }
 
 interface ErrorType {
@@ -88,6 +96,7 @@ function App() {
     }
   };
 
+  
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
@@ -97,31 +106,20 @@ function App() {
         params: ["/subpath"],
       })) as string;
       console.log(`Got invite URL: ${inviteUrl}`);
+
       const id: string | null = new URL(inviteUrl).searchParams.get("id");
       if (id !== null) {
-        const inviteObject: Invite = (await supervisor.functionCall({
-          service: "invite",
-          intf: "invitee",
-          method: "decodeInvite",
-          params: [id as string],
-        })) as Invite;
-        console.log(
-          `Decoded invite object: ${JSON.stringify(inviteObject, null, 2)}`
-        );
-        setRes(`Invited by: ${inviteObject.inviter}`);
+        console.log(`Invite ID: ${id}`);
       } else {
         setRes("id in URL was null");
       }
-
-      // eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
     }
   };
 
   const run4 = async () => {
-    const inviteId: string =
-      "eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9";
+    const inviteId: string = d;
     try {
       const inviteObject: Invite = (await supervisor.functionCall({
         service: "invite",
@@ -237,6 +235,7 @@ function App() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [c, setC] = useState("");
+  const [d, setD] = useState("");
   const [answer, setAnswer] = useState("?");
 
   const [claim, setClaim] = useState<number>(0.95);
@@ -325,11 +324,12 @@ function App() {
       </div>
 
       <div className="card">
-        <button onClick={() => run3()}>{"Generate and decode invite"}</button>
+        <button onClick={() => run3()}>{"Generate invite"}</button>
       </div>
 
       <div className="card">
-        <button onClick={() => run4()}>{"Just decode"}</button>
+        <input type="text" onChange={(e) => setD(e.target.value)} />
+        <button onClick={() => run4()}>{"Decode invite"}</button>
       </div>
 
       <div className="card">
@@ -350,7 +350,7 @@ function App() {
       </div>
 
       <div className="card">
-        <button onClick={() => run8()}>{"Example login functionality"}</button>
+        <button onClick={() => run8()}>{"Example token transfers"}</button>
       </div>
     </>
   );

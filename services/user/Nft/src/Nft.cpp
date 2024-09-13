@@ -340,14 +340,14 @@ struct NftQuery
       return NftDetail
       {
          .id = nft->id,
+         .owner = UserDetail{
+            .account     = nft->owner,
+            .authService = owner->authService,
+         },
          .issuer = UserDetail{
             .account     = nft->issuer,
             .authService = issuer->authService,
          },
-         .owner = UserDetail{
-            .account     = nft->owner,
-            .authService = owner->authService,
-         }
       };
       // clang-format on
    }

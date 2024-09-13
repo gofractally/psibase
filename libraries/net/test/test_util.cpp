@@ -9,7 +9,7 @@
 #include <services/system/Producers.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VerifyK1.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -110,9 +110,9 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
    if (ec)
    {
       services.push_back({
-          .service = VerifyK1::service,
-          .flags   = VerifyK1::serviceFlags,
-          .code    = readWholeFile("VerifyK1.wasm"),
+          .service = VerifySig::service,
+          .flags   = VerifySig::serviceFlags,
+          .code    = readWholeFile("VerifySig.wasm"),
       });
    }
    // Transact + Producers + AuthAny + Accounts
@@ -224,7 +224,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
          if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
             using param_tuple =
-                decltype(psio::tuple_remove_view(psio::args_as_tuple(&Producers::setConsensus)));
+                psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
             auto params                        = psio::view<const param_tuple>(act.rawData());
             newBlock.block.header.newConsensus = get<0>(params);
          }

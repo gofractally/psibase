@@ -49,11 +49,8 @@ interface queries {
     // get-history: func(subject: string) -> result<list<identity-attestation>, error>;
 }
 
-world psibase-plugin {
-    import host:common/server;
-    import host:common/client;
-    import accounts:plugin/accounts;
-    export api;
-    export queries;
-    export types;
+world imports {
+    import types;
+    import api;
+    import queries;
 }

@@ -42,8 +42,8 @@ namespace psibase
          }
          return true;
       }
+      PSIO_REFLECT(Memo, contents);
    };
-   PSIO_REFLECT(Memo, contents);
 
    void from_json(Memo& s, auto& stream)
    {

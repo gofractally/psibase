@@ -1,26 +1,13 @@
 #pragma once
 
 #include <psibase/Table.hpp>
+#include <services/system/AuthSig.hpp>
 
 namespace UserService
 {
    namespace InviteNs
    {
-      struct ServiceEventRecord
-      {
-         psibase::SingletonKey key;
-         uint64_t              eventHead;
-      };
-      PSIO_REFLECT(ServiceEventRecord, key, eventHead);
-      using ServiceEventTable = psibase::Table<ServiceEventRecord, &ServiceEventRecord::key>;
-
-      struct UserEventRecord
-      {
-         psibase::AccountNumber user;
-         uint64_t               eventHead;
-      };
-      PSIO_REFLECT(UserEventRecord, user, eventHead);
-      using UserEventTable = psibase::Table<UserEventRecord, &UserEventRecord::user>;
+      using Spki = SystemService::AuthSig::SubjectPublicKeyInfo;
 
       /// Table to track the contents of the invite creation
       /// whitelist and blacklist
@@ -40,25 +27,30 @@ namespace UserService
          rejected
       };
 
-      /// Table to track the contents of an invite
-      ///
-      /// - `pubkey`: The public key of the invite. This uniquely identifies
-      /// an invite and is also used to authenticate transactions by users without
-      /// an existing Psibase account.
-      /// - `inviter`: The creator of the invite object
-      /// - `actor`: The last account to accept or reject the invite
-      /// - `expiry`: The time in seconds at which this invite expires
-      /// - `newAccountToken`: A flag that represents whether a new account may
-      /// still be created by redeeming this invite
-      /// - `state`: An integer representing whether the invite is pending (0),
-      /// accepted (1), or rejected (2)
+      /// An invite object
       struct InviteRecord
       {
-         psibase::PublicKey     pubkey;
+         /// The public key of the invite. This uniquely identifies an invite and 
+         ///   may also used to authenticate the transaction accepting the invite.
+         Spki                   pubkey;
+
+         /// The creator of the invite object
          psibase::AccountNumber inviter;
+
+         /// The last account to accept or reject the invite
          psibase::AccountNumber actor;
+
+         /// The time in seconds at which this invite expires
          uint32_t               expiry;
+
+         /// A flag that represents whether a new account may still be created by 
+         ///   redeeming this invite
          bool                   newAccountToken = false;
+
+         /// An integer representing whether the invite is:
+         ///  - pending (0)
+         ///  - accepted (1) 
+         ///  - rejected (2)
          uint8_t                state;
 
          auto secondary() const { return std::tie(inviter, pubkey); }
@@ -70,10 +62,10 @@ namespace UserService
       struct NewAccountRecord
       {
          psibase::AccountNumber name;
-         psibase::AccountNumber invitee;
+         psibase::AccountNumber inviter;
       };
-      PSIO_REFLECT(NewAccountRecord, name, invitee);
+      PSIO_REFLECT(NewAccountRecord, name, inviter);
       using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
 
-   }  // namespace Invite
+   }  // namespace InviteNs
 }  // namespace UserService

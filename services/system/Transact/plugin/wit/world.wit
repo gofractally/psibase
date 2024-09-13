@@ -1,0 +1,20 @@
+package transact:plugin;
+
+interface intf {
+    use host:common/types.{error};
+
+    /// Adds the specified service action to the current transaction.
+    /// 
+    /// No service is specified, as it is only possible for a plugin to call an
+    /// action on its own service. To call actions on another service, it must use
+    /// that service's plugin.
+    /// 
+    /// Parameters
+    /// * `method-name`: The method name of the action being called
+    /// * `packed-args`: The arguments for the action, packed into fracpack format
+    add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+}
+
+world imports {
+    import intf;
+}
