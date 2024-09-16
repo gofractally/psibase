@@ -21,7 +21,7 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "webmail"
+package-name = "Webmail"
 description = "Basic email app"
 services = ["webmail"]
 

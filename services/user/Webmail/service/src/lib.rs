@@ -1,18 +1,17 @@
 use std::collections::HashMap;
 
+use psibase::check;
 use psibase::services::accounts::Wrapper as AccountsSvc;
 use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::AccountNumber;
 use psibase::HttpReply;
 use psibase::HttpRequest;
 
-fn validate_user(user: String) -> bool {
-    let acc = AccountNumber::from(user.as_str());
-    if acc.to_string() != user {
-        return false;
-    }
-
-    AccountsSvc::call().exists(acc)
+fn validate_user(acct: AccountNumber) {
+    check(
+        AccountsSvc::call().exists(acct),
+        format!("account '{}' DNE", acct).as_str(),
+    );
 }
 
 fn make_query(req: &HttpRequest, sql: &str) -> HttpRequest {
@@ -56,18 +55,14 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let mut s_clause = String::new();
         let s_opt = params.get(&String::from("sender"));
         if let Some(s) = s_opt {
-            if !validate_user(String::from(s)) {
-                return None;
-            }
+            validate_user(AccountNumber::from(s.as_str()));
             s_clause = format!("sender = '{}'", s);
         }
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
         if let Some(r) = r_opt {
-            if !validate_user(String::from(r)) {
-                return None;
-            }
+            validate_user(AccountNumber::from(r.as_str()));
             r_clause = format!("receiver = '{}'", r);
         }
 
@@ -80,7 +75,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             where_clause += s_clause.as_str();
         }
         if s_opt.is_some() && r_opt.is_some() {
-            where_clause += " AND WHERE ";
+            where_clause += " AND ";
         }
         if r_opt.is_some() {
             where_clause += r_clause.as_str();
@@ -113,10 +108,7 @@ mod service {
 
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
-        check(
-            validate_user(receiver.to_string()),
-            &format!("receiver account {} doesn't exist", receiver),
-        );
+        validate_user(receiver);
         Wrapper::emit()
             .history()
             .sent(get_sender(), receiver, subject, body);
