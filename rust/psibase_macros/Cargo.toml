@@ -27,4 +27,4 @@ crate-type = ["rlib"]
 macro_derive = { path = "macro_derive" }
 macro_core = { path = "macro_core" }
 quote = "1.0.37"
-syn = "2.0.77"
+syn = "1.0.86"

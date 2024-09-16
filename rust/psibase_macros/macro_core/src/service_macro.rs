@@ -5,8 +5,8 @@ use proc_macro_error::{abort, emit_error};
 use quote::{quote, ToTokens};
 use std::{collections::HashMap, str::FromStr};
 use syn::{
-    parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn, ItemImpl, ItemMod,
-    ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
+    parse_macro_input, parse_quote, AttrStyle, Attribute, AttributeArgs, Field, FnArg, ImplItem,
+    Item, ItemFn, ItemImpl, ItemMod, ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
 };
 
 #[derive(Debug, FromMeta)]
@@ -69,23 +69,11 @@ impl Default for Options {
     }
 }
 
-pub fn service_macro_impl(attr: &[NestedMeta], item: Item) -> TokenStream {
-    let mut options = match Options::from_list(&attr) {
-        Ok(val) => val,
-        Err(err) => {
-            return err.write_errors().into();
-        }
-    };
-    if options.name.is_empty() {
-        options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
-    }
-    if options.dispatch.is_none() {
-        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
-    }
-    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
-        options.dispatch = Some(false);
-    }
+pub fn service_macro_impl(options: Options, item: TokenStream) -> TokenStream {
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
+    let itemAsTokenStream1 = item.to_token_stream()
+    let item = parse_macro_input!(itemAsTokenStream1 as Item);
+    let temp = process_mod(&options, &psibase_mod, impl_mod);
     match item {
         Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod),
         _ => {

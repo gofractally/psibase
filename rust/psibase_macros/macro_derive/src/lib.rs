@@ -292,9 +292,24 @@ use macro_core::service_macro::service_macro_impl;
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr = parse_macro_input!(attr as syn::AttributeArgs);
-    let item = parse_macro_input!(item as Item);
-    service_macro_impl(&attr, item).into()
+    let attr = parse_macro_input!(attr as AttributeArgs);
+    let mut options = match Options::from_list(&attr) {
+        Ok(val) => val,
+        Err(err) => {
+            return err.write_errors().into();
+        }
+    };
+    if options.name.is_empty() {
+        options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
+    }
+    if options.dispatch.is_none() {
+        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
+    }
+    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
+        options.dispatch = Some(false);
+    }
+    let item_parsed = parse_macro_input!(item.clone() as Item);
+    service_macro_impl(options, item).into()
 }
 
 // / Define a [psibase](https://psibase.io) test case.
