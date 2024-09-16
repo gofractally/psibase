@@ -78,7 +78,7 @@ namespace dwarf
    inline constexpr uint8_t dw_inl_declared_not_inlined = 0x02;
    inline constexpr uint8_t dw_inl_declared_inlined     = 0x03;
 
-// clang-format off
+   // clang-format off
 #define DW_ATS(a, b, x)                \
    x(a, b, sibling, 0x01)              \
    x(a, b, location, 0x02)             \
@@ -187,7 +187,7 @@ namespace dwarf
       }
    }
 
-// clang-format off
+   // clang-format off
 #define DW_FORMS(a, b, x)           \
    x(a, b, addr, 0x01)              \
    x(a, b, block2, 0x03)            \
@@ -227,7 +227,7 @@ namespace dwarf
       }
    }
 
-// clang-format off
+   // clang-format off
 #define OP_RANGE32(a, b, name, value,  x)       \
    x(a, b, name ## 0, value + 0)                \
    x(a, b, name ## 1, value + 1)                \
@@ -340,7 +340,7 @@ namespace dwarf
       }
    }
 
-// clang-format off
+   // clang-format off
 #define DW_TAGS(a, b, x)                     \
    x(a, b, array_type, 0x01)                 \
    x(a, b, class_type, 0x02)                 \
@@ -417,7 +417,7 @@ namespace dwarf
       }
    }
 
-// clang-format off
+   // clang-format off
 #define DW_ATES(a, b, x)                        \
    x(a, b, address, 0x01)                       \
    x(a, b, boolean, 0x02)                       \
@@ -493,7 +493,7 @@ namespace dwarf
       }
    }
 
-// clang-format off
+   // clang-format off
 #define DW_CCS(a, b, x)                         \
    x(a, b, normal, 0x01)                        \
    x(a, b, program, 0x02)                       \
@@ -796,7 +796,7 @@ namespace dwarf
             state.discriminator  = 0;
          }
       }  // while (s.remaining())
-   }     // parse_debug_line_unit
+   }  // parse_debug_line_unit
 
    void parse_debug_line(info& result, std::map<std::string, uint32_t>& files, psio::input_stream s)
    {
@@ -1478,9 +1478,8 @@ namespace dwarf
       overloaded o{[](const native_attr_address&) { return dw_form_addr; },
                    [](const attr_block&) { return dw_form_block; },
                    // TODO: preserve form for data
-                   [](const attr_data&) { return dw_form_data8; },
-                   [](const native_attr_exprloc&) { return dw_form_exprloc; },
-                   [](const attr_flag&) { return dw_form_flag; },
+                   [](const attr_data&) { return dw_form_data8; }, [](const native_attr_exprloc&)
+                   { return dw_form_exprloc; }, [](const attr_flag&) { return dw_form_flag; },
                    [](const native_attr_sec_offset&) { return dw_form_sec_offset; },
                    [](const attr_ref&) { return dw_form_ref8; },
                    [](const attr_ref_addr&) { return dw_form_ref_addr; },
@@ -1884,10 +1883,8 @@ namespace dwarf
                {
                   case 0:
                   {
-                     if (!frame)
-                        throw std::runtime_error("Cannot access local without frame info");
                      auto    idx = psio::varuint32_from_bin(s);
-                     int32_t off = frame->get_frame_offset(idx);
+                     int32_t off = frame ? frame->get_frame_offset(idx) : 0;
                      psio::to_bin(std::uint8_t{dw_op_breg6}, out);
                      psio::sleb64_to_bin(off, out);
                      state = native_address;
@@ -1907,10 +1904,8 @@ namespace dwarf
                   }
                   case 2:
                   {
-                     if (!frame)
-                        throw std::runtime_error("Cannot access local without frame info");
                      auto    idx = psio::varuint32_from_bin(s);
-                     int32_t off = frame->get_stack_offset(idx);
+                     int32_t off = frame ? frame->get_stack_offset(idx) : 0;
                      psio::to_bin(std::uint8_t{dw_op_breg6}, out);
                      psio::sleb64_to_bin(off, out);
                      state = native_address;
@@ -2065,15 +2060,10 @@ namespace dwarf
                           die_pattern&           out,
                           const subprogram_info* current_fn)
       {
-         overloaded o{[&](const attr_address& a) {
-                         out.attrs.push_back({attr.name, translate_address(a.value)});
-                      },
-                      [&](const attr_block& a) {
-                         out.attrs.push_back({attr.name, a});
-                      },
-                      [&](const attr_data& a) {
-                         out.attrs.push_back({attr.name, a});
-                      },
+         overloaded o{[&](const attr_address& a)
+                      { out.attrs.push_back({attr.name, translate_address(a.value)}); },
+                      [&](const attr_block& a) { out.attrs.push_back({attr.name, a}); },
+                      [&](const attr_data& a) { out.attrs.push_back({attr.name, a}); },
                       [&](const attr_exprloc& a)
                       {
                          const debug_eos_vm::wasm_frame* frame = nullptr;
@@ -2098,18 +2088,12 @@ namespace dwarf
                          }
                          out.attrs.push_back({attr.name, std::move(translated)});
                       },
-                      [&](const attr_flag& a) {
-                         out.attrs.push_back({attr.name, a});
-                      },
+                      [&](const attr_flag& a) { out.attrs.push_back({attr.name, a}); },
                       [&](const attr_sec_offset& a) {},
-                      [&](const attr_ref& a) {
-                         out.attrs.push_back({attr.name, a});
-                      },
+                      [&](const attr_ref& a) { out.attrs.push_back({attr.name, a}); },
                       [&](const attr_ref_addr&) {},
                       [&](const attr_ref_sig8&) {},
-                      [&](const std::string_view& str) {
-                         out.attrs.push_back({attr.name, str});
-                      }};
+                      [&](const std::string_view& str) { out.attrs.push_back({attr.name, str}); }};
          switch (attr.name)
          {
             case dw_at_high_pc:
@@ -2203,8 +2187,7 @@ namespace dwarf
             }
             die.attrs.push_back({dw_at_calling_convention, attr_data{dw_cc_nocall}});
          }
-         parser.parse_die_attrs_local(abbrev, s,
-                                      [&](const abbrev_attr& attr, attr_value& value)
+         parser.parse_die_attrs_local(abbrev, s, [&](const abbrev_attr& attr, attr_value& value)
                                       { translate_attr(attr, value, attrs, die, current_fn); });
          if (abbrev.tag == dw_tag_compile_unit || abbrev.tag == dw_tag_partial_unit ||
              abbrev.tag == dw_tag_type_unit)
