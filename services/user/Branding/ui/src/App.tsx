@@ -20,7 +20,6 @@ export const App = () => {
     const init = async () => {
         await supervisor.onLoaded();
         supervisor.preLoadPlugins([{ service: "branding" }]);
-        setTimeout(getNetworkName, 1000);
     };
 
     useEffect(() => {
@@ -41,7 +40,7 @@ export const App = () => {
     ) => {
         e.preventDefault();
         try {
-            let res = await supervisor.functionCall({
+            await supervisor.functionCall({
                 service: "accounts",
                 intf: "accounts",
                 method: "loginTemp",
@@ -49,7 +48,7 @@ export const App = () => {
             });
 
             if (networkName) {
-                res = await supervisor.functionCall({
+                await supervisor.functionCall({
                     service: "branding",
                     intf: "api",
                     method: "setNetworkName",
@@ -58,7 +57,7 @@ export const App = () => {
             }
 
             if (logoBytes.length) {
-                res = await supervisor.functionCall({
+                await supervisor.functionCall({
                     service: "branding",
                     intf: "api",
                     method: "setLogo",
@@ -67,6 +66,7 @@ export const App = () => {
             }
 
             setUploadStatus("Successful");
+            setChangesMade(false);
         } catch (e) {
             if (e instanceof Error) {
                 console.error(`Error: ${e.message}\nStack: ${e.stack}`);

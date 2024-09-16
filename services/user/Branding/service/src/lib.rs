@@ -51,10 +51,7 @@ mod service {
     impl Query {
         async fn network_name(&self) -> String {
             let curr_val = NetworkNameTable::new().get_index_pk().get(&SingletonKey {});
-            match curr_val {
-                Some(val) => val.name,
-                None => String::from("psibase"),
-            }
+            curr_val.unwrap_or_default().name
         }
     }
 
@@ -63,8 +60,6 @@ mod service {
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_graphql(&request, Query))
-            .or_else(|| serve_graphiql(&request))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 
     #[action]
