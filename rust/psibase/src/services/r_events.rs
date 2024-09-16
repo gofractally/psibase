@@ -1,6 +1,6 @@
 #[crate::service(name = "r-events", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-pub mod effluvium_interface {
+mod service {
     use crate::HttpRequest;
 
     #[action]
