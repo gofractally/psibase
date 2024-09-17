@@ -2,7 +2,6 @@
 mod bindings;
 
 use bindings::exports::webmail::plugin::api::{Error, Guest as API};
-use bindings::host::common::server::*;
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::services::webmail;
