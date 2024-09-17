@@ -44,14 +44,7 @@ pub enum DbId {
     /// then that node will reject the write. If the producers
     /// accepted the write into a block, then the node will stop
     /// following the chain until it's upgraded to a newer version.
-    NativeConstrained,
-
-    /// Tables used by native code
-    ///
-    /// This database doesn't enforce constraints during write.
-    /// Only writable by privileged services, but readable by all
-    /// services.
-    NativeUnconstrained,
+    Native,
 
     /// Block log
     ///

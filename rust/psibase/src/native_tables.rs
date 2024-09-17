@@ -36,7 +36,7 @@ pub struct StatusRow {
 }
 
 impl StatusRow {
-    pub const DB: DbId = DbId::NativeUnconstrained;
+    pub const DB: DbId = DbId::Native;
 
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         status_key()
@@ -51,7 +51,7 @@ pub struct ConfigRow {
 }
 
 impl ConfigRow {
-    pub const DB: DbId = DbId::NativeConstrained;
+    pub const DB: DbId = DbId::Native;
 
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         (CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
@@ -70,7 +70,7 @@ pub struct ProducerConfigRow {
 }
 
 impl ProducerConfigRow {
-    pub const DB: DbId = DbId::NativeConstrained;
+    pub const DB: DbId = DbId::Native;
 
     pub fn key(&self) -> (NativeTable, AccountNumber) {
         producer_config_key(self.producerName)
