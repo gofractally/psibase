@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, BlockHeader, BlockHeaderAuthAccount, BlockInfo, BlockNum, Checksum256, Claim,
-    Consensus, DbId, Pack, ToSchema, Unpack,
+    BlockHeader, BlockHeaderAuthAccount, BlockInfo, BlockNum, Checksum256, Consensus, DbId, Pack,
+    ToSchema, Unpack,
 };
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ pub const DATABASE_STATUS_TABLE: NativeTable = 4;
 pub const TRANSACTION_WASM_CONFIG_TABLE: NativeTable = 5;
 pub const PROOF_WASM_CONFIG_TABLE: NativeTable = 6; // Also for first auth
 pub const CONFIG_TABLE: NativeTable = 7;
-pub const PRODUCER_CONFIG_TABLE: NativeTable = 8;
+pub const NOTIFY_TABLE: NativeTable = 8;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -55,24 +55,5 @@ impl ConfigRow {
 
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         (CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
-    }
-}
-
-pub fn producer_config_key(producer: AccountNumber) -> (NativeTable, AccountNumber) {
-    (PRODUCER_CONFIG_TABLE, producer)
-}
-
-#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
-#[fracpack(fracpack_mod = "fracpack")]
-pub struct ProducerConfigRow {
-    pub producerName: AccountNumber,
-    pub producerAuth: Claim,
-}
-
-impl ProducerConfigRow {
-    pub const DB: DbId = DbId::Native;
-
-    pub fn key(&self) -> (NativeTable, AccountNumber) {
-        producer_config_key(self.producerName)
     }
 }
