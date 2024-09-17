@@ -2,8 +2,8 @@
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_graphiql, serve_graphql,
-        serve_simple_ui, store_content, Fracpack, HexBytes, HttpReply, HttpRequest, SingletonKey,
+        anyhow, check, get_sender, get_service, serve_content, serve_graphql,
+        store_content, Fracpack, HexBytes, HttpReply, HttpRequest, SingletonKey,
         Table, ToSchema, WebContentRow,
     };
     use serde::{Deserialize, Serialize};
