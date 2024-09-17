@@ -14,24 +14,23 @@ fn validate_user(acct: AccountNumber) {
     );
 }
 
-fn make_query(req: &HttpRequest, sql: &str) -> HttpRequest {
+fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
     return HttpRequest {
         host: req.host.clone(),
         rootHost: req.rootHost.clone(),
         method: String::from("POST"),
         target: String::from("/sql"),
         contentType: String::from("application/sql"),
-        body: sql.to_string().into(),
+        body: sql.into(),
     };
 }
 
-fn parse_query(query: String) -> HashMap<String, String> {
+fn parse_query(query: &str) -> HashMap<String, String> {
     let mut params: HashMap<String, String> = HashMap::new();
 
     let itr = query.split("&");
     for p in itr {
-        let idx = p.find("=").unwrap();
-        let kv = p.split_at(idx);
+        let kv = p.split_once("=").unwrap();
         params.insert(kv.0.to_string(), kv.1.trim_start_matches('=').to_string());
     }
     params
@@ -50,10 +49,10 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let query_start = query_start.unwrap();
 
         let query = request.target.split_at(query_start + 1).1;
-        let params = crate::parse_query(String::from(query));
+        let params = crate::parse_query(query);
 
         let mut s_clause = String::new();
-        let s_opt = params.get(&String::from("sender"));
+        let s_opt = params.get("sender");
         if let Some(s) = s_opt {
             validate_user(AccountNumber::from(s.as_str()));
             s_clause = format!("sender = '{}'", s);
@@ -86,8 +85,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             format!(
                 "SELECT * FROM \"history.webmail.sent\" {} ORDER BY ROWID",
                 where_clause
-            )
-            .as_str(),
+            ),
         );
         return REventsSvc::call().serveSys(mq);
     }
