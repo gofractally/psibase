@@ -202,6 +202,7 @@ namespace psibase::net
             }
          }
          assert(!"Unknown peer connection");
+         __builtin_unreachable();
       }
 
       void disconnect(peer_id id)

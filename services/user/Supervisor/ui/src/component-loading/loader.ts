@@ -101,6 +101,7 @@ async function getWasiImports(): Promise<ImportDetails> {
         ["wasi:cli/stdout", `${wasi_shimName}#stdout`],
         ["wasi:cli/stderr", `${wasi_shimName}#stderr`],
         ["wasi:clocks/wall-clock", `${wasi_shimName}#wallClock`],
+        ["wasi:clocks/monotonic-clock", `${wasi_shimName}#monotonicClock`],
         ["wasi:filesystem/types", `${wasi_shimName}#types`],
         ["wasi:filesystem/preopens", `${wasi_shimName}#preopens`],
         ["wasi:random/random", `${wasi_shimName}#random`],

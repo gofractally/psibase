@@ -20,149 +20,14 @@ import {
     Mail,
     MessageSquare,
     PlusCircle,
-    User,
     UserPlus,
-    Copy,
-    RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
-import { useEffect } from "react";
-
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
-import { useMutation } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { siblingUrl, Supervisor } from "@psibase/common-lib";
-import { useNavigate } from "react-router-dom";
-import { modifyUrlParams } from "@/lib/modifyUrlParams";
-
-const supervisor = new Supervisor({
-    supervisorSrc: siblingUrl(undefined, "supervisor", undefined, false),
-});
-
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const generateInvite = async (): Promise<string> => {
-    await wait(2000);
-
-    const res = modifyUrlParams(
-        siblingUrl(undefined, undefined, "invite", false),
-        {
-            token: "THISISTHETOKEN",
-        }
-    );
-
-    return res;
-};
 
 export const SettingsDropdown = () => {
-    const navigate = useNavigate();
-
-    const {
-        data: inviteLink,
-        isPending,
-        mutate,
-    } = useMutation({
-        mutationFn: () => {
-            return generateInvite();
-        },
-    });
-
-    const init = async () => {
-        await supervisor.onLoaded();
-        supervisor.preLoadPlugins([{ service: "accounts" }]);
-    };
-
-    const generatePair = async () => {
-        console.log("generating pair");
-        const res = await supervisor.functionCall({
-            service: "invite",
-            intf: "inviter",
-            method: "generateInvite",
-            params: [""],
-        });
-        console.log(res, "was the pair.");
-    };
-
-    useEffect(() => {
-        mutate();
-        init();
-    }, []);
-
-    const onCopyClick = async () => {
-        navigate("invite");
-        if ("clipboard" in navigator) {
-            await navigator.clipboard.writeText("test");
-            toast("Copied to clipboard.");
-        } else {
-            toast("Copying failed, not in secure context?");
-            generatePair();
-        }
-    };
-
     return (
-        <Dialog>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Share link</DialogTitle>
-                    <DialogDescription>
-                        Anyone who has this link will be able to create an
-                        account.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex items-center space-x-2">
-                    <div className="grid flex-1 gap-2">
-                        <Label htmlFor="link" className="sr-only">
-                            Link
-                        </Label>
-                        <Input
-                            id="link"
-                            className={cn({ italic: isPending })}
-                            value={inviteLink || "Loading"}
-                            readOnly
-                        />
-                    </div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        className="px-3"
-                        onClick={() => onCopyClick()}
-                    >
-                        <span className="sr-only">Copy</span>
-                        <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        variant="outline"
-                        className="px-3"
-                        onClick={() => mutate()}
-                    >
-                        <span className="sr-only">Refresh</span>
-                        <RefreshCcw className="h-4 w-4" />
-                    </Button>
-                </div>
-                <DialogFooter className="sm:justify-start">
-                    <DialogClose asChild>
-                        <Button type="button" variant="secondary">
-                            Close
-                        </Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-
+        <>
             <ModeToggle />
 
             <DropdownMenu>
@@ -175,12 +40,6 @@ export const SettingsDropdown = () => {
                     <DropdownMenuLabel>Settings</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                        <DialogTrigger asChild>
-                            <DropdownMenuItem>
-                                <User className="mr-2 h-4 w-4" />
-                                <span>Create invite</span>
-                            </DropdownMenuItem>
-                        </DialogTrigger>
                         <DropdownMenuItem disabled>
                             <CreditCard className="mr-2 h-4 w-4" />
                             <span>Billing</span>
@@ -241,6 +100,6 @@ export const SettingsDropdown = () => {
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-        </Dialog>
+        </>
     );
 };

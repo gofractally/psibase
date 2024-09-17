@@ -430,7 +430,9 @@ dependencies = [
  "console",
  "psibase",
  "regex",
+ "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "url",
@@ -439,6 +441,7 @@ dependencies = [
  "wasmparser 0.201.0",
  "wasmprinter",
  "wat",
+ "zip",
 ]
 
 [[package]]
@@ -2150,6 +2153,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 
 [[package]]
+name = "pem"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2414,6 +2427,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "pem",
  "percent-encoding",
  "pkcs8",
  "psibase_macros",
@@ -2498,6 +2512,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "r-tpack"
+version = "0.12.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "tpack",
 ]
 
 [[package]]
@@ -3305,7 +3328,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_contract"
+name = "test-contract"
 version = "0.12.0"
 dependencies = [
  "psibase",
@@ -3322,6 +3345,14 @@ dependencies = [
  "fracpack",
  "hex",
  "psibase_macros",
+]
+
+[[package]]
+name = "test_package"
+version = "0.12.0"
+dependencies = [
+ "r-tpack",
+ "tpack",
 ]
 
 [[package]]
@@ -3500,6 +3531,23 @@ name = "tower-service"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
+
+[[package]]
+name = "tpack"
+version = "0.12.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "test_package",
+]
+
+[[package]]
+name = "tpack-plugin"
+version = "0.1.0"
+dependencies = [
+ "psibase",
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "tracing"
@@ -4213,6 +4261,15 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if 1.0.0",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c7526379ace8709ee9ab9f2bb50f112d95581063a59ef3097d9c10153886c9"
+dependencies = [
+ "bitflags 2.5.0",
 ]
 
 [[package]]

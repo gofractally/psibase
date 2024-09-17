@@ -4,19 +4,38 @@
 #include <services/user/CoreFractal.hpp>
 #include <services/user/Fractal.hpp>
 #include <services/user/Invite.hpp>
+//#include <services/user/
 
 using namespace psibase;
 using namespace UserService;
 using namespace UserService::Errors;
 using namespace UserService::FractalNs;
+using namespace SystemService::AuthSig;
 
 namespace
 {
-   auto invPub  = publicKeyFromString("PUB_K1_7jTdMYEaHi66ZEcrh7To9XKingVkRdBuz6abm3meFbGw8zFFve");
-   auto invPriv = privateKeyFromString("PVT_K1_ZGRNZ4qwN1Ei9YEyVBr1aBGekAxC5FKVPR3rQA2HnEhvqviF2");
-
-   auto userPub  = publicKeyFromString("PUB_K1_5Dcj42CYrYpPMpCPWPzBSpM9gThV5ywAPdbYgiL2JUxGrnVUbn");
-   auto userPriv = privateKeyFromString("PVT_K1_SjmZ1DKTPNZFnfPEPwGb9rt3CAuwAoqYjZf5UoM4Utwm5dJW3");
+   SubjectPublicKeyInfo invPub{
+       parseSubjectPublicKeyInfo("-----BEGIN PUBLIC KEY-----\n"
+                                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuq/4/cEGTAZ8V3+i4Zxz0QfR2RGM"
+                                 "\nJDlUzFnWFApcZiNxKRPmkuf75ReZuHlMIsY8KYl4ofsclgXYX6bA6jseqg==\n"
+                                 "-----END PUBLIC KEY-----\n")};
+   PrivateKeyInfo invPriv{
+       parsePrivateKeyInfo("-----BEGIN PRIVATE KEY-----\n"
+                           "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgPg6NiBwqfaR+62Dg"
+                           "\nlo4SJYDN63VgN5KsJ+ShifkhUS2hRANCAAS6r/j9wQZMBnxXf6LhnHPRB9HZEY"
+                           "wk\nOVTMWdYUClxmI3EpE+aS5/vlF5m4eUwixjwpiXih+xyWBdhfpsDqOx6q\n"
+                           "-----END PRIVATE KEY-----\n")};
+   SubjectPublicKeyInfo userPub{
+       parseSubjectPublicKeyInfo("-----BEGIN PUBLIC KEY-----\n"
+                                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkyH2C34UK39YQuYiKPU7oUG92hdo"
+                                 "\nM/oj7dx2ZxVLoHgb7J2S4RVTAlsxlFnDnm1tQLglLm7EU+VfeDTXF0UOnQ==\n"
+                                 "-----END PUBLIC KEY-----\n")};
+   PrivateKeyInfo userPriv{
+       parsePrivateKeyInfo("-----BEGIN PRIVATE KEY-----\n"
+                           "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgSDWviYxkk0ZXecnn"
+                           "\nm8yWW94bvDE3rqRHNJulM4nH6cehRANCAASTIfYLfhQrf1hC5iIo9TuhQb3aF2"
+                           "gz\n+iPt3HZnFUugeBvsnZLhFVMCWzGUWcOebW1AuCUubsRT5V94NNcXRQ6d\n"
+                           "-----END PRIVATE KEY-----\n")};
 }  // namespace
 
 SCENARIO("Creating a fractal")

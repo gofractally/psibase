@@ -156,14 +156,17 @@ namespace psibase::net
                       const ProducerSet& prods)
       {
          AccountNumber prevAccount{};
-         check(confirms.size() >= prods.threshold(), "Not enough confirmations");
+         if (confirms.size() < prods.threshold())
+            check(false, "Not enough confirmations: " + std::to_string(confirms.size()) + "/" +
+                             std::to_string(prods.threshold()) + " (" + prods.to_string() + ")");
          for (const ProducerConfirm& confirm : confirms)
          {
             const auto& [prod, sig] = confirm;
             // mostly to guarantee that the producers are unique
             check(prevAccount < prod, "Confirmations must be ordered by producer");
             auto claim = prods.getClaim(prod);
-            check(!!claim, "Not a valid producer: " + prod.str());
+            if (!claim)
+               check(false, "Not a valid producer: " + prod.str() + " (" + prods.to_string() + ")");
             M    originalMsg{id, prod, *claim};
             auto msg = network().serialize_unsigned_message(originalMsg);
             chain().verify(revision, {msg.data(), msg.size()}, *claim, sig);
@@ -741,7 +744,10 @@ namespace psibase::net
          }
          catch (std::runtime_error& e)
          {
-            PSIBASE_LOG(logger, warning) << "invalid view change: " << e.what();
+            PSIBASE_LOG(logger, warning)
+                << "invalid view change term=" << info.best_message->data->term()
+                << " producer=" << info.best_message->data->producer().unpack().str() << ": "
+                << e.what();
             return false;
          }
          return true;
@@ -814,14 +820,18 @@ namespace psibase::net
                load_prepares(state, *best_view_change->best_message);
                sync_current_term();
             }
+            state             = chain().get_state(orderToXid(best_prepared).id());
+            auto commit_index = chain().commit_index();
+            if (!state || state->blockNum() < commit_index)
+            {
+               state = chain().get_state(chain().get_block_id(commit_index));
+            }
+            chain().set_subtree(state, "best prepared");
          }
-         // Because we accept view changes even if we don't have the referenced block,
-         // it's possible to trigger a view change without being able to set the subtree.
-         if (!state)
+         else
          {
-            state = chain().get_state(chain().get_block_id(chain().commit_index()));
+            chain().set_subtree(state, "view change from current leader");
          }
-         chain().set_subtree(state, "view change from current leader");
       }
 
       ViewChangeMessage make_view_change(BlockHeaderState* state)
@@ -920,7 +930,7 @@ namespace psibase::net
          if (term > current_term)
          {
             PSIBASE_LOG(logger, info)
-                << "view change: " << term << " "
+                << "view change: term=" << term << " leader="
                 << active_producers[0]->activeProducers.nth(get_leader_index(term))->first.str();
             current_term = term;
             chain().setTerm(current_term);

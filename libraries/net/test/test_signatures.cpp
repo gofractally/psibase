@@ -1,4 +1,4 @@
-#include <psibase/EcdsaProver.hpp>
+#include <psibase/OpenSSLProver.hpp>
 
 #include <catch2/catch.hpp>
 
@@ -18,8 +18,8 @@ TEST_CASE("block signature")
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
    AccountNumber           prod{"prod"};
-   auto ecc    = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyk1"});
-   auto prover = std::make_shared<CompoundProver>();
+   auto                    ecc    = std::make_shared<OpenSSLProver>(AccountNumber{"verify-sig"});
+   auto                    prover = std::make_shared<CompoundProver>();
    prover->add(ecc);
    nodes.add(AccountNumber{"prod"}, prover);
    nodes.add(AccountNumber{"client"});
@@ -42,7 +42,7 @@ TEST_CASE("load signature state")
    TempDatabase  db;
    auto          system = db.getSystemContext();
    AccountNumber prod{"prod"};
-   auto          prover = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyk1"});
+   auto          prover = std::make_shared<OpenSSLProver>(AccountNumber{"verify-sig"});
    {
       boost::asio::io_context ctx;
       node_type               node{ctx, system.get(), prover};

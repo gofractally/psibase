@@ -37,7 +37,7 @@ pub struct ServiceMethod {
 /// its authenticator. Be careful; this allows that service to
 /// act on the account's behalf and that service to authorize
 /// other accounts and services to act on the account's behalf.
-/// It can also can lock out that account. See `AuthK1` (C++)
+/// It can also can lock out that account. See `AuthSig` (C++)
 /// for a canonical example of implementing `auth_interface`.
 ///
 /// This interface can't authenticate non-top-level actions other

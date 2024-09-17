@@ -1,0 +1,23 @@
+[package]
+name = "tpack"
+description = "Test service for package building"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[package.metadata.psibase]
+server = "r-tpack"
+postinstall = [{sender="tpack", service="tpack", method="init", rawData="0000"}]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.12.0"
+
+[dependencies]
+psibase = { path = "../../psibase", version = "0.12.0" }
+serde = "1.0"
+
+[dev-dependencies]
+test_package = { path = "..", version = "0.12.0" }

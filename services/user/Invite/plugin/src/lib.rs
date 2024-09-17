@@ -1,21 +1,24 @@
 #[allow(warnings)]
 mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
-use bindings::auth_sig::plugin::keyvault;
-use bindings::exports::invite::plugin::{
-    admin::Guest as Admin, invitee::Guest as Invitee, inviter::Guest as Inviter,
-};
+use bindings::accounts::plugin as Accounts;
+use bindings::auth_sig::plugin::{keyvault, types::Pem};
+use bindings::exports::invite;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
-use bindings::invite::plugin::types::{Invite, InviteId, Url};
+use bindings::invite::plugin::types::{Invite, InviteId, InviteState, Url};
+use bindings::transact::plugin::intf as Transact;
+use chrono::DateTime;
 use fracpack::Pack;
+use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::services::invite as InviteService;
+use CommonTypes::OriginationData;
 
 use serde::{Deserialize, Serialize};
 
 mod errors;
 use errors::ErrorType::*;
 
-/*
+/* TODO:
     /// This doesn't need to be exposed, it can just be jammed into various plugin functions
     /// when the user is submitting another action anyways.
     /// Used by anyone to garbage collect expired invites. Up to 'maxDeleted' invites
@@ -31,42 +34,93 @@ struct InviteParams {
 }
 
 #[derive(Deserialize)]
-struct ResponseRoot {
-    data: Data,
+struct ResponseRoot<T> {
+    data: T,
+}
+trait TryParseGqlResponse: Sized {
+    fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
 }
 
+//#[qgl_query(name="getInvite")] // <-- Todo: Create this procedural macro ...
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
-struct Data {
-    getInvite: Option<GetInvite>,
+struct InviteRecordSubset {
+    inviter: psibase::AccountNumber,
+    actor: psibase::AccountNumber,
+    expiry: u32,
+    state: u8,
 }
 
-#[allow(non_snake_case, dead_code)]
+//                                           ...Such that something like the below code is generated:
+#[allow(non_snake_case)]
 #[derive(Deserialize)]
-struct GetInvite {
-    pubkey: String,
-    inviter: String,
+struct GetInviteResponse {
+    getInvite: Option<InviteRecordSubset>,
 }
+impl TryParseGqlResponse for InviteRecordSubset {
+    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+        let response_root: ResponseRoot<GetInviteResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryError.err(&e.to_string()))?;
+        Ok(response_root.data.getInvite.ok_or_else(|| {
+            QueryError.err("Unable to extract InviteRecordSubset from query response")
+        })?)
+    }
+}
+//                                            />
 
 struct Component;
 
-// Consider moving to admin plugin
-impl Admin for Component {
-    fn set_whitelist(_accounts: Vec<String>) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("set_whitelist"))
+impl From<InviteParams> for InviteId {
+    fn from(params: InviteParams) -> Self {
+        let params_str = serde_json::to_string(&params).unwrap();
+        URL_SAFE.encode(params_str)
     }
+}
 
-    fn set_blacklist(_accounts: Vec<String>) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("set_blacklist"))
+trait TryFromInviteId: Sized {
+    fn try_from_invite_id(id: InviteId) -> Result<Self, CommonTypes::Error>;
+}
+
+impl TryFromInviteId for InviteParams {
+    fn try_from_invite_id(id: InviteId) -> Result<Self, CommonTypes::Error> {
+        let bytes = URL_SAFE
+            .decode(id.to_owned())
+            .map_err(|_| DecodeInviteError.err("Error decoding base64"))?;
+
+        let str = String::from_utf8(bytes)
+            .map_err(|_| DecodeInviteError.err("Error converting from UTF8"))?;
+
+        let result: InviteParams = serde_json::from_str(&str)
+            .map_err(|_| DecodeInviteError.err("Error deserializing JSON string into object"))?;
+
+        Ok(result)
     }
 }
 
 impl Invitee for Component {
-    fn accept(_id: InviteId) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("accept_with_existing_account"))
-        // The thinking for only a single accept method is that the invite ID is passed
-        // to the account plugin. If the invite contains a valid invite private key
-        // then the login page can also show a Create Account button.
+    fn accept_with_new_account(account: String, id: InviteId) -> Result<(), CommonTypes::Error> {
+        let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
+            return Err(InvalidAccount.err(&account));
+        })?;
+
+        if Accounts::accounts::get_account(&account)?.is_some() {
+            return Err(AccountExists.err("accept_with_new_account"));
+        }
+
+        let invite_params = InviteParams::try_from_invite_id(id)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        Transact::add_action_to_transaction(
+            "acceptCreate",
+            &InviteService::action_structs::acceptCreate {
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+                acceptedBy: accepted_by,
+                newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
     }
 
     fn reject(_id: InviteId) -> Result<(), CommonTypes::Error> {
@@ -74,91 +128,81 @@ impl Invitee for Component {
     }
 
     fn decode_invite(id: InviteId) -> Result<Invite, CommonTypes::Error> {
-        let decoded: InviteParams = URL_SAFE
-            .decode(id.to_owned())
-            .map_err(|_| DecodeInviteError.err("Error decoding base64"))
-            .and_then(|enc| {
-                String::from_utf8(enc)
-                    .map_err(|_| DecodeInviteError.err("Error converting from UTF8"))
-            })
-            .and_then(|decoded| {
-                serde_json::from_str(&decoded).map_err(|_| {
-                    DecodeInviteError.err("Error deserializing JSON string into object")
-                })
-            })?;
+        let invite_params = InviteParams::try_from_invite_id(id)?;
 
-        let pubkey = &decoded.pk;
         let query = format!(
             r#"query {{
                 getInvite(pubkey: "{pubkey}") {{
-                    pubkey,
-                    inviter
+                    inviter,
+                    actor,
+                    expiry,
+                    state,
                 }}
             }}"#,
-            pubkey = pubkey
+            pubkey = keyvault::pub_from_priv(&invite_params.pk)?
         );
+        let invite = InviteRecordSubset::from_gql(Server::post_graphql_get_json(&query)?)?;
 
-        let invite: GetInvite = Server::post_graphql_get_json(&query)
-            .map_err(|e| QueryError.err(&e.message))
-            .and_then(|result| {
-                serde_json::from_str(&result).map_err(|e| QueryError.err(&e.to_string()))
-            })
-            .and_then(|response_root: ResponseRoot| {
-                response_root
-                    .data
-                    .getInvite
-                    .ok_or_else(|| QueryError.err("Invite not found"))
-            })?;
+        let expiry = DateTime::from_timestamp(invite.expiry as i64, 0)
+            .ok_or(DatetimeError.err("decode_invite"))?
+            .to_string();
+        let state = match invite.state {
+            0 => InviteState::Pending,
+            1 => InviteState::Accepted,
+            2 => InviteState::Rejected,
+            _ => {
+                return Err(InvalidInviteState.err("decode_invite"));
+            }
+        };
 
         Ok(Invite {
-            inviter: invite.inviter,
-            app: decoded.app,
-            callback: decoded.cb,
+            inviter: invite.inviter.to_string(),
+            app: invite_params.app,
+            state: state,
+            actor: invite.actor.to_string(),
+            expiry,
+            callback: invite_params.cb,
         })
     }
 }
 
 impl Inviter for Component {
     fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
-        // TODO: I actually need a function here to generate both a private and
-        //         public key (and return them both). Private needs to be added to invite link,
-        //         while public is pushed in a tx to add the invite to the chain.
-        //       When I do this, also update decode.
-        //let keypair = keyvault::generate_unmanaged_keypair()?;
-        let pubkey_str = keyvault::generate_keypair()?;
-        let pubkey: psibase::PublicKey = pubkey_str
-            .parse()
-            .map_err(|_| PubKeyParse.err(&pubkey_str))?;
+        let keypair = keyvault::generate_unmanaged_keypair()?;
 
-        Server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "createInvite",
             &InviteService::action_structs::createInvite {
-                inviteKey: pubkey.to_owned(),
+                inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
             }
             .packed(),
         )?;
 
         let link_root = format!("{}{}", Client::my_service_origin(), "/invited");
 
-        let orig_data = Client::get_sender_app();
-        let orig_domain = orig_data.origin;
-        let originator = orig_data.app.unwrap_or(orig_domain.clone());
+        let OriginationData { origin, app } = Client::get_sender_app();
+        let cb = format!("{}{}", origin, callback_subpath);
 
-        let callback_url = format!("{}{}", orig_domain, callback_subpath);
         let params = InviteParams {
-            app: originator,
-            pk: pubkey_str,
-            cb: callback_url,
+            app: app.unwrap_or(origin.clone()),
+            pk: keypair.private_key,
+            cb,
         };
-        let params = serde_json::to_string(&params)
-            .map_err(|_| SerializationError.err("Serializing invite id params"))?;
 
-        let query_string = format!("id={}", URL_SAFE.encode(params));
+        let query_string = format!("id={}", InviteId::from(params));
         Ok(format!("{}?{}", link_root, query_string))
     }
 
-    fn delete_invite(_invite_public_key: Vec<u8>) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("delete_invite"))
+    fn delete_invite(invite_public_key: Vec<u8>) -> Result<(), CommonTypes::Error> {
+        Transact::add_action_to_transaction(
+            "delInvite",
+            &InviteService::action_structs::delInvite {
+                inviteKey: invite_public_key.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
     }
 }
 

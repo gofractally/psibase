@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, JointRegistry, PackageRegistry, SignedTransaction, StatusRow, TimePointSec,
-    Transaction, TransactionTrace,
+    InnerTraceEnum, PackageRegistry, SignedTransaction, StatusRow, TimePointSec, Transaction,
+    TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -34,6 +34,7 @@ pub struct Chain {
     chain_handle: u32,
     status: RefCell<Option<StatusRow>>,
     producing: Cell<bool>,
+    is_auto_block_start: bool,
 }
 
 impl Default for Chain {
@@ -60,14 +61,18 @@ impl Chain {
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec!["DevDefault".to_string()];
+        self.boot_with(&Self::default_registry(), &default_services[..])
+    }
 
+    pub fn default_registry() -> DirectoryRegistry {
         let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
             .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
         let packages_dir = Path::new(&psibase_data_dir).join("packages");
+        DirectoryRegistry::new(packages_dir)
+    }
 
-        let mut result = JointRegistry::new();
-        result.push(DirectoryRegistry::new(packages_dir))?;
-        let mut services = block_on(result.resolve(&default_services[..]))?;
+    pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
+        let mut services = block_on(reg.resolve(services))?;
 
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
@@ -86,6 +91,8 @@ impl Chain {
             self.push(&trx).ok()?;
         }
 
+        self.start_block();
+
         Ok(())
     }
 
@@ -103,6 +110,7 @@ impl Chain {
             chain_handle,
             status: None.into(),
             producing: false.into(),
+            is_auto_block_start: true,
         }
     }
 
@@ -157,6 +165,13 @@ impl Chain {
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
         }
+    }
+
+    /// By default, the TestChain will automatically advance blocks.
+    /// When disabled, the the chain will only advance blocks manually.
+    /// To manually advance a block, call start_block.
+    pub fn set_auto_block_start(&mut self, enable: bool) {
+        self.is_auto_block_start = enable;
     }
 
     /// Push a transaction
@@ -240,10 +255,6 @@ impl Chain {
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
-        //if producing.get() && is_auto_block_start {
-        //    finishBlock();
-        //}
-
         let packed_request = request.packed();
         let fd = unsafe {
             tester_raw::httpRequest(
@@ -392,6 +403,11 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
+        }
+
         ChainEmptyResult { trace }
     }
 
@@ -419,6 +435,11 @@ impl<'a> Caller for ChainPusher<'a> {
             trace,
             _marker: Default::default(),
         };
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
+        }
+
         ret
     }
 }

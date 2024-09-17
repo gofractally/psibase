@@ -3,17 +3,14 @@ mod bindings;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
-
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::exports::accounts::plugin::admin::Guest as Admin;
-use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
+use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
+use bindings::transact::plugin::intf as Transact;
 use bindings::accounts::plugin::types::{self as AccountTypes};
-
 use psibase::fracpack::Pack;
 use psibase::services::accounts::{self as AccountsService};
 use psibase::AccountNumber;
-
-extern crate url;
 use url::Url;
 use serde::Deserialize;
 
@@ -58,11 +55,29 @@ fn login_key(origin: String) -> String {
     let key_pre: String = "logged-in".to_string();
     return key_pre + "." + &encoded;
 }
+
+fn from_supervisor() -> bool {
+    Client::get_sender_app()
+        .app
+        .map_or(false, |app| app == "supervisor")
+}
+
 impl Admin for AccountsPlugin {
-    fn get_logged_in_user(domain: String) -> Result<Option<String>, CommonTypes::Error> {
+    fn force_login(domain: String, user: String) {
+        assert!(from_supervisor(), "unauthorized");
+        Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
+    }
+
+    fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
         let sender = Client::get_sender_app().app;
-        if sender.is_none() || sender.unwrap() != "supervisor" {
-            return Err(Unauthorized.err("get_logged_in_user"));
+        assert!(
+            sender.is_some() && sender.as_ref().unwrap() == "supervisor",
+            "unauthorized"
+        );
+
+        // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
+        if caller_app != "transact" && caller_app != "supervisor" {
+            return Err(Unauthorized.err("Temporarily, only transact can ask for the logged-in user."));
         }
 
         if let Some(user) = Keyvalue::get(&login_key(domain)) {
@@ -81,7 +96,8 @@ impl Accounts for AccountsPlugin {
 
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
-        Keyvalue::set(&login_key(origin), &user.as_bytes())?;
+
+        Client::login_temp(&origin, &user)?;
         Ok(())
     }
 
@@ -122,7 +138,7 @@ impl Accounts for AccountsPlugin {
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
             .map_err(|_| InvalidAccountName.err(&service_name))?;
-        Server::add_action_to_transaction(
+        Transact::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {
                 authService: account_num,

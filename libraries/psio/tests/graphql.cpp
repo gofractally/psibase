@@ -209,8 +209,8 @@ struct Root
 };
 
 PSIO_REFLECT(Root,
-             method(world),
-             method(hello),
+             world,
+             hello,
              method(sum, a, b),
              method(cat, arg),
              method(getAccounts, first, before, last, after))

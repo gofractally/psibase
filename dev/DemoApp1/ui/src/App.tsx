@@ -1,5 +1,5 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib";
+import { PluginId, Supervisor } from "@psibase/common-lib";
 import React, { ChangeEvent, useEffect, useState } from "react";
 
 import { fetchAnswers } from "./utils/fetchAnswers";
@@ -7,10 +7,24 @@ import { wait } from "./utils/wait";
 
 const supervisor = new Supervisor();
 
+enum InviteState {
+  Pending = "Pending",
+  Accepted = "Accepted",
+  Rejected = "Rejected"
+}
 interface Invite {
-  inviter: string;
-  app: string;
-  callback: string;
+  inviter: string,
+  app: string,
+  state: InviteState,
+  actor: string,
+  expiry: string,
+  callback: string,
+}
+
+interface ErrorType {
+  code: number;
+  producer: PluginId;
+  message: string;
 }
 
 const FileSelector: React.FC<{ onLoad: (content: string) => void }> = ({
@@ -42,6 +56,7 @@ function App() {
       { service: "accounts" },
       { service: "auth-sig" },
       { service: "demoapp1" },
+      { service: "identity" },
     ]);
   };
 
@@ -81,6 +96,7 @@ function App() {
     }
   };
 
+  
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
@@ -90,31 +106,20 @@ function App() {
         params: ["/subpath"],
       })) as string;
       console.log(`Got invite URL: ${inviteUrl}`);
+
       const id: string | null = new URL(inviteUrl).searchParams.get("id");
       if (id !== null) {
-        const inviteObject: Invite = (await supervisor.functionCall({
-          service: "invite",
-          intf: "invitee",
-          method: "decodeInvite",
-          params: [id as string],
-        })) as Invite;
-        console.log(
-          `Decoded invite object: ${JSON.stringify(inviteObject, null, 2)}`
-        );
-        setRes(`Invited by: ${inviteObject.inviter}`);
+        console.log(`Invite ID: ${id}`);
       } else {
         setRes("id in URL was null");
       }
-
-      // eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
     }
   };
 
   const run4 = async () => {
-    const inviteId: string =
-      "eyJpbnZpdGVyIjoiYWxpY2UiLCJhcHAiOiJkZW1vYXBwMSIsInBrIjoiUFVCX0sxXzdqVGRNWUVhSGk2NlpFY3JoN1RvOVhLaW5nVmtSZEJ1ejZhYm0zbWVGYkd3OHpGRnZlIiwiY2IiOiJodHRwczovL2RlbW9hcHAxLnBzaWJhc2UuMTI3LjAuMC4xLnNzbGlwLmlvOjgwOTAvc3VicGF0aCJ9";
+    const inviteId: string = d;
     try {
       const inviteObject: Invite = (await supervisor.functionCall({
         service: "invite",
@@ -230,12 +235,84 @@ function App() {
   const [a, setA] = useState("");
   const [b, setB] = useState("");
   const [c, setC] = useState("");
+  const [d, setD] = useState("");
   const [answer, setAnswer] = useState("?");
 
+  const [claim, setClaim] = useState<number>(0.95);
+  const [attestee, setAttestee] = useState<string>("bob");
+  useState<string>(`{"attestation_type": "notIdentity", "subject": "bob", "claim": "My test claim", "score": 0.95}
+`);
+  const attestIdentity = async () => {
+    try {
+      console.info("attest().calling identity.api.attest()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "api",
+        method: "attestIdentityClaim",
+        params: [attestee, claim],
+      });
+      console.info("returned from Identity.api.attest()");
+      setRes(res as string);
+      console.info("Res:", res);
+    } catch (e) {
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
+    }
+  };
+  const getIdentitySummary = async () => {
+    try {
+      console.info("attest().calling identity.queries.summary()");
+      const res = await supervisor.functionCall({
+        service: "identity",
+        intf: "queries",
+        method: "summary",
+        params: [attestee],
+      });
+      console.info("typeof res:", typeof res);
+      console.info("returned from Identity.queries.summary()");
+      setRes(res as string);
+      console.info("Res:", res);
+      // console.info(`${res.percHighConfidence}% of ${res.uniqueAttestations}`);
+    } catch (e) {
+      alert(`${(e as ErrorType).message}`);
+      console.error(`${(e as ErrorType).message}`);
+    }
+  };
   return (
     <>
       <h1>Psibase Demo App 1</h1>
-      <h3>{res}</h3>
+      <h3>Attestation</h3>
+      <div>
+        <h4>Identity Claim:</h4>
+        <div>
+          <span>Attestee:</span>
+          <input
+            id="attestee"
+            type="text"
+            onChange={(e) => {
+              setAttestee(e.target.value);
+            }}
+            value={attestee}
+          />
+        </div>
+        <div>
+          <input
+            id="claim"
+            type="text"
+            onChange={(e) => {
+              if (!/^[0-9.]*$/.test(e.target.value)) {
+                e.preventDefault();
+              } else {
+                setClaim(parseFloat(e.target.value));
+              }
+            }}
+            value={claim}
+          />
+          <button onClick={attestIdentity}> Attest </button>
+          <button onClick={getIdentitySummary}> get Summary </button>
+        </div>
+      </div>
+      <pre>{JSON.stringify(res, null, 2)}</pre>
       <div className="card">
         <button onClick={() => run()}>
           {"auth-sig:plugin->generateKeypair"}
@@ -247,11 +324,12 @@ function App() {
       </div>
 
       <div className="card">
-        <button onClick={() => run3()}>{"Generate and decode invite"}</button>
+        <button onClick={() => run3()}>{"Generate invite"}</button>
       </div>
 
       <div className="card">
-        <button onClick={() => run4()}>{"Just decode"}</button>
+        <input type="text" onChange={(e) => setD(e.target.value)} />
+        <button onClick={() => run4()}>{"Decode invite"}</button>
       </div>
 
       <div className="card">
@@ -272,7 +350,7 @@ function App() {
       </div>
 
       <div className="card">
-        <button onClick={() => run8()}>{"Example login functionality"}</button>
+        <button onClick={() => run8()}>{"Example token transfers"}</button>
       </div>
     </>
   );

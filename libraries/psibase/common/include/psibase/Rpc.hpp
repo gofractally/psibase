@@ -11,8 +11,8 @@ namespace psibase
    {
       std::string name;
       std::string value;
+      PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
    };
-   PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
 
    // TODO: consider adding headers to this
    /// An HTTP Request
@@ -27,8 +27,8 @@ namespace psibase
       std::string       target;       ///< Absolute path, e.g. "/index.js"
       std::string       contentType;  ///< "application/json", "text/html", ...
       std::vector<char> body;         ///< Request body, e.g. POST data
+      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body)
    };
-   PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body)
 
    enum class HttpStatus : std::uint16_t
    {
@@ -58,7 +58,7 @@ namespace psibase
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<char>       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
+      PSIO_REFLECT(HttpReply, status, contentType, body, headers)
    };
-   PSIO_REFLECT(HttpReply, status, contentType, body, headers)
 
 }  // namespace psibase

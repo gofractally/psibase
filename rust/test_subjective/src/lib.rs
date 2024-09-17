@@ -35,7 +35,7 @@ mod service {
     }
 }
 
-#[psibase::test_case(services("subjective"))]
+#[psibase::test_case(packages("TestSubjective"))]
 fn test1(chain: psibase::Chain) -> Result<(), psibase::Error> {
     psibase::services::setcode::Wrapper::push(&chain)
         .setFlags(SERVICE, 0b1100)

@@ -27,6 +27,7 @@ include_dir = "0.7.3"
 indexmap = { version = "2.2.6", features = ["std", "serde"] }
 sha2 = "0.10"
 mime_guess = "2.0"
+pem = "3.0.4"
 percent-encoding = "2.3"
 psibase_macros = { version = "0.12.0", path = "../psibase_macros" }
 psibase_names = { version = "0.12.0", path = "../psibase_names" }
@@ -55,7 +56,6 @@ jwt = "0.16"
 reqwest = { version = "0.11", default-features = false, features = ["json","rustls-tls","gzip"] }
 rpassword = "7.2"
 secp256k1 = { version="0.27", features = ["global-context", "bitcoin_hashes"] }
-sha2 = "0.10"
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
 pkcs8 = { version = "0.10", features = ["pem"] }

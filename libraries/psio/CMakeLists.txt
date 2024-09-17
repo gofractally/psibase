@@ -1,6 +1,6 @@
 enable_testing()
 
-add_library( psio src/fpconv.c src/schema.cpp)
+add_library( psio src/fpconv.c src/schema.cpp src/from_json.cpp)
 target_link_libraries( psio PUBLIC rapidjson boost )
 target_include_directories( psio PUBLIC include )
 add_compile_options( -Wall -Wstrict-aliasing )
@@ -41,7 +41,7 @@ target_sources( psio INTERFACE
 add_subdirectory(tests)
 
 if(IS_WASM)
-    target_link_libraries(psio PUBLIC wasm-base)
+    target_link_libraries(psio PRIVATE wasm-base)
     target_include_directories(psio PUBLIC ../psibase/common/include)
     install(DIRECTORY include/psio TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
     install(TARGETS psio ARCHIVE COMPONENT libpsibase)

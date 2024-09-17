@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
+#include <services/system/AuthSig.hpp>
 #include <services/system/Transact.hpp>
 #include <services/user/InviteErrors.hpp>
 
@@ -21,7 +22,9 @@ namespace UserService
                         std::vector<psibase::Claim>               claims);
       void canAuthUserSys(psibase::AccountNumber user);
 
-      void requireAuth(const psibase::PublicKey& pubkey);
+      // Callable by any action that wants to confirm that the current transaction
+      // contains a claim for the specified public key.
+      void requireAuth(const SystemService::AuthSig::SubjectPublicKeyInfo& pubkey);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 

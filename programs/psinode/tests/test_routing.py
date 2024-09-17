@@ -12,7 +12,7 @@ class TestRouting(unittest.TestCase):
         # Each node is adjacent to two others. With 7 nodes, consensus
         # requires 4 nodes, so this test will time out if messages are not routed
         prods = cluster.ring(*testutil.generate_names(7))
-        a = testutil.boot_with_producers(prods)
+        a = testutil.boot_with_producers(prods, packages=['Minimal', 'Explorer'])
 
         # wait for irreversibility to advance
         a.wait(new_block())
@@ -33,7 +33,7 @@ class TestRouting(unittest.TestCase):
         # Each node is a adjacent to two others. With 7 nodes, consensus
         # requires 4 nodes, so this test will time out if messages are not routed
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-        testutil.boot_with_producers([a, b, c, d, e, f, g])
+        testutil.boot_with_producers([a, b, c, d, e, f, g], packages=['Minimal', 'Explorer'])
 
         # wait for irreversibility to advance
         a.wait(new_block())
@@ -64,7 +64,7 @@ class TestRouting(unittest.TestCase):
         # Each node is a adjacent to two others. With 7 nodes, consensus
         # requires 4 nodes, so this test will time out if messages are not routed
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j', 'k', 'l', 'm'])
+        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j', 'k', 'l', 'm'], packages=['Minimal', 'Explorer'])
 
         # wait for irreversibility to advance
         a.wait(new_block())
@@ -94,7 +94,7 @@ class TestRouting(unittest.TestCase):
     @testutil.psinode_test
     def test_bft(self, cluster):
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-        testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft')
+        testutil.boot_with_producers([a, b, c, d, e, f, g], 'bft', packages=['Minimal', 'Explorer'])
 
         # wait for irreversibility to advance
         a.wait(new_block())
@@ -124,7 +124,7 @@ class TestRouting(unittest.TestCase):
     @testutil.psinode_test
     def test_bft_min_nodes(self, cluster):
         (a, b, c, d, e, f, g) = cluster.ring('a', 'b', 'c', 'd', 'e', 'f', 'g')
-        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j'], 'bft')
+        testutil.boot_with_producers([a, b, c, d, e, f, g, 'h', 'i', 'j'], 'bft', packages=['Minimal', 'Explorer'])
 
         # wait for irreversibility to advance
         a.wait(new_block())

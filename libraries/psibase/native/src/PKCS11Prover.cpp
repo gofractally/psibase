@@ -269,39 +269,6 @@ namespace
       {
          return std::move(in);
       }
-      else if (service == AccountNumber{"verifyk1"})
-      {
-         const unsigned char* p = reinterpret_cast<const unsigned char*>(in.data());
-         std::unique_ptr<EVP_PKEY, OpenSSLDeleter> key(d2i_PUBKEY(nullptr, &p, in.size()));
-         if (!key)
-         {
-            handleOpenSSLError();
-         }
-         setCompressedKey(key.get());
-         check(EVP_PKEY_base_id(key.get()) == EVP_PKEY_EC, "Expected EC key");
-         auto         data = getPublicKeyData(key.get());
-         EccPublicKey eckey;
-         check(data.size() == eckey.size(), "Expected compressed public key");
-         std::ranges::copy(data, eckey.begin());
-         auto params = getKeyParams(key.get());
-         p           = params.data();
-         std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter> id(
-             d2i_ASN1_OBJECT(nullptr, &p, params.size()));
-         check(!!id, "Expected named curve");
-         auto nid = OBJ_obj2nid(id.get());
-         if (nid == NID_X9_62_prime256v1)
-         {
-            return psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<1>, eckey}});
-         }
-         else if (nid == NID_secp256k1)
-         {
-            return psio::to_frac(PublicKey{PublicKey::variant_type{std::in_place_index<0>, eckey}});
-         }
-         else
-         {
-            throw std::runtime_error("Unsupported curve for verifyk1");
-         }
-      }
       else
       {
          throw std::runtime_error("Unsupported verify service");
@@ -316,47 +283,6 @@ namespace
       {
          return storeKey(session, key_label, parsePrivateKey(key).get());
       }
-      else if (service == AccountNumber{"verifyk1"})
-      {
-         auto           k = psio::from_frac<PrivateKey>(key);
-         EccPrivateKey* eckey;
-         int            nid;
-         if (auto* k1 = std::get_if<0>(&k.data))
-         {
-            eckey = k1;
-            nid   = NID_secp256k1;
-         }
-         if (auto* r1 = std::get_if<1>(&k.data))
-         {
-            eckey = r1;
-            nid   = NID_X9_62_prime256v1;
-         }
-         else
-         {
-            throw std::runtime_error("Unexpected variant value");
-         }
-
-         auto params =
-             encodeObjectId(std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter>(OBJ_nid2obj(nid)).get());
-         auto privkey = std::vector<unsigned char>(eckey->begin(), eckey->end());
-         auto pubkey =
-             encodeOctetString(std::visit(std::identity(), psibase::getPublicKey(k).data));
-         std::vector<unsigned char> fingerprint(32);
-         SHA256(pubkey.data(), pubkey.size(), fingerprint.data());
-         std::string_view label = eckey_label;
-
-         auto priv = session.CreateObject(
-             attributes::class_{object_class::private_key}, attributes::key_type{key_type::ecdsa},
-             attributes::token{true}, attributes::label{std::string{label}},
-             attributes::id{fingerprint}, attributes::ec_params{params},
-             attributes::value{privkey});
-         auto pub = session.CreateObject(
-             attributes::class_{object_class::public_key}, attributes::key_type{key_type::ecdsa},
-             attributes::token{true}, attributes::label{std::string{label}},
-             attributes::id{fingerprint}, attributes::ec_params{params},
-             attributes::ec_point{pubkey});
-         return priv;
-      }
       else
       {
          throw std::runtime_error("Unsupported verify service");
@@ -370,24 +296,6 @@ namespace
       if (service == AccountNumber{"verify-sig"})
       {
          return std::move(sig);
-      }
-      else if (service == AccountNumber{"verifyk1"})
-      {
-         EccSignature result;
-         check(result.size() == sig.size(), "Wrong size for ECDSA signature");
-         std::memcpy(result.data(), sig.data(), sig.size());
-         psio::view<const PublicKey> pkey_view{pubkey};
-         switch (pkey_view.data().index())
-         {
-            case 0:
-               return psio::to_frac(
-                   Signature{Signature::variant_type{std::in_place_index<0>, result}});
-            case 1:
-               return psio::to_frac(
-                   Signature{Signature::variant_type{std::in_place_index<1>, result}});
-            default:
-               throw std::runtime_error("Wrong variant value");
-         }
       }
       else
       {
@@ -435,7 +343,6 @@ void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session,
 void psibase::loadPKCS11Keys(std::shared_ptr<pkcs11::session> session, CompoundProver& out)
 {
    loadPKCS11Keys(session, AccountNumber{"verify-sig"}, key_label, out);
-   loadPKCS11Keys(session, AccountNumber{"verifyk1"}, eckey_label, out);
 }
 
 psibase::PKCS11Prover::PKCS11Prover(std::shared_ptr<pkcs11::session> session,

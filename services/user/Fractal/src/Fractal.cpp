@@ -330,7 +330,7 @@ struct Queries
       return Fractal::Tables(Fractal::service).open<IdentityTable>().get(user);
    }
 
-   auto getInvite(PublicKey pubkey) const
+   auto getInvite(FractalNs::PublicKey pubkey) const
    {  //
       return Fractal::Tables(Fractal::service).open<InviteTable>().get(pubkey);
    }
