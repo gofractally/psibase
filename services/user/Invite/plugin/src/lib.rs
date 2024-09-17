@@ -145,7 +145,7 @@ impl Invitee for Component {
 
         let expiry = DateTime::from_timestamp(invite.expiry as i64, 0)
             .ok_or(DatetimeError.err("decode_invite"))?
-            .to_string();
+            .to_rfc3339();
         let state = match invite.state {
             0 => InviteState::Pending,
             1 => InviteState::Accepted,

@@ -105,7 +105,9 @@ export class Supervisor {
 
     onFunctionCallResponse(response: FunctionCallResponse) {
         if (!this.pendingRequest) {
-            throw Error(`Received unexpected response from supervisor.`);
+            throw Error(
+                `Received unexpected response from supervisor while having no pending request. ${JSON.stringify(response)}`,
+            );
         }
         const expected = this.pendingRequest.call;
         const received = response.call;
