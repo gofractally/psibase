@@ -5,6 +5,7 @@ use bindings::exports::branding::plugin::api::Guest as Api;
 use bindings::exports::branding::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
+use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 
@@ -17,8 +18,7 @@ struct BrandingPlugin;
 impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
         let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
-        CommonServer::add_action_to_transaction("setNetworkName", &packed_network_name_args)
-            .unwrap();
+        add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
         let packed_logo_args = branding::action_structs::storeSys {
@@ -27,7 +27,7 @@ impl Api for BrandingPlugin {
             content: Hex(logo),
         }
         .packed();
-        CommonServer::add_action_to_transaction("storeSys", &packed_logo_args).unwrap();
+        add_action_to_transaction("storeSys", &packed_logo_args).unwrap();
     }
 }
 
