@@ -726,7 +726,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
-                    Docs Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
 )
 

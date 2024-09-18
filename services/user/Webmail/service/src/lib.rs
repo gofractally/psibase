@@ -1,17 +1,18 @@
 use std::collections::HashMap;
 
-use psibase::check;
 use psibase::services::accounts::Wrapper as AccountsSvc;
 use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::AccountNumber;
 use psibase::HttpReply;
 use psibase::HttpRequest;
 
-fn validate_user(acct: AccountNumber) {
-    check(
-        AccountsSvc::call().exists(acct),
-        format!("account '{}' DNE", acct).as_str(),
-    );
+fn validate_user(user: &str) -> bool {
+    let acc = AccountNumber::from(user);
+    if acc.to_string() != user {
+        return false;
+    }
+
+    AccountsSvc::call().exists(acc)
 }
 
 fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
@@ -54,14 +55,18 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let mut s_clause = String::new();
         let s_opt = params.get("sender");
         if let Some(s) = s_opt {
-            validate_user(AccountNumber::from(s.as_str()));
+            if !validate_user(s) {
+                return None;
+            }
             s_clause = format!("sender = '{}'", s);
         }
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
         if let Some(r) = r_opt {
-            validate_user(AccountNumber::from(r.as_str()));
+            if !validate_user(r) {
+                return None;
+            }
             r_clause = format!("receiver = '{}'", r);
         }
 
@@ -94,19 +99,23 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
+    use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::{
         anyhow, check, get_sender, get_service, serve_content, serve_simple_ui, store_content,
         AccountNumber, HexBytes, HttpReply, HttpRequest, Table, WebContentRow,
     };
 
-    use crate::{serve_rest_api, validate_user};
+    use crate::serve_rest_api;
 
     #[table(record = "WebContentRow")]
     struct WebContentTable;
 
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
-        validate_user(receiver);
+        check(
+            AccountsSvc::call().exists(receiver),
+            &format!("receiver account {} doesn't exist", receiver),
+        );
         Wrapper::emit()
             .history()
             .sent(get_sender(), receiver, subject, body);
