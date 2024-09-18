@@ -1,0 +1,19 @@
+package branding:plugin;
+
+interface api {
+    set-network-name: func(name: string);
+    set-logo: func(logo: list<u8>);
+}
+
+interface queries {
+    use host:common/types.{error};
+    get-network-name: func() -> result<string, error>;
+}
+
+world psibase-plugin {
+    import host:common/server;
+    import transact:plugin/intf;
+
+    export api;
+    export queries;
+}
