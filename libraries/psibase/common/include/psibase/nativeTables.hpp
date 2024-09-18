@@ -157,7 +157,8 @@ namespace psibase
       PSIO_REFLECT(DatabaseStatusRow,
                    nextHistoryEventNumber,
                    nextUIEventNumber,
-                   nextMerkleEventNumber)
+                   nextMerkleEventNumber,
+                   blockMerkleEventNumber)
    };
 
    // Notifications are sent by native code
