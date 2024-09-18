@@ -1,0 +1,20 @@
+[package]
+name = "webmail"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
+
+[package.metadata.psibase]
+server = "webmail"
+plugin = "plugin"
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+
+[dev-dependencies]
+webmail_package = { path = ".." }
