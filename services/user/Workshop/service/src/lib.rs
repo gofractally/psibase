@@ -35,41 +35,41 @@ pub mod service {
     pub struct AppMetadata {
         /// The unique identifier for the app
         #[primary_key]
-        account_id: AccountNumber,
+        pub account_id: AccountNumber,
 
         /// The name of the app
-        name: String,
+        pub name: String,
 
         /// A short description of the app
-        short_description: String,
+        pub short_description: String,
 
         /// A detailed description of the app
-        long_description: String,
+        pub long_description: String,
 
         /// The icon of the app (stored as a base64 string)
-        icon: Option<String>,
+        pub icon: Option<String>,
 
         /// The subpage for Terms of Service
-        tos_subpage: String,
+        pub tos_subpage: String,
 
         /// The subpage for Privacy Policy
-        privacy_policy_subpage: String,
+        pub privacy_policy_subpage: String,
 
         /// The subpage for the app's homepage
-        app_homepage_subpage: String,
+        pub app_homepage_subpage: String,
 
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
-        status: String,
+        pub status: String,
 
         /// The timestamp of when the app was created
-        created_at: psibase::TimePointSec,
+        pub created_at: psibase::TimePointSec,
 
         /// The tags associated with the app
-        tags: Vec<u64>,
+        pub tags: Vec<u64>,
     }
 
     #[action]
-    fn getAppMetadata(account_id: AccountNumber) -> Option<AppMetadata> {
+    fn getMetadata(account_id: AccountNumber) -> Option<AppMetadata> {
         AppMetadataTable::new().get_index_pk().get(&account_id)
     }
 
@@ -167,7 +167,7 @@ pub mod service {
 
 //     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
 
-//     // Test getAppMetadata
+//     // Test getMetadata
 //     let reply: Value = chain.graphql(
 //         SERVICE,
 //         r#"query { appMetadata(account_id: "app1") { name shortDescription status } }"#,

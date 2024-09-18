@@ -23,7 +23,7 @@ mod service {
             &self,
             account_id: AccountNumber,
         ) -> Option<workshop::service::AppMetadata> {
-            let x = workshop::Wrapper::call().getAppMetadata(account_id);
+            let x = workshop::Wrapper::call().getMetadata(account_id);
             x
         }
     }

@@ -2,11 +2,6 @@
 resolver = "2"
 members = ["service", "query", "plugin"]
 
-[package]
-name = "workshop_package"
-version = "0.1.0"
-edition = "2021"
-
 [workspace.package]
 version = "0.1.0"
 rust-version = "1.64"
@@ -14,6 +9,9 @@ edition = "2021"
 publish = false
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+
+[package]
+name = "workshop_package"
 
 [package.metadata.psibase]
 package-name = "workshop"
@@ -27,6 +25,10 @@ debug = false
 strip = true
 lto = true
 
+[lib]
+crate-type = ["rlib"]
+
 [dependencies]
 workshop = { path = "service" }
 r-workshop = { path = "query" }
+workshop-plugin = { path = "plugin" }

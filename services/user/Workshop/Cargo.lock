@@ -1327,6 +1327,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "pem"
+version = "3.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1409,15 +1419,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "plugin"
-version = "0.1.0"
-dependencies = [
- "psibase",
- "wit-bindgen-rt",
- "workshop",
-]
-
-[[package]]
 name = "portable-atomic"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1489,6 +1490,7 @@ dependencies = [
  "indicatif",
  "jwt",
  "mime_guess",
+ "pem",
  "percent-encoding",
  "pkcs8",
  "psibase_macros",
@@ -2732,11 +2734,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "workshop_package"
+name = "workshop-plugin"
 version = "0.1.0"
+dependencies = [
+ "fracpack",
+ "psibase",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+ "workshop",
+ "workshop_package",
+]
+
+[[package]]
+name = "workshop_package"
+version = "0.0.0"
 dependencies = [
  "r-workshop",
  "workshop",
+ "workshop-plugin",
 ]
 
 [[package]]

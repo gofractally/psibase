@@ -10,6 +10,7 @@ publish = false
 
 [package.metadata.psibase]
 plugin = "workshop-plugin"
+data = [{src = "../ui/dist", dst = "/"}]
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase" }

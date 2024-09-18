@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import slugify from "slugify";
 import { FunctionCallArgs } from "@psibase/common-lib";
-import { usePluginCall } from "@hooks/use-plugin";
 import { Button } from "@shadcn/button";
 import {
     Form,
@@ -26,6 +25,7 @@ import { useUser } from "@hooks";
 import { RegisteredApp } from "@types";
 import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
 import { workshopPlugin } from "src/plugin/plugin";
+import { useMetadata } from "@hooks/use-metadata";
 
 const slugifyOptions = { lower: true, strict: true };
 
@@ -69,7 +69,8 @@ export function AppMetadataForm() {
     const navigate = useNavigate();
     const location = useLocation() as { state?: { app: RegisteredApp } };
     const id = location.state?.app?.id;
-    const [selectedAccount] = useUser();
+    const { user: selectedAccount } = useUser();
+    const { setMetadata, currentMetadata } = useMetadata();
     const [appStatus, setAppStatus] = useState(
         id ? location.state?.app?.status : "DRAFT",
     );
@@ -77,9 +78,12 @@ export function AppMetadataForm() {
     const [iconPreview, setIconPreview] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { mutateAsync: pluginCall, isPending } = usePluginCall();
-
     const isUpdating = !!id;
+
+    // TODO: preload form with current metadata when present
+    // TODO: we need to make sure the metadata was not found or is present to avoid wrong overwriting
+    // TODO: handle loading state
+    console.info("currentMetadata", currentMetadata);
 
     const form = useForm<AppMetadataFormData>({
         resolver: zodResolver(AppMetadataSchema),
@@ -99,7 +103,7 @@ export function AppMetadataForm() {
         if (isUpdating && location.state?.app) {
             const app = location.state.app;
 
-            if (app.accountId !== selectedAccount.account) {
+            if (app.accountId !== selectedAccount) {
                 toast.error("You don't have permission to edit this app.");
                 navigate("/");
                 return;
@@ -128,14 +132,15 @@ export function AppMetadataForm() {
 
         let args: FunctionCallArgs;
 
-        const iconBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                console.log("Icon read complete");
-                resolve(reader.result as string);
-            };
-            reader.readAsDataURL(data.icon as Blob);
-        });
+        // const iconBase64 = await new Promise<string>((resolve) => {
+        //     const reader = new FileReader();
+        //     reader.onloadend = () => {
+        //         console.log("Icon read complete");
+        //         resolve(reader.result as string);
+        //     };
+        //     reader.readAsDataURL(data.icon as Blob);
+        // });
+        const iconBase64 = "";
 
         console.log("Sending...", {
             name: data.name,
@@ -170,7 +175,10 @@ export function AppMetadataForm() {
         // }
 
         try {
-            await pluginCall(args);
+            // TODO: handle all fields
+            await setMetadata({
+                name: data.name,
+            });
 
             // const result = await mockSubmitToAPI(
             //     data,
