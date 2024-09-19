@@ -1,5 +1,5 @@
 [package]
-name = "webmail"
+name = "chainmail"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -8,7 +8,7 @@ edition.workspace = true
 publish = false
 
 [package.metadata.psibase]
-server = "webmail"
+server = "chainmail"
 plugin = "plugin"
 
 [dependencies]
@@ -17,4 +17,4 @@ async-graphql = "7.0.7"
 serde = { version = "1.0.209", features = ["derive"] }
 
 [dev-dependencies]
-webmail_package = { path = ".." }
+chainmail_package = { path = ".." }

@@ -1,4 +1,4 @@
-#[crate::service(name = "webmail", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "chainmail", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::{http::HttpRequest, AccountNumber, Hex};

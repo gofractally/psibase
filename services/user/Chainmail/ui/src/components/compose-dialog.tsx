@@ -125,7 +125,7 @@ export const ComposeDialog = ({
             const supervisor = await getSupervisor();
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
-                service: "webmail",
+                service: "chainmail",
                 intf: "api",
                 method: "send",
                 params: [draft.to, draft.subject, draft.body],

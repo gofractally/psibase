@@ -3,6 +3,7 @@
 pub mod accounts;
 pub mod auth_delegate;
 pub mod auth_sig;
+pub mod chainmail;
 pub mod common_api;
 pub mod cpu_limit;
 pub mod events;
@@ -18,4 +19,3 @@ pub mod setcode;
 pub mod sites;
 pub mod tokens;
 pub mod transact;
-pub mod webmail;
