@@ -5,6 +5,9 @@ interface api {
 
     // Send an email
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;
+    
+    // Archive an email
+    archive: func(event-id: u64) -> result<_, error>;
 }
 
 world imports {

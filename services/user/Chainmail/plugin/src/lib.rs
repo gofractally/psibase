@@ -4,7 +4,6 @@ mod bindings;
 use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
-use psibase::services::chainmail;
 use psibase::AccountNumber;
 
 struct ChainmailPlugin;
@@ -19,6 +18,14 @@ impl API for ChainmailPlugin {
                 body,
             }
             .packed(),
+        )?;
+        Ok(())
+    }
+
+    fn archive(event_id: u64) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "archive",
+            &chainmail::action_structs::archive { event_id }.packed(),
         )?;
         Ok(())
     }
