@@ -1147,7 +1147,8 @@ struct callbacks
          throw std::runtime_error("Unsupported combination of flags for openChain");
 
       state.chains.push_back(std::make_unique<test_chain>(
-          state, std::string_view{path.data(), path.size()}, *config, mode));
+          state, std::string_view{path.data(), path.size()},
+          create ? *config : triedent::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27}, mode));
       return state.chains.size() - 1;
    }
 
@@ -1350,10 +1351,74 @@ struct callbacks
       return assert_chain(chain_index).native();
    }
 
+   psibase::Database& database(std::uint32_t chain_index)
+   {
+      return assert_chain(chain_index).native().database;
+   }
+
    void setResult(psibase::NativeFunctions& n)
    {
       state.result_key   = std::move(n.result_key);
       state.result_value = std::move(n.result_value);
+   }
+
+   uint32_t setResult(const std::optional<psio::input_stream>& o)
+   {
+      state.result_key.clear();
+      if (o)
+      {
+         state.result_value.assign(o->pos, o->end);
+         return state.result_value.size();
+      }
+      else
+      {
+         state.result_value.clear();
+         return -1;
+      }
+   }
+   uint32_t setResult(const std::optional<psibase::Database::KVResult>& o)
+   {
+      if (!o)
+      {
+         state.result_key.clear();
+         state.result_value.clear();
+         return -1;
+      }
+      else
+      {
+         state.result_key.assign(o->key.pos, o->key.end);
+         state.result_value.assign(o->value.pos, o->value.end);
+         return state.result_value.size();
+      }
+   }
+
+   psibase::DbId getDbRead(std::uint32_t db)
+   {
+      if (db == uint32_t(psibase::DbId::service))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::nativeConstrained))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::nativeUnconstrained))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::subjective))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::writeOnly))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::blockLog))
+         return (psibase::DbId)db;
+      throw std::runtime_error("may not read this db, or must use another intrinsic");
+   }
+
+
+   psibase::DbId getDbReadSequential(std::uint32_t db)
+   {
+      if (db == uint32_t(psibase::DbId::historyEvent))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::uiEvent))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::merkleEvent))
+         return (psibase::DbId)db;
+      throw std::runtime_error("may not read this db, or must use another intrinsic");
    }
 
    uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -1374,18 +1439,13 @@ struct callbacks
 
    uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvGet(db, key);
-      setResult(n);
-      return result;
+      return setResult(database(chain_index).kvGetRaw(getDbRead(db), {key.data(), key.size()}));
    }
 
    uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.getSequential(db, indexNumber);
-      setResult(n);
-      return result;
+      return setResult(database(chain_index)
+                           .kvGetRaw(getDbReadSequential(db), psio::convert_to_key(indexNumber)));
    }
 
    uint32_t kvGreaterEqual(std::uint32_t               chain_index,
@@ -1393,10 +1453,10 @@ struct callbacks
                            eosio::vm::span<const char> key,
                            uint32_t                    matchKeySize)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvGreaterEqual(db, key, matchKeySize);
-      setResult(n);
-      return result;
+      psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+      return setResult(
+          database(chain_index)
+              .kvGreaterEqualRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvLessThan(std::uint32_t               chain_index,
@@ -1404,18 +1464,14 @@ struct callbacks
                        eosio::vm::span<const char> key,
                        uint32_t                    matchKeySize)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvLessThan(db, key, matchKeySize);
-      setResult(n);
-      return result;
+      psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+      return setResult(database(chain_index)
+                           .kvLessThanRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvMax(db, key);
-      setResult(n);
-      return result;
+      return setResult(database(chain_index).kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
    }
 
    uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
