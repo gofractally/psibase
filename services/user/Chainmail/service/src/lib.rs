@@ -88,7 +88,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let mq = make_query(
             request,
             format!(
-                "SELECT * FROM \"history.webmail.sent\" {} ORDER BY ROWID",
+                "SELECT * FROM \"history.chainmail.sent\" {} ORDER BY ROWID",
                 where_clause
             ),
         );

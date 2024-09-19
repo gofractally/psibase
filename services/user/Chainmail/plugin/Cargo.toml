@@ -10,13 +10,13 @@ publish = false
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { path = "../../../../rust/psibase/" }
-webmail = { path = "../service/" }
+chainmail = { path = "../service/" }
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "webmail:plugin"
+package = "chainmail:plugin"
 
 [package.metadata.component.target]
 world = "impl"
@@ -26,4 +26,4 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 
 [dev-dependencies]
-webmail_package = { path = ".." }
+chainmail_package = { path = ".." }

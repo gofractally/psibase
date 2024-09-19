@@ -363,6 +363,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chainmail"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chainmail_package",
+ "psibase",
+ "serde",
+]
+
+[[package]]
+name = "chainmail_package"
+version = "0.0.0"
+dependencies = [
+ "chainmail",
+ "plugin",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1422,9 +1440,9 @@ dependencies = [
 name = "plugin"
 version = "0.1.0"
 dependencies = [
+ "chainmail",
+ "chainmail_package",
  "psibase",
- "webmail",
- "webmail_package",
  "wit-bindgen-rt",
 ]
 
@@ -2506,24 +2524,6 @@ checksum = "26fdeaafd9bd129f65e7c031593c24d62186301e0c72c8978fa1678be7d532c0"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webmail"
-version = "0.1.0"
-dependencies = [
- "async-graphql",
- "psibase",
- "serde",
- "webmail_package",
-]
-
-[[package]]
-name = "webmail_package"
-version = "0.0.0"
-dependencies = [
- "plugin",
- "webmail",
 ]
 
 [[package]]

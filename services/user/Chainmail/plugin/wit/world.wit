@@ -1,4 +1,4 @@
-package webmail:plugin;
+package chainmail:plugin;
 
 interface api {
     use host:common/types.{error};

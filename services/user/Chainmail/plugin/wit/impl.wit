@@ -1,4 +1,4 @@
-package webmail:plugin;
+package chainmail:plugin;
 
 world impl {
     include host:common/imports;

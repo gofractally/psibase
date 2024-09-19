@@ -11,7 +11,7 @@ homepage = "https://psibase.io"
 publish = false
 
 [package]
-name = "webmail_package"
+name = "chainmail_package"
 
 [profile.release]
 codegen-units = 1
@@ -21,13 +21,13 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "Webmail"
+package-name = "Chainmail"
 description = "Basic email app"
-services = ["webmail"]
+services = ["chainmail"]
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-webmail = { path = "service" }
+chainmail = { path = "service" }
 plugin = { path = "plugin" }

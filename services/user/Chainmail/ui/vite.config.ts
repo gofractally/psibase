@@ -132,7 +132,7 @@ const psibase = (service: string, isServing?: boolean) => {
 export default defineConfig(({ command }) => ({
     plugins: [
         react(),
-        psibase("webmail", command === "serve"),
+        psibase("chainmail", command === "serve"),
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),
