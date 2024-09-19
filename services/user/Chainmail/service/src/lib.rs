@@ -87,10 +87,9 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let mq = make_query(
             request,
-            format!(
-                "SELECT * FROM \"history.chainmail.sent\" {} ORDER BY ROWID",
-                where_clause
-            ),
+            format!("SELECT *
+                FROM \"history.chainmail.sent\" AS sent
+                LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id {} ORDER BY ROWID", where_clause),
         );
         return REventsSvc::call().serveSys(mq);
     }
@@ -142,8 +141,17 @@ mod service {
             .sent(get_sender(), receiver, subject, body);
     }
 
+    #[action]
+    fn archive(event_id: u64) {
+        Wrapper::emit()
+            .history()
+            .archive(get_sender().to_string() + &event_id.to_string());
+    }
+
     #[event(history)]
     pub fn sent(sender: AccountNumber, receiver: AccountNumber, subject: String, body: String) {}
+    #[event(history)]
+    pub fn archive(event_id: String) {}
 
     #[action]
     #[allow(non_snake_case)]
