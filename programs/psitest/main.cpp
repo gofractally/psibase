@@ -395,6 +395,19 @@ struct test_chain
       }
    }
 
+   void writeRevision()
+   {
+      psibase::check(!blockContext, "may not call writeRevision while building a block");
+      if (altBlockContext)
+      {
+         auto status = altBlockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
+                                                                     psibase::statusKey());
+         psibase::check(status.has_value(), "missing status record");
+         auto revision = altBlockContext->session.writeRevision(status->head->blockId);
+         db.setHead(*writer, revision);
+      }
+   }
+
    psibase::NativeFunctions& native()
    {
       static const psibase::SignedTransaction dummyTransaction;
@@ -423,6 +436,8 @@ struct test_chain
       }
       return *nativeFunctions;
    }
+
+   psibase::Database& database() { return native().database; }
 };  // test_chain
 
 test_chain_ref::test_chain_ref(test_chain& chain)
@@ -1353,7 +1368,7 @@ struct callbacks
 
    psibase::Database& database(std::uint32_t chain_index)
    {
-      return assert_chain(chain_index).native().database;
+      return assert_chain(chain_index).database();
    }
 
    void setResult(psibase::NativeFunctions& n)
@@ -1409,6 +1424,23 @@ struct callbacks
       throw std::runtime_error("may not read this db, or must use another intrinsic");
    }
 
+   psibase::DbId getDbWrite(test_chain& chain, std::uint32_t db)
+   {
+      switch (db)
+      {
+         case uint32_t(psibase::DbId::service):
+         case uint32_t(psibase::DbId::nativeConstrained):
+         case uint32_t(psibase::DbId::nativeUnconstrained):
+            psibase::check(!chain.blockContext, "may not write this db while building a block");
+            return (psibase::DbId)db;
+         case uint32_t(psibase::DbId::subjective):
+         case uint32_t(psibase::DbId::writeOnly):
+         case uint32_t(psibase::DbId::blockLog):
+            return (psibase::DbId)db;
+         default:
+            throw std::runtime_error("may not write this db, or must use another intrinsic");
+      }
+   }
 
    psibase::DbId getDbReadSequential(std::uint32_t db)
    {
@@ -1474,6 +1506,20 @@ struct callbacks
       return setResult(database(chain_index).kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
    }
 
+   void kvPut(std::uint32_t               chain_index,
+              uint32_t                    db,
+              eosio::vm::span<const char> key,
+              eosio::vm::span<const char> value)
+   {
+      auto& chain = assert_chain(chain_index);
+      state.result_key.clear();
+      state.result_value.clear();
+      chain.database().kvPutRaw(getDbWrite(chain, db), {key.data(), key.size()},
+                                {value.data(), value.size()});
+   }
+
+   void commitState(std::uint32_t chain_index) { assert_chain(chain_index).writeRevision(); }
+
    uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
    {
       auto& n      = native(chain_index);
@@ -1502,6 +1548,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
    rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
    rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
+   rhf_t::add<&callbacks::kvPut>("psibase", "kvPut");
    rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics
@@ -1512,6 +1559,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rhf_t::add<&callbacks::commitState>("psibase", "commitState");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
    rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
    rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
