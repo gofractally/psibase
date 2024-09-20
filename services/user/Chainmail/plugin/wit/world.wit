@@ -8,6 +8,9 @@ interface api {
     
     // Archive an email
     archive: func(event-id: u64) -> result<_, error>;
+    
+    // Save an email
+    save: func(event-id: u64) -> result<_, error>;
 }
 
 world imports {
