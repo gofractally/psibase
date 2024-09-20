@@ -25,6 +25,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 
 mod cli;
@@ -258,6 +259,9 @@ enum Command {
     /// Setup the psibase local config file
     #[command(subcommand)]
     Config(ConfigCommand),
+
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[allow(dead_code)] // TODO: move to lib if still needed
@@ -596,6 +600,27 @@ async fn monitor_trx(
         progress.inc(n);
     }
     Ok(())
+}
+
+fn find_psitest() -> OsString {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psitest = format!("psitest{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psitest);
+                if sibling.is_file() {
+                    return sibling.into();
+                }
+                if parent.ends_with("rust/release") {
+                    let in_build_dir = parent.parent().unwrap().parent().unwrap().join(psitest);
+                    if in_build_dir.exists() {
+                        return in_build_dir.into();
+                    }
+                }
+            }
+        }
+    }
+    "psitest".to_string().into()
 }
 
 fn data_directory() -> Result<PathBuf, anyhow::Error> {
@@ -1175,6 +1200,25 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
+    let psitest = find_psitest();
+    let command_path = data_directory()?.join("wasm");
+    let mut filename: OsString = "psibase-".to_string().into();
+    filename.push(&args[0]);
+    filename.push(".wasm");
+    let wasm_file = command_path.join(filename);
+    if !wasm_file.is_file() {
+        return Err(anyhow!(
+            "unrecognized subcommand '{}'",
+            args[0].to_string_lossy()
+        ));
+    }
+    Err(std::process::Command::new(psitest)
+        .arg(wasm_file)
+        .args(&args[1..])
+        .exec())?
+}
+
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
     Ok((builder.gzip(true).build()?, result))
@@ -1304,6 +1348,7 @@ async fn main() -> Result<(), anyhow::Error> {
             mode,
         } => create_token(Duration::seconds(*expires_after), mode)?,
         Command::Config(config) => handle_cli_config_cmd(config)?,
+        Command::External(argv) => handle_external(argv)?,
     }
 
     Ok(())

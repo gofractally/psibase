@@ -56,7 +56,7 @@ int main(int argc, const char* const* argv)
 {
    if (argc < 3)
    {
-      std::cerr << "Usage: " << argv[0] << " DATABASE SNAPSHOT-FILE" << std::endl;
+      std::cerr << "Usage: psibase create-snapshot DATABASE SNAPSHOT-FILE" << std::endl;
       return 2;
    }
    std::string_view in_path  = argv[1];
