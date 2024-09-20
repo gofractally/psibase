@@ -64,11 +64,12 @@ int main(int argc, const char* const* argv)
       std::cerr << "Usage: " << argv[0] << " DATABASE SNAPSHOT-FILE" << std::endl;
       return 2;
    }
-   std::string_view        out_path = argv[1];
-   auto                    in_path  = argv[2];
-   psibase::DatabaseConfig config;
-   auto          handle = raw::openChain(out_path.data(), out_path.size(), __WASI_OFLAGS_CREAT,
-                                         __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_WRITE, &config);
+   std::string_view   out_path = argv[1];
+   auto               in_path  = argv[2];
+   psibase::TestChain chain(out_path, O_CREAT | O_RDWR);
+   auto               handle = chain.nativeHandle();
+   auto               oldStatus =
+       chain.kvGet<psibase::StatusRow>(DbId::nativeUnconstrained, psibase::statusKey());
    std::ifstream in(in_path);
    if (!in)
    {
@@ -77,5 +78,10 @@ int main(int argc, const char* const* argv)
    }
    read_header({}, in);
    read(handle, in);
+   auto newStatus =
+       chain.kvGet<psibase::StatusRow>(DbId::nativeUnconstrained, psibase::statusKey());
+   psibase::check(!!newStatus, "Missing status row");
+   if (oldStatus)
+      psibase::check(oldStatus->chainId == newStatus->chainId, "Snapshot is for a different chain");
    raw::commitState(handle);
 }
