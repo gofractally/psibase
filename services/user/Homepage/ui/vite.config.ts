@@ -3,9 +3,10 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
 import svgr from "vite-plugin-svgr";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 const psibase = (appletContract: string, isServing?: boolean) => {
-    const buildAliases = [
+    const buildAliases: { find: string | RegExp; replacement: string }[] = [
         {
             find: "@",
             replacement: path.resolve(__dirname, "./src"),
@@ -87,6 +88,7 @@ export default defineConfig(({ command }) => ({
         react(),
         svgr({ exportAsDefault: true }),
         psibase("psibase", command === "serve"),
+        tsconfigPaths(),
     ],
     resolve: {
         alias: {
