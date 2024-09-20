@@ -171,6 +171,13 @@ struct assert_exception : std::exception
    const char* what() const noexcept override { return msg.c_str(); }
 };
 
+struct exit_exception : std::exception
+{
+   explicit exit_exception(std::uint32_t code) : code(code) {}
+   virtual const char* what() const noexcept override { return "exit"; }
+   std::int32_t        code;
+};
+
 struct NullProver : psibase::Prover
 {
    std::vector<char> prove(std::span<const char>, const psibase::Claim&) const { return {}; }
@@ -670,11 +677,7 @@ struct callbacks
       throw std::runtime_error("called testerAbort");
    }
 
-   void wasi_proc_exit(int32_t code)
-   {
-      backtrace();
-      throw std::runtime_error("called testerExit");
-   }
+   void wasi_proc_exit(int32_t code) { throw exit_exception(code); }
 
    int32_t wasi_sched_yield() { return 0; }
 
@@ -1804,6 +1807,10 @@ int main(int argc, char* argv[])
    catch (eosio::vm::exception& e)
    {
       std::cerr << "vm::exception: " << e.detail() << "\n";
+   }
+   catch (::exit_exception& e)
+   {
+      return e.code;
    }
    catch (std::exception& e)
    {
