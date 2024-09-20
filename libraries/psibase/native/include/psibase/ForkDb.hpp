@@ -1331,37 +1331,16 @@ namespace psibase
          {
             // Add blocks in [irreversible, head]
             // for now ignore other forks
-            auto blockNum = status->head->header.blockNum;
+            auto blockId  = status->head->blockId;
+            auto revision = sc->sharedDatabase.getHead();
             do
             {
-               auto block = db.kvGet<Block>(DbId::blockLog, blockNum);
-               if (!block)
-               {
-                  break;
-               }
-               BlockInfo info{*block};
-               auto      revision = sc->sharedDatabase.getRevision(*this->writer, info.blockId);
-               if (!revision)
-               {
-                  if (blocks.empty())
-                  {
-                     revision = sc->sharedDatabase.getHead();
-                  }
-                  else
-                  {
-                     break;
-                  }
-               }
-               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
-               if (!proof)
-               {
-                  proof.emplace();
-               }
-               blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
+               // Initialize state
+               BlockInfo info = readHead(revision);
                auto [state_iter, _] =
                    states.try_emplace(info.blockId, info, systemContext, revision);
                byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
-               byBlocknumIndex.try_emplace(blockNum, info.blockId);
+               byBlocknumIndex.try_emplace(info.header.blockNum, info.blockId);
                if (!head)
                {
                   head = &state_iter->second;
@@ -1369,7 +1348,24 @@ namespace psibase
                   PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
                   PSIBASE_LOG(logger, debug) << "Read head block";
                }
-            } while (blockNum--);
+
+               // load block
+               auto block = db.kvGet<Block>(DbId::blockLog, info.header.blockNum);
+               if (!block)
+               {
+                  break;
+               }
+               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, info.header.blockNum);
+               if (!proof)
+               {
+                  proof.emplace();
+               }
+               blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
+
+               // Find the previous block
+               blockId  = info.header.previous;
+               revision = sc->sharedDatabase.getRevision(*this->writer, blockId);
+            } while (revision);
             const auto& info = states.begin()->second.info;
             PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
             PSIBASE_LOG(logger, debug) << "Read last committed block";
@@ -1453,6 +1449,15 @@ namespace psibase
          BlockContext verifyBc(*systemContext, std::move(revision));
          VerifyProver prover{verifyBc, signature};
          prover.prove(data, claim);
+      }
+
+      BlockInfo readHead(ConstRevisionPtr revision)
+      {
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         check(status && status->head, "Missing head");
+         return *status->head;
       }
 
      private:
