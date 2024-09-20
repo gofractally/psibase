@@ -1521,6 +1521,14 @@ struct callbacks
                                 {value.data(), value.size()});
    }
 
+   void kvRemove(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   {
+      auto& chain = assert_chain(chain_index);
+      state.result_key.clear();
+      state.result_value.clear();
+      chain.database().kvRemoveRaw(getDbWrite(chain, db), {key.data(), key.size()});
+   }
+
    void commitState(std::uint32_t chain_index) { assert_chain(chain_index).writeRevision(); }
 
    uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
@@ -1552,6 +1560,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
    rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
    rhf_t::add<&callbacks::kvPut>("psibase", "kvPut");
+   rhf_t::add<&callbacks::kvRemove>("psibase", "kvRemove");
    rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics

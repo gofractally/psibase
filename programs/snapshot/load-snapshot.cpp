@@ -57,6 +57,21 @@ void read(std::uint32_t chain, auto& stream)
    }
 }
 
+void clearDb(std::uint32_t chain, DbId db)
+{
+   std::vector<char> key;
+   while (true)
+   {
+      std::uint32_t value_size = raw::kvGreaterEqual(chain, db, key.data(), key.size(), 0);
+      if (value_size == 0xffffffffu)
+         return;
+      std::uint32_t key_size = raw::getKey(nullptr, 0);
+      key.resize(key_size);
+      raw::getKey(key.data(), key_size);
+      raw::kvRemove(chain, db, key.data(), key.size());
+   }
+}
+
 int main(int argc, const char* const* argv)
 {
    if (argc < 3)
@@ -77,6 +92,10 @@ int main(int argc, const char* const* argv)
       return 1;
    }
    read_header({}, in);
+   clearDb(handle, DbId::service);
+   clearDb(handle, DbId::nativeConstrained);
+   clearDb(handle, DbId::nativeUnconstrained);
+   clearDb(handle, DbId::writeOnly);
    read(handle, in);
    auto newStatus =
        chain.kvGet<psibase::StatusRow>(DbId::nativeUnconstrained, psibase::statusKey());

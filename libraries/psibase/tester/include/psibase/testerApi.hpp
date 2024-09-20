@@ -79,6 +79,9 @@ namespace psibase::tester::raw
               const char*   value,
               std::uint32_t valueLen);
 
+   TESTER_NATIVE(kvRemove)
+   void kvRemove(std::uint32_t chain, psibase::DbId db, const char* key, std::uint32_t keyLen);
+
    TESTER_NATIVE(commitState)
    void commitState(std::uint32_t chain);
 
