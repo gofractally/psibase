@@ -125,6 +125,7 @@ function(add suffix)
             service/src/time.c
             tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
+            tester/src/wasi_polyfill/init_cwd.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
