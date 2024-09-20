@@ -4,37 +4,18 @@
 #include <vector>
 
 #include <psibase/db.hpp>
+#include <psibase/testerApi.hpp>
 #include "SnapshotHeader.hpp"
 
 using psibase::DbId;
 using namespace psibase::snapshot;
+namespace raw = psibase::tester::raw;
 
 // snapshot format:
 // header
 // (dbid size32 key size32 value)*
 
 // A snapshot must include a subset of blocks (sufficient to prove validity)
-namespace raw
-{
-   [[clang::import_module("psibase"), clang::import_name("openChain")]]
-   std::uint32_t openChain(const char*   path,
-                           std::uint32_t pathlen,
-                           std::uint16_t oflags,
-                           std::uint64_t fs_rights_base,
-                           const void*   config);
-   [[clang::import_module("psibase"), clang::import_name("kvGreaterEqual")]]
-   std::uint32_t kvGreaterEqual(std::uint32_t chain,
-                                psibase::DbId db,
-                                const char*   key,
-                                std::uint32_t keyLen,
-                                std::uint32_t matchLen);
-   [[clang::import_module("psibase"), clang::import_name("getResult")]]
-   std::uint32_t getResult(const char* dest, std::uint32_t destSize, std::uint32_t offset);
-
-   [[clang::import_module("psibase"), clang::import_name("getKey")]]
-   std::uint32_t getKey(const char* dest, std::uint32_t destSize);
-
-}  // namespace raw
 
 void write_u32(std::uint32_t value, auto& stream)
 {

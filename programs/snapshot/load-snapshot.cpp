@@ -4,31 +4,13 @@
 #include <vector>
 
 #include <psibase/tester.hpp>
+#include <psibase/testerApi.hpp>
 #include "SnapshotHeader.hpp"
 
 using psibase::DbId;
 using namespace psibase::snapshot;
 
-namespace raw
-{
-   [[clang::import_module("psibase"), clang::import_name("openChain")]]
-   std::uint32_t openChain(const char*   path,
-                           std::uint32_t pathlen,
-                           std::uint16_t oflags,
-                           std::uint64_t fs_rights_base,
-                           const void*   config);
-
-   [[clang::import_module("psibase"), clang::import_name("kvPut")]]
-   void kvPut(std::uint32_t chain,
-              psibase::DbId db,
-              const char*   key,
-              std::uint32_t keyLen,
-              const char*   value,
-              std::uint32_t valueLen);
-
-   [[clang::import_module("psibase"), clang::import_name("commitState")]]
-   void commitState(std::uint32_t chain);
-}  // namespace raw
+namespace raw = psibase::tester::raw;
 
 bool read_u32(std::uint32_t& result, auto& stream)
 {
