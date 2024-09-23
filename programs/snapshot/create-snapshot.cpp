@@ -70,6 +70,5 @@ int main(int argc, const char* const* argv)
    }
    write_header({}, out);
    write_db(handle, DbId::service, out);
-   write_db(handle, DbId::nativeConstrained, out);
-   write_db(handle, DbId::nativeUnconstrained, out);
+   write_db(handle, DbId::native, out);
 }

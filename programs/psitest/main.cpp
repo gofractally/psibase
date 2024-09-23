@@ -1414,9 +1414,7 @@ struct callbacks
    {
       if (db == uint32_t(psibase::DbId::service))
          return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::nativeConstrained))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::nativeUnconstrained))
+      if (db == uint32_t(psibase::DbId::native))
          return (psibase::DbId)db;
       if (db == uint32_t(psibase::DbId::subjective))
          return (psibase::DbId)db;
@@ -1432,8 +1430,7 @@ struct callbacks
       switch (db)
       {
          case uint32_t(psibase::DbId::service):
-         case uint32_t(psibase::DbId::nativeConstrained):
-         case uint32_t(psibase::DbId::nativeUnconstrained):
+         case uint32_t(psibase::DbId::native):
             psibase::check(!chain.blockContext, "may not write this db while building a block");
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):

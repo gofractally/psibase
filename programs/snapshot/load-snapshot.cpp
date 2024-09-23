@@ -42,8 +42,7 @@ void read(std::uint32_t chain, auto& stream)
       switch (db)
       {
          case static_cast<std::uint32_t>(DbId::service):
-         case static_cast<std::uint32_t>(DbId::nativeConstrained):
-         case static_cast<std::uint32_t>(DbId::nativeUnconstrained):
+         case static_cast<std::uint32_t>(DbId::native):
             break;
          default:
             psibase::check(false, "Unexpected database id: " + std::to_string(db));
@@ -83,8 +82,7 @@ int main(int argc, const char* const* argv)
    auto               in_path  = argv[2];
    psibase::TestChain chain(out_path, O_CREAT | O_RDWR);
    auto               handle = chain.nativeHandle();
-   auto               oldStatus =
-       chain.kvGet<psibase::StatusRow>(DbId::nativeUnconstrained, psibase::statusKey());
+   auto          oldStatus   = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    std::ifstream in(in_path);
    if (!in)
    {
@@ -93,12 +91,10 @@ int main(int argc, const char* const* argv)
    }
    read_header({}, in);
    clearDb(handle, DbId::service);
-   clearDb(handle, DbId::nativeConstrained);
-   clearDb(handle, DbId::nativeUnconstrained);
+   clearDb(handle, DbId::native);
    clearDb(handle, DbId::writeOnly);
    read(handle, in);
-   auto newStatus =
-       chain.kvGet<psibase::StatusRow>(DbId::nativeUnconstrained, psibase::statusKey());
+   auto newStatus = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    psibase::check(!!newStatus, "Missing status row");
    if (oldStatus)
       psibase::check(oldStatus->chainId == newStatus->chainId, "Snapshot is for a different chain");
