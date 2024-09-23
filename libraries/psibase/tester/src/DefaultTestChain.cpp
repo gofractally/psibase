@@ -30,7 +30,7 @@ namespace
    InitCwd initCwd;
 #endif
 
-   void pushGenesisTransaction(DefaultTestChain& chain, std::span<PackagedService> service_packages)
+   void pushGenesisTransaction(TestChain& chain, std::span<PackagedService> service_packages)
    {
       std::vector<GenesisService> services;
       for (auto& s : service_packages)
@@ -138,29 +138,25 @@ namespace
          group.push_back(std::move(act));
          if (size >= 1024 * 1024)
          {
-            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+            result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
             size = 0;
          }
       }
       if (!group.empty())
       {
-         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group))});
+         result.push_back(SignedTransaction{chain.makeTransaction(std::move(group), 30)});
       }
+      return result;
+   }
+
+   DefaultTestChain& defaultChainInstance()
+   {
+      static DefaultTestChain result{DefaultTestChain::defaultPackages(), false, {}, false};
       return result;
    }
 }  // namespace
 
-std::vector<std::string> DefaultTestChain::defaultPackages()
-{
-   return {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "CommonApi", "CpuLimit",  "Events",
-           "Explorer", "Fractal", "Invite",       "Nft",     "Packages",  "Producers", "HttpServer",
-           "Sites",    "SetCode", "Symbol",       "Tokens",  "Transact"};
-}
-
-DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
-                                   bool                            installUI,
-                                   const DatabaseConfig&           dbconfig)
-    : TestChain(dbconfig)
+void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 {
    auto packageRoot = std::getenv("PSIBASE_DATADIR");
    check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
@@ -179,13 +175,35 @@ DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
            {transactor<Transact>{Transact::service, Transact::service}.startBoot(transactionIds)}),
        {});
    check(psibase::show(false, trace) == "", "Failed to boot");
-   startBlock();
-   setAutoBlockStart(true);
    for (const auto& trx : transactions)
    {
+      startBlock();
       auto trace = pushTransaction(trx);
       check(psibase::show(false, trace) == "", "Failed to boot");
    }
+   setAutoBlockStart(true);
+   startBlock();
+}
+
+std::vector<std::string> DefaultTestChain::defaultPackages()
+{
+   return {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "CommonApi", "CpuLimit",  "Events",
+           "Explorer", "Fractal", "Invite",       "Nft",     "Packages",  "Producers", "HttpServer",
+           "Sites",    "SetCode", "Symbol",       "Tokens",  "Transact"};
+}
+
+DefaultTestChain::DefaultTestChain() : TestChain(defaultChainInstance(), true)
+{
+   startBlock();
+}
+
+DefaultTestChain::DefaultTestChain(const std::vector<std::string>& names,
+                                   bool                            installUI,
+                                   const DatabaseConfig&           dbconfig,
+                                   bool                            pub)
+    : TestChain(dbconfig, pub)
+{
+   boot(names, installUI);
 }
 
 AccountNumber DefaultTestChain::addAccount(

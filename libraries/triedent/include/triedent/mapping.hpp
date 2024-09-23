@@ -1,5 +1,7 @@
 #pragma once
 
+#include <triedent/file_fwd.hpp>
+
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -7,12 +9,6 @@
 
 namespace triedent
 {
-
-   enum access_mode
-   {
-      read_only  = 0,
-      read_write = 1
-   };
 
    // Thread safety:
    //
@@ -34,7 +30,7 @@ namespace triedent
    class mapping
    {
      public:
-      mapping(const std::filesystem::path& file, access_mode mode, bool pin = false);
+      mapping(const std::filesystem::path& file, open_mode mode, bool pin = false);
       ~mapping();
       // Sets the size of the file to new_size.
       //

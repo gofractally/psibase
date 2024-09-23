@@ -9,6 +9,8 @@
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
 
+#include <fcntl.h>
+
 namespace psibase
 {
    using KeyList = std::vector<std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
@@ -135,17 +137,12 @@ namespace psibase
 
    template <typename T>
    concept HttpRequestBody = requires(const T& t) {
-      {
-         t.contentType()
-      } -> std::convertible_to<std::string>;
-      {
-         t.body()
-      } -> std::convertible_to<std::vector<char>>;
+      { t.contentType() } -> std::convertible_to<std::string>;
+      { t.body() } -> std::convertible_to<std::vector<char>>;
    };
 
    /**
     * Manages a chain.
-    * Only one TestChain can exist at a time.
     * The test chain uses simulated time.
     */
    class TestChain
@@ -155,28 +152,48 @@ namespace psibase
       std::optional<psibase::StatusRow> status;
       bool                              producing        = false;
       bool                              isAutoBlockStart = true;
+      bool                              isPublicChain;
+
+      explicit TestChain(uint32_t chain_id, bool clone, bool pub = true);
 
      public:
-      explicit TestChain(const DatabaseConfig&);
+      // Clones the chain
+      TestChain(const TestChain&, bool pub);
+      /**
+       * Creates a new temporary chain.
+       *
+       * @param pub If this is the only public chain, it will be automatically
+       * selected.
+       */
+      explicit TestChain(const DatabaseConfig&, bool pub = true);
+      /**
+       * Opens a chain.
+       *
+       * @param flags must include at least either O_RDONLY or O_RDWR, and
+       * can also contain O_CREAT, O_EXCL, and O_TRUNC.
+       */
+      TestChain(std::string_view      path,
+                int                   flags = O_CREAT | O_RDWR,
+                const DatabaseConfig& cfg   = {},
+                bool                  pub   = true);
       TestChain(uint64_t hot_bytes  = 1ull << 27,
                 uint64_t warm_bytes = 1ull << 27,
                 uint64_t cool_bytes = 1ull << 27,
                 uint64_t cold_bytes = 1ull << 27);
-      TestChain(const TestChain&) = delete;
       virtual ~TestChain();
 
       TestChain& operator=(const TestChain&) = delete;
+
+      /**
+       * Boots the chain.
+       */
+      void boot(const std::vector<std::string>& names, bool installUI);
 
       /**
        * Shuts down the chain to allow copying its state file. The chain's temporary path will
        * live until this object destructs.
        */
       void shutdown();
-
-      /**
-       * Get the temporary path which contains the chain's blocks and states directories
-       */
-      std::string getPath();
 
       /**
        * By default, the TestChain will automatically advance blocks.
@@ -213,7 +230,8 @@ namespace psibase
       /*
        * Creates a transaction.
        */
-      Transaction makeTransaction(std::vector<Action>&& actions = {}) const;
+      Transaction makeTransaction(std::vector<Action>&& actions    = {},
+                                  uint32_t              expire_sec = 2) const;
 
       /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
@@ -383,6 +401,27 @@ namespace psibase
       };
 
       auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
+
+      /// Get a key-value pair, if any
+      std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key);
+
+      /// Get a key-value pair, if any
+      template <typename V, typename K>
+      std::optional<V> kvGet(psibase::DbId db, const K& key)
+      {
+         auto v = kvGetRaw(db, psio::convert_to_key(key));
+         if (!v)
+            return std::nullopt;
+         // TODO: validate (allow opt-in or opt-out)
+         return psio::from_frac<V>(psio::prevalidated{*v});
+      }
+
+      /// Get a key-value pair, if any
+      template <typename V, typename K>
+      std::optional<V> kvGet(const K& key)
+      {
+         return kvGet<V>(psibase::DbId::service, key);
+      }
    };  // TestChain
 
 }  // namespace psibase

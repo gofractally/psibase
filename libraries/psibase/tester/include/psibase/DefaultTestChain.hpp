@@ -14,9 +14,11 @@ namespace psibase
      public:
       // default excludes Docs and TokenUsers
       static std::vector<std::string> defaultPackages();
-      DefaultTestChain(const std::vector<std::string>& packageNames = defaultPackages(),
-                       bool                            installUI    = false,
-                       const DatabaseConfig&           dbconfig     = {});
+      DefaultTestChain();
+      DefaultTestChain(const std::vector<std::string>& packageNames,
+                       bool                            installUI = false,
+                       const DatabaseConfig&           dbconfig  = {},
+                       bool                            pub       = true);
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);

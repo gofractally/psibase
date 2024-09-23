@@ -54,7 +54,7 @@ int main(int argc, char** argv)
       }
       if (vm.count("status"))
       {
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_only);
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::open_mode::read_only);
          db->print_stats(std::cerr, true);
       }
       if (vm.count("create"))
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 
       if (vm.count("validate"))
       {
-         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::database::read_only);
+         auto db   = std::make_shared<database>(db_dir.c_str(), triedent::open_mode::read_only);
          auto s    = db->start_write_session();
          auto root = s->get_top_root();
          s->validate(root);
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
 
       if (vm.count("gc"))
       {
-         auto db = std::make_shared<database>(db_dir.c_str(), triedent::database::read_write, true);
+         auto db = std::make_shared<database>(db_dir.c_str(), triedent::open_mode::gc);
          auto s  = db->start_write_session();
          s->start_collect_garbage();
          s->recursive_retain();

@@ -6,7 +6,6 @@ using namespace triedent;
 
 std::shared_ptr<database> createDb(const database::config& cfg)
 {
-   temp_directory dir("triedent-test");
-   database::create(dir.path, cfg);
-   return std::make_shared<database>(dir.path, cfg, access_mode::read_write);
+   return std::make_shared<database>(std::filesystem::temp_directory_path(), cfg,
+                                     open_mode::temporary);
 }
