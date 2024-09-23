@@ -12,7 +12,7 @@ use std::{
 
 pub use indexmap;
 
-#[derive(Debug, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
 #[fracpack(fracpack_mod = "crate")]
 pub struct Schema(IndexMap<String, AnyType>);
 

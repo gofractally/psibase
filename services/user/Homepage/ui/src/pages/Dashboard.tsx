@@ -16,7 +16,7 @@ const App = () => {
             <AppItem
                 name="Chain mail"
                 description="Send mail between accounts."
-                service="webmail"
+                service="chainmail"
             />
             <AppItem
                 name="Doc"

@@ -41,17 +41,27 @@ include(GNUInstallDirs)
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
-    ExternalProject_Add(wasi-sdk
-        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sdk-20.0-linux.tar.gz
-        URL_HASH SHA256=7030139d495a19fbeccb9449150c2b1531e15d8fb74419872a719a7580aad0f9
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-    )
-    ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
-    set(WASI_SDK_PREFIX ${SOURCE_DIR})
-    set(wasm-deps wasi-sdk)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz)
+        set(WASI_SDK_SHA256 c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5)
+    elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-linux.tar.gz)
+        set(WASI_SDK_SHA256 ae6c1417ea161e54bc54c0a168976af57a0c6e53078857886057a71a0d928646)
+    endif()
+    if(DEFINED WASI_SDK_URL)
+        ExternalProject_Add(wasi-sdk
+            URL ${WASI_SDK_URL}
+            URL_HASH SHA256=${WASI_SDK_SHA256}
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+        )
+
+        ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
+        set(WASI_SDK_PREFIX ${SOURCE_DIR})
+        set(wasm-deps wasi-sdk)
+        install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    endif()
 endif()
 
 if(DEFINED WASI_SDK_PREFIX)
@@ -140,7 +150,6 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
-                         ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
@@ -235,7 +244,6 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
-    services/user/Webmail/ui:Webmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -311,7 +319,6 @@ add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-
 add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi ${AuthPlugin_DEP})
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
-add_rs_component(services/user/Webmail/plugin:WebmailPlugin webmail_plugin.wasm wasm32-wasi)
 add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -626,23 +633,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Webmail.psi
-    NAME Webmail
-    VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "This app provides a webmail client for authenticated asynchronous communication between network users"
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})"
-    SERVICE webmail
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Webmail.wasm
-        SERVER webmail
-        DATA ${COMPONENT_BIN_DIR}/${WebmailPlugin_OUTPUT_FILE} /plugin.wasm
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Webmail/ui/dist/* /
-        INIT
-    DEPENDS ${Webmail_js_DEP}
-    DEPENDS wasm
-    DEPENDS ${WebmailPlugin_DEP}
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/Nft.psi
     NAME Nft
     VERSION ${PSIBASE_VERSION}
@@ -746,7 +736,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
-                    Docs Webmail Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
 )
 
@@ -819,7 +809,6 @@ install(
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/Transact.psi
-          ${SERVICE_DIR}/Webmail.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

@@ -2,7 +2,7 @@ use crate::services::{accounts, auth_delegate, producers, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
     Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
-    PackagedService, ProducerConfigRow, SignedTransaction, Tapos, TimePointSec, Transaction,
+    PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
 use serde_bytes::ByteBuf;
@@ -19,9 +19,9 @@ macro_rules! method {
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
-    producers::Wrapper::pack().setProducers(vec![ProducerConfigRow {
-        producerName: name,
-        producerAuth: key,
+    producers::Wrapper::pack().setProducers(vec![Producer {
+        name: name,
+        auth: key,
     }])
 }
 

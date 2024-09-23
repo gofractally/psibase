@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.64"
+edition = "2021"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
+publish = false
+
+[package]
+name = "chainmail_package"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "Chainmail"
+description = "Basic email app"
+services = ["chainmail"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+chainmail = { path = "service" }
+plugin = { path = "plugin" }

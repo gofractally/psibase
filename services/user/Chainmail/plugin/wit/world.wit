@@ -1,0 +1,12 @@
+package chainmail:plugin;
+
+interface api {
+    use host:common/types.{error};
+
+    // Send an email
+    send: func(receiver: string, subject: string, body: string) -> result<_, error>;
+}
+
+world imports {
+    import api;
+}
