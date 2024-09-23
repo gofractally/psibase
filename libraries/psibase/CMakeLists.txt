@@ -9,6 +9,7 @@ function(add suffix)
     target_sources(psibase${suffix} PRIVATE
         common/src/block.cpp
         common/src/crypto.cpp
+        common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
         common/src/time.cpp
         common/src/trace.cpp
