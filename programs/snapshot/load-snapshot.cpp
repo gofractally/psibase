@@ -3,11 +3,15 @@
 #include <iostream>
 #include <vector>
 
+#include <psibase/KvMerkle.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 #include "SnapshotHeader.hpp"
 
+#include <psio/to_hex.hpp>
+
 using psibase::DbId;
+using psibase::KvMerkle;
 using namespace psibase::snapshot;
 
 namespace raw = psibase::tester::raw;
@@ -33,27 +37,77 @@ void read_header(const SnapshotHeader& header, auto& stream)
    psibase::check(read_u32(stream) == header.version, "Unexpected snapshot version");
 }
 
-void read(std::uint32_t chain, auto& stream)
+void read_footer_row(SnapshotFooter& footer, std::span<const char> key, std::span<const char> value)
 {
-   std::uint32_t     db;
-   std::vector<char> key, value;
+   if (key.size() >= 3 && key[0] == 0 && key[1] == StateChecksum::table && key[2] == 0)
+   {
+      footer.hash = psio::from_frac<StateChecksum>(value);
+   }
+   else if (key.size() == 3 && key[0] == 0 && key[1] == StateSignature::table && key[2] == 0)
+   {
+      footer.signatures.push_back(psio::from_frac<StateSignature>(value));
+   }
+}
+
+int read(std::uint32_t chain, auto& stream)
+{
+   std::uint32_t  db;
+   KvMerkle::Item item;
+   std::uint32_t  current_db = 0;
+   KvMerkle       merkle;
+   SnapshotFooter footer;
+   StateChecksum  hash;
    while (read_u32(db, stream))
    {
       switch (db)
       {
          case static_cast<std::uint32_t>(DbId::service):
          case static_cast<std::uint32_t>(DbId::native):
+         case SnapshotFooter::id:
             break;
          default:
             psibase::check(false, "Unexpected database id: " + std::to_string(db));
       }
 
-      key.resize(read_u32(stream));
-      stream.read(key.data(), key.size());
-      value.resize(read_u32(stream));
-      stream.read(value.data(), value.size());
-      raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(), value.size());
+      if (db != current_db)
+      {
+         psibase::check(db > current_db, "Databases are in the wrong order");
+         if (current_db == static_cast<std::uint32_t>(DbId::service))
+         {
+            hash.serviceRoot = std::move(merkle).root();
+         }
+         else if (current_db == static_cast<std::uint32_t>(DbId::native))
+         {
+            hash.nativeRoot = std::move(merkle).root();
+         }
+         current_db = db;
+      }
+
+      item.fromStream(stream);
+      auto key   = sspan(item.key());
+      auto value = sspan(item.value());
+      if (db == SnapshotFooter::id)
+         read_footer_row(footer, key, value);
+      else
+      {
+         merkle.push(item);
+         raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(),
+                    value.size());
+      }
    }
+   if (footer.hash)
+   {
+      if (*footer.hash != hash)
+      {
+         std::cerr << "Snapshot checksum failed\n";
+         return 1;
+      }
+   }
+   else
+   {
+      std::cerr << "Warning: snapshot does not have a checksum\n";
+   }
+   return 0;
 }
 
 void clearDb(std::uint32_t chain, DbId db)
@@ -93,7 +147,8 @@ int main(int argc, const char* const* argv)
    clearDb(handle, DbId::service);
    clearDb(handle, DbId::native);
    clearDb(handle, DbId::writeOnly);
-   read(handle, in);
+   if (int res = read(handle, in))
+      return res;
    auto newStatus = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    psibase::check(!!newStatus, "Missing status row");
    if (oldStatus)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <span>
 #include <vector>
@@ -24,8 +25,11 @@ namespace psibase
       {
          Item();
          Item(std::span<const unsigned char> key, std::span<const unsigned char> value);
+         void                           fromStream(auto& stream);
          void                           fromResult(std::uint32_t valueSize);
+         void                           nextKey();
          std::span<const unsigned char> key() const;
+         std::span<const unsigned char> value() const;
          Checksum256                    get_hash() const;
          std::vector<unsigned char>     data;
       };
@@ -44,4 +48,25 @@ namespace psibase
       static Checksum256 combine(const Checksum256& lhs, const Checksum256& rhs);
       void               pop_n(std::size_t n);
    };
+
+   void KvMerkle::Item::fromStream(auto& stream)
+   {
+      auto do_read = [&](void* out, std::size_t n)
+      {
+         if (!stream.read(reinterpret_cast<char*>(out), n))
+         {
+            abortMessage("read");
+         }
+      };
+      std::uint32_t keySize;
+      std::uint32_t valueSize;
+      do_read(&keySize, 4);
+      data.resize(5 + keySize);
+      std::memcpy(data.data() + 1, &keySize, 4);
+      do_read(data.data() + 5, keySize);
+      do_read(&valueSize, 4);
+      data.resize(9 + keySize + valueSize);
+      std::memcpy(data.data() + 5 + keySize, &valueSize, 4);
+      do_read(data.data() + 9 + keySize, valueSize);
+   }
 }  // namespace psibase

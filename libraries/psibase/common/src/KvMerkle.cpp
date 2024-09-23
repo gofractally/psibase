@@ -73,11 +73,28 @@ namespace psibase
       std::memcpy(data.data() + 5 + keySize, &valueSize, 4);
       psibase::raw::getResult(reinterpret_cast<char*>(data.data()) + 9 + keySize, valueSize, 0);
    }
+   void KvMerkle::Item::nextKey()
+   {
+      std::uint32_t keySize;
+      std::memcpy(&keySize, data.data() + 1, 4);
+      keySize += 1;
+      data.resize(5 + keySize);
+      std::memcpy(data.data() + 1, &keySize, 4);
+      data.back() = 0;
+   }
    std::span<const unsigned char> KvMerkle::Item::key() const
    {
       std::uint32_t keySize;
       std::memcpy(&keySize, data.data() + 1, 4);
       return std::span{data.data() + 5, keySize};
+   }
+   std::span<const unsigned char> KvMerkle::Item::value() const
+   {
+      std::uint32_t keySize;
+      std::memcpy(&keySize, data.data() + 1, 4);
+      std::uint32_t valueSize;
+      std::memcpy(&valueSize, data.data() + 5 + keySize, 4);
+      return std::span{data.data() + 9 + keySize, valueSize};
    }
    Checksum256 KvMerkle::Item::get_hash() const
    {
