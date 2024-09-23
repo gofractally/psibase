@@ -29,7 +29,7 @@ namespace psibase
       std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
       std::vector<BlockHeaderAuthAccount>            authServices;
 
-      static constexpr auto db = psibase::DbId::nativeUnconstrained;
+      static constexpr auto db = psibase::DbId::native;
       static auto           key() -> KeyPrefixType;
       PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
    };
@@ -39,7 +39,7 @@ namespace psibase
       uint32_t maxKeySize   = 128;
       uint32_t maxValueSize = 8 << 20;
 
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
 
       static auto key() -> KeyPrefixType;
       PSIO_REFLECT(ConfigRow, maxKeySize, maxValueSize)
@@ -79,7 +79,7 @@ namespace psibase
       uint32_t  numExecutionMemories = 32;
       VMOptions vmOptions;
 
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
 
       static auto key(NativeTableNum TableNum) -> KeyPrefixType;
       PSIO_REFLECT(WasmConfigRow, numExecutionMemories, vmOptions)
@@ -108,15 +108,16 @@ namespace psibase
       uint8_t     vmType    = 0;
       uint8_t     vmVersion = 0;
 
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeKeyType;
       PSIO_REFLECT(CodeRow, codeNum, flags, codeHash, vmType, vmVersion)
    };
 
    using CodeByHashKeyType =
        std::tuple<std::uint16_t, std::uint8_t, Checksum256, std::uint8_t, std::uint8_t>;
-   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
-       -> CodeByHashKeyType;
+   auto codeByHashKey(const Checksum256& codeHash,
+                      uint8_t            vmType,
+                      uint8_t            vmVersion) -> CodeByHashKeyType;
 
    /// where code is actually stored, duplicate services are reused
    struct CodeByHashRow
@@ -128,11 +129,11 @@ namespace psibase
       uint32_t             numRefs = 0;   // number accounts that ref this
       std::vector<uint8_t> code    = {};  // actual code, TODO: compressed
 
-      // The code table is in nativeConstrained. The native code
+      // The code table is in native. The native code
       // verifies codeHash and the key. This prevents a poison block
       // that could happen if the key->code map doesn't match the
       // key->(jitted code) map or the key->(optimized code) map.
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> CodeByHashKeyType;
       PSIO_REFLECT(CodeByHashRow, codeHash, vmType, vmVersion, numRefs, code)
    };
@@ -149,14 +150,15 @@ namespace psibase
 
       uint64_t blockMerkleEventNumber = 1;
 
-      // This table is in nativeConstrained. The native code blocks services
+      // This table is in native. The native code blocks services
       // from writing to this since it could break backing stores.
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
       static auto           key() -> KeyPrefixType;
       PSIO_REFLECT(DatabaseStatusRow,
                    nextHistoryEventNumber,
                    nextUIEventNumber,
-                   nextMerkleEventNumber)
+                   nextMerkleEventNumber,
+                   blockMerkleEventNumber)
    };
 
    // Notifications are sent by native code
@@ -183,7 +185,7 @@ namespace psibase
       std::vector<Action> actions;
 
       // TODO: we need a native subjective table
-      static constexpr auto db = psibase::DbId::nativeConstrained;
+      static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> NotifyKeyType;
       PSIO_REFLECT(NotifyRow, type, actions)
    };

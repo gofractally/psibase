@@ -34,9 +34,7 @@ namespace psibase
                "database access disabled during proof verification or first auth");
          if (db == uint32_t(DbId::service))
             return (DbId)db;
-         if (db == uint32_t(DbId::nativeConstrained))
-            return (DbId)db;
-         if (db == uint32_t(DbId::nativeUnconstrained))
+         if (db == uint32_t(DbId::native))
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
@@ -125,11 +123,7 @@ namespace psibase
 
          if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::nativeConstrained) &&
-             (self.code.flags & CodeRow::allowWriteNative))
-            return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::nativeUnconstrained) &&
-             (self.code.flags & CodeRow::allowWriteNative))
+         if (db == uint32_t(DbId::native) && (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};
          throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
@@ -156,6 +150,19 @@ namespace psibase
             return (DbId)db;
          throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
+      }
+
+      void verifyStatusRow(psio::input_stream                key,
+                           psio::input_stream                value,
+                           std::optional<psio::input_stream> oldValue)
+      {
+         check(psio::fracpack_validate_strict<StatusRow>({value.pos, value.end}),
+               "StatusRow has invalid format");
+         // TODO: Verify that only nextConsensus has changed
+         auto expectedKey = psio::convert_to_key(statusKey());
+         check(key.remaining() == expectedKey.size() &&
+                   !std::memcmp(key.pos, expectedKey.data(), key.remaining()),
+               "StatusRow has incorrect key");
       }
 
       void verifyCodeRow(TransactionContext&               ctx,
@@ -258,7 +265,9 @@ namespace psibase
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
-         if (table == codeTable)
+         if (table == statusTable)
+            verifyStatusRow(key, value, existing);
+         else if (table == codeTable)
             verifyCodeRow(context, key, value, existing);
          else if (table == codeByHashTable)
             verifyCodeByHashRow(key, value);
@@ -483,7 +492,7 @@ namespace psibase
                       delta.valueBytes -= existing->remaining();
                    }
                    // nativeConstrained is both refundable and chargeable
-                   if (db == uint32_t(DbId::nativeConstrained))
+                   if (db == uint32_t(DbId::native))
                    {
                       verifyWriteConstrained(transactionContext, {key.data(), key.size()},
                                              {value.data(), value.size()}, existing);
@@ -545,7 +554,7 @@ namespace psibase
                           delta.records -= 1;
                           delta.keyBytes -= key.size();
                           delta.valueBytes -= existing->remaining();
-                          if (db == uint32_t(DbId::nativeConstrained))
+                          if (db == uint32_t(DbId::native))
                           {
                              verifyRemoveConstrained(transactionContext, {key.data(), key.size()},
                                                      *existing);
