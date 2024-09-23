@@ -41,17 +41,27 @@ include(GNUInstallDirs)
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
-    ExternalProject_Add(wasi-sdk
-        URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sdk-20.0-linux.tar.gz
-        URL_HASH SHA256=7030139d495a19fbeccb9449150c2b1531e15d8fb74419872a719a7580aad0f9
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-    )
-    ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
-    set(WASI_SDK_PREFIX ${SOURCE_DIR})
-    set(wasm-deps wasi-sdk)
-    install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz)
+        set(WASI_SDK_SHA256 c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5)
+    elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-linux.tar.gz)
+        set(WASI_SDK_SHA256 ae6c1417ea161e54bc54c0a168976af57a0c6e53078857886057a71a0d928646)
+    endif()
+    if(DEFINED WASI_SDK_URL)
+        ExternalProject_Add(wasi-sdk
+            URL ${WASI_SDK_URL}
+            URL_HASH SHA256=${WASI_SDK_SHA256}
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+        )
+
+        ExternalProject_Get_Property(wasi-sdk SOURCE_DIR)
+        set(WASI_SDK_PREFIX ${SOURCE_DIR})
+        set(wasm-deps wasi-sdk)
+        install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI)
+    endif()
 endif()
 
 if(DEFINED WASI_SDK_PREFIX)
