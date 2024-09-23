@@ -8,13 +8,40 @@ This is a place to capture
 
 Note: some doc updates are done here simply because we're more intersted in capturing the issues (rather than forgetting them) than we are in writing perfect docs. Once they're captured, we can always go back and 1) write good docs and 2) fix dev issues we have recorded. If we don't capture them as they happen, they disappear to time, and the dev experience sucks (as we acclimate to hardships we've gotten used to and forget new devs will be in the dark about.)
 
+## Potential Tasks
+
+1. add tests for psibase_macros
+2. fix hygiene of psibase_macros.service_impl (details below in Bugs section)
+
 ## Doc Updates
 
 ### Tables
 
+#### Singleton Tables
+
+[Current doc on Singletons](development/services/rust-service/tables.html#singletons) uses in-place code, rather than a generalized, explicit Singleton construct. Probably worth defining a `Singleton` thing that makes it explicit what's happening. Could be a type def, a struct, or some kind of Trait or Key type.
+
+The code snippets I think could be improved are as follows:
+
+```
+// A somewhat esoteric way to define the key
+impl LastUsed {
+    // The primary key is an empty tuple. Rust functions
+    // which return nothing actually return ().
+    #[primary_key]
+    fn pk(&self) {}
+}
+```
+
+```
+// Requesting the only table record: the esoteric key = `&()`
+let mut lastUsed =
+            table.get_index_pk().get(&()).unwrap_or_default();
+```
+
 #### Externalizing Table definitions and their structs / Code Splitting
 
-The basic Table docs for "[Storing Structs Defined Elsewhere](https://docs.psibase.io/development/services/rust-service/tables.html#storing-structs-defined-elsewhere)" are outdated.
+The basic Table docs for "[Storing Structs Defined Elsewhere](development/services/rust-service/tables.html#storing-structs-defined-elsewhere)" are outdated.
 
 1. `Reflect` doesn't seem to exist.
 2. using the documented `impl WrapMessage { ... }` doesn't seem to work anymore. Updated doc that I believe accomplishes the same thing is below.
@@ -65,6 +92,7 @@ Then define only the table itself in the `service` mod:
 1. `anyhow` must be imported for the macro to be happy (need to clarify under what circumstances this is the case to fix it properly)
 2. `Table` must be imported for the macro to be happy (need to figure out which table def exactly require it. Maybe just be when record = "" is specified in the `table` macro).
    `Table` is a Trait that implements things like <table name>::new(). Getting a reference to a table won't work without bringing the Trait into scope. We could bring it in scope whenever the named table shows up in an #[action]. We could also have the macro look for any element of the Trait and include `Table` only if it finds it being used. Perhaps there's a way to define tables that naturally pulls it into scope?
+3. `asyncgraphql_*` need to be `use`d in some cases. should come along with Query definitions.
 
 ```svgbob
 +-------------+      +---------+      +---------+
