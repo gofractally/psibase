@@ -10,6 +10,9 @@ publish = false
 [package.metadata.psibase]
 server = "chainmail"
 plugin = "plugin"
+postinstall = [
+    { sender = "chainmail", service = "chainmail", method = "init", rawData = "0000" },
+]
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/" }
