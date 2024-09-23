@@ -161,6 +161,9 @@ namespace psibase
       TestChain(const TestChain&, bool pub);
       /**
        * Creates a new temporary chain.
+       *
+       * @param pub If this is the only public chain, it will be automatically
+       * selected.
        */
       explicit TestChain(const DatabaseConfig&, bool pub = true);
       /**
