@@ -84,10 +84,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let mq: HttpRequest;
         // handle id param requests (for specific message)
         if params.contains_key("id") {
-            where_clause = format!(
-                "WHERE CONCAT(sent.receiver, sent.rowid) = {}",
-                params.get("id")?
-            );
+            where_clause = format!("WHERE CONCAT(receiver, rowid) = {}", params.get("id")?);
 
             mq = make_query(
                 request,
