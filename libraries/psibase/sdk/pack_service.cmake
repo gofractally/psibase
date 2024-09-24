@@ -320,8 +320,8 @@ function(cargo_psibase_package)
     endif()
 
     # Set variables
-    cmake_path(GET ARG_OUTPUT FILENAME PACKAGE_NAME)
-    cmake_path(GET ARG_OUTPUT STEM TARGET_NAME)
+    get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
+    get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
     set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
