@@ -8,6 +8,12 @@
         "paths": {
             "@/*": ["./src/*"],
             "/common": ["../../CommonApi/common"],
+            "@shadcn": ["./src/components/ui"],
+            "@shadcn/*": ["./src/components/ui/*"],
+            "@lib": ["./src/lib"],
+            "@lib/*": ["./src/lib/*"],
+            "@hooks": ["./src/hooks"],
+            "@hooks/*": ["./src/hooks/*"],
             "@psibase/common-lib": [
                 "../../CommonApi/common/packages/common-lib/src"
             ],
