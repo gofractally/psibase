@@ -12,6 +12,7 @@ publish = false
 
 [package]
 name = "chainmail_package"
+description = "Message-sending application"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -21,7 +22,6 @@ publish.workspace = true
 
 [package.metadata.psibase]
 package-name = "Chainmail"
-description = "Message-sending application"
 services = ["chainmail"]
 
 [profile.release]
