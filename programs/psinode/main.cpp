@@ -1439,8 +1439,9 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (!config.tls.trustfiles.empty())
    {
       file.set(
-          "", "tls-trustfile", config.tls.trustfiles, [](std::string_view text)
-          { return std::string(text); }, "A file containing trusted certificate authorities");
+          "", "tls-trustfile", config.tls.trustfiles,
+          [](std::string_view text) { return std::string(text); },
+          "A file containing trusted certificate authorities");
    }
 #endif
    if (!config.services.empty())
@@ -1451,8 +1452,9 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
          services.push_back(to_string(service));
       }
       file.set(
-          "", "service", services, [](std::string_view text)
-          { return service_from_string(text).host; }, "Native service root directory");
+          "", "service", services,
+          [](std::string_view text) { return service_from_string(text).host; },
+          "Native service root directory");
    }
    if (!std::holds_alternative<http::admin_none>(config.admin))
    {
@@ -1480,6 +1482,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // private keys.
    file.keep("", "key");
    file.keep("", "leeway");
+   file.keep("", "database-cache-size");
    //
    to_config(config.loggers, file);
 }
