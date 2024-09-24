@@ -325,7 +325,7 @@ function(cargo_psibase_package)
     set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
-    ExternalProject_Add(${TARGET_NAME}
+    ExternalProject_Add(${TARGET_NAME}_ext
         SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
         BUILD_BYPRODUCTS ${PACKAGE_OUTPUT}
         CONFIGURE_COMMAND ""
@@ -343,5 +343,5 @@ function(cargo_psibase_package)
         DEPENDS ${PACKAGE_OUTPUT}
         VERBATIM
     )
-    add_custom_target(${TARGET_NAME}_output ALL DEPENDS ${ARG_OUTPUT})
+    add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT})
 endfunction()
