@@ -99,9 +99,10 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
-    use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::*;
     use serde::{Deserialize, Serialize};
+    use services::accounts::Wrapper as AccountsSvc;
+    use services::events::Wrapper as EventsSvc;
 
     use crate::serve_rest_api;
 
@@ -125,11 +126,9 @@ mod service {
         );
         table.put(&InitRow {}).unwrap();
 
-        // TODO: Depends on #845
-        // use services::events::Wrapper as EventsSvc;
-        // EventsSvc::call().setSchema(&create_schema());
-        // EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
-        // EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
+        EventsSvc::call().setSchema(create_schema::<Wrapper>());
+        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
+        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
     }
 
     #[action]
