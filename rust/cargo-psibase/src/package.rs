@@ -205,7 +205,7 @@ pub async fn build_package(
     metadata: &MetadataIndex<'_>,
     service: Option<&str>,
 ) -> Result<PackageInfo, anyhow::Error> {
-    let mut depends = vec![];
+    let mut depends_set = HashSet::new();
     let mut accounts: Vec<AccountNumber> = Vec::new();
     let mut visited = HashSet::new();
     let mut queue = Vec::new();
@@ -249,10 +249,16 @@ pub async fn build_package(
             visited.insert(root);
             queue.push(root);
         }
-        // Add postinstall from the root whether it is a service or not
+        // Add postinstall and dependencies from the root whether it is a service or not
         if !visited.contains(root) {
             if let Some(actions) = &meta.postinstall {
                 postinstall.extend_from_slice(actions.as_slice());
+            }
+            for (k, v) in meta.dependencies {
+                depends_set.insert(PackageRef {
+                    name: k,
+                    version: v,
+                });
             }
         }
     } else {
@@ -268,10 +274,10 @@ pub async fn build_package(
             accounts.push(account.into());
             let pmeta: PsibaseMetadata = get_metadata(package)?;
             for (k, v) in pmeta.dependencies {
-                depends.push(PackageRef {
+                depends_set.insert(PackageRef {
                     name: k,
                     version: v,
-                })
+                });
             }
             let mut info = ServiceInfo {
                 flags: pmeta.flags,
@@ -326,14 +332,16 @@ pub async fn build_package(
         }
     };
 
-    let mut meta = Meta {
+    let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
+    depends.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let meta = Meta {
         name: package_name.to_string(),
         version: package_version.to_string(),
         description: package_description.unwrap_or_else(|| package_name.to_string()),
         depends,
         accounts,
     };
-    meta.depends.sort_by(|a, b| a.name.cmp(&b.name));
 
     let mut service_wasms = Vec::new();
     for (service, info, id) in services {
