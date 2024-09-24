@@ -24,6 +24,14 @@ publish.workspace = true
 package-name = "Chainmail"
 services = ["chainmail"]
 
+[package.metadata.psibase.dependencies]
+HttpServer = "0.12.0"
+Supervisor = "0.12.0"
+Events = "0.12.0"
+SetCode = "0.12.0"
+Accounts = "0.12.0"
+CommonApi = "0.12.0"
+
 [profile.release]
 codegen-units = 1
 opt-level = "s"

@@ -1440,8 +1440,6 @@ dependencies = [
 name = "plugin"
 version = "0.12.0"
 dependencies = [
- "chainmail",
- "chainmail_package",
  "psibase",
  "wit-bindgen-rt",
 ]
