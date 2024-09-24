@@ -410,7 +410,7 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH services/user/Chainmail
-    # DEPENDS ${Chainmail_js_DEP}
+    DEPENDS ${Chainmail_js_DEP}
 )
 
 psibase_package(

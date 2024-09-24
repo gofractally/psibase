@@ -311,8 +311,9 @@ endfunction()
 #                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
 # OUTPUT <filename>         - [Required] The package file.
 # PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `services/user/Branding`).
+# DEPENDS <targets>...      - [Required] Targets that this target depends on
 function(cargo_psibase_package)
-    cmake_parse_arguments(ARG "" "PATH;OUTPUT" "" ${ARGN})
+    cmake_parse_arguments(ARG "" "PATH;OUTPUT;DEPENDS" "" ${ARGN})
 
     if(NOT ARG_PATH OR NOT ARG_OUTPUT)
         message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
@@ -332,6 +333,7 @@ function(cargo_psibase_package)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
+        DEPENDS ${ARG_DEPENDS}
     )
 
     # Make the final output
