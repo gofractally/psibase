@@ -29,6 +29,10 @@ namespace psibase::tester::raw
    TESTER_NATIVE(cloneChain) uint32_t cloneChain(std::uint32_t chain);
    TESTER_NATIVE(destroyChain) void destroyChain(std::uint32_t chain);
    TESTER_NATIVE(finishBlock) void finishBlock(std::uint32_t chain_index);
+   TESTER_NATIVE(verify)
+   std::uint32_t verify(std::uint32_t chain_index,
+                        const char*   args_packed,
+                        std::uint32_t args_packed_size);
    TESTER_NATIVE(pushTransaction)
    std::uint32_t pushTransaction(std::uint32_t chain_index,
                                  const char*   args_packed,

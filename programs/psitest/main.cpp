@@ -1206,6 +1206,36 @@ struct callbacks
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
 
+   uint32_t testerVerify(uint32_t chain_index, span<const char> args_packed)
+   {
+      auto&              chain = assert_chain(chain_index);
+      psio::input_stream s     = {args_packed.data(), args_packed.size()};
+      auto               act   = psio::from_frac<psibase::Action>(args_packed);
+
+      BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
+      BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
+      psibase::TransactionTrace trace;
+      try
+      {
+         psibase::BlockContext proofBC{*chain.sys, chain.sys->sharedDatabase.getHead(),
+                                       chain.writer, true};
+         proofBC.start();
+         proofBC.execExport("verify", std::move(act), trace);
+      }
+      catch (const std::exception& e)
+      {
+         if (!trace.error)
+         {
+            trace.error = e.what();
+         }
+      }
+
+      state.result_value = psio::convert_to_frac(trace);
+      state.result_key.clear();
+      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
+      return state.result_value.size();
+   }
+
    uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
       auto&              chain     = assert_chain(chain_index);
@@ -1569,6 +1599,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
    rhf_t::add<&callbacks::commitState>("psibase", "commitState");
+   rhf_t::add<&callbacks::testerVerify>("psibase", "verify");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
    rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
    rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");

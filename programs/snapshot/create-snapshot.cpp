@@ -5,13 +5,21 @@
 
 #include <psibase/KvMerkle.hpp>
 #include <psibase/db.hpp>
+#include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
+#include <services/system/VerifySig.hpp>
 #include "SnapshotHeader.hpp"
+#include "cli.hpp"
+
+#include <tuple>
 
 using psibase::DbId;
 using psibase::KvMerkle;
 using namespace psibase::snapshot;
 namespace raw = psibase::tester::raw;
+using psibase::cli::Option;
+using psibase::cli::parse;
+using psibase::cli::PositionalOptions;
 
 // snapshot format:
 // header
@@ -67,20 +75,55 @@ void write_footer(const SnapshotFooter& self, auto& stream)
       write_row(SnapshotFooter::id, sig.key(), psio::to_frac(sig), stream);
 }
 
+static const char* usage_brief =
+    "Usage: psibase create-snapshot [-s KEY]... DATABASE SNAPSHOT-FILE";
+
+static auto usage_full = R"(
+Writes a snapshot of the chain to a file
+
+Options:
+  -s, --sign KEY-FILE   Signs the snapshot with this key
+  -h, --help            Prints a help message
+)";
+
 int main(int argc, const char* const* argv)
 {
-   if (argc < 3)
+   std::vector<std::string_view> key_files;
+   std::string_view              database_file;
+   std::string_view              snapshot_file;
+   bool                          help = false;
+   auto opts = std::tuple(Option{&key_files, 's', "sign"}, Option{&help, 'h', "help"},
+                          PositionalOptions{&database_file, &snapshot_file});
+   if (!parse(argc, argv, opts))
    {
-      std::cerr << "Usage: psibase create-snapshot DATABASE SNAPSHOT-FILE" << std::endl;
+      std::cerr << usage_brief << std::endl;
       return 2;
    }
-   std::string_view in_path  = argv[1];
-   auto             out_path = argv[2];
-   auto handle = raw::openChain(in_path.data(), in_path.size(), 0, __WASI_RIGHTS_FD_READ, nullptr);
-   std::ofstream out(out_path, std::ios_base::trunc | std::ios_base::binary);
+   if (help)
+   {
+      std::cerr << usage_brief << '\n' << usage_full;
+      return 2;
+   }
+   if (snapshot_file.data() == nullptr)
+   {
+      std::cerr << usage_brief << std::endl;
+      return 2;
+   }
+   psibase::KeyList keys;
+   for (auto key : key_files)
+   {
+      auto contents = psibase::readWholeFile(key);
+      auto pvt      = SystemService::AuthSig::PrivateKeyInfo{
+          SystemService::AuthSig::parsePrivateKeyInfo({contents.data(), contents.size()})};
+      auto pub = SystemService::AuthSig::getSubjectPublicKeyInfo(pvt);
+      keys.emplace_back(std::move(pub), std::move(pvt));
+   }
+   auto          handle = raw::openChain(database_file.data(), database_file.size(), 0,
+                                         __WASI_RIGHTS_FD_READ, nullptr);
+   std::ofstream out(snapshot_file, std::ios_base::trunc | std::ios_base::binary);
    if (!out)
    {
-      std::cerr << "Failed to open " << out_path << std::endl;
+      std::cerr << "Failed to open " << snapshot_file << std::endl;
       return 1;
    }
    write_header({}, out);
@@ -91,5 +134,19 @@ int main(int argc, const char* const* argv)
    footer.hash->serviceRoot = std::move(merkle).root();
    write_db(handle, DbId::native, out, merkle);
    footer.hash->nativeRoot = std::move(merkle).root();
+   if (!keys.empty())
+   {
+      StateSignatureInfo    info{*footer.hash};
+      std::span<const char> preimage{info};
+      auto                  hash = psibase::sha256(preimage.data(), preimage.size());
+      for (const auto& key : keys)
+      {
+         auto           sigData = sign(key.second, hash);
+         StateSignature sig{.claim = {.service = SystemService::VerifySig::service,
+                                      .rawData = {key.first.data.begin(), key.first.data.end()}},
+                            .rawData{sigData.begin(), sigData.end()}};
+         footer.signatures.push_back(std::move(sig));
+      }
+   }
    write_footer(footer, out);
 }

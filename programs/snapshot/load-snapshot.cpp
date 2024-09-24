@@ -4,8 +4,10 @@
 #include <vector>
 
 #include <psibase/KvMerkle.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
+#include <services/system/VerifySig.hpp>
 #include "SnapshotHeader.hpp"
 
 #include <psio/to_hex.hpp>
@@ -39,11 +41,11 @@ void read_header(const SnapshotHeader& header, auto& stream)
 
 void read_footer_row(SnapshotFooter& footer, std::span<const char> key, std::span<const char> value)
 {
-   if (key.size() >= 3 && key[0] == 0 && key[1] == StateChecksum::table && key[2] == 0)
+   if (key.size() == 3 && key[0] == 0 && key[1] == StateChecksum::table && key[2] == 0)
    {
       footer.hash = psio::from_frac<StateChecksum>(value);
    }
-   else if (key.size() == 3 && key[0] == 0 && key[1] == StateSignature::table && key[2] == 0)
+   else if (key.size() >= 3 && key[0] == 0 && key[1] == StateSignature::table && key[2] == 0)
    {
       footer.signatures.push_back(psio::from_frac<StateSignature>(value));
    }
@@ -105,7 +107,46 @@ int read(std::uint32_t chain, auto& stream)
    }
    else
    {
-      std::cerr << "Warning: snapshot does not have a checksum\n";
+      std::cerr << "Warning: snapshot does not include a checksum\n";
+   }
+   if (!footer.signatures.empty())
+   {
+      int                   result = 0;
+      StateSignatureInfo    info{hash};
+      std::span<const char> preimage{info};
+      auto                  hash = psibase::sha256(preimage.data(), preimage.size());
+      for (const auto& sig : footer.signatures)
+      {
+         psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
+         psibase::Action     act{.service = sig.claim.service, .rawData = psio::to_frac(args)};
+         auto                packed = psio::to_frac(act);
+         auto                size   = raw::verify(chain, packed.data(), packed.size());
+         auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
+         if (!trace.error || trace.error->empty())
+         {
+            if (sig.claim.service == SystemService::VerifySig::service)
+            {
+               std::cerr << "Good signature from "
+                         << keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
+                                .data = {sig.rawData.begin(), sig.rawData.end()}})
+                         << std::endl;
+            }
+            else
+            {
+               std::cerr << "Good signature from " << psio::convert_to_json(sig.claim) << std::endl;
+            }
+         }
+         else
+         {
+            std::cerr << "Signature verification failed: " << *trace.error << std::endl;
+            result = 1;
+         }
+      }
+      return result;
+   }
+   else
+   {
+      std::cerr << "Warning: snapshot is not signed\n";
    }
    return 0;
 }
