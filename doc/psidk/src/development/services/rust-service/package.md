@@ -7,6 +7,7 @@ A [psibase package](../../../specifications/data-formats/package.md) may be comp
 The available fields are:
 
 - `package-name`: Must be present on the top-level crate for the package.
+- `description`: A description of the package.
 - `services`: A list of services to include in the psibase package.
 - `server`: May be present on any crate that builds a service. The value is a crate which will handle HTTP requests sent to this service. The other crate will be built and included in the current package.
 - `plugin`: May be present on any crate that builds a service. The value is a crate that should be built with `cargo component` and uploaded as `/plugin.wasm`
@@ -25,6 +26,8 @@ version = "0.1.0"
 [package.metadata.psibase]
 # Builds example.psi
 package-name = "example"
+# Description of the package
+description = "An example package"
 # Most services besides the core system services don't need extra flags.
 flags = []
 # This service handles its own HTTP requests
