@@ -22,9 +22,33 @@ namespace SystemService
             return Sites::Tables{service}.open<SitesContentTable>().getIndex<0>();
          }
       };
-      PSIO_REFLECT(  //
-          Query,
-          method(content))
+      PSIO_REFLECT(Query, method(content))
+
+      bool isSubdomain(const psibase::HttpRequest& req)
+      {
+         return req.host.size() > req.rootHost.size() + 1  //
+                && req.host.ends_with(req.rootHost)        //
+                && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
+      }
+
+      AccountNumber getTargetService(const HttpRequest& req)
+      {
+         std::string serviceName;
+
+         // Path reserved across all subdomains
+         if (req.target.starts_with("/common"))
+            serviceName = "common-api";
+
+         // subdomain
+         else if (isSubdomain(req))
+            serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
+
+         // root domain
+         else
+            serviceName = "homepage";
+
+         return AccountNumber(serviceName);
+      }
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -34,17 +58,7 @@ namespace SystemService
          check(false, "request host invalid: \"" + request.host + "\"");
       }
 
-      auto account = AccountNumber{0};
-      if (request.host == request.rootHost)
-      {
-         account = AccountNumber{"homepage"};
-      }
-      else {
-         std::string_view accountName{request.host.data(),
-                                   request.host.size() - request.rootHost.size() - 1};
-         account = AccountNumber(accountName);
-      }
-
+      auto account = getTargetService(request);
       if (account == Sites::service)
       {
          if (auto result = psibase::serveActionTemplates<Sites>(request))
