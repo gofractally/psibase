@@ -24,14 +24,8 @@ namespace SystemService
 
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
-   /// Rule set:
-   /// - If the target starts with `/common`, then route the request to [SystemService::CommonApi].
-   /// - Else if there's a subdomain and it references a registered service, then route the request to that service.
-   /// - Else if the request references an unregistered subdomain, then route the request to `sites`.
-   /// - Else route the request to [CommonApi]; this handles the chain's main domain.
-   ///
    /// See [C++ Web Services](../development/services/cpp-service/reference/web-services.md) or
-   /// [Rust Web Services](../development/services/rust-service/reference/web-services.md) for more detail,
+   /// [Rust Web Services](../development/services/rust-service/reference/web-services.md) for more detail on routing,
    /// including how to write services which serve HTTP requests.
    ///
    /// #### serve export (not an action)
@@ -66,8 +60,8 @@ namespace SystemService
 
       /// Register sender's subdomain
       ///
-      /// When requests are made to the sender service subdomain, `http-server` will
-      /// forward the request into the `serveSys` action of the specified `server`
+      /// When requests to a subdomain cannot be filled by 'sites', then `http-server` will
+      /// forward the request into the `serveSys` action of the subdomain's registered `server`
       /// for it to handle the request.
       ///
       /// Registered services may optionally:

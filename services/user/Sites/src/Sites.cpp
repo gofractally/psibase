@@ -4,8 +4,8 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
-#include <psibase/serveSimpleUI.hpp>
 #include <psibase/serveSchema.hpp>
+#include <psibase/serveSimpleUI.hpp>
 
 using namespace psibase;
 
@@ -85,11 +85,13 @@ namespace SystemService
          auto pos    = target.find('?');
          if (pos != target.npos)
             target.resize(pos);
-         
+
          auto siteConfig = tables.open<SiteConfigTable>().get(account);
-         if (siteConfig && siteConfig->spa) {
-            if (target.ends_with(".html") || target == "/" || target.find('.') == target.npos) {
-                  target = "/";
+         if (siteConfig && siteConfig->spa)
+         {
+            if (target.ends_with(".html") || target == "/" || target.find('.') == target.npos)
+            {
+               target = "/";
             }
          }
 
@@ -147,10 +149,11 @@ namespace SystemService
    void Sites::enableSpa(bool enable)
    {
       auto table = Tables{}.open<SiteConfigTable>();
-      auto row = table.get(getSender()).value_or(SiteConfigRow{
-         .account = getSender(),
-         .spa = enable,
-      });
+      auto row   = table.get(getSender())
+                     .value_or(SiteConfigRow{
+                         .account = getSender(),
+                         .spa     = enable,
+                     });
       row.spa = enable;
       table.put(row);
    }
