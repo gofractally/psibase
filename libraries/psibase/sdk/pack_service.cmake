@@ -336,15 +336,17 @@ function(cargo_psibase_package)
         DEPENDS ${ARG_DEPENDS} cargo-psibase
     )
 
-    # Adding this target tells cmake how to build package_output, which is needed because the 
-    #   below custom command depends on it.
-    add_custom_target(${TARGET_NAME}_package DEPENDS ${PACKAGE_OUTPUT})
-    add_dependencies(${TARGET_NAME}_package ${TARGET_NAME}_ext)
+    add_custom_command(
+        OUTPUT ${PACKAGE_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E true
+        DEPENDS ${TARGET_NAME}_ext
+    )
+
     add_custom_command(
         OUTPUT ${ARG_OUTPUT}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
         DEPENDS ${PACKAGE_OUTPUT}
         VERBATIM
     )
-    add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT})
+    add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT} cargo-psibase)
 endfunction()
