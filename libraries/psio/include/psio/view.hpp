@@ -221,7 +221,7 @@ namespace psio
          (void)unpack_numeric<false>(&offset, this->data, pos, 4);
          if (offset == 1)
          {
-#ifdef COMPILING_WASM
+#ifndef COMPILING_WASM
             throw std::bad_optional_access{};
 #else
             abort_error("bad optional access");
@@ -340,7 +340,7 @@ namespace psio
       }
       else
       {
-#ifdef COMPILING_WASM
+#ifndef COMPILING_WASM
          throw std::bad_variant_access{};
 #else
          abort_error("bad variant access");
@@ -358,7 +358,7 @@ namespace psio
       }
       else
       {
-#ifdef COMPILING_WASM
+#ifndef COMPILING_WASM
          throw std::bad_variant_access{};
 #else
          abort_error("bad variant access");
@@ -556,7 +556,7 @@ namespace psio
          }
          else
          {
-#ifdef COMPILING_WASM
+#ifndef COMPILING_WASM
             throw std::out_of_range("view<vector> our of range");
 #else
             abort_error("view<vector> our of range");
@@ -625,7 +625,7 @@ namespace psio
          }
          else
          {
-#ifdef COMPILING_WASM
+#ifndef COMPILING_WASM
             throw std::out_of_range("view<string> out of range");
 #else
             abort_error("view<string> out of range");
