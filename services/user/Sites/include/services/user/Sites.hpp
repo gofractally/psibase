@@ -46,8 +46,9 @@ namespace SystemService
    /// See [psibase CLI docs](../run-infrastructure/cli/psibase.md) for details on how to upload files and directories.
    ///
    /// After files are uploaded, the site is available at `http://$ACCOUNT.$DOMAIN`
-   struct Sites : psibase::Service<Sites>
+   class Sites : psibase::Service<Sites>
    {
+     public:
       static constexpr auto service = psibase::AccountNumber("sites");
       using Tables                  = psibase::ServiceTables<SitesContentTable, SiteConfigTable>;
 
@@ -63,6 +64,11 @@ namespace SystemService
       /// Enables/disables single-page application mode.
       /// When enabled, all content requests return the root document.
       void enableSpa(bool enable);
+
+     private:
+      std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
+      bool                              useSpa(const psibase::AccountNumber& account);
+      std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
    };
 
    PSIO_REFLECT(Sites,
