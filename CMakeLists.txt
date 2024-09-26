@@ -320,6 +320,7 @@ add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wa
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
+add_rs_component(services/user/Sites/plugin:SitesPlugin sites.wasm wasm32-wasi )
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -539,7 +540,9 @@ psibase_package(
     SERVICE sites
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
         SERVER sites
+        DATA ${COMPONENT_BIN_DIR}/${SitesPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${SitesPlugin_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 

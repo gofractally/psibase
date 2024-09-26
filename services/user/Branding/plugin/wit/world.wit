@@ -13,6 +13,7 @@ interface queries {
 world psibase-plugin {
     import host:common/server;
     import transact:plugin/intf;
+    include sites:plugin/imports;
 
     export api;
     export queries;
