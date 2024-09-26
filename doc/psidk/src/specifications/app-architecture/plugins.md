@@ -45,7 +45,7 @@ Plugins can synchronously call functionality exported by other app's plugins. Th
 
 ### Transactions
 
-Transactions contain the data and authentication payload necessary to execute an action on a service. Transactions may contain multiple actions. Only the supervisor knows what the entire transaction looks like, whereas plugins are only aware of their own added actions.
+Transactions contain the data and authentication payload necessary to execute an action on a service. Transactions may contain multiple actions. Plugins are unable to see the entire transaction being constructed and are only aware of the actions they have explicitly added.
 
 Actions are added to transactions in a FIFO queue. For example, the following sequence diagram will finally submit a transaction containing actions in the order: C, A, B.
 
@@ -102,10 +102,74 @@ For example, if a user has provided her address or credit card information in on
 
 ### Simplicity
 
-Interactions with smart-contracts can get complex. It often requires specialized knowledge from the development team to know how to correctly integrate with it. For psibase apps, the development team will have created a plugin that abstracts the complexity of the interactions with the service into a streamlined user-facing API that can be used to much more easily integrate with the service.
+Interactions with smart-contracts can get complex. It often requires specialized knowledge from the development team to know how to correctly integrate with it. For apps on a psibase network, the development team will have created a plugin that abstracts the complexity of the interactions with the service into a streamlined user-facing API that can be used to much more easily integrate with the service.
 
 For example, consider an application that requires the user to submit a custom zero-knowledge proof in order to call a particular service action. This would ordinarily likely require the use of complicated cryptographic libraries to generate a proof of the correct type and format expected by the service. In the case of a psibase app, the zero-knowledge app would have a plugin used by their own UI that does the proof generation. This plugin would automatically be available for use by other third-party applications to exercise the same functionality for simpler integration.
 
 ### Private user data
 
 Blockchains typically only have public data. If private client-side data is collected, it's siloed in the application that does the collection. Libraries built on top of client-side synchronous calls can be used to create a private client-side data layer for application to leverage private user data.
+
+## Local data storage
+
+### Access to database operations 
+
+To enable database actions within plugins, a plugin must import database read/write functionality. 
+
+Read/write functionality is provided by a system plugin in the `clientdata` namespace. That plugin provides a high level key/value API for plugins to use that is specific to psibase plugins.
+
+As an MVP implementation, the API provides a get/set implementation:
+```
+    set      : func(key : string, value : string) -> result<_, error>;
+    get      : func(key : string) -> result<string, error>;
+```
+
+<details>
+  <summary>Phase 2 API</summary>
+
+> Phase 2: The API should mirror the [idb-keyval](https://github.com/jakearchibald/idb-keyval) API, except for the `update` function, which would require passing functions:
+
+```
+    set      : func(key : string, value : string) -> result<_, error>;
+    get      : func(key : string) -> result<string, error>;
+    set-many : func(items: list<tuple<string, string>>) -> result<_, error>;
+    get-many : func(keys: list<string>) -> result<list<string>, error>;
+    del      : func(key: string) -> result<_, error>;
+    del-many : func(keys: list<string>) -> result<_, error>;
+    clear    : func() -> result<_, error>;
+    entries  : func() -> result<list<tuple<string, string>>, error>;
+    keys     : func() -> result<list<string>, error>;
+    values   : func() -> result<list<string>, error>;
+```
+</details>
+
+#### Design implications
+
+There is actually no standardized wasi-keyvalue interface (The [proposal](https://github.com/WebAssembly/wasi-keyvalue) is still in stage 2 at the time of writing), so any interface we enable today will be subject to future change. This design specifies that plugins should import a custom psibase-plugin-specific API that itself leverages the `wasi-keyvalue` standard. 
+
+### Host provided functionality
+
+The `clientdata` plugin must itself import functionality that allows it to interact with some persistent storage layer. 
+
+This host functionality is a browser shim implementation of the `wasi-keyvalue` API. Technically, any plugin can import this API and use it directly. But using the standard clientdata plugin simplifies the integration (uses standard error types, exposes a more convenient interface).
+
+The `wasi-keyvalue` implementation currently uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
+
+> Phase 2: Wasi-keyvalue shim should be written to make use of the [idb-keyval](https://github.com/jakearchibald/idb-keyval) library (or simply `idb`), which is built on top of the browser's IndexedDB storage API. This would be easiest if it could be postponed until [JSPI](https://github.com/WebAssembly/js-promise-integration) is farther along in its standardization/integration process. This will allow much more storage, and also allow subsequent phases of the persistence design (see below).
+
+### Persistence
+
+When private user data is written, it is immediately persisted. 
+
+> Phase 2: User data shall not be immediately persisted. It shall only be persisted after all plugin calls have popped off the stack with successful return values.
+
+> Phase 3+: The client-side data should work similarly to the server-side data. If a transaction was scheduled for execution from the plugin execution context, then any written data is not persisted until after an irreversible block is created that contains the successfully executed transaction. We can revisit this design later, but perhaps any client data writes during the window of uncertainty (before irreversible) happen on both the head branch and on the pending branch. If the pending branch is confirmed irreversible, the writes to the head branch are thrown out, and if the transaction is forked out then the writes to the pending branch are thrown out.
+
+### Concurrency
+
+All reads/writes are currently synchronous, with no concurrency.
+
+### Synchronization across devices
+
+Plugins all run within the domain of the supervisor, which ensures that all plugin data is written-to/read-from a storage backing tied to the supervisor domain. Cloning storage in the supervisor domain between TLDs is a way to synchronize plugin data across devices.
+
