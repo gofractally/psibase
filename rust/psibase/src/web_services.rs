@@ -51,7 +51,7 @@ pub mod server_interface {
 /// action to your service.
 ///
 /// Note: most services should not implement this interface, and instead rely on the standard
-/// [psibase::Sites] app to store & serve their static files. It is still possible to use this
+/// [SystemService::Sites] app to store & serve their static files. It is still possible to use this
 /// interface for file storage/service outside of the Sites app, but note that the `psibase`
 /// CLI tool will not work and you will need to call the `storeSys` action on your service manually.
 #[crate::service(

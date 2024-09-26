@@ -39,7 +39,7 @@ namespace psibase
    /// Interface for services which support storing files outside of the standard Sites app
    ///
    /// Most services should not implement the StorageInterface, and instead rely on the standard
-   /// [psibase::Sites] app to store & serve their static files.
+   /// [SystemService::Sites] app to store & serve their static files.
    ///
    /// It is still possible to use this interface for file storage/service outside of the Sites app,
    /// but note that the `psibase` CLI tool will not work and you will need to call the `storeSys` action
