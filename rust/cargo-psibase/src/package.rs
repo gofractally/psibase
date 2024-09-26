@@ -326,13 +326,14 @@ pub async fn build_package(
         }
     };
 
-    let meta = Meta {
+    let mut meta = Meta {
         name: package_name.to_string(),
         version: package_version.to_string(),
         description: package_description.unwrap_or_else(|| package_name.to_string()),
         depends,
         accounts,
     };
+    meta.depends.sort_by(|a, b| a.name.cmp(&b.name));
 
     let mut service_wasms = Vec::new();
     for (service, info, id) in services {
