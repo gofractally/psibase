@@ -337,15 +337,10 @@ function(cargo_psibase_package)
     )
 
     add_custom_command(
-        OUTPUT ${PACKAGE_OUTPUT}
-        COMMAND ${CMAKE_COMMAND} -E true
-        DEPENDS ${TARGET_NAME}_ext
-    )
-
-    add_custom_command(
         OUTPUT ${ARG_OUTPUT}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
         DEPENDS ${PACKAGE_OUTPUT}
+        DEPENDS ${TARGET_NAME}_ext
         VERBATIM
     )
     add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT} cargo-psibase)
