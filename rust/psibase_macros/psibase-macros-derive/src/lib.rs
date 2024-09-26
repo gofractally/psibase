@@ -6,8 +6,8 @@ use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subi
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
+use psibase_macros_lib::service_macro::service_macro_impl;
 use schema_macro::schema_derive_macro;
-use service_macro::service_macro_impl;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
@@ -289,7 +289,11 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
-    service_macro_impl(attr, item)
+    service_macro_impl(
+        proc_macro2::TokenStream::from(attr),
+        proc_macro2::TokenStream::from(item),
+    )
+    .into()
 }
 
 /// Define a [psibase](https://psibase.io) test case.

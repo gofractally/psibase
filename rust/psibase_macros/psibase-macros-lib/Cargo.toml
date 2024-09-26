@@ -1,0 +1,11 @@
+[package]
+name = "psibase-macros-lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+darling = "0.20.10"
+proc-macro2 = "1.0.36"
+syn = { version = "1.0.86" }
+quote = "1.0.15"
+proc-macro-error = "1.0.4"
