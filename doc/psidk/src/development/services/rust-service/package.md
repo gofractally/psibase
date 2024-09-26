@@ -12,7 +12,7 @@ The available fields are:
 - `plugin`: May be present on any crate that builds a service. The value is a crate that should be built with `cargo component` and uploaded as `/plugin.wasm`
 - `flags`: [Flags](../../../specifications/data-formats/package.md#serviceservicejson) for the service.
 - `postinstall`: An array of actions to run when the package is installed. May be specified on the top-level crate or on any service. Actions from a single `postinstall` will be run in order. The order of actions from multiple crates is unspecified.
-- `data`: An array of `{src, dst}` paths to upload to the service. `src` is relative to the location of Cargo.toml. If `src` is a directory, its contents will be included recursively.
+- `data`: An array of `{src, dst}` paths to upload to the service's subdomain. `src` is relative to the location of Cargo.toml. If `src` is a directory, its contents will be included recursively.
 - `dependencies`: Additional packages, not build by cargo, that the package depends on.
 
 Example:

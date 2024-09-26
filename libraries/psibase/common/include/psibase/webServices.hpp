@@ -22,6 +22,7 @@ namespace psibase
       /// - Return `std::nullopt` to signal not found. psinode produces a 404 response in this case.
       /// - Abort. psinode produces a 500 response with the service's abort message.
       /// - Return a [psibase::HttpReply]. psinode produces a 200 response with the body and contentType returned.
+      /// - Call other services.
       /// - Call `http-server::sendReply`. Explicitly sends a response.
       /// - Call `http-server::deferReply`. No response will be produced until `http-server::sendReply` is called.
       ///
@@ -35,10 +36,14 @@ namespace psibase
       PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
    };
 
-   /// Interface for services which support storing files
+   /// Interface for services which support storing files outside of the standard Sites app
    ///
-   /// Some services support storing files which they then serve via HTTP.
-   /// This is the standard interface for these services.
+   /// Most services should not implement the StorageInterface, and instead rely on the standard
+   /// [psibase::Sites] app to store & serve their static files.
+   ///
+   /// It is still possible to use this interface for file storage/service outside of the Sites app,
+   /// but note that the `psibase` CLI tool will not work and you will need to call the `storeSys` action
+   /// on your service manually.
    ///
    /// > ⚠️ Do **not** inherit from this. To implement this interface, add a [storeSys] action
    /// to your service and reflect it.
@@ -57,7 +62,7 @@ namespace psibase
       /// - `contentType`: `text/html`, `text/javascript`, `application/octet-stream`, ...
       /// - `content`: file content
       ///
-      /// The `psibase upload` command uses this action.
+      /// The `psibase upload` command calls this action on the Sites service.
       ///
       /// [storeContent] simplifies implementing this.
       //

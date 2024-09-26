@@ -220,7 +220,7 @@ Search for packages
 
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 
-Upload a file to a service. The service must provide a `storeSys` action.
+Upload a file to a service's subdomain. The file will be stored to and served from the sender's namespace within the `sites` service.
 
 - `-r`, `--recursive`
 

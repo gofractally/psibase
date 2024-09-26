@@ -30,6 +30,8 @@ pub mod server_interface {
     /// - Abort. psinode produces a 500 response with the service's abort message.
     /// - Return a [psibase::HttpReply](crate::HttpReply). psinode produces a 200 response with the body and contentType returned.
     /// - Call other services.
+    /// - Call `http-server::sendReply`. Explicitly sends a response.
+    /// - Call `http-server::deferReply`. No response will be produced until `http-server::sendReply` is called.
     ///
     /// A service runs in RPC mode while serving an HTTP request. This mode prevents database writes,
     /// but allows database reads, including reading data and events which are normally not available
@@ -47,6 +49,11 @@ pub mod server_interface {
 ///
 /// To implement this interface, add a [storeSys](StorageActions::storeSys)
 /// action to your service.
+///
+/// Note: most services should not implement this interface, and instead rely on the standard
+/// [psibase::Sites] app to store & serve their static files. It is still possible to use this
+/// interface for file storage/service outside of the Sites app, but note that the `psibase`
+/// CLI tool will not work and you will need to call the `storeSys` action on your service manually.
 #[crate::service(
     name = "example-store",
     actions = "StorageActions",
@@ -70,9 +77,7 @@ pub mod storage_interface {
     /// - `contentType`: `text/html`, `text/javascript`, `application/octet-stream`, ...
     /// - `content`: file content
     ///
-    /// The `psibase upload` command uses this action.
-    ///
-    /// (TODO) simplifies implementing this.
+    /// The `psibase upload` command calls this action on the Sites service.
     #[action]
     fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
