@@ -196,10 +196,6 @@ namespace psibase
       for (const auto& [sender, index] : data)
       {
          AccountNumber service = Sites::service;
-         if (hasService(sender))
-         {
-            service = sender;
-         }
          auto path = index.filename.substr(5);
          auto pos  = path.find('/');
          assert(pos != std::string::npos);
