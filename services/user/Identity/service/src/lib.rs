@@ -225,12 +225,4 @@ mod service {
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
-    }
 }

@@ -300,14 +300,6 @@ mod service {
         CandidatesTable::new().put(&candidate_record).unwrap();
     }
 
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
-    }
-
     // The UI allows us to test things manually
     #[action]
     #[allow(non_snake_case)]

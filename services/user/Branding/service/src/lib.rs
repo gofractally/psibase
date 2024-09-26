@@ -61,12 +61,4 @@ mod service {
         None.or_else(|| serve_content(&request, &WebContentTable::new()))
             .or_else(|| serve_graphql(&request, Query))
     }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
-    }
 }

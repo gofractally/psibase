@@ -21,13 +21,14 @@ impl Api for BrandingPlugin {
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
-        let packed_logo_args = branding::action_structs::storeSys {
-            path: String::from("/network_logo.svg"),
-            contentType: String::from("image/svg+xml"),
-            content: Hex(logo),
-        }
-        .packed();
-        add_action_to_transaction("storeSys", &packed_logo_args).unwrap();
+        // TODO! - This needs to be changed to call storeSys on the Sites plugin.
+        // let packed_logo_args = branding::action_structs::storeSys {
+        //     path: String::from("/network_logo.svg"),
+        //     contentType: String::from("image/svg+xml"),
+        //     content: Hex(logo),
+        // }
+        // .packed();
+        // add_action_to_transaction("storeSys", &packed_logo_args).unwrap();
     }
 }
 

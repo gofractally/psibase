@@ -94,15 +94,12 @@ namespace SystemService
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
       {
-         if (service != AccountNumber{"common-api"})
+         for (const auto& header : result.headers)
          {
-            for (const auto& header : result.headers)
+            if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
-               if (!std::ranges::binary_search(allowedHeaders, header.name))
-               {
-                  abortMessage("service " + service.str() + " attempted to set http header " +
-                               header.name);
-               }
+               abortMessage("service " + service.str() + " attempted to set http header " +
+                            header.name);
             }
          }
 

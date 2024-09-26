@@ -80,16 +80,7 @@ namespace UserService
       if (auto result = psibase::serveSchema<AuthInvite>(request))
          return result;
 
-      if (auto result = psibase::serveContent(request, Tables{}))
-         return result;
-
       return std::nullopt;
-   }
-
-   void AuthInvite::storeSys(std::string path, std::string contentType, std::vector<char> content)
-   {
-      psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
-      psibase::storeContent(std::move(path), std::move(contentType), std::move(content), Tables{});
    }
 
 }  // namespace UserService
