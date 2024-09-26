@@ -34,15 +34,18 @@ const TX_SIZE_LIMIT: usize = 64 * 1024; // 64kb
 
 impl Sites for SitesPlugin {
     fn upload(file: File) -> Result<(), Error> {
-        Transact::add_action_to_transaction(
-            "storeSys",
-            &SitesService::action_structs::storeSys {
-                path: file.path,
-                contentType: file.content_type,
-                content: Hex::from(file.content),
-            }
-            .packed(),
-        )?;
+        let packed = SitesService::action_structs::storeSys {
+            path: file.path.clone(),
+            contentType: file.content_type,
+            content: Hex::from(file.content),
+        }
+        .packed();
+
+        if packed.len() >= TX_SIZE_LIMIT {
+            return Err(ErrorType::FileTooLarge.err(&file.path));
+        }
+
+        Transact::add_action_to_transaction("storeSys", &packed)?;
         Ok(())
     }
 
