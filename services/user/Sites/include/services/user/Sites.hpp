@@ -24,10 +24,11 @@ namespace SystemService
       std::string            path        = {};
       std::string            contentType = {};
       std::vector<char>      content     = {};
+      std::string            csp         = {};
 
       SitesContentKey key() const { return {account, path}; }
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
    struct SiteConfigRow
@@ -37,6 +38,14 @@ namespace SystemService
    };
    PSIO_REFLECT(SiteConfigRow, account, spa)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
+
+   struct GlobalCspRow
+   {
+      psibase::AccountNumber account;
+      std::string            csp;
+   };
+   PSIO_REFLECT(GlobalCspRow, account, csp)
+   using GlobalCspTable = psibase::Table<GlobalCspRow, &GlobalCspRow::account>;
 
    /// Provide web hosting
    ///
@@ -50,7 +59,7 @@ namespace SystemService
    {
      public:
       static constexpr auto service = psibase::AccountNumber("sites");
-      using Tables                  = psibase::ServiceTables<SitesContentTable, SiteConfigTable>;
+      using Tables = psibase::ServiceTables<SitesContentTable, SiteConfigTable, GlobalCspTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
@@ -65,15 +74,23 @@ namespace SystemService
       /// When enabled, all content requests return the root document.
       void enableSpa(bool enable);
 
+      /// Sets the Content Security Policy for the specified path (or "*" for a global CSP).
+      /// If a specific CSP is set, it takes precedence over the global CSP.
+      /// If no specific or global CSP is set, a default CSP is used.
+      void setCsp(std::string path, std::string csp);
+
      private:
       std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
       bool                              useSpa(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
+      std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
+                                                     const psibase::AccountNumber&         account);
    };
 
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, content),
                 method(removeSys, path),
-                method(enableSpa, enable))
+                method(enableSpa, enable),
+                method(setCsp, path, csp))
 }  // namespace SystemService

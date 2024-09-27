@@ -53,6 +53,31 @@ namespace SystemService
             target.resize(pos);
          return target;
       }
+
+      /*
+        script-src:
+          * `unsafe-eval` is needed for WebAssembly.compile()
+          * `unsafe-inline` is needed for inline <script> tags
+          * `blob:` for loading dynamically generated modules
+          * `https:` for dynamically loading libs from CDNs
+        font-src:
+          * `https:` for dynamically loading fonts from CDNs
+        frame-src:
+          * `*` is needed to allow embedding supervisor
+        connect-src:
+          * `blob:` for fetch-compiling blob urls
+          * `*` allows fetching plugins, as well as websocket connections
+      */
+      const std::string DEFAULT_CSP_HEADER =                               //
+          "default-src 'self';"                                            //
+          "font-src 'self' https:;"                                        //
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"  //
+          "img-src *;"                                                     //
+          "style-src 'self' 'unsafe-inline';"                              //
+          "frame-src *;"                                                   //
+          "connect-src * blob:;"                                           //
+          ;
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -105,9 +130,12 @@ namespace SystemService
 
          if (content)
          {
+            std::string cspHeader = getCspHeader(content, account);
+
             return HttpReply{
                 .contentType = content->contentType,
                 .body        = content->content,
+                .headers     = {{"Content-Security-Policy", cspHeader}},
             };
          }
       }
@@ -166,6 +194,48 @@ namespace SystemService
    {
       auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
       return siteConfig && siteConfig->spa;
+   }
+
+   void Sites::setCsp(std::string path, std::string csp)
+   {
+      Tables tables{};
+      if (path == "*")
+      {
+         auto table = tables.open<GlobalCspTable>();
+         table.put({
+             .account = getSender(),
+             .csp     = std::move(csp),
+         });
+      }
+      else
+      {
+         auto table   = tables.open<SitesContentTable>();
+         auto index   = table.getIndex<0>();
+         auto content = index.get(SitesContentKey{getSender(), path});
+         check(!!content, "Content not found for the specified path");
+
+         content->csp = std::move(csp);
+         table.put(*content);
+      }
+   }
+
+   std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
+                                   const AccountNumber&                  account)
+   {
+      std::string cspHeader = DEFAULT_CSP_HEADER;
+      if (content && !content->csp.empty())
+      {
+         cspHeader = content->csp;
+      }
+      else
+      {
+         auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
+         if (globalCsp)
+         {
+            cspHeader = globalCsp->csp;
+         }
+      }
+      return cspHeader;
    }
 
    namespace

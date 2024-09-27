@@ -73,6 +73,22 @@ impl Sites for SitesPlugin {
 
         Ok(0)
     }
+
+    fn enable_spa(enable: bool) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "enableSpa",
+            &SitesService::action_structs::enableSpa { enable }.packed(),
+        )?;
+        Ok(())
+    }
+
+    fn set_csp(path: String, csp: String) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "setCsp",
+            &SitesService::action_structs::setCsp { path, csp }.packed(),
+        )?;
+        Ok(())
+    }
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);
