@@ -19,8 +19,7 @@ export const App = () => {
 
     const init = async () => {
         await supervisor.onLoaded();
-        supervisor.preLoadPlugins([{ service: "branding" }]);
-        setTimeout(getNetworkName, 1500);
+        await getNetworkName();
     };
 
     useEffect(() => {
