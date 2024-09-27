@@ -2,8 +2,8 @@
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, serve_content, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
-        Table, ToSchema, WebContentRow,
+        anyhow, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -27,9 +27,6 @@ mod service {
             }
         }
     }
-
-    #[table(record = "WebContentRow", index = 1)]
-    struct WebContentTable;
 
     #[action]
     #[allow(non_snake_case)]
@@ -57,7 +54,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query))
     }
 }

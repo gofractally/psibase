@@ -84,9 +84,6 @@ mod service {
         }
     }
 
-    #[table(record = "WebContentRow", index = 2)]
-    struct WebContentTable;
-
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
         check(value <= 100, "bad confidence score");
@@ -220,8 +217,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }

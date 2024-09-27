@@ -40,7 +40,6 @@ Services which serve HTTP implement these interfaces:
 - [psibase::server_interface](https://docs.rs/psibase/latest/psibase/server_interface/index.html) (required)
   - [psibase::HttpRequest](https://docs.rs/psibase/latest/psibase/struct.HttpRequest.html)
   - [psibase::HttpReply](https://docs.rs/psibase/latest/psibase/struct.HttpReply.html)
-- [psibase::storage_interface](https://docs.rs/psibase/latest/psibase/storage_interface/index.html) (optional)
 
 ## Helpers
 

@@ -39,17 +39,15 @@ A service doesn't have to serve HTTP requests itself; it may delegate this to an
 
 ## HTTP Interfaces
 
-Services which serve HTTP implement these interfaces:
+Services which serve HTTP implements this interface:
 
 - [psibase::ServerInterface] (required)
   - [psibase::HttpRequest]
   - [psibase::HttpReply]
-- [psibase::StorageInterface] (optional)
 
 {{#cpp-doc ::psibase::ServerInterface}}
 {{#cpp-doc ::psibase::HttpRequest}}
 {{#cpp-doc ::psibase::HttpReply}}
-{{#cpp-doc ::psibase::StorageInterface}}
 
 ## Helpers
 
@@ -59,9 +57,6 @@ These help implement basic functionality:
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
 - [psibase::serveSchema]
-- [psibase::WebContentRow]
-- [psibase::storeContent]
-- [psibase::serveContent]
 - [psibase::serveGraphQL]
 - [psibase::makeConnection]
   - [psibase::PageInfo]
@@ -101,9 +96,6 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
 {{#cpp-doc ::psibase::serveSchema}}
-{{#cpp-doc ::psibase::WebContentRow}}
-{{#cpp-doc ::psibase::storeContent}}
-{{#cpp-doc ::psibase::serveContent}}
 {{#cpp-doc ::psibase::serveGraphQL}}
 {{#cpp-doc ::psibase::makeConnection}}
 {{#cpp-doc ::psibase::PageInfo}}
@@ -114,7 +106,3 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::makeEventConnection}}
 {{#cpp-doc ::psibase::historyQuery}}
 {{#cpp-doc ::psibase::QueryableService}}
-
-```
-
-```

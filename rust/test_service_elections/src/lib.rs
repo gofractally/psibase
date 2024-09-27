@@ -4,9 +4,9 @@
 #[psibase::service(name = "elections")]
 mod service {
     use psibase::{
-        check, check_none, check_some, get_sender, get_service, serve_content, serve_simple_ui,
-        services::transact, store_content, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack,
-        Table, TimePointSec, ToKey, ToSchema, Unpack, WebContentRow,
+        check, check_none, check_some, get_sender, get_service, serve_simple_ui,
+        services::transact, AccountNumber, HexBytes, HttpReply, HttpRequest, Pack, Table,
+        TimePointSec, ToKey, ToSchema, Unpack,
     };
     use serde::{Deserialize, Serialize};
 
@@ -71,9 +71,6 @@ mod service {
             (self.election_id, self.voter)
         }
     }
-
-    #[table(record = "WebContentRow", index = 3)]
-    struct WebContentTable;
 
     fn get_current_time() -> TimePointSec {
         transact::Wrapper::call().currentBlock().time
@@ -304,8 +301,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
+        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
 

@@ -44,7 +44,7 @@ Properties associated with a service.
 
 ## data/&lt;service&gt;/*
 
-Files that will be uploaded to the service's subdomain using the `storeSys` action on the `sites` service.
+Files that will be uploaded to the service's namespace within the the `sites` app, accessible from the service's subdomain.
 
 ## script/postinstall.json
 

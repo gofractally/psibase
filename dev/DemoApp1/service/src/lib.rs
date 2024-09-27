@@ -21,9 +21,6 @@ mod service {
         result: i32,
     }
 
-    #[table(record = "WebContentRow", index = 1)]
-    struct WebContentTable;
-
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
         let res = a + b;
@@ -84,8 +81,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
     }
 }

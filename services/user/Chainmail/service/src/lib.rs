@@ -101,14 +101,11 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 mod service {
     use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_simple_ui, store_content,
-        AccountNumber, HexBytes, HttpReply, HttpRequest, Table, WebContentRow,
+        anyhow, check, get_sender, get_service, serve_simple_ui, AccountNumber, HexBytes,
+        HttpReply, HttpRequest, Table,
     };
 
     use crate::serve_rest_api;
-
-    #[table(record = "WebContentRow")]
-    struct WebContentTable;
 
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
@@ -127,8 +124,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_rest_api(&request))
+        None.or_else(|| serve_rest_api(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
