@@ -280,6 +280,7 @@ impl Chain {
             target: target.into(),
             contentType: "".into(),
             body: <Vec<u8>>::new().into(),
+            headers: vec![],
         })
     }
 
@@ -296,6 +297,7 @@ impl Chain {
             target: target.into(),
             contentType: data.contentType,
             body: data.body,
+            headers: vec![],
         })
     }
 

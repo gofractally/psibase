@@ -25,18 +25,20 @@ namespace SystemService
       std::string            contentType = {};
       std::vector<char>      content     = {};
       std::string            csp         = {};
+      uint64_t               hash        = 0;
 
       SitesContentKey key() const { return {account, path}; }
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp, hash)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
    struct SiteConfigRow
    {
       psibase::AccountNumber account;
-      bool                   spa = false;
+      bool                   spa   = false;
+      bool                   cache = true;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
 
    struct GlobalCspRow
@@ -79,9 +81,18 @@ namespace SystemService
       /// If no specific or global CSP is set, a default CSP is used.
       void setCsp(std::string path, std::string csp);
 
+      /// Enables/disables caching of responses (Enabled by default)
+      /// Cache strategy:
+      /// - `If-None-Match` header is checked against the hash of the content
+      /// - The hash is stored in the `ETag` header
+      /// - If the hash matches, a 304 Not Modified response is returned
+      /// - If the hash does not match, the new content is returned with an updated `ETag` header
+      void enableCache(bool enable);
+
      private:
       std::optional<SitesContentRow>    useDefaultProfile(const std::string& target);
       bool                              useSpa(const psibase::AccountNumber& account);
+      bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
       std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
                                                      const psibase::AccountNumber&         account);
@@ -92,5 +103,6 @@ namespace SystemService
                 method(storeSys, path, contentType, content),
                 method(removeSys, path),
                 method(enableSpa, enable),
-                method(setCsp, path, csp))
+                method(setCsp, path, csp),
+                method(enableCache, enable))
 }  // namespace SystemService

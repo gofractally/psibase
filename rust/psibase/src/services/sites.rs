@@ -21,6 +21,7 @@ struct SitesContentRow {
     contentType: String,
     content: Vec<u8>,
     csp: String,
+    hash: u64,
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
@@ -74,6 +75,17 @@ mod service {
     /// If no specific or global CSP is set, a default CSP is used.
     #[action]
     fn setCsp(path: String, csp: String) {
+        unimplemented!()
+    }
+
+    /// Enables/disables caching of responses (Enabled by default)
+    /// Cache strategy:
+    /// - `If-None-Match` header is checked against the hash of the content
+    /// - The hash is stored in the `ETag` header
+    /// - If the hash matches, a 304 Not Modified response is returned
+    /// - If the hash does not match, the new content is returned with an updated `ETag` header
+    #[action]
+    fn enableCache(enable: bool) {
         unimplemented!()
     }
 }

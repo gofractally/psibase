@@ -45,6 +45,7 @@ namespace SystemService
          return target.find('.', last_slash_pos) != target.npos;
       }
 
+      // Remove query parameters from the target
       std::string normalizeTarget(const std::string& t)
       {
          std::string target = t;
@@ -77,6 +78,14 @@ namespace SystemService
           "frame-src *;"                                                   //
           "connect-src * blob:;"                                           //
           ;
+
+      bool shouldCache(const HttpRequest& request, const std::string& etag)
+      {
+         auto it =
+             std::find_if(request.headers.begin(), request.headers.end(),
+                          [](const HttpHeader& header) { return header.name == "If-None-Match"; });
+         return it != request.headers.end() && it->value == etag;
+      }
 
    }  // namespace
 
@@ -131,11 +140,24 @@ namespace SystemService
          if (content)
          {
             std::string cspHeader = getCspHeader(content, account);
+            auto        etag      = std::to_string(content->hash);
+
+            if (useCache(account) && shouldCache(request, etag))
+            {
+               // https://issues.chromium.org/issues/40132719
+               // Chrome bug - Devtools still shows 200 status code sometimes
+               return HttpReply{
+                   .status  = HttpStatus::notModified,
+                   .headers = {{"ETag", etag}},
+               };
+            }
 
             return HttpReply{
                 .contentType = content->contentType,
                 .body        = content->content,
-                .headers     = {{"Content-Security-Policy", cspHeader}},
+                .headers     = {{"Content-Security-Policy", cspHeader},
+                                {"Cache-Control", "no-cache"},
+                                {"ETag", etag}},
             };
          }
       }
@@ -149,11 +171,14 @@ namespace SystemService
       auto   table = tables.template open<SitesContentTable>();
 
       check(path.starts_with('/'), "Path doesn't begin with /");
+      auto hash = psio::detail::seahash(std::string_view(content.data(), content.size()));
+
       SitesContentRow row{
           .account     = getSender(),
           .path        = std::move(path),
           .contentType = std::move(contentType),
           .content     = std::move(content),
+          .hash        = hash,
       };
       table.put(row);
    }
@@ -175,25 +200,6 @@ namespace SystemService
                      });
       row.spa = enable;
       table.put(row);
-   }
-
-   std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
-   {
-      auto index = Tables{}.open<SitesContentTable>().getIndex<0>();
-
-      std::optional<SitesContentRow> content;
-      if (target == "/" || target.starts_with("/default-profile/"))
-      {
-         content =
-             index.get(SitesContentKey{getReceiver(), "/default-profile/default-profile.html"});
-      }
-      return content;
-   }
-
-   bool Sites::useSpa(const psibase::AccountNumber& account)
-   {
-      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
-      return siteConfig && siteConfig->spa;
    }
 
    void Sites::setCsp(std::string path, std::string csp)
@@ -219,6 +225,33 @@ namespace SystemService
       }
    }
 
+   void Sites::enableCache(bool enable)
+   {
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row   = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+      row.cache  = enable;
+      table.put(row);
+   }
+
+   std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
+   {
+      auto index = Tables{}.open<SitesContentTable>().getIndex<0>();
+
+      std::optional<SitesContentRow> content;
+      if (target == "/" || target.starts_with("/default-profile/"))
+      {
+         content =
+             index.get(SitesContentKey{getReceiver(), "/default-profile/default-profile.html"});
+      }
+      return content;
+   }
+
+   bool Sites::useSpa(const psibase::AccountNumber& account)
+   {
+      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
+      return siteConfig && siteConfig->spa;
+   }
+
    std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
                                    const AccountNumber&                  account)
    {
@@ -236,6 +269,13 @@ namespace SystemService
          }
       }
       return cspHeader;
+   }
+
+   bool Sites::useCache(const AccountNumber& account)
+   {
+      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account).value_or(
+          SiteConfigRow{.account = getSender()});
+      return siteConfig.cache;
    }
 
    namespace

@@ -49,6 +49,9 @@ pub struct HttpRequest {
 
     /// Request body, e.g. POST data
     pub body: Hex<Vec<u8>>,
+
+    /// HTTP Headers
+    pub headers: Vec<HttpHeader>,
 }
 
 pub struct HttpBody {

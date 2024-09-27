@@ -42,6 +42,14 @@ interface sites {
     /// If a specific CSP is set, it takes precedence over the global CSP.
     /// If no specific or global CSP is set, a default CSP is used.
     set-csp: func(path: string, csp: string) -> result<_, error>;
+
+    /// Enable or disable caching of responses.
+    /// Cache strategy:
+    /// - `If-None-Match` header is checked against the hash of the content
+    /// - The hash is stored in the `ETag` header
+    /// - If the hash matches, a 304 Not Modified response is returned
+    /// - If the hash does not match, the new content is returned with an updated `ETag` header
+    enable-cache: func(enable: bool) -> result<_, error>;
 }
 
 world imports {

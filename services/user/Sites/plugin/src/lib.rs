@@ -89,6 +89,14 @@ impl Sites for SitesPlugin {
         )?;
         Ok(())
     }
+
+    fn enable_cache(enable: bool) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "enableCache",
+            &SitesService::action_structs::enableCache { enable }.packed(),
+        )?;
+        Ok(())
+    }
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);
