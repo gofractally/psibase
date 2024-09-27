@@ -464,7 +464,7 @@ psibase_package(
     DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
