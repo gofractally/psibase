@@ -7,7 +7,7 @@ A more in depth guide will be added later, but this is a rough outline of the st
 1. Create a psibase account
 2. Create a psibase package including a service, [plugin](../../specifications/app-architecture/plugins.md), and UI
 3. Install the package to your subdomain
-4. [Optional] Register an http server that implements the [psibase::ServerInterface] to handle custom RPC/Rest/GraphQl queries.
+4. [Optional] Register an http server that implements the [psibase::ServerInterface] to handle custom RPC/REST/GraphQl queries.
 
 ## Virtual hosting
 
