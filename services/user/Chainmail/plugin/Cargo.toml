@@ -26,4 +26,4 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 
 [dev-dependencies]
-chainmail_package = { path = ".." }
+chainmail_package = { path = "..", version = "0.12.0" }

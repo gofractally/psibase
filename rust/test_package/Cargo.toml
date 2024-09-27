@@ -1,5 +1,6 @@
 [package]
 name = "test_package"
+description = "Test for package building"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -9,7 +10,6 @@ publish = false
 
 [package.metadata.psibase]
 package-name = "TestPackage"
-description = "Test for package building"
 services = ["tpack"]
 
 [lib]

@@ -21,6 +21,7 @@ Example:
 [package]
 name = "example"
 version = "0.1.0"
+description = "An example package"
 
 [package.metadata.psibase]
 # Builds example.psi

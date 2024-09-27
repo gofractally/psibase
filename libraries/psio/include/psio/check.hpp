@@ -17,7 +17,7 @@ namespace psio
    template <typename T>
    [[noreturn]] void abort_error(const T& msg)
    {
-#ifdef __cpp_exceptions
+#ifndef COMPILING_WASM
       throw std::runtime_error((std::string)error_to_str(msg));
 #else
       psibase::abortMessage(error_to_str(msg));
