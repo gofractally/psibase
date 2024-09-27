@@ -444,6 +444,10 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
 
+        if !self.data.is_empty() {
+            result.push(sites::SERVICE);
+        }
+
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
                 result.push(http_server::SERVICE)

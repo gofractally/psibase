@@ -244,6 +244,7 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
+    services/user/Chainmail/ui:Chainmail_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -417,6 +418,12 @@ psibase_package(
     DEPENDS ${ClientDataPlugin_DEP}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Chainmail.psi
+    PATH services/user/Chainmail
+    DEPENDS ${Chainmail_js_DEP}
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
@@ -464,7 +471,7 @@ psibase_package(
     DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -738,7 +745,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
 )
@@ -748,7 +755,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
@@ -777,7 +784,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts AuthAny AuthSig Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
@@ -787,6 +794,7 @@ install(
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
+          ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/DevDefault.psi

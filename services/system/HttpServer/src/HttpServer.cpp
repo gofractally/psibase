@@ -229,7 +229,7 @@ namespace SystemService
       auto result    = iface(server).serveSys(req, std::optional{sock});
 
       // If not found, we check the registered server
-      if (!result)
+      if (!result && currentRequest)
       {
          auto service    = getTargetService(req);
          auto registered = getServer(service);

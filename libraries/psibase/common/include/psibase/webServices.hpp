@@ -36,39 +36,4 @@ namespace psibase
       PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
    };
 
-   /// Interface for services which support storing files outside of the standard Sites app
-   ///
-   /// Most services should not implement the StorageInterface, and instead rely on the standard
-   /// [SystemService::Sites] app to store & serve their static files.
-   ///
-   /// It is still possible to use this interface for file storage/service outside of the Sites app,
-   /// but note that the `psibase` CLI tool will not work and you will need to call the `storeSys` action
-   /// on your service manually.
-   ///
-   /// > ⚠️ Do **not** inherit from this. To implement this interface, add a [storeSys] action
-   /// to your service and reflect it.
-   ///
-   /// > If you implement this interface, you must also implement the [psibase::ServerInterface]
-   /// in order to serve the files over HTTP.
-   struct StorageInterface
-   {
-      /// Store a file
-      ///
-      /// Define this action in your service to handle file storage requests. This action
-      /// should store the file in the service's tables. The service can then serve these
-      /// files via HTTP.
-      ///
-      /// - `path`: absolute path to file. e.g. `/index.html` for the main page
-      /// - `contentType`: `text/html`, `text/javascript`, `application/octet-stream`, ...
-      /// - `content`: file content
-      ///
-      /// The `psibase upload` command calls this action on the Sites service.
-      ///
-      /// [storeContent] simplifies implementing this.
-      //
-      // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
-      //       implementations of this interface may, of course, use it.
-      void storeSys(std::string_view path, std::string_view contentType, std::vector<char> content);
-      PSIO_REFLECT(StorageInterface, method(storeSys, path, contentType, content))
-   };
 }  // namespace psibase

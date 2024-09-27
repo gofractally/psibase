@@ -195,12 +195,11 @@ namespace psibase
    {
       for (const auto& [sender, index] : data)
       {
-         AccountNumber service = Sites::service;
          auto path = index.filename.substr(5);
          auto pos  = path.find('/');
          assert(pos != std::string::npos);
          path = path.substr(pos);
-         actions.push_back(transactor<Sites>{sender, service}.storeSys(
+         actions.push_back(transactor<Sites>{sender, Sites::service}.storeSys(
              path, guessMimeType(path), archive.getEntry(index).read()));
       }
    }
