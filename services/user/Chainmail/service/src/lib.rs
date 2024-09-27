@@ -107,7 +107,7 @@ mod service {
 
     use crate::serve_rest_api;
 
-    #[table(name = "InitTable", index = 1)]
+    #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
     struct InitRow {}
     impl InitRow {
