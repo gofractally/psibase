@@ -14,7 +14,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 
 ## DESCRIPTION
@@ -218,9 +218,9 @@ Search for packages
 
 ### upload
 
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 
-Upload a file to a service. The service must provide a `storeSys` action.
+Upload a file to a service's subdomain. The file will be stored to and served from the sender's namespace within the `sites` service.
 
 - `-r`, `--recursive`
 
@@ -230,21 +230,17 @@ Upload a file to a service. The service must provide a `storeSys` action.
 
   MIME Content-Type of the file. If not specified, it will be guessed from the file name. Cannot be used with `-r`.
 
-- *service*
-
-  Service to upload to
-
 - *source*
 
   Source filename to upload
 
 - *dest*
 
-  Destination path within *service*. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
+  Destination path at the subdomain from which the file will be served. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
 
 - `-S`, `--sender` *sender*
 
-  Account to use as the sender of the transaction. Defaults to the *service* account.
+  Account to use as the sender of the transaction. Required. Files are uploaded to this account's subdomain.
 
 ### create-token
 

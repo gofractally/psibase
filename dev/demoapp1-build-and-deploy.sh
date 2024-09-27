@@ -26,6 +26,6 @@ cd ./ui
 rm -rf node_modules
 rm -rf dist
 yarn --mutex network && yarn build
-psibase upload -r $account_name ./dist / -S $account_name
+psibase upload -r ./dist / -S $account_name
 
 

@@ -9,8 +9,6 @@ namespace UserService
    class Chainmail : public psibase::Service<Chainmail>
    {
      public:
-      using Tables = psibase::ServiceTables<InitTable, psibase::WebContentTable>;
-
       static constexpr auto service = psibase::AccountNumber("chainmail");
 
       Chainmail(psio::shared_view_ptr<psibase::Action> action);
@@ -22,7 +20,6 @@ namespace UserService
                 const std::string&     body);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
       // clang-format off
       struct Events
@@ -41,8 +38,7 @@ namespace UserService
    PSIO_REFLECT(Chainmail,
       method(init),
       method(send, receiver, subject, body),
-      method(serveSys, request),
-      method(storeSys, path, contentType, content)
+      method(serveSys, request)
    );
    PSIBASE_REFLECT_EVENTS(Chainmail);
    PSIBASE_REFLECT_HISTORY_EVENTS(Chainmail,

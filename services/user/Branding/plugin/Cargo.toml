@@ -24,8 +24,9 @@ package = "branding:psibase-plugin"
 
 [package.metadata.component.target.dependencies]
 # Something's wrong with transact that it needs host:common added as a dep in a project like this
-"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
 branding_package = { path = ".." }

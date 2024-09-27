@@ -2,7 +2,6 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/serveContent.hpp>
 #include <psio/to_json.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
@@ -10,7 +9,6 @@
 static constexpr bool enable_print = false;
 
 using namespace psibase;
-using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 namespace SystemService
 {
@@ -78,23 +76,8 @@ namespace SystemService
             };
          }
       }
-
-      if (auto result = psibase::serveContent(request, Tables{getReceiver()}))
-      {
-         result->headers = {
-             {"Content-Security-Policy", "frame-ancestors 'none';"},
-         };
-         return result;
-      }
       return std::nullopt;
    }  // CommonApi::serveSys
-
-   void CommonApi::storeSys(std::string path, std::string contentType, std::vector<char> content)
-   {
-      psibase::check(getSender() == getReceiver(), "wrong sender");
-      psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                            Tables{getReceiver()});
-   }
 
 }  // namespace SystemService
 
