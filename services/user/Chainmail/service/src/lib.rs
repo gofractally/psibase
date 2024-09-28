@@ -16,6 +16,7 @@ fn validate_user(user: &str) -> bool {
 }
 
 fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
+    //events.psibase.???
     return HttpRequest {
         host: req.host.clone(),
         rootHost: req.rootHost.clone(),
@@ -74,23 +75,58 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             return None;
         }
 
-        let mut where_clause: String = String::from("WHERE ");
+        let archived_requested = match params.get(&String::from("archived")) {
+            Some(arch) => arch == "true",
+            None => false,
+        };
+
+        let mut where_clause_sender_receiver: String = String::from("");
         if s_opt.is_some() {
-            where_clause += s_clause.as_str();
+            where_clause_sender_receiver += s_clause.as_str();
         }
         if s_opt.is_some() && r_opt.is_some() {
-            where_clause += " AND ";
+            where_clause_sender_receiver += " AND ";
         }
         if r_opt.is_some() {
-            where_clause += r_clause.as_str();
+            where_clause_sender_receiver += r_clause.as_str();
         }
 
-        let mq = make_query(
-            request,
-            format!("SELECT *
-                FROM \"history.chainmail.sent\" AS sent
-                LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id {} ORDER BY ROWID", where_clause),
+        /* TASKS
+         * x- clean this up so chainmail shows sent/received messages instead of []
+         * x- send a couple of archive actions so 'alice test 2' and 'bob test 1' are archived
+         * x- tweak this sql until I can retrieve archived an not archived messages properly
+         */
+
+        // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as msg_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
+        // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
+
+        // Select from all sent emails *not archived* where receiver/send are as query params specify
+        let select_clause = format!("DISTINCT sent.rowid as msg_id, archive.event_id, sent.*");
+        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id" );
+        let where_clause_archived_or_not = format!(
+            "archive.event_id IS {} NULL",
+            if archived_requested { "NOT" } else { "" }
         );
+        let order_by_clause = "sent.ROWID";
+
+        let sql_query_str = format!(
+            "SELECT {} FROM {} WHERE {} {} {} ORDER BY {}",
+            select_clause,
+            from_clause,
+            where_clause_archived_or_not,
+            if s_opt.is_some() || r_opt.is_some() {
+                "AND"
+            } else {
+                ""
+            },
+            where_clause_sender_receiver,
+            order_by_clause
+        );
+
+        let mq = make_query(request, sql_query_str.clone());
+
+        println!("query: {}", sql_query_str);
+
         return REventsSvc::call().serveSys(mq);
     }
     return None;
@@ -102,6 +138,7 @@ mod service {
     use serde::{Deserialize, Serialize};
     use services::accounts::Wrapper as AccountsSvc;
     use services::events::Wrapper as EventsSvc;
+    // use services::sites::Wrapper as SitesSvc;
 
     use crate::serve_rest_api;
 
@@ -124,6 +161,9 @@ mod service {
             "Service already initialized",
         );
         table.put(&InitRow {}).unwrap();
+
+        // Register as SPA
+        // SitesSvc::call().
 
         EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);

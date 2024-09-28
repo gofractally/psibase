@@ -11,6 +11,7 @@ export function useCompose() {
 
 export type Message = {
     id: string;
+    msgId: string;
     from: string;
     to: string;
     datetime: number;
@@ -26,13 +27,17 @@ type RawMessage = {
     receiver: string;
     subject: string;
     body: string;
+    msg_id: string;
 };
 
 const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
+    console.info("transformRawMessagesToMessages().top; rawMessagses:");
+    console.info(rawMessages);
     return rawMessages.reverse().map(
         (msg, i) =>
             ({
                 id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.body}`,
+                msgId: msg.msg_id,
                 from: msg.sender,
                 to: msg.receiver,
                 datetime: Date.now() - i * 1_000_000,
@@ -61,6 +66,33 @@ export function useIncomingMessages() {
     });
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(incomingMsgAtom);
+    const selectedMessage = query.data?.find(
+        (msg) => msg.id === selectedMessageId,
+    );
+
+    return {
+        query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
+}
+
+const getArchivedMessages = async (account: string) => {
+    const res = await fetch(`/messages?archived=true&receiver=${account}`);
+    const rawMessages = (await res.json()) as RawMessage[];
+    return transformRawMessagesToMessages(rawMessages);
+};
+
+const archivedMsgAtom = atom<Message["id"]>("");
+export function useArchivedMessages() {
+    const { user } = useUser();
+    const query = useQuery({
+        queryKey: ["archived", user],
+        queryFn: () => getArchivedMessages(user),
+        enabled: Boolean(user),
+    });
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(archivedMsgAtom);
     const selectedMessage = query.data?.find(
         (msg) => msg.id === selectedMessageId,
     );
