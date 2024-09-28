@@ -138,7 +138,7 @@ mod service {
     use serde::{Deserialize, Serialize};
     use services::accounts::Wrapper as AccountsSvc;
     use services::events::Wrapper as EventsSvc;
-    // use services::sites::Wrapper as SitesSvc;
+    use services::sites::Wrapper as SitesSvc;
 
     use crate::serve_rest_api;
 
@@ -162,8 +162,7 @@ mod service {
         );
         table.put(&InitRow {}).unwrap();
 
-        // Register as SPA
-        // SitesSvc::call().
+        SitesSvc::call().enableSpa(true);
 
         EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
