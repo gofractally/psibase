@@ -1,5 +1,23 @@
 package chainmail:plugin;
 
+interface types {
+    record message {
+        msg-id: u64,
+        receiver: string,
+        sender: string,
+        subject: string,
+        body: string
+    }
+}
+
+interface queries {
+    use host:common/types.{error};
+    use types.{message};
+
+    get-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    get-archived-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+}
+
 interface api {
     use host:common/types.{error};
 
@@ -12,4 +30,5 @@ interface api {
 
 world imports {
     import api;
+    import queries;
 }
