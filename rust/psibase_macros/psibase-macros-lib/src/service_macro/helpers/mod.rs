@@ -1,47 +1,14 @@
-use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
 use proc_macro2::{Span, TokenStream};
 use proc_macro_error::{abort, emit_error};
 use quote::{quote, ToTokens};
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 use syn::{
     parse_quote, AttrStyle, Attribute, Field, FnArg, Ident, ImplItem, Item, ItemFn, ItemImpl,
-    ItemMod, ItemStruct, Pat, ReturnType, Type,
+    ItemMod, ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
 };
 
-pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_args = match NestedMeta::parse_meta_list(attr) {
-        Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors());
-        }
-    };
-
-    let mut options: Options = match Options::from_list(&attr_args) {
-        Ok(val) => val,
-        Err(err) => {
-            return err.write_errors().into();
-        }
-    };
-
-    if options.name.is_empty() {
-        options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
-    }
-    if options.dispatch.is_none() {
-        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
-    }
-    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
-        options.dispatch = Some(false);
-    }
-    let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
-    let item = syn::parse2::<syn::Item>(item).unwrap();
-    match item {
-        Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod),
-        _ => {
-            abort!(item, "service attribute may only be used on a module")
-        }
-    }
-}
+pub mod events;
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -92,37 +59,39 @@ enum EventType {
 
 fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
     if let AttrStyle::Outer = attr.style {
-        if attr.meta.path().is_ident("event") {
-            let mut event_type = None;
-            let _ = attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("history") {
-                    event_type = Some(EventType::History);
-                    return Ok(());
+        if attr.path.is_ident("event") {
+            match attr.parse_meta() {
+                Ok(Meta::List(list)) => {
+                    if list.nested.len() == 1 {
+                        if let Some(NestedMeta::Meta(Meta::Path(inner))) = list.nested.first() {
+                            if inner.is_ident("history") {
+                                return Some(EventType::History);
+                            } else if inner.is_ident("ui") {
+                                return Some(EventType::Ui);
+                            } else if inner.is_ident("merkle") {
+                                return Some(EventType::Merkle);
+                            } else {
+                                emit_error!(inner, "expected history, ui, or merkle");
+                                return None;
+                            }
+                        }
+                    }
                 }
-                if meta.path.is_ident("ui") {
-                    event_type = Some(EventType::Ui);
-                    return Ok(());
-                }
-                if meta.path.is_ident("merkle") {
-                    event_type = Some(EventType::Merkle);
-                    return Ok(());
-                }
-                emit_error!(attr.meta, "expected history, ui, or merkle");
-                return Err(meta.error("expected history, ui, or merkle"));
-            });
-            return event_type;
+                _ => {}
+            }
+            emit_error!(attr, "invalid event attribute");
         }
     }
     None
 }
 
 fn is_event_attr(attr: &Attribute) -> bool {
-    matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("event")
+    matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("event")
 }
 
 fn is_action_attr(attr: &Attribute) -> bool {
     if let AttrStyle::Outer = attr.style {
-        if attr.meta.path().is_ident("action") {
+        if attr.path.is_ident("action") {
             return true;
         }
     }
@@ -131,7 +100,7 @@ fn is_action_attr(attr: &Attribute) -> bool {
 
 fn is_table_attr(attr: &Attribute) -> bool {
     if let AttrStyle::Outer = attr.style {
-        if attr.meta.path().is_ident("table") {
+        if attr.path.is_ident("table") {
             return true;
         }
     }
@@ -189,13 +158,6 @@ impl Default for TableOptions {
         }
     }
 }
-
-// impl FromAttributes for TableOptions {
-//     fn from_attributes(attrs: &[Attribute]) -> darling::Result<Self> {
-//         todo!()
-//     }
-// }
-
 fn process_service_tables(
     psibase_mod: &proc_macro2::TokenStream,
     table_record_struct_name: &Ident,
@@ -360,19 +322,7 @@ fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
 
-        // Goal: Vec<syn::Attribute, Global> --> Vec<NestedMeta>
-        // let attr_args: Vec<NestedMeta> = table_struct.attrs.into();
-        // darling::FromMeta::from_meta
-
-        // let attr_args = match NestedMeta::parse_meta_list(nestedMeta_vec) {
-        //     Ok(v) => v,
-        //     Err(e) => {
-        //         abort!(table_struct, e);
-        //     }
-        // };
-
-        match TableOptions::from_meta(&attr.meta) {
-            // match TableOptions::from_list(&attr_args) {
+        match TableOptions::from_meta(&attr.parse_meta().unwrap()) {
             Ok(options) => {
                 *table_options = Some(options);
             }
@@ -401,9 +351,7 @@ fn process_table_fields(table_record_struct: &mut ItemStruct, pk_data: &mut Opti
         let mut removable_attr_idxs = Vec::new();
 
         for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
-            if field_attr.style == AttrStyle::Outer
-                && field_attr.meta.path().is_ident("primary_key")
-            {
+            if field_attr.style == AttrStyle::Outer && field_attr.path.is_ident("primary_key") {
                 process_table_pk_field(pk_data, field);
                 removable_attr_idxs.push(field_attr_idx);
             }
@@ -421,12 +369,12 @@ fn process_table_impls(
     secondary_keys: &mut Vec<SkIdentData>,
 ) {
     for impl_item in table_impl.items.iter_mut() {
-        if let ImplItem::Fn(method) = impl_item {
+        if let ImplItem::Method(method) = impl_item {
             let mut removable_attr_idxs = Vec::new();
 
             for (attr_idx, attr) in method.attrs.iter().enumerate() {
                 if attr.style == AttrStyle::Outer {
-                    if attr.meta.path().is_ident("primary_key") {
+                    if attr.path.is_ident("primary_key") {
                         let pk_method = &method.sig.ident;
                         check_unique_pk(pk_data, pk_method);
 
@@ -441,7 +389,7 @@ fn process_table_impls(
                         }
 
                         removable_attr_idxs.push(attr_idx);
-                    } else if attr.meta.path().is_ident("secondary_key") {
+                    } else if attr.path.is_ident("secondary_key") {
                         if let Ok(lit) = attr.parse_args::<syn::LitInt>() {
                             if let Ok(idx) = lit.base10_parse::<u8>() {
                                 if idx == 0 {
@@ -650,9 +598,7 @@ fn process_mod(
         let doc = impl_mod
             .attrs
             .iter()
-            .filter(|attr| {
-                matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc")
-            })
+            .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
             .fold(quote! {}, |a, b| quote! {#a #b});
         items.push(parse_quote! {
             #[derive(Debug, Clone)]
@@ -1288,14 +1234,12 @@ fn process_action_callers(
     let inner_doc = f
         .attrs
         .iter()
-        .filter(|attr| {
-            matches!(attr.style, AttrStyle::Inner(_)) && attr.meta.path().is_ident("doc")
-        })
+        .filter(|attr| matches!(attr.style, AttrStyle::Inner(_)) && attr.path.is_ident("doc"))
         .fold(quote! {}, |a, b| quote! {#a #b});
     let outer_doc = f
         .attrs
         .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc"))
+        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
         .fold(quote! {}, |a, b| quote! {#a #b});
 
     #[allow(unused_variables)]
@@ -1521,77 +1465,5 @@ fn add_unknown_action_check_to_dispatch_body(
                 ));
             }
         };
-    }
-}
-
-fn process_event_callers(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    event_callers: &mut proc_macro2::TokenStream,
-    invoke_args: &proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-    let inputs = &f.sig.inputs;
-
-    let inner_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| {
-            matches!(attr.style, AttrStyle::Inner(_)) && attr.meta.path().is_ident("doc")
-        })
-        .fold(quote! {}, |a, b| quote! {#a #b});
-    let outer_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc"))
-        .fold(quote! {}, |a, b| quote! {#a #b});
-
-    *event_callers = quote! {
-        #event_callers
-
-        #outer_doc
-        pub fn #name(&self, #inputs) -> u64 {
-            #inner_doc
-            #psibase_mod::put_sequential(self.event_log, self.sender, &#method_number, &(#invoke_args))
-        }
-    };
-}
-
-fn process_event_name(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    structs: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-
-    *structs = quote! {
-        #structs
-
-        impl #psibase_mod::NamedEvent for #name {
-            fn name() -> #psibase_mod::MethodNumber { #method_number }
-        }
-    }
-}
-
-fn process_event_schema(
-    psibase_mod: &proc_macro2::TokenStream,
-    event_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    insertions: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-
-    *insertions = quote! {
-        #insertions
-        events.insert(#method_number, builder.insert::<#event_mod::#name>());
     }
 }
