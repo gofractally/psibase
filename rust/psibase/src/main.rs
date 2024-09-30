@@ -641,14 +641,12 @@ async fn boot(
     add_package_registry(package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
 
-    println!("Constructing boot transactions...");
     let (boot_transactions, transactions) =
         create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
 
-    println!("Submitting boot transactions...");
     push_boot(args, &client, boot_transactions.packed(), &progress).await?;
     progress.inc(1);
     for transaction in transactions {
