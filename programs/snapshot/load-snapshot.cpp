@@ -51,14 +51,126 @@ void read_footer_row(SnapshotFooter& footer, std::span<const char> key, std::spa
    }
 }
 
-int read(std::uint32_t chain, auto& stream)
+enum class ProducerGroup
+{
+   current      = 0,
+   next         = 1,
+   not_producer = -1,
+};
+
+bool isProducer(const psibase::Consensus& consensus, const StateSignature& sig)
+{
+   auto& producers = std::visit([](auto& c) -> auto& { return c.producers; }, consensus.data);
+   return std::ranges::find_if(producers, [&](const auto& prod)
+                               { return prod.name == sig.account && prod.auth == sig.claim; }) !=
+          producers.end();
+}
+
+ProducerGroup findProducer(const psibase::JointConsensus& consensus, const StateSignature& sig)
+{
+   if (isProducer(consensus.current, sig))
+      return ProducerGroup::current;
+   else if (consensus.next && isProducer(consensus.next->consensus, sig))
+      return ProducerGroup::next;
+   else
+      return ProducerGroup::not_producer;
+}
+
+std::string keyId(const psibase::Claim& claim)
+{
+   if (claim.service == SystemService::VerifySig::service)
+      return keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
+          .data = {claim.rawData.begin(), claim.rawData.end()}});
+   else
+      return psio::convert_to_json(claim);
+}
+
+std::size_t weakThreshold(const psibase::BftConsensus& c)
+{
+   return c.producers.size() / 3 + 1;
+}
+
+std::size_t weakThreshold(const psibase::CftConsensus& c)
+{
+   return 1;
+}
+
+std::size_t weakThreshold(const psibase::Consensus& consensus)
+{
+   return std::visit([](const auto& c) { return weakThreshold(c); }, consensus.data);
+}
+
+bool compareProducers(const psibase::Producer& lhs, const psibase::Producer& rhs)
+{
+   return std::tie(lhs.name, lhs.auth.service, lhs.auth.rawData) <
+          std::tie(rhs.name, rhs.auth.service, rhs.auth.rawData);
+};
+
+int verifySignatures(std::uint32_t                  chain,
+                     const SnapshotFooter&          footer,
+                     const psibase::JointConsensus& consensus)
+{
+   if (consensus.next)
+   {
+      std::cerr << "Not implemented: Cannot verify snapshot producers" << std::endl;
+      return 1;
+   }
+   int                            result = 0;
+   StateSignatureInfo             info{*footer.hash};
+   std::span<const char>          preimage{info};
+   auto                           hash = psibase::sha256(preimage.data(), preimage.size());
+   std::vector<psibase::Producer> producerSignatures;
+   for (const auto& sig : footer.signatures)
+   {
+      psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
+      psibase::Action     act{.service = sig.claim.service, .rawData = psio::to_frac(args)};
+      auto                packed = psio::to_frac(act);
+      auto                size   = raw::verify(chain, packed.data(), packed.size());
+      auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
+      if (!trace.error || trace.error->empty())
+      {
+         if (isProducer(consensus.current, sig))
+         {
+            producerSignatures.push_back({sig.account, sig.claim});
+         }
+         else
+         {
+            std::cerr << "Good signature from unverified key " << keyId(sig.claim) << std::endl;
+         }
+      }
+      else
+      {
+         std::cerr << "Signature verification failed: " << *trace.error << std::endl;
+         result = 1;
+      }
+   }
+   if (!producerSignatures.empty())
+   {
+      std::ranges::sort(producerSignatures, compareProducers);
+      producerSignatures.erase(std::ranges::unique(producerSignatures, compareProducers).begin(),
+                               producerSignatures.end());
+      if (producerSignatures.size() >= weakThreshold(consensus.current))
+      {
+         std::cerr << "Verified signature" << std::endl;
+      }
+      else
+      {
+         std::cerr << "Warning: not enough signatures on snapshot" << std::endl;
+         for (const auto& prod : producerSignatures)
+         {
+            std::cerr << "Good signature from " << prod.name.str() << std::endl;
+         }
+      }
+   }
+   return result;
+}
+
+int read(std::uint32_t chain, auto& stream, SnapshotFooter& footer, StateChecksum& hash)
 {
    std::uint32_t  db;
    KvMerkle::Item item;
    std::uint32_t  current_db = 0;
    KvMerkle       merkle;
-   SnapshotFooter footer;
-   StateChecksum  hash;
    while (read_u32(db, stream))
    {
       switch (db)
@@ -68,12 +180,17 @@ int read(std::uint32_t chain, auto& stream)
          case SnapshotFooter::id:
             break;
          default:
-            psibase::check(false, "Unexpected database id: " + std::to_string(db));
+            std::cerr << "Unexpected database id: " + std::to_string(db) << std::endl;
+            return 1;
       }
 
       if (db != current_db)
       {
-         psibase::check(db > current_db, "Databases are in the wrong order");
+         if (db < current_db)
+         {
+            std::cerr << "Databases are in the wrong order" << std::endl;
+            return 1;
+         }
          if (current_db == static_cast<std::uint32_t>(DbId::service))
          {
             hash.serviceRoot = std::move(merkle).root();
@@ -96,57 +213,6 @@ int read(std::uint32_t chain, auto& stream)
          raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(),
                     value.size());
       }
-   }
-   if (footer.hash)
-   {
-      if (*footer.hash != hash)
-      {
-         std::cerr << "Snapshot checksum failed\n";
-         return 1;
-      }
-   }
-   else
-   {
-      std::cerr << "Warning: snapshot does not include a checksum\n";
-   }
-   if (!footer.signatures.empty())
-   {
-      int                   result = 0;
-      StateSignatureInfo    info{hash};
-      std::span<const char> preimage{info};
-      auto                  hash = psibase::sha256(preimage.data(), preimage.size());
-      for (const auto& sig : footer.signatures)
-      {
-         psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
-         psibase::Action     act{.service = sig.claim.service, .rawData = psio::to_frac(args)};
-         auto                packed = psio::to_frac(act);
-         auto                size   = raw::verify(chain, packed.data(), packed.size());
-         auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
-         if (!trace.error || trace.error->empty())
-         {
-            if (sig.claim.service == SystemService::VerifySig::service)
-            {
-               std::cerr << "Good signature from "
-                         << keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
-                                .data = {sig.rawData.begin(), sig.rawData.end()}})
-                         << std::endl;
-            }
-            else
-            {
-               std::cerr << "Good signature from " << psio::convert_to_json(sig.claim) << std::endl;
-            }
-         }
-         else
-         {
-            std::cerr << "Signature verification failed: " << *trace.error << std::endl;
-            result = 1;
-         }
-      }
-      return result;
-   }
-   else
-   {
-      std::cerr << "Warning: snapshot is not signed\n";
    }
    return 0;
 }
@@ -254,13 +320,40 @@ int main(int argc, const char* const* argv)
    clearDb(handle, DbId::service);
    clearDb(handle, DbId::native);
    clearDb(handle, DbId::writeOnly);
-   if (int res = read(handle, in))
+   SnapshotFooter footer;
+   StateChecksum  hash;
+   if (int res = read(handle, in, footer, hash))
       return res;
+   if (footer.hash)
+   {
+      if (*footer.hash != hash)
+      {
+         std::cerr << "Snapshot checksum failed\n";
+         return 1;
+      }
+   }
+   else
+   {
+      std::cerr << "Warning: snapshot does not include a checksum\n";
+      footer.hash = hash;
+   }
    auto newStatus = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    psibase::check(!!newStatus, "Missing status row");
-   if (oldStatus)
-      psibase::check(oldStatus->chainId == newStatus->chainId, "Snapshot is for a different chain");
+   if (oldStatus && oldStatus->chainId != newStatus->chainId)
+   {
+      std::cerr << "Snapshot is for a different chain" << std::endl;
+      return 1;
+   }
    if (int res = verifyState(handle, *newStatus))
       return res;
+   if (!footer.signatures.empty())
+   {
+      if (int res = verifySignatures(handle, footer, newStatus->consensus))
+         return res;
+   }
+   else
+   {
+      std::cerr << "Warning: snapshot is not signed\n";
+   }
    raw::commitState(handle);
 }

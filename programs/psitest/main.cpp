@@ -1217,10 +1217,7 @@ struct callbacks
       psibase::TransactionTrace trace;
       try
       {
-         psibase::BlockContext proofBC{*chain.sys, chain.sys->sharedDatabase.getHead(),
-                                       chain.writer, true};
-         proofBC.start();
-         proofBC.execExport("verify", std::move(act), trace);
+         chain.readBlockContext()->execExport("verify", std::move(act), trace);
       }
       catch (const std::exception& e)
       {
