@@ -80,7 +80,9 @@ pub fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageRef {
     pub name: String,
