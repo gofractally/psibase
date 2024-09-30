@@ -51,16 +51,19 @@ fn should_compress(content_type: &str) -> bool {
     )
 }
 
+fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<String>) {
+    if should_compress(content_type) {
+        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
+        writer.write_all(content).unwrap();
+        (writer.into_inner(), Some("br".to_string()))
+    } else {
+        (content.to_vec(), None)
+    }
+}
+
 impl Sites for SitesPlugin {
     fn upload(file: File) -> Result<(), Error> {
-        let (content, content_encoding) = if should_compress(&file.content_type) {
-            let mut writer =
-                brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
-            writer.write_all(&file.content).unwrap();
-            (writer.into_inner(), Some("br".to_string()))
-        } else {
-            (file.content.clone(), None)
-        };
+        let (content, content_encoding) = compress_content(&file.content, &file.content_type);
 
         let packed = SitesService::action_structs::storeSys {
             path: file.path.clone(),
@@ -81,14 +84,7 @@ impl Sites for SitesPlugin {
     fn upload_tree(files: Vec<File>) -> Result<u16, Error> {
         let mut accumulated_size = 0;
         for (index, file) in files.iter().enumerate() {
-            let (content, content_encoding) = if should_compress(&file.content_type) {
-                let mut writer =
-                    brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
-                writer.write_all(&file.content).unwrap();
-                (writer.into_inner(), Some("br".to_string()))
-            } else {
-                (file.content.clone(), None)
-            };
+            let (content, content_encoding) = compress_content(&file.content, &file.content_type);
 
             let packed = SitesService::action_structs::storeSys {
                 path: normalize_path(&file.path),
