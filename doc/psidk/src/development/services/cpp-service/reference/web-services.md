@@ -2,39 +2,21 @@
 
 ## Routing
 
-```svgbob
-+-------------+      +---------+      +---------+
-| http-server |      |         |      | HTTP    |
-| service     |<---- | psinode |<---- | Request |
-|             |      |         |      |         |
-+-------------+      +---------+      +---------+
-         |
-         |
-         v
-  +--------------+           +-----------------+
- /                \  yes     | Common          |
-/  target begins   \ ------> | service's       |
-\  with "/common?" /         | serveSys action |
- \                /          +-----------------+
-  +--------------+                    ^
-         | no                         |
-         |                +-----------+
-         v                |
-  +----------------+      |  +-----------------+
- /                  \  no |  | sites           |
-/  on a subdomain?   \ ---+  | service's       |
-\                    /       | serveSys action |
- \                  /        +-----------------+
-  +----------------+                  ^
-         | yes                        |
-         |           +----------------+
-         v           |
-  +------------+  no |       +-----------------+
- /              \ ---+       | registered      |
-/  registered?   \           | service's       |
-\                / yes   +-->| serveSys action |
- \              / -------+   +-----------------+
-  +------------+
+```mermaid
+flowchart TD
+   200[200 OK]
+   404[404 Not Found]
+
+   A[HTTP Request]
+   B[psinode]
+   C[http-server service]
+   D[sites service's serveSys action]
+
+   A --> B --> C --> D --> E{{was site data found?}} -->|yes| 200
+   E -->|no| G{{target begins with '/common'?}} -->|yes| H['common-api' service's serveSys action]
+   G -->|no| I{{on a subdomain?}} -->|no| 404
+   I -->|yes| J{{Has registered server?}} -->|no| 404
+   J -->|yes| L[registered server's serveSys action]
 ```
 
 `psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
@@ -57,17 +39,15 @@ A service doesn't have to serve HTTP requests itself; it may delegate this to an
 
 ## HTTP Interfaces
 
-Services which serve HTTP implement these interfaces:
+Services which serve HTTP implements this interface:
 
 - [psibase::ServerInterface] (required)
   - [psibase::HttpRequest]
   - [psibase::HttpReply]
-- [psibase::StorageInterface] (optional)
 
 {{#cpp-doc ::psibase::ServerInterface}}
 {{#cpp-doc ::psibase::HttpRequest}}
 {{#cpp-doc ::psibase::HttpReply}}
-{{#cpp-doc ::psibase::StorageInterface}}
 
 ## Helpers
 
@@ -77,9 +57,6 @@ These help implement basic functionality:
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
 - [psibase::serveSchema]
-- [psibase::WebContentRow]
-- [psibase::storeContent]
-- [psibase::serveContent]
 - [psibase::serveGraphQL]
 - [psibase::makeConnection]
   - [psibase::PageInfo]
@@ -119,9 +96,6 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
 {{#cpp-doc ::psibase::serveSchema}}
-{{#cpp-doc ::psibase::WebContentRow}}
-{{#cpp-doc ::psibase::storeContent}}
-{{#cpp-doc ::psibase::serveContent}}
 {{#cpp-doc ::psibase::serveGraphQL}}
 {{#cpp-doc ::psibase::makeConnection}}
 {{#cpp-doc ::psibase::PageInfo}}

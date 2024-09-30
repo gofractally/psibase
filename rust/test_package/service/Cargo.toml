@@ -10,10 +10,13 @@ publish = false
 
 [package.metadata.psibase]
 server = "r-tpack"
-postinstall = [{sender="tpack", service="tpack", method="init", rawData="0000"}]
+postinstall = [
+    { sender = "tpack", service = "tpack", method = "init", rawData = "0000" },
+]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.12.0"
+Sites = "0.12.0"
 
 [dependencies]
 psibase = { path = "../../psibase", version = "0.12.0" }

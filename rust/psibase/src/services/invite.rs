@@ -48,15 +48,10 @@ pub struct NewAccountRecord {
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::{http::HttpRequest, AccountNumber, Hex};
+    use crate::{http::HttpRequest, AccountNumber};
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
-        unimplemented!()
-    }
-
-    #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
     }
 

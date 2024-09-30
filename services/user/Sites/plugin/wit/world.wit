@@ -1,0 +1,39 @@
+package sites:plugin;
+
+interface types {
+    record file {
+        path: string,
+        content-type: string,
+        content: list<u8>,
+    }
+}
+
+interface sites {
+    use types.{file};
+    use host:common/types.{error};
+
+    /// Upload a single file to Sites.
+    /// 
+    /// This file will be accessible at the subdomain of the caller, 
+    /// at the specified path.
+    upload: func(file: file) -> result<_, error>;
+
+    /// Upload multiple files to Sites.
+    /// 
+    /// These files will be accessible at the subdomain of the caller, 
+    /// at the specified paths.
+    /// 
+    /// If the transaction size limit is exceeded, returns the index of the
+    /// first file that was not uploaded.
+    /// 
+    /// If all files are uploaded successfully, returns 0.
+    /// 
+    /// If the first file in the list exceeds the transaction size limit,
+    /// the transaction will be aborted and the error will contain the path
+    /// of the file that caused the error.
+    upload-tree: func(files: list<file>) -> result<u16, error>;
+}
+
+world imports {
+    import sites;
+}
