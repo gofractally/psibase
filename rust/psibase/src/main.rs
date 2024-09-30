@@ -8,13 +8,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, sites};
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_accounts_to_create,
-    get_installed_manifest, get_manifest, get_tapos_for_head, method, new_account_action,
-    push_transaction, push_transactions, reg_server, set_auth_service_action, set_code_action,
-    set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
-    AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry,
-    Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo,
-    SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    account, apply_proxy, as_json, compress_content, create_boot_transactions,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
+    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
+    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry,
+    JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry,
+    ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
     TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
@@ -269,10 +269,13 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 fn store_sys(sender: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
+    let (content, content_encoding) = compress_content(content, content_type);
+
     sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
         path.to_string(),
         content_type.to_string(),
-        content.to_vec().into(),
+        content_encoding,
+        content.into(),
     )
 }
 
@@ -637,11 +640,15 @@ async fn boot(
     };
     add_package_registry(package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
+
+    println!("Constructing boot transactions...");
     let (boot_transactions, transactions) =
         create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+
+    println!("Submitting boot transactions...");
     push_boot(args, &client, boot_transactions.packed(), &progress).await?;
     progress.inc(1);
     for transaction in transactions {

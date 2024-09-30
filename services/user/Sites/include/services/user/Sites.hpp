@@ -20,16 +20,17 @@ namespace SystemService
 
    struct SitesContentRow
    {
-      psibase::AccountNumber account     = {};
-      std::string            path        = {};
-      std::string            contentType = {};
-      std::vector<char>      content     = {};
-      std::string            csp         = {};
-      uint64_t               hash        = 0;
+      psibase::AccountNumber     account         = {};
+      std::string                path            = {};
+      std::string                contentType     = {};
+      std::vector<char>          content         = {};
+      std::string                csp             = {};
+      uint64_t                   hash            = 0;
+      std::optional<std::string> contentEncoding = std::nullopt;
 
       SitesContentKey key() const { return {account, path}; }
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp, hash)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp, hash, contentEncoding)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
    struct SiteConfigRow
@@ -67,7 +68,10 @@ namespace SystemService
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
 
       /// Stores content accessible at the caller's subdomain
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
+      void storeSys(std::string                path,
+                    std::string                contentType,
+                    std::optional<std::string> contentEncoding,
+                    std::vector<char>          content);
 
       /// Removes content from the caller's subdomain
       void removeSys(std::string path);
@@ -81,7 +85,7 @@ namespace SystemService
       /// If no specific or global CSP is set, a default CSP is used.
       void setCsp(std::string path, std::string csp);
 
-      /// Enables/disables caching of responses (Enabled by default)
+      /// Enables/disables HTTP caching of responses (Enabled by default)
       /// Cache strategy:
       /// - `If-None-Match` header is checked against the hash of the content
       /// - The hash is stored in the `ETag` header
@@ -100,7 +104,7 @@ namespace SystemService
 
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
-                method(storeSys, path, contentType, content),
+                method(storeSys, path, contentType, contentEncoding, content),
                 method(removeSys, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),

@@ -79,6 +79,9 @@ namespace SystemService
           "connect-src * blob:;"                                           //
           ;
 
+      // Accepted content encodings
+      const std::array<std::string, 2> validEncodings = {"gzip", "br"};
+
       bool shouldCache(const HttpRequest& request, const std::string& etag)
       {
          auto it =
@@ -152,20 +155,31 @@ namespace SystemService
                };
             }
 
+            std::vector<HttpHeader> headers = {{
+                {"Content-Security-Policy", cspHeader},
+                {"Cache-Control", "no-cache"},
+                {"ETag", etag},
+            }};
+            if (content->contentEncoding)
+            {
+               headers.push_back({"Content-Encoding", *content->contentEncoding});
+            }
+
             return HttpReply{
                 .contentType = content->contentType,
                 .body        = content->content,
-                .headers     = {{"Content-Security-Policy", cspHeader},
-                                {"Cache-Control", "no-cache"},
-                                {"ETag", etag}},
+                .headers     = std::move(headers),
             };
          }
       }
 
       return std::nullopt;
-   }  // Sites::serveSys
+   }
 
-   void Sites::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void Sites::storeSys(std::string                path,
+                        std::string                contentType,
+                        std::optional<std::string> contentEncoding,
+                        std::vector<char>          content)
    {
       Tables tables{};
       auto   table = tables.template open<SitesContentTable>();
@@ -173,12 +187,20 @@ namespace SystemService
       check(path.starts_with('/'), "Path doesn't begin with /");
       auto hash = psio::detail::seahash(std::string_view(content.data(), content.size()));
 
+      if (contentEncoding)
+      {
+         check(std::find(validEncodings.begin(), validEncodings.end(), *contentEncoding) !=
+                   validEncodings.end(),
+               "Unsupported content encoding");
+      }
+
       SitesContentRow row{
-          .account     = getSender(),
-          .path        = std::move(path),
-          .contentType = std::move(contentType),
-          .content     = std::move(content),
-          .hash        = hash,
+          .account         = getSender(),
+          .path            = std::move(path),
+          .contentType     = std::move(contentType),
+          .content         = std::move(content),
+          .hash            = hash,
+          .contentEncoding = std::move(contentEncoding),
       };
       table.put(row);
    }

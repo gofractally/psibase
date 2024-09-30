@@ -19,13 +19,11 @@ use zip::ZipArchive;
 use async_trait::async_trait;
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
-#[cfg(not(target_family = "wasm"))]
-use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
 use tempfile::tempfile;
 
@@ -44,6 +42,42 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+}
+
+fn should_compress(content_type: &str) -> bool {
+    matches!(
+        content_type,
+        "text/plain"
+            | "text/html"
+            | "text/css"
+            | "application/javascript"
+            | "application/json"
+            | "application/xml"
+            | "application/rss+xml"
+            | "application/atom+xml"
+            | "image/svg+xml"
+            | "font/ttf"
+            | "font/otf"
+            | "application/wasm"
+    )
+}
+
+// From testing, I see that quality 4 achieves about 80% of the compression as the maximum quality of 11,
+// and it's much faster (Around 20x).
+const COMPRESSION_QUALITY: u32 = 4;
+
+pub fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<String>) {
+    if should_compress(content_type) {
+        // buffer_size: specifies the size of the internal buffer that the compressor will use (4096 is default)
+        // q: u32 sets the quality level of the compression, higher = better compression but slower
+        // lgwin: base-2 logarithm of the sliding window size. Influences the amount of memory used for compression. Default = 22
+        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
+        writer.write_all(&content).unwrap();
+        let compressed_content = writer.into_inner();
+        (compressed_content, Some("br".to_string()))
+    } else {
+        (content.to_vec(), None)
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
@@ -271,18 +305,24 @@ impl<R: Read + Seek> PackagedService<R> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
+            let file_name = file.name().to_string();
             let path = data_re
-                .captures(file.name())
+                .captures(&file_name)
                 .unwrap()
                 .get(1)
                 .unwrap()
                 .as_str();
+
             if let Some(t) = mime_guess::from_path(path).first() {
+                let content = read(&mut file)?;
+                let (content, content_encoding) = compress_content(&content, t.essence_str());
+
                 actions.push(
                     sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
                         path.to_string(),
                         t.essence_str().to_string(),
-                        read(&mut file)?.into(),
+                        content_encoding,
+                        content.into(),
                     ),
                 );
             } else {

@@ -53,7 +53,12 @@ mod service {
 
     /// Stores content accessible at the caller's subdomain
     #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
+    fn storeSys(
+        path: String,
+        contentType: String,
+        contentEncoding: Option<String>,
+        content: Hex<Vec<u8>>,
+    ) {
         unimplemented!()
     }
 
