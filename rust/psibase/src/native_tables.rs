@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, Action, BlockHeader, BlockHeaderAuthAccount, BlockInfo, BlockNum, Checksum256,
-    Consensus, DbId, Hex, Pack, ToSchema, Unpack,
+    AccountNumber, Action, BlockHeader, BlockInfo, Checksum256, DbId, Hex, JointConsensus, Pack,
+    ToSchema, Unpack,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,9 +30,7 @@ pub struct StatusRow {
     pub chainId: Checksum256,
     pub current: BlockHeader,
     pub head: Option<BlockInfo>,
-    pub consensus: Consensus,
-    pub nextConsensus: Option<(Consensus, BlockNum)>,
-    pub authServices: Vec<BlockHeaderAuthAccount>,
+    pub consensus: JointConsensus,
 }
 
 impl StatusRow {

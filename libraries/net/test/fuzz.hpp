@@ -371,7 +371,7 @@ struct NetworkBase
 
 struct StaticDatabase
 {
-   explicit StaticDatabase(const psibase::Consensus& init);
+   explicit StaticDatabase(const psibase::ConsensusData& init);
    ~StaticDatabase();
    operator psibase::SystemContext*();
 };

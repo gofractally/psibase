@@ -189,7 +189,7 @@ namespace
 {
    struct StaticDatabaseImpl
    {
-      StaticDatabaseImpl(const psibase::Consensus* init) : systemContext(db.getSystemContext())
+      StaticDatabaseImpl(const psibase::ConsensusData* init) : systemContext(db.getSystemContext())
       {
          assert(!!init);
          AccountNumber  genesisProducer{"alice"};
@@ -220,7 +220,7 @@ namespace
       ConstRevisionPtr                initialHead;
       std::shared_ptr<triedent::root> initialState;
       mock_clock::time_point          initialClock;
-      static StaticDatabaseImpl&      instance(const psibase::Consensus* init = nullptr)
+      static StaticDatabaseImpl&      instance(const psibase::ConsensusData* init = nullptr)
       {
          static StaticDatabaseImpl result(init);
          return result;
@@ -228,7 +228,7 @@ namespace
    };
 }  // namespace
 
-StaticDatabase::StaticDatabase(const psibase::Consensus& init)
+StaticDatabase::StaticDatabase(const psibase::ConsensusData& init)
 {
    StaticDatabaseImpl::instance(&init);
 }

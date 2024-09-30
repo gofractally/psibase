@@ -333,7 +333,7 @@ struct test_chain
           blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
       if (status.has_value())
       {
-         if (status->nextConsensus)
+         if (status->consensus.next)
          {
             std::visit(
                 [&](const auto& c)
@@ -343,10 +343,10 @@ struct test_chain
                       producer = c.producers.front().name;
                    }
                 },
-                std::get<0>(*status->nextConsensus));
+                status->consensus.next->consensus.data);
          }
-         if (!status->nextConsensus ||
-             status->current.commitNum < std::get<1>(*status->nextConsensus))
+         if (!status->consensus.next ||
+             status->current.commitNum < status->consensus.next->blockNum)
          {
             std::visit(
                 [&](const auto& c)
@@ -356,7 +356,7 @@ struct test_chain
                       producer = c.producers.front().name;
                    }
                 },
-                status->consensus);
+                status->consensus.current.data);
          }
       }
 

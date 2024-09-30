@@ -22,16 +22,14 @@ namespace psibase
    auto statusKey() -> KeyPrefixType;
    struct StatusRow
    {
-      Checksum256                                    chainId;
-      BlockHeader                                    current;
-      std::optional<BlockInfo>                       head;
-      Consensus                                      consensus;
-      std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
-      std::vector<BlockHeaderAuthAccount>            authServices;
+      Checksum256              chainId;
+      BlockHeader              current;
+      std::optional<BlockInfo> head;
+      JointConsensus           consensus;
 
       static constexpr auto db = psibase::DbId::native;
       static auto           key() -> KeyPrefixType;
-      PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
+      PSIO_REFLECT(StatusRow, chainId, current, head, consensus)
    };
 
    struct ConfigRow

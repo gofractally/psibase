@@ -58,12 +58,17 @@ namespace psibase
    {
    };
 
+   struct BlockAuthState;
+
    struct ProducerSet
    {
       ConsensusAlgorithm                               algorithm;
       boost::container::flat_map<AccountNumber, Claim> activeProducers;
+      // Holds the services that can be used to verify producer
+      // signatures.
+      std::shared_ptr<BlockAuthState> authState;
       ProducerSet() = default;
-      ProducerSet(const Consensus& c)
+      ProducerSet(const ConsensusData& c)
       {
          const auto& [alg, prods] = std::visit([](auto& c) { return split(c); }, c);
          algorithm                = alg;
@@ -74,6 +79,7 @@ namespace psibase
          }
          activeProducers.adopt_sequence(std::move(result));
       }
+      ProducerSet(const Consensus& c) : ProducerSet(c.data) {}
       bool isProducer(AccountNumber producer) const
       {
          return activeProducers.find(producer) != activeProducers.end();
@@ -216,15 +222,23 @@ namespace psibase
       BlockAuthState(SystemContext*   systemContext,
                      const WriterPtr& writer,
                      Database&        db,
-                     const BlockInfo& info)
+                     const BlockInfo& info,
+                     bool             useNext)
       {
          revision = systemContext->sharedDatabase.emptyRevision();
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
             Database dst{systemContext->sharedDatabase, revision};
             auto     session = dst.startWrite(writer);
-            services         = status->authServices;
-            auto keys        = getCodeKeys(services);
+            if (status->consensus.next)
+            {
+               services = status->consensus.next->consensus.services;
+            }
+            else
+            {
+               services = status->consensus.current.services;
+            }
+            auto keys = getCodeKeys(services);
             for (const auto& key : keys)
             {
                if (auto row = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))
@@ -241,50 +255,73 @@ namespace psibase
          }
       }
 
-      BlockAuthState(SystemContext*        systemContext,
-                     const WriterPtr&      writer,
-                     const BlockAuthState& prev,
-                     const BlockHeader&    header)
+      const std::vector<BlockHeaderAuthAccount>* getUpdatedAuthServices(
+          const BlockHeader& header) const
       {
-         if (header.authServices)
+         if (header.newConsensus)
+         {
+            auto& result = header.newConsensus->services;
+            if (result != services)
+               return &result;
+         }
+         return nullptr;
+      }
+
+      static std::shared_ptr<BlockAuthState> next(SystemContext*   systemContext,
+                                                  const WriterPtr& writer,
+                                                  const std::shared_ptr<BlockAuthState>& prev,
+                                                  const BlockHeader&                     header)
+      {
+         if (const auto* newServices = prev->getUpdatedAuthServices(header))
          {
             check(!!header.authCode, "code must be provided when changing auth services");
-            services                    = *header.authServices;
-            auto               prevKeys = getCodeKeys(prev.services);
-            auto               nextKeys = getCodeKeys(*header.authServices);
-            decltype(prevKeys) removed, added;
-            std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
-            std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
-            auto code = makeCodeIndex(&header);
-            check(std::ranges::includes(
-                      nextKeys,
-                      code | std::views::transform([](auto& arg) -> auto& { return arg.first; })),
-                  "Wrong code");
-            Database db{systemContext->sharedDatabase, prev.revision};
-            auto     session = db.startWrite(writer);
-            for (const auto& r : removed)
-            {
-               db.kvRemove(CodeByHashRow::db, r);
-            }
-            for (const auto& a : added)
-            {
-               const auto& [prefix, index, codeHash, vmType, vmVersion] = a;
-               auto iter                                                = code.find(a);
-               check(iter != code.end(), "Missing required code");
-               CodeByHashRow code{.codeHash  = codeHash,
-                                  .vmType    = vmType,
-                                  .vmVersion = vmVersion,
-                                  .numRefs   = 0,
-                                  .code      = iter->second->code};
-               db.kvPut(CodeByHashRow::db, a, code);
-            }
-            updateServices(db, prev.services, services);
-            revision = db.getModifiedRevision();
+            return std::make_shared<BlockAuthState>(systemContext, writer, *prev, header,
+                                                    *newServices);
          }
          else
          {
             check(!header.authCode, "authCode unexpected");
+            return prev;
          }
+      }
+
+      BlockAuthState(SystemContext*                             systemContext,
+                     const WriterPtr&                           writer,
+                     const BlockAuthState&                      prev,
+                     const BlockHeader&                         header,
+                     const std::vector<BlockHeaderAuthAccount>& newServices)
+      {
+         check(!!header.authCode, "code must be provided when changing auth services");
+         services                    = newServices;
+         auto               prevKeys = getCodeKeys(prev.services);
+         auto               nextKeys = getCodeKeys(newServices);
+         decltype(prevKeys) removed, added;
+         std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
+         std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
+         auto code = makeCodeIndex(&header);
+         check(std::ranges::includes(nextKeys, code | std::views::transform([](auto& arg) -> auto&
+                                                                            { return arg.first; })),
+               "Wrong code");
+         Database db{systemContext->sharedDatabase, prev.revision};
+         auto     session = db.startWrite(writer);
+         for (const auto& r : removed)
+         {
+            db.kvRemove(CodeByHashRow::db, r);
+         }
+         for (const auto& a : added)
+         {
+            const auto& [prefix, index, codeHash, vmType, vmVersion] = a;
+            auto iter                                                = code.find(a);
+            check(iter != code.end(), "Missing required code");
+            CodeByHashRow code{.codeHash  = codeHash,
+                               .vmType    = vmType,
+                               .vmVersion = vmVersion,
+                               .numRefs   = 0,
+                               .code      = iter->second->code};
+            db.kvPut(CodeByHashRow::db, a, code);
+         }
+         updateServices(db, prev.services, services);
+         revision = db.getModifiedRevision();
       }
    };
 
@@ -300,9 +337,6 @@ namespace psibase
       BlockNum nextProducersBlockNum;
       // Set to true if this block or an ancestor failed validation
       bool invalid = false;
-      // Holds the services that can be used to verify producer
-      // signatures for the next block.
-      std::shared_ptr<BlockAuthState> authState;
       // Creates the initial state
       BlockHeaderState() : info()
       {
@@ -326,10 +360,10 @@ namespace psibase
          }
          else
          {
-            producers = std::make_shared<ProducerSet>(status->consensus);
-            if (status->nextConsensus)
+            producers = std::make_shared<ProducerSet>(status->consensus.current);
+            if (status->consensus.next)
             {
-               const auto& [prods, num] = *status->nextConsensus;
+               const auto& [prods, num] = *status->consensus.next;
                nextProducers            = std::make_shared<ProducerSet>(prods);
                nextProducersBlockNum    = num;
             }
@@ -354,12 +388,20 @@ namespace psibase
          if (info.header.newConsensus)
          {
             nextProducers = std::make_shared<ProducerSet>(*info.header.newConsensus);
+            if (producers->authState)
+            {
+               nextProducers->authState =
+                   BlockAuthState::next(systemContext, writer, producers->authState, info.header);
+            }
+            else
+            {
+               loadAuthState(systemContext, writer);
+            }
             // N.B. joint consensus with two identical producer sets
             // is functionally indistinguishable from non-joint consensus.
             // Don't both detecting this case here.
             nextProducersBlockNum = info.header.blockNum;
          }
-         initAuthState(systemContext, writer, prev);
       }
       // initAuthState and loadAuthState should only be used when
       // loading blocks from the database. initAuthState is preferred
@@ -368,22 +410,51 @@ namespace psibase
                          const WriterPtr&        writer,
                          const BlockHeaderState& prev)
       {
-         if (info.header.authServices)
+         if (prev.endsJointConsensus())
          {
-            authState = std::make_shared<BlockAuthState>(systemContext, writer, *prev.authState,
-                                                         info.header);
+            producers->authState = prev.nextProducers->authState;
+         }
+         else
+         {
+            producers->authState = prev.producers->authState;
+         }
+         if (nextProducers)
+         {
+            if (producers->authState)
+            {
+               auto prevAuthState =
+                   (prev.nextProducers ? prev.nextProducers : prev.producers)->authState;
+               nextProducers->authState =
+                   BlockAuthState::next(systemContext, writer, prevAuthState, info.header);
+            }
+            else
+            {
+               loadAuthState(systemContext, writer);
+            }
          }
          else
          {
             check(!info.header.authCode, "Unexpected authCode");
-            authState = prev.authState;
          }
       }
       void loadAuthState(SystemContext* systemContext, const WriterPtr& writer)
       {
+         // N.B. It's impossible to fill producers->authState if nextProducers is set. Leave it as null.
+         auto&    authState = nextProducers ? nextProducers->authState : producers->authState;
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
-         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
+         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info,
+                                                      nextProducers ? true : false);
+      }
+      JointConsensus readState(SystemContext* systemContext) const
+      {
+         Database db{systemContext->sharedDatabase, revision};
+         auto     session = db.startRead();
+         if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
+         {
+            return status->consensus;
+         }
+         return JointConsensus{};
       }
       bool endsJointConsensus() const
       {
@@ -416,6 +487,41 @@ namespace psibase
             }
          }
          return {};
+      }
+      ConstRevisionPtr getProdsAuthRevision() const
+      {
+         check(!!producers->authState,
+               "Auth services not loaded (this should only be possible for blocks that are already "
+               "committed, which we shouldn't need signatures for...)");
+         return producers->authState->revision;
+      }
+      ConstRevisionPtr getNextAuthRevision() const
+      {
+         if (endsJointConsensus())
+         {
+            return nextProducers->authState->revision;
+         }
+         else
+         {
+            return getProdsAuthRevision();
+         }
+      }
+      ConstRevisionPtr getAuthRevision(AccountNumber producer, const Claim& claim)
+      {
+         if (producers->getIndex(producer, claim))
+         {
+            return getProdsAuthRevision();
+         }
+         else if (nextProducers && nextProducers->getIndex(producer, claim))
+         {
+            return nextProducers->authState->revision;
+         }
+         else
+         {
+            abortMessage(producer.str() + " is not an active producer at block " +
+                         loggers::to_string(info.blockId));
+            return nullptr;
+         }
       }
       // The block that finalizes a swap to a new producer set needs to
       // contain proof that the block that started the switch is irreversible.
@@ -786,7 +892,7 @@ namespace psibase
       // sends a correct block with the wrong signature.
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
-         BlockContext verifyBc(*systemContext, prev->authState->revision);
+         BlockContext verifyBc(*systemContext, prev->getNextAuthRevision());
          VerifyProver prover{verifyBc, sig};
          auto         claim = prev->getNextProducerClaim(info.header.producer);
          if (!claim)
@@ -1411,34 +1517,22 @@ namespace psibase
       }
 
       // Verifies a signature on a message associated with a block.
-      // The signature is verified using the state at the end of
-      // the previous block
       void verify(const Checksum256&       blockId,
                   std::span<char>          data,
+                  AccountNumber            producer,
                   const Claim&             claim,
                   const std::vector<char>& signature)
       {
          auto stateIter = states.find(blockId);
          check(stateIter != states.end(), "Unknown block");
-         stateIter = states.find(stateIter->second.info.header.previous);
-         check(stateIter != states.end(), "Previous block unknown");
-         BlockContext verifyBc(*systemContext, stateIter->second.authState->revision);
-         VerifyProver prover{verifyBc, signature};
-         prover.prove(data, claim);
+         // TODO: if the producer has the same key but the authServices changed, should
+         // we check the signature twice?
+         verify(stateIter->second.getAuthRevision(producer, claim), data, claim, signature);
       }
 
       void verify(std::span<char> data, const Claim& claim, const std::vector<char>& signature)
       {
-         auto iter = byBlocknumIndex.find(commitIndex);
-         // The last committed block is guaranteed to be present
-         assert(iter != byBlocknumIndex.end());
-         auto stateIter = states.find(iter->second);
-         // We'd better have a state for this block
-         assert(stateIter != states.end());
-         assert(stateIter->second.revision);
-         BlockContext verifyBc(*systemContext, stateIter->second.revision);
-         VerifyProver prover{verifyBc, signature};
-         prover.prove(data, claim);
+         verify(head->getProdsAuthRevision(), data, claim, signature);
       }
 
       void verify(ConstRevisionPtr         revision,

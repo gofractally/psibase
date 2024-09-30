@@ -128,6 +128,18 @@ namespace psibase
 
    using TermNum = uint32_t;
 
+   struct BlockHeaderAuthAccount
+   {
+      AccountNumber codeNum;
+
+      Checksum256 codeHash                                  = {};
+      uint8_t     vmType                                    = 0;
+      uint8_t     vmVersion                                 = 0;
+      friend bool operator==(const BlockHeaderAuthAccount&,
+                             const BlockHeaderAuthAccount&) = default;
+      PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
+   };
+
    struct Producer
    {
       AccountNumber name;
@@ -148,23 +160,18 @@ namespace psibase
       PSIO_REFLECT(BftConsensus, producers);
    };
 
-   using Consensus = std::variant<CftConsensus, BftConsensus>;
+   using ConsensusData = std::variant<CftConsensus, BftConsensus>;
 
-   inline auto get_gql_name(Consensus*)
+   inline auto get_gql_name(ConsensusData*)
    {
-      return "Consensus";
+      return "ConsensusData";
    }
 
-   struct BlockHeaderAuthAccount
+   struct Consensus
    {
-      AccountNumber codeNum;
-
-      Checksum256 codeHash                                  = {};
-      uint8_t     vmType                                    = 0;
-      uint8_t     vmVersion                                 = 0;
-      friend bool operator==(const BlockHeaderAuthAccount&,
-                             const BlockHeaderAuthAccount&) = default;
-      PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
+      ConsensusData                       data;
+      std::vector<BlockHeaderAuthAccount> services;
+      PSIO_REFLECT(Consensus, data, services)
    };
 
    struct BlockHeaderCode
@@ -174,6 +181,21 @@ namespace psibase
 
       std::vector<uint8_t> code = {};
       PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
+   };
+
+   struct PendingConsensus
+   {
+      Consensus consensus;
+      BlockNum  blockNum;
+      PSIO_REFLECT(PendingConsensus, consensus, blockNum)
+   };
+
+   // This commits to all the state used to verify block signatures.
+   struct JointConsensus
+   {
+      Consensus                       current;
+      std::optional<PendingConsensus> next;
+      PSIO_REFLECT(JointConsensus, current, next)
    };
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
@@ -190,6 +212,9 @@ namespace psibase
       TermNum       term;
       BlockNum      commitNum;
 
+      // Holds a sha256 of the current JointConsensus
+      Checksum256 consensusState;
+
       // Holds a merkle root of the transactions in the block.
       // This does not depend on execution, so that it can be
       // verified early. The leaves of the tree have type
@@ -203,9 +228,6 @@ namespace psibase
       // this block. Joint consensus must not be active already.
       // Joint consensus ends after this block becomes irreversible.
       std::optional<Consensus> newConsensus;
-      // If this is specified, it should should contain the full set of
-      // of services that can be used for verifying block signatures.
-      std::optional<std::vector<BlockHeaderAuthAccount>> authServices;
       // This contains the code for authServices
       // It MUST contain all code that was added in this block
       // It MUST NOT contain code that is not in authServices
@@ -219,10 +241,10 @@ namespace psibase
                    producer,
                    term,
                    commitNum,
+                   consensusState,
                    trxMerkleRoot,
                    eventMerkleRoot,
                    newConsensus,
-                   authServices,
                    authCode)
    };
 
