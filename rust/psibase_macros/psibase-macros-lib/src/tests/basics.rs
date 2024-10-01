@@ -81,6 +81,7 @@ mod tests {
     #[test]
     #[should_panic]
     // Events can only have one of 3 values: history, ui, or merkle
+    // How to test the error text?
     fn test_event_attribute_parsing_event_type() {
         use quote::quote;
 
