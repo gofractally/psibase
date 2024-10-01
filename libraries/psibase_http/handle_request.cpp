@@ -648,7 +648,10 @@ namespace psibase::http
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
-               data.headers.emplace_back(HttpHeader{std::string(iter->name_string()), iter->value()});
+            {
+               data.headers.emplace_back(
+                   HttpHeader{std::string(iter->name_string()), std::string(iter->value())});
+            }
 
             if (req.method() == bhttp::verb::get)
                data.method = "GET";
