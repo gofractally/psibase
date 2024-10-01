@@ -15,7 +15,6 @@ mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
 mod schema_macro;
-mod service_macro;
 mod test_case_macro;
 mod to_key_macro;
 
