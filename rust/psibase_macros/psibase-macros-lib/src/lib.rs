@@ -9,9 +9,19 @@ use syn::{
     ItemMod, ItemStruct, Pat, ReturnType, Type,
 };
 
+mod tests;
+
+pub fn identity_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // println!("attr: {:#?}", attr);
     let attr_args = match NestedMeta::parse_meta_list(attr) {
-        Ok(v) => v,
+        Ok(v) => {
+            // println!("v in match: {:#?}", v);
+            v
+        }
         Err(e) => {
             return TokenStream::from(Error::from(e).write_errors());
         }
@@ -33,6 +43,7 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
         options.dispatch = Some(false);
     }
+
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = syn::parse2::<syn::Item>(item).unwrap();
     match item {
