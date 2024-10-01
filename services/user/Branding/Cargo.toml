@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.12.0"
+version = "0.13.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false

@@ -38,5 +38,5 @@ postinstall = [{sender="tpack", service="tpack", method="init", rawData="0000"}]
 data = [{src = "ui/", dst = "/"}]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.12.0"
+HttpServer = "0.13.0"
 ```
