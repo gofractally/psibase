@@ -1,4 +1,15 @@
-fn process_event_callers(
+use proc_macro_error::emit_error;
+use quote::quote;
+use syn::{AttrStyle, Attribute, ItemFn};
+
+#[derive(PartialEq, Eq, Hash)]
+pub enum EventType {
+    History,
+    Ui,
+    Merkle,
+}
+
+pub fn process_event_callers(
     psibase_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     event_callers: &mut proc_macro2::TokenStream,
@@ -13,12 +24,14 @@ fn process_event_callers(
     let inner_doc = f
         .attrs
         .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Inner(_)) && attr.path.is_ident("doc"))
+        .filter(|attr| {
+            matches!(attr.style, AttrStyle::Inner(_)) && attr.meta.path().is_ident("doc")
+        })
         .fold(quote! {}, |a, b| quote! {#a #b});
     let outer_doc = f
         .attrs
         .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
+        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc"))
         .fold(quote! {}, |a, b| quote! {#a #b});
 
     *event_callers = quote! {
@@ -32,7 +45,7 @@ fn process_event_callers(
     };
 }
 
-fn process_event_name(
+pub fn process_event_name(
     psibase_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     structs: &mut proc_macro2::TokenStream,
@@ -51,7 +64,7 @@ fn process_event_name(
     }
 }
 
-fn process_event_schema(
+pub fn process_event_schema(
     psibase_mod: &proc_macro2::TokenStream,
     event_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
@@ -66,4 +79,30 @@ fn process_event_schema(
         #insertions
         events.insert(#method_number, builder.insert::<#event_mod::#name>());
     }
+}
+
+pub fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
+    if let AttrStyle::Outer = attr.style {
+        if attr.meta.path().is_ident("event") {
+            let mut event_type = None;
+            let _ = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("history") {
+                    event_type = Some(EventType::History);
+                    return Ok(());
+                }
+                if meta.path.is_ident("ui") {
+                    event_type = Some(EventType::Ui);
+                    return Ok(());
+                }
+                if meta.path.is_ident("merkle") {
+                    event_type = Some(EventType::Merkle);
+                    return Ok(());
+                }
+                emit_error!(attr.meta, "expected history, ui, or merkle");
+                return Err(meta.error("expected history, ui, or merkle"));
+            });
+            return event_type;
+        }
+    }
+    None
 }

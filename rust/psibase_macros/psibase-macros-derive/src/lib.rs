@@ -6,7 +6,7 @@ use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subi
 use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
-use psibase_macros_lib::service_macro_impl;
+use psibase_macros_lib::service_macro::service_macro_impl;
 use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;

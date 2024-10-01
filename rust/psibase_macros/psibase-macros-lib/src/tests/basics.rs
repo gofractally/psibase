@@ -1,8 +1,7 @@
-use crate::{identity_macro_impl, service_macro_impl};
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use crate::identity_macro_impl;
+    use crate::service_macro::service_macro_impl;
 
     /*
     #[test]
