@@ -62,16 +62,16 @@ fn should_compress(content_type: &str) -> bool {
     )
 }
 
-// From testing, I see that quality 4 achieves about 80% of the compression as the maximum quality of 11,
-// and it's much faster (Around 20x).
-const COMPRESSION_QUALITY: u32 = 4;
-
-pub fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<String>) {
+pub fn compress_content(
+    content: &[u8],
+    content_type: &str,
+    compression_level: u32,
+) -> (Vec<u8>, Option<String>) {
     if should_compress(content_type) {
         // buffer_size: specifies the size of the internal buffer that the compressor will use (4096 is default)
         // q: u32 sets the quality level of the compression, higher = better compression but slower
         // lgwin: base-2 logarithm of the sliding window size. Influences the amount of memory used for compression. Default = 22
-        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
+        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, compression_level, 22);
         writer.write_all(&content).unwrap();
         let compressed_content = writer.into_inner();
         (compressed_content, Some("br".to_string()))
@@ -303,7 +303,11 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         false
     }
-    pub fn store_data(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+    pub fn store_data(
+        &mut self,
+        actions: &mut Vec<Action>,
+        compression_level: u32,
+    ) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
@@ -317,7 +321,8 @@ impl<R: Read + Seek> PackagedService<R> {
 
             if let Some(t) = mime_guess::from_path(path).first() {
                 let content = read(&mut file)?;
-                let (content, content_encoding) = compress_content(&content, t.essence_str());
+                let (content, content_encoding) =
+                    compress_content(&content, t.essence_str(), compression_level);
 
                 actions.push(
                     sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
@@ -464,10 +469,11 @@ impl<R: Read + Seek> PackagedService<R> {
         actions: &mut Vec<Action>,
         sender: AccountNumber,
         install_ui: bool,
+        compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
-            self.store_data(actions)?;
+            self.store_data(actions, compression_level)?;
         }
 
         self.postinstall(actions)?;

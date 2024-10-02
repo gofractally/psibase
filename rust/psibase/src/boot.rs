@@ -82,6 +82,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     let has_packages = true;
@@ -95,7 +96,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 
         if install_ui {
             s.reg_server(&mut actions)?;
-            s.store_data(&mut actions)?;
+            s.store_data(&mut actions, compression_level)?;
         }
 
         s.postinstall(&mut actions)?;
@@ -173,11 +174,17 @@ pub fn create_boot_transactions<R: Read + Seek>(
     install_ui: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
-    let mut actions =
-        get_initial_actions(initial_key, initial_producer, install_ui, service_packages)?;
+    let mut actions = get_initial_actions(
+        initial_key,
+        initial_producer,
+        install_ui,
+        service_packages,
+        compression_level,
+    )?;
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -236,12 +243,15 @@ pub fn js_create_boot_transactions(
     };
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
+    // Todo: Allow parameterization of compression level from browser
+    let compression_level = 4;
     let (boot_transactions, transactions) = js_err(create_boot_transactions(
         &None,
         prod.into(),
         true,
         expiration,
         &mut services[..],
+        compression_level,
     ))?;
 
     let boot_transactions = boot_transactions.packed();

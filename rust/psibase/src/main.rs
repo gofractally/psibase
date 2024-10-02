@@ -87,6 +87,11 @@ enum Command {
         package_source: Vec<String>,
 
         services: Vec<OsString>,
+
+        /// Configure compression level for boot package file uploads
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        compression_level: u32,
     },
 
     /// Create or modify an account
@@ -165,6 +170,10 @@ enum Command {
         /// Destination path within service
         dest: Option<String>,
 
+        /// Sender to use (required). Files are uploaded to this account's subdomain.
+        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+        sender: ExactAccountNumber,
+
         /// MIME content type of file
         #[clap(short = 't', long, value_name = "MIME-TYPE")]
         content_type: Option<String>,
@@ -173,9 +182,10 @@ enum Command {
         #[clap(short = 'r', long)]
         recursive: bool,
 
-        /// Sender to use (required). Files are uploaded to this account's subdomain.
-        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
-        sender: ExactAccountNumber,
+        /// Configure compression level
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        compression_level: u32,
     },
 
     /// Install apps to the chain
@@ -200,6 +210,11 @@ enum Command {
         /// Install the package even if it is already installed
         #[clap(long)]
         reinstall: bool,
+
+        /// Configure compression level to use for uploaded files
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        compression_level: u32,
     },
 
     /// Prints a list of apps
@@ -268,8 +283,23 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-fn store_sys(sender: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
-    let (content, content_encoding) = compress_content(content, content_type);
+fn validate_compression(compression_level: u32) -> Result<(), anyhow::Error> {
+    if compression_level < 1 || compression_level > 11 {
+        return Err(anyhow!(
+            "Accepted compression levels: 1 (fastest) to 11 (most compression)"
+        ));
+    }
+    Ok(())
+}
+
+fn store_sys(
+    sender: AccountNumber,
+    path: &str,
+    content_type: &str,
+    content: &[u8],
+    compression_level: u32,
+) -> Action {
+    let (content, content_encoding) = compress_content(content, content_type, compression_level);
 
     sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
         path.to_string(),
@@ -451,6 +481,7 @@ async fn upload(
     dest: &Option<String>,
     content_type: &Option<String>,
     source: &str,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let deduced_content_type = match content_type {
         Some(t) => t.clone(),
@@ -473,11 +504,14 @@ async fn upload(
         "/".to_string() + Path::new(source).file_name().unwrap().to_str().unwrap()
     };
 
+    validate_compression(compression_level)?;
+
     let actions = vec![store_sys(
         sender.into(),
         &normalized_dest,
         &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+        compression_level,
     )];
     let trx = with_tapos(
         &get_tapos_for_head(&args.api, client.clone()).await?,
@@ -505,6 +539,7 @@ fn fill_tree(
     dest: &str,
     source: &str,
     top: bool,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let md = metadata(source)?;
     if md.is_file() {
@@ -518,6 +553,7 @@ fn fill_tree(
                     dest,
                     t.essence_str(),
                     &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+                    compression_level,
                 ),
             ));
         } else {
@@ -531,7 +567,14 @@ fn fill_tree(
         for path in read_dir(source)? {
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
-            fill_tree(sender, actions, &d, path.path().to_str().unwrap(), false)?;
+            fill_tree(
+                sender,
+                actions,
+                &d,
+                path.path().to_str().unwrap(),
+                false,
+                compression_level,
+            )?;
         }
     } else {
         if top {
@@ -625,7 +668,10 @@ async fn boot(
     producer: ExactAccountNumber,
     package_source: &Vec<String>,
     services: &Vec<OsString>,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
+    validate_compression(compression_level)?;
+
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec {
         seconds: now_plus_120secs.timestamp() as u32,
@@ -641,8 +687,14 @@ async fn boot(
     add_package_registry(package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
 
-    let (boot_transactions, transactions) =
-        create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
+    let (boot_transactions, transactions) = create_boot_transactions(
+        key,
+        producer.into(),
+        true,
+        expiration,
+        &mut packages,
+        compression_level,
+    )?;
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
@@ -703,11 +755,21 @@ async fn upload_tree(
     sender: ExactAccountNumber,
     dest: &Option<String>,
     source: &str,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let normalized_dest = normalize_upload_path(dest);
 
+    validate_compression(compression_level)?;
+
     let mut actions = Vec::new();
-    fill_tree(sender.into(), &mut actions, &normalized_dest, source, true)?;
+    fill_tree(
+        sender.into(),
+        &mut actions,
+        &normalized_dest,
+        source,
+        true,
+        compression_level,
+    )?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
@@ -781,6 +843,7 @@ async fn apply_packages<
     out: &mut TransactionBuilder<F>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     for op in ops {
         match op {
@@ -793,7 +856,7 @@ async fn apply_packages<
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true)?;
+                package.install(&mut actions, sender, true, compression_level)?;
                 out.push_all(actions)?;
             }
             PackageOp::Replace(meta, info) => {
@@ -816,7 +879,7 @@ async fn apply_packages<
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true)?;
+                package.install(&mut actions, sender, true, compression_level)?;
                 out.push_all(actions)?;
             }
             PackageOp::Remove(meta) => {
@@ -838,7 +901,10 @@ async fn install(
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
     reinstall: bool,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
+    validate_compression(compression_level)?;
+
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(packages)?;
@@ -880,6 +946,7 @@ async fn install(
         &mut trx_builder,
         sender,
         key,
+        compression_level,
     )
     .await?;
 
@@ -1164,7 +1231,19 @@ async fn main() -> Result<(), anyhow::Error> {
             producer,
             package_source,
             services,
-        } => boot(&args, client, key, *producer, package_source, services).await?,
+            compression_level,
+        } => {
+            boot(
+                &args,
+                client,
+                key,
+                *producer,
+                package_source,
+                services,
+                *compression_level,
+            )
+            .await?
+        }
         Command::Create {
             account,
             key,
@@ -1212,14 +1291,24 @@ async fn main() -> Result<(), anyhow::Error> {
             content_type,
             recursive,
             sender,
+            compression_level,
         } => {
             if *recursive {
                 if content_type.is_some() {
                     return Err(anyhow!("--recursive is incompatible with --content-type"));
                 }
-                upload_tree(&args, client, *sender, dest, source).await?
+                upload_tree(&args, client, *sender, dest, source, *compression_level).await?
             } else {
-                upload(&args, client, *sender, dest, content_type, source).await?
+                upload(
+                    &args,
+                    client,
+                    *sender,
+                    dest,
+                    content_type,
+                    source,
+                    *compression_level,
+                )
+                .await?
             }
         }
         Command::Install {
@@ -1228,6 +1317,7 @@ async fn main() -> Result<(), anyhow::Error> {
             package_source,
             sender,
             reinstall,
+            compression_level,
         } => {
             install(
                 &args,
@@ -1237,6 +1327,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 key,
                 package_source,
                 *reinstall,
+                *compression_level,
             )
             .await?
         }

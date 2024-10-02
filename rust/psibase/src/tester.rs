@@ -74,12 +74,14 @@ impl Chain {
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
         let mut services = block_on(reg.resolve(services))?;
 
+        const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
             AccountNumber::new(account_raw!("prod")),
             false,
             TimePointSec { seconds: 10 },
             &mut services[..],
+            COMPRESSION_LEVEL,
         )
         .unwrap();
 
