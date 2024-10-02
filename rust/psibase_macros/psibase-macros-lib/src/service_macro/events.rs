@@ -84,18 +84,13 @@ pub fn process_event_schema(
 pub fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
     if let AttrStyle::Outer = attr.style {
         if attr.meta.path().is_ident("event") {
-            // FOR DEMO
-            // let mut num_event_types: u8 = 0;
-            // let _ = attr.parse_nested_meta(|_meta| {
-            //     num_event_types += 1;
-            //     Ok(())
-            // });
-            // if num_event_types > 1 {
-            //     abort!(attr, "Invalid number of events types; expected: 1.");
-            // }
-            // DEMO
             let mut event_type = None;
             let _ = attr.parse_nested_meta(|meta| {
+                // FOR DEMO
+                // if event_type.is_some() {
+                //     abort!(attr, "Invalid number of events types; expected: 1.");
+                // }
+                // DEMO
                 if meta.path.is_ident("history") {
                     event_type = Some(EventType::History);
                     return Ok(());
