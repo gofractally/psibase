@@ -1,20 +1,25 @@
 [package]
-name = "psibase-macros-test"
+name = "psimacrotest"
 edition = "2021"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
+public = false
 
-# [lib]
-# crate-type = ["cdylib"]
+[lib]
+crate-type = ["rlib"]
+
+[package.metadata.psibase]
+# Relates to test cases specification of packages that should be loaded on the chain
+package-name = "PsiMacroTest"
+# services installed by the package
+services = ["basicwquery", "mincallrecvr"]
 
 [dependencies]
 psibase = { path = "../psibase" }
 psibase_macros = { path = "../psibase_macros" }
 async-graphql = "7.0.7"
 serde = { version = "1.0.209", features = ["derive"] }
-# colored-diff = "0.2.3"
-# proc-macro2 = "1.0.36"
-# syn = { version = "2.0.79" }
-# quote = "1.0.15"
+basicwquery = { path = "services/basic-w-query" }
+mincallrecvr = { path = "services/min-call-recvr" }
