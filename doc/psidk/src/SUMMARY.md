@@ -3,6 +3,7 @@
 - [Introduction](README.md)
 
 - [Specifications](specifications/README.md)
+
   - [Blockchain](specifications/blockchain/README.md)
     - [TaPoS](specifications/blockchain/tapos.md)
     - [Smart authorization](specifications/blockchain/smart-authorization.md)
@@ -29,6 +30,7 @@
     - [App Packages](specifications/data-formats/package.md)
 
 - [Development guides](development/README.md)
+
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)
     - [Standards](development/services/standards.md)
@@ -57,6 +59,7 @@
       - [GraphQL](development/services/rust-service/graphql.md)
       - [Reference]()
         - [Web Services](development/services/rust-service/reference/web-services.md)
+        - [Chicken Scratch](development/services/rust-service/reference/chicken-scratch.md)
   - [Plugins]()
   - [Front-ends](development/front-ends/README.md)
     - [User onboarding]()
@@ -66,6 +69,7 @@
       - [JS libraries](development/front-ends/reference/js-libraries.md)
 
 - [Running infrastructure](run-infrastructure/README.md)
+
   - [Installation]()
     - [Native binaries]()
     - [Docker containers]()
@@ -78,6 +82,7 @@
     - [Logging](run-infrastructure/configuration/logging.md)
 
 - [Default apps](default-apps/README.md)
+
   - [accounts](default-apps/accounts.md)
   - [x-admin](default-apps/x-admin.md)
   - [auth-sig](default-apps/auth-sig.md)
