@@ -7,7 +7,7 @@ use bindings::accounts::plugin as Accounts;
 use bindings::auth_sig::plugin::{keyvault, types::Pem};
 use bindings::exports::invite;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
-use bindings::invite::plugin::types::{Invite, InviteId, InviteState, Url};
+use bindings::invite::plugin::types::{Invite, InviteState, InviteToken};
 use bindings::transact::plugin::intf as Transact;
 use chrono::DateTime;
 use errors::ErrorType::*;
@@ -28,7 +28,10 @@ use CommonTypes::OriginationData;
 struct InvitePlugin;
 
 impl Invitee for InvitePlugin {
-    fn accept_with_new_account(account: String, id: InviteId) -> Result<(), CommonTypes::Error> {
+    fn accept_with_new_account(
+        account: String,
+        token: InviteToken,
+    ) -> Result<(), CommonTypes::Error> {
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount.err(&account));
         })?;
@@ -37,7 +40,7 @@ impl Invitee for InvitePlugin {
             return Err(AccountExists.err("accept_with_new_account"));
         }
 
-        let invite_params = InviteParams::try_from_invite_id(id)?;
+        let invite_params = InviteParams::try_from_invite_id(token)?;
         let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
 
         Transact::add_action_to_transaction(
@@ -53,12 +56,12 @@ impl Invitee for InvitePlugin {
         Ok(())
     }
 
-    fn reject(_id: InviteId) -> Result<(), CommonTypes::Error> {
+    fn reject(_token: InviteToken) -> Result<(), CommonTypes::Error> {
         Err(NotYetImplemented.err("reject"))
     }
 
-    fn decode_invite(id: InviteId) -> Result<Invite, CommonTypes::Error> {
-        let invite_params = InviteParams::try_from_invite_id(id)?;
+    fn decode_invite(token: InviteToken) -> Result<Invite, CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(token)?;
 
         let query = format!(
             r#"query {{
@@ -91,13 +94,12 @@ impl Invitee for InvitePlugin {
             state: state,
             actor: invite.actor.to_string(),
             expiry,
-            callback: invite_params.cb,
         })
     }
 }
 
 impl Inviter for InvitePlugin {
-    fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
+    fn generate_invite() -> Result<InviteToken, CommonTypes::Error> {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         Transact::add_action_to_transaction(
@@ -108,26 +110,24 @@ impl Inviter for InvitePlugin {
             .packed(),
         )?;
 
-        let link_root = format!("{}{}", Client::my_service_origin(), "/invited");
-
         let OriginationData { origin, app } = Client::get_sender_app();
-        let cb = format!("{}{}", origin, callback_subpath);
 
         let params = InviteParams {
             app: app.unwrap_or(origin.clone()),
             pk: keypair.private_key,
-            cb,
         };
 
-        let query_string = format!("id={}", InviteId::from(params));
-        Ok(format!("{}?{}", link_root, query_string))
+        Ok(InviteToken::from(params))
     }
 
-    fn delete_invite(invite_public_key: Vec<u8>) -> Result<(), CommonTypes::Error> {
+    fn delete_invite(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
         Transact::add_action_to_transaction(
             "delInvite",
             &InviteService::action_structs::delInvite {
-                inviteKey: invite_public_key.into(),
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
             }
             .packed(),
         )?;
