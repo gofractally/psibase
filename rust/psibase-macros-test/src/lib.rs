@@ -1,6 +1,6 @@
-// #[psibase::service]
-// #[allow(non_snake_case)]
-// mod service {}
+#[psibase::service]
+#[allow(non_snake_case)]
+mod service {}
 
 mod tests {
 

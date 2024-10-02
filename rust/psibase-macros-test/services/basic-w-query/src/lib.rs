@@ -1,12 +1,17 @@
 #[psibase::service(name = "basicwquery")]
 #[allow(non_snake_case)]
 mod service {
-    // FOR DEMO vvv Used by event definition
     use psibase::{
-        anyhow, serve_content, serve_simple_ui, HttpReply, HttpRequest, Table, WebContentRow,
+        // FOR DEMO vvv Used by event definition
+        anyhow,
+        // FOR DEMO ^^^
+        serve_content,
+        serve_simple_ui,
+        HttpReply,
+        HttpRequest,
+        Table,
+        WebContentRow,
     };
-    // use psibase::anyhow;
-    // FOR DEMO ^^^
 
     #[table(record = "WebContentRow", index = 0)]
     struct WebContentTable;
