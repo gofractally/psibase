@@ -9,6 +9,7 @@
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
+#include <psibase/headerValidation.hpp>
 #include <psibase/log.hpp>
 #include <psibase/serviceEntry.hpp>
 
@@ -174,50 +175,6 @@ namespace psibase
       ConstRevisionPtr                    revision;
       std::vector<BlockHeaderAuthAccount> services;
 
-      static auto makeCodeIndex(const BlockHeader* header)
-      {
-         using K = decltype(codeByHashKey(Checksum256(), 0, 0));
-         using R = boost::container::flat_map<K, const BlockHeaderCode*>;
-         R::sequence_type seq;
-         for (const auto& code : *header->authCode)
-         {
-            auto codeHash = sha256(code.code.data(), code.code.size());
-            auto key      = codeByHashKey(codeHash, code.vmType, code.vmVersion);
-            seq.push_back({key, &code});
-         }
-         R result;
-         result.adopt_sequence(std::move(seq));
-         return result;
-      }
-
-      static void writeServices(Database& db, const std::vector<BlockHeaderAuthAccount>& accounts)
-      {
-         for (const auto& account : accounts)
-         {
-            CodeRow row{.codeNum   = account.codeNum,
-                        .flags     = 0,
-                        .codeHash  = account.codeHash,
-                        .vmType    = account.vmType,
-                        .vmVersion = account.vmVersion};
-            db.kvPut(CodeRow::db, row.key(), row);
-         }
-      }
-
-      static void updateServices(Database&                                  db,
-                                 const std::vector<BlockHeaderAuthAccount>& oldServices,
-                                 const std::vector<BlockHeaderAuthAccount>& services)
-      {
-         std::vector<AccountNumber> removedAccounts;
-         auto codeNumView = std::views::transform([](auto& p) { return p.codeNum; });
-         std::ranges::set_difference(oldServices | codeNumView, services | codeNumView,
-                                     std::back_inserter(removedAccounts));
-         for (AccountNumber account : removedAccounts)
-         {
-            db.kvRemove(CodeRow::db, codeKey(account));
-         }
-         writeServices(db, services);
-      }
-
       // Read state at revision
       BlockAuthState(SystemContext*   systemContext,
                      const WriterPtr& writer,
@@ -238,19 +195,7 @@ namespace psibase
             {
                services = status->consensus.current.services;
             }
-            auto keys = getCodeKeys(services);
-            for (const auto& key : keys)
-            {
-               if (auto row = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))
-               {
-                  dst.kvPut(CodeByHashRow::db, key, *row);
-               }
-               else
-               {
-                  check(false, "Missing code for auth service");
-               }
-            }
-            writeServices(dst, services);
+            copyServices(dst, db, services);
             revision = dst.getModifiedRevision();
          }
       }
@@ -292,35 +237,10 @@ namespace psibase
                      const std::vector<BlockHeaderAuthAccount>& newServices)
       {
          check(!!header.authCode, "code must be provided when changing auth services");
-         services                    = newServices;
-         auto               prevKeys = getCodeKeys(prev.services);
-         auto               nextKeys = getCodeKeys(newServices);
-         decltype(prevKeys) removed, added;
-         std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
-         std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
-         auto code = makeCodeIndex(&header);
-         check(std::ranges::includes(nextKeys, code | std::views::transform([](auto& arg) -> auto&
-                                                                            { return arg.first; })),
-               "Wrong code");
+         services = newServices;
          Database db{systemContext->sharedDatabase, prev.revision};
          auto     session = db.startWrite(writer);
-         for (const auto& r : removed)
-         {
-            db.kvRemove(CodeByHashRow::db, r);
-         }
-         for (const auto& a : added)
-         {
-            const auto& [prefix, index, codeHash, vmType, vmVersion] = a;
-            auto iter                                                = code.find(a);
-            check(iter != code.end(), "Missing required code");
-            CodeByHashRow code{.codeHash  = codeHash,
-                               .vmType    = vmType,
-                               .vmVersion = vmVersion,
-                               .numRefs   = 0,
-                               .code      = iter->second->code};
-            db.kvPut(CodeByHashRow::db, a, code);
-         }
-         updateServices(db, prev.services, services);
+         updateServices(db, prev.services, services, *header.authCode);
          revision = db.getModifiedRevision();
       }
    };
