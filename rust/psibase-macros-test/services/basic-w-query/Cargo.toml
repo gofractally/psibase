@@ -19,7 +19,7 @@ server = "basicwquery"
 # ]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.12.0"
+HttpServer = "0.13.0"
 
 [dependencies]
 psibase = { path = "../../../psibase" }
@@ -29,4 +29,4 @@ serde = { version = "1.0.209", features = ["derive"] }
 mincallrecvr = { path = "../min-call-recvr" }
 
 [dev-dependencies]
-psimacrotest = { path = "../..", version = "0.12.0" }
+psimacrotest = { path = "../.." }
