@@ -10,8 +10,7 @@ Note: some doc updates are done here simply because we're more intersted in capt
 
 ## Potential Tasks
 
-1. add tests for psibase_macros
-2. fix hygiene of psibase_macros.service_impl (details below in Bugs section)
+[x] 1. add tests for psibase_macros 2. fix hygiene of psibase_macros.service_impl (details below in Bugs section)
 
 ## Doc Updates
 
@@ -87,12 +86,12 @@ Then define only the table itself in the `service` mod:
 
 ## Bugs
 
-`service` macro's hygiene could use some cleanup.
+[x] `service` macro's hygiene could use some cleanup.
 
-1. `anyhow` must be imported for the macro to be happy (need to clarify under what circumstances this is the case to fix it properly)
+[x] 1. `anyhow` must be imported for the macro to be happy (need to clarify under what circumstances this is the case to fix it properly)
+
 2. `Table` must be imported for the macro to be happy (need to figure out which table def exactly require it. Maybe just be when record = "" is specified in the `table` macro).
-   `Table` is a Trait that implements things like <table name>::new(). Getting a reference to a table won't work without bringing the Trait into scope. We could bring it in scope whenever the named table shows up in an #[action]. We could also have the macro look for any element of the Trait and include `Table` only if it finds it being used. Perhaps there's a way to define tables that naturally pulls it into scope?
-3. `asyncgraphql_*` need to be `use`d in some cases. should come along with Query definitions.
+   `Table` is a Trait that implements things like <table name>::new(). Getting a reference to a table won't work without bringing the Trait into scope. We could bring it in scope whenever the named table shows up in an #[action]. We could also have the macro look for any element of the Trait and include `Table` only if it finds it being used. Perhaps there's a way to define tables that naturally pulls it into scope? 3. `asyncgraphql_*` need to be `use`d in some cases. should come along with Query definitions.
 
 ```svgbob
 +-------------+      +---------+      +---------+
