@@ -39,10 +39,10 @@ pub fn process_gql_union(
             #enumerators
         }
         impl #psibase_mod::DecodeEvent for #event_struct {
-            fn decode(gql_imp_type: #psibase_mod::MethodNumber, gql_imp_data: &[u8]) -> Result<#event_struct, anyhow::Error> {
+            fn decode(gql_imp_type: #psibase_mod::MethodNumber, gql_imp_data: &[u8]) -> Result<#event_struct, #psibase_mod::anyhow::Error> {
                 match gql_imp_type.value {
                     #dispatch
-                    _ => { Err(anyhow::anyhow!("Unknown event type")) }
+                    _ => { Err(#psibase_mod::anyhow::anyhow!("Unknown event type")) }
                 }
             }
         }

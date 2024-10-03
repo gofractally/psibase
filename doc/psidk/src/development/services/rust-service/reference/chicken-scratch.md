@@ -23,7 +23,7 @@ Note: some doc updates are done here simply because we're more intersted in capt
 
 The code snippets I think could be improved are as follows:
 
-```
+```rust
 // A somewhat esoteric way to define the key
 impl LastUsed {
     // The primary key is an empty tuple. Rust functions
@@ -33,7 +33,7 @@ impl LastUsed {
 }
 ```
 
-```
+```rust
 // Requesting the only table record: the esoteric key = `&()`
 let mut lastUsed =
             table.get_index_pk().get(&()).unwrap_or_default();
@@ -50,7 +50,7 @@ The `service` mod, being decorated by the `service` attribute macro, has a lot o
 
 First you can move the table's struct (record definition) out of the module by structuring it as follows:
 
-```
+```rust
 use psibase::{Fracpack, TableRecord};
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +73,7 @@ pub struct MyTableRec {
 
 Then define only the table itself in the `service` mod:
 
-```
+```rust
     use psibase::{Fracpack, Table};
     use serde::{Deserialize, Serialize};
     ...

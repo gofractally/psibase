@@ -6,6 +6,7 @@ mod tests {
 
     #[psibase::test_case(packages("PsiMacroTest"))]
     // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
+    // Verifies hygiene (how to expect a particular error?)
     fn test_macro_generated_wrapper(chain: psibase::Chain) -> Result<(), psibase::Error> {
         use basicwquery::Wrapper;
         use psibase::AccountNumber;
