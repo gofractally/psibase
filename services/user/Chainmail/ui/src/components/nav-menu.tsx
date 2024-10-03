@@ -56,7 +56,7 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                     },
                     {
                         title: "Archived",
-                        icon: Send,
+                        icon: Archive,
                         variant: at === "/archived" ? "default" : "ghost",
                         href: "/archived",
                     },

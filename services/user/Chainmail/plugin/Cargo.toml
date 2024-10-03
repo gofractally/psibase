@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { path = "../../../../rust/psibase/" }
+chainmail = { path = "../service" }
 
 [dev-dependencies]
 chainmail_package = { path = "..", version = "0.13.0" }

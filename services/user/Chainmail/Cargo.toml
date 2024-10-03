@@ -23,6 +23,11 @@ publish.workspace = true
 [package.metadata.psibase]
 package-name = "Chainmail"
 services = ["chainmail"]
+plugin = ["plugin"]
+postinstall = [
+    { sender = "chainmail", service = "chainmail", method = "init", rawData = "0000" },
+]
+data = [{ src = "ui/", dst = "/" }]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.13.0"

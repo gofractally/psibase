@@ -3,6 +3,8 @@ mod bindings;
 
 use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
 use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
+use bindings::host::common::server as CommonServer;
+use bindings::host::common::types::{BodyTypes, PostRequest};
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::services::r_events::Wrapper as REventsSvc;
@@ -38,9 +40,7 @@ fn build_query(
         where_clause_sender_receiver,
         order_by_clause
     );
-    let resp = REventsSvc::call().sqlQuery(sql_query_str);
-    println!("response: {}", resp);
-    resp
+    sql_query_str
 }
 
 impl API for ChainmailPlugin {
@@ -69,8 +69,18 @@ impl API for ChainmailPlugin {
 impl QUERY for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
         let archived_requested = false;
-        let _resp = build_query(archived_requested, sender, receiver);
-
+        let sql_query_str = build_query(archived_requested, sender, receiver);
+        // need to call add_transaction(); can't call call() (not in a service)
+        // use host::server to call .get(<http>)
+        // let resp = REventsSvc::call().sqlQuery(sql_query_str);
+        // println!("response: {}", resp);
+        let query_result = CommonServer::post(&PostRequest {
+            endpoint: String::from("/sql"),
+            body: BodyTypes::Json(sql_query_str),
+        });
+        println!("query_results: {:#?}", query_result);
+        let results = query_result.unwrap();
+        println!("results: {}", results);
         Ok(vec![])
     }
 
