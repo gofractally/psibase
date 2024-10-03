@@ -154,10 +154,6 @@ mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_none(),
-            "Service already initialized",
-        );
         table.put(&InitRow {}).unwrap();
 
         SitesSvc::call().enableSpa(true);
