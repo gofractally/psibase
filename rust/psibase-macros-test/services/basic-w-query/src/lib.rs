@@ -1,20 +1,7 @@
 #[psibase::service(name = "basicwquery")]
 #[allow(non_snake_case)]
 mod service {
-    use psibase::{
-        // FOR DEMO vvv Used by event definition
-        anyhow,
-        // FOR DEMO ^^^
-        serve_content,
-        serve_simple_ui,
-        HttpReply,
-        HttpRequest,
-        Table,
-        WebContentRow,
-    };
-
-    #[table(record = "WebContentRow", index = 0)]
-    struct WebContentTable;
+    use psibase::{serve_simple_ui, HttpReply, HttpRequest};
 
     #[action]
     // got an error because serde dep wasn't present?
@@ -43,7 +30,6 @@ mod service {
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
+        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
