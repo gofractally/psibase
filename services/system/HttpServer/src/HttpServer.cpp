@@ -1,5 +1,6 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
+#include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/system/HttpServer.hpp>
@@ -23,33 +24,37 @@ namespace SystemService
                 && req.host[req.host.size() - req.rootHost.size() - 1] == '.';
       }
 
+      std::optional<RegisteredServiceRow> getServer(const AccountNumber& server)
+      {
+         return HttpServer::Tables(HttpServer::service).open<RegServTable>().get(server);
+      }
+
+      AccountNumber getTargetService(const HttpRequest& req)
+      {
+         std::string serviceName;
+
+         // Path reserved across all subdomains
+         if (req.target.starts_with("/common"))
+            serviceName = "common-api";
+
+         // subdomain
+         else if (isSubdomain(req))
+            serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
+
+         // root domain
+         else
+            serviceName = "homepage";
+
+         return AccountNumber(serviceName);
+      }
    }  // namespace
-
-   // TODO: switch to Table wrapper
-   using table_num = uint16_t;
-
-   static constexpr table_num registeredServiceTable = 1;
-
-   inline auto registeredServiceKey(AccountNumber thisService, AccountNumber service)
-   {
-      return std::tuple{thisService, registeredServiceTable, service};
-   }
-   struct RegisteredServiceRow
-   {
-      AccountNumber service = {};
-      AccountNumber server  = {};
-
-      auto key(AccountNumber thisService) { return registeredServiceKey(thisService, service); }
-   };
-   PSIO_REFLECT(RegisteredServiceRow, service, server)
 
    void HttpServer::registerServer(AccountNumber server)
    {
-      RegisteredServiceRow row{
+      Tables{getReceiver()}.open<RegServTable>().put(RegisteredServiceRow{
           .service = getSender(),
           .server  = server,
-      };
-      kvPut(row.key(getReceiver()), row);
+      });
    }
 
    static void checkRecvAuth(const Action& act)
@@ -89,15 +94,12 @@ namespace SystemService
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, const HttpReply& result)
       {
-         if (service != AccountNumber{"common-api"})
+         for (const auto& header : result.headers)
          {
-            for (const auto& header : result.headers)
+            if (!std::ranges::binary_search(allowedHeaders, header.name))
             {
-               if (!std::ranges::binary_search(allowedHeaders, header.name))
-               {
-                  abortMessage("service " + service.str() + " attempted to set http header " +
-                               header.name);
-               }
+               abortMessage("service " + service.str() + " attempted to set http header " +
+                            header.name);
             }
          }
 
@@ -211,46 +213,41 @@ namespace SystemService
 
    extern "C" [[clang::export_name("serve")]] void serve()
    {
-      auto act = getCurrentAction();
+      auto act   = getCurrentAction();
+      auto iface = [&](AccountNumber server)
+      { return psibase::Actor<ServerInterface>(act.service, server); };
+
       // TODO: use a view
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
-      std::string serviceName;
+      // First we check the `sites` server
+      auto server    = "sites"_a;
+      currentRequest = {.socket = sock, .owner = server};
+      auto result    = iface(server).serveSys(req, std::optional{sock});
 
-      // Path reserved across all subdomains
-      if (req.target.starts_with("/common"))
-         serviceName = "common-api";
-
-      // subdomain
-      else if (isSubdomain(req))
-         serviceName.assign(req.host.begin(), req.host.end() - req.rootHost.size() - 1);
-
-      // root domain
-      else
-         serviceName = "homepage";
-
-      auto service = AccountNumber(serviceName);
-      auto reg     = kvGet<RegisteredServiceRow>(registeredServiceKey(act.service, service));
-      if (reg)
-         service = reg->server;
-      else
-         service = "sites"_a;
-
-      currentRequest = {.socket = sock, .owner = service};
-
-      psibase::Actor<ServerInterface> iface(act.service, service);
-      auto                            result = iface.serveSys(req, std::optional{sock});
+      // If not found, we check the registered server
+      if (!result && currentRequest)
+      {
+         auto service    = getTargetService(req);
+         auto registered = getServer(service);
+         if (registered)
+         {
+            server         = registered->server;
+            currentRequest = {.socket = sock, .owner = server};
+            result         = iface(server).serveSys(req, std::optional{sock});
+         }
+      }
 
       if (currentRequest)
       {
          if (result)
          {
-            sendReplyImpl(service, sock, std::move(*result));
+            sendReplyImpl(server, sock, std::move(*result));
          }
          else
          {
             std::string msg = "The resource '" + req.target + "' was not found";
-            sendReplyImpl(service, sock,
+            sendReplyImpl(server, sock,
                           {.status      = HttpStatus::notFound,
                            .contentType = "text/html",
                            .body        = std::vector(msg.begin(), msg.end())});

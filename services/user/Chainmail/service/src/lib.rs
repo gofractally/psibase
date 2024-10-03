@@ -134,6 +134,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
+
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use services::accounts::Wrapper as AccountsSvc;
@@ -142,10 +143,7 @@ mod service {
 
     use crate::serve_rest_api;
 
-    #[table(record = "WebContentRow")]
-    struct WebContentTable;
-
-    #[table(name = "InitTable", index = 1)]
+    #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
     struct InitRow {}
     impl InitRow {
@@ -195,16 +193,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_rest_api(&request))
+        None.or_else(|| serve_rest_api(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
     }
 }

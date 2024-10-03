@@ -23,11 +23,8 @@ namespace UserService
       class Invite : public psibase::Service<Invite>
       {
         public:
-         using Tables = psibase::ServiceTables<InviteSettingsTable,
-                                               InviteTable,
-                                               InitTable,
-                                               NewAccTable,
-                                               psibase::WebContentTable>;
+         using Tables =
+             psibase::ServiceTables<InviteSettingsTable, InviteTable, InitTable, NewAccTable>;
          /// "invite"
          static constexpr auto service = SystemService::Accounts::inviteService;
          /// "invited-sys"
@@ -104,9 +101,6 @@ namespace UserService
          /// is directed at this invite service
          std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
 
-         /// Used to store UI files and other `content` at the specified `path`.
-         void storeSys(std::string path, std::string contentType, std::vector<char> content);
-
          // clang-format off
          struct Events
          {
@@ -143,7 +137,6 @@ namespace UserService
          method(isExpired, pubkey),
          method(checkClaim, actor, pubkey),
          method(serveSys, request),
-         method(storeSys, path, contentType, content),
          method(setWhitelist, accounts),
          method(setBlacklist, accounts)
       );

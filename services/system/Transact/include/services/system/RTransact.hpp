@@ -96,13 +96,11 @@ namespace SystemService
       void onBlock();
       auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
           -> std::optional<psibase::HttpReply>;
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
                 method(recv, transaction),
                 method(onTrx, id, trace),
                 method(onBlock),
-                method(serveSys, request, socket),
-                method(storeSys, path, contentType, content))
+                method(serveSys, request, socket))
 }  // namespace SystemService

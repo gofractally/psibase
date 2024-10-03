@@ -5,13 +5,13 @@ use bindings::exports::branding::plugin::api::Guest as Api;
 use bindings::exports::branding::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
+use bindings::sites::plugin::sites::{upload, File};
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
-use psibase::Hex;
 
 struct BrandingPlugin;
 
@@ -21,13 +21,12 @@ impl Api for BrandingPlugin {
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
-        let packed_logo_args = branding::action_structs::storeSys {
+        upload(&File {
             path: String::from("/network_logo.svg"),
-            contentType: String::from("image/svg+xml"),
-            content: Hex(logo),
-        }
-        .packed();
-        add_action_to_transaction("storeSys", &packed_logo_args).unwrap();
+            content_type: String::from("image/svg+xml"),
+            content: logo,
+        })
+        .expect("Failed to upload logo");
     }
 }
 
