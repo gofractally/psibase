@@ -28,7 +28,7 @@ type RawMessage = {
     receiver: string;
     subject: string;
     body: string;
-    msg_id: string;
+    msgId: string;
 };
 
 const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
@@ -38,7 +38,7 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
         (msg, i) =>
             ({
                 id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.body}`,
-                msgId: msg.msg_id,
+                msgId: msg.msgId,
                 from: msg.sender,
                 to: msg.receiver,
                 datetime: Date.now() - i * 1_000_000,
@@ -60,7 +60,7 @@ const getIncomingMessages = async (account: string) => {
                 service: "chainmail",
                 intf: "queries",
                 method: "getMsgs",
-                params: ["", account],
+                params: [, account],
             })) as RawMessage[];
     console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
@@ -89,10 +89,6 @@ export function useIncomingMessages() {
 
 const getArchivedMessages = async (account: string) => {
     console.info("getArchivedMessages().top");
-    // const res = await fetch(`/messages?archived=true&receiver=${account}`);
-    // const rawMessages = (await res.json()) as RawMessage[];
-    // return transformRawMessagesToMessages(rawMessages);
-
     const supervisor = await getSupervisor();
     console.info("[archived] got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
@@ -100,7 +96,7 @@ const getArchivedMessages = async (account: string) => {
                 service: "chainmail",
                 intf: "queries",
                 method: "getArchivedMsgs",
-                params: ["", account],
+                params: [, account],
             })) as RawMessage[];
     console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
@@ -129,8 +125,20 @@ export function useArchivedMessages() {
 
 const getSentMessages = async (account: string) => {
     console.info("getSentMessages().top");
-    const res = await fetch(`/messages?sender=${account}`);
-    const rawMessages = (await res.json()) as RawMessage[];
+    // const res = await fetch(`/messages?sender=${account}`);
+
+    const supervisor = await getSupervisor();
+    console.info("[sent] got Supervisor instance");
+    // const res = await fetch(`/messages?receiver=${account}`);
+    let rawMessages = (await supervisor.functionCall({
+                service: "chainmail",
+                intf: "queries",
+                method: "getMsgs",
+                params: [account, ],
+            })) as RawMessage[];
+    console.info("rawMessages: ", rawMessages);
+
+    // const rawMessages = (await res.json()) as RawMessage[];
     return transformRawMessagesToMessages(rawMessages);
 };
 

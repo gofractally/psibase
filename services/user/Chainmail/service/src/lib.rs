@@ -16,18 +16,6 @@ fn validate_user(user: &str) -> bool {
     AccountsSvc::call().exists(acc)
 }
 
-fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
-    //events.psibase.???
-    return HttpRequest {
-        host: req.host.clone(),
-        rootHost: req.rootHost.clone(),
-        method: String::from("POST"),
-        target: String::from("/sql"),
-        contentType: String::from("application/sql"),
-        body: sql.into(),
-    };
-}
-
 fn parse_query(query: &str) -> HashMap<String, String> {
     let mut params: HashMap<String, String> = HashMap::new();
 
@@ -41,6 +29,7 @@ fn parse_query(query: &str) -> HashMap<String, String> {
 
 fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
+        println!("request.target = {}", request.target);
         if !request.target.starts_with("/api/messages") {
             return None;
         }
@@ -53,9 +42,11 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let query = request.target.split_at(query_start + 1).1;
         let params = crate::parse_query(query);
+        println!("params: {:#?}", params);
 
         let mut s_clause = String::new();
         let s_opt = params.get("sender");
+        println!("sender: {:#?}", s_opt);
         if let Some(s) = s_opt {
             if !validate_user(s) {
                 return None;
@@ -65,6 +56,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
+        println!("receiver: {:#?}", r_opt);
         if let Some(r) = r_opt {
             if !validate_user(r) {
                 return None;
@@ -80,6 +72,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             Some(arch) => arch == "true",
             None => false,
         };
+        println!("archived_requested: {}", archived_requested);
 
         let mut where_clause_sender_receiver: String = String::from("");
         if s_opt.is_some() {
@@ -91,6 +84,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         if r_opt.is_some() {
             where_clause_sender_receiver += r_clause.as_str();
         }
+        println!("where-clause: {}", where_clause_sender_receiver);
 
         /* TASKS
          * x- clean this up so chainmail shows sent/received messages instead of []
@@ -124,11 +118,10 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             order_by_clause
         );
 
-        // let mq = make_query(request, sql_query_str.clone());
-
         println!("query: {}", sql_query_str);
 
         let query_response = REventsSvc::call().sqlQuery(sql_query_str);
+        println!("query_response: {}", query_response);
 
         return Some(HttpReply {
             status: 200,
@@ -184,6 +177,11 @@ mod service {
 
     #[action]
     fn archive(event_id: u64) {
+        println!("action archive(event_id[{}]).top", event_id);
+        println!(
+            "Archiving {}",
+            get_sender().to_string() + &event_id.to_string()
+        );
         Wrapper::emit()
             .history()
             .archive(get_sender().to_string() + &event_id.to_string());
