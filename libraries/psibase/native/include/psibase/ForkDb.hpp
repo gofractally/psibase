@@ -957,14 +957,21 @@ namespace psibase
 
       void setBlockData(const Checksum256& id, std::vector<char>&& data)
       {
-         char key[] = {0};
-         systemContext->sharedDatabase.setBlockData(*writer, id, key, data);
+         BlockDataRow row{id, std::move(data)};
+         systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
+                                                       psio::to_frac(row));
       }
 
       std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
       {
-         char key[] = {0};
-         return systemContext->sharedDatabase.getBlockData(*writer, id, key);
+         if (auto data = systemContext->sharedDatabase.kvGetSubjective(
+                 *writer, psio::convert_to_key(blockDataKey(id))))
+         {
+            auto row = psio::from_frac<BlockDataRow>(*data);
+            if (row.auxConsensusData)
+               return std::move(*row.auxConsensusData);
+         }
+         return {};
       }
 
       // removes blocks and states before irreversible

@@ -38,8 +38,9 @@ namespace psibase
       return codeKey(codeNum);
    }
 
-   auto codeByHashKey(const Checksum256& codeHash, uint8_t vmType, uint8_t vmVersion)
-       -> CodeByHashKeyType
+   auto codeByHashKey(const Checksum256& codeHash,
+                      uint8_t            vmType,
+                      uint8_t            vmVersion) -> CodeByHashKeyType
    {
       return std::tuple{codeByHashTable, nativeTablePrimaryIndex, codeHash, vmType, vmVersion};
    }
@@ -78,5 +79,31 @@ namespace psibase
    auto NotifyRow::key() const -> NotifyKeyType
    {
       return notifyKey(type);
+   }
+
+   auto blockDataPrefix() -> KeyPrefixType
+   {
+      return std::tuple{blockDataTable, nativeTablePrimaryIndex};
+   }
+   auto blockDataKey(const Checksum256& id) -> BlockDataKeyType
+   {
+      return std::tuple{blockDataTable, nativeTablePrimaryIndex, id};
+   }
+   auto BlockDataRow::key() const -> BlockDataKeyType
+   {
+      return blockDataKey(blockId);
+   }
+
+   auto consensusChangePrefix() -> KeyPrefixType
+   {
+      return std::tuple{consensusChangeTable, nativeTablePrimaryIndex};
+   }
+   auto consensusChangeKey(BlockNum num) -> ConsensusChangeKeyType
+   {
+      return std::tuple{consensusChangeTable, nativeTablePrimaryIndex, num};
+   }
+   auto ConsensusChangeRow::key() const -> ConsensusChangeKeyType
+   {
+      return consensusChangeKey(start);
    }
 }  // namespace psibase

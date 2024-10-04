@@ -95,6 +95,13 @@ namespace psibase
       if (status->consensus.next &&
           status->consensus.next->blockNum <= status->head->header.commitNum)
       {
+         if (!isReadOnly)
+         {
+            ConsensusChangeRow changeRow{status->consensus.next->blockNum,
+                                         status->head->header.commitNum, current.header.blockNum};
+            systemContext.sharedDatabase.kvPutSubjective(
+                *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+         }
          status->consensus.current = std::move(status->consensus.next->consensus);
          status->consensus.next.reset();
       }

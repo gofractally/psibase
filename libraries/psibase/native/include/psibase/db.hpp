@@ -10,6 +10,7 @@
 #include <psio/to_key.hpp>
 #include <triedent/file_fwd.hpp>
 
+#include <array>
 #include <filesystem>
 
 namespace triedent
@@ -51,6 +52,9 @@ namespace psibase
       void               onWrite(std::span<const char> key);
    };
 
+   using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
+   using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
+
    struct SharedDatabaseImpl;
    struct SharedDatabase
    {
@@ -78,22 +82,17 @@ namespace psibase
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
-      void                             setBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key,
-                                                    std::span<const char> value);
-      std::optional<std::vector<char>> getBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key);
+      void kvPutSubjective(Writer& writer, std::span<const char> key, std::span<const char> value);
+      std::optional<std::vector<char>> kvGetSubjective(Writer& writer, std::span<const char> key);
 
-      DbPtr getSubjective();
-      bool  commitSubjective(Writer&             writer,
-                             DbPtr&              original,
-                             DbPtr               updated,
-                             DbChangeSet&&       changes,
-                             SocketChangeSet&&   socketChanges,
-                             Sockets&            sockets,
-                             SocketAutoCloseSet& closing);
+      IndependentRevision getSubjective();
+      bool                commitSubjective(Writer&                writer,
+                                           IndependentRevision&   original,
+                                           IndependentRevision    updated,
+                                           IndependentChangeSet&& changes,
+                                           SocketChangeSet&&      socketChanges,
+                                           Sockets&               sockets,
+                                           SocketAutoCloseSet&    closing);
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;

@@ -447,6 +447,22 @@ struct test_chain
    psibase::Database& database() { return native().database; }
 };  // test_chain
 
+struct ScopedCheckoutSubjective
+{
+   ScopedCheckoutSubjective(psibase::DbId db) : db(db) {}
+   ScopedCheckoutSubjective(test_chain& chain, psibase::DbId db) : impl(&chain.native()), db(db)
+   {
+      impl->checkoutSubjective();
+   }
+   ~ScopedCheckoutSubjective()
+   {
+      if (impl && !impl->commitSubjective())
+         psibase::abortMessage("commitSubjective failure should not happen without concurrency");
+   }
+   psibase::NativeFunctions* impl = nullptr;
+   psibase::DbId             db;
+};
+
 test_chain_ref::test_chain_ref(test_chain& chain)
 {
    chain.refs.insert(this);
@@ -1437,22 +1453,25 @@ struct callbacks
       }
    }
 
-   psibase::DbId getDbRead(std::uint32_t db)
+   ScopedCheckoutSubjective getDbRead(test_chain& chain, std::uint32_t db)
    {
-      if (db == uint32_t(psibase::DbId::service))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::native))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::subjective))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::writeOnly))
-         return (psibase::DbId)db;
-      if (db == uint32_t(psibase::DbId::blockLog))
-         return (psibase::DbId)db;
-      throw std::runtime_error("may not read this db, or must use another intrinsic");
+      switch (db)
+      {
+         case uint32_t(psibase::DbId::service):
+         case uint32_t(psibase::DbId::native):
+         case uint32_t(psibase::DbId::writeOnly):
+         case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::blockProof):
+            return (psibase::DbId)db;
+         case uint32_t(psibase::DbId::subjective):
+         case uint32_t(psibase::DbId::nativeSubjective):
+            return {chain, (psibase::DbId)db};
+         default:
+            throw std::runtime_error("may not read this db, or must use another intrinsic");
+      }
    }
 
-   psibase::DbId getDbWrite(test_chain& chain, std::uint32_t db)
+   ScopedCheckoutSubjective getDbWrite(test_chain& chain, std::uint32_t db)
    {
       switch (db)
       {
@@ -1461,8 +1480,11 @@ struct callbacks
             psibase::check(!chain.blockContext, "may not write this db while building a block");
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
+         case uint32_t(psibase::DbId::nativeSubjective):
+            return {chain, (psibase::DbId)db};
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::blockProof):
             return (psibase::DbId)db;
          default:
             throw std::runtime_error("may not write this db, or must use another intrinsic");
@@ -1498,7 +1520,9 @@ struct callbacks
 
    uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      return setResult(database(chain_index).kvGetRaw(getDbRead(db), {key.data(), key.size()}));
+      auto& chain = assert_chain(chain_index);
+      return setResult(
+          chain.database().kvGetRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
    uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
@@ -1513,9 +1537,9 @@ struct callbacks
                            uint32_t                    matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-      return setResult(
-          database(chain_index)
-              .kvGreaterEqualRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
+      auto& chain = assert_chain(chain_index);
+      return setResult(chain.database().kvGreaterEqualRaw(getDbRead(chain, db).db,
+                                                          {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvLessThan(std::uint32_t               chain_index,
@@ -1524,13 +1548,16 @@ struct callbacks
                        uint32_t                    matchKeySize)
    {
       psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
-      return setResult(database(chain_index)
-                           .kvLessThanRaw(getDbRead(db), {key.data(), key.size()}, matchKeySize));
+      auto& chain = assert_chain(chain_index);
+      return setResult(chain.database().kvLessThanRaw(getDbRead(chain, db).db,
+                                                      {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      return setResult(database(chain_index).kvMaxRaw(getDbRead(db), {key.data(), key.size()}));
+      auto& chain = assert_chain(chain_index);
+      return setResult(
+          chain.database().kvMaxRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
    void kvPut(std::uint32_t               chain_index,
@@ -1541,7 +1568,7 @@ struct callbacks
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
       state.result_value.clear();
-      chain.database().kvPutRaw(getDbWrite(chain, db), {key.data(), key.size()},
+      chain.database().kvPutRaw(getDbWrite(chain, db).db, {key.data(), key.size()},
                                 {value.data(), value.size()});
    }
 
@@ -1550,7 +1577,7 @@ struct callbacks
       auto& chain = assert_chain(chain_index);
       state.result_key.clear();
       state.result_value.clear();
-      chain.database().kvRemoveRaw(getDbWrite(chain, db), {key.data(), key.size()});
+      chain.database().kvRemoveRaw(getDbWrite(chain, db).db, {key.data(), key.size()});
    }
 
    void commitState(std::uint32_t chain_index) { assert_chain(chain_index).writeRevision(); }
