@@ -3,6 +3,7 @@ import { atom, useAtom } from "jotai";
 import { useUser } from "./use-user";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalStorage } from "./use-local-storage";
+import { getSupervisor } from "@lib/supervisor";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -51,8 +52,17 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 };
 
 const getIncomingMessages = async (account: string) => {
-    const res = await fetch(`/messages?receiver=${account}`);
-    const rawMessages = (await res.json()) as RawMessage[];
+    console.info("getInboxMessages().top");
+    const supervisor = await getSupervisor();
+    console.info("got Supervisor instance");
+    // const res = await fetch(`/messages?receiver=${account}`);
+    let rawMessages = (await supervisor.functionCall({
+                service: "chainmail",
+                intf: "queries",
+                method: "getMsgs",
+                params: ["", account],
+            })) as RawMessage[];
+    console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
 
@@ -78,8 +88,21 @@ export function useIncomingMessages() {
 }
 
 const getArchivedMessages = async (account: string) => {
-    const res = await fetch(`/messages?archived=true&receiver=${account}`);
-    const rawMessages = (await res.json()) as RawMessage[];
+    console.info("getArchivedMessages().top");
+    // const res = await fetch(`/messages?archived=true&receiver=${account}`);
+    // const rawMessages = (await res.json()) as RawMessage[];
+    // return transformRawMessagesToMessages(rawMessages);
+
+    const supervisor = await getSupervisor();
+    console.info("[archived] got Supervisor instance");
+    // const res = await fetch(`/messages?receiver=${account}`);
+    let rawMessages = (await supervisor.functionCall({
+                service: "chainmail",
+                intf: "queries",
+                method: "getArchivedMsgs",
+                params: ["", account],
+            })) as RawMessage[];
+    console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
 
@@ -105,6 +128,7 @@ export function useArchivedMessages() {
 }
 
 const getSentMessages = async (account: string) => {
+    console.info("getSentMessages().top");
     const res = await fetch(`/messages?sender=${account}`);
     const rawMessages = (await res.json()) as RawMessage[];
     return transformRawMessagesToMessages(rawMessages);

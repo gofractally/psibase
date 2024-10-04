@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use psibase::services::accounts::Wrapper as AccountsSvc;
 use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::AccountNumber;
+use psibase::Hex;
 use psibase::HttpReply;
 use psibase::HttpRequest;
 
@@ -40,7 +41,7 @@ fn parse_query(query: &str) -> HashMap<String, String> {
 
 fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
-        if !request.target.starts_with("/messages") {
+        if !request.target.starts_with("/api/messages") {
             return None;
         }
 
@@ -123,11 +124,18 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             order_by_clause
         );
 
-        let mq = make_query(request, sql_query_str.clone());
+        // let mq = make_query(request, sql_query_str.clone());
 
         println!("query: {}", sql_query_str);
 
-        return REventsSvc::call().serveSys(mq);
+        let query_response = REventsSvc::call().sqlQuery(sql_query_str);
+
+        return Some(HttpReply {
+            status: 200,
+            contentType: request.contentType.clone(),
+            headers: vec![],
+            body: Hex(query_response.as_bytes().to_vec()),
+        });
     }
     return None;
 }

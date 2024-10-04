@@ -3,11 +3,11 @@ mod bindings;
 
 use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
 use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
+use bindings::host;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::{BodyTypes, PostRequest};
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
-use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::AccountNumber;
 
 struct ChainmailPlugin;
@@ -68,26 +68,66 @@ impl API for ChainmailPlugin {
 
 impl QUERY for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
-        let archived_requested = false;
-        let sql_query_str = build_query(archived_requested, sender, receiver);
+        println!(
+            "get_msgs(sender[{}], receiver[{}]).top",
+            sender.clone().unwrap(),
+            receiver.clone().unwrap()
+        );
+        // let archived_requested = false;
+        // let sql_query_str = build_query(archived_requested, sender, receiver);
+        // println!("sql_query_str: {}", sql_query_str);
         // need to call add_transaction(); can't call call() (not in a service)
         // use host::server to call .get(<http>)
         // let resp = REventsSvc::call().sqlQuery(sql_query_str);
         // println!("response: {}", resp);
-        let query_result = CommonServer::post(&PostRequest {
-            endpoint: String::from("/sql"),
-            body: BodyTypes::Json(sql_query_str),
-        });
-        println!("query_results: {:#?}", query_result);
-        let results = query_result.unwrap();
-        println!("results: {}", results);
+        // let query_result = CommonServer::post(&PostRequest {
+        //     endpoint: String::from("/sql"),
+        //     body: BodyTypes::Json(sql_query_str),
+        // });
+
+        let resp = host::common::server::get_json(&format!(
+            "/api/messages?sender={}&receiver={}",
+            sender.unwrap(),
+            receiver.unwrap()
+        ));
+        println!("inbox resp: {:#?}", resp);
         Ok(vec![])
+
+        // println!("query_results: {:#?}", query_result);
+        // let results = query_result.unwrap();
+        // println!("results: {}", results);
+        // Ok(vec![])
     }
 
     fn get_archived_msgs(
-        _sender: Option<String>,
-        _receiver: Option<String>,
+        sender: Option<String>,
+        receiver: Option<String>,
     ) -> Result<Vec<Message>, Error> {
+        println!("get_archived_msgs TWO ().top");
+        // let archived_requested = true;
+        // let sql_query_str = build_query(archived_requested, sender, receiver);
+        // println!("sql_query_str: {}", sql_query_str);
+        // // need to call add_transaction(); can't call call() (not in a service)
+        // // use host::server to call .get(<http>)
+        // // let resp = REventsSvc::call().sqlQuery(sql_query_str);
+        // // println!("response: {}", resp);
+
+        // let endpoint = CommonServer::getSiblingUrl();
+        // let query_result = CommonServer::post(&PostRequest {
+        //     endpoint: endpoint + "/sql",
+        //     body: BodyTypes::Json(sql_query_str),
+        // });
+        // println!("query_results: {:#?}", query_result);
+        // let results = query_result.unwrap();
+        // println!("results: {}", results);
+        // Ok(vec![])
+
+        let resp = host::common::server::get_json(&format!(
+            "/api/messages?archived=true&sender={}&receiver={}",
+            sender.unwrap(),
+            receiver.unwrap()
+        ));
+        println!("archived resp: {:#?}", resp);
         Ok(vec![])
     }
 }
