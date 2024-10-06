@@ -2748,7 +2748,7 @@ dependencies = [
 
 [[package]]
 name = "workshop_package"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "r-workshop",
  "workshop",

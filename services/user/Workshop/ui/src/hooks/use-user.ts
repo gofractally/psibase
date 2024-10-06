@@ -11,28 +11,10 @@ interface SupervisorError {
 }
 
 const accountsAtom = atom<string[]>([]);
-// TODO: get rid of hard-coded alice
-const userAtom = atom<string>("alice");
+const userAtom = atom<string>("");
 export function useUser() {
     const [availableAccounts, setAvailableAccounts] = useAtom(accountsAtom);
     const [user, setUser] = useAtom(userAtom);
-
-    const getAvailableAccounts = async () => {
-        console.info("getting available accounts");
-        const supervisor = await getSupervisor();
-        try {
-            const res = (await supervisor.functionCall({
-                service: "accounts",
-                intf: "accounts",
-                method: "getAvailableAccounts",
-                params: [],
-            })) as string[];
-            console.info("available accounts", res);
-            setAvailableAccounts(res);
-        } catch (e: unknown) {
-            console.error(`${(e as SupervisorError).message}`);
-        }
-    };
 
     const logInAs = async (accountName: string) => {
         console.info("logging in as", accountName);
@@ -48,6 +30,26 @@ export function useUser() {
         } catch (e: unknown) {
             console.error("ERROR setting user:");
             console.log(e);
+        }
+    };
+
+    const getAvailableAccounts = async () => {
+        console.info("getting available accounts");
+        const supervisor = await getSupervisor();
+        try {
+            const res = (await supervisor.functionCall({
+                service: "accounts",
+                intf: "accounts",
+                method: "getAvailableAccounts",
+                params: [],
+            })) as string[];
+            console.info("available accounts", res);
+            setAvailableAccounts(res);
+            if (res.length > 0) {
+                logInAs(res[0]);
+            }
+        } catch (e: unknown) {
+            console.error(`${(e as SupervisorError).message}`);
         }
     };
 

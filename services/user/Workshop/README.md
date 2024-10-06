@@ -10,12 +10,14 @@ open http://localhost:8080
 
 # go through the steps to create a network in dev mode, name the producer as prod and confirm
 
-# TODO: steps to deploy the package
-
 # ui development
 cd ui
-yarn dev
-open http://workshop.psibase.127.0.0.1.sslip.io:8081/
+yarn build
+
+cd Workshop
+cargo psibase install && psibase install --reinstall target/wasm32-wasi/release/packages/workshop.psi
+
+open http://workshop.psibase.127.0.0.1.sslip.io:8080/
 
 # wip: about writing a psibase service
 open http://docs.psibase.127.0.0.1.sslip.io:8080/development/services/rust-service/index.html

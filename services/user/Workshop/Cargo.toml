@@ -12,6 +12,7 @@ homepage = "https://psibase.io"
 
 [package]
 name = "workshop_package"
+version = "0.1.0"
 
 [package.metadata.psibase]
 package-name = "workshop"

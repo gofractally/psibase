@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { type PluginId } from "@psibase/common-lib";
-
 import { getSupervisor } from "@lib/supervisor";
+
 import { useUser } from "./use-user";
+
 interface SupervisorError {
     code: number;
     producer: PluginId;
@@ -14,12 +15,15 @@ export interface Metadata {
     name: string;
     shortDescription: string;
     longDescription: string;
+    icon: string;
+    iconMimeType: string;
     tosSubpage: string;
     privacyPolicySubpage: string;
     appHomepageSubpage: string;
     status: string;
-    icon: string;
-    // TODO: complete this type
+    tags: string[];
+    redirectUris: string[];
+    owners: string[];
 }
 
 export const useMetadata = () => {
@@ -45,7 +49,7 @@ export const useMetadata = () => {
         }
     };
 
-    const setMetadata = async (metadata: Partial<Metadata>) => {
+    const setMetadata = async (metadata: Metadata) => {
         const supervisor = await getSupervisor();
         try {
             await supervisor.functionCall({
@@ -53,19 +57,25 @@ export const useMetadata = () => {
                 intf: "developer",
                 method: "setAppMetadata",
                 params: [
-                    metadata.name ?? "",
-                    metadata.shortDescription ?? "",
-                    metadata.longDescription ?? "",
-                    "", // todo: icon
-                    metadata.tosSubpage ?? "",
-                    metadata.privacyPolicySubpage ?? "",
-                    metadata.appHomepageSubpage ?? "",
-                    metadata.status ?? "",
-                    [],
+                    metadata.name,
+                    metadata.shortDescription,
+                    metadata.longDescription,
+                    metadata.icon,
+                    metadata.iconMimeType,
+                    metadata.tosSubpage,
+                    metadata.privacyPolicySubpage,
+                    metadata.appHomepageSubpage,
+                    metadata.status,
+                    metadata.tags,
+                    metadata.redirectUris,
+                    metadata.owners,
                 ],
             });
         } catch (e: unknown) {
-            console.error(`${(e as SupervisorError).message}`, e);
+            console.error(
+                `setMetadata error: ${(e as SupervisorError).message}`,
+                e,
+            );
             throw e;
         }
     };

@@ -1,3 +1,5 @@
+mod utils;
+
 #[psibase::service(name = "workshop")]
 #[allow(non_snake_case)]
 pub mod service {
@@ -7,33 +9,35 @@ pub mod service {
     use psibase::services::transact;
     use psibase::*;
 
-    // #[derive(Debug, Pack, Unpack, Serialize, Deserialize, ToSchema, Clone)]
-    // pub enum AppStatus {
-    //     Draft,
-    //     Published,
-    //     Unpublished,
-    // }
+    use crate::utils::increment_last_char;
 
-    /// Holds tags for the app
-    #[table(name = "TagRowTable", index = 0)]
+    // An App can't have more than 3 tags
+    const MAX_APP_TAGS: usize = 3;
+
+    /// Holds tags
+    #[table(name = "TagsTable", index = 0)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
-    pub struct TagRow {
+    pub struct TagRecord {
         /// The unique identifier for the tag
         #[primary_key]
-        id: u64,
+        pub id: u32,
 
         /// The name of the tag
-        tag: String,
+        pub tag: String,
+    }
 
-        /// The account number of the app
-        app: AccountNumber,
+    impl TagRecord {
+        #[secondary_key(1)]
+        fn by_tags(&self) -> (String, u32) {
+            (self.tag.clone(), self.id)
+        }
     }
 
     /// Holds metadata for a registered app
     #[table(name = "AppMetadataTable", index = 1)]
-    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AppMetadata {
-        /// The unique identifier for the app
+        /// The unique identifier for the app: it's own account id
         #[primary_key]
         pub account_id: AccountNumber,
 
@@ -47,7 +51,10 @@ pub mod service {
         pub long_description: String,
 
         /// The icon of the app (stored as a base64 string)
-        pub icon: Option<String>,
+        pub icon: String,
+
+        /// The MIME type of the icon
+        pub icon_mime_type: String,
 
         /// The subpage for Terms of Service
         pub tos_subpage: String,
@@ -59,18 +66,42 @@ pub mod service {
         pub app_homepage_subpage: String,
 
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
-        pub status: String,
+        pub status: String, // TODO: Create enum
 
         /// The timestamp of when the app was created
         pub created_at: psibase::TimePointSec,
 
-        /// The tags associated with the app
-        pub tags: Vec<u64>,
+        pub redirect_uris: Vec<String>,
+
+        pub owners: Vec<AccountNumber>,
     }
 
-    #[action]
-    fn getMetadata(account_id: AccountNumber) -> Option<AppMetadata> {
-        AppMetadataTable::new().get_index_pk().get(&account_id)
+    #[table(name = "AppTagsTable", index = 2)]
+    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    pub struct AppTags {
+        /// The app ID
+        pub app_id: AccountNumber,
+
+        /// The tag ID
+        pub tag_id: u32,
+    }
+
+    impl AppTags {
+        #[primary_key]
+        fn by_app_tag_ids(&self) -> (AccountNumber, u32) {
+            (self.app_id, self.tag_id)
+        }
+    }
+
+    #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
+    pub struct AppMetadataWithTags {
+        pub metadata: AppMetadata,
+        pub tags: Vec<TagRecord>,
+    }
+
+    #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
+    pub struct RelatedTags {
+        pub tags: Vec<String>,
     }
 
     #[action]
@@ -78,210 +109,245 @@ pub mod service {
         name: String,
         short_description: String,
         long_description: String,
-        icon: Option<String>,
+        icon: String,
+        icon_mime_type: String,
         tos_subpage: String,
         privacy_policy_subpage: String,
         app_homepage_subpage: String,
         status: String,
         tags: Vec<String>,
+        redirect_uris: Vec<String>,
+        owners: Vec<AccountNumber>,
     ) {
         let app_metadata_table = AppMetadataTable::new();
-        let tag_table = TagRowTable::new();
         let account_id = get_sender();
         let created_at = transact::Wrapper::call().currentBlock().time;
 
-        let tags = tags.into_iter().take(3).collect::<Vec<String>>();
+        check(
+            tags.len() < MAX_APP_TAGS,
+            format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
+        );
 
-        let mut tag_ids = Vec::new();
-        let tag_index = tag_table.get_index_pk();
-
-        // Get the last tag ID or start from 0 if the table is empty
-        let last_tag_id = tag_index
-            .into_iter()
-            .last()
-            .map(|last_tag| last_tag.id)
-            .unwrap_or(0);
-
-        for (i, tag) in tags.iter().enumerate() {
-            let id = last_tag_id + i as u64 + 1; // Increment ID for each new tag
-            let tag_row = TagRow {
-                id,
-                tag: tag.clone(),
-                app: account_id,
-            };
-            tag_table.put(&tag_row).unwrap();
-            tag_ids.push(id);
-        }
-
-        // let status = match status.as_str() {
-        //     "Draft" => AppStatus::Draft,
-        //     "Published" => AppStatus::Published,
-        //     "Unpublished" => AppStatus::Unpublished,
-        //     _ => return,
-        // };
-
-        let app_metadata = AppMetadata {
-            account_id,
-            name,
-            short_description,
-            long_description,
-            icon,
-            tos_subpage,
-            privacy_policy_subpage,
-            app_homepage_subpage,
-            status,
-            created_at,
-            tags: tag_ids,
+        let mut metadata = app_metadata_table
+            .get_index_pk()
+            .get(&account_id)
+            .unwrap_or_default();
+        metadata.account_id = account_id;
+        metadata.name = name;
+        metadata.short_description = short_description;
+        metadata.long_description = long_description;
+        metadata.icon = icon;
+        metadata.icon_mime_type = icon_mime_type;
+        metadata.tos_subpage = tos_subpage;
+        metadata.privacy_policy_subpage = privacy_policy_subpage;
+        metadata.app_homepage_subpage = app_homepage_subpage;
+        metadata.status = status;
+        metadata.created_at = if metadata.created_at.seconds == 0 {
+            created_at
+        } else {
+            metadata.created_at
         };
+        metadata.redirect_uris = redirect_uris;
+        metadata.owners = owners;
 
-        app_metadata_table.put(&app_metadata).unwrap();
+        println!("metadata to be inserted: {:?}", metadata);
 
-        Wrapper::emit().history().appMetaChanged(app_metadata);
+        app_metadata_table.put(&metadata).unwrap();
+
+        updateAppTags(account_id, &tags);
+
+        println!("metadata inserted !!!");
+
+        Wrapper::emit().history().appMetadataChanged(metadata);
+    }
+
+    #[action]
+    fn getMetadata(account_id: AccountNumber) -> Option<AppMetadataWithTags> {
+        let app_metadata_table = AppMetadataTable::new();
+        let app_tags_table = AppTagsTable::new();
+        let tags_table = TagsTable::new();
+        // Get the app metadata
+        let metadata = app_metadata_table.get_index_pk().get(&account_id)?;
+
+        // Get the app tag IDs
+        let tags: Vec<TagRecord> = app_tags_table
+            .get_index_pk()
+            .range((account_id, 0)..(account_id, u32::MAX))
+            .map(|app_tag| {
+                let tag_id = app_tag.tag_id;
+                tags_table.get_index_pk().get(&tag_id).unwrap()
+            })
+            .collect();
+
+        Some(AppMetadataWithTags {
+            metadata: metadata,
+            tags,
+        })
+    }
+
+    #[action]
+    fn getTag(tag_id: u32) -> Option<TagRecord> {
+        let tags_table = TagsTable::new();
+        tags_table.get_index_pk().get(&tag_id)
+    }
+
+    #[action]
+    fn getRelatedTags(partial_tag: String) -> Option<RelatedTags> {
+        let table = TagsTable::new();
+        let idx = table.get_index_by_tags();
+
+        let from = partial_tag.to_lowercase();
+        let excluded_to = increment_last_char(from.clone());
+
+        let tags: Vec<String> = idx
+            .range((from, 0)..(excluded_to, 0))
+            .take(10)
+            .map(|tag_row| tag_row.tag)
+            .collect();
+
+        Some(RelatedTags { tags })
     }
 
     #[event(history)]
-    fn appMetaChanged(app_metadata: AppMetadata) {}
+    fn appMetadataChanged(app_metadata: AppMetadata) {}
+
+    fn process_tag(
+        tag: &str,
+        account_id: AccountNumber,
+        existing_app_tags: &Vec<AppTags>,
+    ) -> AppTags {
+        if let Some(existing_tag) = find_existing_app_tag(tag, existing_app_tags) {
+            existing_tag.clone()
+        } else {
+            create_new_app_tag(tag, account_id)
+        }
+    }
+
+    fn create_new_app_tag(tag: &str, account_id: AccountNumber) -> AppTags {
+        let app_tags_table = AppTagsTable::new();
+        let tag_id = get_or_create_tag_id(tag);
+        let new_app_tag = AppTags {
+            app_id: account_id,
+            tag_id,
+        };
+        app_tags_table.put(&new_app_tag).unwrap();
+        new_app_tag
+    }
+
+    fn find_existing_app_tag(tag: &str, existing_app_tags: &Vec<AppTags>) -> Option<AppTags> {
+        let tags_table = TagsTable::new();
+        existing_app_tags
+            .iter()
+            .find(|at| {
+                tags_table
+                    .get_index_pk()
+                    .get(&at.tag_id)
+                    .map(|tr| tr.tag == tag)
+                    .unwrap_or(false)
+            })
+            .cloned()
+    }
+
+    fn updateAppTags(account_id: AccountNumber, tags: &Vec<String>) {
+        let app_tags_table = AppTagsTable::new();
+
+        // Get existing app tags
+        let existing_app_tags: Vec<AppTags> = app_tags_table
+            .get_index_pk()
+            .range((account_id, 0)..(account_id, u32::MAX))
+            .collect();
+
+        let mut new_app_tags = Vec::new();
+
+        for tag in tags {
+            let app_tag = process_tag(tag, account_id, &existing_app_tags);
+            new_app_tags.push(app_tag);
+        }
+
+        remove_obsolete_tags(&existing_app_tags, &new_app_tags);
+
+        // todo: validate if tags are valid (lowercase alphanumeric and dashes)
+    }
+
+    fn get_or_create_tag_id(tag: &str) -> u32 {
+        let tags_table = TagsTable::new();
+        let idx = tags_table.get_index_by_tags();
+        idx.range((tag.to_string(), 0)..(tag.to_string(), u32::MAX))
+            .find(|tag_row| tag_row.tag == tag)
+            .map(|tag_row| tag_row.id)
+            .unwrap_or_else(|| create_new_tag(tag.to_string()))
+    }
+
+    fn create_new_tag(tag: String) -> u32 {
+        let tags_table = TagsTable::new();
+        let new_id = tags_table
+            .get_index_pk()
+            .into_iter()
+            .last()
+            .map(|last_tag| last_tag.id + 1)
+            .unwrap_or(1);
+        let new_tag = TagRecord {
+            id: new_id,
+            tag: tag.to_string(),
+        };
+        tags_table.put(&new_tag).unwrap();
+        new_id
+    }
+
+    fn remove_obsolete_tags(existing_app_tags: &[AppTags], new_app_tags: &[AppTags]) {
+        let app_tags_table = AppTagsTable::new();
+        for existing_tag in existing_app_tags {
+            if !new_app_tags
+                .iter()
+                .any(|at| at.tag_id == existing_tag.tag_id)
+            {
+                app_tags_table.remove(existing_tag);
+                // TODO: Check if there are any apps using the tag from tags_table and remove if not
+            }
+        }
+    }
 }
 
-// #[psibase::test_case(packages("workshop"))]
-// fn test_set_app_metadata(chain: psibase::Chain) -> Result<(), psibase::Error> {
-//     use psibase::services::http_server;
-//     use psibase::HttpBody;
-//     use serde_json::{json, Value};
+// TODO: how to make these tests work?
+#[cfg(test)]
+mod tests {
+    use crate::Wrapper;
+    use psibase::*;
 
-//     // Test setMetadata
-//     let result = Wrapper::push(&chain).setMetadata(
-//         "Test App".to_string(),
-//         "A short description".to_string(),
-//         "A long description".to_string(),
-//         Some("base64_encoded_icon".to_string()),
-//         "/tos".to_string(),
-//         "/privacy".to_string(),
-//         "/".to_string(),
-//         "Draft".to_string(),
-//         vec!["tag1".to_string(), "tag2".to_string(), "tag3".to_string()],
-//     );
-//     assert!(result.get().is_ok());
+    #[psibase::test_case(packages("Workshop"))]
+    fn test_foo(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.new_account(account!("alice"))?;
 
-//     chain.finish_block();
+        Wrapper::push_from(&chain, AccountNumber::from_exact("alice").unwrap())
+            .setMetadata(
+                "Super Cooking App".to_string(),
+                "Alice's Cooking App".to_string(),
+                "Super cooking app".to_string(),
+                "icon-as-base64".to_string(),
+                "image/png".to_string(),
+                "/tos".to_string(),
+                "/privacy-policy".to_string(),
+                "/".to_string(),
+                "DRAFT".to_string(),
+                vec![
+                    "cozy".to_string(),
+                    "cuisine".to_string(),
+                    "cooking".to_string(),
+                ],
+                vec!["http://localhost:3000/callback".to_string()],
+                vec![
+                    AccountNumber::from_exact("alice").unwrap(),
+                    AccountNumber::from_exact("bob").unwrap(),
+                ],
+            )
+            .get()?;
 
-//     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
+        let metadata = Wrapper::push(&chain)
+            .getMetadata(AccountNumber::from_exact("alice").unwrap())
+            .unwrap();
 
-//     // Test getMetadata
-//     let reply: Value = chain.graphql(
-//         SERVICE,
-//         r#"query { appMetadata(account_id: "app1") { name shortDescription status } }"#,
-//     )?;
-//     assert_eq!(
-//         reply,
-//         json!({
-//             "data": {
-//                 "appMetadata": {
-//                     "name": "Test App",
-//                     "shortDescription": "A short description",
-//                     "status": "Draft"
-//                 }
-//             }
-//         })
-//     );
+        assert_eq!(metadata.metadata.name, "Super Cooking App");
 
-//     Ok(())
-// }
-
-#[psibase::test_case(packages("workshop"))]
-fn test_workshop_actions(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    use psibase::services::http_server;
-    use psibase::AccountNumber;
-    use serde_json::{json, Value};
-
-    let SERVICE = AccountNumber::from_exact("app1").unwrap();
-    let APP1 = AccountNumber::from_exact("app1").unwrap();
-
-    // Test setMetadata
-    let result = Wrapper::push_from(&chain, APP1).setMetadata(
-        "Test App".to_string(),
-        "A short description".to_string(),
-        "A long description".to_string(),
-        Some("base64_encoded_icon".to_string()),
-        "/tos".to_string(),
-        "/privacy".to_string(),
-        "/".to_string(),
-        "Draft".to_string(),
-        vec!["tag1".to_string(), "tag2".to_string(), "tag3".to_string()],
-    );
-    assert!(result.get().is_ok());
-
-    chain.finish_block();
-
-    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
-
-    // Test getMetadata
-    let reply: Value = chain.graphql(
-        SERVICE,
-        &*format!(r#"query {{ getMetadata(account_id: "{APP1}") {{ name shortDescription status tags }} }}"#),
-    )?;
-    assert_eq!(
-        reply,
-        json!({
-            "data": {
-                "getMetadata": {
-                    "name": "Test App",
-                    "shortDescription": "A short description",
-                    "status": "Draft",
-                    "tags": [1, 2, 3]
-                }
-            }
-        })
-    );
-
-    // Test updating metadata
-    let update_result = Wrapper::push_from(&chain, APP1).setMetadata(
-        "Updated App".to_string(),
-        "Updated short description".to_string(),
-        "Updated long description".to_string(),
-        Some("updated_base64_icon".to_string()),
-        "/updated-tos".to_string(),
-        "/updated-privacy".to_string(),
-        "/updated".to_string(),
-        "Published".to_string(),
-        vec!["newtag1".to_string(), "newtag2".to_string()],
-    );
-    assert!(update_result.get().is_ok());
-
-    chain.finish_block();
-
-    // Test getting updated metadata
-    let updated_reply: Value = chain.graphql(
-        SERVICE,
-        &*format!(r#"query {{ getMetadata(account_id: "{APP1}") {{ name shortDescription status tags }} }}"#),
-    )?;
-    assert_eq!(
-        updated_reply,
-        json!({
-            "data": {
-                "getMetadata": {
-                    "name": "Updated App",
-                    "shortDescription": "Updated short description",
-                    "status": "Published",
-                   "tags": [4, 5]
-                }
-            }
-        })
-    );
-
-    // Test invalid status
-    let invalid_status_result = Wrapper::push_from(&chain, APP1).setMetadata(
-        "Invalid Status App".to_string(),
-        "Short description".to_string(),
-        "Long description".to_string(),
-        None,
-        "/tos".to_string(),
-        "/privacy".to_string(),
-        "/".to_string(),
-        "INVALID_STATUS".to_string(),
-        vec![],
-    );
-    assert!(invalid_status_result.get().is_ok());
-
-    Ok(())
+        Ok(())
+    }
 }

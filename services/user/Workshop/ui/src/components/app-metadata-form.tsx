@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import slugify from "slugify";
-import { FunctionCallArgs } from "@psibase/common-lib";
 import { Button } from "@shadcn/button";
 import {
     Form,
@@ -17,25 +16,26 @@ import {
 
 import { Input } from "@shadcn/input";
 import { Textarea } from "@shadcn/textarea";
-import { mockSubmitToAPI } from "@lib/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useUser } from "@hooks";
 
 import { RegisteredApp } from "@types";
 import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
-import { workshopPlugin } from "src/plugin/plugin";
-import { useMetadata } from "@hooks/use-metadata";
+import { Metadata, useMetadata } from "@hooks/use-metadata";
+import { TagSelect } from "./tag-select";
+// import { fileToBase64 } from "@lib/utils";
 
 const slugifyOptions = { lower: true, strict: true };
 
 const AppMetadataSchema = z.object({
-    icon: z.instanceof(File).nullable(),
+    icon: z.instanceof(File).optional(),
     name: z.string().min(1, "Name is required"),
     shortDescription: z
         .string()
-        .max(100, "Short description must be 100 characters or less"),
-    longDescription: z.string(),
+        .max(100, "Short description must be 100 characters or less")
+        .optional(),
+    longDescription: z.string().optional(),
     tosSubpage: z
         .string()
         .refine(
@@ -43,7 +43,8 @@ const AppMetadataSchema = z.object({
                 value.startsWith("/") &&
                 slugify(value, slugifyOptions) === value.slice(1),
             "Must start with '/' and be a valid slug",
-        ),
+        )
+        .optional(),
     privacyPolicySubpage: z
         .string()
         .refine(
@@ -51,7 +52,8 @@ const AppMetadataSchema = z.object({
                 value.startsWith("/") &&
                 slugify(value, slugifyOptions) === value.slice(1),
             "Must start with '/' and be a valid slug",
-        ),
+        )
+        .optional(),
     appHomepageSubpage: z
         .string()
         .refine(
@@ -59,8 +61,12 @@ const AppMetadataSchema = z.object({
                 value.startsWith("/") &&
                 slugify(value, slugifyOptions) === value.slice(1),
             "Must start with '/' and be a valid slug",
-        ),
+        )
+        .optional(),
     status: z.enum(["DRAFT", "PUBLISHED", "UNPUBLISHED"]),
+    tags: z.array(z.object({ value: z.string(), label: z.string() })),
+    redirectUris: z.string().optional(),
+    owners: z.string().optional(),
 });
 
 export type AppMetadataFormData = z.infer<typeof AppMetadataSchema>;
@@ -81,14 +87,20 @@ export function AppMetadataForm() {
     const isUpdating = !!id;
 
     // TODO: preload form with current metadata when present
-    // TODO: we need to make sure the metadata was not found or is present to avoid wrong overwriting
     // TODO: handle loading state
-    console.info("currentMetadata", currentMetadata);
+
+    useEffect(() => {
+        if (currentMetadata) {
+            console.info("test: currentMetadata", currentMetadata);
+        } else {
+            console.info("currentMetadata not found");
+        }
+    }, [currentMetadata]);
 
     const form = useForm<AppMetadataFormData>({
         resolver: zodResolver(AppMetadataSchema),
         defaultValues: {
-            icon: null,
+            icon: undefined,
             name: "",
             shortDescription: "",
             longDescription: "",
@@ -96,6 +108,7 @@ export function AppMetadataForm() {
             privacyPolicySubpage: "/privacy-policy",
             appHomepageSubpage: "/",
             status: "DRAFT",
+            tags: [],
         },
     });
 
@@ -130,67 +143,36 @@ export function AppMetadataForm() {
     const onSubmit = async (data: AppMetadataFormData) => {
         setIsSubmitting(true);
 
-        let args: FunctionCallArgs;
-
-        // const iconBase64 = await new Promise<string>((resolve) => {
-        //     const reader = new FileReader();
-        //     reader.onloadend = () => {
-        //         console.log("Icon read complete");
-        //         resolve(reader.result as string);
-        //     };
-        //     reader.readAsDataURL(data.icon as Blob);
-        // });
-        const iconBase64 = "";
-
-        console.log("Sending...", {
-            name: data.name,
-            shortDescription: data.shortDescription,
-            longDescription: data.longDescription,
-            iconBase64,
-            tosSubpage: data.tosSubpage,
-            privacyPolicySubpage: data.privacyPolicySubpage,
-            appHomepageSubpage: data.appHomepageSubpage,
-            status: data.status,
-        });
-
-        args = workshopPlugin.intf.setMetadata(
-            data.name,
-            data.shortDescription,
-            data.longDescription,
-            iconBase64,
-            data.tosSubpage,
-            data.privacyPolicySubpage,
-            data.appHomepageSubpage,
-            data.status,
-        );
-        // if (isTransfer) {
-        //   const recipient = form.watch("to")!;
-        //   args = tokenPlugin.transfer.credit(tokenId, recipient, amount, memo);
-        // } else if (isBurning) {
-        //   args = tokenPlugin.intf.burn(tokenId, amount);
-        // } else if (isMinting) {
-        //   args = tokenPlugin.intf.mint(tokenId, amount, memo);
-        // } else {
-        //   throw new Error(`Failed to identify args`);
-        // }
-
         try {
-            // TODO: handle all fields
-            await setMetadata({
-                name: data.name,
-            });
+            // Convert File to Uint8Array
+            // const arrayBuffer = await data.icon.arrayBuffer();
+            // const iconData = new Uint8Array(arrayBuffer);
 
-            // const result = await mockSubmitToAPI(
-            //     data,
-            //     isUpdating
-            //         ? "App updated successfully!"
-            //         : "App registered successfully!",
-            //     selectedAccount.account,
-            //     id,
-            // );
+            const base64Icon = "test-base64-icon";
+            // const base64Icon = await fileToBase64(data.icon);
+            const iconMimeType = data.icon?.type ?? "";
+
+            const metadata: Metadata = {
+                name: data.name,
+                shortDescription: data.shortDescription ?? "",
+                longDescription: data.longDescription ?? "",
+                icon: base64Icon,
+                iconMimeType,
+                tosSubpage: data.tosSubpage ?? "",
+                privacyPolicySubpage: data.privacyPolicySubpage ?? "",
+                appHomepageSubpage: data.appHomepageSubpage ?? "",
+                status: data.status,
+                tags: data.tags?.map((tag) => tag.value) ?? [],
+                redirectUris: data.redirectUris?.split(",") ?? [],
+                owners: data.owners?.split(",") ?? [],
+            };
+
+            console.info("sending metadata", metadata);
+            await setMetadata(metadata);
             toast.success("App registered successfully!");
             navigate("/");
-        } catch (error) {
+        } catch (error: any) {
+            console.error(`Form Error: ${error.message}`);
             toast.error("An error occurred while submitting the form.");
         } finally {
             setIsSubmitting(false);
@@ -307,6 +289,26 @@ export function AppMetadataForm() {
 
                 <FormField
                     control={form.control}
+                    name="tags"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Tags</FormLabel>
+                            <FormControl>
+                                <TagSelect
+                                    selectedTags={field.value}
+                                    onChange={field.onChange}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                Select tags that describe your app
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
                     name="tosSubpage"
                     render={({ field }) => (
                         <FormItem>
@@ -352,6 +354,41 @@ export function AppMetadataForm() {
                             </FormControl>
                             <FormDescription>
                                 The subpage for your app's homepage (e.g., "/")
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="redirectUris"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Redirect URIs</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormDescription>
+                                The URIs to redirect to after authentication
+                                (comma separated) (e.g.,
+                                "https://example.com/callback")
+                            </FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="owners"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Owners</FormLabel>
+                            <FormControl>
+                                <Input {...field} />
+                            </FormControl>
+                            <FormDescription>
+                                The owners of your app (comma separated) (e.g.,
+                                "account1,account2")
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

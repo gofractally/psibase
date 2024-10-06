@@ -17,7 +17,7 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
 
     return (
         <Select
-            defaultValue={user}
+            value={user}
             onValueChange={(value) => {
                 setUser(value);
             }}

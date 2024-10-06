@@ -2,44 +2,63 @@ package workshop:plugin;
 
 interface types {
     type account-id = string;
-    type bytes = list<u8>;
+    type base64-str = string;
 }
 
 interface developer {
     use host:common/types.{error};
-    use types.{account-id, bytes};
+    use types.{account-id, base64-str};
 
     set-app-metadata: func(
         name: string, 
         short-description: string, 
         long-description: string, 
-        icon: string, 
+        icon: base64-str, 
+        icon-mime-type: string, 
         tos-subpage: string, 
         privacy-policy-subpage: string, 
         app-homepage-subpage: string, 
         status: string,
-        tags: list<string>
+        tags: list<string>,
+        redirect-uris: list<string>,
+        owners: list<account-id>
     ) -> result<_, error>;
 }
 
 interface consumer {
     use host:common/types.{error};
-    use types.{account-id};
+    use types.{account-id, base64-str};
 
+    record tag {
+        id: u32,
+        tag: string
+    }
 
     record app-metadata {
         name: string,
         short-description: string,
         long-description: string,
-        icon: string,
+        icon: base64-str,
+        icon-mime-type: string, 
         tos-subpage: string,
         privacy-policy-subpage: string,
         app-homepage-subpage: string,
         status: string,
+        redirect-uris: list<string>,
+        owners: list<account-id>
+    }
+
+    record return-metadata {
+        metadata: app-metadata,
+        tags: list<tag>
+    }
+
+    record tags {
         tags: list<string>
     }
 
-    get-app-metadata: func(account: account-id) -> result<app-metadata, error>;
+    get-app-metadata: func(account: account-id) -> result<return-metadata, error>;
+    get-related-tags: func(tag: string) -> result<tags, error>;
 }
 
 world imports {

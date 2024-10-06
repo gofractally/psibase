@@ -24,7 +24,7 @@ export function Home() {
                     className="my-2 mr-2 max-w-[15rem]"
                     onClick={onClickManageAppMetadata}
                 >
-                    Manage App Metadata
+                    Manage App Metadataa
                 </Button>
                 {/* <SupportRequestForm /> */}
             </div>
