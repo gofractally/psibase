@@ -18,6 +18,40 @@ namespace psibase::tester::raw
    }
 }  // namespace psibase::tester::raw
 
+namespace
+{
+   std::uint32_t numPublicChains = 0;
+   struct ScopedSelectChain
+   {
+      ScopedSelectChain(std::uint32_t id) : saved(psibase::tester::raw::selectedChain)
+      {
+         psibase::tester::raw::selectedChain = id;
+      }
+      ~ScopedSelectChain() { psibase::tester::raw::selectedChain = saved; }
+      std::optional<std::uint32_t> saved;
+   };
+   __wasi_oflags_t get_wasi_oflags(int flags)
+   {
+      __wasi_oflags_t result = 0;
+      if (flags & O_CREAT)
+         result |= __WASI_OFLAGS_CREAT;
+      if (flags & O_EXCL)
+         result |= __WASI_OFLAGS_EXCL;
+      if (flags & O_TRUNC)
+         result |= __WASI_OFLAGS_TRUNC;
+      return result;
+   }
+   __wasi_rights_t get_wasi_rights(int flags)
+   {
+      __wasi_rights_t result = 0;
+      if ((flags & O_RDONLY) == O_RDONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_READ;
+      if ((flags & O_WRONLY) == O_WRONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_WRITE;
+      return result;
+   }
+}  // namespace
+
 using psibase::tester::raw::selectedChain;
 using namespace SystemService::AuthSig;
 
@@ -26,15 +60,23 @@ extern "C"
 #define TESTER_NATIVE(name) [[clang::import_module("psibase"), clang::import_name(#name)]]
    // clang-format off
    TESTER_NATIVE(createChain)      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
+   TESTER_NATIVE(cloneChain)       uint32_t testerCloneChain(uint32_t chain);
    TESTER_NATIVE(destroyChain)     void     testerDestroyChain(uint32_t chain);
    TESTER_NATIVE(finishBlock)      void     testerFinishBlock(uint32_t chain_index);
-   TESTER_NATIVE(getChainPath)     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
    TESTER_NATIVE(pushTransaction)  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    TESTER_NATIVE(httpRequest)      uint32_t testerHttpRequest(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
    TESTER_NATIVE(socketRecv)       uint32_t testerSocketRecv(int32_t fd, std::size_t* size);
    TESTER_NATIVE(selectChainForDb) void     testerSelectChainForDb(uint32_t chain_index);
    TESTER_NATIVE(shutdownChain)    void     testerShutdownChain(uint32_t chain);
    TESTER_NATIVE(startBlock)       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
+   TESTER_NATIVE(kvGet)            uint32_t testerKvGet(uint32_t chain, psibase::DbId db, const char* key, uint32_t keyLen);
+
+   TESTER_NATIVE(openChain) uint32_t testerOpenChain(const char*   path,
+                                                     uint32_t pathlen,
+                                                     uint16_t      oflags,
+                                                     uint64_t      fs_rights_base,
+                                                     const psibase::DatabaseConfig* config);
+
    // clang-format on
 #undef TESTER_NATIVE
 
@@ -125,14 +167,25 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
-psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
-    : id{::testerCreateChain(dbconfig.hotBytes,
-                             dbconfig.warmBytes,
-                             dbconfig.coolBytes,
-                             dbconfig.coldBytes)}
+psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub)
+    : id{clone ? ::testerCloneChain(chain_id) : chain_id}, isPublicChain(pub)
 {
-   if (id == 0)
+   if (pub && numPublicChains++ == 0)
       psibase::tester::raw::selectedChain = id;
+}
+
+psibase::TestChain::TestChain(const TestChain& other, bool pub) : TestChain{other.id, true, pub}
+{
+   status = other.status;
+}
+
+psibase::TestChain::TestChain(const DatabaseConfig& dbconfig, bool pub)
+    : TestChain{::testerCreateChain(dbconfig.hotBytes,
+                                    dbconfig.warmBytes,
+                                    dbconfig.coolBytes,
+                                    dbconfig.coldBytes),
+                false, pub}
+{
 }
 
 psibase::TestChain::TestChain(uint64_t hot_bytes,
@@ -143,8 +196,21 @@ psibase::TestChain::TestChain(uint64_t hot_bytes,
 {
 }
 
+psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseConfig& cfg, bool pub)
+    : TestChain(::testerOpenChain(path.data(),
+                                  path.size(),
+                                  get_wasi_oflags(flags),
+                                  get_wasi_rights(flags),
+                                  &cfg),
+                false,
+                pub)
+{
+}
+
 psibase::TestChain::~TestChain()
 {
+   if (isPublicChain)
+      --numPublicChains;
    ::testerDestroyChain(id);
    if (selectedChain && *selectedChain == id)
       selectedChain.reset();
@@ -153,14 +219,6 @@ psibase::TestChain::~TestChain()
 void psibase::TestChain::shutdown()
 {
    ::testerShutdownChain(id);
-}
-
-std::string psibase::TestChain::getPath()
-{
-   size_t      len = testerGetChainPath(id, nullptr, 0);
-   std::string result(len, 0);
-   testerGetChainPath(id, result.data(), len);
-   return result;
 }
 
 void psibase::TestChain::setAutoBlockStart(bool enable)
@@ -188,7 +246,7 @@ void psibase::TestChain::startBlock(TimePointSec tp)
    if (status && status->current.time.seconds + 1 < tp.seconds)
       ::testerStartBlock(id, tp.seconds - 1);
    ::testerStartBlock(id, tp.seconds);
-   status    = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
 }
 
@@ -200,16 +258,18 @@ void psibase::TestChain::finishBlock()
 
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
+   ScopedSelectChain s{id};
    t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
    auto [index, suffix]       = SystemService::headTapos();
    t.tapos.refBlockIndex      = index;
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions) const
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions,
+                                                         uint32_t              expire_sec) const
 {
    Transaction t;
-   fillTapos(t);
+   fillTapos(t, expire_sec);
    t.actions = std::move(actions);
    return t;
 }
@@ -265,4 +325,13 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
    }
 
    return psio::from_frac<HttpReply>(getResult(size));
+}
+
+std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
+                                                              psio::input_stream key)
+{
+   auto size = ::testerKvGet(id, db, key.pos, key.remaining());
+   if (size == -1)
+      return std::nullopt;
+   return psibase::getResult(size);
 }

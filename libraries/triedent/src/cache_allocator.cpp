@@ -4,18 +4,29 @@
 
 namespace triedent
 {
+   std::filesystem::path get_subpath(const std::filesystem::path& dir,
+                                     const char*                  name,
+                                     open_mode                    mode)
+   {
+      if (mode == open_mode::temporary)
+         return dir;
+      else
+         return dir / name;
+   }
+
    cache_allocator::cache_allocator(const std::filesystem::path& dir,
                                     const config&                cfg,
-                                    access_mode                  mode,
-                                    bool                         allow_gc)
+                                    open_mode                    mode)
        : _gc{256},
-         _obj_ids(_gc, dir / "obj_ids", mode, allow_gc),
-         _levels{ring_allocator{dir / "hot", cfg.hot_bytes, hot_cache, mode, true},
-                 ring_allocator{dir / "warm", cfg.warm_bytes, warm_cache, mode, true},
-                 ring_allocator{dir / "cool", cfg.cool_bytes, cool_cache, mode, true}},
-         _cold{_gc, _obj_ids, dir / "cold", mode, cfg.cold_bytes}
+         _obj_ids(_gc, get_subpath(dir, "obj_ids", mode), mode),
+         _levels{
+             ring_allocator{get_subpath(dir, "hot", mode), cfg.hot_bytes, hot_cache, mode, true},
+             ring_allocator{get_subpath(dir, "warm", mode), cfg.warm_bytes, warm_cache, mode, true},
+             ring_allocator{get_subpath(dir, "cool", mode), cfg.cool_bytes, cool_cache, mode,
+                            true}},
+         _cold{_gc, _obj_ids, get_subpath(dir, "cold", mode), mode, cfg.cold_bytes}
    {
-      if (mode == access_mode::read_write)
+      if (mode != open_mode::read_only)
       {
          _swap_thread = std::thread(
              [this]()
@@ -23,7 +34,7 @@ namespace triedent
                 thread_name("swap");
 #ifndef __APPLE__
                 pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
+#else  // if __APPLE__
                 pthread_setname_np("swap");
 #endif
                 swap_loop();
@@ -31,9 +42,9 @@ namespace triedent
          _gc_thread = std::thread{[this]
                                   {
 #ifndef __APPLE__
-                                    pthread_setname_np(pthread_self(), "swap");
-#else // if __APPLE__
-                                    pthread_setname_np("swap");
+                                     pthread_setname_np(pthread_self(), "swap");
+#else  // if __APPLE__
+                                     pthread_setname_np("swap");
 #endif
                                      _gc.run(&_done);
                                   }};

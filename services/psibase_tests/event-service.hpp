@@ -17,16 +17,16 @@ struct EventService : psibase::Service<EventService>
       };
       struct Merkle
       {
+         void m(std::string s);
       };
    };
    psibase::EventNumber foo(std::string s, int i);
+   psibase::EventNumber emitMerkle(std::string);
 };
 
-PSIO_REFLECT(EventService, method(foo, s, i))
-
+PSIO_REFLECT(EventService, method(foo, s, i), method(emitMerkle, s))
 PSIBASE_REFLECT_EVENTS(EventService)
 
 PSIBASE_REFLECT_HISTORY_EVENTS(EventService, method(e, s, i))
-
 PSIBASE_REFLECT_UI_EVENTS(EventService)
-PSIBASE_REFLECT_MERKLE_EVENTS(EventService)
+PSIBASE_REFLECT_MERKLE_EVENTS(EventService, method(m, s))

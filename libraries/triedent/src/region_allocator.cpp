@@ -8,7 +8,7 @@ namespace triedent
    region_allocator::region_allocator(gc_queue&                    gc,
                                       object_db&                   obj_ids,
                                       const std::filesystem::path& path,
-                                      access_mode                  mode,
+                                      open_mode                    mode,
                                       std::uint64_t                initial_size)
        : _gc(gc), _obj_ids(obj_ids), _file(path, mode), _done(false)
    {
@@ -40,7 +40,7 @@ namespace triedent
          throw std::runtime_error("File size is smaller than required by the header: " +
                                   path.native());
 
-      if (mode == access_mode::read_write)
+      if (_file.mode() == access_mode::read_write)
       {
          load_queue();
          _thread = std::thread{[this]

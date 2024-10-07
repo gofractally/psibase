@@ -4,17 +4,21 @@ mod errors;
 
 use crate::bindings::host::common::server;
 use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
+use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
+use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
-use errors::ErrorType;
+use errors::ErrorType::QueryResponseParseError;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 use serde::Deserialize;
 
 struct ChainmailPlugin;
 
-#[derive(Deserialize, Debug)]
-struct Message {
-    receiver: AccountNumber,
+#[derive(Debug, Deserialize)]
+struct MessageSerde {
+    msg_id: String,
+    receiver: String,
+    sender: String,
     subject: String,
     body: String,
 }
@@ -60,6 +64,67 @@ impl API for ChainmailPlugin {
             .packed(),
         )?;
         Ok(())
+    }
+}
+
+fn query_messages_endpoint(
+    sender: Option<String>,
+    receiver: Option<String>,
+    archived_requested: bool,
+) -> Result<Vec<Message>, Error> {
+    let mut endpoint = String::from("/api/messages?");
+    if archived_requested {
+        endpoint += "archived=true&";
+    }
+    if sender.is_some() {
+        endpoint += &format!("sender={}", sender.clone().unwrap());
+    }
+    if sender.is_some() && receiver.is_some() {
+        endpoint += "&";
+    }
+    if receiver.is_some() {
+        endpoint += &format!("receiver={}", receiver.unwrap());
+    }
+
+    let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
+    let mut resp_val: Vec<MessageSerde>;
+    if resp.is_err() {
+        return Err(errors::ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
+    } else {
+        resp_val = resp.unwrap();
+    }
+    println!("queried messages resp: {:#?}", resp_val);
+
+    // There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
+    // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
+    let messages: Vec<Message> = resp_val
+        .into_iter()
+        .map(|m| Message {
+            msg_id: m
+                .msg_id
+                .parse::<u64>()
+                .map_err(|err| QueryResponseParseError.err(&err.to_string()))
+                .unwrap(),
+            receiver: m.receiver,
+            sender: m.sender,
+            subject: m.subject,
+            body: m.body,
+        })
+        .collect();
+    println!("messages: {:#?}", messages);
+    Ok(messages)
+}
+
+impl QUERY for ChainmailPlugin {
+    fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
+        Ok(query_messages_endpoint(sender, receiver, false)?)
+    }
+
+    fn get_archived_msgs(
+        sender: Option<String>,
+        receiver: Option<String>,
+    ) -> Result<Vec<Message>, Error> {
+        Ok(query_messages_endpoint(sender, receiver, true)?)
     }
 }
 
