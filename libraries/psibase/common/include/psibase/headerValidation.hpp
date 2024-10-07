@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/container/flat_map.hpp>
 #include <psibase/block.hpp>
 #include <psibase/nativeTables.hpp>
 #include <ranges>

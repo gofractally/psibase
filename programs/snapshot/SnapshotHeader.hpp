@@ -63,4 +63,8 @@ namespace psibase::snapshot
       return {reinterpret_cast<const char*>(s.data()), s.size()};
    }
 
+   inline std::span<const unsigned char> uspan(std::span<const char> s)
+   {
+      return {reinterpret_cast<const unsigned char*>(s.data()), s.size()};
+   }
 }  // namespace psibase::snapshot

@@ -8,10 +8,12 @@
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 #include <services/system/VerifySig.hpp>
+#include "LightValidator.hpp"
 #include "SnapshotHeader.hpp"
 
 #include <psio/to_hex.hpp>
 
+using psibase::BlockNum;
 using psibase::DbId;
 using psibase::KvMerkle;
 using namespace psibase::snapshot;
@@ -106,15 +108,62 @@ bool compareProducers(const psibase::Producer& lhs, const psibase::Producer& rhs
           std::tie(rhs.name, rhs.auth.service, rhs.auth.rawData);
 };
 
-int verifySignatures(std::uint32_t                  chain,
+int verifyHeaders(psibase::TestChain&          chain,
+                  psibase::LightValidator&     validator,
+                  const std::vector<BlockNum>& blocks,
+                  const psibase::StatusRow&    status)
+{
+   psibase::check(!!status.head, "Missing head");
+   auto maxNum = status.head->header.blockNum;
+   for (BlockNum num : blocks)
+   {
+      // Skip blocks that are already known
+      if (num <= validator.current.blockNum)
+         continue;
+      // Only process consensus changes up to but not including head.
+      if (num >= maxNum)
+         break;
+      std::cerr << "Loading block: " << num << std::endl;
+      auto block = chain.kvGet<psibase::Block>(DbId::blockLog, num);
+      if (!block)
+      {
+         std::cerr << "Missing block " << num << std::endl;
+         return 1;
+      }
+      psibase::BlockInfo info{block->header};
+      auto               sig = chain.kvGet<std::vector<char>>(DbId::blockProof, num);
+      if (!sig)
+         sig.emplace();
+      std::cout << "aux: "
+                << psio::to_hex(psio::convert_to_key(psibase::blockDataKey(info.blockId)))
+                << std::endl;
+      std::optional<std::vector<char>> auxConsensusData;
+      if (auto aux = chain.kvGet<psibase::BlockDataRow>(psibase::BlockDataRow::db,
+                                                        psibase::blockDataKey(info.blockId)))
+      {
+         auxConsensusData = std::move(aux->auxConsensusData);
+      }
+      else
+      {
+         auto key  = psio::composite_key(psibase::blockDataPrefix(), info.header.commitNum);
+         auto size = raw::kvGreaterEqual(chain.nativeHandle(), psibase::BlockDataRow::db,
+                                         key.data(), key.size(), key.size());
+         if (size != -1)
+         {
+            auto aux         = psibase::getResult(size);
+            auxConsensusData = psio::from_frac<psibase::BlockDataRow>(aux).auxConsensusData;
+         }
+      }
+      validator.push(
+          psibase::SignedBlock{std::move(*block), std::move(*sig), std::move(auxConsensusData)});
+   }
+   return 0;
+}
+
+int verifySignatures(std::uint32_t                  authServices,
                      const SnapshotFooter&          footer,
                      const psibase::JointConsensus& consensus)
 {
-   if (consensus.next)
-   {
-      std::cerr << "Not implemented: Cannot verify snapshot producers" << std::endl;
-      return 1;
-   }
    int                            result = 0;
    StateSignatureInfo             info{*footer.hash};
    std::span<const char>          preimage{info};
@@ -125,7 +174,7 @@ int verifySignatures(std::uint32_t                  chain,
       psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
       psibase::Action     act{.service = sig.claim.service, .rawData = psio::to_frac(args)};
       auto                packed = psio::to_frac(act);
-      auto                size   = raw::verify(chain, packed.data(), packed.size());
+      auto                size   = raw::verify(authServices, packed.data(), packed.size());
       auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
       if (!trace.error || trace.error->empty())
       {
@@ -165,7 +214,11 @@ int verifySignatures(std::uint32_t                  chain,
    return result;
 }
 
-int read(std::uint32_t chain, auto& stream, SnapshotFooter& footer, StateChecksum& hash)
+int read(std::uint32_t          chain,
+         auto&                  stream,
+         SnapshotFooter&        footer,
+         StateChecksum&         hash,
+         std::vector<BlockNum>& blocks)
 {
    std::uint32_t  db;
    KvMerkle::Item item;
@@ -177,6 +230,9 @@ int read(std::uint32_t chain, auto& stream, SnapshotFooter& footer, StateChecksu
       {
          case static_cast<std::uint32_t>(DbId::service):
          case static_cast<std::uint32_t>(DbId::native):
+         case static_cast<std::uint32_t>(DbId::blockLog):
+         case static_cast<std::uint32_t>(DbId::blockProof):
+         case static_cast<std::uint32_t>(DbId::nativeSubjective):
          case SnapshotFooter::id:
             break;
          default:
@@ -207,6 +263,41 @@ int read(std::uint32_t chain, auto& stream, SnapshotFooter& footer, StateChecksu
       auto value = sspan(item.value());
       if (db == SnapshotFooter::id)
          read_footer_row(footer, key, value);
+      else if (db == static_cast<std::uint32_t>(DbId::blockLog))
+      {
+         std::uint32_t num = 0;
+         psibase::check(key.size() == 4, "wrong key size in blockLog");
+         for (auto ch : key)
+         {
+            num = (num << 8) | static_cast<std::uint8_t>(ch);
+         }
+         blocks.push_back(num);
+         // Only insert entries in the block log if they are missing.
+         if (raw::kvGet(chain, static_cast<DbId>(db), key.data(), key.size()) == -1)
+         {
+            raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(),
+                       value.size());
+         }
+      }
+      else if (db == static_cast<std::uint32_t>(DbId::blockProof))
+      {
+         // Only insert entries in the block log if they are missing.
+         if (raw::kvGet(chain, static_cast<DbId>(db), key.data(), key.size()) == -1)
+         {
+            raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(),
+                       value.size());
+         }
+      }
+      else if (db == static_cast<std::uint32_t>(DbId::nativeSubjective))
+      {
+         std::cout << psio::to_hex(key) << std::endl;
+         // TODO: validation
+         if (raw::kvGet(chain, static_cast<DbId>(db), key.data(), key.size()) == -1)
+         {
+            raw::kvPut(chain, static_cast<DbId>(db), key.data(), key.size(), value.data(),
+                       value.size());
+         }
+      }
       else
       {
          merkle.push(item);
@@ -317,12 +408,14 @@ int main(int argc, const char* const* argv)
       return 1;
    }
    read_header({}, in);
+   psibase::LightValidator validator{psibase::ChainHandle{handle}, oldStatus};
    clearDb(handle, DbId::service);
    clearDb(handle, DbId::native);
    clearDb(handle, DbId::writeOnly);
-   SnapshotFooter footer;
-   StateChecksum  hash;
-   if (int res = read(handle, in, footer, hash))
+   SnapshotFooter        footer;
+   StateChecksum         hash;
+   std::vector<BlockNum> blocks;
+   if (int res = read(handle, in, footer, hash, blocks))
       return res;
    if (footer.hash)
    {
@@ -346,9 +439,18 @@ int main(int argc, const char* const* argv)
    }
    if (int res = verifyState(handle, *newStatus))
       return res;
+   if (int res = verifyHeaders(chain, validator, blocks, *newStatus))
+      return res;
+   if (validator.stateHash != newStatus->head->header.consensusState)
+   {
+      std::cerr << psio::format_json(validator.state) << std::endl;
+      std::cerr << psio::format_json(newStatus->consensus) << std::endl;
+      std::cerr << "Verification of current producers failed" << std::endl;
+      return 1;
+   }
    if (!footer.signatures.empty())
    {
-      if (int res = verifySignatures(handle, footer, newStatus->consensus))
+      if (int res = verifySignatures(validator.authServices.id, footer, newStatus->consensus))
          return res;
    }
    else
