@@ -52,9 +52,7 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 };
 
 const getIncomingMessages = async (account: string) => {
-    console.info("getInboxMessages().top");
     const supervisor = await getSupervisor();
-    console.info("got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
                 service: "chainmail",
@@ -62,7 +60,6 @@ const getIncomingMessages = async (account: string) => {
                 method: "getMsgs",
                 params: [, account],
             })) as RawMessage[];
-    console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
 

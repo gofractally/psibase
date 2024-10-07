@@ -86,15 +86,8 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         }
         println!("where-clause: {}", where_clause_sender_receiver);
 
-        /* TASKS
-         * x- clean this up so chainmail shows sent/received messages instead of []
-         * x- send a couple of archive actions so 'alice test 2' and 'bob test 1' are archived
-         * x- tweak this sql until I can retrieve archived an not archived messages properly
-         */
-
         // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as msg_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
         // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
-
         // Select from all sent emails *not archived* where receiver/send are as query params specify
         let select_clause = format!("DISTINCT sent.rowid as msg_id, archive.event_id, sent.*");
         let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id" );
