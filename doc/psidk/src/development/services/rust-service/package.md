@@ -18,7 +18,6 @@ In any crate that builds a service:
 - `flags`: [Flags](../../../specifications/data-formats/package.md#serviceservicejson) for the service.
 - `data`: An array of `{src, dst}` paths to upload to the service's subdomain. `src` is relative to the location of Cargo.toml. If `src` is a directory, its contents will be included recursively.
 
-We disagree on how to articulate this category, but one suggestion:
 In top-level crate or any crate that builds a service:
 
 - `postinstall`: An array of actions to run when the package is installed. Actions from a single `postinstall` will be run in order. The order of actions from multiple crates is unspecified.
