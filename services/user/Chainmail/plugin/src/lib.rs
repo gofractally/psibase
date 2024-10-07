@@ -7,9 +7,9 @@ use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
 use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
 use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
-use errors::ErrorType::QueryResponseParseError;
+use errors::ErrorType::{self, QueryResponseParseError};
 use psibase::fracpack::Pack;
-use psibase::AccountNumber;
+use psibase::{get_sender, AccountNumber};
 use serde::Deserialize;
 
 struct ChainmailPlugin;
@@ -50,16 +50,18 @@ impl API for ChainmailPlugin {
         // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
         let res = server::get_json(&format!("/messages?id={}", event_id))?;
 
-        let msg = serde_json::from_str::<Message>(&res)
+        let msg = serde_json::from_str::<MessageSerde>(&res)
             .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
         // save the message to state
         Transact::add_action_to_transaction(
             "save",
             &chainmail::action_structs::save {
-                receiver: msg.receiver,
                 subject: msg.subject,
                 body: msg.body,
+                event_id: u64::from_str_radix(&msg.msg_id, 10)
+                    .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))?,
+                sender: get_sender(),
             }
             .packed(),
         )?;

@@ -19,7 +19,7 @@ Note: some doc updates are done here simply because we're more intersted in capt
 
 #### Singleton Tables
 
-[Current doc on Singletons](development/services/rust-service/tables.html#singletons) uses in-place code, rather than a generalized, explicit Singleton construct. Probably worth defining a `Singleton` thing that makes it explicit what's happening. Could be a type def, a struct, or some kind of Trait or Key type.
+[Current doc on Singletons](../tables.html) uses in-place code, rather than a generalized, explicit Singleton construct. Probably worth defining a `Singleton` thing that makes it explicit what's happening. Could be a type def, a struct, or some kind of Trait or Key type.
 
 The code snippets I think could be improved are as follows:
 
@@ -41,7 +41,7 @@ let mut lastUsed =
 
 #### Externalizing Table definitions and their structs / Code Splitting
 
-The basic Table docs for "[Storing Structs Defined Elsewhere](development/services/rust-service/tables.html#storing-structs-defined-elsewhere)" are outdated.
+The basic Table docs for "[Storing Structs Defined Elsewhere](../tables.html)" are outdated.
 
 1. `Reflect` doesn't seem to exist.
 2. using the documented `impl WrapMessage { ... }` doesn't seem to work anymore. Updated doc that I believe accomplishes the same thing is below.
