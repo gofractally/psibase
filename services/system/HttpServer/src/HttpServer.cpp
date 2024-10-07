@@ -225,25 +225,21 @@ namespace SystemService
       auto registered = getServer(service);
       std::optional<HttpReply> result;
       psibase::AccountNumber server;
-      if (!registered)
-      {
-         // Check sites
-         server    = "sites"_a;
-         currentRequest = {.socket = sock, .owner = server};
-         result         = iface(server).serveSys(req, std::optional{sock});
-      } else {
-         // Check registered server, then sites if nothing found
-         server    = registered->server;
-         currentRequest = {.socket = sock, .owner = server};
-         result    = iface(server).serveSys(req, std::optional{sock});
 
-         // If not found, we check the `sites` server
-         if (!result && currentRequest)
-         {
-            server    = "sites"_a;
-            currentRequest = {.socket = sock, .owner = server};
-            result         = iface(server).serveSys(req, std::optional{sock});
-         }
+      auto checkServer = [&](psibase::AccountNumber srv) {
+         server = srv;
+         currentRequest = {.socket = sock, .owner = server};
+         return iface(server).serveSys(req, std::optional{sock});
+      };
+
+      if (registered)
+      {
+         result = checkServer(registered->server);
+      }
+
+      if (!registered || (!result && currentRequest))
+      {
+         result = checkServer("sites"_a);
       }
 
       if (currentRequest)
