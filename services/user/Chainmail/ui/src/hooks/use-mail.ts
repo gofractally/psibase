@@ -51,15 +51,18 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
     );
 };
 
-const getIncomingMessages = async (account: string) => {
+const getIncomingMessages = async (account: string | undefined) => {
+    if (!account) throw new Error("Not logged in");
+    console.info("getInboxMessages().top");
     const supervisor = await getSupervisor();
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getMsgs",
-                params: [, account],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getMsgs",
+        params: [, account],
+    })) as RawMessage[];
+    console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
 
@@ -84,17 +87,18 @@ export function useIncomingMessages() {
     };
 }
 
-const getArchivedMessages = async (account: string) => {
+const getArchivedMessages = async (account: string | undefined) => {
+    if (!account) throw new Error("Not logged in");
     console.info("getArchivedMessages().top");
     const supervisor = await getSupervisor();
     console.info("[archived] got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getArchivedMsgs",
-                params: [, account],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getArchivedMsgs",
+        params: [, account],
+    })) as RawMessage[];
     console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
@@ -120,7 +124,8 @@ export function useArchivedMessages() {
     };
 }
 
-const getSentMessages = async (account: string) => {
+const getSentMessages = async (account: string | undefined) => {
+    if (!account) throw new Error("Not logged in");
     console.info("getSentMessages().top");
     // const res = await fetch(`/messages?sender=${account}`);
 
@@ -128,11 +133,11 @@ const getSentMessages = async (account: string) => {
     console.info("[sent] got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getMsgs",
-                params: [account, ],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getMsgs",
+        params: [account],
+    })) as RawMessage[];
     console.info("rawMessages: ", rawMessages);
 
     // const rawMessages = (await res.json()) as RawMessage[];
