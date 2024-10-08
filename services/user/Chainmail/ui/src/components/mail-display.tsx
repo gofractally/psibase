@@ -4,14 +4,16 @@ import { useEffect, useRef } from "react";
 import { MilkdownProvider, useInstance } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { format } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { replaceAll } from "@milkdown/utils";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
 import { Button } from "@shadcn/button";
 import { Separator } from "@shadcn/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
 import { ScrollArea } from "@shadcn/scroll-area";
+import { Dialog } from "@shadcn/dialog";
 
 import {
     ComposeDialog,
@@ -21,8 +23,7 @@ import {
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
-
-import { Dialog } from "@shadcn/dialog";
+import { getSupervisor } from "@lib/supervisor";
 
 export function MailDisplay({
     message,
@@ -91,33 +92,80 @@ const ActionBar = ({
         deleteDraftById,
     } = useDraftMessages();
 
-    const onDelete = () => {
-        if (mailbox === "inbox") {
-            setInboxMessageId("");
-        } else if (mailbox === "drafts") {
-            setDraftMessageId("");
-            if (!selectedDraftMessage?.id) return;
-            deleteDraftById(selectedDraftMessage.id);
-        }
+    const onArchive = async (itemId: string) => {
+        let id = parseInt(itemId);
+        const supervisor = await getSupervisor();
+        // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "api",
+            method: "archive",
+            params: [id],
+        });
+        setInboxMessageId("");
+        toast.success("Your message has been archived");
+    };
+
+    const onUnArchive = (itemId: string) => {
+        toast.error("Not implemented");
+    };
+
+    const onDeleteDraft = () => {
+        setDraftMessageId("");
+        if (!selectedDraftMessage?.id) return;
+        deleteDraftById(selectedDraftMessage.id);
+        toast.success("Your draft has been deleted");
     };
 
     return (
         <div className="flex p-2">
             <div className="flex items-center gap-2">
-                {mailbox !== "sent" ? (
+                {mailbox === "inbox" ? (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 disabled={!message}
-                                onClick={onDelete}
+                                onClick={() => onArchive(message.msgId)}
                             >
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Move to trash</span>
+                                <Archive className="h-4 w-4" />
+                                <span className="sr-only">Archive message</span>
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Move to trash</TooltipContent>
+                        <TooltipContent>Archive message</TooltipContent>
+                    </Tooltip>
+                ) : null}
+                {mailbox === "archived" ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={!message}
+                                onClick={() => onUnArchive(message.msgId)}
+                            >
+                                <ArchiveRestore className="h-4 w-4" />
+                                <span className="sr-only">Move to inbox</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Move to inbox</TooltipContent>
+                    </Tooltip>
+                ) : null}
+                {mailbox === "drafts" ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={!message}
+                                onClick={onDeleteDraft}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete draft</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete draft</TooltipContent>
                     </Tooltip>
                 ) : null}
             </div>

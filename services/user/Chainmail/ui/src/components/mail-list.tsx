@@ -5,11 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@lib/utils";
 import { ScrollArea } from "@shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
-import { Archive } from "lucide-react";
-import { Button } from "@shadcn/button";
 import { type Message } from "@hooks";
-import { toast } from "sonner";
-import { getSupervisor } from "@lib/supervisor";
 
 interface SharedProps {
     mailbox: Mailbox;
@@ -20,20 +16,6 @@ interface SharedProps {
 interface MailListProps extends SharedProps {
     messages: Message[];
 }
-
-const onArchive = async (itemId: string) => {
-    console.info(`onArchive.top(itemid[${itemId}])`);
-    let id = parseInt(itemId);
-    const supervisor = await getSupervisor();
-    // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-    await supervisor.functionCall({
-        service: "chainmail",
-        intf: "api",
-        method: "archive",
-        params: [id],
-    });
-    toast.success("Your message has been archived");
-};
 
 export function MailList({
     mailbox,
@@ -103,14 +85,6 @@ const MailItem = ({
                                         <span className="flex h-2 w-2 rounded-full bg-blue-600" />
                                     )} */}
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onArchive(item.msgId)}
-                    >
-                        <Archive className="h-4 w-4" />
-                        <span className="sr-only">Archive</span>
-                    </Button>
                     <div
                         className={cn(
                             "ml-auto text-xs",
