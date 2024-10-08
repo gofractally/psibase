@@ -2,8 +2,8 @@
 mod bindings;
 mod errors;
 
-use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
-use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
+use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
+use bindings::exports::chainmail::plugin::queries::{Guest as Query, Message};
 use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
 use errors::ErrorType::QueryResponseParseError;
@@ -53,7 +53,7 @@ fn build_query(
     sql_query_str
 }
 
-impl API for ChainmailPlugin {
+impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "send",
@@ -82,6 +82,19 @@ fn query_messages_endpoint(
     receiver: Option<String>,
     archived_requested: bool,
 ) -> Result<Vec<Message>, Error> {
+    println!(
+        "query_messages_endpoint(sender[{}], receiver[{}]).top",
+        if sender.is_some() {
+            sender.clone().unwrap()
+        } else {
+            "".to_string()
+        },
+        if receiver.is_some() {
+            receiver.clone().unwrap()
+        } else {
+            "".to_string()
+        },
+    );
     let mut endpoint = String::from("/api/messages?");
     if archived_requested {
         endpoint += "archived=true&";
@@ -95,6 +108,8 @@ fn query_messages_endpoint(
     if receiver.is_some() {
         endpoint += &format!("receiver={}", receiver.unwrap());
     }
+
+    println!("plugin.endpoing: {}", endpoint);
 
     let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
     let mut resp_val: Vec<MessageSerde>;
@@ -125,7 +140,7 @@ fn query_messages_endpoint(
     Ok(messages)
 }
 
-impl QUERY for ChainmailPlugin {
+impl Query for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
         Ok(query_messages_endpoint(sender, receiver, false)?)
     }
