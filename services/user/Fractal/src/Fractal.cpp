@@ -417,9 +417,6 @@ PSIO_REFLECT(Queries,  //
 
 optional<HttpReply> Fractal::serveSys(HttpRequest request)
 {
-   if (auto result = serveContent(request, Tables{}))
-      return result;
-
    if (auto result = serveSimpleUI<Fractal, true>(request))
       return result;
 
@@ -427,12 +424,6 @@ optional<HttpReply> Fractal::serveSys(HttpRequest request)
       return result;
 
    return nullopt;
-}
-
-void Fractal::storeSys(string path, string contentType, vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::FractalNs::Fractal)

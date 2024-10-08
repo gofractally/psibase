@@ -84,7 +84,7 @@ Another account that will serve content for this account.
 
 #### DATA &lt;path&gt; &lt;dest&gt;
 
-Adds web content that will be installed to the service using `storeSys`. If path is a directory it will be added recursively.
+Adds web content that will be installed to the service's namespace within the the `sites` app, accessible from the service's subdomain. If path is a directory it will be added recursively.
 
 ```
 DATA index.html /index.html
@@ -93,7 +93,7 @@ DATA dist /
 
 #### DATA GLOB &lt;path&gt;... &lt;dir&gt;
 
-Adds web content that will be installed to the service using `storeSys`. Globs in the source paths will be processed and all matching files will be copied into the destination directory.
+Adds web content that will be installed to the service's namespace within the the `sites` app, accessible from the service's subdomain. Globs in the source paths will be processed and all matching files will be copied into the destination directory.
 
 ```
 DATA GLOB dist/*.html /

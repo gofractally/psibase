@@ -46,7 +46,9 @@ custom_error! {
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageRef {
     pub name: String,
@@ -270,11 +272,6 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn store_data(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
-            let service = if self.has_service(*sender) {
-                *sender
-            } else {
-                sites::SERVICE
-            };
             let mut file = self.archive.by_index(*index)?;
             let path = data_re
                 .captures(file.name())
@@ -283,11 +280,13 @@ impl<R: Read + Seek> PackagedService<R> {
                 .unwrap()
                 .as_str();
             if let Some(t) = mime_guess::from_path(path).first() {
-                actions.push(sites::Wrapper::pack_from_to(*sender, service).storeSys(
-                    path.to_string(),
-                    t.essence_str().to_string(),
-                    read(&mut file)?.into(),
-                ));
+                actions.push(
+                    sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
+                        path.to_string(),
+                        t.essence_str().to_string(),
+                        read(&mut file)?.into(),
+                    ),
+                );
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -445,6 +444,10 @@ impl<R: Read + Seek> PackagedService<R> {
             if !self.has_service(*account) {
                 result.push(accounts::SERVICE)
             }
+        }
+
+        if !self.data.is_empty() {
+            result.push(sites::SERVICE);
         }
 
         for (_, _, info) in &self.services {

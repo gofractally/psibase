@@ -99,16 +99,35 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
 #[psibase::service]
 mod service {
-    use psibase::services::accounts::Wrapper as AccountsSvc;
-    use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_simple_ui, store_content,
-        AccountNumber, HexBytes, HttpReply, HttpRequest, Table, WebContentRow,
-    };
+
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+    use services::accounts::Wrapper as AccountsSvc;
+    use services::events::Wrapper as EventsSvc;
 
     use crate::serve_rest_api;
 
-    #[table(record = "WebContentRow")]
-    struct WebContentTable;
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[action]
+    fn init() {
+        let table = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_none(),
+            "Service already initialized",
+        );
+        table.put(&InitRow {}).unwrap();
+
+        EventsSvc::call().setSchema(create_schema::<Wrapper>());
+        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
+        EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
+    }
 
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
@@ -127,16 +146,7 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_rest_api(&request))
+        None.or_else(|| serve_rest_api(&request))
             .or_else(|| serve_simple_ui::<Wrapper>(&request))
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
     }
 }

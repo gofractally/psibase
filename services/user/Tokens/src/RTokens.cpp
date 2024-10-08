@@ -1,6 +1,5 @@
 #include <cmath>
 #include <psibase/dispatch.hpp>
-#include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/Accounts.hpp>
@@ -285,20 +284,10 @@ optional<HttpReply> RTokens::serveSys(HttpRequest request)
    if (auto result = serveSimpleUI<Tokens, false>(request))
       return result;
 
-   if (auto result = serveContent(request, ServiceTables<WebContentTable>{getReceiver()}))
-      return result;
-
    if (auto result = serveGraphQL(request, TokenQuery{}))
       return result;
 
    return nullopt;
-}
-
-void RTokens::storeSys(string path, string contentType, vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   storeContent(std::move(path), std::move(contentType), std::move(content),
-                ServiceTables<WebContentTable>{getReceiver()});
 }
 
 PSIBASE_DISPATCH(UserService::RTokens)

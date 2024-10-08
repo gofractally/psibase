@@ -12,8 +12,6 @@ namespace UserService
      public:
       static constexpr auto service = psibase::AccountNumber("auth-invite");
 
-      using Tables = psibase::ServiceTables<psibase::WebContentTable>;
-
       void checkAuthSys(uint32_t                                  flags,
                         psibase::AccountNumber                    requester,
                         psibase::AccountNumber                    sender,
@@ -27,15 +25,12 @@ namespace UserService
       void requireAuth(const SystemService::AuthSig::SubjectPublicKeyInfo& pubkey);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
-
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(AuthInvite,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(requireAuth, pubkey),
                 method(serveSys, request),
-                method(storeSys, path, contentType, content)
                 //
    )
 }  // namespace UserService

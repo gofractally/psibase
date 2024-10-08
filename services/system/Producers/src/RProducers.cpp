@@ -1,7 +1,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSimpleUI.hpp>
@@ -12,8 +11,6 @@
 
 using namespace SystemService;
 using namespace psibase;
-
-using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct ProducerQuery
 {
@@ -64,9 +61,6 @@ std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
    if (auto result = serveSchema<Producers>(request))
       return result;
 
-   if (auto result = serveContent(request, Tables{getReceiver()}))
-      return result;
-
    if (auto result = serveGraphQL(request, ProducerQuery{}))
       return result;
 
@@ -74,12 +68,6 @@ std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
       return result;
 
    return {};
-}
-
-void RProducers::storeSys(std::string path, std::string contentType, std::vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   storeContent(std::move(path), std::move(contentType), std::move(content), Tables{getReceiver()});
 }
 
 PSIBASE_DISPATCH(SystemService::RProducers)

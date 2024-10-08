@@ -1,5 +1,6 @@
 [package]
 name = "test_package"
+description = "Test for package building"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -9,12 +10,11 @@ publish = false
 
 [package.metadata.psibase]
 package-name = "TestPackage"
-description = "Test for package building"
 services = ["tpack"]
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-tpack = { path = "service", version = "0.12.0" }
-r-tpack = { path = "query", version = "0.12.0" }
+tpack = { path = "service", version = "0.13.0" }
+r-tpack = { path = "query", version = "0.13.0" }

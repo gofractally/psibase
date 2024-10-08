@@ -364,7 +364,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainmail"
-version = "0.1.0"
+version = "0.13.0"
 dependencies = [
  "async-graphql",
  "chainmail_package",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "chainmail_package"
-version = "0.0.0"
+version = "0.13.0"
 dependencies = [
  "chainmail",
  "plugin",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "custom_error",
  "indexmap",
@@ -1438,9 +1438,8 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.1.0"
+version = "0.13.0"
 dependencies = [
- "chainmail",
  "chainmail_package",
  "psibase",
  "wit-bindgen-rt",
@@ -1496,7 +1495,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1549,7 +1548,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1561,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "seahash",
 ]

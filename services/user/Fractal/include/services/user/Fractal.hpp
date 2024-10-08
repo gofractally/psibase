@@ -13,7 +13,6 @@ namespace UserService
       {
         public:
          using Tables = psibase::ServiceTables<InitTable,
-                                               psibase::WebContentTable,
                                                FractalTable,
                                                FractalTypeTable,
                                                MemberTable,
@@ -62,7 +61,6 @@ namespace UserService
          void setFracLang(psibase::AccountNumber fractalAccount, std::string languageCode);
 
          auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
-         void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
          // clang-format off
          struct Events
@@ -113,7 +111,6 @@ namespace UserService
          method(setFracLang, fractalAccount, languageCode),
 
          method(serveSys, request),
-         method(storeSys, path, contentType, content),
 
          // Interface for other services
          method(getIdentity, name),

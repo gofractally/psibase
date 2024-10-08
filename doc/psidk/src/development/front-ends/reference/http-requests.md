@@ -129,8 +129,9 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 
 ### Common files
 
-`common-api` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
-Booting the network with either the psibase CLI tool or with the x-admin app will automatically install this default set of files:
+There are special rules in the standard psibase HTTP server that allow for common files to be accessed at a special path on any subdomain. Any files added to the `common-api` subdomain by the infrastructure providers can be served from any subdomain through this mechanism.
+
+Default common files:
 
 | Path                          | Description                                                                                                                                                                                                           |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
