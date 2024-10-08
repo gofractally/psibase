@@ -12,10 +12,11 @@ use psibase::Hex;
 mod errors;
 use errors::ErrorType;
 
+use std::io::Write;
+
 struct SitesPlugin;
 
-// TODO: consider compression
-// Will need to add a content_encoding field to the File struct, and a corresponding parameter to storeSys.
+const COMPRESSION_QUALITY: u32 = 4;
 
 // Add a leading slash if missing and remove trailing slashes.
 fn normalize_path(path: &String) -> String {
@@ -32,12 +33,43 @@ fn normalize_path(path: &String) -> String {
 
 const TX_SIZE_LIMIT: usize = 64 * 1024; // 64kb
 
+fn should_compress(content_type: &str) -> bool {
+    matches!(
+        content_type,
+        "text/plain"
+            | "text/html"
+            | "text/css"
+            | "application/javascript"
+            | "application/json"
+            | "application/xml"
+            | "application/rss+xml"
+            | "application/atom+xml"
+            | "image/svg+xml"
+            | "font/ttf"
+            | "font/otf"
+            | "application/wasm"
+    )
+}
+
+fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<String>) {
+    if should_compress(content_type) {
+        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
+        writer.write_all(content).unwrap();
+        (writer.into_inner(), Some("br".to_string()))
+    } else {
+        (content.to_vec(), None)
+    }
+}
+
 impl Sites for SitesPlugin {
     fn upload(file: File) -> Result<(), Error> {
+        let (content, content_encoding) = compress_content(&file.content, &file.content_type);
+
         let packed = SitesService::action_structs::storeSys {
             path: file.path.clone(),
             contentType: file.content_type,
-            content: Hex::from(file.content),
+            contentEncoding: content_encoding,
+            content: Hex::from(content),
         }
         .packed();
 
@@ -52,10 +84,13 @@ impl Sites for SitesPlugin {
     fn upload_tree(files: Vec<File>) -> Result<u16, Error> {
         let mut accumulated_size = 0;
         for (index, file) in files.iter().enumerate() {
+            let (content, content_encoding) = compress_content(&file.content, &file.content_type);
+
             let packed = SitesService::action_structs::storeSys {
                 path: normalize_path(&file.path),
                 contentType: file.content_type.clone(),
-                content: Hex::from(file.content.clone()),
+                contentEncoding: content_encoding,
+                content: Hex::from(content),
             }
             .packed();
 
@@ -72,6 +107,30 @@ impl Sites for SitesPlugin {
         }
 
         Ok(0)
+    }
+
+    fn enable_spa(enable: bool) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "enableSpa",
+            &SitesService::action_structs::enableSpa { enable }.packed(),
+        )?;
+        Ok(())
+    }
+
+    fn set_csp(path: String, csp: String) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "setCsp",
+            &SitesService::action_structs::setCsp { path, csp }.packed(),
+        )?;
+        Ok(())
+    }
+
+    fn enable_cache(enable: bool) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "enableCache",
+            &SitesService::action_structs::enableCache { enable }.packed(),
+        )?;
+        Ok(())
     }
 }
 

@@ -200,7 +200,7 @@ namespace psibase
          assert(pos != std::string::npos);
          path = path.substr(pos);
          actions.push_back(transactor<Sites>{sender, Sites::service}.storeSys(
-             path, guessMimeType(path), archive.getEntry(index).read()));
+             path, guessMimeType(path), std::nullopt, archive.getEntry(index).read()));
       }
    }
    void PackagedService::regServer(std::vector<Action>& actions)

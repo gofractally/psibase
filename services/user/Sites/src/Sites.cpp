@@ -45,6 +45,7 @@ namespace SystemService
          return target.find('.', last_slash_pos) != target.npos;
       }
 
+      // Remove query parameters from the target
       std::string normalizeTarget(const std::string& t)
       {
          std::string target = t;
@@ -53,6 +54,42 @@ namespace SystemService
             target.resize(pos);
          return target;
       }
+
+      /*
+        script-src:
+          * `unsafe-eval` is needed for WebAssembly.compile()
+          * `unsafe-inline` is needed for inline <script> tags
+          * `blob:` for loading dynamically generated modules
+          * `https:` for dynamically loading libs from CDNs
+        font-src:
+          * `https:` for dynamically loading fonts from CDNs
+        frame-src:
+          * `*` is needed to allow embedding supervisor
+        connect-src:
+          * `blob:` for fetch-compiling blob urls
+          * `*` allows fetching plugins, as well as websocket connections
+      */
+      const std::string DEFAULT_CSP_HEADER =                               //
+          "default-src 'self';"                                            //
+          "font-src 'self' https:;"                                        //
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"  //
+          "img-src *;"                                                     //
+          "style-src 'self' 'unsafe-inline';"                              //
+          "frame-src *;"                                                   //
+          "connect-src * blob:;"                                           //
+          ;
+
+      // Accepted content encodings
+      const std::array<std::string, 2> validEncodings = {"gzip", "br"};
+
+      bool shouldCache(const HttpRequest& request, const std::string& etag)
+      {
+         auto it =
+             std::find_if(request.headers.begin(), request.headers.end(),
+                          [](const HttpHeader& header) { return header.name == "If-None-Match"; });
+         return it != request.headers.end() && it->value == etag;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -105,27 +142,65 @@ namespace SystemService
 
          if (content)
          {
+            std::string cspHeader = getCspHeader(content, account);
+            auto        etag      = std::to_string(content->hash);
+
+            if (useCache(account) && shouldCache(request, etag))
+            {
+               // https://issues.chromium.org/issues/40132719
+               // Chrome bug - Devtools still shows 200 status code sometimes
+               return HttpReply{
+                   .status  = HttpStatus::notModified,
+                   .headers = {{"ETag", etag}},
+               };
+            }
+
+            std::vector<HttpHeader> headers = {{
+                {"Content-Security-Policy", cspHeader},
+                {"Cache-Control", "no-cache"},
+                {"ETag", etag},
+            }};
+            if (content->contentEncoding)
+            {
+               headers.push_back({"Content-Encoding", *content->contentEncoding});
+            }
+
             return HttpReply{
                 .contentType = content->contentType,
                 .body        = content->content,
+                .headers     = std::move(headers),
             };
          }
       }
 
       return std::nullopt;
-   }  // Sites::serveSys
+   }
 
-   void Sites::storeSys(std::string path, std::string contentType, std::vector<char> content)
+   void Sites::storeSys(std::string                path,
+                        std::string                contentType,
+                        std::optional<std::string> contentEncoding,
+                        std::vector<char>          content)
    {
       Tables tables{};
       auto   table = tables.template open<SitesContentTable>();
 
       check(path.starts_with('/'), "Path doesn't begin with /");
+      auto hash = psio::detail::seahash(std::string_view(content.data(), content.size()));
+
+      if (contentEncoding)
+      {
+         check(std::find(validEncodings.begin(), validEncodings.end(), *contentEncoding) !=
+                   validEncodings.end(),
+               "Unsupported content encoding");
+      }
+
       SitesContentRow row{
-          .account     = getSender(),
-          .path        = std::move(path),
-          .contentType = std::move(contentType),
-          .content     = std::move(content),
+          .account         = getSender(),
+          .path            = std::move(path),
+          .contentType     = std::move(contentType),
+          .content         = std::move(content),
+          .hash            = hash,
+          .contentEncoding = std::move(contentEncoding),
       };
       table.put(row);
    }
@@ -149,6 +224,37 @@ namespace SystemService
       table.put(row);
    }
 
+   void Sites::setCsp(std::string path, std::string csp)
+   {
+      Tables tables{};
+      if (path == "*")
+      {
+         auto table = tables.open<GlobalCspTable>();
+         table.put({
+             .account = getSender(),
+             .csp     = std::move(csp),
+         });
+      }
+      else
+      {
+         auto table   = tables.open<SitesContentTable>();
+         auto index   = table.getIndex<0>();
+         auto content = index.get(SitesContentKey{getSender(), path});
+         check(!!content, "Content not found for the specified path");
+
+         content->csp = std::move(csp);
+         table.put(*content);
+      }
+   }
+
+   void Sites::enableCache(bool enable)
+   {
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row   = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+      row.cache  = enable;
+      table.put(row);
+   }
+
    std::optional<SitesContentRow> Sites::useDefaultProfile(const std::string& target)
    {
       auto index = Tables{}.open<SitesContentTable>().getIndex<0>();
@@ -166,6 +272,32 @@ namespace SystemService
    {
       auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
       return siteConfig && siteConfig->spa;
+   }
+
+   std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
+                                   const AccountNumber&                  account)
+   {
+      std::string cspHeader = DEFAULT_CSP_HEADER;
+      if (content && !content->csp.empty())
+      {
+         cspHeader = content->csp;
+      }
+      else
+      {
+         auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
+         if (globalCsp)
+         {
+            cspHeader = globalCsp->csp;
+         }
+      }
+      return cspHeader;
+   }
+
+   bool Sites::useCache(const AccountNumber& account)
+   {
+      auto siteConfig = Tables{}.open<SiteConfigTable>().get(account).value_or(
+          SiteConfigRow{.account = getSender()});
+      return siteConfig.cache;
    }
 
    namespace

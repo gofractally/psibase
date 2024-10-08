@@ -23,6 +23,7 @@ fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
         target: String::from("/sql"),
         contentType: String::from("application/sql"),
         body: sql.into(),
+        headers: vec![],
     };
 }
 
