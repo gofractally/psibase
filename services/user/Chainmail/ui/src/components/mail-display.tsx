@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { MilkdownProvider, useInstance } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { format } from "date-fns";
-import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Pin, Trash2 } from "lucide-react";
 import { replaceAll } from "@milkdown/utils";
 import { toast } from "sonner";
 
@@ -93,6 +93,7 @@ const ActionBar = ({
     } = useDraftMessages();
 
     const onArchive = async (itemId: string) => {
+        // TODO: Unsave if saved
         let id = parseInt(itemId);
         const supervisor = await getSupervisor();
         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
@@ -110,6 +111,10 @@ const ActionBar = ({
         toast.error("Not implemented");
     };
 
+    const onSave = (itemId: string) => {
+        toast.error("Not implemented");
+    };
+
     const onDeleteDraft = () => {
         setDraftMessageId("");
         if (!selectedDraftMessage?.id) return;
@@ -121,36 +126,83 @@ const ActionBar = ({
         <div className="flex p-2">
             <div className="flex items-center gap-2">
                 {mailbox === "inbox" ? (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled={!message}
-                                onClick={() => onArchive(message.msgId)}
-                            >
-                                <Archive className="h-4 w-4" />
-                                <span className="sr-only">Archive message</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Archive message</TooltipContent>
-                    </Tooltip>
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={!message}
+                                    onClick={() => onArchive(message.msgId)}
+                                >
+                                    <Archive className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        Archive message
+                                    </span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Archive message</TooltipContent>
+                        </Tooltip>
+                        {/* TODO: if the message is saved, do not show this. To un-save, the user should just archive it */}
+                        {/* {message.saved ? ( */}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={!message}
+                                    onClick={() => onSave(message.msgId)}
+                                >
+                                    <Pin className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        Keep message
+                                    </span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Keep message</TooltipContent>
+                        </Tooltip>
+                        {/* ) : (
+                            null
+                        )} */}
+                    </>
                 ) : null}
                 {mailbox === "archived" ? (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                disabled={!message}
-                                onClick={() => onUnArchive(message.msgId)}
-                            >
-                                <ArchiveRestore className="h-4 w-4" />
-                                <span className="sr-only">Move to inbox</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Move to inbox</TooltipContent>
-                    </Tooltip>
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={!message}
+                                    onClick={() => onUnArchive(message.msgId)}
+                                >
+                                    <ArchiveRestore className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        Move to inbox
+                                    </span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Move to inbox</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={!message}
+                                    onClick={() => onSave(message.msgId)}
+                                >
+                                    <Pin className="h-4 w-4" />
+                                    <span className="sr-only">
+                                        Keep message and move to inbox
+                                    </span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                Keep message and move to inbox
+                            </TooltipContent>
+                        </Tooltip>
+                    </>
                 ) : null}
                 {mailbox === "drafts" ? (
                     <Tooltip>
