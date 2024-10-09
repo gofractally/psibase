@@ -86,13 +86,14 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         }
         println!("where-clause: {}", where_clause_sender_receiver);
 
-        // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as msg_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
-        // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
+        // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as event_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
+        // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as event_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
         // Select from all sent emails *not archived* where receiver/send are as query params specify
-        let select_clause = format!("DISTINCT sent.rowid as msg_id, archive.event_id, sent.*");
-        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id" );
+        let select_clause =
+            format!("DISTINCT archive.msg_id as archived_msg_id, sent.*, sent.rowid as msg_id");
+        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archived_msg_id" );
         let where_clause_archived_or_not = format!(
-            "archive.event_id IS {} NULL",
+            "archived_msg_id IS {} NULL",
             if archived_requested { "NOT" } else { "" }
         );
         let order_by_clause = "sent.ROWID";
