@@ -2,9 +2,8 @@
 mod bindings;
 mod errors;
 
-use crate::bindings::host::common::server;
-use bindings::exports::chainmail::plugin::api::{Error, Guest as API};
-use bindings::exports::chainmail::plugin::queries::{Guest as QUERY, Message};
+use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
+use bindings::exports::chainmail::plugin::queries::{Guest as Query, Message};
 use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
 use errors::ErrorType::{self, QueryResponseParseError};
@@ -23,7 +22,7 @@ struct MessageSerde {
     body: String,
 }
 
-impl API for ChainmailPlugin {
+impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "send",
@@ -37,10 +36,10 @@ impl API for ChainmailPlugin {
         Ok(())
     }
 
-    fn archive(event_id: u64) -> Result<(), Error> {
+    fn archive(msg_id: u64) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "archive",
-            &chainmail::action_structs::archive { event_id }.packed(),
+            &chainmail::action_structs::archive { msg_id }.packed(),
         )?;
         Ok(())
     }
@@ -95,7 +94,6 @@ fn query_messages_endpoint(
     } else {
         resp_val = resp.unwrap();
     }
-    println!("queried messages resp: {:#?}", resp_val);
 
     // There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
     // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
@@ -113,11 +111,10 @@ fn query_messages_endpoint(
             body: m.body,
         })
         .collect();
-    println!("messages: {:#?}", messages);
     Ok(messages)
 }
 
-impl QUERY for ChainmailPlugin {
+impl Query for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
         Ok(query_messages_endpoint(sender, receiver, false)?)
     }

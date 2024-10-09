@@ -1,15 +1,12 @@
 import type { Mailbox } from "src/types";
 
 import { formatDistanceToNow } from "date-fns";
+import { Pin } from "lucide-react";
 
 import { cn } from "@lib/utils";
 import { ScrollArea } from "@shadcn/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
-import { Archive } from "lucide-react";
-import { Button } from "@shadcn/button";
 import { type Message } from "@hooks";
-import { toast } from "sonner";
-import { getSupervisor } from "@lib/supervisor";
 
 interface SharedProps {
     mailbox: Mailbox;
@@ -20,20 +17,6 @@ interface SharedProps {
 interface MailListProps extends SharedProps {
     messages: Message[];
 }
-
-const onArchive = async (itemId: string) => {
-    console.info(`onArchive.top(itemid[${itemId}])`);
-    let id = parseInt(itemId);
-    const supervisor = await getSupervisor();
-    // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-    await supervisor.functionCall({
-        service: "chainmail",
-        intf: "api",
-        method: "archive",
-        params: [id],
-    });
-    toast.success("Your message has been archived");
-};
 
 export function MailList({
     mailbox,
@@ -99,29 +82,24 @@ const MailItem = ({
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
-                        {/* {!item.read && (
-                                        <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-                                    )} */}
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onArchive(item.msgId)}
-                    >
-                        <Archive className="h-4 w-4" />
-                        <span className="sr-only">Archive</span>
-                    </Button>
                     <div
                         className={cn(
-                            "ml-auto text-xs",
+                            "ml-auto flex items-center justify-center gap-2",
                             selectedMessage?.id === item.id
                                 ? "text-foreground"
                                 : "text-muted-foreground",
                         )}
                     >
-                        {formatDistanceToNow(new Date(item.datetime), {
-                            addSuffix: true,
-                        })}
+                        <p className="text-xs">
+                            {formatDistanceToNow(new Date(item.datetime), {
+                                addSuffix: true,
+                            })}
+                        </p>
+                        {/* TODO: If message is saved, display a pin here */}
+                        {/* {item.saved ? (
+                            <Pin size={14} className="mt-0.5" />
+                        ) : null} */}
                     </div>
                 </div>
                 <div className="text-xs font-medium">{item.subject}</div>

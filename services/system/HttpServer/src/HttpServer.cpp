@@ -220,22 +220,26 @@ namespace SystemService
       // TODO: use a view
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
-      // First we check the `sites` server
-      auto server    = "sites"_a;
-      currentRequest = {.socket = sock, .owner = server};
-      auto result    = iface(server).serveSys(req, std::optional{sock});
+      // First we check the registered server
+      auto service    = getTargetService(req);
+      auto registered = getServer(service);
+      std::optional<HttpReply> result;
+      psibase::AccountNumber server;
 
-      // If not found, we check the registered server
-      if (!result && currentRequest)
+      auto checkServer = [&](psibase::AccountNumber srv) {
+         server = srv;
+         currentRequest = {.socket = sock, .owner = server};
+         return iface(server).serveSys(req, std::optional{sock});
+      };
+
+      if (registered)
       {
-         auto service    = getTargetService(req);
-         auto registered = getServer(service);
-         if (registered)
-         {
-            server         = registered->server;
-            currentRequest = {.socket = sock, .owner = server};
-            result         = iface(server).serveSys(req, std::optional{sock});
-         }
+         result = checkServer(registered->server);
+      }
+
+      if (!registered || (!result && currentRequest))
+      {
+         result = checkServer("sites"_a);
       }
 
       if (currentRequest)

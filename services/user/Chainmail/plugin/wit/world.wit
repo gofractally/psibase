@@ -25,7 +25,7 @@ interface api {
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;
     
     // Archive an email
-    archive: func(event-id: u64) -> result<_, error>;
+    archive: func(msg-id: u64) -> result<_, error>;
     
     // Save an email
     save: func(event-id: u64) -> result<_, error>;
