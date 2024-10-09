@@ -4,6 +4,11 @@ mod service {
     use crate::HttpRequest;
 
     #[action]
+    fn sqlQuery(query: String) -> String {
+        unimplemented!()
+    }
+
+    #[action]
     fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }

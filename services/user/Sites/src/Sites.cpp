@@ -77,6 +77,11 @@ namespace SystemService
          auto                           isSpa = useSpa(account);
          if (isSpa)
          {
+            if (target.find("api/") != std::string::npos)
+            {
+               return std::nullopt;
+            }
+
             if (!isStaticAsset(target))
             {
                target = "/index.html";
