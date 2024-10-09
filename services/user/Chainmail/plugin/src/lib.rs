@@ -47,7 +47,7 @@ impl Api for ChainmailPlugin {
     fn save(event_id: u64) -> Result<(), Error> {
         // look up message details via event_id
         // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
-        let res = server::get_json(&format!("/messages?id={}", event_id))?;
+        let res = CommonServer::get_json(&format!("/messages?id={}", event_id))?;
 
         let msg = serde_json::from_str::<MessageSerde>(&res)
             .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
