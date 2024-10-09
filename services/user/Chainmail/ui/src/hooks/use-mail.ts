@@ -56,11 +56,11 @@ const getIncomingMessages = async (account: string | undefined) => {
     const supervisor = await getSupervisor();
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getMsgs",
-                params: [, account],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getMsgs",
+        params: [, account],
+    })) as RawMessage[];
     return transformRawMessagesToMessages(rawMessages);
 };
 
@@ -92,11 +92,11 @@ const getArchivedMessages = async (account: string | undefined) => {
     console.info("[archived] got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getArchivedMsgs",
-                params: [, account],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getArchivedMsgs",
+        params: [, account],
+    })) as RawMessage[];
     console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
@@ -130,11 +130,11 @@ const getSentMessages = async (account: string | undefined) => {
     console.info("[sent] got Supervisor instance");
     // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
-                service: "chainmail",
-                intf: "queries",
-                method: "getMsgs",
-                params: [account,],
-            })) as RawMessage[];
+        service: "chainmail",
+        intf: "queries",
+        method: "getMsgs",
+        params: [account],
+    })) as RawMessage[];
     console.info("account:", account);
     console.info("rawMessages: ", rawMessages);
 
