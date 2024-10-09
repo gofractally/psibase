@@ -7,10 +7,10 @@
 
 using psibase::KvMerkle;
 
-std::vector<unsigned char> operator""_x(const char* s, std::size_t n)
+std::vector<char> operator""_x(const char* s, std::size_t n)
 {
-   std::vector<unsigned char> result;
-   auto                       get_digit = [](char ch)
+   std::vector<char> result;
+   auto              get_digit = [](char ch)
    {
       if (ch >= '0' && ch <= '9')
          return ch - '0';

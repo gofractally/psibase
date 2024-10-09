@@ -4,11 +4,12 @@
 #include <vector>
 
 #include <psibase/KvMerkle.hpp>
+#include <psibase/SnapshotHeader.hpp>
 #include <psibase/db.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 #include <services/system/VerifySig.hpp>
-#include "SnapshotHeader.hpp"
+#include "LightValidator.hpp"
 #include "cli.hpp"
 
 #include <tuple>
@@ -53,29 +54,29 @@ void write_db(std::uint32_t chain, DbId db, auto& stream, KvMerkle& merkle)
    KvMerkle::Item item{{}, {}};
    while (true)
    {
-      auto          key        = sspan(item.key());
+      auto          key        = item.key();
       std::uint32_t value_size = raw::kvGreaterEqual(chain, db, key.data(), key.size(), 0);
       if (value_size == 0xffffffffu)
          return;
       item.fromResult(value_size);
-      write_row(static_cast<std::uint32_t>(db), sspan(item.key()), sspan(item.value()), stream);
+      write_row(static_cast<std::uint32_t>(db), item.key(), item.value(), stream);
       merkle.push(item);
       item.nextKey();
    }
 }
 
-void write_rows(std::uint32_t chain, DbId db, std::span<const unsigned char> prefix, auto& stream)
+void write_rows(std::uint32_t chain, DbId db, std::span<const char> prefix, auto& stream)
 {
    KvMerkle::Item item{prefix, {}};
    while (true)
    {
-      auto          key = sspan(item.key());
+      auto          key = item.key();
       std::uint32_t value_size =
           raw::kvGreaterEqual(chain, db, key.data(), key.size(), prefix.size());
       if (value_size == 0xffffffffu)
          return;
       item.fromResult(value_size);
-      write_row(static_cast<std::uint32_t>(db), sspan(item.key()), sspan(item.value()), stream);
+      write_row(static_cast<std::uint32_t>(db), item.key(), item.value(), stream);
       item.nextKey();
    }
 }
@@ -182,7 +183,6 @@ void write_block_data(std::uint32_t                   chain,
       key.clear();
       psio::vector_stream kstream{key};
       psio::to_key(psibase::blockDataKey(id), kstream);
-      std::cout << "key: " << psio::to_hex(key) << std::endl;
       auto size =
           raw::kvGreaterEqual(chain, DbId::nativeSubjective, key.data(), key.size(), key.size());
       if (size != -1)
@@ -248,6 +248,7 @@ int main(int argc, const char* const* argv)
       return 2;
    }
    psibase::KeyList keys;
+   SnapshotFooter   footer;
    for (auto key : key_files)
    {
       auto contents = psibase::readWholeFile(key);
@@ -258,7 +259,23 @@ int main(int argc, const char* const* argv)
    }
    psibase::TestChain chain(database_file, O_RDONLY);
    auto               handle = chain.nativeHandle();
-   auto               status = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
+   {
+      auto key  = psio::convert_to_key(psibase::snapshotPrefix());
+      auto size = raw::kvMax(handle, psibase::SnapshotRow::db, key.data(), key.size());
+      if (size == -1)
+      {
+         std::cerr << "No verified snapshot available" << std::endl;
+         return 1;
+      }
+      auto snapshot = psio::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
+      // TODO: go farther back if this snapshot isn't ready
+      raw::getFork(handle, snapshot.id);
+      if (snapshot.state)
+      {
+         footer.signatures = std::move(snapshot.state->signatures);
+      }
+   }
+   auto status = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    if (!status || !status->head)
    {
       std::cerr << "No chain" << std::endl;
@@ -271,7 +288,6 @@ int main(int argc, const char* const* argv)
       return 1;
    }
    write_header({}, out);
-   SnapshotFooter footer;
    footer.hash.emplace();
    KvMerkle merkle;
    write_db(handle, DbId::service, out, merkle);

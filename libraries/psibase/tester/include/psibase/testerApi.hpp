@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <psibase/crypto.hpp>
 #include <psibase/db.hpp>
 
 namespace psibase
@@ -26,7 +27,8 @@ namespace psibase::tester::raw
                              std::uint64_t warm_addr_bits,
                              std::uint64_t cool_addr_bits,
                              std::uint64_t cold_addr_bits);
-   TESTER_NATIVE(cloneChain) uint32_t cloneChain(std::uint32_t chain);
+   TESTER_NATIVE(cloneChain) std::uint32_t cloneChain(std::uint32_t chain);
+   TESTER_NATIVE(getFork) void getFork(std::uint32_t chain, const psibase::Checksum256& id);
    TESTER_NATIVE(destroyChain) void destroyChain(std::uint32_t chain);
    TESTER_NATIVE(finishBlock) void finishBlock(std::uint32_t chain_index);
    TESTER_NATIVE(verify)

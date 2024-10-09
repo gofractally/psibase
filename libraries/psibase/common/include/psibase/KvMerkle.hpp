@@ -24,14 +24,15 @@ namespace psibase
       struct Item
       {
          Item();
-         Item(std::span<const unsigned char> key, std::span<const unsigned char> value);
-         void                           fromStream(auto& stream);
-         void                           fromResult(std::uint32_t valueSize);
-         void                           nextKey();
-         std::span<const unsigned char> key() const;
-         std::span<const unsigned char> value() const;
-         Checksum256                    get_hash() const;
-         std::vector<unsigned char>     data;
+         Item(std::span<const char> key, std::span<const char> value);
+         void                  fromStream(auto& stream);
+         void                  fromResult(std::uint32_t valueSize);
+         void                  from(std::span<const char> key, std::span<const char> value);
+         void                  nextKey();
+         std::span<const char> key() const;
+         std::span<const char> value() const;
+         Checksum256           get_hash() const;
+         std::vector<char>     data;
       };
       // The stack contains:
       // - for i in 0..current_key.size()

@@ -106,4 +106,26 @@ namespace psibase
    {
       return consensusChangeKey(start);
    }
+
+   auto snapshotPrefix() -> KeyPrefixType
+   {
+      return std::tuple{snapshotTable, nativeTablePrimaryIndex};
+   }
+   auto snapshotKey(const Checksum256& id) -> SnapshotKeyType
+   {
+      return std::tuple{snapshotTable, nativeTablePrimaryIndex, id};
+   }
+   auto SnapshotRow::key() const -> SnapshotKeyType
+   {
+      return snapshotKey(id);
+   }
+
+   auto scheduledSnapshotKey(BlockNum num) -> ScheduledSnapshotKeyType
+   {
+      return std::tuple{scheduledSnapshotTable, nativeTablePrimaryIndex, num};
+   }
+   auto ScheduledSnapshotRow::key() const -> ScheduledSnapshotKeyType
+   {
+      return scheduledSnapshotKey(blockNum);
+   }
 }  // namespace psibase

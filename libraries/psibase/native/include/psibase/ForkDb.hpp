@@ -4,6 +4,7 @@
 #include <boost/log/attributes/constant.hpp>
 #include <iostream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/KvMerkle.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/VerifyProver.hpp>
@@ -135,6 +136,18 @@ namespace psibase
             return activeProducers.size() * 2 / 3 + 1;
          }
       }
+      std::size_t weak_threshold() const
+      {
+         if (algorithm == ConsensusAlgorithm::cft)
+         {
+            return 1;
+         }
+         else
+         {
+            assert(algorithm == ConsensusAlgorithm::bft);
+            return (activeProducers.size() + 2) / 3;
+         }
+      }
       std::string to_string() const
       {
          std::string result;
@@ -243,6 +256,36 @@ namespace psibase
          updateServices(db, prev.services, services, *header.authCode);
          revision = db.getModifiedRevision();
       }
+   };
+
+   struct BuildStateChecksum
+   {
+      void operator()()
+      {
+         Database                db{sharedDatabase, revision};
+         auto                    session = db.startRead();
+         snapshot::StateChecksum result{.serviceRoot = hash(db, DbId::service),
+                                        .nativeRoot  = hash(db, DbId::native)};
+         next(result);
+      }
+      Checksum256 hash(Database& database, DbId db)
+      {
+         KvMerkle       merkle;
+         KvMerkle::Item item{{}, {}};
+         while (true)
+         {
+            auto key = item.key();
+            auto kv  = database.kvGreaterEqualRaw(db, key, 0);
+            if (!kv)
+               return std::move(merkle).root();
+            item.from(kv->key, kv->value);
+            merkle.push(item);
+            item.nextKey();
+         }
+      }
+      ConstRevisionPtr                                    revision;
+      SharedDatabase                                      sharedDatabase;
+      std::function<void(const snapshot::StateChecksum&)> next;
    };
 
    struct BlockHeaderState
@@ -940,6 +983,7 @@ namespace psibase
                   setBlockData(id, *pos->second->auxConsensusData());
                }
             }
+            onCommitFn(state);
          }
          // ensure that only descendants of the committed block
          // are considered when searching for the best block.
@@ -1127,6 +1171,92 @@ namespace psibase
       {
          assert(!!blockContext);
          blockContext.reset();
+      }
+      void make_snapshot(const BlockHeaderState* state, AccountNumber me)
+      {
+         PSIBASE_LOG(logger, info) << "Making state checksum";
+         auto fn =
+             BuildStateChecksum{state->revision, systemContext->sharedDatabase,
+                                [this, id = state->info.blockId, me,
+                                 prods = state->producers](const snapshot::StateChecksum& result)
+                                { on_state_checksum(id, result, me, prods); }};
+         // TODO: Run in another thread
+         fn();
+      }
+      bool should_make_snapshot(const BlockHeaderState* state)
+      {
+         PSIBASE_LOG(logger, info) << "Checking whether to create checksum";
+         Database db(systemContext->sharedDatabase, state->revision);
+         auto     session = db.startRead();
+         if (db.kvGet<ScheduledSnapshotRow>(ScheduledSnapshotRow::db,
+                                            scheduledSnapshotKey(state->info.header.blockNum)))
+         {
+            return true;
+         }
+         return false;
+      }
+      void on_state_checksum(const Checksum256&                  id,
+                             const snapshot::StateChecksum&      checksum,
+                             AccountNumber                       me,
+                             const std::shared_ptr<ProducerSet>& prods)
+      {
+         PSIBASE_LOG(logger, info) << "Calculated state checksum";
+         SnapshotRow row{.id = id};
+         auto        key = psio::convert_to_key(row.key());
+         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         {
+            psio::from_frac(row, *bytes);
+         }
+         // Check whether there are existing signatures for the same state
+         auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+         if (pos != row.other.end())
+         {
+            row.state = std::move(*pos);
+            row.other.erase(pos);
+         }
+         else
+         {
+            row.state = {.state = checksum};
+         }
+         // Add my signature
+         if (auto claim = prods->getClaim(me))
+         {
+            if (std::ranges::find(row.state->signatures, me, &snapshot::StateSignature::account) ==
+                row.state->signatures.end())
+            {
+               auto sig = prover.prove(snapshot::StateSignatureInfo{checksum}, *claim);
+               row.state->signatures.push_back({me, *claim, sig});
+            }
+         }
+         systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+         verify_state_checksum(row, prods);
+      }
+      void verify_state_checksum(const SnapshotRow& row, const std::shared_ptr<ProducerSet>& prods)
+      {
+         auto        threshold = prods->weak_threshold();
+         std::size_t total     = 0;
+         std::size_t max       = 0;
+         for (const auto& item : row.other)
+         {
+            total += item.signatures.size();
+            max = std::max(max, item.signatures.size());
+         }
+         if (row.state)
+         {
+            if (total >= threshold)
+            {
+               PSIBASE_LOG(logger, critical) << "Consensus failure: state does not match producers";
+               throw consensus_failure{};
+            }
+         }
+         else
+         {
+            if (total - max >= threshold)
+            {
+               PSIBASE_LOG(logger, critical) << "Consensus failure: producer state has diverged";
+               throw consensus_failure{};
+            }
+         }
       }
       BlockHeaderState* finish_block(auto&& makeData)
       {
@@ -1332,6 +1462,8 @@ namespace psibase
          }
       }
 
+      void onCommit(std::function<void(BlockHeaderState*)> fn) { onCommitFn = std::move(fn); }
+
       bool isProducing() const { return !!blockContext; }
 
       auto& getLogger() { return logger; }
@@ -1496,6 +1628,8 @@ namespace psibase
 
       std::map<decltype(std::declval<BlockHeaderState>().order()), Checksum256> byOrderIndex;
       std::map<BlockNum, Checksum256>                                           byBlocknumIndex;
+
+      std::function<void(BlockHeaderState*)> onCommitFn;
 
       loggers::common_logger logger;
       loggers::common_logger blockLogger;

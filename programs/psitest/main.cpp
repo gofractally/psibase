@@ -251,6 +251,7 @@ struct test_chain
    psibase::WriterPtr                       writer;
    std::unique_ptr<psibase::SystemContext>  sys;
    std::shared_ptr<const psibase::Revision> revisionAtBlockStart;
+   std::shared_ptr<const psibase::Revision> head;
    std::unique_ptr<psibase::BlockContext>   blockContext;
    // altBlockContext is created on demand to handle db reads between blocks
    std::unique_ptr<psibase::BlockContext>       altBlockContext;
@@ -285,6 +286,7 @@ struct test_chain
                                  state.watchdogManager,
                                  std::make_shared<psibase::Sockets>()});
       state.shared_memory_cache.init(*sys);
+      head = this->db.getHead();
    }
 
    test_chain(::state&                         state,
@@ -297,6 +299,25 @@ struct test_chain
 
    explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
 
+   bool setFork(const psibase::Checksum256& id)
+   {
+      if (auto newHead = db.getRevision(*writer, id))
+      {
+         nativeFunctions.reset();
+         nativeFunctionsActionContext.reset();
+         nativeFunctionsTransactionContext.reset();
+         blockContext.reset();
+         altBlockContext.reset();
+         revisionAtBlockStart.reset();
+         head = std::move(newHead);
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -307,6 +328,7 @@ struct test_chain
       nativeFunctionsActionContext.reset();
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
+      altBlockContext.reset();
       revisionAtBlockStart.reset();
       state.shared_memory_cache.cleanup(*sys);
       sys.reset();
@@ -319,7 +341,7 @@ struct test_chain
    {
       // TODO: undo control
       finishBlock();
-      revisionAtBlockStart = db.getHead();
+      revisionAtBlockStart = head;
       nativeFunctions.reset();
       nativeFunctionsActionContext.reset();
       nativeFunctionsTransactionContext.reset();
@@ -380,6 +402,7 @@ struct test_chain
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
+         head                     = revision;
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          PSIBASE_LOG_CONTEXT_BLOCK(logger, blockContext->current.header, blockId);
@@ -396,8 +419,7 @@ struct test_chain
       else
       {
          if (!altBlockContext)
-            altBlockContext = std::make_unique<psibase::BlockContext>(
-                *sys, sys->sharedDatabase.getHead(), writer, true);
+            altBlockContext = std::make_unique<psibase::BlockContext>(*sys, head, writer, true);
          return altBlockContext.get();
       }
    }
@@ -411,6 +433,7 @@ struct test_chain
                                                                      psibase::statusKey());
          psibase::check(status.has_value(), "missing status record");
          auto revision = altBlockContext->session.writeRevision(status->head->blockId);
+         head          = revision;
          db.setHead(*writer, revision);
       }
    }
@@ -1193,6 +1216,12 @@ struct callbacks
       return state.chains.size() - 1;
    }
 
+   void testerGetFork(uint32_t chain, wasm_ptr<psibase::Checksum256> id)
+   {
+      if (!assert_chain(chain).setFork(*id))
+         psibase::abortMessage("Cannot find state for block " + psibase::loggers::to_string(*id));
+   }
+
    void testerDestroyChain(uint32_t chain)
    {
       assert_chain(chain, false);
@@ -1329,7 +1358,7 @@ struct callbacks
       psibase::TransactionTrace trace;
       psibase::ActionTrace&     atrace = trace.actionTraces.emplace_back();
 
-      psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead(), chain.writer, true};
+      psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
       psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
       psibase::SignedTransaction  trx;
@@ -1618,6 +1647,7 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
    rhf_t::add<&callbacks::testerOpenChain>("psibase", "openChain");
    rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
+   rhf_t::add<&callbacks::testerGetFork>("psibase", "getFork");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");

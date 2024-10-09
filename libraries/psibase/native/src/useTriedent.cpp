@@ -403,17 +403,28 @@ namespace psibase
    void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
       // TODO: Reduce critical section
+      auto              nativeSubjective = impl->getNativeSubjective();
       std::lock_guard   lock{impl->topMutex};
       std::vector<char> key{revisionByIdPrefix};
+      std::vector<char> tmpKey;
 
-      // Remove everything with a blockNum <= irreversible's, except irreversible.
+      // Remove everything with a blockNum <= irreversible's, except irreversible
+      // and saved snapshots.
       while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, nullptr))
       {
          if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix ||
              memcmp(key.data() + 1, irreversible.data(), sizeof(BlockNum)) > 0)
             break;
-         if (memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
-            writer.remove(impl->topRoot, key);
+         Checksum256 id;
+         std::memcpy(id.data(), key.data() + 1, id.size());
+         if (id != irreversible)
+         {
+            tmpKey.clear();
+            psio::vector_stream stream{tmpKey};
+            psio::to_key(snapshotKey(id), stream);
+            if (!writer.get(nativeSubjective, tmpKey))
+               writer.remove(impl->topRoot, key);
+         }
          key.push_back(0);
       }
 

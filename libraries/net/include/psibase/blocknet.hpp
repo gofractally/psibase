@@ -341,6 +341,14 @@ namespace psibase::net
       void load_producers()
       {
          chain().addSocket(prods_socket);
+         chain().onCommit(
+             [this](BlockHeaderState* state)
+             {
+                if (chain().should_make_snapshot(state))
+                {
+                   chain().make_snapshot(state, self);
+                }
+             });
          current_term = chain().get_head()->term;
          consensus().set_producers(chain().getProducers());
       }

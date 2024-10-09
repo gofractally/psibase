@@ -4,12 +4,12 @@
 #include <vector>
 
 #include <psibase/KvMerkle.hpp>
+#include <psibase/SnapshotHeader.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/tester.hpp>
 #include <psibase/testerApi.hpp>
 #include <services/system/VerifySig.hpp>
 #include "LightValidator.hpp"
-#include "SnapshotHeader.hpp"
 
 #include <psio/to_hex.hpp>
 
@@ -123,7 +123,6 @@ int verifyHeaders(psibase::TestChain&          chain,
       // Only process consensus changes up to but not including head.
       if (num >= maxNum)
          break;
-      std::cerr << "Loading block: " << num << std::endl;
       auto block = chain.kvGet<psibase::Block>(DbId::blockLog, num);
       if (!block)
       {
@@ -134,9 +133,6 @@ int verifyHeaders(psibase::TestChain&          chain,
       auto               sig = chain.kvGet<std::vector<char>>(DbId::blockProof, num);
       if (!sig)
          sig.emplace();
-      std::cout << "aux: "
-                << psio::to_hex(psio::convert_to_key(psibase::blockDataKey(info.blockId)))
-                << std::endl;
       std::optional<std::vector<char>> auxConsensusData;
       if (auto aux = chain.kvGet<psibase::BlockDataRow>(psibase::BlockDataRow::db,
                                                         psibase::blockDataKey(info.blockId)))
@@ -259,8 +255,8 @@ int read(std::uint32_t          chain,
       }
 
       item.fromStream(stream);
-      auto key   = sspan(item.key());
-      auto value = sspan(item.value());
+      auto key   = item.key();
+      auto value = item.value();
       if (db == SnapshotFooter::id)
          read_footer_row(footer, key, value);
       else if (db == static_cast<std::uint32_t>(DbId::blockLog))
@@ -290,7 +286,6 @@ int read(std::uint32_t          chain,
       }
       else if (db == static_cast<std::uint32_t>(DbId::nativeSubjective))
       {
-         std::cout << psio::to_hex(key) << std::endl;
          // TODO: validation
          if (raw::kvGet(chain, static_cast<DbId>(db), key.data(), key.size()) == -1)
          {
@@ -458,4 +453,9 @@ int main(int argc, const char* const* argv)
       std::cerr << "Warning: snapshot is not signed\n";
    }
    raw::commitState(handle);
+   std::cerr << "Snapshot successfully loaded\n"
+             << "Chain: " << psio::hex(newStatus->chainId.begin(), newStatus->chainId.end())
+             << "\nHead: "
+             << psio::hex(newStatus->head->blockId.begin(), newStatus->head->blockId.end())
+             << std::endl;
 }

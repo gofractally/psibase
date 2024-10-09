@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/SnapshotHeader.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -17,6 +18,8 @@ namespace psibase
    static constexpr NativeTableNum notifyTable                = 8;   // both
    static constexpr NativeTableNum blockDataTable             = 9;   // subjective
    static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
+   static constexpr NativeTableNum snapshotTable              = 11;  // subjective
+   static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -217,6 +220,39 @@ namespace psibase
       static constexpr auto db = psibase::DbId::nativeSubjective;
       auto                  key() const -> ConsensusChangeKeyType;
       PSIO_REFLECT(ConsensusChangeRow, start, commit, end);
+   };
+
+   struct SnapshotStateItem
+   {
+      snapshot::StateChecksum               state;
+      std::vector<snapshot::StateSignature> signatures;
+      PSIO_REFLECT(SnapshotStateItem, state, signatures)
+   };
+
+   using SnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, Checksum256>;
+   auto snapshotPrefix() -> KeyPrefixType;
+   auto snapshotKey(const Checksum256&) -> SnapshotKeyType;
+   struct SnapshotRow
+   {
+      using Item = SnapshotStateItem;
+      Checksum256         id;
+      std::optional<Item> state;
+      std::vector<Item>   other;
+
+      static constexpr auto db = psibase::DbId::nativeSubjective;
+      auto                  key() const -> SnapshotKeyType;
+      PSIO_REFLECT(SnapshotRow, id, state, other)
+   };
+
+   using ScheduledSnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, BlockNum>;
+   auto scheduledSnapshotKey(BlockNum num) -> ScheduledSnapshotKeyType;
+   struct ScheduledSnapshotRow
+   {
+      BlockNum blockNum;
+
+      static constexpr auto db = psibase::DbId::native;
+      auto                  key() const -> ScheduledSnapshotKeyType;
+      PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
    };
 
 }  // namespace psibase

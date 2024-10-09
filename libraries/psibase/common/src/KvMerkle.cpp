@@ -54,24 +54,32 @@ namespace
 namespace psibase
 {
    KvMerkle::Item::Item() : data{0} {}
-   KvMerkle::Item::Item(std::span<const unsigned char> key, std::span<const unsigned char> value)
+   KvMerkle::Item::Item(std::span<const char> key, std::span<const char> value)
    {
-      std::uint32_t keySize   = key.size();
-      std::uint32_t valueSize = value.size();
-      data.resize(9 + keySize + valueSize);
-      std::memcpy(data.data() + 1, &keySize, 4);
-      std::memcpy(data.data() + 5, key.data(), keySize);
-      std::memcpy(data.data() + 5 + keySize, &valueSize, 4);
-      std::memcpy(data.data() + 9 + keySize, value.data(), valueSize);
+      from(key, value);
    }
+#ifdef __wasm32__
    void KvMerkle::Item::fromResult(std::uint32_t valueSize)
    {
       std::uint32_t keySize = psibase::raw::getKey(nullptr, 0);
       data.resize(9 + keySize + valueSize);
       std::memcpy(data.data() + 1, &keySize, 4);
-      psibase::raw::getKey(reinterpret_cast<char*>(data.data()) + 5, keySize);
+      psibase::raw::getKey(data.data() + 5, keySize);
       std::memcpy(data.data() + 5 + keySize, &valueSize, 4);
-      psibase::raw::getResult(reinterpret_cast<char*>(data.data()) + 9 + keySize, valueSize, 0);
+      psibase::raw::getResult(data.data() + 9 + keySize, valueSize, 0);
+   }
+#endif
+   void KvMerkle::Item::from(std::span<const char> key, std::span<const char> value)
+   {
+      std::uint32_t keySize   = key.size();
+      std::uint32_t valueSize = value.size();
+      data.resize(9 + keySize + valueSize);
+      std::memcpy(data.data() + 1, &keySize, 4);
+      if (keySize != 0)
+         std::memcpy(data.data() + 5, key.data(), keySize);
+      std::memcpy(data.data() + 5 + keySize, &valueSize, 4);
+      if (valueSize != 0)
+         std::memcpy(data.data() + 9 + keySize, value.data(), valueSize);
    }
    void KvMerkle::Item::nextKey()
    {
@@ -82,13 +90,13 @@ namespace psibase
       std::memcpy(data.data() + 1, &keySize, 4);
       data.back() = 0;
    }
-   std::span<const unsigned char> KvMerkle::Item::key() const
+   std::span<const char> KvMerkle::Item::key() const
    {
       std::uint32_t keySize;
       std::memcpy(&keySize, data.data() + 1, 4);
       return std::span{data.data() + 5, keySize};
    }
-   std::span<const unsigned char> KvMerkle::Item::value() const
+   std::span<const char> KvMerkle::Item::value() const
    {
       std::uint32_t keySize;
       std::memcpy(&keySize, data.data() + 1, 4);
@@ -113,7 +121,8 @@ namespace psibase
    }
    void KvMerkle::push(const Item& item)
    {
-      push_hash(item.key(), item.get_hash());
+      push_hash({reinterpret_cast<const unsigned char*>(item.key().data()), item.key().size()},
+                item.get_hash());
    }
    void KvMerkle::push_hash(std::span<const unsigned char> key, const Checksum256& value)
    {

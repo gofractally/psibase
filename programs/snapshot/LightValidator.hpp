@@ -5,6 +5,7 @@
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/headerValidation.hpp>
+#include <psibase/serviceEntry.hpp>
 #include <psibase/testerApi.hpp>
 #include <psio/fracpack.hpp>
 #include <psio/stream.hpp>
@@ -237,7 +238,6 @@ namespace psibase
       {
          if (claim.service == psibase::AccountNumber{})
             return;
-         std::cerr << "verifying signature: " << signature.size() << std::endl;
          psibase::VerifyArgs args{hash, claim, signature};
          psibase::Action     act{.service = claim.service, .rawData = psio::to_frac(args)};
          auto                packed = psio::to_frac(act);
