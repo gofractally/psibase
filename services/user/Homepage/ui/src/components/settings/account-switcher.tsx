@@ -1,39 +1,45 @@
-import { useUser } from "@hooks";
+import { Button } from "@shadcn/button";
+
+import { useUser } from "@/hooks";
+import { ChevronRight, SettingsIcon } from "lucide-react";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@shadcn/select";
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@shadcn/dropdown-menu";
 
 export function AccountSwitcher() {
     const { availableAccounts, user, setUser } = useUser();
 
     return (
-        <Select
-            defaultValue={user}
-            onValueChange={(value) => {
-                setUser(value);
-            }}
-        >
-            <SelectTrigger
-                className="flex items-center gap-2 [&>span]:line-clamp-1 [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-1 [&>span]:truncate [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
-                aria-label="Select account"
-            >
-                <SelectValue placeholder="Select an account">
-                    <span className="ml-2">{user}</span>
-                </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-                {availableAccounts.map((account) => (
-                    <SelectItem key={account} value={account}>
-                        <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button className="flex justify-between">
+                    <div>Switch accounts </div>
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="end">
+                <DropdownMenuRadioGroup value={user} onValueChange={setUser}>
+                    {availableAccounts.map((account) => (
+                        <DropdownMenuRadioItem
+                            key={`switch-account-to-${account}`}
+                            value={account}
+                        >
                             {account}
-                        </div>
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
+                        </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                    <SettingsIcon size={16} className="mr-2" />
+                    Manage accounts
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
