@@ -22,37 +22,6 @@ struct MessageSerde {
     body: String,
 }
 
-fn build_query(
-    archived_requested: bool,
-    sender: Option<String>,
-    receiver: Option<String>,
-) -> String {
-    let where_clause_sender_receiver = String::from("");
-
-    let select_clause = format!("DISTINCT sent.rowid as msg_id, archive.event_id, sent.*");
-    let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id" );
-    let where_clause_archived_or_not = format!(
-        "archive.event_id IS {} NULL",
-        if archived_requested { "NOT" } else { "" }
-    );
-    let order_by_clause = "sent.ROWID";
-
-    let sql_query_str = format!(
-        "SELECT {} FROM {} WHERE {} {} {} ORDER BY {}",
-        select_clause,
-        from_clause,
-        where_clause_archived_or_not,
-        if sender.is_some() || receiver.is_some() {
-            "AND"
-        } else {
-            ""
-        },
-        where_clause_sender_receiver,
-        order_by_clause
-    );
-    sql_query_str
-}
-
 impl Api for ChainmailPlugin {
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
         Transact::add_action_to_transaction(
@@ -67,11 +36,10 @@ impl Api for ChainmailPlugin {
         Ok(())
     }
 
-    fn archive(event_id: u64) -> Result<(), Error> {
-        println!("action archive(event_id[{}]).top", event_id);
+    fn archive(msg_id: u64) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "archive",
-            &chainmail::action_structs::archive { event_id }.packed(),
+            &chainmail::action_structs::archive { msg_id }.packed(),
         )?;
         Ok(())
     }
@@ -82,19 +50,6 @@ fn query_messages_endpoint(
     receiver: Option<String>,
     archived_requested: bool,
 ) -> Result<Vec<Message>, Error> {
-    println!(
-        "query_messages_endpoint(sender[{}], receiver[{}]).top",
-        if sender.is_some() {
-            sender.clone().unwrap()
-        } else {
-            "".to_string()
-        },
-        if receiver.is_some() {
-            receiver.clone().unwrap()
-        } else {
-            "".to_string()
-        },
-    );
     let mut endpoint = String::from("/api/messages?");
     if archived_requested {
         endpoint += "archived=true&";
@@ -109,8 +64,6 @@ fn query_messages_endpoint(
         endpoint += &format!("receiver={}", receiver.unwrap());
     }
 
-    println!("plugin.endpoing: {}", endpoint);
-
     let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
     let mut resp_val: Vec<MessageSerde>;
     if resp.is_err() {
@@ -118,7 +71,6 @@ fn query_messages_endpoint(
     } else {
         resp_val = resp.unwrap();
     }
-    println!("queried messages resp: {:#?}", resp_val);
 
     // There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
     // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
@@ -136,7 +88,6 @@ fn query_messages_endpoint(
             body: m.body,
         })
         .collect();
-    println!("messages: {:#?}", messages);
     Ok(messages)
 }
 

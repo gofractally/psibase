@@ -93,9 +93,15 @@ const ActionBar = ({
     } = useDraftMessages();
 
     const onArchive = async (itemId: string) => {
-        // TODO: Unsave if saved
         let id = parseInt(itemId);
         const supervisor = await getSupervisor();
+        // TODO: Unsave if saved
+        // await supervisor.functionCall({
+        //     service: "chainmail",
+        //     intf: "api",
+        //     method: "unsave",
+        //     params: [id],
+        // });
         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
         await supervisor.functionCall({
             service: "chainmail",

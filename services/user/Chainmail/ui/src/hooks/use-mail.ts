@@ -55,7 +55,6 @@ const getIncomingMessages = async (account: string | undefined) => {
     console.info(`ui.getIncomingMessages(undefined, ${account}).top`);
     const supervisor = await getSupervisor();
     // const res = await fetch(`/messages?receiver=${account}`);
-    return [];
     let rawMessages = (await supervisor.functionCall({
                 service: "chainmail",
                 intf: "queries",
@@ -68,7 +67,7 @@ const getIncomingMessages = async (account: string | undefined) => {
 const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
     const { user } = useUser();
-    console.info(`ui.callinghuseQuery(incoming, user[${user}])`);
+    console.info(`ui.callingUseQuery(incoming, user[${user}])`);
     const query = useQuery({
         queryKey: ["incoming", user],
         queryFn: () => getIncomingMessages(user),

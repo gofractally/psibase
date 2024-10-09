@@ -169,21 +169,16 @@ mod service {
     }
 
     #[action]
-    fn archive(event_id: u64) {
-        println!("action archive(event_id[{}]).top", event_id);
-        println!(
-            "Archiving {}",
-            get_sender().to_string() + &event_id.to_string()
-        );
+    fn archive(msg_id: u64) {
         Wrapper::emit()
             .history()
-            .archive(get_sender().to_string() + &event_id.to_string());
+            .archive(get_sender().to_string() + &msg_id.to_string());
     }
 
     #[event(history)]
     pub fn sent(sender: AccountNumber, receiver: AccountNumber, subject: String, body: String) {}
     #[event(history)]
-    pub fn archive(event_id: String) {}
+    pub fn archive(msg_id: String) {}
 
     #[action]
     #[allow(non_snake_case)]
