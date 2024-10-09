@@ -1,3 +1,5 @@
+import { randomUUID, type UUID } from "crypto";
+
 import { siblingUrl } from "./rpc";
 import {
     QualifiedFunctionCallArgs,
@@ -47,11 +49,18 @@ export class Supervisor {
     isSupervisorInitialized = false;
     private supervisorSrc: string;
 
-    private pendingRequest: {
+    private pendingRequests: {
+        id: UUID;
         call: FunctionCallArgs;
         resolve: (result: unknown) => void;
         reject: (result: unknown) => void;
-    } | null = null;
+    }[] = [];
+
+    private removePendingRequestById(id: UUID) {
+        this.pendingRequests = this.pendingRequests.filter(
+            (req) => req.id !== id,
+        );
+    }
 
     private onLoadPromise?: (value?: unknown) => void;
 
@@ -104,29 +113,36 @@ export class Supervisor {
     }
 
     onFunctionCallResponse(response: FunctionCallResponse) {
-        if (!this.pendingRequest) {
+        const pendingRequest = this.pendingRequests.find(
+            (req) => req.id === response.id,
+        );
+        if (!pendingRequest) {
             throw Error(`Received unexpected response from supervisor.`);
         }
-        const expected = this.pendingRequest.call;
+
+        const expected = pendingRequest.call;
         const received = response.call;
         const unexpected =
             expected.method !== received.method ||
             expected.service !== received.service;
 
         const { result } = response;
+
+        this.removePendingRequestById(response.id);
+
         if (isPluginError(result)) {
             const { service, plugin } = result.pluginId;
 
             console.error(`Call to ${toString(response.call)} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
-            this.pendingRequest.reject(result);
+            pendingRequest.reject(result);
             return;
         }
 
         if (isGenericError(result)) {
             console.error(`Call to ${toString(response.call)} failed`);
             console.error(result.message);
-            this.pendingRequest.reject(result);
+            pendingRequest.reject(result);
             return;
         }
 
@@ -135,11 +151,11 @@ export class Supervisor {
             // that it gets reported.
             const msg = `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`;
             console.warn(msg);
-            this.pendingRequest.reject(msg);
+            pendingRequest.reject(msg);
             return;
         }
 
-        this.pendingRequest.resolve(response.result);
+        pendingRequest.resolve(response.result);
     }
 
     private getSupervisorIframe(): HTMLIFrameElement {
@@ -163,9 +179,16 @@ export class Supervisor {
         };
 
         return new Promise((resolve, reject) => {
-            this.pendingRequest = { call: args, resolve, reject };
+            const requestId = randomUUID();
+            this.pendingRequests.push({
+                id: requestId,
+                call: args,
+                resolve,
+                reject,
+            });
             const message: FunctionCallRequest = {
                 type: "FUNCTION_CALL_REQUEST",
+                id: requestId,
                 args: fqArgs,
             };
             if (iframe.contentWindow) {
