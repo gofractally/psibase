@@ -1,4 +1,4 @@
-import { randomUUID, type UUID } from "crypto";
+import { type UUID } from "crypto";
 
 import { siblingUrl } from "./rpc";
 import {
@@ -179,7 +179,7 @@ export class Supervisor {
         };
 
         return new Promise((resolve, reject) => {
-            const requestId = randomUUID();
+            const requestId = window.crypto.randomUUID() as UUID;
             this.pendingRequests.push({
                 id: requestId,
                 call: args,
