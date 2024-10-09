@@ -1,0 +1,48 @@
+package workshop:plugin;
+
+interface types {
+    type account-id = string;
+    type bytes = list<u8>;
+}
+
+interface developer {
+    use host:common/types.{error};
+    use types.{account-id, bytes};
+
+    set-app-metadata: func(
+        name: string, 
+        short-description: string, 
+        long-description: string, 
+        icon: string, 
+        tos-subpage: string, 
+        privacy-policy-subpage: string, 
+        app-homepage-subpage: string, 
+        status: string,
+        tags: list<string>
+    ) -> result<_, error>;
+}
+
+interface consumer {
+    use host:common/types.{error};
+    use types.{account-id};
+
+
+    record app-metadata {
+        name: string,
+        short-description: string,
+        long-description: string,
+        icon: string,
+        tos-subpage: string,
+        privacy-policy-subpage: string,
+        app-homepage-subpage: string,
+        status: string,
+        tags: list<string>
+    }
+
+    get-app-metadata: func(account: account-id) -> result<app-metadata, error>;
+}
+
+world imports {
+    import developer;
+    import consumer;
+}
