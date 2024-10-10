@@ -43,6 +43,9 @@ mod service {
     }
 }
 
+/* packages takes a comma-delimited list and references the
+ * package.metadata.psibase.package-name (case-sensitive) in Cargo.toml).
+ * The test chain will be initialized with default packages + services listed here. */
 #[psibase::test_case(packages("example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Verify the actions work as expected.
@@ -68,7 +71,8 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
 }
 ```
 
-Add the following to `Cargo.toml`. This will allow `cargo psibase` to build a psibase package from the crate.
+Add the following to `Cargo.toml`. This will allow `cargo psibase` to build a psibase package from the crate. See [Building Packages](package.md) for more details.
+
 ```toml
 [package.metadata.psibase]
 package-name = "example"
