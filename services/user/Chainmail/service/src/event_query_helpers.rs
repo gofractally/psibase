@@ -163,7 +163,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         return Some(HttpReply {
             status: 200,
-            contentType: request.contentType.clone(),
+            contentType: String::from("application/json"),
             headers: vec![],
             body: Hex(query_response.as_bytes().to_vec()),
         });

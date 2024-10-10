@@ -113,12 +113,19 @@ const ActionBar = ({
         toast.success("Your message has been archived");
     };
 
-    const onUnArchive = (itemId: string) => {
+    const onUnArchive = async (itemId: string) => {
         toast.error("Not implemented");
     };
 
-    const onSave = (itemId: string) => {
-        toast.error("Not implemented");
+    const onSave = async (itemId: string) => {
+        let id = parseInt(itemId);
+        const supervisor = await getSupervisor();
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "api",
+            method: "save",
+            params: [id],
+        });
     };
 
     const onDeleteDraft = () => {
