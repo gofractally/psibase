@@ -192,7 +192,7 @@ int verifySignatures(std::uint32_t                  authServices,
    if (!producerSignatures.empty())
    {
       std::ranges::sort(producerSignatures, compareProducers);
-      producerSignatures.erase(std::ranges::unique(producerSignatures, compareProducers).begin(),
+      producerSignatures.erase(std::ranges::unique(producerSignatures).begin(),
                                producerSignatures.end());
       if (producerSignatures.size() >= weakThreshold(consensus.current))
       {

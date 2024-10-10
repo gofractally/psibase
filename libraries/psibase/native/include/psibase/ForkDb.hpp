@@ -260,13 +260,13 @@ namespace psibase
 
    struct BuildStateChecksum
    {
-      void operator()()
+      snapshot::StateChecksum operator()()
       {
          Database                db{sharedDatabase, revision};
          auto                    session = db.startRead();
          snapshot::StateChecksum result{.serviceRoot = hash(db, DbId::service),
                                         .nativeRoot  = hash(db, DbId::native)};
-         next(result);
+         return result;
       }
       Checksum256 hash(Database& database, DbId db)
       {
@@ -283,9 +283,8 @@ namespace psibase
             item.nextKey();
          }
       }
-      ConstRevisionPtr                                    revision;
-      SharedDatabase                                      sharedDatabase;
-      std::function<void(const snapshot::StateChecksum&)> next;
+      ConstRevisionPtr revision;
+      SharedDatabase   sharedDatabase;
    };
 
    struct BlockHeaderState
@@ -1172,20 +1171,15 @@ namespace psibase
          assert(!!blockContext);
          blockContext.reset();
       }
-      void make_snapshot(const BlockHeaderState* state, AccountNumber me)
+      // Returns a function that can safely be run in another thread
+      auto snapshot_builder(const BlockHeaderState* state)
       {
-         PSIBASE_LOG(logger, info) << "Making state checksum";
-         auto fn =
-             BuildStateChecksum{state->revision, systemContext->sharedDatabase,
-                                [this, id = state->info.blockId, me,
-                                 prods = state->producers](const snapshot::StateChecksum& result)
-                                { on_state_checksum(id, result, me, prods); }};
-         // TODO: Run in another thread
-         fn();
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, state->info.header, state->info.blockId);
+         PSIBASE_LOG(logger, info) << "Calculating state checksum";
+         return BuildStateChecksum{state->revision, systemContext->sharedDatabase};
       }
       bool should_make_snapshot(const BlockHeaderState* state)
       {
-         PSIBASE_LOG(logger, info) << "Checking whether to create checksum";
          Database db(systemContext->sharedDatabase, state->revision);
          auto     session = db.startRead();
          if (db.kvGet<ScheduledSnapshotRow>(ScheduledSnapshotRow::db,
@@ -1195,12 +1189,23 @@ namespace psibase
          }
          return false;
       }
-      void on_state_checksum(const Checksum256&                  id,
-                             const snapshot::StateChecksum&      checksum,
-                             AccountNumber                       me,
-                             const std::shared_ptr<ProducerSet>& prods)
+
+      enum class ChecksumLog
       {
-         PSIBASE_LOG(logger, info) << "Calculated state checksum";
+         never,
+         exact,
+         always,
+      };
+
+      std::optional<snapshot::StateSignature> on_state_checksum(
+          const Checksum256&             id,
+          const snapshot::StateChecksum& checksum,
+          AccountNumber                  me)
+      {
+         auto        revision = systemContext->sharedDatabase.getRevision(*writer, id);
+         auto        status   = getStatus(revision);
+         ProducerSet producers(status.consensus.current.data);
+         bool        inserted = false;
          SnapshotRow row{.id = id};
          auto        key = psio::convert_to_key(row.key());
          if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
@@ -1219,21 +1224,115 @@ namespace psibase
             row.state = {.state = checksum};
          }
          // Add my signature
-         if (auto claim = prods->getClaim(me))
+         if (auto claim = producers.getClaim(me))
          {
             if (std::ranges::find(row.state->signatures, me, &snapshot::StateSignature::account) ==
                 row.state->signatures.end())
             {
                auto sig = prover.prove(snapshot::StateSignatureInfo{checksum}, *claim);
                row.state->signatures.push_back({me, *claim, sig});
+               inserted = true;
             }
          }
          systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
-         verify_state_checksum(row, prods);
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+         verify_state_checksum(row, producers, ChecksumLog::always);
+         if (inserted)
+         {
+            return std::move(row.state->signatures.back());
+         }
+         else
+         {
+            return {};
+         }
       }
-      void verify_state_checksum(const SnapshotRow& row, const std::shared_ptr<ProducerSet>& prods)
+
+      StatusRow getStatus(ConstRevisionPtr revision)
       {
-         auto        threshold = prods->weak_threshold();
+         check(!!revision, "Missing revision for state signature");
+         // look up active producers
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         check(!!status, "Missing status row");
+         check(!!status->head, "StatusRow missing head");
+         return std::move(*status);
+      }
+
+      // This can lag significantly behind irreversibility, so we can't rely
+      // on the BlockHeaderState being available
+      // Returns true if the signature is new
+      bool on_state_signature(const Checksum256&              id,
+                              const snapshot::StateChecksum&  checksum,
+                              const snapshot::StateSignature& sig)
+      {
+         auto        revision = systemContext->sharedDatabase.getRevision(*writer, id);
+         auto        status   = getStatus(revision);
+         ProducerSet producers(status.consensus.current.data);
+         if (!producers.getIndex(sig.account, sig.claim))
+         {
+            abortMessage(sig.account.str() + " is not a producer for block " +
+                         loggers::to_string(id));
+         }
+         // FIXME: this is the wrong revision during joing consensus
+         check(!status.consensus.next,
+               "Not implemented: verifying snapshot signatures in joint consensus");
+         verify(revision, snapshot::StateSignatureInfo{checksum}, sig.claim, sig.rawData);
+
+         // Check whether we already have a signature from this producers
+         // and insert it if we don't.
+         bool        inserted = false;
+         auto        log      = ChecksumLog::never;
+         SnapshotRow row{.id = id};
+         auto        key = psio::convert_to_key(row.key());
+         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         {
+            psio::from_frac(row, *bytes);
+         }
+         if (row.state && row.state->state == checksum)
+         {
+            if (std::ranges::find(row.state->signatures, sig.account,
+                                  &snapshot::StateSignature::account) ==
+                row.state->signatures.end())
+            {
+               row.state->signatures.push_back(sig);
+               inserted = true;
+            }
+            log = ChecksumLog::exact;
+         }
+         else
+         {
+            auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+            if (pos == row.other.end())
+            {
+               row.other.push_back({.state = checksum, .signatures = {sig}});
+               inserted = true;
+            }
+            else
+            {
+               if (std::ranges::find(pos->signatures, sig.account,
+                                     &snapshot::StateSignature::account) == pos->signatures.end())
+               {
+                  pos->signatures.push_back(sig);
+                  inserted = true;
+               }
+            }
+         }
+         if (inserted)
+         {
+            systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+            PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+            verify_state_checksum(row, producers, log);
+         }
+         return inserted;
+      }
+
+      // returns true if the number of producers is exactly the threshold
+      void verify_state_checksum(const SnapshotRow& row,
+                                 const ProducerSet& prods,
+                                 ChecksumLog        shouldLog)
+      {
+         auto        threshold = prods.weak_threshold();
          std::size_t total     = 0;
          std::size_t max       = 0;
          for (const auto& item : row.other)
@@ -1247,6 +1346,15 @@ namespace psibase
             {
                PSIBASE_LOG(logger, critical) << "Consensus failure: state does not match producers";
                throw consensus_failure{};
+            }
+            if (shouldLog == ChecksumLog::exact && row.state->signatures.size() == threshold ||
+                shouldLog == ChecksumLog::always && row.state->signatures.size() >= threshold)
+            {
+               PSIBASE_LOG(logger, info) << "Verified state checksum";
+            }
+            else if (shouldLog == ChecksumLog::always)
+            {
+               PSIBASE_LOG(logger, info) << "Finished state checksum";
             }
          }
          else
@@ -1589,13 +1697,15 @@ namespace psibase
          verify(stateIter->second.getAuthRevision(producer, claim), data, claim, signature);
       }
 
-      void verify(std::span<char> data, const Claim& claim, const std::vector<char>& signature)
+      void verify(std::span<const char>    data,
+                  const Claim&             claim,
+                  const std::vector<char>& signature)
       {
          verify(head->getProdsAuthRevision(), data, claim, signature);
       }
 
       void verify(ConstRevisionPtr         revision,
-                  std::span<char>          data,
+                  std::span<const char>    data,
                   const Claim&             claim,
                   const std::vector<char>& signature)
       {
