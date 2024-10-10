@@ -185,6 +185,5 @@ mod service {
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_rest_api(&request))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
