@@ -11,8 +11,8 @@ mod service {
     use psibase::services::events::Wrapper as EventsSvc;
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::{
-        anyhow, check, create_schema, get_sender, serve_simple_ui, AccountNumber, DbId, Fracpack,
-        HttpReply, HttpRequest, MethodNumber, Table, ToSchema,
+        anyhow, check, create_schema, get_sender, AccountNumber, DbId, Fracpack, HttpReply,
+        HttpRequest, MethodNumber, Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -93,6 +93,6 @@ mod service {
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_rest_api(&request))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
+        // .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
