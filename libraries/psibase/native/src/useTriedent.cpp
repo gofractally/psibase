@@ -407,6 +407,7 @@ namespace psibase
       std::lock_guard   lock{impl->topMutex};
       std::vector<char> key{revisionByIdPrefix};
       std::vector<char> tmpKey;
+      bool              hasIrreversible = false;
 
       // Remove everything with a blockNum <= irreversible's, except irreversible
       // and saved snapshots.
@@ -417,7 +418,11 @@ namespace psibase
             break;
          Checksum256 id;
          std::memcpy(id.data(), key.data() + 1, id.size());
-         if (id != irreversible)
+         if (id == irreversible)
+         {
+            hasIrreversible = true;
+         }
+         else
          {
             tmpKey.clear();
             psio::vector_stream stream{tmpKey};
@@ -428,25 +433,28 @@ namespace psibase
          key.push_back(0);
       }
 
-      // Remove everything with a blockNum > irreversible's which builds on a block
-      // no longer present.
-      std::vector<std::shared_ptr<triedent::root>> roots;
-      std::vector<char>                            statusBytes;
-      auto                                         sk = psio::convert_to_key(statusKey());
-      while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, &roots))
+      if (hasIrreversible)
       {
-         if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
-            break;
-         check(roots.size() == numChainDatabases, "wrong number of roots in fork");
-         if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
-            throw std::runtime_error("Status row missing in fork");
-         auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
-         if (!status.head)
-            throw std::runtime_error("Status row is missing head information in fork");
-         if (!writer.get(impl->topRoot, revisionById(status.head->header.previous), nullptr,
-                         nullptr))
-            writer.remove(impl->topRoot, key);
-         key.push_back(0);
+         // Remove everything with a blockNum > irreversible's which builds on a block
+         // no longer present.
+         std::vector<std::shared_ptr<triedent::root>> roots;
+         std::vector<char>                            statusBytes;
+         auto                                         sk = psio::convert_to_key(statusKey());
+         while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, &roots))
+         {
+            if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
+               break;
+            check(roots.size() == numChainDatabases, "wrong number of roots in fork");
+            if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
+               throw std::runtime_error("Status row missing in fork");
+            auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
+            if (!status.head)
+               throw std::runtime_error("Status row is missing head information in fork");
+            if (!writer.get(impl->topRoot, revisionById(status.head->header.previous), nullptr,
+                            nullptr))
+               writer.remove(impl->topRoot, key);
+            key.push_back(0);
+         }
       }
 
       writer.set_top_root(impl->topRoot);
