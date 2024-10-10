@@ -161,6 +161,8 @@ namespace psibase
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
+      BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+      PSIBASE_LOG(trxLogger, debug) << "startBlock succeeded";
       // printf("%s\n", prettyTrace(atrace).c_str());
 
       active = true;
