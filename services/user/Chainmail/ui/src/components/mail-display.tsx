@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Archive, ArchiveRestore, Pin, Trash2 } from "lucide-react";
 import { replaceAll } from "@milkdown/utils";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
 import { Button } from "@shadcn/button";
@@ -24,6 +25,7 @@ import {
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
 import { getSupervisor } from "@lib/supervisor";
+import { wait } from "@lib/utils";
 
 export function MailDisplay({
     message,
@@ -85,6 +87,7 @@ const ActionBar = ({
     mailbox: Mailbox;
     message: Message;
 }) => {
+    const queryClient = useQueryClient();
     const { setSelectedMessageId: setInboxMessageId } = useIncomingMessages();
     const {
         selectedMessage: selectedDraftMessage,
@@ -111,6 +114,10 @@ const ActionBar = ({
         });
         setInboxMessageId("");
         toast.success("Your message has been archived");
+        await wait(3000);
+        queryClient.invalidateQueries({
+            queryKey: ["incoming"],
+        });
     };
 
     const onUnArchive = (itemId: string) => {

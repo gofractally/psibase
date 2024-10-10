@@ -25,3 +25,5 @@ export function debounce<T extends (...args: any[]) => any>(
     };
     return <T>(<any>callable);
 }
+
+export const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));

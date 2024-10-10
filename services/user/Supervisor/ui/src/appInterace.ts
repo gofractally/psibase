@@ -1,3 +1,5 @@
+import type { UUID } from "crypto";
+
 import {
     QualifiedFunctionCallArgs,
     QualifiedPluginId,
@@ -10,5 +12,5 @@ export interface AppInterface {
         plugins: QualifiedPluginId[],
     ) => void;
 
-    entry: (callerOrigin: string, args: QualifiedFunctionCallArgs) => void;
+    entry: (callerOrigin: string, id: UUID, args: QualifiedFunctionCallArgs) => void;
 }
