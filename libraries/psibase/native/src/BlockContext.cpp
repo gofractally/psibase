@@ -97,6 +97,8 @@ namespace psibase
       {
          status->consensus.current = std::move(status->consensus.next->consensus);
          status->consensus.next.reset();
+         if (!isReadOnly)
+            db.setPrevAuthServices(nullptr);
       }
       if (singleProducer(*status, producer))
       {
@@ -333,8 +335,10 @@ namespace psibase
       }
    }
 
-   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
-                                                                        const Claim&  claim)
+   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(
+       const Prover&           prover,
+       const Claim&            claim,
+       const ConstRevisionPtr& prevAuthServices)
    {
       checkActive();
       check(!needGenesisAction, "missing genesis action in block");
@@ -374,6 +378,24 @@ namespace psibase
                                       current.header.blockNum};
          systemContext.sharedDatabase.kvPutSubjective(
              *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+      }
+
+      if (status->consensus.next)
+      {
+         if (prevAuthServices)
+         {
+            db.setPrevAuthServices(prevAuthServices);
+         }
+         else if (!status->consensus.current.services.empty() && !db.getPrevAuthServices())
+         {
+            assert(status->consensus.next->blockNum == current.header.blockNum);
+            db.setPrevAuthServices(db.getBaseRevision());
+         }
+      }
+      else
+      {
+         check(!db.getPrevAuthServices(),
+               "prevAuthServices should not be set outside joint consensus");
       }
 
       status->current.consensusState = current.header.consensusState = sha256(status->consensus);

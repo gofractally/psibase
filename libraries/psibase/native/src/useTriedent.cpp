@@ -851,6 +851,45 @@ namespace psibase
       impl->abort();
    }
 
+   ConstRevisionPtr Database::getPrevAuthServices()
+   {
+      return impl->read(
+          [&](auto& session, auto& revision) -> ConstRevisionPtr
+          {
+             auto        index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
+             auto        native = static_cast<std::uint32_t>(DbId::native);
+             const auto& root   = revision.roots[index];
+             if (!session.is_empty(root, {}, {}))
+             {
+                auto result           = std::make_shared<Revision>();
+                result->roots[native] = root;
+                return result;
+             }
+             else
+             {
+                return nullptr;
+             }
+          });
+   }
+
+   void Database::setPrevAuthServices(ConstRevisionPtr revision)
+   {
+      impl->write(
+          [&](auto& session, auto& writeRevision)
+          {
+             auto index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
+             auto native = static_cast<std::uint32_t>(DbId::native);
+             if (revision)
+             {
+                writeRevision.roots[index] = revision->roots[native];
+             }
+             else
+             {
+                writeRevision.roots[index] = nullptr;
+             }
+          });
+   }
+
    void Database::checkoutSubjective()
    {
       impl->checkoutSubjective();

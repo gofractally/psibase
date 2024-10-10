@@ -117,6 +117,11 @@ namespace psibase
       /// block signatures
       blockProof,
 
+      /// Not accessible to WASM. During joint consensus, this holds a
+      /// subset of native as of the last irreversible block. Outside
+      /// joint consensus, it is empty.
+      prevAuthServices,
+
       numChainDatabases,
 
       beginIndependent = 64,
@@ -143,7 +148,6 @@ namespace psibase
       endIndependent,
    };
 
-   //inline constexpr uint32_t numDatabases = (uint32_t)DbId::numDatabases;
    inline constexpr uint32_t numChainDatabases = ((uint32_t)DbId::numChainDatabases);
    inline constexpr uint32_t numIndependentDatabases =
        ((std::uint32_t)DbId::endIndependent) - ((std::uint32_t)DbId::beginIndependent);

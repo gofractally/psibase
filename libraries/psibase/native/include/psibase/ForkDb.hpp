@@ -401,12 +401,18 @@ namespace psibase
       }
       void loadAuthState(SystemContext* systemContext, const WriterPtr& writer)
       {
-         // N.B. It's impossible to fill producers->authState if nextProducers is set. Leave it as null.
          auto&    authState = nextProducers ? nextProducers->authState : producers->authState;
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
          authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info,
                                                       nextProducers ? true : false);
+         if (nextProducers)
+         {
+            Database prev{systemContext->sharedDatabase, db.getPrevAuthServices()};
+            auto     session = prev.startRead();
+            nextProducers->authState =
+                std::make_shared<BlockAuthState>(systemContext, writer, prev, info, false);
+         }
       }
       JointConsensus readState(SystemContext* systemContext) const
       {
@@ -896,8 +902,8 @@ namespace psibase
                validateTransactionSignatures(ctx.current, prev->revision);
                ctx.callStartBlock();
                ctx.execAllInBlock();
-               auto [newRevision, id] =
-                   ctx.writeRevision(FixedProver(blockPtr->signature()), claim);
+               auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
+                                                          state->getProdsAuthRevision());
                // TODO: diff header fields
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
@@ -1274,10 +1280,14 @@ namespace psibase
             abortMessage(sig.account.str() + " is not a producer for block " +
                          loggers::to_string(id));
          }
-         // FIXME: this is the wrong revision during joing consensus
-         check(!status.consensus.next,
-               "Not implemented: verifying snapshot signatures in joint consensus");
-         verify(revision, snapshot::StateSignatureInfo{checksum}, sig.claim, sig.rawData);
+         auto authRevision = revision;
+         if (status.consensus.next)
+         {
+            Database db{systemContext->sharedDatabase, revision};
+            auto     session = db.startRead();
+            authRevision     = db.getPrevAuthServices();
+         }
+         verify(authRevision, snapshot::StateSignatureInfo{checksum}, sig.claim, sig.rawData);
 
          // Check whether we already have a signature from this producers
          // and insert it if we don't.
@@ -1382,7 +1392,8 @@ namespace psibase
             assert(!!claim);
             // If the head block is changed, the pending block needs to be cancelled.
             assert(blockContext->current.header.previous == head->blockId());
-            auto [revision, id] = blockContext->writeRevision(prover, *claim);
+            auto [revision, id] =
+                blockContext->writeRevision(prover, *claim, head->getNextAuthRevision());
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
             BlockInfo info;

@@ -167,6 +167,9 @@ namespace psibase
       ConstRevisionPtr writeRevision(Session& session, const Checksum256& blockId);
       void             abort(Session&);
 
+      ConstRevisionPtr getPrevAuthServices();
+      void             setPrevAuthServices(ConstRevisionPtr revision);
+
       // Manage access to subjective database
       void checkoutSubjective();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
