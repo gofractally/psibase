@@ -88,6 +88,10 @@ namespace psibase::tester::raw
    TESTER_NATIVE(kvRemove)
    void kvRemove(std::uint32_t chain, psibase::DbId db, const char* key, std::uint32_t keyLen);
 
+   TESTER_NATIVE(checkoutSubjective) void checkoutSubjective(std::uint32_t chain);
+   TESTER_NATIVE(commitSubjective) bool commitSubjective(std::uint32_t chain);
+   TESTER_NATIVE(abortSubjective) void abortSubjective(std::uint32_t chain);
+
    TESTER_NATIVE(commitState)
    void commitState(std::uint32_t chain);
 

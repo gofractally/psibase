@@ -424,6 +424,7 @@ int main(int argc, const char* const* argv)
    SnapshotFooter        footer;
    StateChecksum         hash;
    std::vector<BlockNum> blocks;
+   raw::checkoutSubjective(handle);
    if (int res = read(handle, in, footer, hash, blocks))
       return res;
    if (footer.hash)
@@ -467,6 +468,11 @@ int main(int argc, const char* const* argv)
    if (newStatus->consensus.next)
       validator.writePrevAuthServices({handle});
    writeSnapshotRow({handle}, *newStatus, footer);
+   if (!raw::commitSubjective(handle))
+   {
+      std::cerr << "Failed to commit database changes" << std::endl;
+      return 1;
+   }
    raw::commitState(handle);
    std::cerr << "Snapshot successfully loaded\n"
              << "Chain: " << psio::hex(newStatus->chainId.begin(), newStatus->chainId.end())

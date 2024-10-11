@@ -1611,6 +1611,19 @@ struct callbacks
       chain.database().kvRemoveRaw(getDbWrite(chain, db).db, {key.data(), key.size()});
    }
 
+   void checkoutSubjective(std::uint32_t chain_index)
+   {
+      assert_chain(chain_index).native().checkoutSubjective();
+   }
+   bool commitSubjective(std::uint32_t chain_index)
+   {
+      return assert_chain(chain_index).native().commitSubjective();
+   }
+   void abortSubjective(std::uint32_t chain_index)
+   {
+      assert_chain(chain_index).native().abortSubjective();
+   }
+
    void commitState(std::uint32_t chain_index) { assert_chain(chain_index).writeRevision(); }
 
    uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
@@ -1654,6 +1667,9 @@ void register_callbacks()
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rhf_t::add<&callbacks::checkoutSubjective>("psibase", "checkoutSubjective");
+   rhf_t::add<&callbacks::commitSubjective>("psibase", "commitSubjective");
+   rhf_t::add<&callbacks::abortSubjective>("psibase", "abortSubjective");
    rhf_t::add<&callbacks::commitState>("psibase", "commitState");
    rhf_t::add<&callbacks::testerVerify>("psibase", "verify");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
