@@ -160,6 +160,58 @@ int verifyHeaders(psibase::TestChain&          chain,
    return 0;
 }
 
+BlockNum getBlockNum(const psibase::Checksum256& id)
+{
+   BlockNum result;
+   auto     src  = id.data();
+   auto     dest = reinterpret_cast<char*>(&result + 1);
+   while (dest != reinterpret_cast<char*>(&result))
+   {
+      *--dest = *src++;
+   }
+   return result;
+}
+
+int verifyChainId(psibase::ChainHandle         chain,
+                  const std::vector<BlockNum>& blocks,
+                  const psibase::StatusRow&    status)
+{
+   if (blocks.empty())
+   {
+      // special case: the head block counts
+      if (status.chainId == status.head->blockId)
+      {
+         return 0;
+      }
+      else
+      {
+         std::cerr << "Snapshot cannot be loaded in a new database" << std::endl;
+         return 1;
+      }
+   }
+
+   auto block = chain.kvGet<psibase::Block>(DbId::blockLog, blocks.front());
+   if (!block)
+   {
+      std::cerr << "Missing block " << blocks.front() << std::endl;
+      return 1;
+   }
+   psibase::BlockInfo info{block->header};
+   if (info.blockId != status.chainId)
+   {
+      if (getBlockNum(status.chainId) < info.header.blockNum)
+      {
+         std::cerr << "Snapshot cannot be loaded in a new database" << std::endl;
+      }
+      else
+      {
+         std::cerr << "Snapshot chainId is inconsistent with block log" << std::endl;
+      }
+      return 1;
+   }
+   return 0;
+}
+
 int verifySignatures(std::uint32_t                  authServices,
                      const SnapshotFooter&          footer,
                      const psibase::JointConsensus& consensus)
@@ -442,10 +494,18 @@ int main(int argc, const char* const* argv)
    }
    auto newStatus = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
    psibase::check(!!newStatus, "Missing status row");
-   if (oldStatus && oldStatus->chainId != newStatus->chainId)
+   if (oldStatus)
    {
-      std::cerr << "Snapshot is for a different chain" << std::endl;
-      return 1;
+      if (oldStatus->chainId != newStatus->chainId)
+      {
+         std::cerr << "Snapshot is for a different chain" << std::endl;
+         return 1;
+      }
+   }
+   else
+   {
+      if (auto res = verifyChainId({handle}, blocks, *newStatus))
+         return res;
    }
    if (int res = verifyState(handle, *newStatus))
       return res;
