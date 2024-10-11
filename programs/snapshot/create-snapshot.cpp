@@ -343,9 +343,6 @@ int main(int argc, const char* const* argv)
    }
 
    write_block_data(handle, need_commit, out);
-   //write_rows(handle, DbId::nativeSubjective, {}, out);
-   //write_rows(handle, DbId::nativeSubjective, uspan(psio::convert_to_key(psibase::blockDataPrefix())), out);
-   //write_rows(handle, DbId::nativeSubjective, uspan(psio::convert_to_key(psibase::consensusChangePrefix())), out);
    if (!keys.empty())
    {
       StateSignatureInfo    info{*footer.hash};
