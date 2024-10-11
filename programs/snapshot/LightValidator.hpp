@@ -122,6 +122,26 @@ namespace psibase
             psibase::copyServices(authServices.base(), handle, services);
          }
       }
+      // Writes the current set of auth services to prevAuthServices.
+      // The caller is responsible for determining when it is needed,
+      // i.e. out has a state in which joint consensus is active
+      // and matches the current state of the validator.
+      void writePrevAuthServices(ChainHandle out)
+      {
+         std::vector<char> key;
+         std::vector<char> value;
+         std::size_t       size;
+         while ((size = tester::raw::kvGreaterEqual(authServices.id, DbId::native, key.data(),
+                                                    key.size(), 0)) != -1)
+         {
+            value.resize(size);
+            tester::raw::getResult(value.data(), value.size(), 0);
+            key.resize(tester::raw::getKey(nullptr, 0));
+            tester::raw::getKey(key.data(), key.size());
+            out.kvPutRaw(DbId::prevAuthServices, key, value);
+            key.push_back(0);
+         }
+      }
       // Requires up to three blocks for each consensus change:
       // - The block that starts joint consensus
       // - The block in joint consensus that is made irreversible

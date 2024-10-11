@@ -188,12 +188,8 @@ namespace psibase
       ConstRevisionPtr                    revision;
       std::vector<BlockHeaderAuthAccount> services;
 
-      // Read state at revision
-      BlockAuthState(SystemContext*   systemContext,
-                     const WriterPtr& writer,
-                     Database&        db,
-                     const BlockInfo& info,
-                     bool             useNext)
+      // Reads the next or current state
+      BlockAuthState(SystemContext* systemContext, const WriterPtr& writer, Database& db)
       {
          revision = systemContext->sharedDatabase.emptyRevision();
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
@@ -210,6 +206,19 @@ namespace psibase
             }
             copyServices(dst, db, services);
             revision = dst.getModifiedRevision();
+         }
+      }
+
+      // Loads the current state
+      BlockAuthState(SystemContext*   systemContext,
+                     const WriterPtr& writer,
+                     Database&        db,
+                     ConstRevisionPtr revision)
+          : revision(revision ? std::move(revision) : systemContext->sharedDatabase.emptyRevision())
+      {
+         if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
+         {
+            services = status->consensus.current.services;
          }
       }
 
@@ -404,14 +413,11 @@ namespace psibase
          auto&    authState = nextProducers ? nextProducers->authState : producers->authState;
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
-         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info,
-                                                      nextProducers ? true : false);
+         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db);
          if (nextProducers)
          {
-            Database prev{systemContext->sharedDatabase, db.getPrevAuthServices()};
-            auto     session = prev.startRead();
-            nextProducers->authState =
-                std::make_shared<BlockAuthState>(systemContext, writer, prev, info, false);
+            producers->authState = std::make_shared<BlockAuthState>(systemContext, writer, db,
+                                                                    db.getPrevAuthServices());
          }
       }
       JointConsensus readState(SystemContext* systemContext) const
@@ -644,9 +650,12 @@ namespace psibase
          {
             Database db{systemContext->sharedDatabase, head->revision};
             auto     session = db.startRead();
-            if (auto block = db.kvGet<Block>(DbId::blockLog, num))
+            if (auto next = db.kvGet<Block>(DbId::blockLog, num + 1))
             {
-               // TODO: we can look up the next block and get prev instead of calculating the hash
+               return next->header.previous;
+            }
+            else if (auto block = db.kvGet<Block>(DbId::blockLog, num))
+            {
                return BlockInfo{*block}.blockId;
             }
             else
@@ -1099,13 +1108,24 @@ namespace psibase
             {
                id = get_ancestor(id, t.num() - iter->first);
             }
-            else if (get_block_id(t.num()) == t.id())
-            {
-               return t;
-            }
             else
             {
-               throw std::runtime_error("block number is irreversible but block id does not match");
+               auto existing = get_block_id(t.num());
+               if (existing == t.id())
+               {
+                  return t;
+               }
+               else if (existing != Checksum256{})
+               {
+                  throw std::runtime_error("Cannot find common ancestor for block " +
+                                           loggers::to_string(t.id()) +
+                                           " because it has been irreversibly forked");
+               }
+               else
+               {
+                  throw std::runtime_error("Cannot find common ancestor for block " +
+                                           loggers::to_string(t.id()) + " because it is not known");
+               }
             }
          }
          while (true)

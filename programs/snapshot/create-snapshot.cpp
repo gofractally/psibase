@@ -260,19 +260,49 @@ int main(int argc, const char* const* argv)
    psibase::TestChain chain(database_file, O_RDONLY);
    auto               handle = chain.nativeHandle();
    {
-      auto key  = psio::convert_to_key(psibase::snapshotPrefix());
-      auto size = raw::kvMax(handle, psibase::SnapshotRow::db, key.data(), key.size());
-      if (size == -1)
+      auto key       = psio::convert_to_key(psibase::snapshotPrefix());
+      auto size      = raw::kvMax(handle, psibase::SnapshotRow::db, key.data(), key.size());
+      auto prefixLen = key.size();
+      while (true)
       {
-         std::cerr << "No verified snapshot available" << std::endl;
-         return 1;
-      }
-      auto snapshot = psio::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
-      // TODO: go farther back if this snapshot isn't ready
-      raw::getFork(handle, snapshot.id);
-      if (snapshot.state)
-      {
-         footer.signatures = std::move(snapshot.state->signatures);
+         if (size == -1)
+         {
+            std::cerr << "No verified snapshot available" << std::endl;
+            return 1;
+         }
+         auto snapshot = psio::from_frac<psibase::SnapshotRow>(psibase::getResult(size));
+         key.resize(raw::getKey(nullptr, 0));
+         raw::getKey(key.data(), key.size());
+         raw::getFork(handle, snapshot.id);
+         auto status = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
+         if (!status || !status->head)
+         {
+            std::cerr << "No chain" << std::endl;
+         }
+         std::size_t threshold;
+         if (const auto* bft = std::get_if<psibase::BftConsensus>(&status->consensus.current.data))
+         {
+            threshold = (bft->producers.size() + 2) / 3;
+         }
+         else if (const auto* cft =
+                      std::get_if<psibase::CftConsensus>(&status->consensus.current.data))
+         {
+            threshold = 1;
+         }
+         else
+         {
+            psibase::abortMessage("Invalid consensus");
+         }
+         if (snapshot.state && snapshot.state->signatures.size() >= threshold)
+         {
+            footer.signatures = std::move(snapshot.state->signatures);
+            break;
+         }
+         else
+         {
+            size = raw::kvLessThan(handle, psibase::SnapshotRow::db, key.data(), key.size(),
+                                   prefixLen);
+         }
       }
    }
    auto status = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());

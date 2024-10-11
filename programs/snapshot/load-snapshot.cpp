@@ -436,10 +436,10 @@ int main(int argc, const char* const* argv)
       return res;
    if (int res = verifyHeaders(chain, validator, blocks, *newStatus))
       return res;
-   if (validator.stateHash != newStatus->head->header.consensusState)
+   if (validator.state.current != newStatus->consensus.current)
    {
-      std::cerr << psio::format_json(validator.state) << std::endl;
-      std::cerr << psio::format_json(newStatus->consensus) << std::endl;
+      std::cerr << psio::format_json(validator.state.current) << std::endl;
+      std::cerr << psio::format_json(newStatus->consensus.current) << std::endl;
       std::cerr << "Verification of current producers failed" << std::endl;
       return 1;
    }
@@ -452,6 +452,8 @@ int main(int argc, const char* const* argv)
    {
       std::cerr << "Warning: snapshot is not signed\n";
    }
+   if (newStatus->consensus.next)
+      validator.writePrevAuthServices({handle});
    raw::commitState(handle);
    std::cerr << "Snapshot successfully loaded\n"
              << "Chain: " << psio::hex(newStatus->chainId.begin(), newStatus->chainId.end())

@@ -151,12 +151,14 @@ namespace psibase
    struct CftConsensus
    {
       std::vector<Producer> producers;
+      friend bool           operator==(const CftConsensus&, const CftConsensus&) = default;
       PSIO_REFLECT(CftConsensus, producers);
    };
 
    struct BftConsensus
    {
       std::vector<Producer> producers;
+      friend bool           operator==(const BftConsensus&, const BftConsensus&) = default;
       PSIO_REFLECT(BftConsensus, producers);
    };
 
@@ -171,6 +173,7 @@ namespace psibase
    {
       ConsensusData                       data;
       std::vector<BlockHeaderAuthAccount> services;
+      friend bool                         operator==(const Consensus&, const Consensus&) = default;
       PSIO_REFLECT(Consensus, data, services)
    };
 

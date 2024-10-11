@@ -1491,6 +1491,7 @@ struct callbacks
          case uint32_t(psibase::DbId::writeOnly):
          case uint32_t(psibase::DbId::blockLog):
          case uint32_t(psibase::DbId::blockProof):
+         case uint32_t(psibase::DbId::prevAuthServices):
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
          case uint32_t(psibase::DbId::nativeSubjective):
@@ -1506,6 +1507,7 @@ struct callbacks
       {
          case uint32_t(psibase::DbId::service):
          case uint32_t(psibase::DbId::native):
+         case uint32_t(psibase::DbId::prevAuthServices):
             psibase::check(!chain.blockContext, "may not write this db while building a block");
             return (psibase::DbId)db;
          case uint32_t(psibase::DbId::subjective):
