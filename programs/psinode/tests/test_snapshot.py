@@ -35,7 +35,10 @@ class TestSnapshot(unittest.TestCase):
         f = cluster.make_node('f', start=False)
         a.run_psibase(['create-snapshot', a.dir, os.path.join(a.dir, 'snapshot')])
         e.run_psibase(['load-snapshot', e.dir, os.path.join(a.dir, 'snapshot')])
-        f.run_psibase(['load-snapshot', f.dir, os.path.join(a.dir, 'snapshot')])
+        # Make sure that loading from a snapshot leaves a state that is able
+        # to create snapshots
+        e.run_psibase(['create-snapshot', e.dir, os.path.join(e.dir, 'snapshot')])
+        f.run_psibase(['load-snapshot', f.dir, os.path.join(e.dir, 'snapshot')])
         e.start()
         f.start()
         e.connect(f)

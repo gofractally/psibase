@@ -150,7 +150,7 @@ namespace psibase
       // Note that all these blocks are required, but they are
       // not necessarily distinct.
       //
-      void push(SignedBlock block)
+      std::optional<ConsensusChangeRow> push(SignedBlock block)
       {
          auto& header = block.block.header;
          check(header.blockNum > current.blockNum, "Blocks must be added in order");
@@ -171,12 +171,15 @@ namespace psibase
          }
          if (state.next && header.commitNum >= state.next->blockNum)
          {
-            verifyIrreversible(state, block);
+            auto start    = state.next->blockNum;
+            auto commit   = verifyIrreversible(state, block);
             state.current = std::move(state.next->consensus);
             state.next.reset();
             stateHash = sha256(state);
             pendingBlocks.clear();
+            return ConsensusChangeRow{start, commit, header.blockNum};
          }
+         return {};
       }
       static const Claim& getProducerKey(const std::vector<Producer>& producers, AccountNumber prod)
       {
@@ -192,9 +195,9 @@ namespace psibase
          }
          abortMessage(prod.str() + " is not an active producer");
       }
-      void verifyIrreversible(const CftConsensus& consensus,
-                              const JointConsensus&,
-                              const SignedBlock& block)
+      BlockNum verifyIrreversible(const CftConsensus& consensus,
+                                  const JointConsensus&,
+                                  const SignedBlock& block)
       {
          BlockSignatureInfo    info{BlockInfo{block.block.header}};
          std::span<const char> buf{info};
@@ -202,10 +205,11 @@ namespace psibase
                          getProducerKey(consensus.producers, block.block.header.producer),
                          block.signature);
          updateVerifyState();
+         return block.block.header.commitNum;
       }
-      void verifyIrreversible(const BftConsensus&   consensus,
-                              const JointConsensus& jointConsensus,
-                              const SignedBlock&    block)
+      BlockNum verifyIrreversible(const BftConsensus&   consensus,
+                                  const JointConsensus& jointConsensus,
+                                  const SignedBlock&    block)
       {
          check(!!block.auxConsensusData, "BFT requires auxConsensusData to prove irreversibility");
          auto confirms = psio::from_frac<BlockConfirm>(*block.auxConsensusData);
@@ -231,11 +235,12 @@ namespace psibase
                verifySignature(hash, key, msg.signature);
             }
          }
+         return confirms.blockNum;
       }
-      void verifyIrreversible(const JointConsensus& consensus, const SignedBlock& block)
+      BlockNum verifyIrreversible(const JointConsensus& consensus, const SignedBlock& block)
       {
-         std::visit([&](const auto& c) { verifyIrreversible(c, consensus, block); },
-                    consensus.current.data);
+         return std::visit([&](const auto& c) { return verifyIrreversible(c, consensus, block); },
+                           consensus.current.data);
       }
       void updateVerifyState()
       {

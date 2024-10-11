@@ -150,8 +150,12 @@ int verifyHeaders(psibase::TestChain&          chain,
             auxConsensusData = psio::from_frac<psibase::BlockDataRow>(aux).auxConsensusData;
          }
       }
-      validator.push(
-          psibase::SignedBlock{std::move(*block), std::move(*sig), std::move(auxConsensusData)});
+      if (auto consensusChange = validator.push(psibase::SignedBlock{
+              std::move(*block), std::move(*sig), std::move(auxConsensusData)}))
+      {
+         psibase::ChainHandle{chain.nativeHandle()}.kvPut(psibase::ConsensusChangeRow::db,
+                                                          consensusChange->key(), *consensusChange);
+      }
    }
    return 0;
 }
@@ -369,6 +373,16 @@ int verifyState(std::uint32_t chain, const psibase::StatusRow& status)
    return 0;
 }
 
+void writeSnapshotRow(psibase::ChainHandle      chain,
+                      const psibase::StatusRow& status,
+                      const SnapshotFooter&     footer)
+{
+   psibase::SnapshotRow row{
+       .id    = status.head->blockId,
+       .state = psibase::SnapshotStateItem{.state = *footer.hash, .signatures = footer.signatures}};
+   chain.kvPut(psibase::SnapshotRow::db, row.key(), row);
+}
+
 void clearDb(std::uint32_t chain, DbId db)
 {
    std::vector<char> key;
@@ -438,8 +452,6 @@ int main(int argc, const char* const* argv)
       return res;
    if (validator.state.current != newStatus->consensus.current)
    {
-      std::cerr << psio::format_json(validator.state.current) << std::endl;
-      std::cerr << psio::format_json(newStatus->consensus.current) << std::endl;
       std::cerr << "Verification of current producers failed" << std::endl;
       return 1;
    }
@@ -454,6 +466,7 @@ int main(int argc, const char* const* argv)
    }
    if (newStatus->consensus.next)
       validator.writePrevAuthServices({handle});
+   writeSnapshotRow({handle}, *newStatus, footer);
    raw::commitState(handle);
    std::cerr << "Snapshot successfully loaded\n"
              << "Chain: " << psio::hex(newStatus->chainId.begin(), newStatus->chainId.end())
