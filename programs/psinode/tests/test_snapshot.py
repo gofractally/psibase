@@ -1,0 +1,50 @@
+#!/usr/bin/python
+
+from psinode import Cluster
+import testutil
+import predicates
+import unittest
+import os
+
+class TestSnapshot(unittest.TestCase):
+    @testutil.psinode_test
+    def test_snapshot(self, cluster):
+        prods = cluster.complete(*testutil.generate_names(4))
+        (a, b, c, d) = prods
+        a.boot(packages=['Minimal', 'Explorer', 'AuthSig'])
+        # Multisig transactions (and signed transactions in general) are not implemented in python
+        a.push_action('root', 'accounts', 'setAuthServ', {'authService': 'auth-any'})
+        auth = []
+        for p in prods:
+            with p.post('/native/admin/keys', service='x-admin', json={"service":"verify-sig"}) as reply:
+                reply.raise_for_status()
+                print(reply.json())
+                auth.append({"name":p.producer, "auth":reply.json()[0]})
+        a.set_producers(auth[0:3], algorithm='cft')
+        a.wait(predicates.producers_are(prods[0:3]))
+        a.set_producers(auth, algorithm='bft')
+        a.wait(predicates.producers_are(prods))
+        a.push_action('transact', 'transact', 'setSnapshotTime', {"seconds": 5})
+        a.set_producers(auth[0:3], algorithm='cft')
+        a.wait(predicates.producers_are(prods[0:3]))
+        a.wait(predicates.new_block())
+        a.wait(predicates.new_block())
+        a.shutdown()
+        # Load two nodes from snapshots
+        e = cluster.make_node('e', start=False)
+        f = cluster.make_node('f', start=False)
+        a.run_psibase(['create-snapshot', a.dir, os.path.join(a.dir, 'snapshot')])
+        e.run_psibase(['load-snapshot', e.dir, os.path.join(a.dir, 'snapshot')])
+        f.run_psibase(['load-snapshot', f.dir, os.path.join(a.dir, 'snapshot')])
+        e.start()
+        f.start()
+        e.connect(f)
+        b.connect(e)
+        b.connect(f)
+        c.connect(e)
+        c.connect(f)
+        b.set_producers([auth[1], e, f], algorithm='cft')
+        b.wait(predicates.producers_are([prods[1], 'e', 'f']))
+
+if __name__ == '__main__':
+    testutil.main()
