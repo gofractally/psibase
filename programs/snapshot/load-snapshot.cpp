@@ -418,10 +418,6 @@ int verifyState(std::uint32_t chain, const psibase::StatusRow& status)
    {
       psibase::check(authServices == status.consensus.next->consensus.services,
                      "Auth services in chain state do not match block header");
-      if (authServices != status.consensus.current.services)
-      {
-         psibase::abortMessage("Not implemented: don't know how to get current auth services");
-      }
    }
    else
    {
