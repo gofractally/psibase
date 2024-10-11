@@ -16,6 +16,7 @@ struct ChainmailPlugin;
 #[derive(Debug, Deserialize)]
 struct MessageSerde {
     msg_id: String,
+    archived_msg_id: Option<String>,
     receiver: String,
     sender: String,
     subject: String,
@@ -37,6 +38,7 @@ impl Api for ChainmailPlugin {
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
+        // Verify receiver = get_sender() (so people can archive each others' messages)
         Transact::add_action_to_transaction(
             "archive",
             &chainmail::action_structs::archive { msg_id }.packed(),
@@ -44,23 +46,39 @@ impl Api for ChainmailPlugin {
         Ok(())
     }
 
-    fn save(event_id: u64) -> Result<(), Error> {
-        // look up message details via event_id
+    fn save(msg_id: u64) -> Result<(), Error> {
+        let api_root = String::from("/api");
+        println!("save(msg_id[{}]", msg_id);
+        println!(
+            "endpoing[{}]",
+            &format!("{}/messages?id={}", api_root, &msg_id.to_string())
+        );
+        // look up message details via msg_id
         // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
-        let res = CommonServer::get_json(&format!("/messages?id={}", event_id))?;
+        println!("get_sender(): {}", get_sender().to_string());
+        println!("msg_id: {}", get_sender().to_string() + &msg_id.to_string());
+        let res =
+            CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
+        println!("{}", res);
 
-        let msg = serde_json::from_str::<MessageSerde>(&res)
-            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+        let msg = serde_json::from_str::<Vec<MessageSerde>>(&res).map_err(|err| {
+            println!("err: {:#?}", err);
+            ErrorType::QueryResponseParseError.err(err.to_string().as_str())
+        })?;
+        println!("Deserialization complete. msg: {:#?}", msg);
 
+        // TODO: make query return single record for id= param; no need for a vec here
         // save the message to state
+        let msg = msg.get(0).unwrap();
         Transact::add_action_to_transaction(
             "save",
             &chainmail::action_structs::save {
-                subject: msg.subject,
-                body: msg.body,
-                event_id: u64::from_str_radix(&msg.msg_id, 10)
+                subject: msg.subject.clone(),
+                body: msg.body.clone(),
+                receiver: AccountNumber::from(msg.receiver.as_str()),
+                msg_id: u64::from_str_radix(&msg.msg_id, 10)
                     .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))?,
-                sender: get_sender(),
+                sender: AccountNumber::from(msg.sender.as_str()),
             }
             .packed(),
         )?;

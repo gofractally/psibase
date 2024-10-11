@@ -102,7 +102,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             r_clause = format!("receiver = '{}'", r);
         }
 
-        if s_opt.is_none() && r_opt.is_none() {
+        if s_opt.is_none() && r_opt.is_none() && params.get("id").is_none() {
             return None;
         }
 
@@ -111,6 +111,8 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             None => false,
         };
         println!("archived_requested: {}", archived_requested);
+
+        println!("param.id = {}", params.contains_key("id"));
 
         let mut where_clause_sender_receiver: String = String::from("");
         if s_opt.is_some() {
@@ -134,16 +136,18 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
 
         // Select from all sent emails *not archived* where receiver/send are as query params specify
-        let select_clause = format!("DISTINCT sent.rowid as msg_id, archive.event_id, sent.*");
-        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id" );
+        let select_clause =
+            format!("DISTINCT sent.*, sent.rowid as msg_id, archive.msg_id as archived_msg_id ");
+        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archived_msg_id" );
         let where_clause_archived_or_not = format!(
-            "archive.event_id IS {} NULL",
+            "archived_msg_id IS {} NULL",
             if archived_requested { "NOT" } else { "" }
         );
+
         let order_by_clause = "sent.ROWID";
 
         let sql_query_str = format!(
-            "SELECT {} FROM {} WHERE {} {} {} ORDER BY {}",
+            "SELECT {} FROM {} WHERE {} {} {} {} ORDER BY {}",
             select_clause,
             from_clause,
             where_clause_archived_or_not,
@@ -151,6 +155,11 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
                 "AND"
             } else {
                 ""
+            },
+            if params.contains_key("id") {
+                format!("AND sent.rowid = {}", params.get("id")?)
+            } else {
+                String::from("")
             },
             where_clause_sender_receiver,
             order_by_clause

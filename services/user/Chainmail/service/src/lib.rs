@@ -58,12 +58,22 @@ mod service {
     }
 
     #[action]
-    fn save(event_id: u64, sender: AccountNumber, subject: String, body: String) {
+    fn save(
+        msg_id: u64,
+        receiver: AccountNumber,
+        sender: AccountNumber,
+        subject: String,
+        body: String,
+    ) {
+        check(
+            get_sender() == receiver,
+            &format!("only receiver of email can save it"),
+        );
         let saved_messages_table = SavedMessagesTable::new();
 
         saved_messages_table
             .put(&SavedMessage {
-                event_id,
+                msg_id,
                 sender,
                 subject,
                 body,
@@ -73,11 +83,11 @@ mod service {
     }
 
     #[action]
-    fn unsave(event_id: u64, sender: AccountNumber, subject: String, body: String) {
+    fn unsave(msg_id: u64, sender: AccountNumber, subject: String, body: String) {
         let saved_messages_table = SavedMessagesTable::new();
 
         saved_messages_table.remove(&SavedMessage {
-            event_id,
+            msg_id,
             sender,
             subject,
             body,
@@ -93,6 +103,5 @@ mod service {
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_rest_api(&request))
-        // .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
