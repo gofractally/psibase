@@ -256,12 +256,18 @@ int verifySignatures(std::uint32_t                  authServices,
       }
       else
       {
-         std::cerr << "Warning: not enough signatures on snapshot" << std::endl;
          for (const auto& prod : producerSignatures)
          {
             std::cerr << "Good signature from " << prod.name.str() << std::endl;
          }
+         std::cerr << "Not enough block producer signatures on snapshot" << std::endl;
+         return 1;
       }
+   }
+   else
+   {
+      std::cerr << "Snapshot is not signed by the block producers" << std::endl;
+      return 1;
    }
    return result;
 }
@@ -523,7 +529,8 @@ int main(int argc, const char* const* argv)
    }
    else
    {
-      std::cerr << "Warning: snapshot is not signed\n";
+      std::cerr << "Snapshot is not signed\n";
+      return 1;
    }
    if (newStatus->consensus.next)
       validator.writePrevAuthServices({handle});
