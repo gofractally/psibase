@@ -46,8 +46,8 @@ class TestSnapshot(unittest.TestCase):
         b.connect(f)
         c.connect(e)
         c.connect(f)
-        b.set_producers([auth[1], e, f], algorithm='cft')
-        b.wait(predicates.producers_are([prods[1], 'e', 'f']))
+        b.set_producers([e, f, 'missing'], algorithm='cft')
+        b.wait(predicates.producers_are(['e', 'f', 'missing']))
 
 if __name__ == '__main__':
     testutil.main()
