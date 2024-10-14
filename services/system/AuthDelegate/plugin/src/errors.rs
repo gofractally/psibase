@@ -3,13 +3,11 @@ use crate::bindings::host::common::types::{Error, PluginId};
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
     NotYetImplemented,
-    CryptoError,
-    Unauthorized,
 }
 
 fn my_plugin_id() -> PluginId {
     return PluginId {
-        service: "auth-sig".to_string(),
+        service: "auth-delegate".to_string(),
         plugin: "plugin".to_string(),
     };
 }
@@ -21,16 +19,6 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Not yet implemented: {}", msg),
-            },
-            ErrorType::CryptoError => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Crypto error: {}", msg),
-            },
-            ErrorType::Unauthorized => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Unauthorized: {}", msg),
             },
         }
     }

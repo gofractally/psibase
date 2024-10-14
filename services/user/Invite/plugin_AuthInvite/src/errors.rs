@@ -2,14 +2,14 @@ use crate::bindings::host::common::types::{Error, PluginId};
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
-    NotYetImplemented,
-    CryptoError,
     Unauthorized,
+    MissingInviteToken,
+    DecodeInviteError,
 }
 
 fn my_plugin_id() -> PluginId {
     return PluginId {
-        service: "auth-sig".to_string(),
+        service: "auth-invite".to_string(),
         plugin: "plugin".to_string(),
     };
 }
@@ -17,20 +17,20 @@ fn my_plugin_id() -> PluginId {
 impl ErrorType {
     pub fn err(self, msg: &str) -> Error {
         match self {
-            ErrorType::NotYetImplemented => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Not yet implemented: {}", msg),
-            },
-            ErrorType::CryptoError => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Crypto error: {}", msg),
-            },
             ErrorType::Unauthorized => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Unauthorized: {}", msg),
+            },
+            ErrorType::MissingInviteToken => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Missing invite token: {}", msg),
+            },
+            ErrorType::DecodeInviteError => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Decode invite error: {}", msg),
             },
         }
     }

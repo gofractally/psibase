@@ -1,0 +1,31 @@
+/// This plugin facilitates the creation of the transaction that can be used to
+/// submit an action to accept or reject an invite when the user has no pre-existing account.
+///
+/// The way it works is that the invite plugin is required to notify this auth service of
+/// invite tokens that can be used to construct the claims/proofs for the transaction.
+///
+/// At the time of transaction construction/submission, the transact plugin will call
+/// into this auth service plugin for the claims/proofs (just like any other auth service).
+///
+/// This auth service specifies the claim as the public key corresponding to the private key
+/// in the invite, and the proof is the signature on the transaction using that same private key.
+///
+/// The corresponding auth service to this plugin verifies that the transaction claims to be
+/// signed by a key that corresponds to a known and unused invite public key.
+
+package auth-invite:plugin;
+
+interface types {
+    type invite-token = string;
+}
+
+interface intf {
+    use host:common/types.{error};
+    use types.{invite-token};
+
+    notify: func(token: invite-token) -> result<_, error>;
+}
+
+world imports {
+    import intf;
+}

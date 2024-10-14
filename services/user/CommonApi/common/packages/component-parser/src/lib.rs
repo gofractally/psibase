@@ -41,7 +41,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
         if i > 0 {
             wit.push_str("\n\n");
         }
-        match printer.print(resolved_wit, &[id]) {
+        match printer.print(resolved_wit, id, &[]) {
             Ok(s) => wit.push_str(&s),
             Err(e) => {
                 // If we can't print the document, just use the error text
@@ -73,13 +73,19 @@ where
                 // (https://github.com/WebAssembly/component-model/pull/332)
                 let intf = resolved_wit.interfaces.get(*id).unwrap();
                 let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
+                let intf_name = intf.name.as_ref().unwrap();
                 let mut new_intf = Intf {
                     namespace: pkg.name.namespace.to_owned(),
                     package: pkg.name.name.to_owned(),
-                    name: intf.name.to_owned().unwrap(),
+                    name: kebab_to_camel(&intf_name),
                     funcs: vec![],
                 };
-                for (func_name, _) in &intf.functions {
+                for (func_name, _func) in &intf.functions {
+                    //if _func.kind == FunctionKind::Method || _func.kind == FunctionKind::Constructor {
+                    //  Then this is a method defined within a resource
+                    //  But we can also extract this information while generating js bindings
+                    //    from the function name
+                    //}
                     new_intf.funcs.push(kebab_to_camel(&func_name.to_owned()));
                 }
                 funcs.interfaces.push(new_intf);

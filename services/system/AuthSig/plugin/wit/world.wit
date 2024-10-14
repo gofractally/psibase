@@ -3,20 +3,6 @@ package auth-sig:plugin;
 /// Common types used when dealing with auth service plugins
 interface types {
 
-    /// A list of `claim` objects is added to every submitted transaction.
-    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
-    record claim {
-        /// The name of the service used to verify the claim is valid
-        verify-service: string,
-        /// The raw claim data
-        raw-data: list<u8>,
-    }
-
-    /// A list of `proof` is attached
-    record proof {
-        signature: list<u8>,
-    }
-
     /// PEM type is just a string
     type pem = string;
 
@@ -26,23 +12,6 @@ interface types {
         public-key: pem,
         private-key: pem,
     }
-}
-
-/// Methods related to psibase smart authorization
-/// Every auth service must export this interface
-interface smart-auth {
-    use host:common/types.{error};
-    use types.{claim, proof};
-
-    /// Gets the claim needed for this user to satisfy the authorization check
-    get-claim: func() -> result<claim, error>;
-
-    /// Provides proof of the claim. 
-    /// 
-    /// Parameters
-    /// * `message`: A message that usually needs to be signed as
-    ///   proof of the claim.
-    get-proof: func(message: list<u8>) -> result<proof, error>;
 }
 
 /// Methods related to key management
@@ -64,6 +33,9 @@ interface keyvault {
 
     /// Returns the DER encoded key
     to-der: func(key: pem) -> result<list<u8>, error>;
+
+    /// Signs a message with the specified DER-encoded private key
+    sign: func(message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
 }
 
 interface actions {
@@ -76,7 +48,7 @@ interface actions {
 }
 
 world imports {
-    import smart-auth;
+    // All auth services provide the standard smart-auth interface
     import keyvault;
     import actions;
 }

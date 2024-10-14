@@ -1,13 +1,12 @@
-package auth-sig:plugin;
+package auth-invite:plugin;
 
 world impl {
-    include accounts:plugin/imports;
-    include transact:plugin/imports;
     include host:common/imports;
     include clientdata:plugin/imports;
-
+    include invite:plugin/imports;
+    include auth-sig:plugin/imports;
     import accounts:smart-auth/types;
+
     export accounts:smart-auth/smart-auth;
-    export keyvault;
-    export actions;
+    export intf;
 }
