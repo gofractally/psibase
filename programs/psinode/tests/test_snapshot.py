@@ -24,7 +24,7 @@ class TestSnapshot(unittest.TestCase):
         a.wait(predicates.producers_are(prods[0:3]))
         a.set_producers(auth, algorithm='bft')
         a.wait(predicates.producers_are(prods))
-        a.push_action('transact', 'transact', 'setSnapshotTime', {"seconds": 5})
+        a.push_action('transact', 'transact', 'setSnapTime', {"seconds": 5})
         a.set_producers(auth[0:3], algorithm='cft')
         a.wait(predicates.producers_are(prods[0:3]))
         a.wait(predicates.new_block())

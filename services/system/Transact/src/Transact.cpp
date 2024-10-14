@@ -113,7 +113,7 @@ namespace SystemService
       }
    }
 
-   void Transact::setSnapshotTime(std::uint32_t seconds)
+   void Transact::setSnapTime(std::uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
       Tables tables(Transact::service);

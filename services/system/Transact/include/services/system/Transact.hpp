@@ -247,7 +247,7 @@ namespace SystemService
       void startBlock();
 
       /// Sets the time between automatic snapshots
-      void setSnapshotTime(std::uint32_t seconds);
+      void setSnapTime(std::uint32_t seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
@@ -312,7 +312,7 @@ namespace SystemService
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
-                method(setSnapshotTime, seconds),
+                method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
