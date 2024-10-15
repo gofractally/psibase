@@ -29,3 +29,4 @@ package = "auth-invite:plugin"
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "accounts:smart-auth" = { path = "../../../system/Accounts/plugin/smartAuth/world.wit" }
 "auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
