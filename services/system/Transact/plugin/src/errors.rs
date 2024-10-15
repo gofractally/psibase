@@ -6,6 +6,7 @@ pub enum ErrorType {
     InvalidActionName,
     NotLoggedIn,
     TransactionError,
+    ClaimProofMismatch,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -37,6 +38,11 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Transaction error: {}", msg),
+            },
+            ErrorType::ClaimProofMismatch => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Number of proofs does not match number of claims: {}", msg),
             },
         }
     }

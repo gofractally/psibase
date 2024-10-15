@@ -15,7 +15,10 @@ interface admin {
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
+    include accounts:smart-auth/imports;
+    include accounts:plugin/imports;
 
     export admin;
     export intf;
+    export auth;
 }

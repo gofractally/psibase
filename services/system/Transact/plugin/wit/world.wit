@@ -1,5 +1,13 @@
 package transact:plugin;
 
+interface auth {
+    /// Notifies the transact plugin that the caller plugin has one or more claims/proofs to add to the 
+    /// transaction. 
+    /// 
+    /// This is only needed by auth services.
+    notify: func();
+}
+
 interface intf {
     use host:common/types.{error};
 
