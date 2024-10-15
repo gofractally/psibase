@@ -95,13 +95,6 @@ const ActionBar = ({
     const onArchive = async (itemId: string) => {
         let id = parseInt(itemId);
         const supervisor = await getSupervisor();
-        // TODO: Unsave if saved
-        // await supervisor.functionCall({
-        //     service: "chainmail",
-        //     intf: "api",
-        //     method: "unsave",
-        //     params: [id],
-        // });
         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
         await supervisor.functionCall({
             service: "chainmail",
@@ -125,6 +118,12 @@ const ActionBar = ({
             intf: "api",
             method: "save",
             params: [id],
+        });
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "api",
+            method: "dumpTable",
+            params: [],
         });
     };
 

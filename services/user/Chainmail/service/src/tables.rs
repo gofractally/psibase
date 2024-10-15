@@ -1,4 +1,4 @@
-use psibase::{AccountNumber, Fracpack, TableRecord};
+use psibase::{AccountNumber, Fracpack, TableRecord, TimePointSec};
 use serde::{Deserialize, Serialize};
 
 impl TableRecord for SavedMessage {
@@ -14,7 +14,9 @@ impl TableRecord for SavedMessage {
 #[derive(Debug, Fracpack, Serialize, Deserialize)]
 pub struct SavedMessage {
     pub msg_id: u64,
+    pub receiver: AccountNumber,
     pub sender: AccountNumber,
     pub subject: String,
     pub body: String,
+    pub datetime: TimePointSec,
 }

@@ -67,7 +67,7 @@ fn parse_query(query: &str) -> HashMap<String, String> {
 
 pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
-        println!("request.target = {}", request.target);
+        // println!("request.target = {}", request.target);
         if !request.target.starts_with("/api/messages") {
             return None;
         }
@@ -84,7 +84,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let mut s_clause = String::new();
         let s_opt = params.get("sender");
-        println!("sender: {:#?}", s_opt);
+        // println!("sender: {:#?}", s_opt);
         if let Some(s) = s_opt {
             if !validate_user(s) {
                 return None;
@@ -94,7 +94,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
-        println!("receiver: {:#?}", r_opt);
+        // println!("receiver: {:#?}", r_opt);
         if let Some(r) = r_opt {
             if !validate_user(r) {
                 return None;
@@ -110,9 +110,9 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             Some(arch) => arch == "true",
             None => false,
         };
-        println!("archived_requested: {}", archived_requested);
+        // println!("archived_requested: {}", archived_requested);
 
-        println!("param.id = {}", params.contains_key("id"));
+        // println!("param.id = {}", params.contains_key("id"));
 
         let mut where_clause_sender_receiver: String = String::from("");
         if s_opt.is_some() {
@@ -124,7 +124,7 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         if r_opt.is_some() {
             where_clause_sender_receiver += r_clause.as_str();
         }
-        println!("where-clause: {}", where_clause_sender_receiver);
+        // println!("where-clause: {}", where_clause_sender_receiver);
 
         /* TASKS
          * x- clean this up so chainmail shows sent/received messages instead of []

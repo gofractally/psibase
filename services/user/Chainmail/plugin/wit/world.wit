@@ -6,7 +6,8 @@ interface types {
         receiver: string,
         sender: string,
         subject: string,
-        body: string
+        body: string,
+        datetime: u32
     }
 }
 
@@ -29,6 +30,11 @@ interface api {
     
     // Save an email
     save: func(event-id: u64) -> result<_, error>;
+    
+    // Unsave an email (remove it from state)
+    unsave: func(event-id: u64) -> result<_, error>;
+    
+    // dump-table: func() -> result<_, error>;
 }
 
 world imports {
