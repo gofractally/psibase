@@ -8,9 +8,9 @@ mod tables;
 pub fn dump_table() {
     let table_ref = SavedMessagesTable::new();
     let idx = table_ref.get_index_pk();
-    println!("dump_table() SavedMessages:");
+    println!("--> dump_table() SavedMessages:");
     for msg in idx.into_iter() {
-        println!("action: dump_table: {:#?}", msg);
+        println!("{:#?}", msg);
     }
 }
 

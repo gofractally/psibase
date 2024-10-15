@@ -119,12 +119,6 @@ const ActionBar = ({
             method: "save",
             params: [id],
         });
-        await supervisor.functionCall({
-            service: "chainmail",
-            intf: "api",
-            method: "dumpTable",
-            params: [],
-        });
     };
 
     const onDeleteDraft = () => {

@@ -33,8 +33,6 @@ interface api {
     
     // Unsave an email (remove it from state)
     unsave: func(event-id: u64) -> result<_, error>;
-    
-    // dump-table: func() -> result<_, error>;
 }
 
 world imports {

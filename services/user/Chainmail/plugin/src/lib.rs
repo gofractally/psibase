@@ -27,15 +27,13 @@ struct MessageSerde {
 
 fn get_msg_by_id(msg_id: u64) -> Result<MessageSerde, Error> {
     let api_root = String::from("/api");
-    println!("save(msg_id[{}]", msg_id);
+    println!("save(msg_id[{}])", msg_id);
     println!(
-        "endpoing[{}]",
+        "endpoint[{}]",
         &format!("{}/messages?id={}", api_root, &msg_id.to_string())
     );
     // look up message details via msg_id
     // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
-    println!("get_sender(): {}", get_sender().to_string());
-    println!("msg_id: {}", get_sender().to_string() + &msg_id.to_string());
     let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
     println!("{}", res);
 
@@ -79,8 +77,8 @@ impl Api for ChainmailPlugin {
     }
 
     fn save(msg_id: u64) -> Result<(), Error> {
+        println!("save(msg_id[{}]", msg_id);
         // let api_root = String::from("/api");
-        // println!("save(msg_id[{}]", msg_id);
         // println!(
         //     "endpoing[{}]",
         //     &format!("{}/messages?id={}", api_root, &msg_id.to_string())
@@ -103,7 +101,9 @@ impl Api for ChainmailPlugin {
         // // save the message to state
         // let msg = msg.get(0).unwrap();
 
+        println!("save.1");
         let msg = get_msg_by_id(msg_id)?;
+        println!("save.2");
         Transact::add_action_to_transaction(
             "save",
             &chainmail::action_structs::save {
@@ -117,6 +117,7 @@ impl Api for ChainmailPlugin {
             }
             .packed(),
         )?;
+        println!("save.3");
         Ok(())
     }
 
@@ -136,14 +137,6 @@ impl Api for ChainmailPlugin {
         )?;
         Ok(())
     }
-
-    // fn dump_table() -> Result<(), Error> {
-    //     Transact::add_action_to_transaction(
-    //         "dump_table",
-    //         &chainmail::action_structs::dump_table {}.packed(),
-    //     )?;
-    //     Ok(())
-    // }
 }
 
 fn query_messages_endpoint(
