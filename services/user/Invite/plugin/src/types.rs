@@ -54,13 +54,13 @@ impl From<InviteParams> for InviteToken {
 }
 
 pub trait TryFromInviteToken: Sized {
-    fn try_from_invite_id(id: InviteToken) -> Result<Self, CommonTypes::Error>;
+    fn try_from_invite_id(id: &str) -> Result<Self, CommonTypes::Error>;
 }
 
 impl TryFromInviteToken for InviteParams {
-    fn try_from_invite_id(id: InviteToken) -> Result<Self, CommonTypes::Error> {
+    fn try_from_invite_id(id: &str) -> Result<Self, CommonTypes::Error> {
         let bytes = URL_SAFE
-            .decode(id.to_owned())
+            .decode(id)
             .map_err(|_| DecodeInviteError.err("Error decoding base64"))?;
 
         let str = String::from_utf8(bytes)

@@ -87,12 +87,18 @@ interface invitee {
     /// invite.
     decode-invite: func(token: invite-token) -> result<invite, error>;
 
-    /// Call to accept an invite with a new account.
+    /// Creates a new account and accepts the specified invite with it.
     /// 
     /// Parameters
     /// * `account`: The name of the new account being created
     /// * `invite-token`: The token of the invite being accepted
     accept-with-new-account: func(account: string, token: invite-token) -> result<_, error>;
+
+    /// Accepts an invite with an existing account (the currently logged-in account).
+    /// 
+    /// Parameters
+    /// * `token`: The token of the invite being accepted
+    accept: func(token: invite-token) -> result<_, error>;
 
     /// Rejects an invite. Once an invite is rejected, it cannot be accepted or used to
     /// create a new account.
@@ -102,7 +108,25 @@ interface invitee {
     reject: func(token: invite-token) -> result<_, error>;
 }
 
+interface adv-types {
+    // DER encoded
+    record inv-keys {
+        pub-key: list<u8>,
+        priv-key: list<u8>,
+    }
+}
+
+interface advanced {
+    use types.{invite-token, invite};
+    use host:common/types.{error};
+    use adv-types.{inv-keys};
+
+    /// Deserializes an invite token into just the creator app + private key
+    deserialize: func(token: invite-token) -> result<inv-keys, error>;
+}
+
 world imports {
+    import advanced;
     import inviter;
     import invitee;
 }

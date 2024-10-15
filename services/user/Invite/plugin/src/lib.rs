@@ -4,8 +4,11 @@ mod errors;
 mod types;
 
 use bindings::accounts::plugin as Accounts;
+use bindings::auth_invite::plugin::intf as AuthInvite;
 use bindings::auth_sig::plugin::{keyvault, types::Pem};
 use bindings::exports::invite;
+use bindings::exports::invite::plugin::advanced::Guest as Advanced;
+use bindings::exports::invite::plugin::advanced::InvKeys as InviteKeys;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteState, InviteToken};
 use bindings::transact::plugin::intf as Transact;
@@ -13,7 +16,7 @@ use chrono::DateTime;
 use errors::ErrorType::*;
 use fracpack::Pack;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
-use psibase::services::invite as InviteService;
+use psibase::services::invite::{self as InviteService, action_structs::*};
 use types::*;
 use CommonTypes::OriginationData;
 
@@ -40,12 +43,14 @@ impl Invitee for InvitePlugin {
             return Err(AccountExists.err("accept_with_new_account"));
         }
 
-        let invite_params = InviteParams::try_from_invite_id(token)?;
+        AuthInvite::notify(&token)?;
+
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
         let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
 
         Transact::add_action_to_transaction(
-            "acceptCreate",
-            &InviteService::action_structs::acceptCreate {
+            acceptCreate::ACTION_NAME,
+            &acceptCreate {
                 inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
                 acceptedBy: accepted_by,
                 newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
@@ -56,12 +61,42 @@ impl Invitee for InvitePlugin {
         Ok(())
     }
 
-    fn reject(_token: InviteToken) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("reject"))
+    fn accept(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        AuthInvite::notify(&token)?;
+
+        Transact::add_action_to_transaction(
+            accept::ACTION_NAME,
+            &accept {
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
+    }
+
+    fn reject(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        AuthInvite::notify(&token)?;
+
+        Transact::add_action_to_transaction(
+            reject::ACTION_NAME,
+            &reject {
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
     }
 
     fn decode_invite(token: InviteToken) -> Result<Invite, CommonTypes::Error> {
-        let invite_params = InviteParams::try_from_invite_id(token)?;
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
 
         let query = format!(
             r#"query {{
@@ -103,8 +138,8 @@ impl Inviter for InvitePlugin {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         Transact::add_action_to_transaction(
-            "createInvite",
-            &InviteService::action_structs::createInvite {
+            createInvite::ACTION_NAME,
+            &createInvite {
                 inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
             }
             .packed(),
@@ -121,18 +156,29 @@ impl Inviter for InvitePlugin {
     }
 
     fn delete_invite(token: InviteToken) -> Result<(), CommonTypes::Error> {
-        let invite_params = InviteParams::try_from_invite_id(token)?;
-        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+        let invite_keys = Self::deserialize(token)?;
 
         Transact::add_action_to_transaction(
             "delInvite",
             &InviteService::action_structs::delInvite {
-                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+                inviteKey: invite_keys.pub_key.into(),
             }
             .packed(),
         )?;
 
         Ok(())
+    }
+}
+
+impl Advanced for InvitePlugin {
+    fn deserialize(token: InviteToken) -> Result<InviteKeys, CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        Ok(InviteKeys {
+            pub_key: keyvault::to_der(&invite_pubkey)?,
+            priv_key: keyvault::to_der(&invite_params.pk)?,
+        })
     }
 }
 
