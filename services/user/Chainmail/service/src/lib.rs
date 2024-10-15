@@ -1,22 +1,9 @@
-use psibase::Table;
-use service::SavedMessagesTable;
-
 mod event_query_helpers;
 mod helpers;
 mod tables;
 
-pub fn dump_table() {
-    let table_ref = SavedMessagesTable::new();
-    let idx = table_ref.get_index_pk();
-    println!("--> dump_table() SavedMessages:");
-    for msg in idx.into_iter() {
-        println!("{:#?}", msg);
-    }
-}
-
 #[psibase::service(recursive = true)]
 mod service {
-    use crate::dump_table;
     use crate::event_query_helpers::serve_rest_api;
     use crate::tables::SavedMessage;
 
@@ -63,15 +50,11 @@ mod service {
         Wrapper::emit()
             .history()
             .sent(get_sender(), receiver, subject, body, datetime);
-
-        dump_table();
     }
 
     #[action]
     fn archive(msg_id: u64) {
         let saved_messages_table = SavedMessagesTable::new();
-        dump_table();
-
         if let Some(rec) = saved_messages_table.get_index_pk().get(&msg_id) {
             Wrapper::call().unsave(
                 msg_id,
@@ -85,8 +68,6 @@ mod service {
         Wrapper::emit()
             .history()
             .archive(get_sender().to_string() + &msg_id.to_string());
-
-        dump_table();
     }
 
     #[action]
@@ -102,8 +83,8 @@ mod service {
             get_sender() == receiver,
             &format!("only receiver of email can save it"),
         );
-        let saved_messages_table = SavedMessagesTable::new();
 
+        let saved_messages_table = SavedMessagesTable::new();
         saved_messages_table
             .put(&SavedMessage {
                 msg_id,
@@ -114,8 +95,6 @@ mod service {
                 datetime: TimePointSec::from(datetime),
             })
             .unwrap();
-
-        dump_table();
     }
 
     #[action]
@@ -130,8 +109,6 @@ mod service {
             body,
             datetime: TimePointSec::from(datetime),
         });
-
-        dump_table();
     }
 
     #[event(history)]

@@ -7,9 +7,9 @@ use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
 use bindings::exports::chainmail::plugin::queries::Guest as Query;
 use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
-use errors::ErrorType::{self, InvalidMsgId, QueryResponseParseError};
+use errors::ErrorType;
 use psibase::fracpack::Pack;
-use psibase::{get_sender, AccountNumber, TimePointSec};
+use psibase::{AccountNumber, TimePointSec};
 use serde::Deserialize;
 
 struct ChainmailPlugin;
@@ -17,7 +17,7 @@ struct ChainmailPlugin;
 #[derive(Clone, Debug, Deserialize)]
 struct MessageSerde {
     msg_id: String,
-    archived_msg_id: Option<String>,
+    _archived_msg_id: Option<String>,
     receiver: String,
     sender: String,
     subject: String,
@@ -27,25 +27,13 @@ struct MessageSerde {
 
 fn get_msg_by_id(msg_id: u64) -> Result<MessageSerde, Error> {
     let api_root = String::from("/api");
-    println!("save(msg_id[{}])", msg_id);
-    println!(
-        "endpoint[{}]",
-        &format!("{}/messages?id={}", api_root, &msg_id.to_string())
-    );
-    // look up message details via msg_id
-    // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
-    let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
-    println!("{}", res);
 
-    let msg = serde_json::from_str::<Vec<MessageSerde>>(&res).map_err(|err| {
-        println!("err: {:#?}", err);
-        ErrorType::QueryResponseParseError.err(err.to_string().as_str())
-    })?;
-    println!("Deserialization complete. msg: {:#?}", msg);
+    let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
+
+    let msg = serde_json::from_str::<Vec<MessageSerde>>(&res)
+        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
     if msg.len() == 1 {
-        // TODO: make query return single record for id= param; no need for a vec here
-        // save the message to state
         let msg = msg.get(0).unwrap();
         return Ok(msg.clone());
     } else {
@@ -68,7 +56,6 @@ impl Api for ChainmailPlugin {
     }
 
     fn archive(msg_id: u64) -> Result<(), Error> {
-        // Verify receiver = get_sender() (so people can archive each others' messages)
         Transact::add_action_to_transaction(
             "archive",
             &chainmail::action_structs::archive { msg_id }.packed(),
@@ -76,34 +63,10 @@ impl Api for ChainmailPlugin {
         Ok(())
     }
 
+    // Save the message to state
     fn save(msg_id: u64) -> Result<(), Error> {
-        println!("save(msg_id[{}]", msg_id);
-        // let api_root = String::from("/api");
-        // println!(
-        //     "endpoing[{}]",
-        //     &format!("{}/messages?id={}", api_root, &msg_id.to_string())
-        // );
-        // // look up message details via msg_id
-        // // let (sender, receiver, subject, body) = fetch.get(/rest/message by id);
-        // println!("get_sender(): {}", get_sender().to_string());
-        // println!("msg_id: {}", get_sender().to_string() + &msg_id.to_string());
-        // let res =
-        //     CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
-        // println!("{}", res);
-
-        // let msg = serde_json::from_str::<Vec<MessageSerde>>(&res).map_err(|err| {
-        //     println!("err: {:#?}", err);
-        //     ErrorType::QueryResponseParseError.err(err.to_string().as_str())
-        // })?;
-        // println!("Deserialization complete. msg: {:#?}", msg);
-
-        // // TODO: make query return single record for id= param; no need for a vec here
-        // // save the message to state
-        // let msg = msg.get(0).unwrap();
-
-        println!("save.1");
         let msg = get_msg_by_id(msg_id)?;
-        println!("save.2");
+
         Transact::add_action_to_transaction(
             "save",
             &chainmail::action_structs::save {
@@ -117,7 +80,6 @@ impl Api for ChainmailPlugin {
             }
             .packed(),
         )?;
-        println!("save.3");
         Ok(())
     }
 
@@ -159,16 +121,14 @@ fn query_messages_endpoint(
     }
 
     let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
-    println!("resp: {:#?}", resp);
-    let mut resp_val: Vec<MessageSerde>;
+    let resp_val: Vec<MessageSerde>;
     if resp.is_err() {
-        return Err(errors::ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
+        return Err(ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
     } else {
         resp_val = resp.unwrap();
     }
-    println!("resp_val: {:#?}", resp_val);
 
-    // There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
+    // TODO: There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
     // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
     let messages: Vec<Message> = resp_val
         .into_iter()
@@ -176,7 +136,7 @@ fn query_messages_endpoint(
             msg_id: m
                 .msg_id
                 .parse::<u64>()
-                .map_err(|err| QueryResponseParseError.err(&err.to_string()))
+                .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))
                 .unwrap(),
             receiver: m.receiver,
             sender: m.sender,
@@ -185,7 +145,6 @@ fn query_messages_endpoint(
             datetime: m.datetime.seconds,
         })
         .collect();
-    println!("messages: {:#?}", messages);
     Ok(messages)
 }
 

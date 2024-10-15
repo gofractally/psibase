@@ -21,17 +21,11 @@ fn build_query_by_id(params: HashMap<String, String>) -> Option<String> {
     if params.get("id").is_none() {
         return None;
     }
-    // println!("param.id = {}", params.contains_key("id"));
     let msg_id = params.get("id")?;
 
-    // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as msg_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
-    // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
-
-    // Select from all sent emails *not archived* where receiver/send are as query params specify
     let select_clause =
         format!("DISTINCT sent.*, sent.rowid as msg_id, archive.msg_id as archived_msg_id ");
     let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archived_msg_id" );
-    // let where_sent_archived = "CONCAT(sent.receiver, sent.rowid) = archived_msg_id";
     let where_rowid_equals = format!("sent.rowid = {}", msg_id);
 
     Some(format!(
@@ -41,11 +35,8 @@ fn build_query_by_id(params: HashMap<String, String>) -> Option<String> {
 }
 
 fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
-    println!("params: {:#?}", params);
-
     let mut s_clause = String::new();
     let s_opt = params.get("sender");
-    // println!("sender: {:#?}", s_opt);
     if let Some(s) = s_opt {
         if !validate_user(s) {
             return None;
@@ -55,7 +46,6 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
 
     let mut r_clause = String::new();
     let r_opt = params.get(&String::from("receiver"));
-    // println!("receiver: {:#?}", r_opt);
     if let Some(r) = r_opt {
         if !validate_user(r) {
             return None;
@@ -71,7 +61,6 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
         Some(arch) => arch == "true",
         None => false,
     };
-    // println!("archived_requested: {}", archived_requested);
 
     let mut where_clause_sender_receiver: String = String::from("");
     if s_opt.is_some() {
@@ -83,12 +72,7 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
     if r_opt.is_some() {
         where_clause_sender_receiver += r_clause.as_str();
     }
-    // println!("where-clause: {}", where_clause_sender_receiver);
 
-    // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as msg_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
-    // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as msg_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
-
-    // Select from all sent emails *not archived* where receiver/send are as query params specify
     let select_clause =
         format!("DISTINCT sent.*, sent.rowid as msg_id, archive.msg_id as archived_msg_id ");
     let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archived_msg_id" );
@@ -118,7 +102,6 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
 
 pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
-        // println!("request.target = {}", request.target);
         if !request.target.starts_with("/api/messages") {
             return None;
         }
@@ -132,8 +115,6 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let query = request.target.split_at(query_start + 1).1;
         let params = parse_query(query);
 
-        // HERE
-
         let sql_query_str = if params.get("id").is_some() {
             build_query_by_id(params)
         } else {
@@ -143,10 +124,8 @@ pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
         let order_by_clause = "sent.ROWID";
 
         let sql_query_str = format!("{} ORDER BY {}", sql_query_str?, order_by_clause);
-        println!("query: {}", sql_query_str);
 
         let query_response = REventsSvc::call().sqlQuery(sql_query_str);
-        println!("query_response: {}", query_response);
 
         return Some(HttpReply {
             status: 200,
