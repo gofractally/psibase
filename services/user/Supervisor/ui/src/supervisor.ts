@@ -1,3 +1,5 @@
+import type { UUID } from "crypto";
+
 import {
     QualifiedPluginId,
     QualifiedFunctionCallArgs,
@@ -139,10 +141,10 @@ export class Supervisor implements AppInterface {
         return Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
-    private replyToParent(call: FunctionCallArgs, result: any) {
+    private replyToParent(id: UUID, call: FunctionCallArgs, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
-            buildFunctionCallResponse(call, result),
+            buildFunctionCallResponse(id, call, result),
             this.parentOrigination.origin,
         );
     }
@@ -266,6 +268,7 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
+        id: UUID,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
@@ -310,7 +313,7 @@ export class Supervisor implements AppInterface {
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
-            this.replyToParent(args, result);
+            this.replyToParent(id, args, result);
 
             this.context = undefined;
         } catch (e) {
@@ -319,11 +322,12 @@ export class Supervisor implements AppInterface {
                 // Since it is the final return value, it is no longer recoverable and is
                 //   converted to a PluginError to be handled by the client.
                 this.replyToParent(
+                    id,
                     args,
                     new PluginError(e.payload.producer, e.payload.message),
                 );
             } else {
-                this.replyToParent(args, e);
+                this.replyToParent(id, args, e);
             }
 
             this.context = undefined;
