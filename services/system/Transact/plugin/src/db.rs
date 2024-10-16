@@ -1,4 +1,4 @@
-use crate::bindings::accounts::smart_auth::smart_auth_instance::Action as PartialAction;
+use crate::bindings::accounts::smart_auth::smart_auth::Action as PartialAction;
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use psibase::fracpack::{Pack, Unpack};
 

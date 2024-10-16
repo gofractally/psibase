@@ -1,5 +1,5 @@
 use crate::bindings::accounts::plugin::accounts::get_account;
-use crate::bindings::accounts::smart_auth::smart_auth_instance::{
+use crate::bindings::accounts::smart_auth::smart_auth::{
     self as SmartAuth, Action as PartialAction,
 };
 use crate::bindings::host::common as Host;
