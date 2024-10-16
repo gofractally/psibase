@@ -21,23 +21,47 @@ import { CallContext } from "./callContext";
 import { PluginHost } from "./pluginHost";
 import { isRecoverableError, PluginDownloadFailed } from "./plugin/errors";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
-import { isEqual } from "@psibase/common-lib/messaging/PluginId";
+import { getPlugin, isEqual } from "@psibase/common-lib/messaging/PluginId";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
     app: serviceFromOrigin(supervisorDomain),
     origin: supervisorDomain,
 };
+
+// User plugins are those that are dynamically loaded based on the currently logged-in user's account
+//   configuration. For example, the currently logged-in user may use auth-sig as their auth service,
+//   in which case anything that links to the `accounts:smart-auth` plugin will ultimately want to link against
+//   the auth-sig plugin.
+// This array contains a mapping of the plugin ID that is used for bindings generation at compile time
+//   (e.g. accounts:smart-auth) to the plugin ID that is actually linked against. If the mapped plugin is non-null
+//   by default, then that default plugin is used when there is no logged-in user.
+const defaultUserPlugins = (): Array<
+    [QualifiedPluginId, QualifiedPluginId | null]
+> => {
+    return [
+        [
+            getPlugin("accounts", "smart-auth"),
+            getPlugin("auth-invite", "plugin"),
+        ],
+    ];
+};
+let userPlugins: Array<[QualifiedPluginId, QualifiedPluginId | null]> =
+    defaultUserPlugins();
+let userPluginsDirty = true;
+
+// System plugins are always loaded, even if they are not used
+//   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
-    {
-        service: "accounts",
-        plugin: "plugin",
-    },
-    {
-        service: "transact",
-        plugin: "plugin",
-    },
+    getPlugin("accounts", "plugin"),
+    getPlugin("transact", "plugin"),
 ];
+
+interface Account {
+    accountNum: string;
+    authService: string;
+    resourceBalance?: number;
+}
 
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
@@ -80,18 +104,49 @@ export class Supervisor implements AppInterface {
         return this.serviceContexts[service];
     }
 
-    // A valid plugin ID implies that it should be loaded as a distinct plugin
-    //   Therefore we should not validate wasi interfaces or direct host exports
-    private validated(id: QualifiedPluginId): boolean {
-        return id.service !== "wasi" && id.service !== "host";
+    private filterHostPlugins(plugins: QualifiedPluginId[]) {
+        // Plugins at these namespace are built into the supervisor host itself and
+        //  are not pulled from the chain.
+        return plugins.filter(
+            (id) => id.service !== "wasi" && id.service !== "host",
+        );
+    }
+
+    private getMapped(
+        plugin: QualifiedPluginId,
+        map: Array<[QualifiedPluginId, QualifiedPluginId | null]>,
+    ): QualifiedPluginId {
+        const entry = map.find(
+            ([p]) => p.service === plugin.service && p.plugin === plugin.plugin,
+        );
+
+        if (!entry) return plugin;
+
+        const [, mappedPlugin] = entry;
+
+        if (!mappedPlugin) {
+            throw new Error(
+                `Failed to map dynamic plugin: ${plugin.service}:${plugin.plugin}`,
+            );
+        }
+
+        return mappedPlugin;
+    }
+
+    private filterUserPlugins(
+        plugins: QualifiedPluginId[],
+    ): QualifiedPluginId[] {
+        return plugins.map((item) => this.getMapped(item, userPlugins));
     }
 
     private async getDependencies(
         plugin: Plugin,
     ): Promise<QualifiedPluginId[]> {
         try {
-            const dependencies = await plugin.getDependencies();
-            return dependencies.filter((id) => this.validated(id));
+            let dependencies = await plugin.getDependencies();
+            dependencies = this.filterUserPlugins(dependencies);
+            dependencies = this.filterHostPlugins(dependencies);
+            return dependencies;
         } catch (e: any) {
             if (e instanceof PluginDownloadFailed) {
                 return [];
@@ -101,15 +156,31 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    private async preload(callerOrigin: string, plugins: QualifiedPluginId[]) {
-        this.setParentOrigination(callerOrigin);
-        await Promise.all([this.loadPlugins(plugins)]);
+    private async preload(plugins: QualifiedPluginId[]) {
+        await Promise.all([
+            this.loadPlugins(plugins),
+            this.loadPlugins(systemPlugins),
+        ]);
+
+        // Find the user's dynamic plugins
+        this.resetUserPlugins();
+
+        // And preload them as well
+        const validUserPlugins = userPlugins
+            .filter(
+                (p): p is [QualifiedPluginId, QualifiedPluginId] =>
+                    p[1] !== null,
+            )
+            .map((p) => p[1]);
+
+        await Promise.all([this.loadPlugins(validUserPlugins)]);
     }
 
     private async loadPlugins(plugins: QualifiedPluginId[]): Promise<any> {
         if (plugins.length === 0) return;
 
         const addedPlugins: Plugin[] = [];
+        this.filterUserPlugins(plugins);
         plugins.forEach(({ service, plugin }) => {
             const c = this.loadContext(service);
             const loaded = c.loadPlugin(plugin);
@@ -148,7 +219,22 @@ export class Supervisor implements AppInterface {
     }
 
     private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
-        return this.call(supervisorOrigination, callArgs);
+        let newContext = false;
+        if (!this.context) {
+            newContext = true;
+            this.context = new CallContext();
+        }
+
+        let ret: any;
+        try {
+            ret = this.call(supervisorOrigination, callArgs);
+        } finally {
+            if (newContext) {
+                this.context = undefined;
+            }
+        }
+
+        return ret;
     }
 
     constructor() {
@@ -177,6 +263,7 @@ export class Supervisor implements AppInterface {
             user,
         ]);
         this.supervisorCall(login);
+        userPluginsDirty = true;
     }
 
     // Called by the current plugin looking to identify its caller
@@ -195,6 +282,10 @@ export class Supervisor implements AppInterface {
         return frame.caller;
     }
 
+    // Gets the logged in user for the parent app
+    // From the perspective of the accounts plugin, the caller is always the supervisor.
+    // But the caller_app is passed to the accounts plugin to specify the app that was originally responsible
+    //   for requesting the logged-in user.
     getLoggedInUser(caller_app: string): string | undefined {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
 
@@ -210,6 +301,21 @@ export class Supervisor implements AppInterface {
 
     isLoggedIn(): boolean {
         return this.getLoggedInUser("supervisor") !== undefined;
+    }
+
+    getAccount(user: string): Account {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+
+        const getAccount = getCallArgs(
+            "accounts",
+            "plugin",
+            "accounts",
+            "getAccount",
+            [user],
+        );
+        let account: Account | undefined = this.supervisorCall(getAccount);
+        assertTruthy(account, "User account not found");
+        return account;
     }
 
     // Manages callstack and calls plugins
@@ -232,6 +338,15 @@ export class Supervisor implements AppInterface {
             );
         }
 
+        // Map dynamic user plugins to their corresponding plugin
+        const target = this.getMapped(
+            getPlugin(args.service, args.plugin),
+            userPlugins,
+        );
+        args.service = target.service;
+        args.plugin = target.plugin;
+
+        // Load the plugin
         const { service, plugin, intf, method, params } = args;
         const p = this.loadContext(service).loadPlugin(plugin);
         assert(
@@ -239,8 +354,8 @@ export class Supervisor implements AppInterface {
             `Tried to call plugin ${service}:${plugin} before initialization`,
         );
 
+        // Manage the callstack and call the plugin
         this.context.stack.push(sender, args);
-
         let ret: any;
         try {
             ret = p.plugin.call(intf, method, params);
@@ -251,12 +366,33 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
+    // Plugins that are dynamically loaded based on the current user settings
+    private resetUserPlugins() {
+        if (!userPluginsDirty) return;
+        userPluginsDirty = false;
+
+        let user = this.getLoggedInUser("supervisor");
+        if (user === undefined) {
+            userPlugins = defaultUserPlugins();
+            return;
+        }
+
+        const account = this.getAccount(user);
+        userPlugins = [
+            [
+                getPlugin("accounts", "smart-auth"),
+                getPlugin(account.authService, "plugin"), // Implies that the auth service plugin must be called "plugin" ("<namespace>:plugin")
+            ],
+        ];
+    }
+
     // This is an entrypoint for apps to preload plugins.
     // Intended to be used on pageload to prepare the plugins that an app requires,
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
-            this.preload(callerOrigin, [...plugins, ...systemPlugins]);
+            this.setParentOrigination(callerOrigin);
+            await this.preload([...plugins]);
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
@@ -269,17 +405,18 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            // Wait to load the full plugin tree (a plugin and all it's dependencies, recursively).
+            this.setParentOrigination(callerOrigin);
+
+            // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
             // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
             //   transpiling the component, bundling with rollup, and importing & instantiating the es module
             //   in memory.
             // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await this.preload(callerOrigin, [
+            await this.preload([
                 {
                     service: args.service,
                     plugin: args.plugin,
                 },
-                ...systemPlugins,
             ]);
 
             this.context = new CallContext();
