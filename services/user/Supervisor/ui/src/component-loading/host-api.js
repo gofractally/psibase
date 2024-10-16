@@ -1,3 +1,11 @@
+export const types = {
+    pluginRef: class {
+        constructor(name) {
+            this.name = name;
+        }
+    },
+};
+
 export const server = {
     postGraphqlGetJson(graphQL) {
         return host.postGraphqlGetJson(graphQL);
