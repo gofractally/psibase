@@ -24,26 +24,26 @@ struct ProducerQuery
          return std::visit([](const auto& c) { return c.producers; }, *c);
       return {};
    }
-   Consensus consensus() const
+   ConsensusData consensus() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       if (!status)
          return {};
-      return std::move(status->consensus);
+      return std::move(status->consensus.current.data);
    }
-   std::optional<Consensus> nextConsensus() const
+   std::optional<ConsensusData> nextConsensus() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      if (!status || !status->nextConsensus)
+      if (!status || !status->consensus.next)
          return {};
-      return std::move(std::get<0>(*status->nextConsensus));
+      return std::move(status->consensus.next->consensus.data);
    }
    std::optional<BlockNum> jointStart() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      if (!status || !status->nextConsensus)
+      if (!status || !status->consensus.next)
          return {};
-      return std::get<1>(*status->nextConsensus);
+      return status->consensus.next->blockNum;
    }
 };
 PSIO_REFLECT(ProducerQuery,

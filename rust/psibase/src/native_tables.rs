@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
 use crate::{
-    AccountNumber, Action, BlockHeader, BlockHeaderAuthAccount, BlockInfo, BlockNum, Checksum256,
-    Consensus, DbId, Hex, Pack, ToSchema, Unpack,
+    AccountNumber, Action, BlockHeader, BlockInfo, BlockNum, Checksum256, Claim, DbId, Hex,
+    JointConsensus, Pack, ToSchema, Unpack,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +17,10 @@ pub const TRANSACTION_WASM_CONFIG_TABLE: NativeTable = 5;
 pub const PROOF_WASM_CONFIG_TABLE: NativeTable = 6; // Also for first auth
 pub const CONFIG_TABLE: NativeTable = 7;
 pub const NOTIFY_TABLE: NativeTable = 8;
+pub const BLOCK_DATA_TABLE: NativeTable = 9;
+pub const CONSENSUS_CHANGE_TABLE: NativeTable = 10;
+pub const SNAPSHOT_TABLE: NativeTable = 11;
+pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -30,9 +34,7 @@ pub struct StatusRow {
     pub chainId: Checksum256,
     pub current: BlockHeader,
     pub head: Option<BlockInfo>,
-    pub consensus: Consensus,
-    pub nextConsensus: Option<(Consensus, BlockNum)>,
-    pub authServices: Vec<BlockHeaderAuthAccount>,
+    pub consensus: JointConsensus,
 }
 
 impl StatusRow {
@@ -161,5 +163,96 @@ impl NotifyRow {
     pub const DB: DbId = DbId::Native;
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         (NOTIFY_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct BlockDataRow {
+    pub blockId: Checksum256,
+    pub auxConsensusData: Option<Hex<Vec<u8>>>,
+}
+
+impl BlockDataRow {
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex, Checksum256) {
+        (
+            BLOCK_DATA_TABLE,
+            NATIVE_TABLE_PRIMARY_INDEX,
+            self.blockId.clone(),
+        )
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct ConsensusChangeRow {
+    pub start: BlockNum,
+    pub commit: BlockNum,
+    pub end: BlockNum,
+}
+
+impl ConsensusChangeRow {
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex, BlockNum) {
+        (
+            CONSENSUS_CHANGE_TABLE,
+            NATIVE_TABLE_PRIMARY_INDEX,
+            self.start,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StateChecksum {
+    pub serviceRoot: Checksum256,
+    pub nativeRoot: Checksum256,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct StateSignature {
+    pub account: AccountNumber,
+    pub claim: Claim,
+    pub rawData: Hex<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct SnapshotStateItem {
+    pub state: StateChecksum,
+    pub signatures: Vec<StateSignature>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct SnapshotRow {
+    pub id: Checksum256,
+    pub state: Option<SnapshotStateItem>,
+    pub other: Vec<SnapshotStateItem>,
+}
+
+impl SnapshotRow {
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex, Checksum256) {
+        (SNAPSHOT_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.id.clone())
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct ScheduledSnapshotRow {
+    pub blockNum: BlockNum,
+}
+
+impl ScheduledSnapshotRow {
+    pub const DB: DbId = DbId::Native;
+    pub fn key(&self) -> (NativeTable, NativeIndex, BlockNum) {
+        (
+            SCHEDULED_SNAPSHOT_TABLE,
+            NATIVE_TABLE_PRIMARY_INDEX,
+            self.blockNum,
+        )
     }
 }

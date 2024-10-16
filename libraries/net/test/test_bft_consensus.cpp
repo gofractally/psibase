@@ -197,12 +197,12 @@ TEST_CASE("commit before prepare", "[bft]")
       nodes[1].sendto(AccountNumber{"a"}, message);
       ctx.poll();
    };
-   auto boot_block = nodes[0].chain().get_head_state()->info;
+   auto boot_block = nodes.nodes[0]->head();
 
    auto block1 = makeBlock(boot_block, "b", 4);
    auto block2 = makeBlock(boot_block, "c", 5);
-   send(block1);
-   send(block2);
+   send(block1.block);
+   send(block2.block);
 
    send(makeCommit(block2, "b"));
    send(makeCommit(block2, "c"));
@@ -216,13 +216,13 @@ TEST_CASE("view change update head", "[bft]")
 {
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
-   auto                  boot_block = node.head();
+   auto                  boot_block = node.headState();
    auto                  block1     = makeBlock(boot_block, "b", 4);
    node.send(block1);
-   CHECK(node.head().blockId == boot_block.blockId);
+   CHECK(node.head().blockId == boot_block.first->info.blockId);
    node.send(makeViewChange("b", 4));
    node.send(makeViewChange("c", 4));
-   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
+   CHECK(node.head().blockId == block1.id());
 }
 
 //     ------- B
@@ -234,7 +234,7 @@ TEST_CASE("fork before invalid 1", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
    // The final block is ordered between the parent of the
    // invalid block and the invalid block
-   auto root    = node.head();
+   auto root    = node.headState();
    auto block1  = makeBlock(root, "b", 4);
    auto block2  = makeBlock(root, "c", 5);
    auto invalid = makeBlock(block1, "d", 6, Transaction{.actions = {Action{}}});
@@ -243,7 +243,7 @@ TEST_CASE("fork before invalid 1", "[bft]")
    node.send(invalid);
    node.send(makeViewChange("b", 6));
    node.send(makeViewChange("d", 6));
-   CHECK(node.head().blockId == BlockInfo{block2.block->block()}.blockId);
+   CHECK(node.head().blockId == block2.id());
 }
 
 //     ------- B
@@ -255,7 +255,7 @@ TEST_CASE("fork before invalid 2", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
    // The final block is ordered between the invalid block
    // and a descendant of the invalid block
-   auto root    = node.head();
+   auto root    = node.headState();
    auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
    auto block1  = makeBlock(root, "c", 5);
    auto block2  = makeBlock(invalid, "d", 6);
@@ -264,7 +264,7 @@ TEST_CASE("fork before invalid 2", "[bft]")
    node.send(block2);
    node.send(makeViewChange("b", 6));
    node.send(makeViewChange("d", 6));
-   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
+   CHECK(node.head().blockId == block1.id());
 }
 
 //     --- A --- B
@@ -277,7 +277,8 @@ TEST_CASE("truncated fork switch", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
    //
-   auto root    = node.head();
+   auto state   = JointConsensus{.current = {.data = bft("a", "b", "c", "d")}};
+   auto root    = node.headState();
    auto block1a = makeBlock(root, "b", 4);
    auto block1b = makeBlock(block1a, "b", 4);
    auto block1c = makeBlock(block1b, "b", 4);
@@ -294,7 +295,7 @@ TEST_CASE("truncated fork switch", "[bft]")
    node.send0(makeViewChange("b", 5));
    node.send0(makeViewChange("c", 5));
    node.poll();
-   CHECK(node.head().blockId == BlockInfo{block2.block->block()}.blockId);
+   CHECK(node.head().blockId == block2.id());
 }
 
 //           --- B
@@ -306,7 +307,7 @@ TEST_CASE("fork after invalid", "[bft]")
    SingleNode<node_type> node({"a", "b", "c", "d"});
    // If there are multiple forks that descend from an invalid
    // block, they should all get blacklisted.
-   auto root    = node.head();
+   auto root    = node.headState();
    auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
    auto block1  = makeBlock(invalid, "b", 4);
    auto block2  = makeBlock(invalid, "c", 5);
@@ -315,7 +316,7 @@ TEST_CASE("fork after invalid", "[bft]")
    node.send(block2);
    node.send(makeViewChange("b", 5));
    node.send(makeViewChange("c", 5));
-   CHECK(node.head().blockId == root.blockId);
+   CHECK(node.head().blockId == root.first->info.blockId);
 }
 
 //     --- A --- X
@@ -326,7 +327,7 @@ TEST_CASE("producer fork 1", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto fork1   = makeBlock(root, "b", 4);
    auto invalid = makeBlock(fork1, "b", 4, Transaction{.actions = {Action{}}});
    // start block production for "a"
@@ -337,7 +338,7 @@ TEST_CASE("producer fork 1", "[bft]")
    node.send(fork1);
    node.send(invalid);
    // Force switch to fork 1
-   BlockInfo fork1info{fork1.block->block()};
+   BlockInfo fork1info{fork1.info()};
    node.send(makeViewChange("b", 11, fork1info, {"b", "c", "d"}));
    node.send(makeViewChange("c", 11, fork1info, {"b", "c", "d"}));
    node.send(makeViewChange("d", 11, fork1info, {"b", "c", "d"}));
@@ -356,7 +357,7 @@ TEST_CASE("producer cancel fork switch")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto fork1   = makeBlock(root, "b", 4);
    auto fork2   = makeBlock(root, "c", 5);
    auto invalid = makeBlock(fork2, "a", 7, Transaction{.actions = {Action{}}});
@@ -368,14 +369,14 @@ TEST_CASE("producer cancel fork switch")
    node.send(makeViewChange("c", 7));
    // We should not switch forks, because the pending block is better fork2
    node.send(fork2);
-   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().blockId == fork1.id());
    // We should still not switch forks, because invalid gets discarded after it fails
    node.send(invalid);
-   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().blockId == fork1.id());
    // The next block should be built off fork1
-   while (node.head().blockId == BlockInfo{fork1.block->block()}.blockId)
+   while (node.head().blockId == fork1.id())
       runFor(node.ctx, 1s);
-   CHECK(node.head().header.previous == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().header.previous == fork1.id());
    CHECK(node.head().header.producer.str() == "a");
 }
 
@@ -384,7 +385,7 @@ TEST_CASE("better block after commit", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
    // fork2 should be excluded after fork1 is prepared
-   auto root  = node.head();
+   auto root  = node.headState();
    auto fork1 = makeBlock(root, "b", 4);
    auto fork2 = makeBlock(root, "c", 5);
    node.send(makeViewChange("b", 4));
@@ -395,7 +396,7 @@ TEST_CASE("better block after commit", "[bft]")
    node.send(makeViewChange("b", 5));
    node.send(makeViewChange("c", 5));
    node.send(fork2);
-   CHECK(node.head().blockId == BlockInfo{fork1.block->block()}.blockId);
+   CHECK(node.head().blockId == fork1.id());
 }
 
 TEST_CASE("return to previous fork", "[bft]")
@@ -403,7 +404,7 @@ TEST_CASE("return to previous fork", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root   = node.head();
+   auto root   = node.headState();
    auto fork1  = makeBlock(root, "b", 4);
    auto fork2  = makeBlock(root, "c", 5);
    auto fork1b = makeBlock(fork1, "b", 4);
@@ -413,25 +414,25 @@ TEST_CASE("return to previous fork", "[bft]")
    node.send(makeViewChange("b", 5));
    node.send(makeViewChange("c", 5));
    node.send(fork2);
-   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
+   CHECK(node.head().blockId == fork2.id());
    // return to the worse fork
    node.send(fork1b);
-   node.send(makeViewChange("b", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
-   node.send(makeViewChange("d", 6, BlockInfo{fork1.block->block()}, {"b", "c", "d"}));
+   node.send(makeViewChange("b", 6, fork1.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("d", 6, fork1.info(), {"b", "c", "d"}));
    node.send(makePrepare(fork1b, "b"));
    node.send(makePrepare(fork1b, "d"));
-   CHECK(node.head().blockId == BlockInfo{fork1b.block->block()}.blockId);
+   CHECK(node.head().blockId == fork1b.id());
    // Must not generate commit for fork1b because this conflicts
    // with the view change.  Note that d's commit also violates
    // the protocol, so we have to consider it to be the one adversary node..
    node.send(makeCommit(fork1b, "c"));
    node.send(makeCommit(fork1b, "d"));
 
-   node.send(makeViewChange("b", 7, BlockInfo{fork2.block->block()}, {"b", "c", "d"}));
-   node.send(makeViewChange("c", 7, BlockInfo{fork2.block->block()}, {"b", "c", "d"}));
+   node.send(makeViewChange("b", 7, fork2.info(), {"b", "c", "d"}));
+   node.send(makeViewChange("c", 7, fork2.info(), {"b", "c", "d"}));
 
    // should switch to fork 2
-   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
+   CHECK(node.head().blockId == fork2.id());
 }
 
 TEST_CASE("highest view change inconsistent with commit", "[bft]")
@@ -439,7 +440,7 @@ TEST_CASE("highest view change inconsistent with commit", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root  = node.head();
+   auto root  = node.headState();
    auto fork1 = makeBlock(root, "b", 4);
    auto fork2 = makeBlock(root, "c", 5);
    // Make sure that we're on term 5
@@ -456,10 +457,10 @@ TEST_CASE("highest view change inconsistent with commit", "[bft]")
 
    // This view change refers to a block which conflicts with the committed fork2,
    // but is better than any block referenced by any other view change.
-   node.send(makeViewChange("d", 5, BlockInfo{fork1.block->block()}, {"a", "b", "d"}));
+   node.send(makeViewChange("d", 5, fork1.info(), {"a", "b", "d"}));
    // this view change makes term 5 non-viable
-   node.send(makeViewChange("b", 6, BlockInfo{fork2.block->block()}, {"a", "b", "c"}));
-   CHECK(node.head().blockId == BlockInfo{fork2.block->block()}.blockId);
+   node.send(makeViewChange("b", 6, fork2.info(), {"a", "b", "c"}));
+   CHECK(node.head().blockId == fork2.id());
 }
 
 TEST_CASE("new consensus at view change", "[bft]")
@@ -550,7 +551,7 @@ TEST_CASE("invalid prepared block 1", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
    node.send(invalid);
    node.send(makeViewChange("b", 4));
@@ -572,7 +573,7 @@ TEST_CASE("invalid prepared block 2", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
    auto block1  = makeBlock(root, "c", 5);
    node.send(block1);
@@ -595,7 +596,7 @@ TEST_CASE("invalid committed block", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto invalid = makeBlock(root, "b", 4, Transaction{.actions = {Action{}}});
    node.send(invalid);
    node.send(makeViewChange("b", 4));
@@ -610,7 +611,7 @@ TEST_CASE("double commit 1", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root   = node.head();
+   auto root   = node.headState();
    auto block1 = makeBlock(root, "b", 4);
    auto block2 = makeBlock(root, "c", 5);
    node.send(block1);
@@ -631,7 +632,7 @@ TEST_CASE("double commit 1", "[bft]")
    catch (consensus_failure&)
    {
    }
-   CHECK(node.head().blockId == BlockInfo{block1.block->block()}.blockId);
+   CHECK(node.head().blockId == block1.id());
 }
 
 TEST_CASE("double commit 2", "[bft]")
@@ -639,7 +640,7 @@ TEST_CASE("double commit 2", "[bft]")
    TEST_START(logger);
    SingleNode<node_type> node({"a", "b", "c", "d"});
 
-   auto root    = node.head();
+   auto root    = node.headState();
    auto block1a = makeBlock(root, "b", 4);
    auto block1b = makeBlock(block1a, "b", 4);
    auto block2  = makeBlock(root, "c", 5);
@@ -662,5 +663,5 @@ TEST_CASE("double commit 2", "[bft]")
    catch (consensus_failure&)
    {
    }
-   CHECK(node.head().blockId == BlockInfo{block1b.block->block()}.blockId);
+   CHECK(node.head().blockId == block1b.id());
 }

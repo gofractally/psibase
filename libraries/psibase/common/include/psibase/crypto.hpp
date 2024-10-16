@@ -136,7 +136,9 @@ namespace psibase
          psio::to_frac(value, stream);
          return sha256(result.data(), result.size());
       }
-      void push_impl(const Checksum256& hash);
+
+      static Checksum256 combine(const Checksum256& lhs, const Checksum256& rhs);
+      void               push_impl(const Checksum256& hash);
       PSIO_REFLECT(Merkle, i, stack)
    };
 

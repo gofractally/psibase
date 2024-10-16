@@ -36,10 +36,10 @@ namespace psibase
       {
          return std::visit([](auto& c) -> auto& { return c.producers; }, consensus);
       };
-      auto& prods = getProducers(status.consensus);
+      auto& prods = getProducers(status.consensus.current.data);
       if (prods.size() == 1)
       {
-         return !status.nextConsensus;
+         return !status.consensus.next;
       }
       else if (prods.size() == 0)
       {
@@ -92,11 +92,13 @@ namespace psibase
          if (time)
             current.header.time = *time;
       }
-      if (status->nextConsensus &&
-          std::get<1>(*status->nextConsensus) <= status->head->header.commitNum)
+      if (status->consensus.next &&
+          status->consensus.next->blockNum <= status->head->header.commitNum)
       {
-         status->consensus = std::move(std::get<0>(*status->nextConsensus));
-         status->nextConsensus.reset();
+         status->consensus.current = std::move(status->consensus.next->consensus);
+         status->consensus.next.reset();
+         if (!isReadOnly)
+            db.setPrevAuthServices(nullptr);
       }
       if (singleProducer(*status, producer))
       {
@@ -110,7 +112,7 @@ namespace psibase
       }
       if (!status->head)
       {
-         status->nextConsensus.emplace(Consensus{}, current.header.blockNum);
+         status->consensus.next.emplace(Consensus{}, current.header.blockNum);
       }
       status->current = current.header;
       if (!isReadOnly)
@@ -161,6 +163,8 @@ namespace psibase
       //
       // TODO: log failure
       tc.execNonTrxAction(0, action, atrace);
+      BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+      PSIBASE_LOG(trxLogger, debug) << "startBlock succeeded";
       // printf("%s\n", prettyTrace(atrace).c_str());
 
       active = true;
@@ -281,44 +285,17 @@ namespace psibase
       return m.root();
    }
 
-   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(const Prover& prover,
-                                                                        const Claim&  claim)
+   // May start joint consensus if the set of services changed
+   void updateAuthServices(Database&   db,
+                           StatusRow&  status,
+                           Block&      current,
+                           const auto& modifiedAuthAccounts)
    {
-      checkActive();
-      check(!needGenesisAction, "missing genesis action in block");
-      active = false;
-
-      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
-      check(status.has_value(), "missing status record");
-
-      if (status->nextConsensus && std::get<1>(*status->nextConsensus) == status->current.blockNum)
-      {
-         auto& nextConsensus = std::get<0>(*status->nextConsensus);
-         auto& prods = std::visit([](auto& c) -> auto& { return c.producers; }, nextConsensus);
-         // Special case: If no producers are specified, use the producers of the current block
-         if (prods.empty())
-         {
-            prods.push_back({current.header.producer, Claim{}});
-         }
-
-         status->current.newConsensus = current.header.newConsensus = nextConsensus;
-      }
-
-      if (singleProducer(*status, current.header.producer))
-      {
-         // If singleProducer is true here, then it must have been true at the start of
-         // the block as well, unless an existing newConsensus was modified, which is
-         // not permitted.
-         check(current.header.commitNum == current.header.blockNum - 1,
-               "Forbidden consensus update");
-         status->current.commitNum = current.header.commitNum = current.header.blockNum;
-      }
-
-      status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
-      status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
+      auto& currentAuthServices = status.consensus.next ? status.consensus.next->consensus.services
+                                                        : status.consensus.current.services;
 
       std::vector<BlockHeaderAuthAccount> modifiedAuthServices;
-      for (const auto& account : status->authServices)
+      for (const auto& account : currentAuthServices)
       {
          if (modifiedAuthAccounts.find(account.codeNum) == modifiedAuthAccounts.end())
          {
@@ -339,11 +316,10 @@ namespace psibase
       }
       std::ranges::sort(modifiedAuthServices,
                         [](const auto& lhs, const auto& rhs) { return lhs.codeNum < rhs.codeNum; });
-      if (modifiedAuthServices != status->authServices)
+      if (modifiedAuthServices != currentAuthServices)
       {
-         current.header.authServices = modifiedAuthServices;
          current.header.authCode.emplace();
-         auto               origKeys    = getCodeKeys(status->authServices);
+         auto               origKeys    = getCodeKeys(currentAuthServices);
          auto               currentKeys = getCodeKeys(modifiedAuthServices);
          decltype(origKeys) addedKeys;
          std::ranges::set_difference(currentKeys, origKeys, std::back_inserter(addedKeys));
@@ -354,8 +330,81 @@ namespace psibase
             current.header.authCode->push_back(
                 {.vmType = code->vmType, .vmVersion = code->vmVersion, .code = code->code});
          }
-         status->authServices = std::move(modifiedAuthServices);
+         if (!status.consensus.next)
+            status.consensus.next =
+                PendingConsensus{{status.consensus.current.data, std::move(modifiedAuthServices)},
+                                 status.current.blockNum};
+         else
+            status.consensus.next->consensus.services = std::move(modifiedAuthServices);
       }
+   }
+
+   std::pair<ConstRevisionPtr, Checksum256> BlockContext::writeRevision(
+       const Prover&           prover,
+       const Claim&            claim,
+       const ConstRevisionPtr& prevAuthServices)
+   {
+      checkActive();
+      check(!needGenesisAction, "missing genesis action in block");
+      active = false;
+
+      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      check(status.has_value(), "missing status record");
+
+      updateAuthServices(db, *status, current, modifiedAuthAccounts);
+
+      if (status->consensus.next && status->consensus.next->blockNum == status->current.blockNum)
+      {
+         auto& nextConsensus = status->consensus.next->consensus;
+         auto& prods = std::visit([](auto& c) -> auto& { return c.producers; }, nextConsensus.data);
+         // Special case: If no producers are specified, use the producers of the current block
+         if (prods.empty())
+         {
+            prods.push_back({current.header.producer, Claim{}});
+         }
+
+         status->current.newConsensus = current.header.newConsensus = nextConsensus;
+      }
+
+      if (singleProducer(*status, current.header.producer))
+      {
+         // If singleProducer is true here, then it must have been true at the start of
+         // the block as well, unless an existing newConsensus was modified, which is
+         // not permitted.
+         check(current.header.commitNum == current.header.blockNum - 1,
+               "Forbidden consensus update");
+         status->current.commitNum = current.header.commitNum = current.header.blockNum;
+      }
+
+      if (status->consensus.next && status->consensus.next->blockNum <= current.header.commitNum)
+      {
+         ConsensusChangeRow changeRow{status->consensus.next->blockNum, current.header.commitNum,
+                                      current.header.blockNum};
+         systemContext.sharedDatabase.kvPutSubjective(
+             *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+      }
+
+      if (status->consensus.next)
+      {
+         if (prevAuthServices)
+         {
+            db.setPrevAuthServices(prevAuthServices);
+         }
+         else if (!status->consensus.current.services.empty() && !db.getPrevAuthServices())
+         {
+            assert(status->consensus.next->blockNum == current.header.blockNum);
+            db.setPrevAuthServices(db.getBaseRevision());
+         }
+      }
+      else
+      {
+         check(!db.getPrevAuthServices(),
+               "prevAuthServices should not be set outside joint consensus");
+      }
+
+      status->current.consensusState = current.header.consensusState = sha256(status->consensus);
+      status->current.trxMerkleRoot = current.header.trxMerkleRoot = makeTransactionMerkle();
+      status->current.eventMerkleRoot = current.header.eventMerkleRoot = makeEventMerkleRoot();
 
       status->head = current;  // Also calculates blockId
       // authCode can be loaded from the database. We don't need an
