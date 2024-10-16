@@ -66,14 +66,14 @@ struct AppMetadataResponse {
 
 impl TryParseGqlResponse for AppMetadataResponseData {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        println!("response: {:?}", response);
+        // println!("response: {:?}", response);
         let response_root: ResponseRoot<AppMetadataResponse> =
             serde_json::from_str(&response).map_err(|e| QueryError.err(&e.to_string()))?;
-        println!("response_root: {:?}", response_root);
+        // println!("response_root: {:?}", response_root);
 
         match response_root.data.appMetadata {
             Some(app_metadata) => {
-                println!("app_metadata: {:?}", app_metadata);
+                // println!("app_metadata: {:?}", app_metadata);
                 Ok(app_metadata)
             }
             None => Err(NotFound.err("App metadata not found")),
@@ -143,7 +143,7 @@ impl Developer for WorkshopPlugin {
 
 impl Consumer for WorkshopPlugin {
     fn get_app_metadata(account: AccountId) -> Result<ConsumerReturnMetadata, CommonTypes::Error> {
-        println!("get_app_metadata: account = {:?}", account);
+        // println!("get_app_metadata: account = {:?}", account);
 
         let query = format!(
             r#"query {{
@@ -172,7 +172,7 @@ impl Consumer for WorkshopPlugin {
         println!("query: {}", query);
         let metadata = AppMetadataResponseData::from_gql(Server::post_graphql_get_json(&query)?)?;
 
-        println!("metadata: {:?}", metadata);
+        // println!("metadata: {:?}", metadata);
 
         let tags = metadata
             .tags
@@ -199,6 +199,8 @@ impl Consumer for WorkshopPlugin {
             },
             tags,
         };
+
+        println!("res: {:?}", res);
 
         // convert timestamps from unix to iso strings
         Ok(res)

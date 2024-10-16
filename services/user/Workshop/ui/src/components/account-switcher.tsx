@@ -7,13 +7,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shadcn/select";
+import { useEffect } from "react";
 
 interface AccountSwitcherProps {
     isCollapsed: boolean;
 }
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
-    const { availableAccounts, user, setUser } = useUser();
+    const { getAvailableAccounts, availableAccounts, user, setUser } =
+        useUser();
+
+    useEffect(() => {
+        getAvailableAccounts();
+    }, []);
 
     return (
         <Select

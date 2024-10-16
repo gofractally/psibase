@@ -26,10 +26,31 @@ export interface Metadata {
     owners: string[];
 }
 
+export interface MetadataRes {
+    metadata: {
+        name: string;
+        shortDescription: string;
+        longDescription: string;
+        icon: string;
+        iconMimeType: string;
+        tosSubpage: string;
+        privacyPolicySubpage: string;
+        appHomepageSubpage: string;
+        status: string;
+        tags: string[];
+        redirectUris: string[];
+        owners: string[];
+    };
+    tags: {
+        id: number;
+        tag: string;
+    }[];
+}
+
 export const useMetadata = () => {
     const { user } = useUser();
     const [currentMetadata, setCurrentMetadata] = useState<
-        Metadata | undefined
+        MetadataRes | undefined
     >();
 
     const getMetadata = async (acc: string) => {
@@ -41,11 +62,15 @@ export const useMetadata = () => {
                 intf: "consumer",
                 method: "getAppMetadata",
                 params: [acc],
-            })) as Metadata;
+            })) as MetadataRes;
+
             console.info("plugin workshop getMetadata call res", res);
             return res;
         } catch (e: unknown) {
-            console.error(`${(e as SupervisorError).message}`, e);
+            console.error(
+                `getMetadata error: ${(e as SupervisorError).message}`,
+                e,
+            );
         }
     };
 
@@ -82,6 +107,7 @@ export const useMetadata = () => {
 
     useEffect(() => {
         (async () => {
+            console.log({ user });
             if (user) {
                 console.info("loading metadata for current user", user);
                 const metadata = await getMetadata(user);

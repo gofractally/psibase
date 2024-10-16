@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { atom, useAtom } from "jotai";
 
 import { type PluginId } from "@psibase/common-lib";
@@ -53,11 +52,8 @@ export function useUser() {
         }
     };
 
-    useEffect(() => {
-        getAvailableAccounts();
-    }, []);
-
     return {
+        getAvailableAccounts,
         availableAccounts,
         user,
         setUser: logInAs,

@@ -24,7 +24,8 @@ import { RegisteredApp } from "@types";
 import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
 import { Metadata, useMetadata } from "@hooks/use-metadata";
 import { TagSelect } from "./tag-select";
-// import { fileToBase64 } from "@lib/utils";
+import { fileToBase64, isValidUrl } from "@lib/utils";
+import { LoadingSpinner } from "./spinner";
 
 const slugifyOptions = { lower: true, strict: true };
 
@@ -65,7 +66,15 @@ const AppMetadataSchema = z.object({
         .optional(),
     status: z.enum(["DRAFT", "PUBLISHED", "UNPUBLISHED"]),
     tags: z.array(z.object({ value: z.string(), label: z.string() })),
-    redirectUris: z.string().optional(),
+    redirectUris: z
+        .string()
+        .optional()
+        .refine(
+            (value) =>
+                !value ||
+                value.split(",").every((url) => isValidUrl(url.trim())),
+            "All redirect URIs must be valid URLs",
+        ),
     owners: z.string().optional(),
 });
 
@@ -81,21 +90,15 @@ export function AppMetadataForm() {
         id ? location.state?.app?.status : "DRAFT",
     );
 
+    const [isLoading, setIsLoading] = useState(true);
     const [iconPreview, setIconPreview] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [existingIcon, setExistingIcon] = useState<{
+        data: string;
+        mimeType: string;
+    } | null>(null);
 
     const isUpdating = !!id;
-
-    // TODO: preload form with current metadata when present
-    // TODO: handle loading state
-
-    useEffect(() => {
-        if (currentMetadata) {
-            console.info("test: currentMetadata", currentMetadata);
-        } else {
-            console.info("currentMetadata not found");
-        }
-    }, [currentMetadata]);
 
     const form = useForm<AppMetadataFormData>({
         resolver: zodResolver(AppMetadataSchema),
@@ -111,6 +114,76 @@ export function AppMetadataForm() {
             tags: [],
         },
     });
+
+    useEffect(() => {
+        if (currentMetadata) {
+            console.info(
+                "Preloading form with current metadata",
+                currentMetadata,
+            );
+            form.setValue("name", currentMetadata.metadata.name);
+            form.setValue(
+                "shortDescription",
+                currentMetadata.metadata.shortDescription,
+            );
+            form.setValue(
+                "longDescription",
+                currentMetadata.metadata.longDescription,
+            );
+            form.setValue("tosSubpage", currentMetadata.metadata.tosSubpage);
+            form.setValue(
+                "privacyPolicySubpage",
+                currentMetadata.metadata.privacyPolicySubpage,
+            );
+            form.setValue(
+                "appHomepageSubpage",
+                currentMetadata.metadata.appHomepageSubpage,
+            );
+            // Convert base64 icon to viewable format
+            if (
+                currentMetadata.metadata.icon &&
+                currentMetadata.metadata.iconMimeType
+            ) {
+                setExistingIcon({
+                    data: currentMetadata.metadata.icon,
+                    mimeType: currentMetadata.metadata.iconMimeType,
+                });
+                const iconSrc = `data:${currentMetadata.metadata.iconMimeType};base64,${currentMetadata.metadata.icon}`;
+                setIconPreview(iconSrc);
+            } else {
+                setExistingIcon(null);
+                setIconPreview(null);
+            }
+            setAppStatus(
+                currentMetadata.metadata.status as
+                    | "DRAFT"
+                    | "PUBLISHED"
+                    | "UNPUBLISHED",
+            );
+            form.setValue(
+                "status",
+                currentMetadata.metadata.status as
+                    | "DRAFT"
+                    | "PUBLISHED"
+                    | "UNPUBLISHED",
+            );
+            form.setValue(
+                "tags",
+                currentMetadata.tags.map((tag) => ({
+                    value: tag.tag,
+                    label: tag.tag,
+                })),
+            );
+            form.setValue(
+                "redirectUris",
+                currentMetadata.metadata.redirectUris.join(","),
+            );
+            form.setValue("owners", currentMetadata.metadata.owners.join(","));
+            setIsLoading(false);
+        } else if (!isUpdating) {
+            setIsLoading(false);
+        }
+    }, [currentMetadata, form, isUpdating]);
 
     useEffect(() => {
         if (isUpdating && location.state?.app) {
@@ -144,13 +217,15 @@ export function AppMetadataForm() {
         setIsSubmitting(true);
 
         try {
-            // Convert File to Uint8Array
-            // const arrayBuffer = await data.icon.arrayBuffer();
-            // const iconData = new Uint8Array(arrayBuffer);
-
-            const base64Icon = "test-base64-icon";
-            // const base64Icon = await fileToBase64(data.icon);
-            const iconMimeType = data.icon?.type ?? "";
+            let base64Icon = "test-base64-icon";
+            let iconMimeType = data.icon?.type ?? "";
+            if (data.icon) {
+                base64Icon = await fileToBase64(data.icon);
+                iconMimeType = data.icon.type;
+            } else if (existingIcon) {
+                base64Icon = existingIcon.data;
+                iconMimeType = existingIcon.mimeType;
+            }
 
             const metadata: Metadata = {
                 name: data.name,
@@ -199,6 +274,14 @@ export function AppMetadataForm() {
             localStorage.setItem(`appStatus_${id}`, newStatus);
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex h-80 items-center justify-center">
+                <LoadingSpinner size={36} />
+            </div>
+        );
+    }
 
     return (
         <Form {...form}>
@@ -404,7 +487,7 @@ export function AppMetadataForm() {
                             <FormControl>
                                 <RadioGroup
                                     onValueChange={handleStatusChange}
-                                    defaultValue={appStatus}
+                                    value={appStatus}
                                     className="flex flex-col space-y-1"
                                 >
                                     <FormItem className="flex items-center space-x-3 space-y-0">

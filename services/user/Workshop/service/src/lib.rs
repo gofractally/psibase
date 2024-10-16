@@ -124,7 +124,7 @@ pub mod service {
         let created_at = transact::Wrapper::call().currentBlock().time;
 
         check(
-            tags.len() < MAX_APP_TAGS,
+            tags.len() <= MAX_APP_TAGS,
             format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
         );
 
