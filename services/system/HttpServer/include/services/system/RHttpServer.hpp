@@ -4,7 +4,7 @@
 
 namespace SystemService
 {
-   struct RHttpServer : public psibase::Service<RHttpServer>
+   struct RHttpServer : public psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber("rhttp-server");
 

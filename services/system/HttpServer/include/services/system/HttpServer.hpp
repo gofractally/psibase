@@ -40,7 +40,7 @@ namespace SystemService
    /// an HTTP request that services may serve. This function does the actual routing.
    /// `psinode` has a local option (TODO: implement) which may choose an alternative
    /// routing service instead.
-   struct HttpServer : psibase::Service<HttpServer>
+   struct HttpServer : psibase::Service
    {
       static constexpr auto service = psibase::proxyServiceNum;
       using Tables                  = psibase::ServiceTables<RegServTable>;

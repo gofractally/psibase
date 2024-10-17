@@ -10,7 +10,7 @@ namespace SystemService
 {
    // This service manages the active producers.
    // It must have native write permission
-   class CpuLimit : public psibase::Service<CpuLimit>
+   class CpuLimit : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("cpu-limit");

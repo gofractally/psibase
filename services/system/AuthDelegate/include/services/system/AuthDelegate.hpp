@@ -23,7 +23,7 @@ namespace SystemService
    ///
    /// Any account using this auth service must store in this service the name of
    /// the other account that owns it.
-   class AuthDelegate : public psibase::Service<AuthDelegate>
+   class AuthDelegate : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("auth-delegate");

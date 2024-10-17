@@ -2,7 +2,7 @@
 
 namespace UserService
 {
-   class RTokens : public psibase::Service<RTokens>
+   class RTokens : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-tokens");

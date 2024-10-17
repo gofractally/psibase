@@ -16,7 +16,7 @@ PSIO_REFLECT(SubjectiveRow, key, value)
 
 using SubjectiveTable = psibase::Table<SubjectiveRow, &SubjectiveRow::key>;
 
-struct SubjectiveService : psibase::Service<SubjectiveService>
+struct SubjectiveService : psibase::Service
 {
    using Tables                  = psibase::SubjectiveTables<SubjectiveTable>;
    static constexpr auto service = psibase::AccountNumber{"subjective"};

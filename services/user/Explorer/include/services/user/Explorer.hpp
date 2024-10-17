@@ -5,7 +5,7 @@
 
 namespace SystemService
 {
-   struct Explorer : public psibase::Service<Explorer>
+   struct Explorer : public psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber("explorer");
 

@@ -3,7 +3,7 @@
 #include <psibase/Service.hpp>
 #include <psibase/nativeTables.hpp>
 
-struct ClockService : psibase::Service<ClockService>
+struct ClockService : psibase::Service
 {
    static constexpr auto     service      = psibase::AccountNumber{"clock-service"};
    static constexpr uint64_t serviceFlags = psibase::CodeRow::isSubjective;

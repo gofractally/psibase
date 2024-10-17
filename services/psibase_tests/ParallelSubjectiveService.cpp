@@ -26,7 +26,7 @@ PSIO_REFLECT(GeRow, key)
 
 using GeTable = Table<GeRow, &GeRow::key>;
 
-struct ParallelSubjectiveService : psibase::Service<ParallelSubjectiveService>
+struct ParallelSubjectiveService : psibase::Service
 {
    using Tables                  = psibase::SubjectiveTables<ParallelSubjectiveTable, GeTable>;
    static constexpr auto service = psibase::AccountNumber{"psubjective"};

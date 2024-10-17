@@ -8,7 +8,7 @@
 
 namespace UserService
 {
-   struct REvents : psibase::Service<REvents>
+   struct REvents : psibase::Service
    {
       static constexpr psibase::AccountNumber service{"r-events"};
 

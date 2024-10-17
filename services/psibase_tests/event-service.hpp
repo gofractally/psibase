@@ -3,7 +3,7 @@
 #include <psibase/Actor.hpp>
 #include <psibase/Service.hpp>
 
-struct EventService : psibase::Service<EventService>
+struct EventService : psibase::Service
 {
    static constexpr auto service = psibase::AccountNumber{"event-service"};
    struct Events

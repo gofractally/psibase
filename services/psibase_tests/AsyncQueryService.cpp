@@ -30,13 +30,13 @@ PSIO_REFLECT(CounterRow, value)
 
 using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
 
-struct AsyncQueryService : psibase::Service<AsyncQueryService>
+struct AsyncQueryService : psibase::Service
 {
    using Subjective              = psibase::SubjectiveTables<AsyncResponseTable, CounterTable>;
    static constexpr auto service = psibase::AccountNumber{"as-query"};
    void                  onBlock();
-   auto                  serveSys(const HttpRequest& req, std::optional<std::int32_t> socket)
-       -> std::optional<HttpReply>;
+   auto                  serveSys(const HttpRequest&          req,
+                                  std::optional<std::int32_t> socket) -> std::optional<HttpReply>;
 };
 PSIO_REFLECT(AsyncQueryService, method(onBlock), method(serveSys, request, socket))
 

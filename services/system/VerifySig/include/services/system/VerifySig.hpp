@@ -5,7 +5,7 @@
 
 namespace SystemService
 {
-   struct VerifySig : psibase::Service<VerifySig>
+   struct VerifySig : psibase::Service
    {
       static constexpr auto     service      = psibase::AccountNumber("verify-sig");
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isAuthService;

@@ -72,7 +72,7 @@ namespace SystemService
    /// Only the Accounts service itself and the `inviteService` may create new accounts.
    /// Other services may also use this service to check if an account exists.
    // TODO: account deletion, with an index to prevent reusing IDs
-   class Accounts : public psibase::Service<Accounts>
+   class Accounts : public psibase::Service
    {
      public:
       /// "accounts"

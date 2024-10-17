@@ -9,7 +9,7 @@
 
 namespace UserService
 {
-   class Symbol : public psibase::Service<Symbol>
+   class Symbol : public psibase::Service
    {
      public:
       using Tables = psibase::ServiceTables<SymbolTable,

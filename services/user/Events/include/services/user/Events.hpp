@@ -45,7 +45,7 @@ namespace UserService
    /// [{"x":5,"y":7,"sum":12},{"x":6,"y":5,"sum":11}]
    /// ```
    ///
-   struct EventIndex : psibase::Service<EventIndex>
+   struct EventIndex : psibase::Service
    {
       static constexpr psibase::AccountNumber service{"events"};
       static constexpr auto                   serviceFlags =

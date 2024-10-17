@@ -20,7 +20,7 @@ namespace UserService
       /// by third party applications to streamline their user onboarding.
       ///
       /// Only this system service and Accounts are permitted to create new accounts.
-      class Invite : public psibase::Service<Invite>
+      class Invite : public psibase::Service
       {
         public:
          using Tables =

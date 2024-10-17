@@ -8,7 +8,7 @@ namespace SystemService
 {
    // This service manages the active producers.
    // It must have native write permission
-   class Producers : public psibase::Service<Producers>
+   class Producers : public psibase::Service
    {
      public:
       static constexpr auto service      = psibase::AccountNumber("producers");

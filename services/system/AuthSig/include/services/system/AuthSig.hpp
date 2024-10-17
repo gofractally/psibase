@@ -35,7 +35,7 @@ namespace SystemService
       /// transaction sent by this account.
       ///
       /// This service supports K1 or R1 keys (Secp256K1 or Secp256R1) keys.
-      class AuthSig : public psibase::Service<AuthSig>
+      class AuthSig : public psibase::Service
       {
         public:
          static constexpr auto service = psibase::AccountNumber("auth-sig");
