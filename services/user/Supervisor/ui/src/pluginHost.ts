@@ -180,6 +180,10 @@ export class PluginHost implements HostInterface {
         return res;
     }
 
+    getActiveAppDomain(): string {
+        return this.supervisor.getActiveAppDomain(this.self);
+    }
+
     // Client interface
     loginTemp(
         appOrigin: string,

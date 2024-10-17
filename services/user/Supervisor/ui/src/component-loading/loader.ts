@@ -4,6 +4,7 @@ import { plugin } from "./index.js";
 
 const wasiShimURL = new URL("./shims/wasip2-shim.js", import.meta.url);
 import hostShimCode from "./host-api.js?raw";
+import privilegedShimCode from "./privileged-api.js?raw";
 import { HostInterface } from "../hostInterface.js";
 import { ComponentAPI, Functions } from "../witExtraction.js";
 import { assert } from "../utils.js";
@@ -138,6 +139,18 @@ async function getHostImports(): Promise<ImportDetails> {
     };
 }
 
+async function getPrivilegedImports(): Promise<ImportDetails> {
+    const privilegedShimName = "./privileged-api.js"; // internal name used by bundler
+    const privileged_importMap: Array<[PkgId, FilePath]> = [
+        [`host:privileged/*`, `${privilegedShimName}#*`],
+    ];
+    const privileged_ShimFile: [FilePath, Code] = [privilegedShimName, privilegedShimCode];
+    return {
+        importMap: privileged_importMap,
+        files: [privileged_ShimFile],
+    };
+}
+
 function mergeImports(importDetails: ImportDetails[]): ImportDetails {
     const importMap: Array<[PkgId, FilePath]> = importDetails.flatMap(
         (detail) => detail.importMap,
@@ -157,6 +170,7 @@ export async function loadPlugin(
         await Promise.all([
             getWasiImports(),
             getHostImports(),
+            getPrivilegedImports(),
             getProxiedImports(api.importedFuncs),
             getNonstandardWasiImports(),
         ]),

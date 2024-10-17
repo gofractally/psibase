@@ -241,6 +241,20 @@ export class Supervisor implements AppInterface {
         this.parser = parser();
     }
 
+    getActiveAppDomain(sender: OriginationData): string {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+        assertTruthy(
+            sender.app,
+            "[supervisor:getActiveAppDomain] Unauthorized - only callable by Accounts plugin",
+        );
+        assert(
+            sender.app === "accounts",
+            "[supervisor:getActiveAppDomain] Unauthorized - Only callable by Accounts plugin",
+        );
+
+        return this.parentOrigination.origin;
+    }
+
     // Temporary function to allow apps to directly log a user in
     loginTemp(appOrigin: string, user: string, sender: OriginationData) {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
