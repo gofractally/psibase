@@ -1,5 +1,5 @@
 use crate::{
-    bindings::chainmail::plugin::types::Message,
+    bindings::exports::chainmail::plugin::queries::Message,
     bindings::host::common::{server as CommonServer, types::Error},
     deser_structs::TempMessageForDeserialization,
     errors::ErrorType,

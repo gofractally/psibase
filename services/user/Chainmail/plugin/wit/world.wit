@@ -1,9 +1,6 @@
 package chainmail:plugin;
 
 interface types {
-    record time-point {
-        seconds: u32
-    }
     record message {
         msg-id: u64,
         receiver: string,

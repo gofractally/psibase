@@ -4,9 +4,10 @@ mod deser_structs;
 mod errors;
 mod queries;
 
-use bindings::chainmail::plugin::types::Message;
-use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
-use bindings::exports::chainmail::plugin::queries::Guest as Query;
+use bindings::exports::chainmail::plugin::{
+    api::{Error, Guest as Api},
+    queries::{Guest as Query, Message},
+};
 use bindings::transact::plugin::intf as Transact;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;

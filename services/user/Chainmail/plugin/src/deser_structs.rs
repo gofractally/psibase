@@ -2,14 +2,7 @@ use psibase::TimePointSec;
 use serde::{de, Deserialize};
 use serde_aux::prelude::*;
 
-use crate::bindings::chainmail::plugin::types::Message;
-
-fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<u32, D::Error>
-where
-    D: de::Deserializer<'d>,
-{
-    Ok(TimePointSec::deserialize(deserializer)?.seconds)
-}
+use crate::bindings::exports::chainmail::plugin::queries::Message;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TempMessageForDeserialization {
@@ -22,6 +15,13 @@ pub struct TempMessageForDeserialization {
     pub body: String,
     #[serde(deserialize_with = "deserialize_timepoint")]
     pub datetime: u32,
+}
+
+fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: de::Deserializer<'d>,
+{
+    Ok(TimePointSec::deserialize(deserializer)?.seconds)
 }
 
 impl Into<Message> for TempMessageForDeserialization {
