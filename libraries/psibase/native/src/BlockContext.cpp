@@ -199,6 +199,8 @@ namespace psibase
          }
          catch (std::exception& e)
          {
+            trace.error = e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, warning) << "onBlock failed: " << e.what();
          }
       }
@@ -249,6 +251,8 @@ namespace psibase
          }
          catch (std::exception& e)
          {
+            trace.error = e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, warning) << "onTransaction failed: " << e.what();
          }
       }
@@ -402,10 +406,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
-         auto id = sha256(trx.transaction.data(), trx.transaction.size());
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
-         PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
+         auto id     = sha256(trx.transaction.data(), trx.transaction.size());
          trace.error = e.what();
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
          callOnTransaction(id, trace);
          throw;
       }
@@ -429,10 +434,11 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
-         auto id = sha256(trx.transaction.data(), trx.transaction.size());
-         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
-         PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
+         auto id     = sha256(trx.transaction.data(), trx.transaction.size());
          trace.error = e.what();
+         BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
          callOnTransaction(id, trace);
          throw;
       }
@@ -460,8 +466,9 @@ namespace psibase
       session.commit();
    }
 
-   auto BlockContext::execExport(std::string_view fn, Action&& action, TransactionTrace& trace)
-       -> ActionTrace&
+   auto BlockContext::execExport(std::string_view  fn,
+                                 Action&&          action,
+                                 TransactionTrace& trace) -> ActionTrace&
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
@@ -483,8 +490,9 @@ namespace psibase
       tc.execNonTrxAction(0, action, atrace);
    }
 
-   auto BlockContext::execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
-       -> ActionTrace&
+   auto BlockContext::execAsyncExport(std::string_view  fn,
+                                      Action&&          action,
+                                      TransactionTrace& trace) -> ActionTrace&
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
@@ -554,8 +562,9 @@ namespace psibase
       }
       catch (const std::exception& e)
       {
-         PSIBASE_LOG(trxLogger, info) << "Transaction failed";
          trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, info) << "Transaction failed";
          callOnTransaction(id, trace);
          throw;
       }
