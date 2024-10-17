@@ -712,7 +712,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             proofBC.start(bc.current.header.time);
             for (size_t i = 0; i < trx.proofs.size(); ++i)
             {
-               proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
+               proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, &bc);
             }
 
             // TODO: in another thread: check first auth and first proof. After
@@ -735,7 +735,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
             // for a modified node to skip it during production. This won't hurt
             // consensus since replay never uses read-only mode for auth checks.
             auto saveTrace = trace;
-            proofBC.checkFirstAuth(trx, trace, std::nullopt);
+            proofBC.checkFirstAuth(trx, trace, std::nullopt, &bc);
             trace = std::move(saveTrace);
 
             // TODO: RPC: don't forward failed transactions to P2P; this gives users
@@ -1439,9 +1439,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (!config.tls.trustfiles.empty())
    {
       file.set(
-          "", "tls-trustfile", config.tls.trustfiles,
-          [](std::string_view text) { return std::string(text); },
-          "A file containing trusted certificate authorities");
+          "", "tls-trustfile", config.tls.trustfiles, [](std::string_view text)
+          { return std::string(text); }, "A file containing trusted certificate authorities");
    }
 #endif
    if (!config.services.empty())
@@ -1452,9 +1451,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
          services.push_back(to_string(service));
       }
       file.set(
-          "", "service", services,
-          [](std::string_view text) { return service_from_string(text).host; },
-          "Native service root directory");
+          "", "service", services, [](std::string_view text)
+          { return service_from_string(text).host; }, "Native service root directory");
    }
    if (!std::holds_alternative<http::admin_none>(config.admin))
    {

@@ -1209,7 +1209,7 @@ struct callbacks
                         "proofs and claims must have same size");
 
          for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
-            proofBC.verifyProof(signedTrx, trace, i, std::nullopt);
+            proofBC.verifyProof(signedTrx, trace, i, std::nullopt, &*chain.blockContext);
 
          if (!proofBC.needGenesisAction)
          {
@@ -1222,7 +1222,8 @@ struct callbacks
             // cost to this since numExecutionMemories may bounce back
             // and forth.
             auto saveTrace = trace;
-            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
+            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt,
+                                               &*chain.blockContext);
             trace = std::move(saveTrace);
          }
 
