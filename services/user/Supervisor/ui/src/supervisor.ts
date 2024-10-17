@@ -237,6 +237,19 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
+    private getLoggedInUser(): string | undefined {
+        assertTruthy(this.parentOrigination, "Parent origination corrupted");
+
+        let getLoggedInUser = getCallArgs(
+            "accounts",
+            "plugin",
+            "accounts",
+            "getLoggedInUser",
+            [],
+        );
+        return this.supervisorCall(getLoggedInUser);
+    }
+
     constructor() {
         this.parser = parser();
     }
@@ -255,31 +268,6 @@ export class Supervisor implements AppInterface {
         return this.parentOrigination.origin;
     }
 
-    // Temporary function to allow apps to directly log a user in
-    loginTemp(appOrigin: string, user: string, sender: OriginationData) {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-        assertTruthy(
-            sender.app,
-            "[supervisor:loginTemp] only callable by Accounts plugin",
-        );
-
-        assert(
-            sender.app === "accounts",
-            "[supervisor:loginTemp] Unauthorized",
-        );
-        assert(
-            appOrigin === this.parentOrigination.origin,
-            "[supervisor:loginTemp] Unauthorized. Can only login to top-level app.",
-        );
-
-        let login = getCallArgs("accounts", "plugin", "admin", "forceLogin", [
-            appOrigin,
-            user,
-        ]);
-        this.supervisorCall(login);
-        userPluginsDirty = true;
-    }
-
     // Called by the current plugin looking to identify its caller
     getCaller(currentPlugin: OriginationData): OriginationData {
         assertTruthy(this.context, "Uninitialized call context");
@@ -294,27 +282,6 @@ export class Supervisor implements AppInterface {
             "Only active plugin can ask for its caller",
         );
         return frame.caller;
-    }
-
-    // Gets the logged in user for the parent app
-    // From the perspective of the accounts plugin, the caller is always the supervisor.
-    // But the caller_app is passed to the accounts plugin to specify the app that was originally responsible
-    //   for requesting the logged-in user.
-    getLoggedInUser(caller_app: string): string | undefined {
-        assertTruthy(this.parentOrigination, "Parent origination corrupted");
-
-        let getLoggedInUser = getCallArgs(
-            "accounts",
-            "plugin",
-            "admin",
-            "getLoggedInUser",
-            [caller_app, this.parentOrigination.origin],
-        );
-        return this.supervisorCall(getLoggedInUser);
-    }
-
-    isLoggedIn(): boolean {
-        return this.getLoggedInUser("supervisor") !== undefined;
     }
 
     getAccount(user: string): Account {
@@ -385,7 +352,7 @@ export class Supervisor implements AppInterface {
         if (!userPluginsDirty) return;
         userPluginsDirty = false;
 
-        let user = this.getLoggedInUser("supervisor");
+        let user = this.getLoggedInUser();
         if (user === undefined) {
             userPlugins = defaultUserPlugins();
             return;

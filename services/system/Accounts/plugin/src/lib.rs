@@ -4,7 +4,6 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
-use bindings::exports::accounts::plugin::admin::Guest as Admin;
 use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
 use bindings::host::privileged::intf as Privileged;
 use bindings::transact::plugin::intf as Transact;
@@ -57,41 +56,6 @@ fn login_key(origin: String) -> String {
     return key_pre + "." + &encoded;
 }
 
-fn from_supervisor() -> bool {
-    Client::get_sender_app()
-        .app
-        .map_or(false, |app| app == "supervisor")
-}
-
-impl Admin for AccountsPlugin {
-    fn force_login(domain: String, user: String) {
-        assert!(from_supervisor(), "unauthorized");
-        Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
-    }
-
-    fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
-        // Parameters: 
-        //  * `caller-app` - The supervisor will always be the actual caller of the function, 
-        //                   but this parameter specifies the account of the app who originally 
-        //                   prompted the supervisor to ask.
-        //  * `domain`     - The domain of the app whose logged-in user is being requested.
-        if !from_supervisor() {
-            return Err(Unauthorized.err("Only callable by the supervisor"));
-        }
-
-        // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
-        if caller_app != "transact" && caller_app != "supervisor" {
-            return Err(Unauthorized.err("Temporarily, only transact can ask for the logged-in user."));
-        }
-
-        if let Some(user) = Keyvalue::get(&login_key(domain)) {
-            Ok(Some(String::from_utf8(user).unwrap()))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
 impl Accounts for AccountsPlugin {
     fn login() -> Result<(), CommonTypes::Error> {
         println!("Login with popup window not yet supported.");
@@ -122,6 +86,29 @@ impl Accounts for AccountsPlugin {
         }
 
         Ok(())
+    }
+
+    fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
+        let sender =Client::get_sender_app();
+        let active_domain = Privileged::get_active_app_domain();
+        let sender_domain = sender.origin;
+
+        if sender_domain != active_domain {
+            if let Some(sender_app) = sender.app
+            {
+                if sender_app != "supervisor" && sender_app != "transact" {
+                    return Err(Unauthorized.err("Only callable by the top-level app domain"));
+                }
+            } else {
+                return Err(Unauthorized.err("Only callable by the top-level app domain"));
+            }
+        }
+
+        if let Some(user) = Keyvalue::get(&login_key(active_domain)) {
+            Ok(Some(String::from_utf8(user).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_available_accounts() -> Result<Vec<String>, CommonTypes::Error> {

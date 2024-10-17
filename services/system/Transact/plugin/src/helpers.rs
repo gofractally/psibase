@@ -1,4 +1,4 @@
-use crate::bindings::accounts::plugin::accounts::get_account;
+use crate::bindings::accounts::plugin::accounts::{get_account, get_logged_in_user};
 use crate::bindings::accounts::smart_auth::smart_auth::{
     self as SmartAuth, Action as PartialAction,
 };
@@ -79,7 +79,7 @@ pub fn make_transaction(
 }
 
 pub fn get_tx_sender(actions: &[PartialAction]) -> Result<AccountNumber, Host::types::Error> {
-    let sender = Host::client::get_logged_in_user()?;
+    let sender = get_logged_in_user()?;
     if sender.is_none() {
         if actions.len() == 1 {
             let a = &actions[0];
