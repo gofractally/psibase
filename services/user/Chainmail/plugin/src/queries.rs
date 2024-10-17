@@ -5,6 +5,23 @@ use crate::{
     errors::ErrorType,
 };
 
+pub fn get_msg_by_id(msg_id: u64) -> Result<TempMessageForDeserialization, Error> {
+    let api_root = String::from("/api");
+
+    let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
+    println!("REST res msg_by_id: {:?}", res);
+
+    let msg = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
+        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+
+    if msg.len() == 1 {
+        let msg = msg.get(0).unwrap();
+        return Ok(msg.clone());
+    } else {
+        return Err(ErrorType::InvalidMsgId.err(&msg_id.to_string()));
+    }
+}
+
 pub fn query_messages_endpoint(
     sender: Option<String>,
     receiver: Option<String>,
