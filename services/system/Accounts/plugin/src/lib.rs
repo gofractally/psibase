@@ -6,6 +6,7 @@ use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
 use bindings::exports::accounts::plugin::admin::Guest as Admin;
 use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
+use bindings::host::privileged::intf as Privileged;
 use bindings::transact::plugin::intf as Transact;
 use bindings::accounts::plugin::types::{self as AccountTypes};
 use psibase::fracpack::Pack;
@@ -69,11 +70,14 @@ impl Admin for AccountsPlugin {
     }
 
     fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
-        let sender = Client::get_sender_app().app;
-        assert!(
-            sender.is_some() && sender.as_ref().unwrap() == "supervisor",
-            "unauthorized"
-        );
+        // Parameters: 
+        //  * `caller-app` - The supervisor will always be the actual caller of the function, 
+        //                   but this parameter specifies the account of the app who originally 
+        //                   prompted the supervisor to ask.
+        //  * `domain`     - The domain of the app whose logged-in user is being requested.
+        if !from_supervisor() {
+            return Err(Unauthorized.err("Only callable by the supervisor"));
+        }
 
         // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
         if caller_app != "transact" && caller_app != "supervisor" {
@@ -94,10 +98,29 @@ impl Accounts for AccountsPlugin {
         return Err(NotYetImplemented.err("login"));
     }
 
+    fn logout() -> Result<(), CommonTypes::Error> {
+        let origin = Client::get_sender_app().origin;
+        let top_level_domain = Privileged::get_active_app_domain();
+
+        if origin == top_level_domain {
+            Keyvalue::delete(&login_key(origin));
+        } else {
+            return Err(Unauthorized.err("logout can only be called by the top-level app domain"));
+        }
+
+        Ok(())
+    }
+
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
+        let top_level_domain = Privileged::get_active_app_domain();
 
-        Client::login_temp(&origin, &user)?;
+        if origin == top_level_domain {
+            Keyvalue::set(&login_key(origin), &user.as_bytes()).expect("Failed to set logged-in user");
+        } else {
+            return Err(Unauthorized.err("login-temp can only be called by the top-level app domain"));
+        }
+
         Ok(())
     }
 

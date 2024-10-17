@@ -15,6 +15,9 @@ interface accounts {
     /// Creates a login popup allowing the user to log into an account.
     login: func() -> result<_, error>;
 
+    /// Logs out the currently logged-in user.
+    logout: func() -> result<_, error>;
+
     /// Temporary function that will be deprecated once popup login windows are supported.
     /// This function will log in the specified user with zero error checking.
     login-temp: func(user: string) -> result<_, error>;
