@@ -9,7 +9,7 @@ namespace UserService
 {
    namespace FractalNs
    {
-      class Fractal : public psibase::Service<Fractal>
+      class Fractal : public psibase::Service
       {
         public:
          using Tables = psibase::ServiceTables<InitTable,

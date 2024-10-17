@@ -7,7 +7,7 @@ namespace SystemService
 {
    namespace AuthSig
    {
-      class RAuthSig : public psibase::Service<RAuthSig>
+      class RAuthSig : public psibase::Service
       {
         public:
          static constexpr auto service = psibase::AccountNumber("r-auth-sig");

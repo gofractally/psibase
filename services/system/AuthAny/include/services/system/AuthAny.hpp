@@ -4,7 +4,7 @@
 
 namespace SystemService
 {
-   struct AuthAny : psibase::Service<AuthAny>
+   struct AuthAny : psibase::Service
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-any");
 
