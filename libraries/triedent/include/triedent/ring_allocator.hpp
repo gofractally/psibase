@@ -70,7 +70,7 @@ namespace triedent
       ring_allocator(const std::filesystem::path& path,
                      std::uint64_t                size,
                      std::uint8_t                 level,
-                     access_mode                  mode,
+                     open_mode                    mode,
                      bool                         pin);
       struct header
       {

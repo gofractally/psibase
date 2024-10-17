@@ -54,7 +54,6 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
-    add_subdirectory(Webmail)
     add_subdirectory(Events)
     add_subdirectory(Explorer)
     add_subdirectory(Fractal)

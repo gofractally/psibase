@@ -15,12 +15,10 @@ extern std::vector<std::string> data;
 
 TEST_CASE("region_allocator")
 {
-   temp_directory dir("triedent-test");
-   std::filesystem::create_directories(dir.path);
-   gc_queue         gc{256};
-   object_db        obj_ids{gc, dir.path / "obj_ids", access_mode::read_write};
-   region_allocator a{gc, obj_ids, dir.path / "cold", access_mode::read_write, 128};
-   dir.reset();
+   auto                   path = std::filesystem::temp_directory_path();
+   gc_queue               gc{256};
+   object_db              obj_ids{gc, path, open_mode::temporary};
+   region_allocator       a{gc, obj_ids, path, open_mode::temporary, 128};
    std::vector<object_id> ids;
    gc_session             session{gc};
    for (const std::string& s : data)
@@ -50,12 +48,10 @@ TEST_CASE("region_allocator")
 
 TEST_CASE("region_allocator threaded")
 {
-   temp_directory dir("triedent-test");
-   std::filesystem::create_directories(dir.path);
+   auto             path = std::filesystem::temp_directory_path();
    gc_queue         gc{256};
-   object_db        obj_ids{gc, dir.path / "obj_ids", access_mode::read_write};
-   region_allocator a{gc, obj_ids, dir.path / "cold", access_mode::read_write, 128};
-   dir.reset();
+   object_db        obj_ids{gc, path, open_mode::temporary};
+   region_allocator a{gc, obj_ids, path, open_mode::temporary, 128};
 
    std::vector<object_id> ids{data.size()};
    std::mutex             mutex;
@@ -176,8 +172,9 @@ TEST_CASE("region_allocator threaded")
    done.store(true);
    gc.notify_run();
    gc.push(std::make_shared<int>(0));
-   
-   for( auto& t : threads ) {
+
+   for (auto& t : threads)
+   {
       t.join();
    }
 

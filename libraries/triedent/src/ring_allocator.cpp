@@ -7,7 +7,7 @@ namespace triedent
    ring_allocator::ring_allocator(const std::filesystem::path& path,
                                   std::uint64_t                size,
                                   std::uint8_t                 level,
-                                  access_mode                  mode,
+                                  open_mode                    mode,
                                   bool                         pin)
        : _file(path, mode, pin), _level(level), _free_min(0)
    {
@@ -83,8 +83,8 @@ namespace triedent
                _self->_end_free_p = end_free_p | end_free_x;
                if constexpr (debug_gc)
                {
-             //     std::osyncstream(std::cout)
-             //         << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
+                  //     std::osyncstream(std::cout)
+                  //         << "end_free_p: " << _self->_level << ":" << end_free_p << std::endl;
                }
             }
             _self->_free_cond.notify_all();

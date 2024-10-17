@@ -12,7 +12,6 @@
 #include <services/user/Tokens.hpp>
 
 #include <psibase/Bitset.hpp>
-#include <psibase/serveContent.hpp>
 #include <vector>
 
 using namespace psibase;
@@ -31,7 +30,7 @@ using std::vector;
 Invite::Invite(psio::shared_view_ptr<Action> action)
 {
    MethodNumber m{action->method()};
-   if (m != MethodNumber{"init"} && m != MethodNumber{"storeSys"})
+   if (m != MethodNumber{"init"})
    {
       auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
@@ -342,7 +341,8 @@ struct Queries
    auto allCreatedInv() const
    {
       // Todo: pagination?
-      auto result = to<REvents>().sqlQuery("SELECT * FROM \"history.invite.invitecreated\" ORDER BY ROWID");
+      auto result =
+          to<REvents>().sqlQuery("SELECT * FROM \"history.invite.invitecreated\" ORDER BY ROWID");
       return std::string{result.begin(), result.end()};
    }
 
@@ -370,9 +370,6 @@ PSIO_REFLECT(Queries,
 
 auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
 {
-   if (auto result = serveContent(request, Tables{}))
-      return result;
-
    if (auto result = serveSimpleUI<Invite, true>(request))
       return result;
 
@@ -380,12 +377,6 @@ auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>
       return result;
 
    return std::nullopt;
-}
-
-void Invite::storeSys(string path, string contentType, vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   storeContent(std::move(path), std::move(contentType), std::move(content), Tables());
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

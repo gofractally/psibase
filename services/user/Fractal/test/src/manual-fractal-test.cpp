@@ -24,38 +24,26 @@ namespace
 
 SCENARIO("Testing default psibase chain")
 {
-   DefaultTestChain t({"Default"}, true, {1ull << 32, 1ull << 32, 1ull << 32, 1ull << 32});
+   {
+      TestChain t{"tester_psinode_db", O_RDWR | O_CREAT | O_TRUNC};
+      t.boot({"DevDefault"}, true);
 
-   auto alice     = t.from(t.addAccount("alice"_a));
-   auto bob       = t.from(t.addAccount("bob"_a));
-   auto sysIssuer = t.from(Symbol::service).to<Tokens>();
-   auto sysToken  = Tokens::sysToken;
+      auto alice = t.from("alice"_a);
 
-   // Let sys token be tradeable
-   sysIssuer.setTokenConf(sysToken, "untradeable"_m, false);
+      auto create = alice.to<Tokens>().create(4, 1'000'000e4);
+      alice.to<Tokens>().mint(create.returnVal(), 100e4, memo);
 
-   // Distribute a few tokens
-   auto userBalance = 1'000'000e4;
-   sysIssuer.mint(sysToken, userBalance, memo);
-   sysIssuer.credit(sysToken, alice, 1'000e4, memo);
-   sysIssuer.credit(sysToken, bob, 1'000e4, memo);
+      // Create a fractal
+      alice.to<FractalNs::Fractal>().createIdentity();
+      alice.to<FractalNs::Fractal>().newFractal("astronauts"_a, FractalNs::CoreFractal::service);
 
-   auto create = alice.to<Tokens>().create(4, 1'000'000e4);
-   alice.to<Tokens>().mint(create.returnVal(), 100e4, memo);
-
-   // Create a fractal
-   alice.to<FractalNs::Fractal>().createIdentity();
-   alice.to<FractalNs::Fractal>().newFractal("astronauts"_a, FractalNs::CoreFractal::service);
-
-   // Make a couple blocks
-   t.finishBlock();
-   t.startBlock();
-   t.finishBlock();
+      // Make a couple blocks
+      t.finishBlock();
+      t.startBlock();
+      t.finishBlock();
+   }
 
    // Run the chain
-   std::system("rm -rf tester_psinode_db");
-   std::system("mkdir tester_psinode_db");
-   std::system(("cp -a " + t.getPath() + "/. tester_psinode_db/").c_str());
    std::system(
        "psinode -o psibase.127.0.0.1.sslip.io tester_psinode_db -l 8080 --producer firstproducer");
 }

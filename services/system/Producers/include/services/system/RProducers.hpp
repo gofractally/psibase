@@ -10,8 +10,6 @@ namespace SystemService
       static constexpr auto service = psibase::AccountNumber("r-producers");
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
-
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
-   PSIO_REFLECT(RProducers, method(serveSys, request), method(storeSys, path, contentType, content))
+   PSIO_REFLECT(RProducers, method(serveSys, request))
 }  // namespace SystemService

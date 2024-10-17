@@ -1482,6 +1482,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // private keys.
    file.keep("", "key");
    file.keep("", "leeway");
+   file.keep("", "database-cache-size");
    //
    to_config(config.loggers, file);
 }
@@ -1510,8 +1511,10 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState = std::make_shared<psibase::SharedState>(
-       SharedDatabase{db_path, db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes,
-                      db_conf.cold_bytes},
+       SharedDatabase{
+           db_path,
+           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
+           triedent::open_mode::create},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();

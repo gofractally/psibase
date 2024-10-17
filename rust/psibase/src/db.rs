@@ -1,10 +1,13 @@
+use fracpack::{Pack, ToSchema, Unpack};
+use serde::{Deserialize, Serialize};
+
 /// Identify database to operate on
 ///
 /// Native functions expose a set of databases which serve
 /// various purposes. This enum identifies which database to
 /// use when invoking those functions.
 #[repr(u32)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum DbId {
     /// Services should store their tables here
     ///
@@ -44,14 +47,7 @@ pub enum DbId {
     /// then that node will reject the write. If the producers
     /// accepted the write into a block, then the node will stop
     /// following the chain until it's upgraded to a newer version.
-    NativeConstrained,
-
-    /// Tables used by native code
-    ///
-    /// This database doesn't enforce constraints during write.
-    /// Only writable by privileged services, but readable by all
-    /// services.
-    NativeUnconstrained,
+    Native,
 
     /// Block log
     ///
@@ -133,4 +129,37 @@ pub enum DbId {
     ///
     /// This number may grow in the future
     NumDatabases,
+}
+
+impl Pack for DbId {
+    const FIXED_SIZE: u32 = 4;
+
+    const VARIABLE_SIZE: bool = false;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        (*self as u32).pack(dest);
+    }
+}
+impl<'a> Unpack<'a> for DbId {
+    const FIXED_SIZE: u32 = 4;
+
+    const VARIABLE_SIZE: bool = false;
+
+    fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
+        let u32_form = u32::unpack(src, pos)?;
+        if u32_form >= DbId::NumDatabases as u32 {
+            return Err(fracpack::Error::BadEnumIndex);
+        }
+        Ok(unsafe { std::mem::transmute(u32_form) })
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
+        u32::verify(src, pos)
+    }
+}
+
+impl ToSchema for DbId {
+    fn schema(_builder: &mut fracpack::SchemaBuilder) -> fracpack::AnyType {
+        todo!()
+    }
 }
