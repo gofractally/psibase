@@ -1439,9 +1439,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    if (!config.tls.trustfiles.empty())
    {
       file.set(
-          "", "tls-trustfile", config.tls.trustfiles,
-          [](std::string_view text) { return std::string(text); },
-          "A file containing trusted certificate authorities");
+          "", "tls-trustfile", config.tls.trustfiles, [](std::string_view text)
+          { return std::string(text); }, "A file containing trusted certificate authorities");
    }
 #endif
    if (!config.services.empty())
@@ -1452,9 +1451,8 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
          services.push_back(to_string(service));
       }
       file.set(
-          "", "service", services,
-          [](std::string_view text) { return service_from_string(text).host; },
-          "Native service root directory");
+          "", "service", services, [](std::string_view text)
+          { return service_from_string(text).host; }, "Native service root directory");
    }
    if (!std::holds_alternative<http::admin_none>(config.admin))
    {
@@ -1518,7 +1516,6 @@ void run(const std::string&              db_path,
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();
-   auto queue       = std::make_shared<transaction_queue>();
    //
    TransactionStats transactionStats = {};
    std::mutex       transactionStatsMutex;
@@ -1655,6 +1652,7 @@ void run(const std::string&              db_path,
 
    boost::asio::io_context chainContext;
 
+   auto queue       = std::make_shared<transaction_queue>();
    auto server_work = boost::asio::make_work_guard(chainContext);
 
 #ifdef PSIBASE_ENABLE_SSL
@@ -2262,6 +2260,22 @@ void run(const std::string&              db_path,
                            timer.cancel();
                         });
    }
+
+   auto remove_http_handlers = psio::finally{[&http_config, &queue, &system]
+                                             {
+                                                {
+                                                   std::lock_guard l{http_config->mutex};
+                                                   http_config->push_boot_async        = nullptr;
+                                                   http_config->push_transaction_async = nullptr;
+                                                }
+                                                {
+                                                   std::scoped_lock lock{queue->mutex};
+                                                   queue->entries.clear();
+                                                }
+                                                {
+                                                   system->sockets->shutdown();
+                                                }
+                                             }};
 
    node.set_producer_id(producer);
    http_config->enable_p2p = enable_incoming_p2p;
