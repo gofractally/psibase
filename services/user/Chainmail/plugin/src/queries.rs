@@ -1,8 +1,8 @@
 use crate::{
     bindings::exports::chainmail::plugin::queries::Message,
     bindings::host::common::{server as CommonServer, types::Error},
-    deser_structs::TempMessageForDeserialization,
     errors::ErrorType,
+    serde_structs::TempMessageForDeserialization,
 };
 
 pub fn get_msg_by_id(msg_id: u64) -> Result<TempMessageForDeserialization, Error> {

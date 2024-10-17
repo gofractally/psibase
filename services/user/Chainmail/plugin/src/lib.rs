@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
-mod deser_structs;
 mod errors;
 mod queries;
+mod serde_structs;
 
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
