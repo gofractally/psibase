@@ -1,5 +1,6 @@
 #[allow(warnings)]
 mod bindings;
+mod deser_structs;
 mod errors;
 
 use bindings::chainmail::plugin::types::Message;
@@ -7,30 +8,20 @@ use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
 use bindings::exports::chainmail::plugin::queries::Guest as Query;
 use bindings::host::common::server as CommonServer;
 use bindings::transact::plugin::intf as Transact;
+use deser_structs::TempMessageForDeserialization;
 use errors::ErrorType;
 use psibase::fracpack::Pack;
-use psibase::{AccountNumber, TimePointSec};
-use serde::Deserialize;
+use psibase::AccountNumber;
 
 struct ChainmailPlugin;
 
-#[derive(Clone, Debug, Deserialize)]
-struct MessageSerde {
-    msg_id: String,
-    _archived_msg_id: Option<String>,
-    receiver: String,
-    sender: String,
-    subject: String,
-    body: String,
-    datetime: TimePointSec,
-}
-
-fn get_msg_by_id(msg_id: u64) -> Result<MessageSerde, Error> {
+fn get_msg_by_id(msg_id: u64) -> Result<TempMessageForDeserialization, Error> {
     let api_root = String::from("/api");
 
     let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
+    println!("REST res msg_by_id: {:?}", res);
 
-    let msg = serde_json::from_str::<Vec<MessageSerde>>(&res)
+    let msg = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
     if msg.len() == 1 {
@@ -73,8 +64,7 @@ impl Api for ChainmailPlugin {
                 subject: msg.subject.clone(),
                 body: msg.body.clone(),
                 receiver: AccountNumber::from(msg.receiver.as_str()),
-                msg_id: u64::from_str_radix(&msg.msg_id, 10)
-                    .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))?,
+                msg_id: msg.msg_id,
                 sender: AccountNumber::from(msg.sender.as_str()),
                 datetime: msg.datetime.seconds,
             }
@@ -90,8 +80,7 @@ impl Api for ChainmailPlugin {
             &chainmail::action_structs::unsave {
                 subject: msg.subject.clone(),
                 body: msg.body.clone(),
-                msg_id: u64::from_str_radix(&msg.msg_id, 10)
-                    .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))?,
+                msg_id: msg.msg_id,
                 sender: AccountNumber::from(msg.sender.as_str()),
                 datetime: msg.datetime.seconds,
             }
@@ -120,8 +109,11 @@ fn query_messages_endpoint(
         endpoint += &format!("receiver={}", receiver.unwrap());
     }
 
-    let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
-    let resp_val: Vec<MessageSerde>;
+    let resp = CommonServer::get_json(&endpoint)?;
+    println!("REST resp: {:?}", resp);
+    let resp = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&resp);
+    println!("serde parsed resp: {:?}", resp);
+    let resp_val: Vec<TempMessageForDeserialization>;
     if resp.is_err() {
         return Err(ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
     } else {
@@ -133,11 +125,7 @@ fn query_messages_endpoint(
     let messages: Vec<Message> = resp_val
         .into_iter()
         .map(|m| Message {
-            msg_id: m
-                .msg_id
-                .parse::<u64>()
-                .map_err(|err| ErrorType::QueryResponseParseError.err(&err.to_string()))
-                .unwrap(),
+            msg_id: m.msg_id,
             receiver: m.receiver,
             sender: m.sender,
             subject: m.subject,

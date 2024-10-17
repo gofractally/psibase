@@ -4,6 +4,7 @@ use crate::bindings::host::common::types::{Error, PluginId};
 pub enum ErrorType {
     QueryResponseParseError,
     InvalidMsgId,
+    ParseError,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -25,6 +26,11 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("No message found with msg_id {}", msg),
+            },
+            ErrorType::ParseError => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Prase error {}", msg),
             },
         }
     }

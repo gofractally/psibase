@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use crate::helpers::validate_user;
 
 use psibase::services::r_events::Wrapper as REventsSvc;
-
 use psibase::{Hex, HttpReply, HttpRequest};
 
 fn parse_query(query: &str) -> HashMap<String, String> {
