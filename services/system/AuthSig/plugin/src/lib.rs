@@ -57,14 +57,6 @@ impl SmartAuth for AuthSig {
             return Err(Unauthorized.err("get_claims"));
         }
 
-        let current_user = Client::get_logged_in_user()?;
-        if current_user.is_none() || current_user.unwrap() != account_name {
-            // Why is transact asking for the claims of another user?
-            // There may be a legitimate use-case for this, but I'd rather block
-            //   it for now until the use-case is clear.
-            return Err(Unauthorized.err("get_claims"));
-        }
-
         let user_key_json = Server::post_graphql_get_json(&format!(
             "query {{ account(name: \"{}\") {{ pubkey }} }}",
             account_name
