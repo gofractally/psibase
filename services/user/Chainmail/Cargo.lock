@@ -1444,6 +1444,7 @@ dependencies = [
  "chainmail_package",
  "psibase",
  "serde",
+ "serde-aux",
  "serde_json",
  "wit-bindgen-rt",
 ]
