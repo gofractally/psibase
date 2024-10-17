@@ -5,15 +5,6 @@ mod service {
     use psibase::*;
     use workshop;
 
-    #[table(record = "WebContentRow", index = 0)]
-    struct WebContentTable;
-
-    #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
-        println!("{} {}", path, contentType);
-        store_content(path, contentType, content, &WebContentTable::new()).unwrap()
-    }
-
     pub struct Query;
 
     #[derive(SimpleObject)]
@@ -43,8 +34,7 @@ mod service {
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_simple_ui::<workshop::Wrapper>(&request))
+        None.or_else(|| serve_simple_ui::<workshop::Wrapper>(&request))
             .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
     }
