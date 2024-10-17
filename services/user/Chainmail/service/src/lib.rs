@@ -1,3 +1,7 @@
+//! Chainmail Service
+//!
+//! Provides the Chainmail service, a simple email-like client.
+
 mod event_query_helpers;
 mod helpers;
 mod tables;
@@ -17,6 +21,9 @@ mod service {
     };
     use serde::{Deserialize, Serialize};
 
+    /// Saved Messages Table
+    /// Messages are "stored" and accessed as events and via event queries, with nothing in state.
+    /// This table stores messages a user wants to keep around past a message pruning expiration time.
     #[table(name = "SavedMessagesTable", record = "SavedMessage", index = 1)]
     pub struct SavedMessagesTable;
 
@@ -40,6 +47,8 @@ mod service {
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 1);
     }
 
+    /// Send message
+    /// by emiting a `sent` event
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
         check(
@@ -52,6 +61,8 @@ mod service {
             .sent(get_sender(), receiver, subject, body, datetime);
     }
 
+    /// Archive message
+    /// by emiting an `archived` event
     #[action]
     fn archive(msg_id: u64) {
         let saved_messages_table = SavedMessagesTable::new();
@@ -70,6 +81,9 @@ mod service {
             .archive(get_sender().to_string() + &msg_id.to_string());
     }
 
+    /// Save a message
+    /// Events can be pruned by nodes. Since Chainmail relies on events to "store" messages,
+    /// `save` copies a message into state where it can be stored indefinitely at the user's expense.
     #[action]
     fn save(
         msg_id: u64,
@@ -97,6 +111,8 @@ mod service {
             .unwrap();
     }
 
+    /// Unsave a message
+    /// `unsave` releases the state storage for a previously saved message
     #[action]
     fn unsave(msg_id: u64, sender: AccountNumber, subject: String, body: String, datetime: u32) {
         let saved_messages_table = SavedMessagesTable::new();
@@ -111,6 +127,7 @@ mod service {
         });
     }
 
+    /// History events
     #[event(history)]
     pub fn sent(
         sender: AccountNumber,
@@ -123,6 +140,7 @@ mod service {
     #[event(history)]
     pub fn archive(msg_id: String) {}
 
+    /// Serve REST calls
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
