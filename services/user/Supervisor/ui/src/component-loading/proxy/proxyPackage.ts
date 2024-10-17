@@ -38,14 +38,11 @@ class Func {
         let service = `"${this.service}"`;
         let plugin = `"${this.plugin}"`;
 
-        let consolePrint = "";
         if (this.isDynamic) {
-            consolePrint = `console.log(JSON.stringify(plugin_ref, null, 2));`;
             service = `plugin_ref.name`;
             plugin = `"plugin"`;
         }
         return [
-            `${col(2)}${consolePrint}`,
             `${col(2)}return host.syncCall({`,
             `${col(3)}service: ${service},`,
             `${col(3)}plugin: ${plugin},`,
