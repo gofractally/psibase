@@ -9,7 +9,6 @@ pub fn get_msg_by_id(msg_id: u64) -> Result<TempMessageForDeserialization, Error
     let api_root = String::from("/api");
 
     let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
-    println!("REST res msg_by_id: {:?}", res);
 
     let msg = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
@@ -43,13 +42,8 @@ pub fn query_messages_endpoint(
 
     let resp = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&CommonServer::get_json(
         &endpoint,
-    )?);
-    println!("serde parsed resp: {:?}", resp);
-    let resp_val =
-        resp.map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
-    println!("resp_val: {:?}", resp_val);
+    )?)
+    .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-    // TODO: There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
-    // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
-    Ok(resp_val.into_iter().map(|m| m.into()).collect())
+    Ok(resp.into_iter().map(|m| m.into()).collect())
 }

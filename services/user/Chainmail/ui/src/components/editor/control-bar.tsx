@@ -65,8 +65,6 @@ const ControlBarToggle = ({
 
     if (!action) return null;
 
-    // console.log("active:", active);
-
     return (
         <Toggle
             aria-label={label}
@@ -98,9 +96,7 @@ export const ControlBar = () => {
     ];
 
     const [active, setActive] = useState<string[]>([]);
-    // console.log("active:", active);
     const [headingLevel, setHeadingLevel] = useState(0);
-    // console.log("headingLevel:", headingLevel);
 
     useEffect(() => {
         if (selection) {

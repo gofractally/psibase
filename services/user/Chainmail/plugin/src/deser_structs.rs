@@ -8,7 +8,6 @@ use crate::bindings::exports::chainmail::plugin::queries::Message;
 pub struct TempMessageForDeserialization {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub msg_id: u64,
-    pub _archived_msg_id: Option<String>,
     pub receiver: String,
     pub sender: String,
     pub subject: String,
