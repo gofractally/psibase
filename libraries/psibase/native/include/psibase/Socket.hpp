@@ -52,7 +52,9 @@ namespace psibase
    {
       std::vector<std::shared_ptr<Socket>> sockets;
       boost::dynamic_bitset<>              available;
+      bool                                 stopped = false;
       std::mutex                           mutex;
+      void                                 shutdown();
       std::int32_t                         send(std::int32_t fd, std::span<const char> buf);
       void         add(const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* owner = nullptr);
       void         remove(const std::shared_ptr<Socket>& socket);
