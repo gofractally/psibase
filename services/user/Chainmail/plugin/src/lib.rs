@@ -2,6 +2,7 @@
 mod bindings;
 mod deser_structs;
 mod errors;
+mod queries;
 
 use bindings::chainmail::plugin::types::Message;
 use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
@@ -12,6 +13,7 @@ use deser_structs::TempMessageForDeserialization;
 use errors::ErrorType;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
+use queries::query_messages_endpoint;
 
 struct ChainmailPlugin;
 
@@ -88,52 +90,6 @@ impl Api for ChainmailPlugin {
         )?;
         Ok(())
     }
-}
-
-fn query_messages_endpoint(
-    sender: Option<String>,
-    receiver: Option<String>,
-    archived_requested: bool,
-) -> Result<Vec<Message>, Error> {
-    let mut endpoint = String::from("/api/messages?");
-    if archived_requested {
-        endpoint += "archived=true&";
-    }
-    if sender.is_some() {
-        endpoint += &format!("sender={}", sender.clone().unwrap());
-    }
-    if sender.is_some() && receiver.is_some() {
-        endpoint += "&";
-    }
-    if receiver.is_some() {
-        endpoint += &format!("receiver={}", receiver.unwrap());
-    }
-
-    let resp = CommonServer::get_json(&endpoint)?;
-    println!("REST resp: {:?}", resp);
-    let resp = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&resp);
-    println!("serde parsed resp: {:?}", resp);
-    let resp_val: Vec<TempMessageForDeserialization>;
-    if resp.is_err() {
-        return Err(ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
-    } else {
-        resp_val = resp.unwrap();
-    }
-
-    // TODO: There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
-    // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
-    let messages: Vec<Message> = resp_val
-        .into_iter()
-        .map(|m| Message {
-            msg_id: m.msg_id,
-            receiver: m.receiver,
-            sender: m.sender,
-            subject: m.subject,
-            body: m.body,
-            datetime: m.datetime,
-        })
-        .collect();
-    Ok(messages)
 }
 
 impl Query for ChainmailPlugin {
