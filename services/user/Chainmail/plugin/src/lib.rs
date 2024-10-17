@@ -66,7 +66,7 @@ impl Api for ChainmailPlugin {
                 receiver: AccountNumber::from(msg.receiver.as_str()),
                 msg_id: msg.msg_id,
                 sender: AccountNumber::from(msg.sender.as_str()),
-                datetime: msg.datetime.seconds,
+                datetime: msg.datetime,
             }
             .packed(),
         )?;
@@ -82,7 +82,7 @@ impl Api for ChainmailPlugin {
                 body: msg.body.clone(),
                 msg_id: msg.msg_id,
                 sender: AccountNumber::from(msg.sender.as_str()),
-                datetime: msg.datetime.seconds,
+                datetime: msg.datetime,
             }
             .packed(),
         )?;
@@ -130,7 +130,7 @@ fn query_messages_endpoint(
             sender: m.sender,
             subject: m.subject,
             body: m.body,
-            datetime: m.datetime.seconds,
+            datetime: m.datetime,
         })
         .collect();
     Ok(messages)
