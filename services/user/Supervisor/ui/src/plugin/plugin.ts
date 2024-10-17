@@ -36,10 +36,10 @@ export class Plugin {
             const foundInterface = exportedFuncs.interfaces.find(
                 (i) => i.name === intf,
             );
-            return foundInterface?.funcs.some((f) => f === method);
+            return foundInterface?.funcs.some((f) => f.name === method);
         }
 
-        return exportedFuncs.funcs.some((f) => f === method);
+        return exportedFuncs.funcs.some((f) => f.name === method);
     }
 
     private async doFetchPlugin(): Promise<Uint8Array> {

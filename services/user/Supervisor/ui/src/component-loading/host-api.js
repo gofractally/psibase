@@ -1,10 +1,10 @@
-export const types = {
-    pluginRef: class {
-        constructor(name) {
-            this.name = name;
-        }
-    },
-};
+class PluginRef {
+    constructor(name) {
+        this.name = name;
+    }
+}
+
+export const types = { PluginRef };
 
 export const server = {
     postGraphqlGetJson(graphQL) {
