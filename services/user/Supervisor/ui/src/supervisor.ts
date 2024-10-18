@@ -337,6 +337,11 @@ export class Supervisor implements AppInterface {
             `Tried to call plugin ${service}:${plugin} before initialization`,
         );
 
+        // Set the dirty bit for the user plugins
+        if (p.plugin.id.service === "accounts" && method === "loginTemp") {
+            userPluginsDirty = true;
+        }
+
         // Manage the callstack and call the plugin
         this.context.stack.push(sender, args);
         let ret: any;
