@@ -46,7 +46,9 @@ custom_error! {
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct PackageRef {
     pub name: String,

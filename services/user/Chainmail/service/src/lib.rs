@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use psibase::services::accounts::Wrapper as AccountsSvc;
 use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::AccountNumber;
+use psibase::Hex;
 use psibase::HttpReply;
 use psibase::HttpRequest;
 
@@ -13,17 +14,6 @@ fn validate_user(user: &str) -> bool {
     }
 
     AccountsSvc::call().exists(acc)
-}
-
-fn make_query(req: &HttpRequest, sql: String) -> HttpRequest {
-    return HttpRequest {
-        host: req.host.clone(),
-        rootHost: req.rootHost.clone(),
-        method: String::from("POST"),
-        target: String::from("/sql"),
-        contentType: String::from("application/sql"),
-        body: sql.into(),
-    };
 }
 
 fn parse_query(query: &str) -> HashMap<String, String> {
@@ -39,7 +29,8 @@ fn parse_query(query: &str) -> HashMap<String, String> {
 
 fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
-        if !request.target.starts_with("/messages") {
+        println!("request.target = {}", request.target);
+        if !request.target.starts_with("/api/messages") {
             return None;
         }
 
@@ -51,9 +42,11 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let query = request.target.split_at(query_start + 1).1;
         let params = crate::parse_query(query);
+        println!("params: {:#?}", params);
 
         let mut s_clause = String::new();
         let s_opt = params.get("sender");
+        println!("sender: {:#?}", s_opt);
         if let Some(s) = s_opt {
             if !validate_user(s) {
                 return None;
@@ -63,6 +56,7 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
 
         let mut r_clause = String::new();
         let r_opt = params.get(&String::from("receiver"));
+        println!("receiver: {:#?}", r_opt);
         if let Some(r) = r_opt {
             if !validate_user(r) {
                 return None;
@@ -74,25 +68,61 @@ fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
             return None;
         }
 
-        let mut where_clause: String = String::from("WHERE ");
+        let archived_requested = match params.get(&String::from("archived")) {
+            Some(arch) => arch == "true",
+            None => false,
+        };
+        println!("archived_requested: {}", archived_requested);
+
+        let mut where_clause_sender_receiver: String = String::from("");
         if s_opt.is_some() {
-            where_clause += s_clause.as_str();
+            where_clause_sender_receiver += s_clause.as_str();
         }
         if s_opt.is_some() && r_opt.is_some() {
-            where_clause += " AND ";
+            where_clause_sender_receiver += " AND ";
         }
         if r_opt.is_some() {
-            where_clause += r_clause.as_str();
+            where_clause_sender_receiver += r_clause.as_str();
         }
+        println!("where-clause: {}", where_clause_sender_receiver);
 
-        let mq = make_query(
-            request,
-            format!(
-                "SELECT * FROM \"history.chainmail.sent\" {} ORDER BY ROWID",
-                where_clause
-            ),
+        // let archived_msgs_query =     "SELECT DISTINCT sent.rowid as event_id,                   sent.* FROM \"history.chainmail.sent\" AS sent INNER JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id";
+        // let not_archvied_msgs_query = "SELECT DISTINCT sent.rowid as event_id, archive.event_id, sent.* FROM \"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archive.event_id WHERE event_id IS NULL";
+        // Select from all sent emails *not archived* where receiver/send are as query params specify
+        let select_clause =
+            format!("DISTINCT archive.msg_id as archived_msg_id, sent.*, sent.rowid as msg_id");
+        let from_clause = format!("\"history.chainmail.sent\" AS sent LEFT JOIN \"history.chainmail.archive\" AS archive ON CONCAT(sent.receiver, sent.rowid) = archived_msg_id" );
+        let where_clause_archived_or_not = format!(
+            "archived_msg_id IS {} NULL",
+            if archived_requested { "NOT" } else { "" }
         );
-        return REventsSvc::call().serveSys(mq);
+        let order_by_clause = "sent.ROWID";
+
+        let sql_query_str = format!(
+            "SELECT {} FROM {} WHERE {} {} {} ORDER BY {}",
+            select_clause,
+            from_clause,
+            where_clause_archived_or_not,
+            if s_opt.is_some() || r_opt.is_some() {
+                "AND"
+            } else {
+                ""
+            },
+            where_clause_sender_receiver,
+            order_by_clause
+        );
+
+        println!("query: {}", sql_query_str);
+
+        let query_response = REventsSvc::call().sqlQuery(sql_query_str);
+        println!("query_response: {}", query_response);
+
+        return Some(HttpReply {
+            status: 200,
+            contentType: request.contentType.clone(),
+            headers: vec![],
+            body: Hex(query_response.as_bytes().to_vec()),
+        });
     }
     return None;
 }
@@ -104,6 +134,7 @@ mod service {
     use serde::{Deserialize, Serialize};
     use services::accounts::Wrapper as AccountsSvc;
     use services::events::Wrapper as EventsSvc;
+    use services::sites::Wrapper as SitesSvc;
 
     use crate::serve_rest_api;
 
@@ -118,11 +149,9 @@ mod service {
     #[action]
     fn init() {
         let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_none(),
-            "Service already initialized",
-        );
         table.put(&InitRow {}).unwrap();
+
+        SitesSvc::call().enableSpa(true);
 
         EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(DbId::HistoryEvent, SERVICE, MethodNumber::from("sent"), 0);
@@ -140,13 +169,21 @@ mod service {
             .sent(get_sender(), receiver, subject, body);
     }
 
+    #[action]
+    fn archive(msg_id: u64) {
+        Wrapper::emit()
+            .history()
+            .archive(get_sender().to_string() + &msg_id.to_string());
+    }
+
     #[event(history)]
     pub fn sent(sender: AccountNumber, receiver: AccountNumber, subject: String, body: String) {}
+    #[event(history)]
+    pub fn archive(msg_id: String) {}
 
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_rest_api(&request))
-            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }

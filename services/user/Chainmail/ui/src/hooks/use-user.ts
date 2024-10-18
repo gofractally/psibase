@@ -11,8 +11,7 @@ interface SupervisorError {
 }
 
 const accountsAtom = atom<string[]>([]);
-// TODO: get rid of hard-coded alice
-const userAtom = atom<string>("alice");
+const userAtom = atom<string | undefined>(undefined);
 export function useUser() {
     const [availableAccounts, setAvailableAccounts] = useAtom(accountsAtom);
     const [user, setUser] = useAtom(userAtom);
