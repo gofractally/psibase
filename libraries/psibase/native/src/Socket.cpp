@@ -60,6 +60,15 @@ namespace
    }
 }  // namespace
 
+void Sockets::shutdown()
+{
+   std::unique_lock l{mutex};
+   stopped         = true;
+   auto tmpsockets = std::move(sockets);
+   l.unlock();
+   tmpsockets.clear();
+}
+
 std::int32_t Sockets::send(std::int32_t fd, std::span<const char> buf)
 {
    std::shared_ptr<Socket> p;
@@ -81,6 +90,7 @@ std::int32_t Sockets::send(std::int32_t fd, std::span<const char> buf)
 void Sockets::add(const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* owner)
 {
    std::lock_guard l{mutex};
+   check(!stopped, "Shutting down");
    if (auto pos = available.find_first(); pos != boost::dynamic_bitset<>::npos)
    {
       socket->id   = pos;
