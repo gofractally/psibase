@@ -392,7 +392,8 @@ namespace psibase
    void BlockContext::verifyProof(const SignedTransaction&                 trx,
                                   TransactionTrace&                        trace,
                                   size_t                                   i,
-                                  std::optional<std::chrono::microseconds> watchdogLimit)
+                                  std::optional<std::chrono::microseconds> watchdogLimit,
+                                  BlockContext*                            errorContext)
    {
       try
       {
@@ -411,7 +412,8 @@ namespace psibase
          BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction signature verification failed";
-         callOnTransaction(id, trace);
+         if (errorContext)
+            errorContext->callOnTransaction(id, trace);
          throw;
       }
       catch (...)
@@ -422,7 +424,8 @@ namespace psibase
 
    void BlockContext::checkFirstAuth(const SignedTransaction&                 trx,
                                      TransactionTrace&                        trace,
-                                     std::optional<std::chrono::microseconds> watchdogLimit)
+                                     std::optional<std::chrono::microseconds> watchdogLimit,
+                                     BlockContext*                            errorContext)
    {
       try
       {
@@ -439,7 +442,8 @@ namespace psibase
          BOOST_LOG_SCOPED_THREAD_TAG("TransactionId", id);
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction check first auth failed";
-         callOnTransaction(id, trace);
+         if (errorContext)
+            errorContext->callOnTransaction(id, trace);
          throw;
       }
    }

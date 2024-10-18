@@ -808,7 +808,7 @@ namespace psibase
             for (std::size_t i = 0; i < trx.proofs.size(); ++i)
             {
                TransactionTrace trace;
-               verifyBc.verifyProof(trx, trace, i, std::nullopt);
+               verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr);
             }
          }
       }
@@ -1173,7 +1173,7 @@ namespace psibase
                proofBC.start(bc->current.header.time);
                for (size_t i = 0; i < trx.proofs.size(); ++i)
                {
-                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit);
+                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc);
                }
 
                // TODO: in another thread: check first auth and first proof. After
@@ -1196,7 +1196,7 @@ namespace psibase
                // for a modified node to skip it during production. This won't hurt
                // consensus since replay never uses read-only mode for auth checks.
                auto saveTrace = trace;
-               proofBC.checkFirstAuth(trx, trace, std::nullopt);
+               proofBC.checkFirstAuth(trx, trace, std::nullopt, bc);
                trace = std::move(saveTrace);
 
                // TODO: RPC: don't forward failed transactions to P2P; this gives users
