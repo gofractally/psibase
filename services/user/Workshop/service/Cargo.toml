@@ -10,6 +10,7 @@ publish = false
 
 [package.metadata.psibase]
 server = "r-workshop"
+plugin = "workshop-plugin"
 data = [{src = "../ui/dist", dst = "/"}]
 
 [package.metadata.psibase.dependencies]
