@@ -61,7 +61,6 @@ const MailItem = ({
                 selectedMessage?.id === item.id && "bg-muted",
             )}
             onClick={() => {
-                console.info(item);
                 setSelectedMessageId(item.id);
             }}
         >

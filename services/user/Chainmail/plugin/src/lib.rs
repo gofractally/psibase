@@ -1,28 +1,27 @@
+//! Chainmail Plugin: Basic Chainmail API
+//!
+//! Provides a convenient API for interacting with Chainmail, a simple email-like client.
+
 #[allow(warnings)]
 mod bindings;
 mod errors;
+mod queries;
+mod serde_structs;
 
-use bindings::exports::chainmail::plugin::api::{Error, Guest as Api};
-use bindings::exports::chainmail::plugin::queries::{Guest as Query, Message};
-use bindings::host::common::server as CommonServer;
+use bindings::exports::chainmail::plugin::{
+    api::{Error, Guest as Api},
+    queries::{Guest as Query, Message},
+};
 use bindings::transact::plugin::intf as Transact;
-use errors::ErrorType::QueryResponseParseError;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
-use serde::Deserialize;
+use queries::{get_msg_by_id, query_messages_endpoint};
 
+/// Struct that implements the Api as well as the Query interfaces
 struct ChainmailPlugin;
 
-#[derive(Debug, Deserialize)]
-struct MessageSerde {
-    msg_id: String,
-    receiver: String,
-    sender: String,
-    subject: String,
-    body: String,
-}
-
 impl Api for ChainmailPlugin {
+    /// Send a message
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "send",
@@ -36,6 +35,11 @@ impl Api for ChainmailPlugin {
         Ok(())
     }
 
+    /// Archive a message
+    /// - msg_id: the message's rowid (from the events table)
+    ///
+    /// Archiving is equivalent to deleting, given message can't be truly deleted.
+    /// Archiving is a proactive action equivalent to a node pruning an message (an message's historical event)
     fn archive(msg_id: u64) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "archive",
@@ -43,59 +47,59 @@ impl Api for ChainmailPlugin {
         )?;
         Ok(())
     }
-}
 
-fn query_messages_endpoint(
-    sender: Option<String>,
-    receiver: Option<String>,
-    archived_requested: bool,
-) -> Result<Vec<Message>, Error> {
-    let mut endpoint = String::from("/api/messages?");
-    if archived_requested {
-        endpoint += "archived=true&";
-    }
-    if sender.is_some() {
-        endpoint += &format!("sender={}", sender.clone().unwrap());
-    }
-    if sender.is_some() && receiver.is_some() {
-        endpoint += "&";
-    }
-    if receiver.is_some() {
-        endpoint += &format!("receiver={}", receiver.unwrap());
-    }
+    /// Save the message
+    /// - msg_id: the message's rowid (from the events table)
+    ///
+    /// Saving a message moves it to state, making it long-lasting (immune to pruning)
+    fn save(msg_id: u64) -> Result<(), Error> {
+        let msg = get_msg_by_id(msg_id)?;
 
-    let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
-    let mut resp_val: Vec<MessageSerde>;
-    if resp.is_err() {
-        return Err(errors::ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
-    } else {
-        resp_val = resp.unwrap();
+        Transact::add_action_to_transaction(
+            "save",
+            &chainmail::action_structs::save {
+                subject: msg.subject.clone(),
+                body: msg.body.clone(),
+                receiver: AccountNumber::from(msg.receiver.as_str()),
+                msg_id: msg.msg_id,
+                sender: AccountNumber::from(msg.sender.as_str()),
+                datetime: msg.datetime,
+            }
+            .packed(),
+        )?;
+        Ok(())
     }
 
-    // There's a way to tell the bindgen to generate the rust types with custom attributes. Goes in cargo.toml.
-    // Somewhere in the codebase is an example of doing this with serde serialize and deserialize attributes
-    let messages: Vec<Message> = resp_val
-        .into_iter()
-        .map(|m| Message {
-            msg_id: m
-                .msg_id
-                .parse::<u64>()
-                .map_err(|err| QueryResponseParseError.err(&err.to_string()))
-                .unwrap(),
-            receiver: m.receiver,
-            sender: m.sender,
-            subject: m.subject,
-            body: m.body,
-        })
-        .collect();
-    Ok(messages)
+    /// Unsave the message
+    /// - msg_id: the message's rowid (from the events table)
+    ///
+    /// Unsaving a message removing it from state, exposing it to pruning
+    fn unsave(msg_id: u64) -> Result<(), Error> {
+        let msg = get_msg_by_id(msg_id).unwrap();
+        Transact::add_action_to_transaction(
+            "save",
+            &chainmail::action_structs::unsave {
+                subject: msg.subject.clone(),
+                body: msg.body.clone(),
+                msg_id: msg.msg_id,
+                sender: AccountNumber::from(msg.sender.as_str()),
+                datetime: msg.datetime,
+            }
+            .packed(),
+        )?;
+        Ok(())
+    }
 }
 
 impl Query for ChainmailPlugin {
+    /// Retrieve non-archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
         Ok(query_messages_endpoint(sender, receiver, false)?)
     }
 
+    /// Retrieve archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     fn get_archived_msgs(
         sender: Option<String>,
         receiver: Option<String>,
