@@ -10,9 +10,10 @@ publish = false
 
 [package.metadata.psibase]
 server = "r-workshop"
+data = [{src = "../ui/dist", dst = "/"}]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.12.0"
+HttpServer = "0.13.0"
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase" }
