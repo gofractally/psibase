@@ -37,7 +37,7 @@ mod service {
 
     fn check_init() {
         let table = InitTable::new();
-        if table.get_index_pk().iter().count() == 0 {
+        if table.get_index_pk().get(&()).is_some() {
             init();
         }
     }
