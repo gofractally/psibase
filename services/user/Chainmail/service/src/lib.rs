@@ -35,9 +35,11 @@ mod service {
         fn pk(&self) {}
     }
 
-    fn is_service_inited() -> bool {
+    fn check_init() {
         let table = InitTable::new();
-        table.get_index_pk().iter().count() > 0
+        if table.get_index_pk().iter().count() == 0 {
+            init();
+        }
     }
 
     #[action]
@@ -56,9 +58,8 @@ mod service {
     /// by emiting a `sent` event
     #[action]
     fn send(receiver: AccountNumber, subject: String, body: String) {
-        if !is_service_inited() {
-            init();
-        }
+        check_init();
+
         check(
             AccountsSvc::call().exists(receiver),
             &format!("receiver account {} doesn't exist", receiver),
