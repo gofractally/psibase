@@ -18,7 +18,7 @@ use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::G
 use psibase::services::auth_sig::action_structs as MyService;
 
 // Third-party crates
-use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
+use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use psibase::fracpack::Pack;
 use rand_core::OsRng;
@@ -132,10 +132,12 @@ impl KeyVault for AuthSig {
         Ok(pem.contents().to_vec())
     }
 
-    fn sign(message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
+    fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
         let signing_key = SigningKey::from_pkcs8_der(&private_key)
             .map_err(|e| CryptoError.err(&e.to_string()))?;
-        let signature: Signature = signing_key.sign(&message);
+        let signature: Signature = signing_key
+            .sign_prehash(&hashed_message)
+            .map_err(|e| CryptoError.err(&e.to_string()))?;
         Ok(signature.to_bytes().to_vec())
     }
 }

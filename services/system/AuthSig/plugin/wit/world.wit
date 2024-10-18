@@ -34,8 +34,8 @@ interface keyvault {
     /// Returns the DER encoded key
     to-der: func(key: pem) -> result<list<u8>, error>;
 
-    /// Signs a message with the specified DER-encoded private key
-    sign: func(message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
+    /// Signs a pre-hashed message with the specified DER-encoded private key
+    sign: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
 }
 
 interface actions {
