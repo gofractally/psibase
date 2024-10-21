@@ -1,5 +1,3 @@
-import type { UUID } from "crypto";
-
 import { FUNCTION_CALL_REQUEST } from "./index";
 
 export interface FunctionCallArgs {
@@ -55,7 +53,7 @@ export function toString(item: FunctionCallArgs): string {
 
 export interface FunctionCallRequest {
     type: typeof FUNCTION_CALL_REQUEST;
-    id: UUID;
+    id: string;
     args: QualifiedFunctionCallArgs;
 }
 
