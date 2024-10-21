@@ -143,6 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
@@ -154,6 +155,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -602,7 +604,11 @@ psibase_package(
     SERVICE setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
         FLAGS allowWriteNative
+        SERVER r-setcode
+    SERVICE r-setcode
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
     DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -887,7 +893,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/KeepSocket.psi
+    NAME KeepSocket
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Accepts HTTP requests, but never returns a response"
+    SERVICE s-keep-sock
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
+        SERVER s-keep-sock
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket)
 
 ExternalProject_Add(
     rust
