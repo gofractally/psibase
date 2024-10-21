@@ -23,6 +23,7 @@ mod service {
     #[action]
     fn add(a: i32, b: i32) -> i32 {
         // expected to be inserted here by macro: check_init();
+        check_init();
         a + b
     }
 

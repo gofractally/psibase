@@ -104,7 +104,7 @@ fn process_mod(
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
                 } else {
-                    println!("Pushing this item into non_actions:\n{:#?}", f);
+                    println!("Pushing this item into non_actions:\n{:#?}", f.sig.ident);
                     non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
