@@ -6,7 +6,7 @@ mod event_query_helpers;
 mod helpers;
 mod tables;
 
-#[psibase::service(recursive = true)]
+#[psibase::service]
 mod service {
     use crate::event_query_helpers::serve_rest_api;
     use crate::tables::SavedMessage;
