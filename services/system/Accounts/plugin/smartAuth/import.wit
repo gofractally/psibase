@@ -49,7 +49,7 @@ interface smart-auth {
     /// Parameters
     /// * `plugin`: The plugin that contains the auth service
     /// * `account-name`: The name of the account whose claim is being proven
-    /// * `message`: Data needed to generate the proof. Often a message that must be 
+    /// * `message`: Data needed to generate the proof. Often a hashed message that must be 
     ///   cryptographically signed.
     get-proofs: func(plugin: plugin-ref, account-name: string, message: list<u8>) -> result<list<proof>, error>;
 }

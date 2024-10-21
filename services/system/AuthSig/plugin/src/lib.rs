@@ -2,12 +2,17 @@
 mod bindings;
 mod errors;
 use errors::ErrorType::*;
+mod helpers;
+use helpers::*;
+mod db;
+use db::*;
+mod types;
+use types::*;
 
 // Other plugins
 use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
-use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
+use bindings::host::common::{client as Client, types as CommonTypes};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -22,29 +27,6 @@ use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, Verif
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use psibase::fracpack::Pack;
 use rand_core::OsRng;
-use seahash;
-
-trait TryFromPemStr: Sized {
-    fn try_from_pem_str(p: &Pem) -> Result<Self, CommonTypes::Error>;
-}
-
-impl TryFromPemStr for pem::Pem {
-    fn try_from_pem_str(key_string: &Pem) -> Result<Self, CommonTypes::Error> {
-        Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError.err(&e.to_string()))?)
-    }
-}
-
-fn get_hash(key: &Pem) -> Result<String, CommonTypes::Error> {
-    let pem = pem::Pem::try_from_pem_str(&key)?;
-    let digest = seahash::hash(&pem.contents().to_vec());
-    Ok(format!("{:x}", digest))
-}
-
-fn from_transact() -> bool {
-    Client::get_sender_app().app.map_or(false, |app| {
-        app == psibase::services::transact::SERVICE.to_string()
-    })
-}
 
 struct AuthSig;
 
@@ -57,44 +39,36 @@ impl SmartAuth for AuthSig {
             return Err(Unauthorized.err("get_claims"));
         }
 
-        let user_key_json = Server::post_graphql_get_json(&format!(
-            "query {{ account(name: \"{}\") {{ pubkey }} }}",
-            account_name
-        ))?;
-        println!("Found user key: {}", user_key_json);
+        let pubkey = get_pubkey(&account_name)?;
+        if !ManagedKeys::has(&pubkey) {
+            return Err(KeyNotFound.err("get_claims"));
+        }
 
-        // let hash = get_hash(&user_key)?;
-        // let key = Keyvalue::get(&hash);
-        // if key.is_none() {
-        //     return Err(KeyNotFound.err("get_claims"));
-        // }
-        // let key = key.unwrap();
-
-        // Claim {
-        //     verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-        //     raw_data: key,
-        // }
-
-        Err(NotYetImplemented.err("get_claim"))
+        Ok(vec![Claim {
+            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+            raw_data: AuthSig::to_der(pubkey)?,
+        }])
     }
 
     fn get_proofs(
-        _account_name: String,
-        _message: Vec<u8>,
+        account_name: String,
+        message: Vec<u8>,
     ) -> Result<Vec<Proof>, CommonTypes::Error> {
         if !from_transact() {
             return Err(Unauthorized.err("get_proofs"));
         }
 
-        Err(NotYetImplemented.err("get_proof"))
+        let pubkey = get_pubkey(&account_name)?;
+        let private_key = ManagedKeys::get(&pubkey);
+        let signature = AuthSig::sign(message, private_key)?;
+        Ok(vec![Proof { signature }])
     }
 }
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
         let keypair = AuthSig::generate_unmanaged_keypair()?;
-        let hash = get_hash(&keypair.public_key)?;
-        Keyvalue::set(&hash, &AuthSig::to_der(keypair.private_key)?)?;
+        ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);
         Ok(keypair.public_key)
     }
 

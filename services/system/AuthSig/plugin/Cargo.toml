@@ -10,6 +10,8 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 psibase = { path = "../../../../rust/psibase" }
 pem = "3"
 seahash = "4.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [profile.release]
 codegen-units = 1

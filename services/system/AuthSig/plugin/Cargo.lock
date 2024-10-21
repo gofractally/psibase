@@ -241,6 +241,8 @@ dependencies = [
  "psibase",
  "rand_core",
  "seahash",
+ "serde",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 
