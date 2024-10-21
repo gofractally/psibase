@@ -51,10 +51,24 @@ fn get_claims(
     actions: &[PartialAction],
 ) -> Result<Vec<SmartAuth::Claim>, Host::types::Error> {
     let sender_str = sender.to_string();
-    let account_details = get_account(&sender_str)?.unwrap();
+    let mut claims: Vec<SmartAuth::Claim> = vec![];
 
-    let authorizer = Host::types::PluginRef::new(&account_details.auth_service);
-    Ok(SmartAuth::get_claims(authorizer, &sender_str, actions)?)
+    // If the sender is not the invite payer, then we must get claims/proofs from their auth service
+    if *sender != *services::invite::PAYER_ACCOUNT {
+        let account_details = get_account(&sender_str)?.unwrap();
+        let plugin_ref = Host::types::PluginRef::new(&account_details.auth_service);
+        claims = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
+    }
+
+    // Also get proofs from any other auth plugins that were used to add claims to the transaction
+    let auth_plugins = AuthPlugins::get();
+    for plugin in auth_plugins {
+        let plugin_ref = Host::types::PluginRef::new(&plugin);
+        let mut c = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
+        claims.append(&mut c);
+    }
+
+    Ok(claims)
 }
 
 pub fn make_transaction(
