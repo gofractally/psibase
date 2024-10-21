@@ -29,4 +29,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[psibase::test_case(packages("PsiMacroTest"))]
+    // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
+    // Verifies check_init() calls get inserted as designed
+    fn test_check_init(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        use addcheckinit::Wrapper;
+        use psibase::AccountNumber;
+
+        println!("{}", Wrapper::SERVICE);
+        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
+
+        assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
+
+        assert_eq!(Wrapper::push(&chain).check_inited().get()?, ());
+
+        // Q: How to call query function? Call serveSys with a graphql request
+
+        Ok(())
+    }
 }

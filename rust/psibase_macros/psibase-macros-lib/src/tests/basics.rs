@@ -99,7 +99,7 @@ mod tests {
             }
         };
 
-        let after = service_macro_impl(attr, before);
+        let _after = service_macro_impl(attr, before);
     }
 
     #[test]
@@ -122,7 +122,7 @@ mod tests {
             }
         };
 
-        let after = service_macro_impl(attr, before);
+        let _after = service_macro_impl(attr, before);
     }
 
     #[test]
