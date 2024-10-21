@@ -1,5 +1,3 @@
-import type { UUID } from "crypto";
-
 import {
     QualifiedPluginId,
     QualifiedFunctionCallArgs,
@@ -141,7 +139,7 @@ export class Supervisor implements AppInterface {
         return Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
-    private replyToParent(id: UUID, call: FunctionCallArgs, result: any) {
+    private replyToParent(id: string, call: FunctionCallArgs, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
             buildFunctionCallResponse(id, call, result),
@@ -268,11 +266,11 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
-        id: UUID,
+        id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            // Wait to load the full plugin tree (a plugin and all it's dependencies, recursively).
+            // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
             // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
             //   transpiling the component, bundling with rollup, and importing & instantiating the es module
             //   in memory.
