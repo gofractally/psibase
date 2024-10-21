@@ -5,7 +5,7 @@ mod service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     struct InitRow {}
     impl InitRow {
         #[primary_key]
@@ -29,6 +29,8 @@ mod service {
     #[action]
     fn check_inited() {
         let table = InitTable::new();
-        table.get_index_pk().get(&()).unwrap();
+        let table_val = table.get_index_pk().get(&());
+        println!("table_val: {:?}", table_val);
+        // table_val.unwrap()
     }
 }

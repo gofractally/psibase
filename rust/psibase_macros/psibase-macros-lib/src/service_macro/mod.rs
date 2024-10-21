@@ -90,6 +90,7 @@ fn process_mod(
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
+        let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
@@ -102,6 +103,9 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
+                } else {
+                    println!("Pushing this item into non_actions:\n{:#?}", f);
+                    non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
                     if let Some(kind) = parse_event_attr(attr) {

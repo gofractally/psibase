@@ -40,9 +40,12 @@ mod tests {
         println!("{}", Wrapper::SERVICE);
         assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
 
+        println!("result of 3+4: {}", Wrapper::push(&chain).add(3, 4).get()?);
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
-        assert_eq!(Wrapper::push(&chain).check_inited().get()?, ());
+        let retval = Wrapper::push(&chain).check_inited().get();
+        println!("check_init() retval: {:?}", retval);
+        assert!(Wrapper::push(&chain).check_inited().get().is_ok());
 
         // Q: How to call query function? Call serveSys with a graphql request
 
