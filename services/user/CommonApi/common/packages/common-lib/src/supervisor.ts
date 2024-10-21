@@ -1,5 +1,3 @@
-import { type UUID } from "crypto";
-
 import { siblingUrl } from "./rpc";
 import {
     QualifiedFunctionCallArgs,
@@ -50,13 +48,13 @@ export class Supervisor {
     private supervisorSrc: string;
 
     private pendingRequests: {
-        id: UUID;
+        id: string;
         call: FunctionCallArgs;
         resolve: (result: unknown) => void;
         reject: (result: unknown) => void;
     }[] = [];
 
-    private removePendingRequestById(id: UUID) {
+    private removePendingRequestById(id: string) {
         this.pendingRequests = this.pendingRequests.filter(
             (req) => req.id !== id,
         );
@@ -179,7 +177,8 @@ export class Supervisor {
         };
 
         return new Promise((resolve, reject) => {
-            const requestId = window.crypto.randomUUID() as UUID;
+            const requestId: string =
+                window.crypto.randomUUID?.() ?? Math.random().toString(); // if insecure context and randomUUID is unavailable, use Math.random
             this.pendingRequests.push({
                 id: requestId,
                 call: args,
