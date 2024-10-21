@@ -79,13 +79,18 @@ impl Accounts for AccountsPlugin {
         let origin = Client::get_sender_app().origin;
         let top_level_domain = Privileged::get_active_app_domain();
 
-        if origin == top_level_domain {
-            Keyvalue::set(&login_key(origin), &user.as_bytes()).expect("Failed to set logged-in user");
-        } else {
+        if origin != top_level_domain {
             return Err(Unauthorized.err("login-temp can only be called by the top-level app domain"));
         }
 
+        Keyvalue::set(&login_key(top_level_domain), &user.as_bytes()).expect("Failed to set logged-in user");
+
         Ok(())
+    }
+
+    fn is_logged_in() -> bool {
+        let active_domain = Privileged::get_active_app_domain();
+        Keyvalue::get(&login_key(active_domain)).is_some()
     }
 
     fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {

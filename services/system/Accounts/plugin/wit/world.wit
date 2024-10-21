@@ -22,6 +22,11 @@ interface accounts {
     /// This function will log in the specified user with zero error checking.
     login-temp: func(user: string) -> result<_, error>;
 
+    /// Returns true if there is a user logged in to the currently active top-level application.
+    /// Unlike get-logged-in-user, this function is callable by any plugin because it does not
+    /// leak any private information, and only notifies the caller whether there is a user logged in.
+    is-logged-in: func() -> bool;
+
     /// Gets the account name of the user logged into the currently active top-level application.
     /// May also return None if no user is logged in.
     /// 
