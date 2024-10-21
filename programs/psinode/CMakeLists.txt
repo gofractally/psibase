@@ -70,6 +70,10 @@ if(Python_Interpreter_FOUND)
         NAME psinode_test_query
         COMMAND ${Python_EXECUTABLE} test_query.py --psinode=$<TARGET_FILE:psinode>
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_test(
+        NAME psinode_test_exeption_exit
+        COMMAND ${Python_EXECUTABLE} test_exception_exit.py --psinode=$<TARGET_FILE:psinode>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
 include(GNUInstallDirs)
