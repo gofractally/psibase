@@ -1,0 +1,60 @@
+package registry:plugin;
+
+interface types {
+    type account-id = string;
+    type base64-str = string;
+
+    enum app-status {
+        draft,
+        published,
+        unpublished,
+    }
+
+    record app-metadata {
+        name: string,
+        short-description: string,
+        long-description: string,
+        icon: base64-str,
+        icon-mime-type: string, 
+        tos-subpage: string,
+        privacy-policy-subpage: string,
+        app-homepage-subpage: string,
+        status: u32,
+        redirect-uris: list<string>,
+        owners: list<account-id>,
+        tags: list<string>,
+    }
+
+    record extra-metadata {
+        created-at: string,
+    }
+
+    record full-app-metadata {
+        app-metadata: app-metadata,
+        extra-metadata: extra-metadata,
+    }
+}
+
+interface developer {
+    use host:common/types.{error};
+    use types.{app-metadata};
+
+    /// TODO: add docs
+    set-app-metadata: func(metadata: app-metadata) -> result<_, error>;
+}
+
+interface consumer {
+    use host:common/types.{error};
+    use types.{account-id, full-app-metadata};
+
+    /// TODO: add docs
+    get-app-metadata: func(account: account-id) -> result<full-app-metadata, error>;
+
+    /// TODO: add docs
+    get-related-tags: func(tag-substr: string) -> result<list<string>, error>;
+}
+
+world imports {
+    import developer;
+    import consumer;
+}
