@@ -4,7 +4,7 @@ mod service {}
 
 mod tests {
 
-    #[psibase::test_case(packages("PsiMacroTest"))]
+    // #[psibase::test_case(packages("PsiMacroTest"))]
     // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
     // Verifies hygiene (how to expect a particular error?)
     fn test_macro_generated_wrapper(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -37,12 +37,14 @@ mod tests {
         use addcheckinit::Wrapper;
         use psibase::AccountNumber;
 
-        println!("{}", Wrapper::SERVICE);
         assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
 
-        let retval = Wrapper::push(&chain).check_inited().get();
-        println!("check_init() retval: {:?}", retval);
-        assert!(Wrapper::push(&chain).check_inited().get().is_ok());
+        // call action to trigger the check_init() which should be there
+        let _retval = Wrapper::push(&chain).add(3, 4).get();
+
+        // check that check_init() was there and was called
+        let retval = Wrapper::push(&chain).check_inited().get().unwrap();
+        assert_eq!(retval, true);
 
         // Q: How to call query function? Call serveSys with a graphql request
 

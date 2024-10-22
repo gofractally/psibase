@@ -1,12 +1,12 @@
 #[psibase::service(name = "addcheckinit")]
 #[allow(non_snake_case)]
-mod service {
+pub mod service {
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    struct InitRow {}
+    pub struct InitRow {}
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
@@ -15,7 +15,6 @@ mod service {
     fn check_init() {
         let table = InitTable::new();
         if table.get_index_pk().get(&()).is_none() {
-            let table = InitTable::new();
             table.put(&InitRow {}).unwrap();
         }
     }
@@ -28,10 +27,8 @@ mod service {
     }
 
     #[action]
-    fn check_inited() {
+    fn check_inited() -> bool {
         let table = InitTable::new();
-        let table_val = table.get_index_pk().get(&());
-        println!("table_val: {:?}", table_val);
-        // table_val.unwrap()
+        table.get_index_pk().get(&()).is_some()
     }
 }
