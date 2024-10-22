@@ -15,7 +15,7 @@ name = "workshop_package"
 version = "0.1.0"
 
 [package.metadata.psibase]
-package-name = "workshop"
+package-name = "WorkshopPackage"
 description = "Workshop for psibase apps"
 services = ["workshop"]
 

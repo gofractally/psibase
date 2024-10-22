@@ -309,7 +309,7 @@ pub mod service {
 }
 
 // TODO: how to make these tests work?
-#[psibase::test_case(packages("workshop_package"))]
+#[psibase::test_case(packages("WorkshopPackage"))]
 fn test_foo(chain: psibase::Chain) -> Result<(), psibase::Error> {
     chain.new_account(account!("alice"))?;
 
