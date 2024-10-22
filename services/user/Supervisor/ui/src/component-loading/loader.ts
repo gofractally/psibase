@@ -144,7 +144,10 @@ async function getPrivilegedImports(): Promise<ImportDetails> {
     const privileged_importMap: Array<[PkgId, FilePath]> = [
         [`host:privileged/*`, `${privilegedShimName}#*`],
     ];
-    const privileged_ShimFile: [FilePath, Code] = [privilegedShimName, privilegedShimCode];
+    const privileged_ShimFile: [FilePath, Code] = [
+        privilegedShimName,
+        privilegedShimCode,
+    ];
     return {
         importMap: privileged_importMap,
         files: [privileged_ShimFile],
@@ -178,7 +181,7 @@ export async function loadPlugin(
     const pluginModule = await load(
         wasmBytes,
         imports,
-        `${pluginHost.myServiceAccount()} plugin`,
+        `${pluginHost.myServiceAccount()}.plugin.js`,
     );
     pluginModule.__setHost(pluginHost);
 
@@ -188,7 +191,7 @@ export async function loadPlugin(
 async function load(
     wasmBytes: Uint8Array,
     imports: ImportDetails,
-    debugName: string,
+    debugFileName: string,
 ) {
     const name = "component";
     const opts = {
@@ -212,12 +215,14 @@ async function load(
 
     const bundleCode: string = await rollup({
         input: name + ".js",
-        plugins: [plugin([...files_2, ...imports.files], true, debugName)],
+        plugins: [plugin([...files_2, ...imports.files], true, debugFileName)],
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
 
-    const blob = new Blob([bundleCode], { type: "text/javascript" });
+    const namedBundleCode = `${bundleCode}\n//# sourceURL=${debugFileName}`;
+
+    const blob = new Blob([namedBundleCode], { type: "text/javascript" });
     const url = URL.createObjectURL(blob);
 
     const mod = await import(/* @vite-ignore */ url);
@@ -229,7 +234,7 @@ async function load(
 // Not sufficient for plugins, which require other direct host exports, but can be used
 //   to run various other utilities in the browser that have been compiled into wasm
 //   components.
-export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
+export async function loadBasic(wasmBytes: Uint8Array, debugFileName: string) {
     const wasiImports = await getWasiImports();
     const name = "component";
     const opts = {
@@ -246,12 +251,13 @@ export async function loadBasic(wasmBytes: Uint8Array, debugName: string) {
 
     const bundleCode: string = await rollup({
         input: name + ".js",
-        plugins: [plugin(files_2, false, debugName)],
+        plugins: [plugin(files_2, false, debugFileName)],
     })
         .then((bundle) => bundle.generate({ format: "es" }))
         .then(({ output }) => output[0].code);
 
-    const blob = new Blob([bundleCode], { type: "text/javascript" });
+    const namedBundleCode = `${bundleCode}\n//# sourceURL=${debugFileName}`;
+    const blob = new Blob([namedBundleCode], { type: "text/javascript" });
     const url = URL.createObjectURL(blob);
 
     const mod = await import(/* @vite-ignore */ url);
