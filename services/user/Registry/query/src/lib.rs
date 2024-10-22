@@ -28,7 +28,8 @@ mod service {
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_simple_ui::<ServiceWrapper>(&request))
+            .or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
     }
 }

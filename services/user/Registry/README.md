@@ -10,10 +10,6 @@ open http://localhost:8080
 
 # go through the steps to create a network in dev mode, name the producer as prod and confirm
 
-# ui development
-cd ui
-yarn build
-
 # back to this directory
 cd Registry
 cargo psibase install && psibase install --reinstall target/wasm32-wasi/release/packages/registry.psi

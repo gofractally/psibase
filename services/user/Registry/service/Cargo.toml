@@ -11,7 +11,6 @@ publish = false
 [package.metadata.psibase]
 server = "r-registry"
 plugin = "registry-plugin"
-data = [{src = "../ui/dist", dst = "/"}]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.13.0"
