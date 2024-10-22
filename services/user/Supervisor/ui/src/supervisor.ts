@@ -1,5 +1,3 @@
-import type { UUID } from "crypto";
-
 import {
     QualifiedPluginId,
     QualifiedFunctionCallArgs,
@@ -212,7 +210,7 @@ export class Supervisor implements AppInterface {
         return Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
-    private replyToParent(id: UUID, call: FunctionCallArgs, result: any) {
+    private replyToParent(id: string, call: FunctionCallArgs, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
             buildFunctionCallResponse(id, call, result),
@@ -390,7 +388,7 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
-        id: UUID,
+        id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {

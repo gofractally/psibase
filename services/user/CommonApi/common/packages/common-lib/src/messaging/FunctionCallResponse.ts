@@ -1,11 +1,9 @@
-import type { UUID } from "crypto";
-
 import { FUNCTION_CALL_RESPONSE } from "./index";
 import { FunctionCallArgs } from "./index";
 
 export interface FunctionCallResponse {
     type: typeof FUNCTION_CALL_RESPONSE;
-    id: UUID;
+    id: string;
     call: FunctionCallArgs;
     result: any;
 }
@@ -17,7 +15,7 @@ export const isFunctionCallResponse = (
 };
 
 export const buildFunctionCallResponse = (
-    id: UUID,
+    id: string,
     call: FunctionCallArgs,
     result: any,
 ): FunctionCallResponse => {
