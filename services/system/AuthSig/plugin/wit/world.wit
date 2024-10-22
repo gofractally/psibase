@@ -48,7 +48,6 @@ interface actions {
 }
 
 world imports {
-    // All auth services provide the standard smart-auth interface
     import keyvault;
     import actions;
 }
