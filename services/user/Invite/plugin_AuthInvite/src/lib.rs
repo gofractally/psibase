@@ -2,13 +2,14 @@
 mod bindings;
 mod errors;
 use errors::ErrorType::*;
+mod db;
+use db::*;
 
 // Other plugins
 use bindings::auth_invite::plugin::types::InviteToken;
 use bindings::auth_sig::plugin::keyvault as KeyVault;
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::host::common::{client as Client, types::Error};
-use bindings::invite::plugin::advanced::{deserialize, InvKeys};
+use bindings::invite::plugin::advanced::deserialize;
 use bindings::transact::plugin::auth_notifier as Transact;
 
 // Exported interfaces/types
@@ -17,46 +18,13 @@ use bindings::exports::accounts::smart_auth::smart_auth::Guest as SmartAuth;
 
 use bindings::exports::auth_invite::plugin::intf::Guest as Intf;
 
-// Third-party crates
-use psibase::fracpack::{Pack, Unpack};
-
-struct AuthInvite;
-
 fn from_transact() -> bool {
     Client::get_sender_app().app.map_or(false, |app| {
         app == psibase::services::transact::SERVICE.to_string()
     })
 }
 
-#[derive(Pack, Unpack)]
-struct Tokens {
-    tokens: Vec<InviteToken>,
-}
-
-// Database operation wrapper
-struct InviteKeys {}
-impl InviteKeys {
-    const KEY_PUB: &'static str = "pub_key";
-    const KEY_PRV: &'static str = "prv_key";
-
-    fn add(keys: &InvKeys) {
-        Keyvalue::set(Self::KEY_PUB, &keys.pub_key).expect("Failed to set pub key");
-        Keyvalue::set(Self::KEY_PRV, &keys.priv_key).expect("Failed to set priv key");
-    }
-
-    fn delete() {
-        Keyvalue::delete(Self::KEY_PUB);
-        Keyvalue::delete(Self::KEY_PRV);
-    }
-
-    fn get_public_key() -> Vec<u8> {
-        Keyvalue::get(Self::KEY_PUB).expect("Failed to get pub key")
-    }
-
-    fn get_private_key() -> Vec<u8> {
-        Keyvalue::get(Self::KEY_PRV).expect("Failed to get priv key")
-    }
-}
+struct AuthInvite;
 
 impl Intf for AuthInvite {
     fn notify(token: InviteToken) -> Result<(), Error> {
