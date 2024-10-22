@@ -16,14 +16,14 @@ export const useTags = () => {
         const supervisor = await getSupervisor();
         console.info("got supervisor!!!", supervisor);
         try {
-            const res = (await supervisor.functionCall({
+            const tags = (await supervisor.functionCall({
                 service: "registry",
                 intf: "consumer",
                 method: "getRelatedTags",
                 params: [tag],
-            })) as AppTags;
-            console.info("plugin registry getRelatedTags call res", res);
-            return res;
+            })) as string[];
+            console.info("plugin registry getRelatedTags call res", tags);
+            return { tags };
         } catch (e: unknown) {
             console.error(`${(e as SupervisorError).message}`, e);
         }

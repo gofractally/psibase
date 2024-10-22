@@ -33,9 +33,29 @@ pub mod service {
         }
     }
 
+    pub type AppStatusU32 = u32;
+
+    enum AppStatus {
+        Draft = 0,
+        Published = 1,
+        Unpublished = 2,
+    }
+
+    impl From<AppStatusU32> for AppStatus {
+        fn from(status: AppStatusU32) -> Self {
+            match status {
+                0 => AppStatus::Draft,
+                1 => AppStatus::Published,
+                2 => AppStatus::Unpublished,
+                _ => abort_message("Invalid app status"),
+            }
+        }
+    }
+
     /// Holds metadata for a registered app
     #[table(name = "AppMetadataTable", index = 1)]
     #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[serde(rename_all = "camelCase")]
     pub struct AppMetadata {
         /// The unique identifier for the app: it's own account id
         #[primary_key]
@@ -66,7 +86,7 @@ pub mod service {
         pub app_homepage_subpage: String,
 
         /// The status of the app (DRAFT, PUBLISHED, or UNPUBLISHED)
-        pub status: String, // TODO: Create enum
+        pub status: AppStatusU32,
 
         /// The timestamp of when the app was created
         pub created_at: psibase::TimePointSec,
@@ -79,10 +99,7 @@ pub mod service {
     #[table(name = "AppTagsTable", index = 2)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AppTags {
-        /// The app ID
         pub app_id: AccountNumber,
-
-        /// The tag ID
         pub tag_id: u32,
     }
 
@@ -114,7 +131,7 @@ pub mod service {
         tos_subpage: String,
         privacy_policy_subpage: String,
         app_homepage_subpage: String,
-        status: String,
+        status: AppStatusU32,
         tags: Vec<String>,
         redirect_uris: Vec<String>,
         owners: Vec<AccountNumber>,
@@ -127,6 +144,9 @@ pub mod service {
             tags.len() <= MAX_APP_TAGS,
             format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
         );
+
+        // Validate status
+        let status = AppStatus::from(status);
 
         let mut metadata = app_metadata_table
             .get_index_pk()
@@ -141,7 +161,7 @@ pub mod service {
         metadata.tos_subpage = tos_subpage;
         metadata.privacy_policy_subpage = privacy_policy_subpage;
         metadata.app_homepage_subpage = app_homepage_subpage;
-        metadata.status = status;
+        metadata.status = status as AppStatusU32;
         metadata.created_at = if metadata.created_at.seconds == 0 {
             created_at
         } else {

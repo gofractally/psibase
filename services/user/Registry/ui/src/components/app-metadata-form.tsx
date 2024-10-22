@@ -20,7 +20,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useUser } from "@hooks";
 
-import { RegisteredApp } from "@types";
+import { AppStatus, RegisteredApp } from "@types";
 import { RadioGroup, RadioGroupItem } from "@shadcn/radio-group";
 import { Metadata, useMetadata } from "@hooks/use-metadata";
 import { TagSelect } from "./tag-select";
@@ -64,7 +64,7 @@ const AppMetadataSchema = z.object({
             "Must start with '/' and be a valid slug",
         )
         .optional(),
-    status: z.enum(["DRAFT", "PUBLISHED", "UNPUBLISHED"]),
+    status: z.nativeEnum(AppStatus),
     tags: z.array(z.object({ value: z.string(), label: z.string() })),
     redirectUris: z
         .string()
@@ -86,8 +86,8 @@ export function AppMetadataForm() {
     const id = location.state?.app?.id;
     const { user: selectedAccount } = useUser();
     const { setMetadata, currentMetadata } = useMetadata();
-    const [appStatus, setAppStatus] = useState(
-        id ? location.state?.app?.status : "DRAFT",
+    const [appStatus, setAppStatus] = useState<AppStatus>(
+        location.state?.app?.status ?? AppStatus.DRAFT,
     );
 
     const [isLoading, setIsLoading] = useState(true);
@@ -110,7 +110,7 @@ export function AppMetadataForm() {
             tosSubpage: "/tos",
             privacyPolicySubpage: "/privacy-policy",
             appHomepageSubpage: "/",
-            status: "DRAFT",
+            status: AppStatus.DRAFT,
             tags: [],
         },
     });
@@ -121,64 +121,56 @@ export function AppMetadataForm() {
                 "Preloading form with current metadata",
                 currentMetadata,
             );
-            form.setValue("name", currentMetadata.metadata.name);
+            form.setValue("name", currentMetadata.appMetadata.name);
             form.setValue(
                 "shortDescription",
-                currentMetadata.metadata.shortDescription,
+                currentMetadata.appMetadata.shortDescription,
             );
             form.setValue(
                 "longDescription",
-                currentMetadata.metadata.longDescription,
+                currentMetadata.appMetadata.longDescription,
             );
-            form.setValue("tosSubpage", currentMetadata.metadata.tosSubpage);
+            form.setValue("tosSubpage", currentMetadata.appMetadata.tosSubpage);
             form.setValue(
                 "privacyPolicySubpage",
-                currentMetadata.metadata.privacyPolicySubpage,
+                currentMetadata.appMetadata.privacyPolicySubpage,
             );
             form.setValue(
                 "appHomepageSubpage",
-                currentMetadata.metadata.appHomepageSubpage,
+                currentMetadata.appMetadata.appHomepageSubpage,
             );
             // Convert base64 icon to viewable format
             if (
-                currentMetadata.metadata.icon &&
-                currentMetadata.metadata.iconMimeType
+                currentMetadata.appMetadata.icon &&
+                currentMetadata.appMetadata.iconMimeType
             ) {
                 setExistingIcon({
-                    data: currentMetadata.metadata.icon,
-                    mimeType: currentMetadata.metadata.iconMimeType,
+                    data: currentMetadata.appMetadata.icon,
+                    mimeType: currentMetadata.appMetadata.iconMimeType,
                 });
-                const iconSrc = `data:${currentMetadata.metadata.iconMimeType};base64,${currentMetadata.metadata.icon}`;
+                const iconSrc = `data:${currentMetadata.appMetadata.iconMimeType};base64,${currentMetadata.appMetadata.icon}`;
                 setIconPreview(iconSrc);
             } else {
                 setExistingIcon(null);
                 setIconPreview(null);
             }
-            setAppStatus(
-                currentMetadata.metadata.status as
-                    | "DRAFT"
-                    | "PUBLISHED"
-                    | "UNPUBLISHED",
-            );
-            form.setValue(
-                "status",
-                currentMetadata.metadata.status as
-                    | "DRAFT"
-                    | "PUBLISHED"
-                    | "UNPUBLISHED",
-            );
+            setAppStatus(currentMetadata.appMetadata.status);
+            form.setValue("status", currentMetadata.appMetadata.status);
             form.setValue(
                 "tags",
-                currentMetadata.tags.map((tag) => ({
-                    value: tag.tag,
-                    label: tag.tag,
+                currentMetadata.appMetadata.tags.map((tag) => ({
+                    value: tag,
+                    label: tag,
                 })),
             );
             form.setValue(
                 "redirectUris",
-                currentMetadata.metadata.redirectUris.join(","),
+                currentMetadata.appMetadata.redirectUris.join(","),
             );
-            form.setValue("owners", currentMetadata.metadata.owners.join(","));
+            form.setValue(
+                "owners",
+                currentMetadata.appMetadata.owners.join(","),
+            );
             setIsLoading(false);
         } else if (!isUpdating) {
             setIsLoading(false);
@@ -203,13 +195,11 @@ export function AppMetadataForm() {
             setIconPreview(app.icon ?? null);
 
             const savedStatus = localStorage.getItem(`appStatus_${app.id}`);
-            const status = savedStatus || app.status || "DRAFT";
-            setAppStatus(status as "DRAFT" | "PUBLISHED" | "UNPUBLISHED");
-            form.setValue(
-                "status",
-                status as "DRAFT" | "PUBLISHED" | "UNPUBLISHED",
-            );
-            localStorage.setItem(`appStatus_${app.id}`, status);
+            const status: AppStatus =
+                (savedStatus && Number(savedStatus)) || app.status || 0;
+            setAppStatus(status);
+            form.setValue("status", status);
+            localStorage.setItem(`appStatus_${app.id}`, status.toString());
         }
     }, [isUpdating, location.state, form, selectedAccount, navigate]);
 
@@ -267,11 +257,11 @@ export function AppMetadataForm() {
     };
 
     const handleStatusChange = (value: string) => {
-        const newStatus = value as "DRAFT" | "PUBLISHED" | "UNPUBLISHED";
+        const newStatus = Number(value) as AppStatus;
         setAppStatus(newStatus);
         form.setValue("status", newStatus);
         if (id) {
-            localStorage.setItem(`appStatus_${id}`, newStatus);
+            localStorage.setItem(`appStatus_${id}`, value);
         }
     };
 
@@ -487,12 +477,12 @@ export function AppMetadataForm() {
                             <FormControl>
                                 <RadioGroup
                                     onValueChange={handleStatusChange}
-                                    value={appStatus}
+                                    value={appStatus.toString()}
                                     className="flex flex-col space-y-1"
                                 >
                                     <FormItem className="flex items-center space-x-3 space-y-0">
                                         <FormControl>
-                                            <RadioGroupItem value="DRAFT" />
+                                            <RadioGroupItem value="0" />
                                         </FormControl>
                                         <FormLabel className="font-normal">
                                             Draft
@@ -500,7 +490,7 @@ export function AppMetadataForm() {
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-3 space-y-0">
                                         <FormControl>
-                                            <RadioGroupItem value="PUBLISHED" />
+                                            <RadioGroupItem value="1" />
                                         </FormControl>
                                         <FormLabel className="font-normal">
                                             Published
@@ -508,7 +498,7 @@ export function AppMetadataForm() {
                                     </FormItem>
                                     <FormItem className="flex items-center space-x-3 space-y-0">
                                         <FormControl>
-                                            <RadioGroupItem value="UNPUBLISHED" />
+                                            <RadioGroupItem value="2" />
                                         </FormControl>
                                         <FormLabel className="font-normal">
                                             Unpublished

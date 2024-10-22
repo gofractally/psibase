@@ -1,3 +1,9 @@
+export enum AppStatus {
+    DRAFT = 0,
+    PUBLISHED = 1,
+    UNPUBLISHED = 2,
+}
+
 export interface RegisteredApp {
     id: string;
     name: string;
@@ -7,6 +13,6 @@ export interface RegisteredApp {
     tosSubpage: string;
     privacyPolicySubpage: string;
     appHomepageSubpage: string;
-    status: "DRAFT" | "PUBLISHED" | "UNPUBLISHED";
+    status: AppStatus;
     accountId: string;
 }

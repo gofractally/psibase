@@ -4,6 +4,7 @@ use crate::bindings::host::common::types::{Error, PluginId};
 pub enum ErrorType {
     QueryError,
     NotFound,
+    QueryDeserializeError,
 }
 
 fn my_plugin_id() -> PluginId {
@@ -20,6 +21,11 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Failed to post graphql query: {}", msg),
+            },
+            ErrorType::QueryDeserializeError => Error {
+                code: self as u32,
+                producer: my_plugin_id(),
+                message: format!("Failed to deserialize graphql query response: {}", msg),
             },
             ErrorType::NotFound => Error {
                 code: 404,

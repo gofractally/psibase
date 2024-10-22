@@ -1611,6 +1611,7 @@ dependencies = [
 name = "registry-plugin"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "fracpack",
  "psibase",
  "registry",

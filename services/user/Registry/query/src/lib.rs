@@ -8,21 +8,14 @@ mod service {
 
     pub struct Query;
 
-    #[derive(SimpleObject)]
-    pub struct AppMetadataWithTags {
-        // TODO: this is repetitive, duplication of service::AppMetadataWithTags
-        pub metadata: service::AppMetadata,
-        pub tags: Vec<service::TagRecord>,
-    }
-
     #[Object]
     impl Query {
         /// Get the app metadata for a specific app ID
-        async fn app_metadata(&self, account_id: AccountNumber) -> Option<AppMetadataWithTags> {
+        async fn app_metadata(&self, account_id: AccountNumber) -> Option<service::AppMetadataWithTags> {
             println!("getting app_metadata: {}", account_id);
             ServiceWrapper::call()
                 .getMetadata(account_id)
-                .map(|res| AppMetadataWithTags {
+                .map(|res| service::AppMetadataWithTags {
                     metadata: res.metadata,
                     tags: res.tags,
                 })

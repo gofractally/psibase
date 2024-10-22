@@ -4,6 +4,7 @@ import { type PluginId } from "@psibase/common-lib";
 import { getSupervisor } from "@lib/supervisor";
 
 import { useUser } from "./use-user";
+import { AppStatus } from "@types";
 
 interface SupervisorError {
     code: number;
@@ -20,31 +21,17 @@ export interface Metadata {
     tosSubpage: string;
     privacyPolicySubpage: string;
     appHomepageSubpage: string;
-    status: string;
+    status: AppStatus;
     tags: string[];
     redirectUris: string[];
     owners: string[];
 }
 
 export interface MetadataRes {
-    metadata: {
-        name: string;
-        shortDescription: string;
-        longDescription: string;
-        icon: string;
-        iconMimeType: string;
-        tosSubpage: string;
-        privacyPolicySubpage: string;
-        appHomepageSubpage: string;
-        status: string;
-        tags: string[];
-        redirectUris: string[];
-        owners: string[];
+    appMetadata: Metadata;
+    extraMetadata: {
+        createdAt: string;
     };
-    tags: {
-        id: number;
-        tag: string;
-    }[];
 }
 
 export const useMetadata = () => {
@@ -77,23 +64,16 @@ export const useMetadata = () => {
     const setMetadata = async (metadata: Metadata) => {
         const supervisor = await getSupervisor();
         try {
+            console.info({ metadata });
             await supervisor.functionCall({
                 service: "registry",
                 intf: "developer",
                 method: "setAppMetadata",
                 params: [
-                    metadata.name,
-                    metadata.shortDescription,
-                    metadata.longDescription,
-                    metadata.icon,
-                    metadata.iconMimeType,
-                    metadata.tosSubpage,
-                    metadata.privacyPolicySubpage,
-                    metadata.appHomepageSubpage,
-                    metadata.status,
-                    metadata.tags,
-                    metadata.redirectUris,
-                    metadata.owners,
+                    {
+                        ...metadata,
+                        status: Number(metadata.status),
+                    },
                 ],
             });
         } catch (e: unknown) {
