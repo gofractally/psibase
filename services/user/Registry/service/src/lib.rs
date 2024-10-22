@@ -328,48 +328,51 @@ pub mod service {
     }
 }
 
-// TODO: how to make these tests work?
-#[psibase::test_case(packages("RegistryPackage"))]
-fn test_foo(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    chain.new_account(account!("alice"))?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use psibase::account;
 
-    Wrapper::push_from(&chain, AccountNumber::from_exact("alice").unwrap())
-        .setMetadata(
-            "Super Cooking App".to_string(),
-            "Alice's Cooking App".to_string(),
-            "Super cooking app".to_string(),
-            "icon-as-base64".to_string(),
-            "image/png".to_string(),
-            "/tos".to_string(),
-            "/privacy-policy".to_string(),
-            "/".to_string(),
-            "DRAFT".to_string(),
-            vec![
-                "cozy".to_string(),
-                "cuisine".to_string(),
-                "cooking".to_string(),
-            ],
-            vec!["http://localhost:3000/callback".to_string()],
-            vec![
-                AccountNumber::from_exact("alice").unwrap(),
-                AccountNumber::from_exact("bob").unwrap(),
-            ],
-        )
-        .get()?;
+    #[psibase::test_case(packages("RegistryPackage"))]
+    fn test_foo(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.new_account(account!("alice"))?;
 
-    let metadata = Wrapper::push(&chain)
-        .getMetadata(AccountNumber::from_exact("alice").unwrap())
-        .unwrap();
+        Wrapper::push_from(&chain, account!("alice"))
+            .setMetadata(
+                "Super Cooking App".to_string(),
+                "Alice's Cooking App".to_string(),
+                "Super cooking app".to_string(),
+                "icon-as-base64".to_string(),
+                "image/png".to_string(),
+                "/tos".to_string(),
+                "/privacy-policy".to_string(),
+                "/".to_string(),
+                0, // DRAFT
+                vec![
+                    "cozy".to_string(),
+                    "cuisine".to_string(),
+                    "cooking".to_string(),
+                ],
+                vec!["http://localhost:3000/callback".to_string()],
+                vec![account!("alice"), account!("bob")],
+            )
+            .get()?;
 
-    assert_eq!(metadata.metadata.name, "Super Cooking App");
-    assert_eq!(metadata.metadata.short_description, "Alice's Cooking App");
-    assert_eq!(metadata.metadata.long_description, "Super cooking app");
-    assert_eq!(metadata.metadata.icon, "icon-as-base64");
-    assert_eq!(metadata.metadata.icon_mime_type, "image/png");
-    assert_eq!(metadata.metadata.tos_subpage, "/tos");
-    assert_eq!(metadata.metadata.privacy_policy_subpage, "/privacy-policy");
-    assert_eq!(metadata.metadata.app_homepage_subpage, "/");
-    assert_eq!(metadata.metadata.status, "DRAFT");
+        let metadata = Wrapper::push(&chain)
+            .getMetadata(account!("alice"))
+            .get()?
+            .unwrap();
 
-    Ok(())
+        assert_eq!(metadata.metadata.name, "Super Cooking App");
+        assert_eq!(metadata.metadata.short_description, "Alice's Cooking App");
+        assert_eq!(metadata.metadata.long_description, "Super cooking app");
+        assert_eq!(metadata.metadata.icon, "icon-as-base64");
+        assert_eq!(metadata.metadata.icon_mime_type, "image/png");
+        assert_eq!(metadata.metadata.tos_subpage, "/tos");
+        assert_eq!(metadata.metadata.privacy_policy_subpage, "/privacy-policy");
+        assert_eq!(metadata.metadata.app_homepage_subpage, "/");
+        assert_eq!(metadata.metadata.status, 0);
+
+        Ok(())
+    }
 }

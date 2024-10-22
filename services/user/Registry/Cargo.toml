@@ -11,6 +11,7 @@ repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
 
 [package]
+edition = "2021"
 name = "registry_package"
 version = "0.1.0"
 
