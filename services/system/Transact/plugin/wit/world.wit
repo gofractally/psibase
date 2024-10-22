@@ -1,10 +1,12 @@
 package transact:plugin;
 
-interface auth {
+
+/// Interface used by auth notifiers.
+/// Auth notifiers are plugins that add additional claims/proofs to transactions
+///   without being the user's specified auth service plugin.
+interface auth-notifier {
     /// Notifies the transact plugin that the caller plugin has one or more claims/proofs to add to the 
-    /// transaction. 
-    /// 
-    /// This is only needed by auth services.
+    /// transaction.
     notify: func();
 }
 

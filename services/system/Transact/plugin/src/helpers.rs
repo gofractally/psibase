@@ -60,11 +60,20 @@ fn get_claims(
         claims = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
     }
 
-    // Also get proofs from any other auth plugins that were used to add claims to the transaction
+    // Also get proofs from any auth notifiers
     let auth_plugins = AuthPlugins::get();
     for plugin in auth_plugins {
         let plugin_ref = Host::types::PluginRef::new(&plugin);
-        let mut c = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
+
+        // An auth notifier should not be privy to the full action list, only its own actions
+        //   (like every other plugin).
+        let action_subset: Vec<PartialAction> = actions
+            .iter()
+            .filter(|&a| a.service == plugin)
+            .cloned()
+            .collect();
+
+        let mut c = SmartAuth::get_claims(plugin_ref, &sender_str, &action_subset)?;
         claims.append(&mut c);
     }
 

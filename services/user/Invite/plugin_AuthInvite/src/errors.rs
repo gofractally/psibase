@@ -3,7 +3,6 @@ use crate::bindings::host::common::types::{Error, PluginId};
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
     Unauthorized,
-    MissingInviteToken,
     DecodeInviteError,
 }
 
@@ -21,11 +20,6 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("Unauthorized: {}", msg),
-            },
-            ErrorType::MissingInviteToken => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Missing invite token: {}", msg),
             },
             ErrorType::DecodeInviteError => Error {
                 code: self as u32,

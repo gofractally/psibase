@@ -6,7 +6,7 @@ world impl {
     include invite:plugin/imports;
     include auth-sig:plugin/imports;
     import accounts:smart-auth/types;
-    import transact:plugin/auth;
+    import transact:plugin/auth-notifier;
 
     export accounts:smart-auth/smart-auth;
     export intf;

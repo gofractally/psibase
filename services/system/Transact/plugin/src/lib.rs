@@ -17,7 +17,7 @@ use bindings::host::common::{
 
 // Exported interfaces/types
 use bindings::exports::transact::plugin::{
-    admin::Guest as Admin, auth::Guest as Auth, intf::Guest as Intf,
+    admin::Guest as Admin, auth_notifier::Guest as Auth, intf::Guest as Intf,
 };
 
 // Third-party crates

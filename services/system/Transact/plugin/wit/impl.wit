@@ -20,5 +20,5 @@ world impl {
 
     export admin;
     export intf;
-    export auth;
+    export auth-notifier;
 }

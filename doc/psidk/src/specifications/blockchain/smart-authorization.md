@@ -115,9 +115,13 @@ deactivate supervisor
 supervisor-->>app: return
 ```
 
-## Advanced authorization
+## Auth notifiers
 
-At any time, a plugin can notify the `transact` plugin (which is responsible for transaction construction) that it has an additional claim to be added to the transaction. If this is done, the `transact` plugin will include the claim in the transaction and will automatically ask the plugin that added the claim to also generate a proof for the claim, given a hash of the final constructed transaction.
+At any time, a plugin can notify the `transact` plugin (which is responsible for transaction construction) that it has one or more claims to be added to the transaction. If this is done, at the time the transaction is being constructed, the `transact` plugin will ask this notifier for claims and proofs in addition to the user's auth service plugin.
+
+## Transaction privacy
+
+The only plugin that can see the full contents of a transaction is the user's auth service plugin. For every other plugin, it only knows what actions it was itself responsible for including in the transaction. This rule includes auth notifiers. While `transact` provides the user's auth service plugin with all actions in a transaction, it will only provide an auth-notifier with a list of actions that were added by the notifier plugin itself.
 
 ## Conclusion
 

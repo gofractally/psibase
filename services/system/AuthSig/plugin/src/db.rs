@@ -3,8 +3,6 @@ use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::common::types as CommonTypes;
 use crate::types::*;
 
-//use psibase::fracpack::Unpack;
-
 fn get_hash(key: &Pem) -> Result<String, CommonTypes::Error> {
     let pem = pem::Pem::try_from_pem_str(&key)?;
     let digest = seahash::hash(&pem.contents().to_vec());
