@@ -17,7 +17,7 @@ Account authorization can use various techniques: simple signature verification,
 
 Individual accounts may specify how they want their account to be authorized. As the user interacts with psibase apps and publishes transactions to modify their state on the network, code is dynamically loaded on the client-side to ensure that the published transaction contains the necessary information to authorize the account. For example, if an account specifies that it uses a simple cryptographic signature for authorization, the psibase infrastructure on the client-side will automatically pull the corresponding signature-authorization plugin from the server and allow it to modify the transaction by adding signatures before it is published to the network.
 
-This is fully dynamic, allowing third-party developers to write their own authorization plugins and any network account to use any authorization plugin.
+This is fully dynamic. Third-party developers can write their own authorization plugins, and accounts are free to use any authorization plugin.
 
 #### Definitions
 
