@@ -63,11 +63,11 @@ impl Accounts for AccountsPlugin {
     }
 
     fn logout() -> Result<(), CommonTypes::Error> {
-        let origin = Client::get_sender_app().origin;
+        let sender = Client::get_sender_app();
         let top_level_domain = Privileged::get_active_app_domain();
 
-        if origin == top_level_domain {
-            Keyvalue::delete(&login_key(origin));
+        if sender.origin == top_level_domain || sender.app == Some("supervisor".to_string()) {
+            Keyvalue::delete(&login_key(top_level_domain));
         } else {
             return Err(Unauthorized.err("logout can only be called by the top-level app domain"));
         }
