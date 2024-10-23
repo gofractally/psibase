@@ -701,9 +701,12 @@ name = "fracpack"
 version = "0.13.0"
 dependencies = [
  "custom_error",
+ "hex",
  "indexmap",
  "psibase_macros",
  "serde",
+ "serde-aux",
+ "serde_json",
 ]
 
 [[package]]
@@ -874,6 +877,12 @@ name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
+
+[[package]]
+name = "hex"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hmac"
@@ -1854,6 +1863,7 @@ version = "1.0.125"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83c8e735a073ccf5be70aa8066aa984eaf2fa000db6c8d0100ae605b366d31ed"
 dependencies = [
+ "indexmap",
  "itoa 1.0.11",
  "memchr",
  "ryu",

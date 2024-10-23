@@ -1,6 +1,7 @@
-use crate::{Pack, Unpack};
+use crate::{Error, Pack, Unpack};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use serde_aux::prelude::deserialize_number_from_string;
 use std::any::TypeId;
 use std::collections::HashMap;
 
@@ -30,6 +31,7 @@ pub enum AnyType {
     Array {
         #[serde(rename = "type")]
         type_: Box<AnyType>,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         len: u64,
     },
     List(Box<AnyType>),
@@ -514,3 +516,754 @@ tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
+
+pub trait CustomHandler {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool;
+    fn frac2json(
+        &self,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error>;
+}
+
+#[derive(Default)]
+pub struct CustomTypes<'a> {
+    by_name: HashMap<String, usize>,
+    handlers: Vec<&'a dyn CustomHandler>,
+}
+
+impl<'a> CustomTypes<'a> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn insert(&mut self, name: String, handler: &'a dyn CustomHandler) {
+        let id = self.handlers.len();
+        self.handlers.push(handler);
+        self.by_name.insert(name, id);
+    }
+    fn find(&self, name: &str) -> Option<usize> {
+        self.by_name.get(name).copied()
+    }
+    fn matches(&self, id: usize, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        self.handlers[id].matches(schema, ty)
+    }
+    fn frac2json(
+        &self,
+        id: usize,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error> {
+        self.handlers[id].frac2json(schema, ty, src, pos)
+    }
+}
+
+struct CustomBool;
+
+impl CustomHandler for CustomBool {
+    fn matches(&self, _schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        matches!(
+            ty,
+            CompiledType::Int {
+                bits: 1,
+                is_signed: false
+            }
+        )
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error> {
+        Ok(bool::unpack(src, pos)?.into())
+    }
+}
+
+struct CustomString;
+
+impl CustomHandler for CustomString {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        use CompiledType::*;
+        if let List(item) = ty {
+            matches!(schema.get_id(*item), Int { bits: 8, .. })
+        } else {
+            false
+        }
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error> {
+        Ok(String::unpack(src, pos)?.into())
+    }
+}
+
+struct CustomHex;
+
+impl CustomHandler for CustomHex {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        use CompiledType::*;
+        if let List(item) = ty {
+            !schema.get_id(*item).is_variable_size()
+        } else {
+            matches!(ty, FracPack(..)) || !ty.is_variable_size()
+        }
+    }
+    fn frac2json(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error> {
+        let len = if ty.is_variable_size() {
+            u32::unpack(src, pos)?
+        } else {
+            ty.fixed_size()
+        };
+        let start = *pos;
+        let end = *pos + len;
+        *pos = end;
+        Ok(hex::encode_upper(&src[start as usize..end as usize]).into())
+    }
+}
+
+pub fn standard_types() -> CustomTypes<'static> {
+    static BOOL: CustomBool = CustomBool;
+    static STRING: CustomString = CustomString;
+    static HEX: CustomHex = CustomHex;
+    let mut result = CustomTypes::new();
+    result.insert("bool".to_string(), &BOOL);
+    result.insert("string".to_string(), &STRING);
+    result.insert("hex".to_string(), &HEX);
+    result
+}
+
+pub struct CompiledSchema<'a, 'b> {
+    type_map: HashMap<*const AnyType, usize>,
+    queue: Vec<(usize, &'a AnyType)>,
+    types: Vec<CompiledType>,
+    custom: &'b CustomTypes<'b>,
+}
+
+impl<'a, 'b> CompiledSchema<'a, 'b> {
+    pub fn new(schema: &'a Schema, custom: &'b CustomTypes<'b>) -> Self {
+        let mut result = CompiledSchema {
+            type_map: HashMap::new(),
+            queue: Vec::new(),
+            types: Vec::new(),
+            custom,
+        };
+        let mut custom_indexes = Vec::new();
+        for (_, ty) in &schema.0 {
+            result.add(schema, &mut custom_indexes, ty);
+        }
+        while !result.queue.is_empty() {
+            for (id, ty) in std::mem::take(&mut result.queue) {
+                result.complete(schema, &mut custom_indexes, id, ty);
+            }
+        }
+        for idx in custom_indexes {
+            result.resolve_custom(idx);
+        }
+        result
+    }
+    fn add(&mut self, schema: &'a Schema, custom: &mut Vec<usize>, ty: &'a AnyType) -> usize {
+        let p: *const AnyType = &*ty;
+        if let Some(id) = self.type_map.get(&p) {
+            match &self.types[*id] {
+                CompiledType::Alias(other) => {
+                    return *other;
+                }
+                CompiledType::Uninitialized => {
+                    panic!("Invalid recursion in types");
+                }
+                _ => {}
+            }
+            return *id;
+        }
+        let id = self.types.len();
+        self.type_map.insert(p, id);
+        self.types.push(CompiledType::Uninitialized);
+        let mut result = id;
+        self.types[id] = match ty {
+            AnyType::Struct(members) => {
+                let mut is_variable_size = false;
+                let mut fixed_size = 0;
+                let mut children = Vec::with_capacity(members.len());
+                for (name, ty) in members {
+                    let child = self.add(schema, custom, ty);
+                    let childref = self.get_id(child);
+                    if childref.is_variable_size() {
+                        is_variable_size = true;
+                    }
+                    fixed_size += childref.fixed_size();
+                    children.push((name.clone(), child))
+                }
+                CompiledType::Struct {
+                    is_variable_size,
+                    fixed_size,
+                    children,
+                }
+            }
+            AnyType::Array { type_, len } => {
+                let child = self.add(schema, custom, type_);
+                let childref = self.get_id(child);
+                let len = u32::try_from(*len).unwrap();
+                CompiledType::Array {
+                    is_variable_size: childref.is_variable_size(),
+                    fixed_size: childref.fixed_size().checked_mul(len).unwrap(),
+                    child,
+                    len,
+                }
+            }
+            AnyType::Object(_)
+            | AnyType::List(_)
+            | AnyType::Option(_)
+            | AnyType::Variant(..)
+            | AnyType::Tuple(..)
+            | AnyType::FracPack(..) => {
+                self.queue.push((id, ty));
+                CompiledType::Incomplete
+            }
+            AnyType::Int { bits, is_signed } => CompiledType::Int {
+                bits: *bits,
+                is_signed: *is_signed,
+            },
+            AnyType::Float { exp, mantissa } => CompiledType::Float {
+                exp: *exp,
+                mantissa: *mantissa,
+            },
+            AnyType::Custom { type_, id } => {
+                let repr = self.add(schema, custom, type_);
+                let ty = self.get_id(repr);
+                if let Some(idx) = self.custom.find(&*id) {
+                    custom.push(result);
+                    CompiledType::Custom {
+                        is_variable_size: ty.is_variable_size(),
+                        fixed_size: ty.fixed_size(),
+                        repr,
+                        id: idx,
+                    }
+                } else {
+                    result = repr;
+                    CompiledType::Alias(repr)
+                }
+            }
+            AnyType::Type(name) => {
+                result = self.add(schema, custom, schema.0.get(name).unwrap());
+                CompiledType::Alias(result)
+            }
+        };
+        result
+    }
+    fn complete(
+        &mut self,
+        schema: &'a Schema,
+        custom: &mut Vec<usize>,
+        id: usize,
+        ty: &'a AnyType,
+    ) {
+        let result = match ty {
+            AnyType::Object(members) => {
+                let mut children = Vec::with_capacity(members.len());
+                for (name, ty) in members {
+                    children.push((name.clone(), self.add(schema, custom, ty)))
+                }
+                CompiledType::Object { children }
+            }
+            AnyType::List(elem) => CompiledType::List(self.add(schema, custom, &*elem)),
+            AnyType::Option(ty) => CompiledType::Option(self.add(schema, custom, &*ty)),
+            AnyType::Variant(alternatives) => {
+                let mut result = Vec::with_capacity(alternatives.len());
+                for (name, ty) in alternatives {
+                    result.push((name.clone(), self.add(schema, custom, ty)));
+                }
+                CompiledType::Variant(result)
+            }
+            AnyType::Tuple(members) => {
+                let mut result = Vec::with_capacity(members.len());
+                for ty in members {
+                    result.push(self.add(schema, custom, ty))
+                }
+                CompiledType::Tuple(result)
+            }
+            AnyType::FracPack(nested) => CompiledType::FracPack(self.add(schema, custom, nested)),
+            _ => {
+                panic!("Not a recursive type");
+            }
+        };
+        self.types[id] = result;
+    }
+    fn resolve_custom(&mut self, id: usize) {
+        use CompiledType::*;
+        let Custom {
+            repr,
+            id: custom_id,
+            fixed_size,
+            is_variable_size,
+        } = &self.types[id]
+        else {
+            panic!("Not a custom type");
+        };
+        // If the next type is also a custom type unwrap it,
+        // We never need to unwrap more than one level,
+        // because we're calling this in bottom up order.
+        let mut next = *repr;
+        let ty = match &self.types[next] {
+            Custom { repr, .. } | Alias(repr) => {
+                next = *repr;
+                &self.types[next]
+            }
+            ty => ty,
+        };
+        if self.custom.matches(*custom_id, self, ty) {
+            self.types[id] = Custom {
+                repr: next,
+                id: *custom_id,
+                fixed_size: *fixed_size,
+                is_variable_size: *is_variable_size,
+            };
+        } else {
+            self.types[id] = Alias(next);
+        }
+    }
+    fn get_id(&self, id: usize) -> &CompiledType {
+        &self.types[id]
+    }
+    pub fn get(&self, ty: &AnyType) -> Option<&CompiledType> {
+        let p: *const AnyType = &*ty;
+        if let Some(id) = self.type_map.get(&p) {
+            let result = &self.types[*id];
+            match result {
+                CompiledType::Alias(other) => Some(self.get_id(*other)),
+                _ => Some(result),
+            }
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum CompiledType {
+    Struct {
+        is_variable_size: bool,
+        fixed_size: u32,
+        children: Vec<(String, usize)>,
+    },
+    Object {
+        children: Vec<(String, usize)>,
+    },
+    Array {
+        is_variable_size: bool,
+        fixed_size: u32,
+        child: usize,
+        len: u32,
+    },
+    List(usize),
+    Option(usize),
+    Variant(Vec<(String, usize)>),
+    Tuple(Vec<usize>),
+    Int {
+        bits: u32,
+        is_signed: bool,
+    },
+    Float {
+        exp: u32,
+        mantissa: u32,
+    },
+    FracPack(usize),
+    Custom {
+        is_variable_size: bool,
+        fixed_size: u32,
+        repr: usize,
+        id: usize,
+    },
+    Alias(usize),
+    Uninitialized,
+    Incomplete, // The type is known to be variable size
+}
+
+impl CompiledType {
+    fn is_variable_size(&self) -> bool {
+        use CompiledType::*;
+        match self {
+            Struct {
+                is_variable_size, ..
+            } => *is_variable_size,
+            Object { .. } => true,
+            Array {
+                is_variable_size, ..
+            } => *is_variable_size,
+            List(..) => true,
+            Option(..) => true,
+            Variant(..) => true,
+            Tuple(..) => true,
+            Int { .. } => false,
+            Float { .. } => false,
+            FracPack(..) => true,
+            Custom {
+                is_variable_size, ..
+            } => *is_variable_size,
+            Alias(..) => {
+                panic!("Alias should be resolved");
+            }
+            Uninitialized => {
+                panic!("Invalid recursion in types");
+            }
+            Incomplete => true,
+        }
+    }
+    fn fixed_size(&self) -> u32 {
+        use CompiledType::*;
+        match self {
+            Struct {
+                fixed_size,
+                is_variable_size: false,
+                ..
+            } => *fixed_size,
+            Array {
+                fixed_size,
+                is_variable_size: false,
+                ..
+            } => *fixed_size,
+            Int { bits, .. } => (bits + 7) / 8,
+            Float { exp, mantissa } => (exp + mantissa + 7) / 8,
+            Custom {
+                fixed_size,
+                is_variable_size: false,
+                ..
+            } => *fixed_size,
+            Uninitialized => {
+                panic!("Invalid recursion in types");
+            }
+            _ => 4,
+        }
+    }
+    fn is_optional(&self) -> bool {
+        match self {
+            CompiledType::Option(..) => true,
+            _ => false,
+        }
+    }
+    fn new_empty_container(&self, schema: &CompiledSchema) -> Result<serde_json::Value, Error> {
+        use CompiledType::*;
+        match self {
+            List(_) => Ok(serde_json::Value::Array(Vec::new())),
+            FracPack(nested) => {
+                let mut pos = 0;
+                frac2json(schema, schema.get_id(*nested), &[0, 0, 0, 0], &mut pos)
+            }
+            Custom { repr, id, .. } => {
+                let mut pos = 0;
+                schema
+                    .custom
+                    .frac2json(*id, schema, schema.get_id(*repr), &[0, 0, 0, 0], &mut pos)
+            }
+            _ => Err(Error::BadOffset),
+        }
+    }
+}
+
+fn frac2json_pointer(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    src: &[u8],
+    pos: u32,
+    offset: u32,
+    heap_pos: &mut u32,
+) -> Result<serde_json::Value, Error> {
+    if offset == 0 {
+        return ty.new_empty_container(schema);
+    }
+    if *heap_pos as u64 != pos as u64 + offset as u64 {
+        return Err(Error::BadOffset);
+    }
+    return frac2json(schema, ty, src, heap_pos);
+}
+
+fn frac2json_embedded(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    src: &[u8],
+    fixed_pos: &mut u32,
+    heap_pos: &mut u32,
+) -> Result<serde_json::Value, Error> {
+    match ty {
+        CompiledType::Option(t) => {
+            let orig_pos = *fixed_pos;
+            let offset = u32::unpack(src, fixed_pos)?;
+            if offset == 1 {
+                return Ok(serde_json::Value::Null);
+            }
+            frac2json_pointer(schema, schema.get_id(*t), src, orig_pos, offset, heap_pos)
+        }
+        _ => {
+            if ty.is_variable_size() {
+                let orig_pos = *fixed_pos;
+                let offset = u32::unpack(src, fixed_pos)?;
+                frac2json_pointer(schema, ty, src, orig_pos, offset, heap_pos)
+            } else {
+                frac2json(schema, ty, src, fixed_pos)
+            }
+        }
+    }
+}
+
+pub fn frac2json(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    src: &[u8],
+    pos: &mut u32,
+) -> Result<serde_json::Value, Error> {
+    use CompiledType::*;
+    match ty {
+        Struct {
+            fixed_size,
+            children,
+            ..
+        } => {
+            let mut result = serde_json::Map::with_capacity(children.len());
+            let mut fixed_pos = *pos;
+            *pos += fixed_size;
+            for (name, child) in children {
+                result.insert(
+                    name.clone(),
+                    frac2json_embedded(schema, schema.get_id(*child), src, &mut fixed_pos, pos)?,
+                );
+            }
+            Ok(serde_json::Value::Object(result))
+        }
+        Object { children, .. } => {
+            let mut result = serde_json::Map::with_capacity(children.len());
+            let fixed_size = u16::unpack(src, pos)? as u32;
+            let mut fixed_pos = *pos;
+            if src.len() - (fixed_pos as usize) < fixed_size as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            let fixed_end = fixed_pos + fixed_size as u32;
+            *pos = fixed_end;
+            let mut at_end = false;
+            for (name, child) in children {
+                let member_type = schema.get_id(*child);
+                let remaining = fixed_end - fixed_pos;
+                if remaining < member_type.fixed_size() {
+                    at_end = true;
+                }
+                if at_end {
+                    if remaining == 0 && member_type.is_optional() {
+                        result.insert(name.clone(), serde_json::Value::Null);
+                    } else {
+                        return Err(Error::BadSize);
+                    }
+                } else {
+                    result.insert(
+                        name.clone(),
+                        frac2json_embedded(schema, member_type, src, &mut fixed_pos, pos)?,
+                    );
+                }
+            }
+            Ok(serde_json::Value::Object(result))
+        }
+        Array { child, len, .. } => {
+            let mut result = <Vec<serde_json::Value>>::with_capacity(*len as usize);
+            let mut fixed_pos = *pos;
+            let ty = schema.get_id(*child);
+            let fixed_size = ty.fixed_size().checked_mul(*len).ok_or(Error::BadSize)?;
+            if src.len() - (fixed_pos as usize) < fixed_size as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            *pos = fixed_pos + fixed_size;
+            for _ in 0..*len {
+                result.push(frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)?);
+            }
+            Ok(result.into())
+        }
+        List(child) => {
+            let fixed_size = u32::unpack(src, pos)?;
+            let ty = schema.get_id(*child);
+            let elem_size = ty.fixed_size();
+            if fixed_size % elem_size != 0 {
+                return Err(Error::BadSize);
+            }
+            let len = fixed_size / elem_size;
+            let mut fixed_pos = *pos;
+            let mut result = Vec::with_capacity(len as usize);
+            if src.len() - (fixed_pos as usize) < fixed_size as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            *pos = fixed_pos + fixed_size;
+            for _ in 0..len {
+                result.push(frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)?)
+            }
+            Ok(result.into())
+        }
+        Option(..) => {
+            let mut fixed_pos = *pos;
+            let fixed_size = 4;
+            if src.len() - (fixed_pos as usize) < fixed_size as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            *pos = fixed_pos + fixed_size;
+            frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)
+        }
+        Variant(alternatives) => {
+            let index = u8::unpack(src, pos)?;
+            let len = u32::unpack(src, pos)?;
+            if index as usize >= alternatives.len() {
+                return Err(Error::BadEnumIndex);
+            }
+            if src.len() - (*pos as usize) < len as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            let (name, child) = &alternatives[index as usize];
+            let ty = schema.get_id(*child);
+            let mut result = serde_json::Map::with_capacity(1);
+            result.insert(
+                name.clone(),
+                frac2json(schema, ty, &src[0..(*pos as usize + len as usize)], pos)?,
+            );
+            Ok(result.into())
+        }
+        Tuple(children) => {
+            let mut result = Vec::with_capacity(children.len());
+            let fixed_size = u16::unpack(src, pos)? as u32;
+            let mut fixed_pos = *pos;
+            if src.len() - (fixed_pos as usize) < fixed_size as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            let fixed_end = fixed_pos + fixed_size as u32;
+            *pos = fixed_end;
+            let mut at_end = false;
+            for child in children {
+                let member_type = schema.get_id(*child);
+                let remaining = fixed_end - fixed_pos;
+                if remaining < member_type.fixed_size() {
+                    at_end = true;
+                }
+                if at_end {
+                    if remaining == 0 && member_type.is_optional() {
+                        result.push(serde_json::Value::Null);
+                    } else {
+                        return Err(Error::BadSize);
+                    }
+                } else {
+                    result.push(frac2json_embedded(
+                        schema,
+                        member_type,
+                        src,
+                        &mut fixed_pos,
+                        pos,
+                    )?);
+                }
+            }
+            Ok(result.into())
+        }
+        Int {
+            bits: 1,
+            is_signed: false,
+        } => {
+            let result = u8::unpack(src, pos)?;
+            if result != 0 && result != 1 {
+                Err(Error::BadScalar)?
+            }
+            Ok(result.into())
+        }
+        Int {
+            bits: 1,
+            is_signed: true,
+        } => {
+            let result = i8::unpack(src, pos)?;
+            if result != 0 && result != -1 {
+                Err(Error::BadScalar)?
+            }
+            Ok(result.into())
+        }
+        Int {
+            bits: 8,
+            is_signed: false,
+        } => Ok(u8::unpack(src, pos)?.into()),
+        Int {
+            bits: 8,
+            is_signed: true,
+        } => Ok(i8::unpack(src, pos)?.into()),
+        Int {
+            bits: 16,
+            is_signed: false,
+        } => Ok(u16::unpack(src, pos)?.into()),
+        Int {
+            bits: 16,
+            is_signed: true,
+        } => Ok(i16::unpack(src, pos)?.into()),
+        Int {
+            bits: 32,
+            is_signed: false,
+        } => Ok(u32::unpack(src, pos)?.into()),
+        Int {
+            bits: 32,
+            is_signed: true,
+        } => Ok(i32::unpack(src, pos)?.into()),
+        Int {
+            bits: 64,
+            is_signed: false,
+        } => Ok(u64::unpack(src, pos)?.into()),
+        Int {
+            bits: 64,
+            is_signed: true,
+        } => Ok(i64::unpack(src, pos)?.into()),
+        Float {
+            exp: 8,
+            mantissa: 24,
+        } => {
+            let result = f32::unpack(src, pos)?;
+            if result.is_finite() {
+                Ok(result.into())
+            } else {
+                Ok(result.to_string().into())
+            }
+        }
+        Float {
+            exp: 11,
+            mantissa: 53,
+        } => {
+            let result = f64::unpack(src, pos)?;
+            if result.is_finite() {
+                Ok(result.into())
+            } else {
+                Ok(result.to_string().into())
+            }
+        }
+        FracPack(nested) => {
+            let len = u32::unpack(src, pos)?;
+            if src.len() - (*pos as usize) < len as usize {
+                return Err(Error::ReadPastEnd);
+            }
+            let ty = schema.get_id(*nested);
+            let end = *pos + len;
+            let result = frac2json(schema, ty, &src[0..end as usize], pos)?;
+            // TODO: check pos
+            Ok(result)
+        }
+        Custom { id, repr, .. } => {
+            schema
+                .custom
+                .frac2json(*id, schema, schema.get_id(*repr), src, pos)
+        }
+        _ => {
+            unimplemented!();
+        }
+    }
+}
+
+//pub fn json2frac(schema: &CompiledSchema, ty: &CompiledType, serde_json::Value, dest: &mut Vec<u8>) {
+//    use CompiledType::*;
+//}
