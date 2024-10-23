@@ -64,12 +64,20 @@ export class Plugin {
     }
 
     async getDependencies(): Promise<QualifiedPluginId[]> {
-        const api = await this.parsed;
-
-        return api.importedFuncs.interfaces.map((intf) => ({
-            service: intf.namespace,
-            plugin: intf.package,
-        }));
+        let api: ComponentAPI | undefined;
+        try {
+            api = await this.parsed;
+            return api.importedFuncs.interfaces.map((intf) => ({
+                service: intf.namespace,
+                plugin: intf.package,
+            }));
+        } catch (e: any) {
+            if (e instanceof PluginDownloadFailed) {
+                return [];
+            } else {
+                throw e;
+            }
+        }
     }
 
     private async doReady(): Promise<void> {

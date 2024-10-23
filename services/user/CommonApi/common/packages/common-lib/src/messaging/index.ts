@@ -27,7 +27,7 @@ export {
     type PluginId,
     type QualifiedPluginId,
     isEqual,
-    getPlugin,
+    pluginId,
 } from "./PluginId";
 
 export {

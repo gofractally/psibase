@@ -1,12 +1,12 @@
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
-import { HostInterface, PluginPostDetails, Result } from "./hostInterface";
-import { Supervisor } from "./supervisor";
+import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
+import { Supervisor } from "../supervisor";
 import {
     assertTruthy,
     OriginationData,
     QualifiedOriginationData,
-} from "./utils";
-import { RecoverableErrorPayload } from "./plugin/errors";
+} from "../utils";
+import { RecoverableErrorPayload } from "./errors";
 
 interface HttpRequest {
     uri: string;
