@@ -59,7 +59,7 @@ export const parser = (): Promise<any> => {
             "/common/component_parser.wasm",
         );
         modulePromise = wasmFromUrl(url).then((bytes) =>
-            loadBasic(bytes, "Component parser"),
+            loadBasic(bytes, "component-parser.js"),
         );
     }
     return modulePromise;

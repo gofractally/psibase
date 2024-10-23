@@ -6,7 +6,8 @@ world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
 
-    export smart-auth;
+    import accounts:smart-auth/types;
+    export accounts:smart-auth/smart-auth;
     export keyvault;
     export actions;
 }

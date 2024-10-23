@@ -2,18 +2,23 @@ package psibase:component-parser;
 
 interface types {
 
+    record function {
+        name: string,
+        dynamic-link: bool,
+    }
+
     record intf {
         namespace: string,
         %package: string,
         name: string,
-        funcs: list<string>
+        funcs: list<function>
     }
 
     record functions {
         namespace: string,
         %package: string,
         interfaces: list<intf>,
-        funcs: list<string>
+        funcs: list<function>
     }
     
     record component-extraction {

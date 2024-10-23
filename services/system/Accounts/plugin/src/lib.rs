@@ -4,8 +4,8 @@ mod bindings;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
-use bindings::exports::accounts::plugin::admin::Guest as Admin;
 use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
+use bindings::host::privileged::intf as Privileged;
 use bindings::transact::plugin::intf as Transact;
 use bindings::accounts::plugin::types::{self as AccountTypes};
 use psibase::fracpack::Pack;
@@ -56,49 +56,64 @@ fn login_key(origin: String) -> String {
     return key_pre + "." + &encoded;
 }
 
-fn from_supervisor() -> bool {
-    Client::get_sender_app()
-        .app
-        .map_or(false, |app| app == "supervisor")
-}
-
-impl Admin for AccountsPlugin {
-    fn force_login(domain: String, user: String) {
-        assert!(from_supervisor(), "unauthorized");
-        Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
-    }
-
-    fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
-        let sender = Client::get_sender_app().app;
-        assert!(
-            sender.is_some() && sender.as_ref().unwrap() == "supervisor",
-            "unauthorized"
-        );
-
-        // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
-        if caller_app != "transact" && caller_app != "supervisor" {
-            return Err(Unauthorized.err("Temporarily, only transact can ask for the logged-in user."));
-        }
-
-        if let Some(user) = Keyvalue::get(&login_key(domain)) {
-            Ok(Some(String::from_utf8(user).unwrap()))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
 impl Accounts for AccountsPlugin {
     fn login() -> Result<(), CommonTypes::Error> {
         println!("Login with popup window not yet supported.");
         return Err(NotYetImplemented.err("login"));
     }
 
+    fn logout() -> Result<(), CommonTypes::Error> {
+        let sender = Client::get_sender_app();
+        let top_level_domain = Privileged::get_active_app_domain();
+
+        if sender.origin == top_level_domain || sender.app == Some("supervisor".to_string()) {
+            Keyvalue::delete(&login_key(top_level_domain));
+        } else {
+            return Err(Unauthorized.err("logout can only be called by the top-level app domain"));
+        }
+
+        Ok(())
+    }
+
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
+        let top_level_domain = Privileged::get_active_app_domain();
 
-        Client::login_temp(&origin, &user)?;
+        if origin != top_level_domain {
+            return Err(Unauthorized.err("login-temp can only be called by the top-level app domain"));
+        }
+
+        Keyvalue::set(&login_key(top_level_domain), &user.as_bytes()).expect("Failed to set logged-in user");
+
         Ok(())
+    }
+
+    fn is_logged_in() -> bool {
+        let active_domain = Privileged::get_active_app_domain();
+        Keyvalue::get(&login_key(active_domain)).is_some()
+    }
+
+    fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
+        let sender =Client::get_sender_app();
+        let active_domain = Privileged::get_active_app_domain();
+        let sender_domain = sender.origin;
+
+        if sender_domain != active_domain {
+            if let Some(sender_app) = sender.app
+            {
+                if sender_app != "supervisor" && sender_app != "transact" {
+                    return Err(Unauthorized.err("Only callable by the top-level app domain"));
+                }
+            } else {
+                return Err(Unauthorized.err("Only callable by the top-level app domain"));
+            }
+        }
+
+        if let Some(user) = Keyvalue::get(&login_key(active_domain)) {
+            Ok(Some(String::from_utf8(user).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_available_accounts() -> Result<Vec<String>, CommonTypes::Error> {

@@ -1464,6 +1464,7 @@ dependencies = [
  "indexmap",
  "indicatif",
  "jwt",
+ "lazy_static",
  "mime_guess",
  "pem",
  "percent-encoding",
@@ -2219,6 +2220,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "wit-bindgen-rt",
 ]
 

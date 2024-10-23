@@ -2,7 +2,6 @@ use crate::bindings::host::common::types::{Error, PluginId};
 
 #[derive(PartialEq, Eq, Hash)]
 pub enum ErrorType {
-    NotYetImplemented,
     DecodeInviteError,
     QueryError,
     DatetimeError,
@@ -21,11 +20,6 @@ fn my_plugin_id() -> PluginId {
 impl ErrorType {
     pub fn err(self, msg: &str) -> Error {
         match self {
-            ErrorType::NotYetImplemented => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Not yet implemented: {}", msg),
-            },
             ErrorType::DecodeInviteError => Error {
                 code: self as u32,
                 producer: my_plugin_id(),
@@ -55,7 +49,7 @@ impl ErrorType {
                 code: self as u32,
                 producer: my_plugin_id(),
                 message: format!("[{}] Error: Account already exists", msg),
-            }
+            },
         }
     }
 }

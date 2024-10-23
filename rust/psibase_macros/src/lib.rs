@@ -262,7 +262,7 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[psibase::service(
-///     name = see_blow,            // Account service is normally installed on
+///     name = see_below,           // Account service is normally installed on
 ///     recursive = false,          // Allow service to be recursively entered?
 ///     constant = "SERVICE",       // Name of generated constant
 ///     actions = "Actions",        // Name of generated struct

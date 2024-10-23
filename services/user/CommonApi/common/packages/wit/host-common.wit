@@ -3,6 +3,11 @@ package host:common;
 /// Common types used by plugins
 interface types {
 
+    /// A reference to a plugin. Used for dynamically linking to a plugin.
+    resource plugin-ref {
+        constructor(name: string);
+    }
+
     /// A standard error type plugins can use to propagate errors
     /// back up the callchain.
     /// 
@@ -84,18 +89,11 @@ interface server {
 interface client {
     use types.{origination-data, error};
 
-    /// Temporarily facilitates login until we have popup windows to let the user decide
-    login-temp: func(app-origin: string, user: string) -> result<_, error>;
-
     /// Gets details about the app responsible for the call
     get-sender-app: func() -> origination-data;
 
     /// Gets the account name of the user logged into the current top-level application
     get-logged-in-user: func() -> result<option<string>, error>;
-
-    /// Returns `true` if any user is currently logged into the current top-level
-    /// application. Returns `false` otherwise.
-    is-logged-in: func() -> bool;
 
     /// Gets the account name of the service from which the currently running
     /// plugin was fetched.

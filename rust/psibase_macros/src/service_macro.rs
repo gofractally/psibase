@@ -1232,6 +1232,10 @@ fn process_action_args(
         pub struct #fn_name {
             #struct_members
         }
+
+        impl #fn_name {
+            pub const ACTION_NAME: &'static str = stringify!(#fn_name);
+        }
     };
 
     if let Some(db) = event_db {

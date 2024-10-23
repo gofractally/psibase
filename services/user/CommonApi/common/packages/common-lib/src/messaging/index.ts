@@ -23,7 +23,12 @@ export {
     isPreLoadPluginsRequest,
 } from "./PreLoadPluginsRequest";
 
-export { type PluginId, type QualifiedPluginId, isEqual } from "./PluginId";
+export {
+    type PluginId,
+    type QualifiedPluginId,
+    isEqual,
+    pluginId,
+} from "./PluginId";
 
 export {
     isSupervisorInitialized,

@@ -1,12 +1,12 @@
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
-import { HostInterface, PluginPostDetails, Result } from "./hostInterface";
-import { Supervisor } from "./supervisor";
+import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
+import { Supervisor } from "../supervisor";
 import {
     assertTruthy,
     OriginationData,
     QualifiedOriginationData,
-} from "./utils";
-import { RecoverableErrorPayload } from "./plugin/errors";
+} from "../utils";
+import { RecoverableErrorPayload } from "./errors";
 
 interface HttpRequest {
     uri: string;
@@ -180,24 +180,13 @@ export class PluginHost implements HostInterface {
         return res;
     }
 
-    // Client interface
-    loginTemp(
-        appOrigin: string,
-        user: string,
-    ): Result<void, RecoverableErrorPayload> {
-        this.supervisor.loginTemp(appOrigin, user, this.self);
+    getActiveAppDomain(): string {
+        return this.supervisor.getActiveAppDomain(this.self);
     }
 
+    // Client interface
     getSenderApp(): OriginationData {
         return this.supervisor.getCaller(this.self);
-    }
-
-    getLoggedInUser(): Result<string | undefined, RecoverableErrorPayload> {
-        return this.supervisor.getLoggedInUser(this.self.app);
-    }
-
-    isLoggedIn(): boolean {
-        return this.supervisor.isLoggedIn();
     }
 
     myServiceAccount(): string {
