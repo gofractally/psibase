@@ -517,6 +517,70 @@ tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14);
 tuple_impl!(T0 T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15);
 
+#[derive(Debug)]
+struct FracInputStream<'a> {
+    data: &'a [u8],
+    pos: u32,
+    has_unknown: bool,
+    known_end: bool,
+}
+
+impl<'a> FracInputStream<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        FracInputStream {
+            data,
+            pos: 0,
+            has_unknown: false,
+            known_end: true,
+        }
+    }
+    fn read_fixed(&mut self, len: u32) -> Result<Self, Error> {
+        assert!(self.known_end);
+        let Some(pos) = self.pos.checked_add(len) else {
+            return Err(Error::ReadPastEnd);
+        };
+        if self.pos as usize > self.data.len() {
+            return Err(Error::ReadPastEnd);
+        }
+        let result = FracInputStream {
+            data: &self.data[0..pos as usize],
+            pos: self.pos,
+            has_unknown: false,
+            known_end: true,
+        };
+        self.pos = pos;
+        Ok(result)
+    }
+    fn set_pos(&mut self, pos: u32) -> Result<(), Error> {
+        if self.known_end {
+            if self.pos != pos {
+                return Err(Error::BadOffset);
+            }
+        } else {
+            if self.pos > pos {
+                return Err(Error::BadOffset);
+            }
+            if pos > self.data.len() as u32 {
+                return Err(Error::BadOffset);
+            }
+            self.pos = pos;
+            self.known_end = true;
+        }
+        Ok(())
+    }
+    fn remaining(&self) -> u32 {
+        self.data.len() as u32 - self.pos
+    }
+    fn finish(&self) -> Result<(), Error> {
+        if self.known_end {
+            if self.pos != self.data.len() as u32 {
+                return Err(Error::ExtraData);
+            }
+        }
+        Ok(())
+    }
+}
+
 pub trait CustomHandler {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool;
     fn frac2json(
@@ -959,10 +1023,7 @@ impl CompiledType {
         use CompiledType::*;
         match self {
             List(_) => Ok(serde_json::Value::Array(Vec::new())),
-            FracPack(nested) => {
-                let mut pos = 0;
-                frac2json(schema, schema.get_id(*nested), &[0, 0, 0, 0], &mut pos)
-            }
+            FracPack(nested) => frac2json(schema, schema.get_id(*nested), &[]),
             Custom { repr, id, .. } => {
                 let mut pos = 0;
                 schema
@@ -977,53 +1038,91 @@ impl CompiledType {
 fn frac2json_pointer(
     schema: &CompiledSchema,
     ty: &CompiledType,
-    src: &[u8],
-    pos: u32,
+    stream: &mut FracInputStream,
+    fixed_pos: u32,
     offset: u32,
-    heap_pos: &mut u32,
 ) -> Result<serde_json::Value, Error> {
     if offset == 0 {
         return ty.new_empty_container(schema);
     }
-    if *heap_pos as u64 != pos as u64 + offset as u64 {
-        return Err(Error::BadOffset);
-    }
-    return frac2json(schema, ty, src, heap_pos);
+    let Some(new_pos) = fixed_pos.checked_add(offset) else {
+        return Err(Error::ReadPastEnd);
+    };
+    stream.set_pos(new_pos)?;
+    return frac2json_impl(schema, ty, stream, false);
 }
 
 fn frac2json_embedded(
     schema: &CompiledSchema,
     ty: &CompiledType,
-    src: &[u8],
-    fixed_pos: &mut u32,
-    heap_pos: &mut u32,
+    fixed_stream: &mut FracInputStream,
+    stream: &mut FracInputStream,
+    empty_optional: &mut bool,
 ) -> Result<serde_json::Value, Error> {
+    *empty_optional = false;
     match ty {
         CompiledType::Option(t) => {
-            let orig_pos = *fixed_pos;
-            let offset = u32::unpack(src, fixed_pos)?;
+            let orig_pos = fixed_stream.pos;
+            let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
             if offset == 1 {
+                *empty_optional = true;
                 return Ok(serde_json::Value::Null);
             }
-            frac2json_pointer(schema, schema.get_id(*t), src, orig_pos, offset, heap_pos)
+            frac2json_pointer(schema, schema.get_id(*t), stream, orig_pos, offset)
         }
         _ => {
             if ty.is_variable_size() {
-                let orig_pos = *fixed_pos;
-                let offset = u32::unpack(src, fixed_pos)?;
-                frac2json_pointer(schema, ty, src, orig_pos, offset, heap_pos)
+                let orig_pos = fixed_stream.pos;
+                let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+                frac2json_pointer(schema, ty, stream, orig_pos, offset)
             } else {
-                frac2json(schema, ty, src, fixed_pos)
+                frac2json_impl(schema, ty, fixed_stream, true)
             }
         }
     }
+}
+
+fn consume_trailing_optional(
+    fixed_stream: &mut FracInputStream,
+    stream: &mut FracInputStream,
+    mut last_empty: bool,
+) -> Result<(), Error> {
+    while fixed_stream.remaining() > 0 {
+        let orig_pos = fixed_stream.pos;
+        let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+        last_empty = offset == 1;
+        if offset > 1 {
+            let Some(new_pos) = orig_pos.checked_add(offset) else {
+                return Err(Error::ReadPastEnd);
+            };
+            stream.set_pos(new_pos)?;
+            stream.known_end = false;
+        }
+        stream.has_unknown = true;
+    }
+    if last_empty {
+        return Err(Error::ExtraEmptyOptional);
+    }
+    Ok(())
 }
 
 pub fn frac2json(
     schema: &CompiledSchema,
     ty: &CompiledType,
     src: &[u8],
-    pos: &mut u32,
+) -> Result<serde_json::Value, Error> {
+    let mut stream = FracInputStream::new(src);
+    let result = frac2json_impl(schema, ty, &mut stream, true)?;
+    println!("stream: {:?}", stream);
+    stream.finish()?;
+    Ok(result)
+}
+
+fn frac2json_impl(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    stream: &mut FracInputStream,
+    allow_empty_container: bool,
 ) -> Result<serde_json::Value, Error> {
     use CompiledType::*;
     match ty {
@@ -1033,29 +1132,32 @@ pub fn frac2json(
             ..
         } => {
             let mut result = serde_json::Map::with_capacity(children.len());
-            let mut fixed_pos = *pos;
-            *pos += fixed_size;
+            let mut fixed_stream = stream.read_fixed(*fixed_size)?;
+            let mut empty = false;
             for (name, child) in children {
                 result.insert(
                     name.clone(),
-                    frac2json_embedded(schema, schema.get_id(*child), src, &mut fixed_pos, pos)?,
+                    frac2json_embedded(
+                        schema,
+                        schema.get_id(*child),
+                        &mut fixed_stream,
+                        stream,
+                        &mut empty,
+                    )?,
                 );
             }
             Ok(serde_json::Value::Object(result))
         }
         Object { children, .. } => {
             let mut result = serde_json::Map::with_capacity(children.len());
-            let fixed_size = u16::unpack(src, pos)? as u32;
-            let mut fixed_pos = *pos;
-            if src.len() - (fixed_pos as usize) < fixed_size as usize {
-                return Err(Error::ReadPastEnd);
-            }
-            let fixed_end = fixed_pos + fixed_size as u32;
-            *pos = fixed_end;
+            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
+            let mut last_empty = false;
+
             for (name, child) in children {
                 let member_type = schema.get_id(*child);
-                let remaining = fixed_end - fixed_pos;
+                let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
                 }
@@ -1068,85 +1170,93 @@ pub fn frac2json(
                 } else {
                     result.insert(
                         name.clone(),
-                        frac2json_embedded(schema, member_type, src, &mut fixed_pos, pos)?,
+                        frac2json_embedded(
+                            schema,
+                            member_type,
+                            &mut fixed_stream,
+                            stream,
+                            &mut last_empty,
+                        )?,
                     );
                 }
             }
+            consume_trailing_optional(&mut fixed_stream, stream, last_empty)?;
             Ok(serde_json::Value::Object(result))
         }
         Array { child, len, .. } => {
             let mut result = <Vec<serde_json::Value>>::with_capacity(*len as usize);
-            let mut fixed_pos = *pos;
             let ty = schema.get_id(*child);
             let fixed_size = ty.fixed_size().checked_mul(*len).ok_or(Error::BadSize)?;
-            if src.len() - (fixed_pos as usize) < fixed_size as usize {
-                return Err(Error::ReadPastEnd);
-            }
-            *pos = fixed_pos + fixed_size;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut last_empty = false;
             for _ in 0..*len {
-                result.push(frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)?);
+                result.push(frac2json_embedded(
+                    schema,
+                    ty,
+                    &mut fixed_stream,
+                    stream,
+                    &mut last_empty,
+                )?);
             }
             Ok(result.into())
         }
         List(child) => {
-            let fixed_size = u32::unpack(src, pos)?;
+            let fixed_size = u32::unpack(stream.data, &mut stream.pos)?;
+            if fixed_size == 0 && !allow_empty_container {
+                return Err(Error::PtrEmptyList);
+            }
             let ty = schema.get_id(*child);
             let elem_size = ty.fixed_size();
             if fixed_size % elem_size != 0 {
                 return Err(Error::BadSize);
             }
             let len = fixed_size / elem_size;
-            let mut fixed_pos = *pos;
             let mut result = Vec::with_capacity(len as usize);
-            if src.len() - (fixed_pos as usize) < fixed_size as usize {
-                return Err(Error::ReadPastEnd);
-            }
-            *pos = fixed_pos + fixed_size;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut last_empty = false;
             for _ in 0..len {
-                result.push(frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)?)
+                result.push(frac2json_embedded(
+                    schema,
+                    ty,
+                    &mut fixed_stream,
+                    stream,
+                    &mut last_empty,
+                )?)
             }
             Ok(result.into())
         }
         Option(..) => {
-            let mut fixed_pos = *pos;
-            let fixed_size = 4;
-            if src.len() - (fixed_pos as usize) < fixed_size as usize {
-                return Err(Error::ReadPastEnd);
-            }
-            *pos = fixed_pos + fixed_size;
-            frac2json_embedded(schema, ty, src, &mut fixed_pos, pos)
+            let mut fixed_stream = stream.read_fixed(4)?;
+            let mut last_empty = false;
+            frac2json_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)
         }
         Variant(alternatives) => {
-            let index = u8::unpack(src, pos)?;
-            let len = u32::unpack(src, pos)?;
+            let index = u8::unpack(stream.data, &mut stream.pos)?;
+            let len = u32::unpack(stream.data, &mut stream.pos)?;
             if index as usize >= alternatives.len() {
                 return Err(Error::BadEnumIndex);
             }
-            if src.len() - (*pos as usize) < len as usize {
-                return Err(Error::ReadPastEnd);
-            }
+            let mut substream = stream.read_fixed(len)?;
             let (name, child) = &alternatives[index as usize];
             let ty = schema.get_id(*child);
             let mut result = serde_json::Map::with_capacity(1);
             result.insert(
                 name.clone(),
-                frac2json(schema, ty, &src[0..(*pos as usize + len as usize)], pos)?,
+                frac2json_impl(schema, ty, &mut substream, true)?,
             );
+            stream.has_unknown |= substream.has_unknown;
+            substream.finish()?;
             Ok(result.into())
         }
         Tuple(children) => {
             let mut result = Vec::with_capacity(children.len());
-            let fixed_size = u16::unpack(src, pos)? as u32;
-            let mut fixed_pos = *pos;
-            if src.len() - (fixed_pos as usize) < fixed_size as usize {
-                return Err(Error::ReadPastEnd);
-            }
-            let fixed_end = fixed_pos + fixed_size as u32;
-            *pos = fixed_end;
+            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut at_end = false;
+            let mut last_empty = false;
             for child in children {
                 let member_type = schema.get_id(*child);
-                let remaining = fixed_end - fixed_pos;
+                let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
                 }
@@ -1160,19 +1270,20 @@ pub fn frac2json(
                     result.push(frac2json_embedded(
                         schema,
                         member_type,
-                        src,
-                        &mut fixed_pos,
-                        pos,
+                        &mut fixed_stream,
+                        stream,
+                        &mut last_empty,
                     )?);
                 }
             }
+            consume_trailing_optional(&mut fixed_stream, stream, last_empty)?;
             Ok(result.into())
         }
         Int {
             bits: 1,
             is_signed: false,
         } => {
-            let result = u8::unpack(src, pos)?;
+            let result = u8::unpack(stream.data, &mut stream.pos)?;
             if result != 0 && result != 1 {
                 Err(Error::BadScalar)?
             }
@@ -1182,7 +1293,7 @@ pub fn frac2json(
             bits: 1,
             is_signed: true,
         } => {
-            let result = i8::unpack(src, pos)?;
+            let result = i8::unpack(stream.data, &mut stream.pos)?;
             if result != 0 && result != -1 {
                 Err(Error::BadScalar)?
             }
@@ -1191,40 +1302,40 @@ pub fn frac2json(
         Int {
             bits: 8,
             is_signed: false,
-        } => Ok(u8::unpack(src, pos)?.into()),
+        } => Ok(u8::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 8,
             is_signed: true,
-        } => Ok(i8::unpack(src, pos)?.into()),
+        } => Ok(i8::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 16,
             is_signed: false,
-        } => Ok(u16::unpack(src, pos)?.into()),
+        } => Ok(u16::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 16,
             is_signed: true,
-        } => Ok(i16::unpack(src, pos)?.into()),
+        } => Ok(i16::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 32,
             is_signed: false,
-        } => Ok(u32::unpack(src, pos)?.into()),
+        } => Ok(u32::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 32,
             is_signed: true,
-        } => Ok(i32::unpack(src, pos)?.into()),
+        } => Ok(i32::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 64,
             is_signed: false,
-        } => Ok(u64::unpack(src, pos)?.into()),
+        } => Ok(u64::unpack(stream.data, &mut stream.pos)?.into()),
         Int {
             bits: 64,
             is_signed: true,
-        } => Ok(i64::unpack(src, pos)?.into()),
+        } => Ok(i64::unpack(stream.data, &mut stream.pos)?.into()),
         Float {
             exp: 8,
             mantissa: 24,
         } => {
-            let result = f32::unpack(src, pos)?;
+            let result = f32::unpack(stream.data, &mut stream.pos)?;
             if result.is_finite() {
                 Ok(result.into())
             } else {
@@ -1235,7 +1346,7 @@ pub fn frac2json(
             exp: 11,
             mantissa: 53,
         } => {
-            let result = f64::unpack(src, pos)?;
+            let result = f64::unpack(stream.data, &mut stream.pos)?;
             if result.is_finite() {
                 Ok(result.into())
             } else {
@@ -1243,20 +1354,26 @@ pub fn frac2json(
             }
         }
         FracPack(nested) => {
-            let len = u32::unpack(src, pos)?;
-            if src.len() - (*pos as usize) < len as usize {
-                return Err(Error::ReadPastEnd);
+            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            if len == 0 && !allow_empty_container {
+                return Err(Error::PtrEmptyList);
             }
+            let mut substream = stream.read_fixed(len)?;
             let ty = schema.get_id(*nested);
-            let end = *pos + len;
-            let result = frac2json(schema, ty, &src[0..end as usize], pos)?;
-            // TODO: check pos
+            let result = frac2json_impl(schema, ty, &mut substream, true)?;
+            println!("substream: {:?}", substream);
+            stream.has_unknown |= substream.has_unknown;
+            substream.finish()?;
             Ok(result)
         }
         Custom { id, repr, .. } => {
+            let repr = schema.get_id(*repr);
+            let mut pos = stream.pos;
+            // Use the underlying type for verification, but discard the result
+            frac2json_impl(schema, repr, stream, allow_empty_container)?;
             schema
                 .custom
-                .frac2json(*id, schema, schema.get_id(*repr), src, pos)
+                .frac2json(*id, schema, repr, stream.data, &mut pos)
         }
         _ => {
             unimplemented!();

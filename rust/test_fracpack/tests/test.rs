@@ -814,23 +814,17 @@ fn schema_unpack() -> Result<()> {
             println!("type: {}", test.type_);
             if let Some(expected) = test.json {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                let mut pos = 0;
-                let actual = frac2json(
-                    &cschema,
-                    ty,
-                    &hex::decode(&test.fracpack).unwrap(),
-                    &mut pos,
-                )?;
+                let actual = frac2json(&cschema, ty, &hex::decode(&test.fracpack).unwrap())?;
                 assert!(
                     fuzzy_equal(&actual, &expected),
                     "`{actual}` != `{expected}`"
                 );
             }
-            //if test.error {
-            //    let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-            //    let mut pos = 0;
-            //    frac2json(&cschema, ty, &hex::decode(&test.fracpack).unwrap(), &mut pos).expect_err(&format!("expected error for {}", &test.fracpack));
-            //}
+            if test.error {
+                let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
+                frac2json(&cschema, ty, &hex::decode(&test.fracpack).unwrap())
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+            }
         }
     }
     Ok(())

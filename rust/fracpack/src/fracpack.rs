@@ -63,7 +63,9 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
-    BadScalar           = "Bad scalar value"
+    BadScalar           = "Bad scalar value",
+    ExtraEmptyOptional  = "Trailing empty optionals must be omitted",
+    PtrEmptyList        = "A pointer to an empty list must use zero offset"
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
