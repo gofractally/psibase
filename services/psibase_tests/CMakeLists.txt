@@ -21,6 +21,7 @@ function(add suffix)
     service(CounterService "${suffix}" CounterService.cpp)
     service(AsyncQueryService "${suffix}" AsyncQueryService.cpp)
     service(SubjectiveCounterService "${suffix}" SubjectiveCounterService.cpp)
+    service(KeepSocketService "${suffix}" KeepSocketService.cpp)
 
     add_executable(psibase-tests${suffix} test.cpp test-sig.cpp test_event.cpp test_crypto.cpp test_memo.cpp test_clock.cpp test_semver.cpp test_subjective.cpp testKvMerkle.cpp)
     target_include_directories(psibase-tests${suffix} PUBLIC include)

@@ -139,10 +139,10 @@ export class Supervisor implements AppInterface {
         return Promise.all([pluginsReady, this.loadPlugins(dependencies)]);
     }
 
-    private replyToParent(call: FunctionCallArgs, result: any) {
+    private replyToParent(id: string, call: FunctionCallArgs, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
-            buildFunctionCallResponse(call, result),
+            buildFunctionCallResponse(id, call, result),
             this.parentOrigination.origin,
         );
     }
@@ -266,10 +266,11 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
+        id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
-            // Wait to load the full plugin tree (a plugin and all it's dependencies, recursively).
+            // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
             // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
             //   transpiling the component, bundling with rollup, and importing & instantiating the es module
             //   in memory.
@@ -310,7 +311,7 @@ export class Supervisor implements AppInterface {
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
-            this.replyToParent(args, result);
+            this.replyToParent(id, args, result);
 
             this.context = undefined;
         } catch (e) {
@@ -319,11 +320,12 @@ export class Supervisor implements AppInterface {
                 // Since it is the final return value, it is no longer recoverable and is
                 //   converted to a PluginError to be handled by the client.
                 this.replyToParent(
+                    id,
                     args,
                     new PluginError(e.payload.producer, e.payload.message),
                 );
             } else {
-                this.replyToParent(args, e);
+                this.replyToParent(id, args, e);
             }
 
             this.context = undefined;

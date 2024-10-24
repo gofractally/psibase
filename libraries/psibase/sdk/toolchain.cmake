@@ -65,6 +65,7 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/../../wasi-sysroot)
 elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/wasm/deps)
     # Build directory
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+    set(psibase_ROOT ${CMAKE_CURRENT_LIST_DIR})
     set(CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_LIST_DIR})
     # Make sure that the replacement libc can be found
     set(CMAKE_EXE_LINKER_FLAGS -L${CMAKE_CURRENT_LIST_DIR}/wasm/libraries/psibase)

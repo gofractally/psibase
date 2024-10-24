@@ -55,11 +55,13 @@ namespace psibase
       void verifyProof(const SignedTransaction&                 trx,
                        TransactionTrace&                        trace,
                        size_t                                   i,
-                       std::optional<std::chrono::microseconds> watchdogLimit);
+                       std::optional<std::chrono::microseconds> watchdogLimit,
+                       BlockContext*                            errorContext);
 
       void checkFirstAuth(const SignedTransaction&                 trx,
                           TransactionTrace&                        trace,
-                          std::optional<std::chrono::microseconds> watchdogLimit);
+                          std::optional<std::chrono::microseconds> watchdogLimit,
+                          BlockContext*                            errorContext);
 
       void pushTransaction(SignedTransaction&&                      trx,
                            TransactionTrace&                        trace,

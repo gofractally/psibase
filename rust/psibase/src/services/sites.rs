@@ -6,6 +6,11 @@ mod service {
     use crate::{http::HttpRequest, Hex};
 
     #[action]
+    fn enableSpa(enable: bool) {
+        unimplemented!()
+    }
+
+    #[action]
     fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }
