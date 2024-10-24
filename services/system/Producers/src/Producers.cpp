@@ -8,7 +8,7 @@ namespace
 {
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
    { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
-}
+}  // namespace
 
 namespace SystemService
 {
@@ -34,7 +34,7 @@ namespace SystemService
       }
    }
 
-   void Producers::setConsensus(psibase::Consensus consensus)
+   void Producers::setConsensus(psibase::ConsensusData consensus)
    {
       check(getSender() == getReceiver(), "sender must match service account");
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
@@ -46,10 +46,10 @@ namespace SystemService
           },
           consensus);
       check(!!status, "Missing status row");
-      check(
-          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
-          "Consensus update pending");
-      status->nextConsensus = std::tuple(std::move(consensus), status->current.blockNum);
+      check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
+            "Consensus update pending");
+      status->consensus.next = {{std::move(consensus), status->consensus.current.services},
+                                status->current.blockNum};
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
@@ -60,17 +60,17 @@ namespace SystemService
       check(!prods.empty(), "There must be at least one producer");
       checkAuthServices(prods);
       check(!!status, "Missing status row");
-      check(
-          !status->nextConsensus || std::get<1>(*status->nextConsensus) == status->current.blockNum,
-          "Consensus update pending");
-      status->nextConsensus = std::tuple(std::visit(
-                                             [&](auto old)
-                                             {
-                                                old.producers = std::move(prods);
-                                                return Consensus{std::move(old)};
-                                             },
-                                             status->consensus),
-                                         status->current.blockNum);
+      check(!status->consensus.next || status->consensus.next->blockNum == status->current.blockNum,
+            "Consensus update pending");
+      status->consensus.next = {{std::visit(
+                                     [&](auto old)
+                                     {
+                                        old.producers = std::move(prods);
+                                        return ConsensusData{std::move(old)};
+                                     },
+                                     status->consensus.current.data),
+                                 status->consensus.current.services},
+                                status->current.blockNum};
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
@@ -124,7 +124,7 @@ namespace SystemService
                 expectedClaims.push_back(auth);
              }
           },
-          status->consensus);
+          status->consensus.current.data);
       std::sort(claims.begin(), claims.end(), compare_claim);
       auto matching = std::ranges::count_if(
           expectedClaims, [&](const auto& claim)
@@ -133,7 +133,7 @@ namespace SystemService
       auto threshold = expectedClaims.empty()
                            ? 0
                            : std::visit([&](const auto& c) { return getThreshold(c, sender); },
-                                        status->consensus);
+                                        status->consensus.current.data);
       if (matching < threshold)
       {
          abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +

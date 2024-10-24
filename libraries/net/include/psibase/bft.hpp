@@ -173,16 +173,15 @@ namespace psibase::net
          }
       }
 
-      void verifyIrreversibleSignature(const auto&             revision,
-                                       const BlockConfirm&     commits,
-                                       const BlockHeaderState* state)
+      void verifyIrreversibleSignature(const BlockConfirm& commits, const BlockHeaderState* state)
       {
-         verifyMsig<CommitMessage>(revision, state->blockId(), commits.commits, *state->producers);
+         verifyMsig<CommitMessage>(state->getProdsAuthRevision(), state->blockId(), commits.commits,
+                                   *state->producers);
          if (state->nextProducers)
          {
             check(!!commits.nextCommits, "nextCommits required during joint consensus");
-            verifyMsig<CommitMessage>(revision, state->blockId(), *commits.nextCommits,
-                                      *state->nextProducers);
+            verifyMsig<CommitMessage>(state->nextProducers->authState->revision, state->blockId(),
+                                      *commits.nextCommits, *state->nextProducers);
          }
          else
          {
@@ -711,24 +710,17 @@ namespace psibase::net
             PSIBASE_LOG(logger, warning) << "invalid view change: wrong term";
             return false;
          }
-         auto verifyState = chain().get_state(state->info.header.previous);
-         if (!verifyState)
-         {
-            // TODO: This implies that state is LIB. The need for this check
-            // is yet another symptom of the problems with the way we're handling
-            // the services for signature verification
-            return true;
-         }
          try
          {
-            verifyMsig<PrepareMessage>(verifyState->authState->revision, state->blockId(),
+            verifyMsig<PrepareMessage>(state->getProdsAuthRevision(), state->blockId(),
                                        info.best_message->data->prepares(), *state->producers);
             if (state->nextProducers && state->nextProducers->algorithm == ConsensusAlgorithm::bft)
             {
                if (auto nextPrepares = info.best_message->data->nextPrepares())
                {
-                  verifyMsig<PrepareMessage>(verifyState->authState->revision, state->blockId(),
-                                             *nextPrepares, *state->nextProducers);
+                  verifyMsig<PrepareMessage>(state->nextProducers->authState->revision,
+                                             state->blockId(), *nextPrepares,
+                                             *state->nextProducers);
                }
                else
                {
@@ -1392,9 +1384,7 @@ namespace psibase::net
                return;
             }
          }
-         auto verifyState = chain().get_state(state->info.header.previous);
-         assert(verifyState && "accept_block_header requires the previous block to be known");
-         verifyIrreversibleSignature(verifyState->authState->revision, data, committed);
+         verifyIrreversibleSignature(data, committed);
          if (committed->producers->algorithm == ConsensusAlgorithm::bft)
          {
             chain().setBlockData(committed->blockId(), aux);

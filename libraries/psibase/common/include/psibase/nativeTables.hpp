@@ -1,5 +1,6 @@
 #pragma once
 
+#include <psibase/SnapshotHeader.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
 
@@ -7,14 +8,18 @@ namespace psibase
 {
    using NativeTableNum = uint16_t;
 
-   static constexpr NativeTableNum statusTable                = 1;
-   static constexpr NativeTableNum codeTable                  = 2;
-   static constexpr NativeTableNum codeByHashTable            = 3;
-   static constexpr NativeTableNum databaseStatusTable        = 4;
-   static constexpr NativeTableNum transactionWasmConfigTable = 5;
-   static constexpr NativeTableNum proofWasmConfigTable       = 6;  // Also for first auth
-   static constexpr NativeTableNum configTable                = 7;
-   static constexpr NativeTableNum notifyTable                = 8;
+   static constexpr NativeTableNum statusTable                = 1;   // objective
+   static constexpr NativeTableNum codeTable                  = 2;   // both
+   static constexpr NativeTableNum codeByHashTable            = 3;   // both
+   static constexpr NativeTableNum databaseStatusTable        = 4;   // objective
+   static constexpr NativeTableNum transactionWasmConfigTable = 5;   // objective
+   static constexpr NativeTableNum proofWasmConfigTable       = 6;   // Also for first auth
+   static constexpr NativeTableNum configTable                = 7;   // both
+   static constexpr NativeTableNum notifyTable                = 8;   // both
+   static constexpr NativeTableNum blockDataTable             = 9;   // subjective
+   static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
+   static constexpr NativeTableNum snapshotTable              = 11;  // subjective
+   static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -22,16 +27,14 @@ namespace psibase
    auto statusKey() -> KeyPrefixType;
    struct StatusRow
    {
-      Checksum256                                    chainId;
-      BlockHeader                                    current;
-      std::optional<BlockInfo>                       head;
-      Consensus                                      consensus;
-      std::optional<std::tuple<Consensus, BlockNum>> nextConsensus;
-      std::vector<BlockHeaderAuthAccount>            authServices;
+      Checksum256              chainId;
+      BlockHeader              current;
+      std::optional<BlockInfo> head;
+      JointConsensus           consensus;
 
       static constexpr auto db = psibase::DbId::native;
       static auto           key() -> KeyPrefixType;
-      PSIO_REFLECT(StatusRow, chainId, current, head, consensus, nextConsensus, authServices)
+      PSIO_REFLECT(StatusRow, chainId, current, head, consensus)
    };
 
    struct ConfigRow
@@ -188,6 +191,68 @@ namespace psibase
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> NotifyKeyType;
       PSIO_REFLECT(NotifyRow, type, actions)
+   };
+
+   using BlockDataKeyType = std::tuple<std::uint16_t, std::uint8_t, Checksum256>;
+   auto blockDataPrefix() -> KeyPrefixType;
+   auto blockDataKey(const Checksum256&) -> BlockDataKeyType;
+   struct BlockDataRow
+   {
+      Checksum256 blockId;
+      // Contains additional signatures if required by the consensus algorithm
+      std::optional<std::vector<char>> auxConsensusData;
+
+      static constexpr auto db = psibase::DbId::nativeSubjective;
+      auto                  key() const -> BlockDataKeyType;
+      PSIO_REFLECT(BlockDataRow, blockId, auxConsensusData);
+   };
+
+   using ConsensusChangeKeyType = std::tuple<std::uint16_t, std::uint8_t, BlockNum>;
+   /// Indicates the blocks that change consensus
+   auto consensusChangePrefix() -> KeyPrefixType;
+   auto consensusChangeKey(BlockNum start) -> ConsensusChangeKeyType;
+   struct ConsensusChangeRow
+   {
+      BlockNum start;
+      BlockNum commit;
+      BlockNum end;
+
+      static constexpr auto db = psibase::DbId::nativeSubjective;
+      auto                  key() const -> ConsensusChangeKeyType;
+      PSIO_REFLECT(ConsensusChangeRow, start, commit, end);
+   };
+
+   struct SnapshotStateItem
+   {
+      snapshot::StateChecksum               state;
+      std::vector<snapshot::StateSignature> signatures;
+      PSIO_REFLECT(SnapshotStateItem, state, signatures)
+   };
+
+   using SnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, Checksum256>;
+   auto snapshotPrefix() -> KeyPrefixType;
+   auto snapshotKey(const Checksum256&) -> SnapshotKeyType;
+   struct SnapshotRow
+   {
+      using Item = SnapshotStateItem;
+      Checksum256         id;
+      std::optional<Item> state;
+      std::vector<Item>   other;
+
+      static constexpr auto db = psibase::DbId::nativeSubjective;
+      auto                  key() const -> SnapshotKeyType;
+      PSIO_REFLECT(SnapshotRow, id, state, other)
+   };
+
+   using ScheduledSnapshotKeyType = std::tuple<std::uint16_t, std::uint8_t, BlockNum>;
+   auto scheduledSnapshotKey(BlockNum num) -> ScheduledSnapshotKeyType;
+   struct ScheduledSnapshotRow
+   {
+      BlockNum blockNum;
+
+      static constexpr auto db = psibase::DbId::native;
+      auto                  key() const -> ScheduledSnapshotKeyType;
+      PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
    };
 
 }  // namespace psibase

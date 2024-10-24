@@ -27,21 +27,23 @@ namespace psibase
 
      private:
       template <typename M>
-      static auto makeParams(psio::SchemaBuilder& builder, std::span<const char* const> ref)
-          -> psio::schema_types::Object
+      static auto makeParams(psio::SchemaBuilder&         builder,
+                             std::span<const char* const> ref) -> psio::schema_types::Object
       {
          psio::schema_types::Object type;
          auto                       nameIter = ref.begin();
          auto                       nameEnd  = ref.end();
          auto                       i        = ref.size();
-         forEachType(
-             typename M::SimplifiedArgTypes{},
-             [&](auto* t)
-             {
-                std::string name = nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
-                type.members.push_back(
-                    {std::move(name), builder.insert<std::remove_pointer_t<decltype(t)>>()});
-             });
+         forEachType(typename M::SimplifiedArgTypes{},
+                     [&](auto* t)
+                     {
+                        std::string name =
+                            nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
+                        type.members.push_back(
+                            {std::move(name),
+                             builder.insert<std::remove_cv_t<
+                                 psio::remove_view_t<std::remove_pointer_t<decltype(t)>>>>()});
+                     });
          return type;
       }
       template <typename T>
@@ -54,7 +56,7 @@ namespace psibase
          }
          else
          {
-            return builder.insert<T>();
+            return builder.insert<std::remove_cv_t<psio::remove_view_t<T>>>();
          }
       }
       template <typename T>

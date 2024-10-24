@@ -257,7 +257,7 @@ pub struct BftConsensus {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, Union)]
 #[fracpack(fracpack_mod = "fracpack")]
-pub enum Consensus {
+pub enum ConsensusData {
     CFT(CftConsensus),
     BFT(BftConsensus),
 }
@@ -305,6 +305,27 @@ pub struct BlockHeaderAuthAccount {
     pub vmVersion: u8,
 }
 
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct Consensus {
+    data: ConsensusData,
+    services: Vec<BlockHeaderAuthAccount>,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct PendingConsensus {
+    consensus: Consensus,
+    blockNum: BlockNum,
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct JointConsensus {
+    current: Consensus,
+    next: Option<PendingConsensus>,
+}
+
 #[derive(
     Debug,
     Clone,
@@ -336,6 +357,9 @@ pub struct BlockHeader {
     pub term: TermNum,
     pub commitNum: BlockNum,
 
+    // Holds a sha256 of the current JointConsensus
+    consensusState: Checksum256,
+
     // Holds a merkle root of the transactions in the block.
     // This does not depend on execution, so that it can be
     // verified early. The leaves of the tree have type
@@ -350,10 +374,6 @@ pub struct BlockHeader {
     // this block. Joint consensus must not be active already.
     // Joint consensus ends after this block becomes irreversible.
     newConsensus: Option<Consensus>,
-
-    // If this is specified, it should should contain the full set of
-    // of services that can be used for verifying block signatures.
-    authServices: Option<Vec<BlockHeaderAuthAccount>>,
 
     // This contains the code for authServices
     // It MUST contain all code that was added in this block

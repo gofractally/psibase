@@ -47,7 +47,10 @@ namespace psibase
       void        callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
       Checksum256 makeEventMerkleRoot();
       Checksum256 makeTransactionMerkle();
-      std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);
+      std::pair<ConstRevisionPtr, Checksum256> writeRevision(
+          const Prover&,
+          const Claim&,
+          const ConstRevisionPtr& prevAuthServices = nullptr);
 
       void verifyProof(const SignedTransaction&                 trx,
                        TransactionTrace&                        trace,

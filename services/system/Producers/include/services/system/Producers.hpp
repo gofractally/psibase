@@ -32,7 +32,7 @@ namespace SystemService
       static constexpr auto producerAccountWeak   = psibase::AccountNumber("prods-weak");
       static constexpr auto producerAccountStrong = psibase::AccountNumber("prods-strong");
 
-      void setConsensus(psibase::Consensus consensus);
+      void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
 
       // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.

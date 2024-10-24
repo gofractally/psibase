@@ -331,7 +331,7 @@ class Model:
     def compress(self, input, out=None):
         for i in input:
             if self.char_to_symbol[ord(i)] == 0:
-                raise InvalidName()
+                raise InvalidName(input)
         if out is None:
             out = BitStream()
 
@@ -542,8 +542,8 @@ class BitInputStream:
         return self.not_eof == 0
 
 class InvalidName(Exception):
-    def __init__():
-        super().__init__("Invalid name")
+    def __init__(self, name=None):
+        super().__init__("Invalid name" + (name if name is None else ": " + name))
 
 def account_to_number(m_input):
     if len(m_input) == 0:

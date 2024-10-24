@@ -93,6 +93,41 @@ namespace SystemService
             break;
          includedTable.remove(obj);
       }
+
+      auto snap    = tables.open<SnapshotInfoTable>();
+      auto snapRow = snap.get(SingletonKey{});
+      if (snapRow)
+      {
+         if (snapRow->snapshotInterval &&
+             stat.current.time.seconds - snapRow->lastSnapshot.seconds >= snapRow->snapshotInterval)
+         {
+            ScheduledSnapshotRow row{stat.current.blockNum};
+            kvPut(ScheduledSnapshotRow::db, row.key(), row);
+            snapRow->lastSnapshot = stat.current.time;
+            snap.put(*snapRow);
+         }
+      }
+      else
+      {
+         snap.put({stat.head->header.time, 0});
+      }
+   }
+
+   void Transact::setSnapTime(std::uint32_t seconds)
+   {
+      check(getSender() == getReceiver(), "Wrong sender");
+      Tables tables(Transact::service);
+
+      auto& stat = getStatus();
+
+      auto table = tables.open<SnapshotInfoTable>();
+      auto row   = table.get(SingletonKey{});
+      if (!row)
+         row = {.lastSnapshot     = stat.head ? stat.head->header.time : stat.current.time,
+                .snapshotInterval = seconds};
+      else
+         row->snapshotInterval = seconds;
+      table.put(*row);
    }
 
    static void checkObjectiveCallback(CallbackType type)
@@ -265,7 +300,7 @@ namespace SystemService
                               ServiceMethod{action.service, action.method}, allowedActions,
                               std::vector<Claim>{});
          }  // if (requester != account->authService)
-      }     // if(enforceAuth)
+      }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
