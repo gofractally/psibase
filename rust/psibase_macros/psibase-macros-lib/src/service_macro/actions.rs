@@ -1,7 +1,7 @@
 use darling::FromMeta;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use syn::{AttrStyle, FnArg, ItemFn, Pat, ReturnType};
+use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Pat, ReturnType};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -189,10 +189,48 @@ pub fn process_action_schema(
     }
 }
 
-pub fn add_check_init(f: &mut ItemFn) {
+pub struct PreAction {
+    pub exists: bool,
+    pub fn_name: Option<Ident>,
+}
+
+impl Default for PreAction {
+    fn default() -> Self {
+        Self {
+            exists: false,
+            fn_name: None,
+        }
+    }
+}
+
+fn is_pre_action_attr(attr: &Attribute) -> bool {
+    if let AttrStyle::Outer = attr.style {
+        if attr.meta.path().is_ident("pre_action") {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
+    for (_item_index, item) in items.iter_mut().enumerate() {
+        if let Item::Fn(f) = item {
+            if f.attrs.iter().any(is_pre_action_attr) {
+                pre_action_info.exists = true;
+                pre_action_info.fn_name = Some(f.sig.ident.clone());
+                if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
+                    f.attrs.remove(pre_action_pos);
+                }
+            }
+        }
+    }
+}
+
+pub fn add_pre_action_call(pre_action_info: &PreAction, f: &mut ItemFn) {
     // println!("adding check_init to {}", f.sig.ident.to_string());
+    let fn_name = pre_action_info.fn_name.clone();
     let new_line_ts = quote! {
-        check_init();
+        #fn_name();
     };
     let new_line = syn::parse2(new_line_ts).unwrap();
     f.block.stmts.insert(0, new_line);

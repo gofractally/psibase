@@ -5,7 +5,8 @@ mod graphql;
 mod tables;
 
 use actions::{
-    add_check_init, process_action_args, process_action_callers, process_action_schema, Options,
+    add_pre_action_call, check_for_pre_action, process_action_args, process_action_callers,
+    process_action_schema, Options, PreAction,
 };
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
@@ -32,6 +33,7 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
             return TokenStream::from(Error::from(e).write_errors());
         }
     };
+    // println!("attr_args: {:#?}", attr_args);
 
     let mut options: Options = match Options::from_list(&attr_args) {
         Ok(val) => val,
@@ -88,12 +90,14 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
+        check_for_pre_action(&mut pre_action_info, items);
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
                 if s.attrs.iter().any(is_table_attr) {
@@ -175,7 +179,7 @@ fn process_mod(
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
                 if has_check_init {
-                    add_check_init(f);
+                    add_pre_action_call(&pre_action_info, f);
                     // println!(
                     //     "1 : 1st line of {} is {:#?}",
                     //     f.sig.ident.to_string(),
