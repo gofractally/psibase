@@ -311,7 +311,7 @@ int main(int argc, const char* const* argv)
       std::cerr << "No chain" << std::endl;
       return 1;
    }
-   std::ofstream out(snapshot_file, std::ios_base::trunc | std::ios_base::binary);
+   std::ofstream out(snapshot_file.data(), std::ios_base::trunc | std::ios_base::binary);
    if (!out)
    {
       std::cerr << "Failed to open " << snapshot_file << std::endl;
