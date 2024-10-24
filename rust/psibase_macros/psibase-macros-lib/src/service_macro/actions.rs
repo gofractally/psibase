@@ -188,3 +188,17 @@ pub fn process_action_schema(
         actions.insert(#method_number, #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
 }
+
+pub fn add_check_init(f: &mut ItemFn) {
+    // println!("adding check_init to {}", f.sig.ident.to_string());
+    let new_line_ts = quote! {
+        check_init();
+    };
+    let new_line = syn::parse2(new_line_ts).unwrap();
+    f.block.stmts.insert(0, new_line);
+    // println!(
+    //     "add_check_init() ==> 1st line of {} is {:#?}",
+    //     f.sig.ident.to_string(),
+    //     f.block.stmts[0].clone()
+    // );
+}

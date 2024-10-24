@@ -4,7 +4,9 @@ mod events;
 mod graphql;
 mod tables;
 
-use actions::{process_action_args, process_action_callers, process_action_schema, Options};
+use actions::{
+    add_check_init, process_action_args, process_action_callers, process_action_schema, Options,
+};
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
 use dispatch::{add_unknown_action_check_to_dispatch_body, process_dispatch_body};
@@ -103,6 +105,11 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
+                    // println!(
+                    //     "adding action fn: {} w {} lines",
+                    //     f.sig.ident.to_string(),
+                    //     f.block.stmts.len()
+                    // )
                 } else {
                     // println!("Pushing this item into non_actions:\n{:#?}", f.sig.ident);
                     non_action_fns.push(item_index);
@@ -145,15 +152,36 @@ fn process_mod(
             }
         }
 
+        let mut has_check_init = false;
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
+        for fn_index in non_action_fns.iter() {
+            if let Item::Fn(f) = &mut items[*fn_index] {
+                let fn_name = f.sig.ident.to_string();
+                if fn_name == "check_init" {
+                    // println!("found check_init(): {:#?}", fn_name);
+                    has_check_init = true;
+                } else {
+                    // println!("not check_init(): {:#?}", fn_name);
+                }
+            }
+        }
+
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
+                if has_check_init {
+                    add_check_init(f);
+                    // println!(
+                    //     "1 : 1st line of {} is {:#?}",
+                    //     f.sig.ident.to_string(),
+                    //     f.block.stmts[0].clone()
+                    // );
+                }
                 process_action_args(
                     options,
                     false,
@@ -180,8 +208,14 @@ fn process_mod(
                     }
                 };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
+                    // If this is an action, remove the action attribute
                     f.attrs.remove(i);
                 }
+                // println!(
+                //     "2 : 1st line of {} is {:#?}",
+                //     f.sig.ident.to_string(),
+                //     f.block.stmts[0].clone()
+                // );
             }
         }
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
@@ -478,6 +512,7 @@ fn process_mod(
                     #psibase_mod::ActionPacker { sender, service }.into()
                 }
 
+                // TODO: thids doc and the next seem switched, no?
                 #[doc = #emit_from_doc]
                 pub fn emit() -> EmitEvent {
                     EmitEvent { sender: Self::#constant }
@@ -748,6 +783,19 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
+    // let Some(_, ItemMod { _, _, _, _, i, c, _}) = impl_mod.content;
+    // println!("final impl_mod.content {:#?}", impl_mod.content);
+    // if let Some((_, items)) = &mut impl_mod.content {
+    //     for (_, item) in items.iter_mut().enumerate() {
+    //         if let Item::Fn(f) = item {
+    //             println!(
+    //                 "{}.stmts[0]: {:#?}",
+    //                 f.sig.ident.to_string(),
+    //                 f.block.stmts[0]
+    //             );
+    //         }
+    //     }
+    // }
     quote! {
         #silence
         #impl_mod
