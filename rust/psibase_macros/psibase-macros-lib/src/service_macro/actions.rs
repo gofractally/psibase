@@ -225,7 +225,7 @@ struct PreActionOptions {
 }
 
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
-    println!("check_for_pre_action().top");
+    // println!("check_for_pre_action().top");
     for (_item_index, item) in items.iter_mut().enumerate() {
         if let Item::Fn(f) = item {
             if f.attrs.iter().any(is_pre_action_attr) {
@@ -238,7 +238,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                 // println!("1: processing pre_action_attr args");
                 let attr_args_ts = match pre_action_attr.meta.clone() {
                     Meta::List(args) => {
-                        println!("List: {:?}", args);
+                        // println!("List: {:?}", args);
                         args.tokens
                     }
                     Meta::Path(args) => panic!("expected list; got path."),
@@ -254,14 +254,14 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                     }
                     Err(e) => {
                         // TODO: how to handle macro errors/reporting better?
-                        println!(
-                            "about to panic; error in parse_meta_list(); err {}",
-                            e.to_string()
-                        );
+                        // println!(
+                        //     "about to panic; error in parse_meta_list(); err {}",
+                        //     e.to_string()
+                        // );
                         panic!("Error parsing pre_action arguments");
                     }
                 };
-                println!("2: parsing attr args into options...");
+                // println!("2: parsing attr args into options...");
                 // println!("attr_args: {:#?}", attr_args);
 
                 let mut options: PreActionOptions = match PreActionOptions::from_list(&attr_args) {
@@ -271,7 +271,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                         // return err.write_errors().into();
                     }
                 };
-                println!("pre-action options: {:?}", options);
+                // println!("pre-action options: {:?}", options);
                 pre_action_info.exclude = options.exclude;
 
                 if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
@@ -289,10 +289,10 @@ pub fn add_pre_action_call(pre_action_info: &PreAction, f: &mut ItemFn) {
         .to_strings()
         .contains(&f.sig.ident.to_string())
     {
-        println!(
-            "{} is in exclude list; skipping adding pre_action call",
-            f.sig.ident.to_string()
-        );
+        // println!(
+        //     "{} is in exclude list; skipping adding pre_action call",
+        //     f.sig.ident.to_string()
+        // );
         return;
     }
     let fn_name = pre_action_info.fn_name.clone();

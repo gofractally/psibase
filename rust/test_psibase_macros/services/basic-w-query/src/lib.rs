@@ -4,15 +4,16 @@ mod service {
     use psibase::{serve_simple_ui, HttpReply, HttpRequest};
 
     #[action]
-    // got an error because serde dep wasn't present?
+    // TODO: got an error because serde dep wasn't present? Can't I bring this dep along with the macro crate and not require it in a project using the macro?
     fn add(a: i32, b: i32) -> i32 {
         // Wrapper::call() uses and therefore covers the testing of service::Actions
         assert_eq!(mincallrecvr::Wrapper::call().add2(3, 5), 8);
 
-        // event emission must be called from within service; so this is call we can do here
+        // event emission must be called from within service
         Wrapper::emit()
             .history()
             .history_fn1(String::from("Test string"));
+
         a + b
     }
 

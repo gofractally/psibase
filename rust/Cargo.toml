@@ -7,7 +7,6 @@ members = [
     "gen-cpp-doc",
     "md2man",
     "psibase_macros",
-    # "psibase-macros-derive",
     "psibase",
     "test_contract",
     "test_contract_2",
@@ -17,7 +16,8 @@ members = [
     "test_service_elections",
     "test_service_sites",
     "test_fracpack",
-    "test_subjective", "psibase-macros-test",
+    "test_subjective",
+    "test_psibase_macros",
 ]
 
 default-members = [

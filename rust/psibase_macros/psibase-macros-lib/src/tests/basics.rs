@@ -1,87 +1,11 @@
 #[cfg(test)]
 mod tests {
-    // use crate::identity_macro_impl;
     use crate::service_macro::service_macro_impl;
-
-    /*
-    #[test]
-    fn test_identity_macro_impl() {
-        use crate::tests::helpers::assert_tokens_eq;
-        use quote::quote;
-
-        let attr = quote! {
-            #[allow(non_snake_case)]
-        };
-        let before = quote! {
-            mod service {
-                #[action]
-                fn add(a: i32, b: i32) -> i32 {
-                    a + b
-                }
-
-                #[action]
-                fn multiply(a: i32, b: i32) -> i32 {
-                    a * b
-                }
-            }
-        };
-        let expected = quote! {
-            mod service {
-                #[action]
-                fn add(a: i32, b: i32) -> i32 {
-                    a + b
-                }
-
-                #[action]
-                fn multiply(a: i32, b: i32) -> i32 {
-                    a * b
-                }
-            }
-        };
-
-        let after = identity_macro_impl(attr, before);
-        assert_tokens_eq(&expected, &after);
-    }
-    */
-
-    /*
-    #[test]
-    fn test_basic_service_structure() {
-        use crate::tests::helpers::assert_tokens_eq;
-        use quote::quote;
-
-        let attr = quote! {};
-        let before = quote! {
-            mod service {
-                #[action]
-                fn add(a: i32, b: i32) -> i32 {
-                    a + b
-                }
-                #[event(history)]
-                fn something() {
-
-                }
-            }
-        };
-        let expected = quote! {
-            mod service {
-                #[action]
-                fn add(a: i32, b: i32) -> i32 {
-                    a + b
-                }
-            }
-        };
-
-        service_macro_impl(attr, before);
-        // println!("{:#?}", after);
-        // assert_tokens_eq(&expected, &after);
-    }
-    */
 
     #[test]
     #[should_panic]
     // Events can only have one of 3 values: history, ui, or merkle
-    // How to test the error text?
+    // TODO: How to test the error text?
     fn test_event_attribute_parsing_event_type() {
         use quote::quote;
 
@@ -126,7 +50,7 @@ mod tests {
     }
 
     #[test]
-    // service should expand without requiring use to provide its deps
+    // `service` macro should expand without requiring a `use` to provide its deps
     fn test_macro_hygiene() {
         use quote::quote;
 

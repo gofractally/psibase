@@ -25,9 +25,7 @@ pub mod service {
     }
 
     #[pre_action(exclude(init, init2))]
-    // #[pre_action(exclude)]
     fn bobs_init() {
-        // name is not important
         let table = InitTable::new();
         check(
             table.get_index_pk().get(&()).is_some(),
@@ -37,8 +35,6 @@ pub mod service {
 
     #[action]
     fn add(a: i32, b: i32) -> i32 {
-        // expected to be inserted here by macro: check_init();
-        // check_init();
         a + b
     }
 
