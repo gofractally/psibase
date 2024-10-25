@@ -18,9 +18,15 @@ pub mod service {
         table.put(&InitRow {}).unwrap();
     }
 
-    #[pre_action(exclude = "init")]
+    #[action]
+    fn init2() {
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+    }
+
+    #[pre_action(exclude(init, init2))]
     // #[pre_action(exclude)]
-    fn check_initialize() {
+    fn bobs_init() {
         // name is not important
         let table = InitTable::new();
         check(

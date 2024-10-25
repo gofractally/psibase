@@ -1,7 +1,7 @@
-use darling::{ast::NestedMeta, FromMeta};
+use darling::{ast::NestedMeta, util::PathList, FromMeta};
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, ReturnType};
+use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, Path, ReturnType};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -192,7 +192,7 @@ pub fn process_action_schema(
 pub struct PreAction {
     pub exists: bool,
     pub fn_name: Option<Ident>,
-    pub exclude: Option<String>,
+    pub exclude: PathList,
 }
 
 impl Default for PreAction {
@@ -200,7 +200,7 @@ impl Default for PreAction {
         PreAction {
             exists: false,
             fn_name: None,
-            exclude: None,
+            exclude: PathList::from(vec![]),
         }
     }
 }
@@ -221,7 +221,7 @@ fn is_pre_action_attr(attr: &Attribute) -> bool {
 // }
 #[derive(Debug, FromMeta)]
 struct PreActionOptions {
-    exclude: String, // PreActionExclude,
+    exclude: PathList,
 }
 
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
@@ -238,7 +238,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                 // println!("1: processing pre_action_attr args");
                 let attr_args_ts = match pre_action_attr.meta.clone() {
                     Meta::List(args) => {
-                        // println!("List: {:?}", args);
+                        println!("List: {:?}", args);
                         args.tokens
                     }
                     Meta::Path(args) => panic!("expected list; got path."),
@@ -272,7 +272,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                     }
                 };
                 println!("pre-action options: {:?}", options);
-                pre_action_info.exclude = Some(options.exclude);
+                pre_action_info.exclude = options.exclude;
 
                 if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
                     f.attrs.remove(pre_action_pos);
@@ -284,7 +284,11 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
 
 pub fn add_pre_action_call(pre_action_info: &PreAction, f: &mut ItemFn) {
     // println!("adding check_init to {}", f.sig.ident.to_string());
-    if Some(f.sig.ident.to_string()) == pre_action_info.exclude {
+    if pre_action_info
+        .exclude
+        .to_strings()
+        .contains(&f.sig.ident.to_string())
+    {
         println!(
             "{} is in exclude list; skipping adding pre_action call",
             f.sig.ident.to_string()

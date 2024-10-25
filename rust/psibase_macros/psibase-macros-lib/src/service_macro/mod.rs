@@ -162,18 +162,6 @@ fn process_mod(
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
-        // for fn_index in non_action_fns.iter() {
-        //     if let Item::Fn(f) = &mut items[*fn_index] {
-        //         let fn_name = f.sig.ident.to_string();
-        //         if fn_name == "check_init" {
-        //             // println!("found check_init(): {:#?}", fn_name);
-        //             // TODO: Replace this with PreAction mechanism
-        //             has_check_init = true;
-        //         } else {
-        //             // println!("not check_init(): {:#?}", fn_name);
-        //         }
-        //     }
-        // }
 
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
