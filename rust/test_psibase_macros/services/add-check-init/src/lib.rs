@@ -25,7 +25,7 @@ pub mod service {
     }
 
     #[pre_action(exclude(init, init2))]
-    fn bobs_init() {
+    fn check_init() {
         let table = InitTable::new();
         check(
             table.get_index_pk().get(&()).is_some(),
