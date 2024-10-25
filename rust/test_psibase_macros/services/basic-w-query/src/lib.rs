@@ -4,7 +4,6 @@ mod service {
     use psibase::{serve_simple_ui, HttpReply, HttpRequest};
 
     #[action]
-    // TODO: got an error because serde dep wasn't present? Can't I bring this dep along with the macro crate and not require it in a project using the macro?
     fn add(a: i32, b: i32) -> i32 {
         // Wrapper::call() uses and therefore covers the testing of service::Actions
         assert_eq!(mincallrecvr::Wrapper::call().add2(3, 5), 8);
