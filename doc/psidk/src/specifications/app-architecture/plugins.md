@@ -114,7 +114,7 @@ Blockchains typically only have public data. If private client-side data is coll
 
 ### Access to database operations
 
-The psibase plugin host provides a `wasi:keyvalue` interface for plugins to use. However, the wasi-keyvalue interface [proposal](https://github.com/WebAssembly/wasi-keyvalue) is still in stage 2 of standardization, and therefore the implementation provided by the host is subject to change.
+The psibase plugin host provides a `wasi:keyvalue` interface for plugins to use. However, the wasi-keyvalue interface [proposal](https://github.com/WebAssembly/wasi-keyvalue) is still early in the standardization process, and therefore the implementation provided by the host is subject to change.
 
 For more stable interactions with the database, a plugin should import the `clientdata` plugin, which is a wrapper around the host's `wasi:keyvalue` interface.
 
@@ -126,11 +126,13 @@ This `clientdata` plugin provides a high level key/value API for plugins.
     delete: func(key: string);
 ```
 
+Every plugin has its own independent key space, and can only directly read/write its own data. Data may be shared between plugins only if explicilty exposed through the plugin's API.
+
 ### Data backing
 
 The `wasi-keyvalue` implementation currently uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
 
-Note: This imposes a major restriction on the amount of memory available for psibase plugins: Currently there is a hard limit of 5MB for the total amount of data stored in LocalStorage across all psibase apps. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
+Note: This imposes a major restriction on the amount of local data storage available for psibase plugins: Currently there is [a hard limit](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#web_storage) for the total amount of data stored in LocalStorage across all psibase apps in a given browser, since storage across all apps is managed by a single domain. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
 
 ### Persistence
 
