@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Args as _, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
@@ -21,7 +21,7 @@ use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
@@ -33,7 +33,7 @@ use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about, long_about = None, disable_help_flag=true, disable_help_subcommand=true)]
 struct Args {
     /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
@@ -67,8 +67,12 @@ struct Args {
     #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
     console: bool,
 
+    /// Print help
+    #[clap(short = 'h', long, num_args=0..)]
+    help: Option<Vec<OsString>>,
+
     #[clap(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -256,6 +260,9 @@ enum Command {
     /// Setup the psibase local config file
     #[command(subcommand)]
     Config(ConfigCommand),
+
+    /// Print help for the subcommands
+    Help { command: Vec<OsString> },
 
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -1160,6 +1167,23 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+fn get_external(name: &OsString) -> Option<&str> {
+    name.to_str()?
+        .strip_prefix("psibase-")?
+        .strip_suffix(".wasm")
+}
+
+fn list_external() -> Result<Vec<String>, anyhow::Error> {
+    let command_path = data_directory()?.join("wasm");
+    let mut result = Vec::new();
+    for dir in command_path.read_dir()? {
+        if let Some(name) = get_external(&dir?.file_name()) {
+            result.push(name.to_string())
+        }
+    }
+    Ok(result)
+}
+
 fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
     let psitest = find_psitest();
     let command_path = data_directory()?.join("wasm");
@@ -1177,6 +1201,53 @@ fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
         .arg(wasm_file)
         .args(&args[1..])
         .exec())?
+}
+
+fn get_subcommand<'a, I: Iterator<Item = &'a OsString>>(
+    mut iter: I,
+    command: &mut clap::Command,
+) -> Option<&mut clap::Command> {
+    if let Some(name) = iter.next() {
+        if let Some(subcommand) = command.find_subcommand_mut(name) {
+            get_subcommand(iter, subcommand)
+        } else {
+            None
+        }
+    } else {
+        Some(command)
+    }
+}
+
+fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    if !subcommand.is_empty() {
+        command.build();
+        let mut iter = subcommand.iter();
+        if let Some(command) = command.find_subcommand_mut(iter.next().unwrap()) {
+            if let Some(command) = get_subcommand(iter, command) {
+                command.print_help()?;
+            } else {
+                return Err(anyhow!(
+                    "unrecognized subcommand '{}'",
+                    subcommand.join(OsStr::new(" ")).to_string_lossy()
+                ));
+            }
+        } else {
+            let mut subcommand: Vec<_> = subcommand.iter().cloned().collect();
+            subcommand.push(OsStr::new("--help").to_os_string());
+            handle_external(&subcommand)?;
+        }
+    } else {
+        if let Ok(subcommands) = list_external() {
+            for sub in subcommands {
+                command = command.subcommand(clap::Command::new(sub));
+            }
+        }
+        command.build();
+        command.print_help()?;
+    }
+    Ok(())
 }
 
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
@@ -1197,7 +1268,13 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let (client, _proxy) = build_client(&args).await?;
-    match &args.command {
+    if let Some(help) = &args.help {
+        return print_help(help);
+    }
+    let Some(command) = &args.command else {
+        return print_help(&[]);
+    };
+    match command {
         Command::Boot {
             key,
             producer,
@@ -1298,6 +1375,7 @@ async fn main() -> Result<(), anyhow::Error> {
             mode,
         } => create_token(Duration::seconds(*expires_after), mode)?,
         Command::Config(config) => handle_cli_config_cmd(config)?,
+        Command::Help { command } => print_help(command)?,
         Command::External(argv) => handle_external(argv)?,
     }
 
