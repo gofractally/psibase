@@ -4,10 +4,7 @@ mod events;
 mod graphql;
 mod tables;
 
-use actions::{
-    add_pre_action_call, check_for_pre_action, process_action_args, process_action_callers,
-    process_action_schema, Options, PreAction,
-};
+use actions::{process_action_args, process_action_callers, process_action_schema, Options};
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
 use dispatch::{add_unknown_action_check_to_dispatch_body, process_dispatch_body};
@@ -23,17 +20,12 @@ use syn::{parse_quote, AttrStyle, Attribute, Ident, Item, ItemMod, ReturnType, T
 use tables::{is_table_attr, process_service_tables};
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    // println!("attr: {:#?}", attr);
     let attr_args = match NestedMeta::parse_meta_list(attr) {
-        Ok(v) => {
-            // println!("v in match: {:#?}", v);
-            v
-        }
+        Ok(v) => v,
         Err(e) => {
             return TokenStream::from(Error::from(e).write_errors());
         }
     };
-    // println!("attr_args: {:#?}", attr_args);
 
     let mut options: Options = match Options::from_list(&attr_args) {
         Ok(val) => val,
@@ -90,14 +82,12 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
-    let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
-        check_for_pre_action(&mut pre_action_info, items);
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
                 if s.attrs.iter().any(is_table_attr) {
@@ -109,13 +99,7 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
-                    // println!(
-                    //     "adding action fn: {} w {} lines",
-                    //     f.sig.ident.to_string(),
-                    //     f.block.stmts.len()
-                    // )
                 } else {
-                    // println!("Pushing this item into non_actions:\n{:#?}", f.sig.ident);
                     non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
@@ -156,7 +140,6 @@ fn process_mod(
             }
         }
 
-        // let mut has_check_init = false;
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
@@ -167,15 +150,6 @@ fn process_mod(
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
-                if pre_action_info.exists {
-                    // TODO: add only-if-not-excluded
-                    add_pre_action_call(&pre_action_info, f);
-                    // println!(
-                    //     "1 : 1st line of {} is {:#?}",
-                    //     f.sig.ident.to_string(),
-                    //     f.block.stmts[0].clone()
-                    // );
-                }
                 process_action_args(
                     options,
                     false,
@@ -205,11 +179,6 @@ fn process_mod(
                     // If this is an action, remove the action attribute
                     f.attrs.remove(i);
                 }
-                // println!(
-                //     "2 : 1st line of {} is {:#?}",
-                //     f.sig.ident.to_string(),
-                //     f.block.stmts[0].clone()
-                // );
             }
         }
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
@@ -777,19 +746,6 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
-    // let Some(_, ItemMod { _, _, _, _, i, c, _}) = impl_mod.content;
-    // println!("final impl_mod.content {:#?}", impl_mod.content);
-    // if let Some((_, items)) = &mut impl_mod.content {
-    //     for (_, item) in items.iter_mut().enumerate() {
-    //         if let Item::Fn(f) = item {
-    //             println!(
-    //                 "{}.stmts[0]: {:#?}",
-    //                 f.sig.ident.to_string(),
-    //                 f.block.stmts[0]
-    //             );
-    //         }
-    //     }
-    // }
     quote! {
         #silence
         #impl_mod
