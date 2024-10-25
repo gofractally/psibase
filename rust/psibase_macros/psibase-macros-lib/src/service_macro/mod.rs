@@ -156,29 +156,31 @@ fn process_mod(
             }
         }
 
-        let mut has_check_init = false;
+        // let mut has_check_init = false;
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
-        for fn_index in non_action_fns.iter() {
-            if let Item::Fn(f) = &mut items[*fn_index] {
-                let fn_name = f.sig.ident.to_string();
-                if fn_name == "check_init" {
-                    // println!("found check_init(): {:#?}", fn_name);
-                    has_check_init = true;
-                } else {
-                    // println!("not check_init(): {:#?}", fn_name);
-                }
-            }
-        }
+        // for fn_index in non_action_fns.iter() {
+        //     if let Item::Fn(f) = &mut items[*fn_index] {
+        //         let fn_name = f.sig.ident.to_string();
+        //         if fn_name == "check_init" {
+        //             // println!("found check_init(): {:#?}", fn_name);
+        //             // TODO: Replace this with PreAction mechanism
+        //             has_check_init = true;
+        //         } else {
+        //             // println!("not check_init(): {:#?}", fn_name);
+        //         }
+        //     }
+        // }
 
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
-                if has_check_init {
+                if pre_action_info.exists {
+                    // TODO: add only-if-not-excluded
                     add_pre_action_call(&pre_action_info, f);
                     // println!(
                     //     "1 : 1st line of {} is {:#?}",

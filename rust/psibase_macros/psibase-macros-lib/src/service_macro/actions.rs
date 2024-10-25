@@ -1,7 +1,7 @@
-use darling::FromMeta;
+use darling::{ast::NestedMeta, FromMeta};
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Pat, ReturnType};
+use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, ReturnType};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -192,13 +192,15 @@ pub fn process_action_schema(
 pub struct PreAction {
     pub exists: bool,
     pub fn_name: Option<Ident>,
+    pub exclude: Option<String>,
 }
 
 impl Default for PreAction {
     fn default() -> Self {
-        Self {
+        PreAction {
             exists: false,
             fn_name: None,
+            exclude: None,
         }
     }
 }
@@ -212,12 +214,66 @@ fn is_pre_action_attr(attr: &Attribute) -> bool {
     false
 }
 
+// #[derive(Debug, FromMeta)]
+// enum PreActionExclude {
+//     String,
+//     Vec(String),
+// }
+#[derive(Debug, FromMeta)]
+struct PreActionOptions {
+    exclude: String, // PreActionExclude,
+}
+
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
+    println!("check_for_pre_action().top");
     for (_item_index, item) in items.iter_mut().enumerate() {
         if let Item::Fn(f) = item {
             if f.attrs.iter().any(is_pre_action_attr) {
+                let temp = f.attrs.clone();
+                let pre_action_attr = temp.iter().find(|el| is_pre_action_attr(el)).unwrap();
+                // println!("pre_action_attr {:?}", pre_action_attr);
                 pre_action_info.exists = true;
                 pre_action_info.fn_name = Some(f.sig.ident.clone());
+                //TODO: decode attrs and get `exclude` arg
+                // println!("1: processing pre_action_attr args");
+                let attr_args_ts = match pre_action_attr.meta.clone() {
+                    Meta::List(args) => {
+                        // println!("List: {:?}", args);
+                        args.tokens
+                    }
+                    Meta::Path(args) => panic!("expected list; got path."),
+                    Meta::NameValue(args) => {
+                        // println!("NameValue: {:?}", args);
+                        args.value.to_token_stream()
+                    }
+                };
+                let attr_args = match NestedMeta::parse_meta_list(attr_args_ts) {
+                    Ok(v) => {
+                        // println!("v in match: {:#?}", v);
+                        v
+                    }
+                    Err(e) => {
+                        // TODO: how to handle macro errors/reporting better?
+                        println!(
+                            "about to panic; error in parse_meta_list(); err {}",
+                            e.to_string()
+                        );
+                        panic!("Error parsing pre_action arguments");
+                    }
+                };
+                println!("2: parsing attr args into options...");
+                // println!("attr_args: {:#?}", attr_args);
+
+                let mut options: PreActionOptions = match PreActionOptions::from_list(&attr_args) {
+                    Ok(val) => val,
+                    Err(err) => {
+                        panic!("Error parsing pre_action arguments");
+                        // return err.write_errors().into();
+                    }
+                };
+                println!("pre-action options: {:?}", options);
+                pre_action_info.exclude = Some(options.exclude);
+
                 if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
                     f.attrs.remove(pre_action_pos);
                 }
@@ -228,6 +284,13 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
 
 pub fn add_pre_action_call(pre_action_info: &PreAction, f: &mut ItemFn) {
     // println!("adding check_init to {}", f.sig.ident.to_string());
+    if Some(f.sig.ident.to_string()) == pre_action_info.exclude {
+        println!(
+            "{} is in exclude list; skipping adding pre_action call",
+            f.sig.ident.to_string()
+        );
+        return;
+    }
     let fn_name = pre_action_info.fn_name.clone();
     let new_line_ts = quote! {
         #fn_name();

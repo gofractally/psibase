@@ -19,7 +19,8 @@ pub mod service {
     }
 
     #[pre_action(exclude = "init")]
-    fn check_init() {
+    // #[pre_action(exclude)]
+    fn check_initialize() {
         // name is not important
         let table = InitTable::new();
         check(
