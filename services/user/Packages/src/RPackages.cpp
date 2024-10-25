@@ -4,8 +4,6 @@
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthDelegate.hpp>
 
-using Tables = psibase::ServiceTables<psibase::WebContentTable>;
-
 using namespace SystemService;
 
 namespace UserService
@@ -135,16 +133,7 @@ namespace UserService
          return result;
       if (auto result = servePackageManifest(request))
          return result;
-      if (auto result = psibase::serveContent(request, Tables{psibase::getReceiver()}))
-         return result;
       return std::nullopt;
-   }
-
-   void RPackages::storeSys(std::string path, std::string contentType, std::vector<char> content)
-   {
-      psibase::check(psibase::getSender() == psibase::getReceiver(), "wrong sender");
-      psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                            Tables{psibase::getReceiver()});
    }
 }  // namespace UserService
 

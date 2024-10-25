@@ -11,6 +11,5 @@ psibase standard action names end with `Sys` or `_Sys` (case insensitive). Do no
 The following standard actions exist for both Rust and C++, though only the C++ code examples are listed below.
 
 - *serveSys* - `optional<HttpReply> serveSys(HttpRequest request)`
-- *storeSys* - `void storeSys(std::string path, std::string contentType, std::vector<char> content)`
 
 > ➕ TODO - Document other standard actions

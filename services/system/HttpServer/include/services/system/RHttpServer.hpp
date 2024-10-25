@@ -9,9 +9,7 @@ namespace SystemService
       static constexpr auto service = psibase::AccountNumber("rhttp-server");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
    };
    PSIO_REFLECT(RHttpServer,  //
-                method(serveSys, request),
-                method(storeSys, path, contentType, content))
+                method(serveSys, request))
 }  // namespace SystemService

@@ -10,7 +10,12 @@ publish = false
 [dependencies]
 wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
 psibase = { path = "../../../../rust/psibase/" }
-chainmail = { path = "../service/" }
+chainmail = { path = "../service" }
+serde_json = "1.0.128"
+serde = "1.0.210"
+
+[dev-dependencies]
+chainmail_package = { path = "..", version = "0.13.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -24,6 +29,3 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-
-[dev-dependencies]
-chainmail_package = { path = "..", version = "0.12.0" }

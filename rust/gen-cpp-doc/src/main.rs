@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fmt::Write as FmtWrite;
 use std::io;
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -784,6 +785,16 @@ fn get_clang_include_dir(wasi_sdk_prefix: &str) -> String {
     path
 }
 
+fn get_wasi_include_dir(wasi_sdk_prefix: &str) -> String {
+    let dir = wasi_sdk_prefix.to_owned() + "/share/wasi-sysroot/include";
+    let wasm32_wasi_dir = dir.clone() + "/wasm32-wasi";
+    if Path::new(&wasm32_wasi_dir).exists() {
+        wasm32_wasi_dir
+    } else {
+        dir
+    }
+}
+
 fn parse<'tu>(
     index: &'tu clang::Index<'tu>,
     repo_path: &str,
@@ -791,6 +802,7 @@ fn parse<'tu>(
 ) -> Result<TranslationUnit<'tu>, anyhow::Error> {
     let mut parser = index.parser(repo_path.to_owned() + "/doc/psidk/src/doc-root.cpp");
     let wasi_sdk_prefix = env::var("WASI_SDK_PREFIX")?;
+    let wasi_include_dir = get_wasi_include_dir(&wasi_sdk_prefix);
     let clang_include_dir = get_clang_include_dir(&wasi_sdk_prefix);
     parser.arguments(&[
         "-fcolor-diagnostics",
@@ -804,8 +816,8 @@ fn parse<'tu>(
         "-nostdlib++",
         "-DCOMPILING_SERVICE",
         "-DCOMPILING_WASM",
-        &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include/c++/v1"),
-        &("-I".to_owned() + &wasi_sdk_prefix + "/share/wasi-sysroot/include"),
+        &("-I".to_owned() + &wasi_include_dir + "/c++/v1"),
+        &("-I".to_owned() + &wasi_include_dir),
         &("-I".to_owned() + &clang_include_dir),
         &("-I".to_owned() + build_path + "/wasm/boost"),
         &("-I".to_owned() + build_path + "/wasm/deps/include"),

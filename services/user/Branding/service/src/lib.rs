@@ -2,9 +2,8 @@
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, check, get_sender, get_service, serve_content, serve_graphql,
-        store_content, Fracpack, HexBytes, HttpReply, HttpRequest, SingletonKey,
-        Table, ToSchema, WebContentRow,
+        anyhow, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
+        Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -28,9 +27,6 @@ mod service {
             }
         }
     }
-
-    #[table(record = "WebContentRow", index = 1)]
-    struct WebContentTable;
 
     #[action]
     #[allow(non_snake_case)]
@@ -58,15 +54,6 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_content(&request, &WebContentTable::new()))
-            .or_else(|| serve_graphql(&request, Query))
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn storeSys(path: String, contentType: String, content: HexBytes) {
-        check(get_sender() == get_service(), "unauthorized");
-        let table = WebContentTable::new();
-        store_content(path, contentType, content, &table).unwrap();
+        None.or_else(|| serve_graphql(&request, Query))
     }
 }

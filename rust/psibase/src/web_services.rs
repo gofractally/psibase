@@ -30,51 +30,14 @@ pub mod server_interface {
     /// - Abort. psinode produces a 500 response with the service's abort message.
     /// - Return a [psibase::HttpReply](crate::HttpReply). psinode produces a 200 response with the body and contentType returned.
     /// - Call other services.
+    /// - Call `http-server::sendReply`. Explicitly sends a response.
+    /// - Call `http-server::deferReply`. No response will be produced until `http-server::sendReply` is called.
     ///
     /// A service runs in RPC mode while serving an HTTP request. This mode prevents database writes,
     /// but allows database reads, including reading data and events which are normally not available
     /// to services; see [psibase::DbId](crate::DbId).
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        unimplemented!()
-    }
-}
-
-/// Interface for services which support storing files
-///
-/// Some services support storing files which they then serve via HTTP.
-/// This is the standard interface for these services.
-///
-/// To implement this interface, add a [storeSys](StorageActions::storeSys)
-/// action to your service.
-#[crate::service(
-    name = "example-store",
-    actions = "StorageActions",
-    wrapper = "StorageWrapper",
-    structs = "storage_action_structs",
-    dispatch = false,
-    pub_constant = false,
-    psibase_mod = "crate"
-)]
-#[allow(non_snake_case, unused_variables)]
-pub mod storage_interface {
-    use crate::Hex;
-
-    /// Store a file
-    ///
-    /// Define this action in your service to handle file storage requests. This action
-    /// should store the file in the service's tables. The service can then serve these
-    /// files via HTTP.
-    ///
-    /// - `path`: absolute path to file. e.g. `/index.html` for the main page
-    /// - `contentType`: `text/html`, `text/javascript`, `application/octet-stream`, ...
-    /// - `content`: file content
-    ///
-    /// The `psibase upload` command uses this action.
-    ///
-    /// (TODO) simplifies implementing this.
-    #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
     }
 }

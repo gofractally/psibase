@@ -159,9 +159,6 @@ enum Command {
 
     /// Upload a file to a service
     Upload {
-        /// Service to upload to
-        service: ExactAccountNumber,
-
         /// Source filename to upload
         source: String,
 
@@ -176,9 +173,9 @@ enum Command {
         #[clap(short = 'r', long)]
         recursive: bool,
 
-        /// Sender to use; defaults to <SERVICE>
-        #[clap(short = 'S', long, value_name = "SENDER")]
-        sender: Option<ExactAccountNumber>,
+        /// Sender to use (required). Files are uploaded to this account's subdomain.
+        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+        sender: ExactAccountNumber,
     },
 
     /// Install apps to the chain
@@ -271,14 +268,8 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-fn store_sys(
-    service: AccountNumber,
-    sender: AccountNumber,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
-) -> Action {
-    sites::Wrapper::pack_from_to(sender, service).storeSys(
+fn store_sys(sender: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
+    sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
         path.to_string(),
         content_type.to_string(),
         content.to_vec().into(),
@@ -453,18 +444,11 @@ async fn deploy(
 async fn upload(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     content_type: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let deduced_content_type = match content_type {
         Some(t) => t.clone(),
         None => {
@@ -487,8 +471,7 @@ async fn upload(
     };
 
     let actions = vec![store_sys(
-        service,
-        sender,
+        sender.into(),
         &normalized_dest,
         &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
@@ -514,7 +497,6 @@ async fn upload(
 }
 
 fn fill_tree(
-    service: AccountNumber,
     sender: AccountNumber,
     actions: &mut Vec<(String, Action)>,
     dest: &str,
@@ -529,7 +511,6 @@ fn fill_tree(
             actions.push((
                 dest.to_owned(),
                 store_sys(
-                    service,
                     sender,
                     dest,
                     t.essence_str(),
@@ -547,14 +528,7 @@ fn fill_tree(
         for path in read_dir(source)? {
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
-            fill_tree(
-                service,
-                sender,
-                actions,
-                &d,
-                path.path().to_str().unwrap(),
-                false,
-            )?;
+            fill_tree(sender, actions, &d, path.path().to_str().unwrap(), false)?;
         }
     } else {
         if top {
@@ -721,28 +695,14 @@ fn normalize_upload_path(path: &Option<String>) -> String {
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let normalized_dest = normalize_upload_path(dest);
 
     let mut actions = Vec::new();
-    fill_tree(
-        service,
-        sender,
-        &mut actions,
-        &normalized_dest,
-        source,
-        true,
-    )?;
+    fill_tree(sender.into(), &mut actions, &normalized_dest, source, true)?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
@@ -1242,7 +1202,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .await?
         }
         Command::Upload {
-            service,
             source,
             dest,
             content_type,
@@ -1253,18 +1212,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 if content_type.is_some() {
                     return Err(anyhow!("--recursive is incompatible with --content-type"));
                 }
-                upload_tree(&args, client, (*service).into(), *sender, dest, source).await?
+                upload_tree(&args, client, *sender, dest, source).await?
             } else {
-                upload(
-                    &args,
-                    client,
-                    (*service).into(),
-                    *sender,
-                    dest,
-                    content_type,
-                    source,
-                )
-                .await?
+                upload(&args, client, *sender, dest, content_type, source).await?
             }
         }
         Command::Install {
