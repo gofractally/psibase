@@ -47,11 +47,11 @@ pub struct HttpRequest {
     /// "application/json", "text/html", ...
     pub contentType: String,
 
-    /// Request body, e.g. POST data
-    pub body: Hex<Vec<u8>>,
-
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
+
+    /// Request body, e.g. POST data
+    pub body: Hex<Vec<u8>>,
 }
 
 pub struct HttpBody {

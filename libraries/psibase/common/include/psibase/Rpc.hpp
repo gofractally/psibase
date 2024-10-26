@@ -25,9 +25,9 @@ namespace psibase
       std::string             method;       ///< "GET" or "POST"
       std::string             target;       ///< Absolute path, e.g. "/index.js"
       std::string             contentType;  ///< "application/json", "text/html", ...
-      std::vector<char>       body;         ///< Request body, e.g. POST data
       std::vector<HttpHeader> headers;      ///< HTTP Headers
-      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body, headers)
+      std::vector<char>       body;         ///< Request body, e.g. POST data
+      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, headers, body)
    };
 
    enum class HttpStatus : std::uint16_t
