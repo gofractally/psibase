@@ -1,8 +1,7 @@
 pub use crate::services::auth_sig::SubjectPublicKeyInfo;
-use crate::AccountNumber;
+use crate::{account, AccountNumber};
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -45,9 +44,8 @@ pub struct NewAccountRecord {
     invitee: AccountNumber,
 }
 
-lazy_static! {
-    pub static ref PAYER_ACCOUNT: AccountNumber = AccountNumber::from("invited-sys");
-}
+use crate as psibase;
+pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
 
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]

@@ -2426,7 +2426,6 @@ dependencies = [
  "indexmap 2.2.6",
  "indicatif",
  "jwt",
- "lazy_static",
  "mime_guess",
  "pem",
  "percent-encoding",

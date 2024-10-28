@@ -1483,7 +1483,6 @@ dependencies = [
  "indexmap",
  "indicatif",
  "jwt",
- "lazy_static",
  "mime_guess",
  "pem",
  "percent-encoding",

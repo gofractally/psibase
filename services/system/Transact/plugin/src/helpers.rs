@@ -51,18 +51,19 @@ fn get_claims(
     actions: &[PartialAction],
 ) -> Result<Vec<SmartAuth::Claim>, Host::types::Error> {
     let sender_str = sender.to_string();
-    let mut claims: Vec<SmartAuth::Claim> = vec![];
 
-    // If the sender is not the invite payer, then we must get claims/proofs from their auth service
-    if *sender != *services::invite::PAYER_ACCOUNT {
-        let account_details = get_account(&sender_str)?.unwrap();
-        let plugin_ref = Host::types::PluginRef::new(&account_details.auth_service);
-        claims = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
-    }
+    // Get claims from their auth service
+    let auth_service_acc = get_account(&sender_str)?.unwrap().auth_service;
+    let plugin_ref = Host::types::PluginRef::new(&auth_service_acc);
+    let mut claims = SmartAuth::get_claims(plugin_ref, &sender_str, actions)?;
 
-    // Also get proofs from any auth notifiers
+    // Also get claims from any auth notifiers
     let auth_plugins = AuthPlugins::get();
     for plugin in auth_plugins {
+        if plugin == auth_service_acc {
+            continue;
+        }
+
         let plugin_ref = Host::types::PluginRef::new(&plugin);
 
         // An auth notifier should not be privy to the full action list, only its own actions
@@ -110,7 +111,7 @@ pub fn get_tx_sender(actions: &[PartialAction]) -> Result<AccountNumber, Host::t
                 && (a.method == InviteService::acceptCreate::ACTION_NAME
                     || a.method == InviteService::reject::ACTION_NAME)
             {
-                return Ok(*services::invite::PAYER_ACCOUNT);
+                return Ok(services::invite::PAYER_ACCOUNT);
             }
         }
     }
@@ -133,18 +134,19 @@ pub fn get_proofs(
     tx_hash: &[u8; 32],
 ) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
     let sender_str = sender.to_string();
-    let mut proofs: Vec<SmartAuth::Proof> = vec![];
 
-    // If the sender is not the invite payer, then we must get claims/proofs from their auth service
-    if *sender != *services::invite::PAYER_ACCOUNT {
-        let account_details = get_account(&sender_str)?.unwrap();
-        let plugin_ref = Host::types::PluginRef::new(&account_details.auth_service);
-        proofs = SmartAuth::get_proofs(plugin_ref, &sender_str, tx_hash)?;
-    }
+    // Get proofs from the sender's auth service
+    let auth_service_acc = get_account(&sender_str)?.unwrap().auth_service;
+    let plugin_ref = Host::types::PluginRef::new(&auth_service_acc);
+    let mut proofs = SmartAuth::get_proofs(plugin_ref, &sender_str, tx_hash)?;
 
-    // Also get proofs from any other auth plugins that were used to add claims to the transaction
+    // Also get proofs from any auth notifiers
     let auth_plugins = AuthPlugins::get();
     for plugin in auth_plugins {
+        if plugin == auth_service_acc {
+            continue;
+        }
+
         let plugin_ref = Host::types::PluginRef::new(&plugin);
         let mut p = SmartAuth::get_proofs(plugin_ref, &sender_str, tx_hash)?;
         proofs.append(&mut p);
