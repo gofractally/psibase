@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Args as _, Parser, Subcommand};
+use clap::{Args as _, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
@@ -33,7 +33,7 @@ use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None, disable_help_flag=true, disable_help_subcommand=true)]
+#[clap(author, version, about, long_about = None)]
 struct Args {
     /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
@@ -68,7 +68,7 @@ struct Args {
     console: bool,
 
     /// Print help
-    #[clap(short = 'h', long, num_args=0..)]
+    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
     help: Option<Vec<OsString>>,
 
     #[clap(subcommand)]
@@ -1184,6 +1184,22 @@ fn list_external() -> Result<Vec<String>, anyhow::Error> {
     Ok(result)
 }
 
+fn unrecognized_subcommand(command: &mut clap::Command, name: &OsString) -> ! {
+    let mut command = std::mem::take(command)
+        .disable_help_subcommand(false)
+        .disable_help_flag(false);
+    let mut err = clap::Error::new(clap::error::ErrorKind::InvalidSubcommand).with_cmd(&command);
+    err.insert(
+        clap::error::ContextKind::InvalidSubcommand,
+        clap::error::ContextValue::String(name.to_string_lossy().to_string()),
+    );
+    err.insert(
+        clap::error::ContextKind::Usage,
+        clap::error::ContextValue::StyledStr(command.render_usage()),
+    );
+    err.exit();
+}
+
 fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
     let psitest = find_psitest();
     let command_path = data_directory()?.join("wasm");
@@ -1192,10 +1208,12 @@ fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
     filename.push(".wasm");
     let wasm_file = command_path.join(filename);
     if !wasm_file.is_file() {
-        return Err(anyhow!(
-            "unrecognized subcommand '{}'",
-            args[0].to_string_lossy()
-        ));
+        let command = clap::Command::new("psibase");
+        let mut command = Args::augment_args(command)
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
+        command.build();
+        unrecognized_subcommand(&mut command, &args[0]);
     }
     Err(std::process::Command::new(psitest)
         .arg(wasm_file)
@@ -1203,18 +1221,18 @@ fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
         .exec())?
 }
 
-fn get_subcommand<'a, I: Iterator<Item = &'a OsString>>(
+fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
     mut iter: I,
     command: &mut clap::Command,
-) -> Option<&mut clap::Command> {
+) {
     if let Some(name) = iter.next() {
         if let Some(subcommand) = command.find_subcommand_mut(name) {
-            get_subcommand(iter, subcommand)
+            print_subcommand_help(iter, subcommand)
         } else {
-            None
+            unrecognized_subcommand(command, name);
         }
     } else {
-        Some(command)
+        command.print_help().unwrap();
     }
 }
 
@@ -1225,20 +1243,16 @@ fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
         command.build();
         let mut iter = subcommand.iter();
         if let Some(command) = command.find_subcommand_mut(iter.next().unwrap()) {
-            if let Some(command) = get_subcommand(iter, command) {
-                command.print_help()?;
-            } else {
-                return Err(anyhow!(
-                    "unrecognized subcommand '{}'",
-                    subcommand.join(OsStr::new(" ")).to_string_lossy()
-                ));
-            }
+            print_subcommand_help(iter, command);
         } else {
             let mut subcommand: Vec<_> = subcommand.iter().cloned().collect();
             subcommand.push(OsStr::new("--help").to_os_string());
             handle_external(&subcommand)?;
         }
     } else {
+        command = command
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
         if let Ok(subcommands) = list_external() {
             for sub in subcommands {
                 command = command.subcommand(clap::Command::new(sub));
@@ -1248,6 +1262,16 @@ fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
         command.print_help()?;
     }
     Ok(())
+}
+
+fn parse_args() -> Result<Args, anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    command.build();
+    command = command
+        .disable_help_subcommand(true)
+        .disable_help_flag(true);
+    Ok(Args::from_arg_matches(&command.get_matches())?)
 }
 
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
@@ -1266,7 +1290,7 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let args = Args::parse();
+    let args = parse_args()?;
     let (client, _proxy) = build_client(&args).await?;
     if let Some(help) = &args.help {
         return print_help(help);
