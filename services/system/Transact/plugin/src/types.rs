@@ -4,8 +4,8 @@ use psibase::{AccountNumber, Hex, Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-impl From<&SmartAuth::Claim> for psibase::Claim {
-    fn from(claim: &SmartAuth::Claim) -> Self {
+impl From<SmartAuth::Claim> for psibase::Claim {
+    fn from(claim: SmartAuth::Claim) -> Self {
         psibase::Claim {
             service: AccountNumber::from(claim.verify_service.as_str()),
             rawData: Hex::from(claim.raw_data.clone()),

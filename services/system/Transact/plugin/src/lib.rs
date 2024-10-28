@@ -77,7 +77,7 @@ impl Admin for TransactPlugin {
         CurrentActions::clear();
 
         let sender = get_tx_sender(&actions)?;
-        let tx = make_transaction(&actions, sender, 10);
+        let tx = make_transaction(actions, sender, 10);
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs(&sender, &sha256(&tx.packed()))?,

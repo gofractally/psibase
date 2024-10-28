@@ -30,7 +30,7 @@ pub fn assert_from_supervisor() {
     assert!(sender_app == "supervisor", "Unauthorized");
 }
 
-fn inject_sender(actions: &[PartialAction], sender: AccountNumber) -> Vec<psibase::Action> {
+fn inject_sender(actions: Vec<PartialAction>, sender: AccountNumber) -> Vec<psibase::Action> {
     actions
         .into_iter()
         .map(|a| psibase::Action {
@@ -82,12 +82,12 @@ fn get_claims(
 }
 
 pub fn make_transaction(
-    actions: &[SmartAuth::Action],
+    actions: Vec<SmartAuth::Action>,
     sender: AccountNumber,
     expiration_seconds: u64,
 ) -> Transaction {
     let claims = get_claims(&sender, &actions).expect("Failed to retrieve claims from auth plugin");
-    let claims: Vec<psibase::Claim> = claims.iter().map(|c| c.into()).collect();
+    let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
     let actions = inject_sender(actions, sender);
 
     let t = Transaction {
