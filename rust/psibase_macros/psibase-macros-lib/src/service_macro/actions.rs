@@ -1,7 +1,7 @@
 use darling::{ast::NestedMeta, util::PathList, FromMeta};
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, Path, ReturnType};
+use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, ReturnType};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -214,11 +214,6 @@ fn is_pre_action_attr(attr: &Attribute) -> bool {
     false
 }
 
-// #[derive(Debug, FromMeta)]
-// enum PreActionExclude {
-//     String,
-//     Vec(String),
-// }
 #[derive(Debug, FromMeta)]
 struct PreActionOptions {
     exclude: PathList,
@@ -241,36 +236,40 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                         // println!("List: {:?}", args);
                         args.tokens
                     }
-                    Meta::Path(args) => panic!("expected list; got path."),
+                    Meta::Path(args) => abort!(
+                        args,
+                        "Invalid pre_action attributes: expected list; got path."
+                    ),
                     Meta::NameValue(args) => {
                         // println!("NameValue: {:?}", args);
                         args.value.to_token_stream()
                     }
                 };
-                let attr_args = match NestedMeta::parse_meta_list(attr_args_ts) {
+                let attr_args = match NestedMeta::parse_meta_list(attr_args_ts.clone()) {
                     Ok(v) => {
                         // println!("v in match: {:#?}", v);
                         v
                     }
                     Err(e) => {
-                        // TODO: how to handle macro errors/reporting better?
-                        // println!(
-                        //     "about to panic; error in parse_meta_list(); err {}",
-                        //     e.to_string()
-                        // );
-                        panic!("Error parsing pre_action arguments");
+                        abort!(
+                            attr_args_ts,
+                            format!("Invalid pre_action arguments: {}", e.to_string())
+                        );
                     }
                 };
                 // println!("2: parsing attr args into options...");
                 // println!("attr_args: {:#?}", attr_args);
 
-                let mut options: PreActionOptions = match PreActionOptions::from_list(&attr_args) {
-                    Ok(val) => val,
-                    Err(err) => {
-                        panic!("Error parsing pre_action arguments");
-                        // return err.write_errors().into();
-                    }
-                };
+                let options: PreActionOptions =
+                    match PreActionOptions::from_list(&attr_args.clone()) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            abort!(
+                                attr_args_ts,
+                                format!("Invalid pre_action arguments: {}", err.to_string())
+                            );
+                        }
+                    };
                 // println!("pre-action options: {:?}", options);
                 pre_action_info.exclude = options.exclude;
 
