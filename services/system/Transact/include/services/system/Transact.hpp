@@ -246,7 +246,10 @@ namespace SystemService
       /// Called by native code at the beginning of each block
       void startBlock();
 
-      /// Sets the time between automatic snapshots
+      /// Sets the time between snapshots
+      ///
+      /// A value of 0 will disable snapshots. This is a chain-wide
+      /// setting because snapshots are signed by the block producers.
       void setSnapTime(std::uint32_t seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
