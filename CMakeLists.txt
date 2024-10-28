@@ -214,20 +214,21 @@ add_custom_target(
     doc
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-)
-add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-)
-add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
+
+function(add_manpage name)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/${name}.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/${name}.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
+    )
+    add_custom_target(${name}.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1 TYPE MAN COMPONENT Client)
+endfunction()
+
+add_manpage(psinode)
+add_manpage(psibase)
+add_manpage(psibase-create-snapshot)
+add_manpage(psibase-load-snapshot)
 
 # Cargo psibase
 ExternalProject_Add(

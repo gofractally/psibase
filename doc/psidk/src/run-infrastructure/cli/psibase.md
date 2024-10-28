@@ -16,6 +16,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
+`psibase` *subcommand* [*args*\.\.\.]  
 
 ## DESCRIPTION
 
@@ -255,3 +256,23 @@ Create an access token. `psibase` will prompt for the key to use to sign the tok
 - `-m`, `--mode` *mode*
 
   The permissions granted by the token. Should be `r` or `rw`. The default is `rw`.
+
+### Custom Commands
+
+`psibase` *subcommand* [*args*\.\.\.]__
+
+Additional `psibase` subcommands can be implemented in WASM. They will be found in *$PREFIX/share/psibase/wasm/*.
+
+## FILES
+
+- *$PREFIX/share/psibase/packages/index.json*
+
+  Local package repository
+
+- *$PREFIX/share/psibase/wasm/psibase-\*.wasm*
+
+  Custom subcommands
+
+## SEE ALSO
+
+[`psibase-create-snapshot`(1)](psibase-create-snapshot.md), [`psibase-load-snapshot`(1)](psibase-load-snapshot.md)

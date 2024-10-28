@@ -214,7 +214,8 @@ static const char* usage_brief =
     "Usage: psibase create-snapshot [-s KEY]... DATABASE SNAPSHOT-FILE";
 
 static auto usage_full = R"(
-Writes a snapshot of the chain to a file
+Writes a snapshot of the chain to a file. The snapshot will hold the the most
+recent state that is signed by the block producers.
 
 Options:
   -s, --sign KEY-FILE   Signs the snapshot with this key

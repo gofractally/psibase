@@ -73,6 +73,8 @@
   - [Administration](run-infrastructure/administration.md)
   - [Command-line utilities](run-infrastructure/cli/README.md)
     - [psibase](run-infrastructure/cli/psibase.md)
+      - [psibase-create-snapshot](run-infrastructure/cli/psibase-create-snapshot.md)
+      - [psibase-load-snapshot](run-infrastructure/cli/psibase-load-snapshot.md)
     - [psinode](run-infrastructure/cli/psinode.md)
   - [Configuration]()
     - [HTTPS](run-infrastructure/configuration/https.md)

@@ -2,7 +2,7 @@
 
 After a block becomes irreversible, the block producers may sign a checksum of the state. This state that is signed will be preserved. On-chain services control when the state is signed. The `transact` service provides the action `transact::setSnapTime` to set the interval between snapshots. When a state is signed all nodes in the network will verify that their state matches.
 
-The command `psibase create-snapshot <DATABASE> <FILE>` will write the most recent signed snapshot to a file. It can be loaded into another node with the command `psibase load-snapshot <DATABASE> <FILE>`.
+The command [`psibase create-snapshot <DATABASE> <FILE>`](../../run-infrastructure/cli/psibase-create-snapshot.md) will write the most recent signed snapshot to a file. It can be loaded into another node with the command [`psibase load-snapshot <DATABASE> <FILE>`](../../run-infrastructure/cli/psibase-load-snapshot.md).
 
 A snapshot file contains:
 - The complete contents of the `service` and `native` databases.
