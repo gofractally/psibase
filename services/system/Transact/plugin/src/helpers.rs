@@ -37,7 +37,7 @@ fn inject_sender(actions: Vec<PartialAction>, sender: AccountNumber) -> Vec<psib
             sender,
             service: AccountNumber::from(a.service.as_str()),
             method: MethodNumber::from(a.method.as_str()),
-            rawData: Hex::from(a.raw_data.clone()),
+            rawData: Hex::from(a.raw_data),
         })
         .collect()
 }
