@@ -86,11 +86,9 @@ pub fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
         if attr.meta.path().is_ident("event") {
             let mut event_type = None;
             let _ = attr.parse_nested_meta(|meta| {
-                // FOR DEMO
-                // if event_type.is_some() {
-                //     abort!(attr, "Invalid number of events types; expected: 1.");
-                // }
-                // DEMO
+                if event_type.is_some() {
+                    abort!(attr, "Invalid number of event types; expected: 1.");
+                }
                 if meta.path.is_ident("history") {
                     event_type = Some(EventType::History);
                     return Ok(());

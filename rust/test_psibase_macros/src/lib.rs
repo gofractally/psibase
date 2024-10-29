@@ -13,18 +13,10 @@ mod tests {
         println!("{}", Wrapper::SERVICE);
         assert_eq!(Wrapper::SERVICE, AccountNumber::from("basicwquery"));
 
-        // Wrapper::push(&chain).add(3, 4);
-        // Don't know why the .get()? break this line:
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
-        // event emission must be called from within service; so this is call we can do here
-        Wrapper::emit().history();
-
-        // This can only be called from within a service
-        // Wrapper::call() uses and therefore covers the testing of service::Actions
-        // let ret = Wrapper::call(); //.add(2, 3);
-
         // Q: How to call query function? Call serveSys with a graphql request
+        // TODO: from James: The unit test in test_contract_2 has an example of making a GET, POST, and a graphql POST on the chain object.
 
         Ok(())
     }

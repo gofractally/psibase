@@ -9,14 +9,7 @@ publish = false
 
 [package.metadata.psibase]
 package-name = "basicwquery"
-# RPC for this service (not optional if RPC service is same as server; omission means no RPC service)
 server = "basicwquery"
-# postinstall (can be anywhere, but better to be with the service)
-# the params here just represent an action; rawData is <no args> in Fracpack terms
-# only required if service requires a postinstall/init() call
-# postinstall = [
-#     { sender = "basicwquery", service = "basicwquery", method = "init", rawData = "0000" },
-# ]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.13.0"

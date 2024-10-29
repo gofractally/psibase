@@ -9,10 +9,6 @@ publish = false
 
 [package.metadata.psibase]
 package-name = "mincallrecvr"
-# server = "mincallrecvr"
-# postinstall = [
-#     { sender = "mincallrecvr", service = "mincallrecvr", method = "init", rawData = "0000" },
-# ]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.13.0"

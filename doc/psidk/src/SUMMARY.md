@@ -59,7 +59,6 @@
       - [GraphQL](development/services/rust-service/graphql.md)
       - [Reference]()
         - [Web Services](development/services/rust-service/reference/web-services.md)
-        - [Chicken Scratch](development/services/rust-service/reference/chicken-scratch.md)
   - [Plugins]()
   - [Front-ends](development/front-ends/README.md)
     - [User onboarding]()
