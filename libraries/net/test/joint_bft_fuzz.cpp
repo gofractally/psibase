@@ -125,7 +125,7 @@ struct Network : NetworkBase<node_type>
          }
       }
    }
-   std::vector<Consensus> consensus_change;
+   std::vector<ConsensusData> consensus_change;
 };
 
 __AFL_FUZZ_INIT();
