@@ -1,12 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::psibase::component_parser::types::{ComponentExtraction, Functions, Intf};
+use bindings::psibase::component_parser::types::{ComponentExtraction, Function, Functions, Intf};
 use bindings::Guest as Parser;
 use indexmap::IndexMap;
 use wasm_compose::graph::Component;
 use wit_component::{decode, WitPrinter};
-use wit_parser::{World, WorldItem, WorldKey};
+use wit_parser::{Type, TypeDefKind, TypeOwner, World, WorldItem, WorldKey};
 
 pub struct ComponentParser;
 
@@ -41,7 +41,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
         if i > 0 {
             wit.push_str("\n\n");
         }
-        match printer.print(resolved_wit, &[id]) {
+        match printer.print(resolved_wit, id, &[]) {
             Ok(s) => wit.push_str(&s),
             Err(e) => {
                 // If we can't print the document, just use the error text
@@ -51,6 +51,68 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
         }
     }
     Ok(wit)
+}
+
+// This imported function is dynamically linking to another plugin if:
+//   Its first parameter is a handle to an imported resource
+//   called "plugin-ref" that is owned by the "host:common" package
+fn is_linking_dynamically(func: &wit_parser::Function, resolved_wit: &wit_parser::Resolve) -> bool {
+    if func.params.len() == 0 {
+        return false;
+    }
+
+    let param_type = match func.params[0].1 {
+        Type::Id(id) => resolved_wit.types.get(id).expect("Get param type failed"),
+        _ => return false,
+    };
+
+    let handle = match param_type.kind {
+        TypeDefKind::Handle(handle) => handle,
+        _ => return false,
+    };
+
+    let guest_type = match handle {
+        wit_parser::Handle::Own(id) => resolved_wit.types.get(id).expect("Get guest type failed"),
+        _ => return false,
+    };
+
+    let guest_type_kind = match guest_type.kind {
+        TypeDefKind::Type(ty) => ty,
+        _ => return false,
+    };
+
+    let host_type = match guest_type_kind {
+        Type::Id(id) => resolved_wit.types.get(id).expect("Get host type failed"),
+        _ => return false,
+    };
+
+    let is_plugin_ref =
+        host_type.name.as_ref().is_some() && host_type.name.as_ref().unwrap() == "plugin-ref";
+    let is_resource = host_type.kind == TypeDefKind::Resource;
+
+    let owner_interface = match host_type.owner {
+        TypeOwner::Interface(id) => resolved_wit
+            .interfaces
+            .get(id)
+            .expect("Get host type owner interface failed"),
+        _ => return false,
+    };
+
+    if owner_interface.package.is_none() {
+        return false;
+    }
+
+    let owner_package_id = owner_interface.package.unwrap();
+
+    let owner_package = resolved_wit
+        .packages
+        .get(owner_package_id)
+        .expect("Get host type owner package failed");
+
+    let is_owner_host =
+        owner_package.name.namespace == "host" && owner_package.name.name == "common";
+
+    is_plugin_ref && is_resource && is_owner_host
 }
 
 fn extract_functions<F>(resolved_wit: &wit_parser::Resolve, get_world_item: F) -> Functions
@@ -73,19 +135,34 @@ where
                 // (https://github.com/WebAssembly/component-model/pull/332)
                 let intf = resolved_wit.interfaces.get(*id).unwrap();
                 let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
+                let intf_name = intf.name.as_ref().unwrap();
                 let mut new_intf = Intf {
                     namespace: pkg.name.namespace.to_owned(),
                     package: pkg.name.name.to_owned(),
-                    name: intf.name.to_owned().unwrap(),
+                    name: kebab_to_camel(&intf_name),
                     funcs: vec![],
                 };
-                for (func_name, _) in &intf.functions {
-                    new_intf.funcs.push(kebab_to_camel(&func_name.to_owned()));
+                for (func_name, func) in &intf.functions {
+                    //if _func.kind == FunctionKind::Method || _func.kind == FunctionKind::Constructor {
+                    //  Then this is a method defined within a resource
+                    //  But we can also extract this information while generating js bindings
+                    //    from the function name
+                    //}
+
+                    let dynamic_link = is_linking_dynamically(func, resolved_wit);
+                    new_intf.funcs.push(Function {
+                        name: kebab_to_camel(&func_name.to_owned()),
+                        dynamic_link,
+                    });
                 }
                 funcs.interfaces.push(new_intf);
             }
             WorldItem::Function(func) => {
-                funcs.funcs.push(kebab_to_camel(&func.name.to_owned()));
+                let dynamic_link = is_linking_dynamically(func, resolved_wit);
+                funcs.funcs.push(Function {
+                    name: kebab_to_camel(&func.name.to_owned()),
+                    dynamic_link,
+                });
             }
             WorldItem::Type(_) => {}
         };
