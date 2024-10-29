@@ -819,6 +819,10 @@ fn schema_unpack() -> Result<()> {
                     fuzzy_equal(&actual, &expected),
                     "`{actual}` != `{expected}`"
                 );
+                if let Some(compat) = test.compat {
+                    let compat_json = frac2json(&cschema, ty, &hex::decode(&compat).unwrap())?;
+                    assert_eq!(compat_json, actual);
+                }
             }
             if test.error {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
