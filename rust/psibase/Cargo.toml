@@ -49,7 +49,7 @@ url = "2.4"
 toml = "0.8.19"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-clap = {version = "4.5", features = ["derive", "env"]}
+clap = {version = "4.5", features = ["derive", "env", "string"]}
 hmac = "0.12"
 indicatif = "0.17"
 jwt = "0.16"

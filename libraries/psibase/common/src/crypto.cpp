@@ -237,7 +237,7 @@ namespace psibase
       }
    }
 
-   static Checksum256 merkle_combine(const Checksum256& lhs, const Checksum256& rhs)
+   Checksum256 Merkle::combine(const Checksum256& lhs, const Checksum256& rhs)
    {
       char buf[1 + lhs.size() + rhs.size()];
       buf[0]   = '\1';
@@ -254,7 +254,7 @@ namespace psibase
       for (std::uint64_t x = i; (x & 1) != 0; x >>= 1)
       {
          auto end   = stack.end();
-         *(end - 2) = merkle_combine(*(end - 2), *(end - 1));
+         *(end - 2) = combine(*(end - 2), *(end - 1));
          stack.pop_back();
       }
       ++i;
@@ -269,7 +269,7 @@ namespace psibase
       Checksum256 result = *--iter;
       while (iter != begin)
       {
-         result = merkle_combine(*--iter, result);
+         result = combine(*--iter, result);
       }
       return result;
    }
