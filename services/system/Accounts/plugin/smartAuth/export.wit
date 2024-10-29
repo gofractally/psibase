@@ -1,0 +1,52 @@
+package accounts:smart-auth;
+
+interface types {
+    /// A list of `claim` objects is added to every submitted transaction.
+    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
+    record claim {
+        /// The name of the service used to verify the claim is valid
+        verify-service: string,
+        /// The raw claim data
+        raw-data: list<u8>,
+    }
+
+    /// The verify-service specified in the claim is the service that knows how to verify that
+    /// a proof actually proves the claim.
+    record proof {
+        signature: list<u8>,
+    }
+
+    /// Action data from a transaction
+    record action {
+        /// The service that will execute this action
+        service: string,
+        /// The name of the action to execute
+        method: string, 
+        /// The data passed to the action, packed in fracpack format
+        raw-data: list<u8>,
+    }
+}
+
+/// Export this interface to implement an auth service plugin
+/// This interface should only be exported, not imported.
+interface smart-auth {
+    use host:common/types.{error};
+    use types.{claim, proof, action};
+
+    /// Gets the claim(s) needed to satisfy the authorization of the sender of this transaction
+    /// 
+    /// Parameters
+    /// * `account-name`: The name of the account whose authorization this transaction
+    ///   claims to satisfy (The sender of the transaction).
+    /// * `actions`: The actions that the sender of this transaction is attempting to execute
+    get-claims: func(account-name: string, actions: list<action>) -> result<list<claim>, error>;
+
+    /// Provides proof(s) of the claim(s). 
+    /// If there are multiple claims, the returned list of proofs must be in the same order as the 
+    /// claims were specified.
+    /// 
+    /// Parameters
+    /// * `account-name`: The name of the account whose claim is being proven
+    /// * `transaction-hash`: A hash of the current transaction. Often signed to generate a proof.
+    get-proofs: func(account-name: string, transaction-hash: list<u8>) -> result<list<proof>, error>;
+}

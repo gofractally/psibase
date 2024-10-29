@@ -2,6 +2,7 @@
 
 pub mod accounts;
 pub mod auth_delegate;
+pub mod auth_invite;
 pub mod auth_sig;
 pub mod chainmail;
 pub mod common_api;
@@ -19,3 +20,4 @@ pub mod setcode;
 pub mod sites;
 pub mod tokens;
 pub mod transact;
+pub mod verify_sig;
