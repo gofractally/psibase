@@ -52,12 +52,12 @@ impl SmartAuth for AuthInvite {
         }])
     }
 
-    fn get_proofs(_account_name: String, message: Vec<u8>) -> Result<Vec<Proof>, Error> {
+    fn get_proofs(_account_name: String, transaction_hash: Vec<u8>) -> Result<Vec<Proof>, Error> {
         if !from_transact() {
             return Err(Unauthorized.err("get_proofs"));
         }
 
-        let signature = KeyVault::sign(&message, &InviteKeys::get_private_key())?;
+        let signature = KeyVault::sign(&transaction_hash, &InviteKeys::get_private_key())?;
 
         // Free the local storage space
         InviteKeys::delete();

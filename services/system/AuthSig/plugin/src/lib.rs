@@ -52,7 +52,7 @@ impl SmartAuth for AuthSig {
 
     fn get_proofs(
         account_name: String,
-        message: Vec<u8>,
+        transaction_hash: Vec<u8>,
     ) -> Result<Vec<Proof>, CommonTypes::Error> {
         if !from_transact() {
             return Err(Unauthorized.err("get_proofs"));
@@ -60,7 +60,7 @@ impl SmartAuth for AuthSig {
 
         let pubkey = get_pubkey(&account_name)?;
         let private_key = ManagedKeys::get(&pubkey);
-        let signature = AuthSig::sign(message, private_key)?;
+        let signature = AuthSig::sign(transaction_hash, private_key)?;
         Ok(vec![Proof { signature }])
     }
 }

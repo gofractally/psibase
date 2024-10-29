@@ -22,7 +22,7 @@ impl SmartAuth for AuthDelegate {
 
     fn get_proofs(
         _account_name: String,
-        _message: Vec<u8>,
+        _transaction_hash: Vec<u8>,
     ) -> Result<Vec<Proof>, CommonTypes::Error> {
         Err(NotYetImplemented.err("get_proofs"))
     }
