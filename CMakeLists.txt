@@ -143,6 +143,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
@@ -154,6 +155,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/CounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -212,20 +214,21 @@ add_custom_target(
     doc
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/book/html/index.html
 )
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psinode.md
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psinode.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1
-)
-add_custom_target(psinode.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psinode.1 TYPE MAN COMPONENT ServerData)
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-    DEPENDS md2man doc/psidk/src/run-infrastructure/cli/psibase.md
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/psibase.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1
-)
-add_custom_target(psibase.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/psibase.1 TYPE MAN COMPONENT Client)
+
+function(add_manpage name)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
+        DEPENDS md2man doc/psidk/src/run-infrastructure/cli/${name}.md
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/md2man < ${CMAKE_CURRENT_SOURCE_DIR}/doc/psidk/src/run-infrastructure/cli/${name}.md > ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1
+    )
+    add_custom_target(${name}.1 ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/doc/psidk/${name}.1 TYPE MAN COMPONENT Client)
+endfunction()
+
+add_manpage(psinode)
+add_manpage(psibase)
+add_manpage(psibase-create-snapshot)
+add_manpage(psibase-load-snapshot)
 
 # Cargo psibase
 ExternalProject_Add(
@@ -317,7 +320,10 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component(services/system/Transact/plugin:TransactPlugin transact.wasm wasm32-wasi )
 add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wasm32-wasi )
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
-add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi ${AuthPlugin_DEP})
+add_rs_component(services/system/AuthDelegate/plugin:AuthDelegatePlugin auth_delegate.wasm wasm32-wasi )
+add_rs_component(services/system/AuthAny/plugin:AuthAnyPlugin auth_any.wasm wasm32-wasi )
+add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi )
+add_rs_component(services/user/Invite/plugin_AuthInvite:AuthInvitePlugin auth_invite.wasm wasm32-wasi )
 add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
@@ -481,7 +487,11 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
+        SERVER auth-delegate
+        DATA ${COMPONENT_BIN_DIR}/${AuthDelegatePlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${AuthDelegatePlugin_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -491,7 +501,10 @@ psibase_package(
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AuthAnyPlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
+    DEPENDS ${AuthAnyPlugin_DEP}
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -592,7 +605,11 @@ psibase_package(
     SERVICE setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
         FLAGS allowWriteNative
+        SERVER r-setcode
+    SERVICE r-setcode
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
     DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -638,8 +655,10 @@ psibase_package(
         DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE auth-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AuthInvitePlugin_OUTPUT_FILE} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${InvitesPlugin_DEP}
+    DEPENDS ${AuthInvitePlugin_DEP}
 )
 
 psibase_package(
@@ -875,7 +894,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/KeepSocket.psi
+    NAME KeepSocket
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Accepts HTTP requests, but never returns a response"
+    SERVICE s-keep-sock
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
+        SERVER s-keep-sock
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket)
 
 ExternalProject_Add(
     rust

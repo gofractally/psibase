@@ -47,16 +47,21 @@ namespace psibase
       void        callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
       Checksum256 makeEventMerkleRoot();
       Checksum256 makeTransactionMerkle();
-      std::pair<ConstRevisionPtr, Checksum256> writeRevision(const Prover&, const Claim&);
+      std::pair<ConstRevisionPtr, Checksum256> writeRevision(
+          const Prover&,
+          const Claim&,
+          const ConstRevisionPtr& prevAuthServices = nullptr);
 
       void verifyProof(const SignedTransaction&                 trx,
                        TransactionTrace&                        trace,
                        size_t                                   i,
-                       std::optional<std::chrono::microseconds> watchdogLimit);
+                       std::optional<std::chrono::microseconds> watchdogLimit,
+                       BlockContext*                            errorContext);
 
       void checkFirstAuth(const SignedTransaction&                 trx,
                           TransactionTrace&                        trace,
-                          std::optional<std::chrono::microseconds> watchdogLimit);
+                          std::optional<std::chrono::microseconds> watchdogLimit,
+                          BlockContext*                            errorContext);
 
       void pushTransaction(SignedTransaction&&                      trx,
                            TransactionTrace&                        trace,
@@ -67,12 +72,14 @@ namespace psibase
       // The action is not allowed to modify any consensus state.
       // It is allowed to read and write subjective tables.
       void execNonTrxAction(Action&& action, ActionTrace& trace);
-      auto execExport(std::string_view fn, Action&& action, TransactionTrace& trace)
-          -> ActionTrace&;
+      auto execExport(std::string_view  fn,
+                      Action&&          action,
+                      TransactionTrace& trace) -> ActionTrace&;
       // The action has the same database access rules as queries
       void execAsyncAction(Action&& action);
-      auto execAsyncExport(std::string_view fn, Action&& action, TransactionTrace& trace)
-          -> ActionTrace&;
+      auto execAsyncExport(std::string_view  fn,
+                           Action&&          action,
+                           TransactionTrace& trace) -> ActionTrace&;
 
       void execAllInBlock();
 

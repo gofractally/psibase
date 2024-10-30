@@ -16,20 +16,6 @@ using namespace UserService;
 
 namespace
 {
-#ifdef __wasm32__
-   struct InitCwd
-   {
-      InitCwd()
-      {
-         if (char* pwd = std::getenv("PWD"))
-         {
-            ::chdir(pwd);
-         }
-      }
-   };
-   InitCwd initCwd;
-#endif
-
    void pushGenesisTransaction(TestChain& chain, std::span<PackagedService> service_packages)
    {
       std::vector<GenesisService> services;

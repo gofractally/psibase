@@ -256,6 +256,18 @@ namespace psibase
          // The notifyTable is only processed subjectively
       }
 
+      void verifyScheduledSnapshotRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
+               "ScheduledSnapshotRow has invalid format");
+         auto row = psio::from_frac<ScheduledSnapshotRow>(
+             psio::prevalidated{std::span{value.pos, value.end}});
+         auto expected_key = psio::convert_to_key(row.key());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "ScheduledSnapshotRow has incorrect key");
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -277,6 +289,8 @@ namespace psibase
             verifyWasmConfigRow(table, key, value);
          else if (table == notifyTable)
             verifyNotifyTableRow(key, value);
+         else if (table == scheduledSnapshotTable)
+            verifyScheduledSnapshotRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }
