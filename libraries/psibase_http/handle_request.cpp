@@ -12,6 +12,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
+#include <unordered_set>
 
 namespace beast     = boost::beast;
 namespace bhttp     = beast::http;
@@ -20,6 +21,16 @@ using steady_clock  = std::chrono::steady_clock;
 
 namespace psibase::http
 {
+
+   // Private HTTP headers that are not forwarded to wasm
+   const std::unordered_set<std::string> private_headers = {"authorization", "proxy-authorization"};
+
+   bool is_private_header(const std::string& name)
+   {
+      std::string lower_name = name;
+      std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+      return private_headers.find(lower_name) != private_headers.end();
+   }
 
    template <typename T>
    constexpr std::size_t function_arg_count = 0;
@@ -649,8 +660,13 @@ namespace psibase::http
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
             {
-               data.headers.emplace_back(
-                   HttpHeader{std::string(iter->name_string()), std::string(iter->value())});
+               auto header =
+                   HttpHeader{std::string(iter->name_string()), std::string(iter->value())};
+
+               if (!is_private_header(header.name))
+               {
+                  data.headers.emplace_back(std::move(header));
+               }
             }
 
             if (req.method() == bhttp::verb::get)
