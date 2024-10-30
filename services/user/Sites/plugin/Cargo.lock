@@ -347,6 +347,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc97b8f16f944bba54f0433f07e30be199b6dc2bd25937444bbad560bcea29bd"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+ "brotli-decompressor",
+]
+
+[[package]]
 name = "brotli-decompressor"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1494,7 +1505,7 @@ dependencies = [
  "anyhow",
  "async-graphql",
  "async-trait",
- "brotli",
+ "brotli 7.0.0",
  "chrono",
  "clap",
  "const_format",
@@ -1939,7 +1950,7 @@ dependencies = [
 name = "sites"
 version = "0.12.0"
 dependencies = [
- "brotli",
+ "brotli 6.0.0",
  "psibase",
  "wit-bindgen-rt",
 ]

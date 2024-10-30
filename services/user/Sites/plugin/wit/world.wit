@@ -16,12 +16,18 @@ interface sites {
     /// 
     /// This file will be accessible at the subdomain of the caller, 
     /// at the specified path.
+    /// 
+    /// Maximum quality Brotli file compression is automatically applied to 
+    /// the file if compression on its content type is supported.
     upload: func(file: file) -> result<_, error>;
 
     /// Upload multiple files to Sites.
     /// 
     /// These files will be accessible at the subdomain of the caller, 
     /// at the specified paths.
+    /// 
+    /// Maximum quality Brotli file compression is automatically applied to 
+    /// the files if compression on their content type is supported.
     /// 
     /// If the transaction size limit is exceeded, returns the index of the
     /// first file that was not uploaded.

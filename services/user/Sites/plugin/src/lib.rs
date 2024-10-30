@@ -5,18 +5,16 @@ use bindings::exports::sites::plugin::sites::Guest as Sites;
 use bindings::host::common::types::Error;
 use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf as Transact;
+use psibase::compress_content;
 use psibase::fracpack::Pack;
 use psibase::services::sites as SitesService;
 use psibase::Hex;
 
 mod errors;
 use errors::ErrorType;
-
-use std::io::Write;
-
 struct SitesPlugin;
 
-const COMPRESSION_QUALITY: u32 = 4;
+const COMPRESSION_QUALITY: u32 = 11;
 
 // Add a leading slash if missing and remove trailing slashes.
 fn normalize_path(path: &String) -> String {
@@ -33,37 +31,10 @@ fn normalize_path(path: &String) -> String {
 
 const TX_SIZE_LIMIT: usize = 64 * 1024; // 64kb
 
-fn should_compress(content_type: &str) -> bool {
-    matches!(
-        content_type,
-        "text/plain"
-            | "text/html"
-            | "text/css"
-            | "application/javascript"
-            | "application/json"
-            | "application/xml"
-            | "application/rss+xml"
-            | "application/atom+xml"
-            | "image/svg+xml"
-            | "font/ttf"
-            | "font/otf"
-            | "application/wasm"
-    )
-}
-
-fn compress_content(content: &[u8], content_type: &str) -> (Vec<u8>, Option<String>) {
-    if should_compress(content_type) {
-        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, COMPRESSION_QUALITY, 22);
-        writer.write_all(content).unwrap();
-        (writer.into_inner(), Some("br".to_string()))
-    } else {
-        (content.to_vec(), None)
-    }
-}
-
 impl Sites for SitesPlugin {
     fn upload(file: File) -> Result<(), Error> {
-        let (content, content_encoding) = compress_content(&file.content, &file.content_type);
+        let (content, content_encoding) =
+            compress_content(&file.content, &file.content_type, COMPRESSION_QUALITY);
 
         let packed = SitesService::action_structs::storeSys {
             path: file.path.clone(),
@@ -84,7 +55,8 @@ impl Sites for SitesPlugin {
     fn upload_tree(files: Vec<File>) -> Result<u16, Error> {
         let mut accumulated_size = 0;
         for (index, file) in files.iter().enumerate() {
-            let (content, content_encoding) = compress_content(&file.content, &file.content_type);
+            let (content, content_encoding) =
+                compress_content(&file.content, &file.content_type, COMPRESSION_QUALITY);
 
             let packed = SitesService::action_structs::storeSys {
                 path: normalize_path(&file.path),
