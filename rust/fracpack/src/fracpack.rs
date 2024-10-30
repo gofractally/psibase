@@ -65,7 +65,8 @@ custom_error! {pub Error
     ExtraData           = "Extra data in buffer",
     BadScalar           = "Bad scalar value",
     ExtraEmptyOptional  = "Trailing empty optionals must be omitted",
-    PtrEmptyList        = "A pointer to an empty list must use zero offset"
+    PtrEmptyList        = "A pointer to an empty list must use zero offset",
+    HasUnknown          = "Unknown fields not allowed",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

@@ -1453,8 +1453,8 @@ fn frac2json_impl(
         Custom { id, repr, .. } => {
             let repr = schema.get_id(*repr);
             let mut pos = stream.pos;
-            // Use the underlying type for verification, but discard the result
-            frac2json_impl(schema, repr, stream, allow_empty_container)?;
+            // Use the underlying type for verification
+            fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
             schema
                 .custom
                 .frac2json(*id, schema, repr, stream.data, &mut pos)
@@ -1566,7 +1566,7 @@ fn json2frac_variable(
     }
 }
 
-// Elides empty traling optionals
+// Elides empty trailing optionals
 struct ObjectWriter<'a> {
     items: Vec<Option<Repack<'a>>>,
     empty_count: u32,
@@ -1816,5 +1816,283 @@ pub fn json2frac(
         }
 
         _ => unimplemented!(),
+    }
+}
+
+fn fracpack_verify_pointer(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    stream: &mut FracInputStream,
+    fixed_pos: u32,
+    offset: u32,
+) -> Result<(), Error> {
+    if offset == 0 {
+        ty.new_empty_container(schema)?;
+        return Ok(());
+    }
+    let Some(new_pos) = fixed_pos.checked_add(offset) else {
+        return Err(Error::ReadPastEnd);
+    };
+    stream.set_pos(new_pos)?;
+    fracpack_verify_impl(schema, ty, stream, false)
+}
+
+fn fracpack_verify_embedded(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    fixed_stream: &mut FracInputStream,
+    stream: &mut FracInputStream,
+    empty_optional: &mut bool,
+) -> Result<(), Error> {
+    *empty_optional = false;
+    match ty {
+        CompiledType::Option(t) => {
+            let orig_pos = fixed_stream.pos;
+            let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+            if offset == 1 {
+                *empty_optional = true;
+                return Ok(());
+            }
+            fracpack_verify_pointer(schema, schema.get_id(*t), stream, orig_pos, offset)
+        }
+        _ => {
+            if ty.is_variable_size() {
+                let orig_pos = fixed_stream.pos;
+                let offset = u32::unpack(fixed_stream.data, &mut fixed_stream.pos)?;
+                fracpack_verify_pointer(schema, ty, stream, orig_pos, offset)
+            } else {
+                fracpack_verify_impl(schema, ty, fixed_stream, true)
+            }
+        }
+    }
+}
+
+fn fracpack_verify_impl(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    stream: &mut FracInputStream,
+    allow_empty_container: bool,
+) -> Result<(), Error> {
+    use CompiledType::*;
+    match ty {
+        Struct {
+            fixed_size,
+            children,
+            ..
+        } => {
+            let mut fixed_stream = stream.read_fixed(*fixed_size)?;
+            let mut empty = false;
+            for (_name, child) in children {
+                fracpack_verify_embedded(
+                    schema,
+                    schema.get_id(*child),
+                    &mut fixed_stream,
+                    stream,
+                    &mut empty,
+                )?;
+            }
+        }
+        Object { children, .. } => {
+            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut at_end = false;
+            let mut last_empty = false;
+
+            for (_name, child) in children {
+                let member_type = schema.get_id(*child);
+                let remaining = fixed_stream.remaining();
+                if remaining < member_type.fixed_size() {
+                    at_end = true;
+                }
+                if at_end {
+                    if remaining != 0 || !member_type.is_optional() {
+                        return Err(Error::BadSize);
+                    }
+                } else {
+                    fracpack_verify_embedded(
+                        schema,
+                        member_type,
+                        &mut fixed_stream,
+                        stream,
+                        &mut last_empty,
+                    )?;
+                }
+            }
+            consume_trailing_optional(&mut fixed_stream, stream, last_empty)?;
+        }
+        Array { child, len, .. } => {
+            let ty = schema.get_id(*child);
+            let fixed_size = ty.fixed_size().checked_mul(*len).ok_or(Error::BadSize)?;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut last_empty = false;
+            for _ in 0..*len {
+                fracpack_verify_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)?;
+            }
+        }
+        List(child) => {
+            let fixed_size = u32::unpack(stream.data, &mut stream.pos)?;
+            if fixed_size == 0 && !allow_empty_container {
+                return Err(Error::PtrEmptyList);
+            }
+            let ty = schema.get_id(*child);
+            let elem_size = ty.fixed_size();
+            if fixed_size % elem_size != 0 {
+                return Err(Error::BadSize);
+            }
+            let len = fixed_size / elem_size;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut last_empty = false;
+            for _ in 0..len {
+                fracpack_verify_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)?;
+            }
+        }
+        Option(..) => {
+            let mut fixed_stream = stream.read_fixed(4)?;
+            let mut last_empty = false;
+            fracpack_verify_embedded(schema, ty, &mut fixed_stream, stream, &mut last_empty)?
+        }
+        Variant(alternatives) => {
+            let index = u8::unpack(stream.data, &mut stream.pos)?;
+            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            if index as usize >= alternatives.len() {
+                return Err(Error::BadEnumIndex);
+            }
+            let mut substream = stream.read_fixed(len)?;
+            let (_name, child) = &alternatives[index as usize];
+            let ty = schema.get_id(*child);
+            fracpack_verify_impl(schema, ty, &mut substream, true)?;
+            stream.has_unknown |= substream.has_unknown;
+            substream.finish()?;
+        }
+        Tuple(children) => {
+            let fixed_size = u16::unpack(stream.data, &mut stream.pos)? as u32;
+            let mut fixed_stream = stream.read_fixed(fixed_size)?;
+            let mut at_end = false;
+            let mut last_empty = false;
+            for child in children {
+                let member_type = schema.get_id(*child);
+                let remaining = fixed_stream.remaining();
+                if remaining < member_type.fixed_size() {
+                    at_end = true;
+                }
+                if at_end {
+                    if remaining != 0 || !member_type.is_optional() {
+                        return Err(Error::BadSize);
+                    }
+                } else {
+                    fracpack_verify_embedded(
+                        schema,
+                        member_type,
+                        &mut fixed_stream,
+                        stream,
+                        &mut last_empty,
+                    )?;
+                }
+            }
+            consume_trailing_optional(&mut fixed_stream, stream, last_empty)?;
+        }
+        Int {
+            bits: 1,
+            is_signed: false,
+        } => {
+            let result = u8::unpack(stream.data, &mut stream.pos)?;
+            if result != 0 && result != 1 {
+                Err(Error::BadScalar)?
+            }
+        }
+        Int {
+            bits: 1,
+            is_signed: true,
+        } => {
+            let result = i8::unpack(stream.data, &mut stream.pos)?;
+            if result != 0 && result != -1 {
+                Err(Error::BadScalar)?
+            }
+        }
+        Int {
+            bits: 8,
+            is_signed: false,
+        } => u8::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 8,
+            is_signed: true,
+        } => i8::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 16,
+            is_signed: false,
+        } => u16::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 16,
+            is_signed: true,
+        } => i16::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 32,
+            is_signed: false,
+        } => u32::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 32,
+            is_signed: true,
+        } => i32::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 64,
+            is_signed: false,
+        } => u64::verify(stream.data, &mut stream.pos)?,
+        Int {
+            bits: 64,
+            is_signed: true,
+        } => i64::verify(stream.data, &mut stream.pos)?,
+        Float {
+            exp: 8,
+            mantissa: 24,
+        } => f32::verify(stream.data, &mut stream.pos)?,
+        Float {
+            exp: 11,
+            mantissa: 53,
+        } => f64::verify(stream.data, &mut stream.pos)?,
+        FracPack(nested) => {
+            let len = u32::unpack(stream.data, &mut stream.pos)?;
+            if len == 0 && !allow_empty_container {
+                return Err(Error::PtrEmptyList);
+            }
+            let mut substream = stream.read_fixed(len)?;
+            let ty = schema.get_id(*nested);
+            fracpack_verify_impl(schema, ty, &mut substream, true)?;
+            stream.has_unknown |= substream.has_unknown;
+            substream.finish()?;
+        }
+        Custom { repr, .. } => {
+            let repr = schema.get_id(*repr);
+            fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
+        }
+        _ => {
+            unimplemented!();
+        }
+    }
+    Ok(())
+}
+
+pub fn fracpack_verify(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    src: &[u8],
+) -> Result<(), Error> {
+    let mut stream = FracInputStream::new(src);
+    fracpack_verify_impl(schema, ty, &mut stream, true)?;
+    stream.finish()?;
+    Ok(())
+}
+
+pub fn fracpack_verify_strict(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    src: &[u8],
+) -> Result<(), Error> {
+    let mut stream = FracInputStream::new(src);
+    fracpack_verify_impl(schema, ty, &mut stream, true)?;
+    stream.finish()?;
+    if stream.has_unknown {
+        Err(Error::HasUnknown)
+    } else {
+        Ok(())
     }
 }

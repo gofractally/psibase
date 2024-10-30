@@ -1,5 +1,6 @@
 use fracpack::{
-    frac2json, json2frac, CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned,
+    frac2json, fracpack_verify, fracpack_verify_strict, json2frac, CompiledSchema, Pack, Result,
+    SchemaBuilder, Unpack, UnpackOwned,
 };
 use serde::Deserialize;
 use test_fracpack::*;
@@ -814,17 +815,23 @@ fn schema_json() -> Result<()> {
         let cschema = CompiledSchema::new(&tests.schema, &builtin);
         for test in tests.values {
             println!("type: {}", test.type_);
+            let fracpack = hex::decode(&test.fracpack).unwrap();
             if let Some(expected) = test.json {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                let fracpack = hex::decode(&test.fracpack).unwrap();
                 let actual = frac2json(&cschema, ty, &fracpack)?;
                 assert!(
                     fuzzy_equal(&actual, &expected),
                     "`{actual}` != `{expected}`"
                 );
+                fracpack_verify(&cschema, ty, &fracpack)?;
+                fracpack_verify_strict(&cschema, ty, &fracpack)?;
                 if let Some(compat) = test.compat {
-                    let compat_json = frac2json(&cschema, ty, &hex::decode(&compat).unwrap())?;
+                    let compat = hex::decode(&compat).unwrap();
+                    let compat_json = frac2json(&cschema, ty, &compat)?;
                     assert_eq!(compat_json, actual);
+                    fracpack_verify(&cschema, ty, &compat)?;
+                    fracpack_verify_strict(&cschema, ty, &compat)
+                        .expect_err(&format!("expected HasUnknown for {}", &test.fracpack));
                 }
                 let mut reverse = Vec::new();
                 json2frac(&cschema, ty, &expected, &mut reverse).unwrap();
@@ -835,7 +842,11 @@ fn schema_json() -> Result<()> {
             }
             if test.error {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                frac2json(&cschema, ty, &hex::decode(&test.fracpack).unwrap())
+                frac2json(&cschema, ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                fracpack_verify(&cschema, ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                fracpack_verify_strict(&cschema, ty, &fracpack)
                     .expect_err(&format!("expected error for {}", &test.fracpack));
             }
         }
