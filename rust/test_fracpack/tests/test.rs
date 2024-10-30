@@ -1,4 +1,6 @@
-use fracpack::{frac2json, CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use fracpack::{
+    frac2json, json2frac, CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned,
+};
 use serde::Deserialize;
 use test_fracpack::*;
 
@@ -802,7 +804,7 @@ fn fuzzy_equal(lhs: &serde_json::Value, rhs: &serde_json::Value) -> bool {
 }
 
 #[test]
-fn schema_unpack() -> Result<()> {
+fn schema_json() -> Result<()> {
     let builtin = fracpack::standard_types();
     let all_tests: Vec<SchemaTestFile> = serde_json::from_str(include_str!(
         "../../../libraries/psio/tests/fracpack-tests.json"
@@ -814,7 +816,8 @@ fn schema_unpack() -> Result<()> {
             println!("type: {}", test.type_);
             if let Some(expected) = test.json {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                let actual = frac2json(&cschema, ty, &hex::decode(&test.fracpack).unwrap())?;
+                let fracpack = hex::decode(&test.fracpack).unwrap();
+                let actual = frac2json(&cschema, ty, &fracpack)?;
                 assert!(
                     fuzzy_equal(&actual, &expected),
                     "`{actual}` != `{expected}`"
@@ -823,6 +826,12 @@ fn schema_unpack() -> Result<()> {
                     let compat_json = frac2json(&cschema, ty, &hex::decode(&compat).unwrap())?;
                     assert_eq!(compat_json, actual);
                 }
+                let mut reverse = Vec::new();
+                json2frac(&cschema, ty, &expected, &mut reverse).unwrap();
+                assert_eq!(reverse, fracpack);
+                let mut roundtrip = Vec::new();
+                json2frac(&cschema, ty, &actual, &mut roundtrip).unwrap();
+                assert_eq!(roundtrip, fracpack);
             }
             if test.error {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();

@@ -1,5 +1,6 @@
 use crate::{Error, Pack, Unpack};
 use indexmap::IndexMap;
+use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
 use std::any::TypeId;
@@ -590,6 +591,14 @@ pub trait CustomHandler {
         src: &[u8],
         pos: &mut u32,
     ) -> Result<serde_json::Value, Error>;
+    fn json2frac(
+        &self,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error>;
+    fn is_empty_container(&self, ty: &CompiledType, value: &serde_json::Value) -> bool;
 }
 
 #[derive(Default)]
@@ -623,6 +632,19 @@ impl<'a> CustomTypes<'a> {
     ) -> Result<serde_json::Value, Error> {
         self.handlers[id].frac2json(schema, ty, src, pos)
     }
+    fn json2frac(
+        &self,
+        id: usize,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        self.handlers[id].json2frac(schema, ty, val, dest)
+    }
+    fn is_empty_container(&self, id: usize, ty: &CompiledType, value: &serde_json::Value) -> bool {
+        self.handlers[id].is_empty_container(ty, value)
+    }
 }
 
 struct CustomBool;
@@ -646,6 +668,18 @@ impl CustomHandler for CustomBool {
     ) -> Result<serde_json::Value, Error> {
         Ok(bool::unpack(src, pos)?.into())
     }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        Ok(bool::deserialize(val)?.pack(dest))
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, _value: &serde_json::Value) -> bool {
+        false
+    }
 }
 
 struct CustomString;
@@ -667,6 +701,18 @@ impl CustomHandler for CustomString {
         pos: &mut u32,
     ) -> Result<serde_json::Value, Error> {
         Ok(String::unpack(src, pos)?.into())
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        _ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        Ok(<&str>::deserialize(val)?.pack(dest))
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, value: &serde_json::Value) -> bool {
+        value.as_str().map_or(false, |s| s.is_empty())
     }
 }
 
@@ -697,6 +743,33 @@ impl CustomHandler for CustomHex {
         let end = *pos + len;
         *pos = end;
         Ok(hex::encode_upper(&src[start as usize..end as usize]).into())
+    }
+    fn json2frac(
+        &self,
+        _schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        let s = val
+            .as_str()
+            .ok_or_else(|| serde_json::Error::custom("Expected hex string"))?;
+        let x = hex::decode(s).map_err(|_| serde_json::Error::custom("Expected hex string"))?;
+        if ty.is_variable_size() {
+            Ok(x.pack(dest))
+        } else {
+            if ty.fixed_size() as usize != x.len() {
+                return Err(serde_json::Error::custom(format!(
+                    "Expected hex string of length {}",
+                    ty.fixed_size()
+                )));
+            }
+            dest.extend_from_slice(&x);
+            Ok(())
+        }
+    }
+    fn is_empty_container(&self, ty: &CompiledType, value: &serde_json::Value) -> bool {
+        ty.is_variable_size() && value.as_str().map_or(false, |s| s.is_empty())
     }
 }
 
@@ -1033,6 +1106,19 @@ impl CompiledType {
             _ => Err(Error::BadOffset),
         }
     }
+    fn is_empty_container(&self, schema: &CompiledSchema, val: &serde_json::Value) -> bool {
+        use CompiledType::*;
+        match self {
+            List(_) => val.as_array().map_or(false, |a| a.is_empty()),
+            FracPack(nested) => schema.get_id(*nested).fixed_size() == 0,
+            Custom { repr, id, .. } => {
+                schema
+                    .custom
+                    .is_empty_container(*id, schema.get_id(*repr), val)
+            }
+            _ => false,
+        }
+    }
 }
 
 fn frac2json_pointer(
@@ -1113,7 +1199,6 @@ pub fn frac2json(
 ) -> Result<serde_json::Value, Error> {
     let mut stream = FracInputStream::new(src);
     let result = frac2json_impl(schema, ty, &mut stream, true)?;
-    println!("stream: {:?}", stream);
     stream.finish()?;
     Ok(result)
 }
@@ -1361,7 +1446,6 @@ fn frac2json_impl(
             let mut substream = stream.read_fixed(len)?;
             let ty = schema.get_id(*nested);
             let result = frac2json_impl(schema, ty, &mut substream, true)?;
-            println!("substream: {:?}", substream);
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
             Ok(result)
@@ -1381,6 +1465,356 @@ fn frac2json_impl(
     }
 }
 
-//pub fn json2frac(schema: &CompiledSchema, ty: &CompiledType, serde_json::Value, dest: &mut Vec<u8>) {
-//    use CompiledType::*;
-//}
+#[derive(Debug)]
+struct Repack<'a> {
+    ty: &'a CompiledType,
+    val: &'a serde_json::Value,
+    fixed_pos: usize,
+}
+
+enum EmbeddedPack<'a> {
+    Offset {
+        ty: &'a CompiledType,
+        val: &'a serde_json::Value,
+        fixed_pos: usize,
+    },
+    NoHeap {
+        schema: &'a CompiledSchema<'a, 'a>,
+        ty: &'a CompiledType,
+        val: &'a serde_json::Value,
+    },
+    EmptyOption,
+}
+
+impl<'a> EmbeddedPack<'a> {
+    fn pack(self, dest: &mut Vec<u8>) -> Result<Option<Repack<'a>>, serde_json::Error> {
+        use EmbeddedPack::*;
+        match self {
+            Offset { ty, val, fixed_pos } => {
+                dest.extend_from_slice(&0u32.to_le_bytes());
+                Ok(Some(Repack { ty, val, fixed_pos }))
+            }
+            NoHeap { schema, ty, val } => {
+                json2frac(schema, ty, val, dest)?;
+                Ok(None)
+            }
+            EmptyOption => {
+                dest.extend_from_slice(&1u32.to_le_bytes());
+                Ok(None)
+            }
+        }
+    }
+}
+
+fn json2frac_pointer<'a>(
+    schema: &'a CompiledSchema,
+    ty: &'a CompiledType,
+    val: &'a serde_json::Value,
+    dest: &mut Vec<u8>,
+) -> Result<EmbeddedPack<'a>, serde_json::Error> {
+    if ty.is_empty_container(schema, val) {
+        Ok(EmbeddedPack::NoHeap { schema, ty, val })
+    } else {
+        Ok(EmbeddedPack::Offset {
+            ty,
+            val,
+            fixed_pos: dest.len(),
+        })
+    }
+}
+
+fn json2frac_fixed<'a>(
+    schema: &'a CompiledSchema<'a, 'a>,
+    ty: &'a CompiledType,
+    val: Option<&'a serde_json::Value>,
+    dest: &mut Vec<u8>,
+) -> Result<EmbeddedPack<'a>, serde_json::Error> {
+    match ty {
+        CompiledType::Option(ty) => {
+            if let Some(val) = val {
+                if !val.is_null() {
+                    return json2frac_pointer(schema, schema.get_id(*ty), val, dest);
+                }
+            }
+            Ok(EmbeddedPack::EmptyOption)
+        }
+        _ => {
+            let Some(val) = val else {
+                return Err(serde_json::Error::custom("Missing field"));
+            };
+            if ty.is_variable_size() {
+                json2frac_pointer(schema, ty, val, dest)
+            } else {
+                Ok(EmbeddedPack::NoHeap { schema, ty, val })
+            }
+        }
+    }
+}
+
+fn json2frac_variable(
+    schema: &CompiledSchema,
+    info: Option<Repack>,
+    dest: &mut Vec<u8>,
+) -> Result<(), serde_json::Error> {
+    if let Some(Repack { ty, val, fixed_pos }) = info {
+        let heap_pos = dest.len();
+        dest[fixed_pos..fixed_pos + 4]
+            .copy_from_slice(&((heap_pos - fixed_pos) as u32).to_le_bytes());
+        json2frac(schema, ty, val, dest)
+    } else {
+        Ok(())
+    }
+}
+
+// Elides empty traling optionals
+struct ObjectWriter<'a> {
+    items: Vec<Option<Repack<'a>>>,
+    empty_count: u32,
+}
+
+impl<'a> ObjectWriter<'a> {
+    fn with_capacity(capacity: usize) -> Self {
+        ObjectWriter {
+            items: Vec::with_capacity(capacity),
+            empty_count: 0,
+        }
+    }
+    fn push(
+        &mut self,
+        item: EmbeddedPack<'a>,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        if matches!(&item, EmbeddedPack::EmptyOption) {
+            self.empty_count += 1;
+        } else {
+            for _i in 0..self.empty_count {
+                self.items.push(EmbeddedPack::EmptyOption.pack(dest)?);
+            }
+            self.empty_count = 0;
+            self.items.push(item.pack(dest)?)
+        }
+        Ok(())
+    }
+}
+
+pub fn json2frac(
+    schema: &CompiledSchema,
+    ty: &CompiledType,
+    val: &serde_json::Value,
+    dest: &mut Vec<u8>,
+) -> Result<(), serde_json::Error> {
+    use CompiledType::*;
+    match ty {
+        Struct { children, .. } => {
+            let Some(map) = val.as_object() else {
+                return Err(serde_json::Error::custom("Expected object"));
+            };
+            let mut items = Vec::with_capacity(children.len());
+            for (name, child) in children {
+                items.push(
+                    json2frac_fixed(schema, schema.get_id(*child), map.get(name), dest)?
+                        .pack(dest)?,
+                );
+            }
+            for item in items {
+                json2frac_variable(schema, item, dest)?;
+            }
+            Ok(())
+        }
+        Object { children, .. } => {
+            let Some(map) = val.as_object() else {
+                return Err(serde_json::Error::custom("Expected object"));
+            };
+            let start_pos = dest.len();
+            0u16.pack(dest);
+            let mut items = ObjectWriter::with_capacity(children.len());
+            for (name, child) in children {
+                items.push(
+                    json2frac_fixed(schema, schema.get_id(*child), map.get(name), dest)?,
+                    dest,
+                )?;
+            }
+            let fixed_size = (dest.len() - (start_pos + 2)) as u16;
+            dest[start_pos..start_pos + 2].copy_from_slice(&fixed_size.to_le_bytes());
+            for item in items.items {
+                json2frac_variable(schema, item, dest)?;
+            }
+            Ok(())
+        }
+        Array { child, len, .. } => {
+            let arr = val
+                .as_array()
+                .ok_or_else(|| serde_json::Error::custom("Expected array"))?;
+            let ty = schema.get_id(*child);
+            if arr.len() != *len as usize {
+                return Err(serde_json::Error::custom(format!(
+                    "Expected array of length {}",
+                    len
+                )));
+            }
+            let mut items = Vec::with_capacity(arr.len());
+            for item in arr {
+                items.push(json2frac_fixed(schema, ty, Some(item), dest)?.pack(dest)?);
+            }
+            for item in items {
+                json2frac_variable(schema, item, dest)?;
+            }
+            Ok(())
+        }
+        List(ty) => {
+            let arr = val
+                .as_array()
+                .ok_or_else(|| serde_json::Error::custom("Expected list"))?;
+            let ty = schema.get_id(*ty);
+            let len = (arr.len() as u32)
+                .checked_mul(ty.fixed_size())
+                .ok_or_else(|| serde_json::Error::custom("Packed data too large"))?;
+            len.pack(dest);
+            let mut items = Vec::with_capacity(arr.len());
+            for item in arr {
+                items.push(json2frac_fixed(schema, ty, Some(item), dest)?.pack(dest)?);
+            }
+            for item in items {
+                json2frac_variable(schema, item, dest)?;
+            }
+            Ok(())
+        }
+        Option(_) => {
+            let item = json2frac_fixed(schema, ty, Some(val), dest)?.pack(dest)?;
+            json2frac_variable(schema, item, dest)
+        }
+        Variant(alternatives) => {
+            let (alt, val) = val
+                .as_object()
+                .and_then(|m| if m.len() == 1 { m.iter().next() } else { None })
+                .ok_or_else(|| serde_json::Error::custom("Expected variant"))?;
+            let alt = alternatives
+                .iter()
+                .position(|(name, _)| name == alt)
+                .ok_or_else(|| serde_json::Error::custom("Unknown variant alternative"))?;
+            (alt as u8).pack(dest);
+            let size_pos = dest.len();
+            0u32.pack(dest);
+            json2frac(schema, schema.get_id(alternatives[alt].1), val, dest)?;
+            let end_pos = dest.len();
+            let size = (end_pos - size_pos - 4) as u32;
+            dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
+            Ok(())
+        }
+        Tuple(children) => {
+            let Some(arr) = val.as_array() else {
+                return Err(serde_json::Error::custom("Expected tuple"));
+            };
+            if arr.len() != children.len() {
+                return Err(serde_json::Error::custom(format!(
+                    "Expected tuple of length {}",
+                    children.len()
+                )));
+            }
+            let start_pos = dest.len();
+            0u16.pack(dest);
+            let mut items = ObjectWriter::with_capacity(children.len());
+            for (ty, val) in children.iter().zip(arr) {
+                items.push(
+                    json2frac_fixed(schema, schema.get_id(*ty), Some(val), dest)?,
+                    dest,
+                )?;
+            }
+            let fixed_size = (dest.len() - (start_pos + 2)) as u16;
+            dest[start_pos..start_pos + 2].copy_from_slice(&fixed_size.to_le_bytes());
+            for item in items.items {
+                json2frac_variable(schema, item, dest)?;
+            }
+            Ok(())
+        }
+        Int {
+            bits: 1,
+            is_signed: false,
+        } => {
+            let v = u8::deserialize(val)?;
+            if v == 0 || v == 1 {
+                Ok(v.pack(dest))
+            } else {
+                Err(serde_json::Error::custom("Out-of-range"))
+            }
+        }
+        Int {
+            bits: 1,
+            is_signed: true,
+        } => {
+            let v = i8::deserialize(val)?;
+            if v == 0 || v == -1 {
+                Ok(v.pack(dest))
+            } else {
+                Err(serde_json::Error::custom("Out-of-range"))
+            }
+        }
+        Int {
+            bits: 8,
+            is_signed: false,
+        } => Ok(u8::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 8,
+            is_signed: true,
+        } => Ok(i8::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 16,
+            is_signed: false,
+        } => Ok(u16::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 16,
+            is_signed: true,
+        } => Ok(i16::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 32,
+            is_signed: false,
+        } => Ok(u32::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 32,
+            is_signed: true,
+        } => Ok(i32::deserialize(val)?.pack(dest)),
+        Int {
+            bits: 64,
+            is_signed: false,
+        } => {
+            let v: u64 = deserialize_number_from_string(val)?;
+            Ok(v.pack(dest))
+        }
+        Int {
+            bits: 64,
+            is_signed: true,
+        } => {
+            let v: i64 = deserialize_number_from_string(val)?;
+            Ok(v.pack(dest))
+        }
+        Float {
+            exp: 8,
+            mantissa: 24,
+        } => {
+            let v: f32 = deserialize_number_from_string(val)?;
+            Ok(v.pack(dest))
+        }
+        Float {
+            exp: 11,
+            mantissa: 53,
+        } => {
+            let v: f64 = deserialize_number_from_string(val)?;
+            Ok(v.pack(dest))
+        }
+        FracPack(nested) => {
+            let start_pos = dest.len();
+            0u32.pack(dest);
+            json2frac(schema, schema.get_id(*nested), val, dest)?;
+            let end_pos = dest.len();
+            let size = (end_pos - start_pos - 4) as u32;
+            dest[start_pos..start_pos + 4].copy_from_slice(&size.to_le_bytes());
+            Ok(())
+        }
+        Custom { id, repr, .. } => {
+            let repr = schema.get_id(*repr);
+            schema.custom.json2frac(*id, schema, repr, val, dest)
+        }
+
+        _ => unimplemented!(),
+    }
+}
