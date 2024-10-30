@@ -1,7 +1,4 @@
-use fracpack::{
-    frac2json, fracpack_verify, fracpack_verify_strict, json2frac, CompiledSchema, Pack, Result,
-    SchemaBuilder, Unpack, UnpackOwned,
-};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
 use serde::Deserialize;
 use test_fracpack::*;
 
@@ -817,36 +814,38 @@ fn schema_json() -> Result<()> {
             println!("type: {}", test.type_);
             let fracpack = hex::decode(&test.fracpack).unwrap();
             if let Some(expected) = test.json {
-                let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                let actual = frac2json(&cschema, ty, &fracpack)?;
+                let ty = cschema.get(&test.type_).unwrap();
+                let actual = cschema.to_value(ty, &fracpack)?; //frac2json(&cschema, ty, &fracpack)?;
                 assert!(
                     fuzzy_equal(&actual, &expected),
                     "`{actual}` != `{expected}`"
                 );
-                fracpack_verify(&cschema, ty, &fracpack)?;
-                fracpack_verify_strict(&cschema, ty, &fracpack)?;
+                cschema.verify(ty, &fracpack)?;
+                cschema.verify_strict(ty, &fracpack)?;
                 if let Some(compat) = test.compat {
                     let compat = hex::decode(&compat).unwrap();
-                    let compat_json = frac2json(&cschema, ty, &compat)?;
+                    let compat_json = cschema.to_value(ty, &compat)?;
                     assert_eq!(compat_json, actual);
-                    fracpack_verify(&cschema, ty, &compat)?;
-                    fracpack_verify_strict(&cschema, ty, &compat)
+                    cschema.verify(ty, &compat)?;
+                    cschema
+                        .verify_strict(ty, &compat)
                         .expect_err(&format!("expected HasUnknown for {}", &test.fracpack));
                 }
-                let mut reverse = Vec::new();
-                json2frac(&cschema, ty, &expected, &mut reverse).unwrap();
+                let reverse = cschema.from_value(ty, &expected).unwrap();
                 assert_eq!(reverse, fracpack);
-                let mut roundtrip = Vec::new();
-                json2frac(&cschema, ty, &actual, &mut roundtrip).unwrap();
+                let roundtrip = cschema.from_value(ty, &actual).unwrap();
                 assert_eq!(roundtrip, fracpack);
             }
             if test.error {
                 let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
-                frac2json(&cschema, ty, &fracpack)
+                cschema
+                    .to_value(ty, &fracpack)
                     .expect_err(&format!("expected error for {}", &test.fracpack));
-                fracpack_verify(&cschema, ty, &fracpack)
+                cschema
+                    .verify(ty, &fracpack)
                     .expect_err(&format!("expected error for {}", &test.fracpack));
-                fracpack_verify_strict(&cschema, ty, &fracpack)
+                cschema
+                    .verify_strict(ty, &fracpack)
                     .expect_err(&format!("expected error for {}", &test.fracpack));
             }
         }

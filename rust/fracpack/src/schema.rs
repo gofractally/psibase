@@ -688,7 +688,7 @@ impl CustomHandler for CustomString {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         use CompiledType::*;
         if let List(item) = ty {
-            matches!(schema.get_id(*item), Int { bits: 8, .. })
+            matches!(schema.get_by_id(*item), Int { bits: 8, .. })
         } else {
             false
         }
@@ -722,7 +722,7 @@ impl CustomHandler for CustomHex {
     fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
         use CompiledType::*;
         if let List(item) = ty {
-            !schema.get_id(*item).is_variable_size()
+            !schema.get_by_id(*item).is_variable_size()
         } else {
             matches!(ty, FracPack(..)) || !ty.is_variable_size()
         }
@@ -784,18 +784,55 @@ pub fn standard_types() -> CustomTypes<'static> {
     result
 }
 
-pub struct CompiledSchema<'a, 'b> {
-    type_map: HashMap<*const AnyType, usize>,
-    queue: Vec<(usize, &'a AnyType)>,
-    types: Vec<CompiledType>,
-    custom: &'b CustomTypes<'b>,
+trait CompiledSchemaTypeId {
+    fn to_compiled_type<'a>(&self, schema: &'a CompiledSchema) -> Option<&'a CompiledType>;
 }
 
-impl<'a, 'b> CompiledSchema<'a, 'b> {
-    pub fn new(schema: &'a Schema, custom: &'b CustomTypes<'b>) -> Self {
+impl<T: std::hash::Hash + Eq + ?Sized> CompiledSchemaTypeId for T
+where
+    String: std::borrow::Borrow<T>,
+{
+    fn to_compiled_type<'a>(&self, schema: &'a CompiledSchema) -> Option<&'a CompiledType> {
+        schema.get_by_name(self)
+    }
+}
+
+impl CompiledSchemaTypeId for AnyType {
+    fn to_compiled_type<'a>(&self, schema: &'a CompiledSchema) -> Option<&'a CompiledType> {
+        schema.get_by_type(self)
+    }
+}
+
+trait CompiledSchemaType {
+    fn as_compiled_type<'a>(&'a self, schema: &'a CompiledSchema) -> Option<&'a CompiledType>;
+}
+
+impl<T: CompiledSchemaTypeId> CompiledSchemaType for T {
+    fn as_compiled_type<'a>(&'a self, schema: &'a CompiledSchema) -> Option<&'a CompiledType> {
+        self.to_compiled_type(schema)
+    }
+}
+
+impl CompiledSchemaType for CompiledType {
+    fn as_compiled_type<'a>(&'a self, _schema: &'a CompiledSchema) -> Option<&'a CompiledType> {
+        Some(self)
+    }
+}
+
+pub struct CompiledSchema<'a> {
+    type_map: HashMap<*const AnyType, usize>,
+    queue: Vec<(usize, &'a AnyType)>,
+    schema: &'a Schema,
+    types: Vec<CompiledType>,
+    custom: &'a CustomTypes<'a>,
+}
+
+impl<'a> CompiledSchema<'a> {
+    pub fn new(schema: &'a Schema, custom: &'a CustomTypes<'a>) -> Self {
         let mut result = CompiledSchema {
             type_map: HashMap::new(),
             queue: Vec::new(),
+            schema,
             types: Vec::new(),
             custom,
         };
@@ -838,7 +875,7 @@ impl<'a, 'b> CompiledSchema<'a, 'b> {
                 let mut children = Vec::with_capacity(members.len());
                 for (name, ty) in members {
                     let child = self.add(schema, custom, ty);
-                    let childref = self.get_id(child);
+                    let childref = self.get_by_id(child);
                     if childref.is_variable_size() {
                         is_variable_size = true;
                     }
@@ -853,7 +890,7 @@ impl<'a, 'b> CompiledSchema<'a, 'b> {
             }
             AnyType::Array { type_, len } => {
                 let child = self.add(schema, custom, type_);
-                let childref = self.get_id(child);
+                let childref = self.get_by_id(child);
                 let len = u32::try_from(*len).unwrap();
                 CompiledType::Array {
                     is_variable_size: childref.is_variable_size(),
@@ -881,7 +918,7 @@ impl<'a, 'b> CompiledSchema<'a, 'b> {
             },
             AnyType::Custom { type_, id } => {
                 let repr = self.add(schema, custom, type_);
-                let ty = self.get_id(repr);
+                let ty = self.get_by_id(repr);
                 if let Some(idx) = self.custom.find(&*id) {
                     custom.push(result);
                     CompiledType::Custom {
@@ -973,20 +1010,81 @@ impl<'a, 'b> CompiledSchema<'a, 'b> {
             self.types[id] = Alias(next);
         }
     }
-    fn get_id(&self, id: usize) -> &CompiledType {
+    fn get_by_id(&self, id: usize) -> &CompiledType {
         &self.types[id]
     }
-    pub fn get(&self, ty: &AnyType) -> Option<&CompiledType> {
+    #[allow(private_bounds)]
+    pub fn get<T: CompiledSchemaTypeId + ?Sized>(&'a self, ty: &T) -> Option<&'a CompiledType> {
+        ty.to_compiled_type(self)
+    }
+    pub fn get_by_type(&self, ty: &AnyType) -> Option<&CompiledType> {
         let p: *const AnyType = &*ty;
         if let Some(id) = self.type_map.get(&p) {
             let result = &self.types[*id];
             match result {
-                CompiledType::Alias(other) => Some(self.get_id(*other)),
+                CompiledType::Alias(other) => Some(self.get_by_id(*other)),
                 _ => Some(result),
             }
         } else {
             None
         }
+    }
+    pub fn get_by_name<T: std::hash::Hash + Eq + ?Sized>(&self, ty: &T) -> Option<&CompiledType>
+    where
+        String: std::borrow::Borrow<T>,
+    {
+        self.schema.0.get(ty).and_then(|ty| self.get_by_type(ty))
+    }
+    #[allow(private_bounds)]
+    pub fn to_value<T: CompiledSchemaType + ?Sized>(
+        &self,
+        ty: &T,
+        src: &[u8],
+    ) -> Result<serde_json::Value, Error> {
+        frac2json(
+            self,
+            ty.as_compiled_type(self)
+                .ok_or_else(|| Error::UnknownType)?,
+            src,
+        )
+    }
+    #[allow(private_bounds)]
+    pub fn verify<T: CompiledSchemaType + ?Sized>(&self, ty: &T, src: &[u8]) -> Result<(), Error> {
+        fracpack_verify(
+            self,
+            ty.as_compiled_type(self)
+                .ok_or_else(|| Error::UnknownType)?,
+            src,
+        )
+    }
+    #[allow(private_bounds)]
+    pub fn verify_strict<T: CompiledSchemaType + ?Sized>(
+        &self,
+        ty: &T,
+        src: &[u8],
+    ) -> Result<(), Error> {
+        fracpack_verify_strict(
+            self,
+            ty.as_compiled_type(self)
+                .ok_or_else(|| Error::UnknownType)?,
+            src,
+        )
+    }
+    #[allow(private_bounds)]
+    pub fn from_value<T: CompiledSchemaType + ?Sized>(
+        &self,
+        ty: &T,
+        val: &serde_json::Value,
+    ) -> Result<Vec<u8>, serde_json::Error> {
+        let mut result = Vec::new();
+        json2frac(
+            self,
+            ty.as_compiled_type(self)
+                .ok_or_else(|| serde_json::Error::custom("Unknown type"))?,
+            val,
+            &mut result,
+        )?;
+        Ok(result)
     }
 }
 
@@ -1096,12 +1194,16 @@ impl CompiledType {
         use CompiledType::*;
         match self {
             List(_) => Ok(serde_json::Value::Array(Vec::new())),
-            FracPack(nested) => frac2json(schema, schema.get_id(*nested), &[]),
+            FracPack(nested) => frac2json(schema, schema.get_by_id(*nested), &[]),
             Custom { repr, id, .. } => {
                 let mut pos = 0;
-                schema
-                    .custom
-                    .frac2json(*id, schema, schema.get_id(*repr), &[0, 0, 0, 0], &mut pos)
+                schema.custom.frac2json(
+                    *id,
+                    schema,
+                    schema.get_by_id(*repr),
+                    &[0, 0, 0, 0],
+                    &mut pos,
+                )
             }
             _ => Err(Error::BadOffset),
         }
@@ -1110,11 +1212,11 @@ impl CompiledType {
         use CompiledType::*;
         match self {
             List(_) => val.as_array().map_or(false, |a| a.is_empty()),
-            FracPack(nested) => schema.get_id(*nested).fixed_size() == 0,
+            FracPack(nested) => schema.get_by_id(*nested).fixed_size() == 0,
             Custom { repr, id, .. } => {
                 schema
                     .custom
-                    .is_empty_container(*id, schema.get_id(*repr), val)
+                    .is_empty_container(*id, schema.get_by_id(*repr), val)
             }
             _ => false,
         }
@@ -1154,7 +1256,7 @@ fn frac2json_embedded(
                 *empty_optional = true;
                 return Ok(serde_json::Value::Null);
             }
-            frac2json_pointer(schema, schema.get_id(*t), stream, orig_pos, offset)
+            frac2json_pointer(schema, schema.get_by_id(*t), stream, orig_pos, offset)
         }
         _ => {
             if ty.is_variable_size() {
@@ -1224,7 +1326,7 @@ fn frac2json_impl(
                     name.clone(),
                     frac2json_embedded(
                         schema,
-                        schema.get_id(*child),
+                        schema.get_by_id(*child),
                         &mut fixed_stream,
                         stream,
                         &mut empty,
@@ -1241,7 +1343,7 @@ fn frac2json_impl(
             let mut last_empty = false;
 
             for (name, child) in children {
-                let member_type = schema.get_id(*child);
+                let member_type = schema.get_by_id(*child);
                 let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
@@ -1270,7 +1372,7 @@ fn frac2json_impl(
         }
         Array { child, len, .. } => {
             let mut result = <Vec<serde_json::Value>>::with_capacity(*len as usize);
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             let fixed_size = ty.fixed_size().checked_mul(*len).ok_or(Error::BadSize)?;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut last_empty = false;
@@ -1290,7 +1392,7 @@ fn frac2json_impl(
             if fixed_size == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             let elem_size = ty.fixed_size();
             if fixed_size % elem_size != 0 {
                 return Err(Error::BadSize);
@@ -1323,7 +1425,7 @@ fn frac2json_impl(
             }
             let mut substream = stream.read_fixed(len)?;
             let (name, child) = &alternatives[index as usize];
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             let mut result = serde_json::Map::with_capacity(1);
             result.insert(
                 name.clone(),
@@ -1340,7 +1442,7 @@ fn frac2json_impl(
             let mut at_end = false;
             let mut last_empty = false;
             for child in children {
-                let member_type = schema.get_id(*child);
+                let member_type = schema.get_by_id(*child);
                 let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
@@ -1444,14 +1546,14 @@ fn frac2json_impl(
                 return Err(Error::PtrEmptyList);
             }
             let mut substream = stream.read_fixed(len)?;
-            let ty = schema.get_id(*nested);
+            let ty = schema.get_by_id(*nested);
             let result = frac2json_impl(schema, ty, &mut substream, true)?;
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
             Ok(result)
         }
         Custom { id, repr, .. } => {
-            let repr = schema.get_id(*repr);
+            let repr = schema.get_by_id(*repr);
             let mut pos = stream.pos;
             // Use the underlying type for verification
             fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
@@ -1479,7 +1581,7 @@ enum EmbeddedPack<'a> {
         fixed_pos: usize,
     },
     NoHeap {
-        schema: &'a CompiledSchema<'a, 'a>,
+        schema: &'a CompiledSchema<'a>,
         ty: &'a CompiledType,
         val: &'a serde_json::Value,
     },
@@ -1524,7 +1626,7 @@ fn json2frac_pointer<'a>(
 }
 
 fn json2frac_fixed<'a>(
-    schema: &'a CompiledSchema<'a, 'a>,
+    schema: &'a CompiledSchema<'a>,
     ty: &'a CompiledType,
     val: Option<&'a serde_json::Value>,
     dest: &mut Vec<u8>,
@@ -1533,7 +1635,7 @@ fn json2frac_fixed<'a>(
         CompiledType::Option(ty) => {
             if let Some(val) = val {
                 if !val.is_null() {
-                    return json2frac_pointer(schema, schema.get_id(*ty), val, dest);
+                    return json2frac_pointer(schema, schema.get_by_id(*ty), val, dest);
                 }
             }
             Ok(EmbeddedPack::EmptyOption)
@@ -1612,7 +1714,7 @@ pub fn json2frac(
             let mut items = Vec::with_capacity(children.len());
             for (name, child) in children {
                 items.push(
-                    json2frac_fixed(schema, schema.get_id(*child), map.get(name), dest)?
+                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name), dest)?
                         .pack(dest)?,
                 );
             }
@@ -1630,7 +1732,7 @@ pub fn json2frac(
             let mut items = ObjectWriter::with_capacity(children.len());
             for (name, child) in children {
                 items.push(
-                    json2frac_fixed(schema, schema.get_id(*child), map.get(name), dest)?,
+                    json2frac_fixed(schema, schema.get_by_id(*child), map.get(name), dest)?,
                     dest,
                 )?;
             }
@@ -1645,7 +1747,7 @@ pub fn json2frac(
             let arr = val
                 .as_array()
                 .ok_or_else(|| serde_json::Error::custom("Expected array"))?;
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             if arr.len() != *len as usize {
                 return Err(serde_json::Error::custom(format!(
                     "Expected array of length {}",
@@ -1665,7 +1767,7 @@ pub fn json2frac(
             let arr = val
                 .as_array()
                 .ok_or_else(|| serde_json::Error::custom("Expected list"))?;
-            let ty = schema.get_id(*ty);
+            let ty = schema.get_by_id(*ty);
             let len = (arr.len() as u32)
                 .checked_mul(ty.fixed_size())
                 .ok_or_else(|| serde_json::Error::custom("Packed data too large"))?;
@@ -1695,7 +1797,7 @@ pub fn json2frac(
             (alt as u8).pack(dest);
             let size_pos = dest.len();
             0u32.pack(dest);
-            json2frac(schema, schema.get_id(alternatives[alt].1), val, dest)?;
+            json2frac(schema, schema.get_by_id(alternatives[alt].1), val, dest)?;
             let end_pos = dest.len();
             let size = (end_pos - size_pos - 4) as u32;
             dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
@@ -1716,7 +1818,7 @@ pub fn json2frac(
             let mut items = ObjectWriter::with_capacity(children.len());
             for (ty, val) in children.iter().zip(arr) {
                 items.push(
-                    json2frac_fixed(schema, schema.get_id(*ty), Some(val), dest)?,
+                    json2frac_fixed(schema, schema.get_by_id(*ty), Some(val), dest)?,
                     dest,
                 )?;
             }
@@ -1804,14 +1906,14 @@ pub fn json2frac(
         FracPack(nested) => {
             let start_pos = dest.len();
             0u32.pack(dest);
-            json2frac(schema, schema.get_id(*nested), val, dest)?;
+            json2frac(schema, schema.get_by_id(*nested), val, dest)?;
             let end_pos = dest.len();
             let size = (end_pos - start_pos - 4) as u32;
             dest[start_pos..start_pos + 4].copy_from_slice(&size.to_le_bytes());
             Ok(())
         }
         Custom { id, repr, .. } => {
-            let repr = schema.get_id(*repr);
+            let repr = schema.get_by_id(*repr);
             schema.custom.json2frac(*id, schema, repr, val, dest)
         }
 
@@ -1853,7 +1955,7 @@ fn fracpack_verify_embedded(
                 *empty_optional = true;
                 return Ok(());
             }
-            fracpack_verify_pointer(schema, schema.get_id(*t), stream, orig_pos, offset)
+            fracpack_verify_pointer(schema, schema.get_by_id(*t), stream, orig_pos, offset)
         }
         _ => {
             if ty.is_variable_size() {
@@ -1885,7 +1987,7 @@ fn fracpack_verify_impl(
             for (_name, child) in children {
                 fracpack_verify_embedded(
                     schema,
-                    schema.get_id(*child),
+                    schema.get_by_id(*child),
                     &mut fixed_stream,
                     stream,
                     &mut empty,
@@ -1899,7 +2001,7 @@ fn fracpack_verify_impl(
             let mut last_empty = false;
 
             for (_name, child) in children {
-                let member_type = schema.get_id(*child);
+                let member_type = schema.get_by_id(*child);
                 let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
@@ -1921,7 +2023,7 @@ fn fracpack_verify_impl(
             consume_trailing_optional(&mut fixed_stream, stream, last_empty)?;
         }
         Array { child, len, .. } => {
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             let fixed_size = ty.fixed_size().checked_mul(*len).ok_or(Error::BadSize)?;
             let mut fixed_stream = stream.read_fixed(fixed_size)?;
             let mut last_empty = false;
@@ -1934,7 +2036,7 @@ fn fracpack_verify_impl(
             if fixed_size == 0 && !allow_empty_container {
                 return Err(Error::PtrEmptyList);
             }
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             let elem_size = ty.fixed_size();
             if fixed_size % elem_size != 0 {
                 return Err(Error::BadSize);
@@ -1959,7 +2061,7 @@ fn fracpack_verify_impl(
             }
             let mut substream = stream.read_fixed(len)?;
             let (_name, child) = &alternatives[index as usize];
-            let ty = schema.get_id(*child);
+            let ty = schema.get_by_id(*child);
             fracpack_verify_impl(schema, ty, &mut substream, true)?;
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
@@ -1970,7 +2072,7 @@ fn fracpack_verify_impl(
             let mut at_end = false;
             let mut last_empty = false;
             for child in children {
-                let member_type = schema.get_id(*child);
+                let member_type = schema.get_by_id(*child);
                 let remaining = fixed_stream.remaining();
                 if remaining < member_type.fixed_size() {
                     at_end = true;
@@ -2055,13 +2157,13 @@ fn fracpack_verify_impl(
                 return Err(Error::PtrEmptyList);
             }
             let mut substream = stream.read_fixed(len)?;
-            let ty = schema.get_id(*nested);
+            let ty = schema.get_by_id(*nested);
             fracpack_verify_impl(schema, ty, &mut substream, true)?;
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
         }
         Custom { repr, .. } => {
-            let repr = schema.get_id(*repr);
+            let repr = schema.get_by_id(*repr);
             fracpack_verify_impl(schema, repr, stream, allow_empty_container)?;
         }
         _ => {
