@@ -1,29 +1,31 @@
-use crate::services::{accounts, auth_delegate, http_server, packages, setcode, sites};
+use crate::services::{
+    accounts, auth_delegate, http_server, packages, psi_brotli::brotli_impl, setcode, sites,
+};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
     GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
+use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
-use std::io::{Read, Seek};
+use std::ffi::OsString;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
 
-use async_trait::async_trait;
-use std::ffi::OsString;
-use std::fs::File;
-use std::io::{BufReader, Write};
-use std::path::{Path, PathBuf};
-
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
+#[cfg(not(target_family = "wasm"))]
+use std::io::Write;
 #[cfg(not(target_family = "wasm"))]
 use tempfile::tempfile;
 
@@ -68,12 +70,13 @@ pub fn compress_content(
     compression_level: u32,
 ) -> (Vec<u8>, Option<String>) {
     if should_compress(content_type) {
-        // buffer_size: specifies the size of the internal buffer that the compressor will use (4096 is default)
-        // q: u32 sets the quality level of the compression, higher = better compression but slower
-        // lgwin: base-2 logarithm of the sliding window size. Influences the amount of memory used for compression. Default = 22
-        let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, compression_level, 22);
-        writer.write_all(&content).unwrap();
-        let compressed_content = writer.into_inner();
+        assert!(
+            compression_level >= 1 && compression_level <= 11,
+            "Compression level must be between 1 and 11"
+        );
+
+        let compressed_content = brotli_impl::compress(content.to_vec(), compression_level as u8);
+
         (compressed_content, Some("br".to_string()))
     } else {
         (content.to_vec(), None)
