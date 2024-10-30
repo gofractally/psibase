@@ -1013,11 +1013,16 @@ impl<'a> CompiledSchema<'a> {
     fn get_by_id(&self, id: usize) -> &CompiledType {
         &self.types[id]
     }
+
+    /// Looks up a CompiledType
+    ///
+    /// The arguemnt can be either any borrowed form of String or an
+    /// &AnyType that is part of the Schema.
     #[allow(private_bounds)]
     pub fn get<T: CompiledSchemaTypeId + ?Sized>(&'a self, ty: &T) -> Option<&'a CompiledType> {
         ty.to_compiled_type(self)
     }
-    pub fn get_by_type(&self, ty: &AnyType) -> Option<&CompiledType> {
+    fn get_by_type(&self, ty: &AnyType) -> Option<&CompiledType> {
         let p: *const AnyType = &*ty;
         if let Some(id) = self.type_map.get(&p) {
             let result = &self.types[*id];
@@ -1029,12 +1034,17 @@ impl<'a> CompiledSchema<'a> {
             None
         }
     }
-    pub fn get_by_name<T: std::hash::Hash + Eq + ?Sized>(&self, ty: &T) -> Option<&CompiledType>
+    fn get_by_name<T: std::hash::Hash + Eq + ?Sized>(&self, ty: &T) -> Option<&CompiledType>
     where
         String: std::borrow::Borrow<T>,
     {
         self.schema.0.get(ty).and_then(|ty| self.get_by_type(ty))
     }
+
+    /// Converts packed data to a Value
+    ///
+    /// The type can be specified as any of a string,
+    /// a &CompiledType, or an &AnyType.
     #[allow(private_bounds)]
     pub fn to_value<T: CompiledSchemaType + ?Sized>(
         &self,
@@ -1048,6 +1058,10 @@ impl<'a> CompiledSchema<'a> {
             src,
         )
     }
+    /// Verifies that packed data is valid
+    ///
+    /// The type can be specified as any of a string,
+    /// a &CompiledType, or an &AnyType.
     #[allow(private_bounds)]
     pub fn verify<T: CompiledSchemaType + ?Sized>(&self, ty: &T, src: &[u8]) -> Result<(), Error> {
         fracpack_verify(
@@ -1057,6 +1071,11 @@ impl<'a> CompiledSchema<'a> {
             src,
         )
     }
+    /// Verifies that packed data is valid and does not
+    /// contain any unknown fields
+    ///
+    /// The type can be specified as any of a string,
+    /// a &CompiledType, or an &AnyType.
     #[allow(private_bounds)]
     pub fn verify_strict<T: CompiledSchemaType + ?Sized>(
         &self,
@@ -1070,6 +1089,10 @@ impl<'a> CompiledSchema<'a> {
             src,
         )
     }
+    /// Packs a Value
+    ///
+    /// The type can be specified as any of a string,
+    /// a &CompiledType, or an &AnyType.
     #[allow(private_bounds)]
     pub fn from_value<T: CompiledSchemaType + ?Sized>(
         &self,
@@ -1294,7 +1317,7 @@ fn consume_trailing_optional(
     Ok(())
 }
 
-pub fn frac2json(
+fn frac2json(
     schema: &CompiledSchema,
     ty: &CompiledType,
     src: &[u8],
@@ -1699,7 +1722,7 @@ impl<'a> ObjectWriter<'a> {
     }
 }
 
-pub fn json2frac(
+fn json2frac(
     schema: &CompiledSchema,
     ty: &CompiledType,
     val: &serde_json::Value,
@@ -2173,18 +2196,14 @@ fn fracpack_verify_impl(
     Ok(())
 }
 
-pub fn fracpack_verify(
-    schema: &CompiledSchema,
-    ty: &CompiledType,
-    src: &[u8],
-) -> Result<(), Error> {
+fn fracpack_verify(schema: &CompiledSchema, ty: &CompiledType, src: &[u8]) -> Result<(), Error> {
     let mut stream = FracInputStream::new(src);
     fracpack_verify_impl(schema, ty, &mut stream, true)?;
     stream.finish()?;
     Ok(())
 }
 
-pub fn fracpack_verify_strict(
+fn fracpack_verify_strict(
     schema: &CompiledSchema,
     ty: &CompiledType,
     src: &[u8],
