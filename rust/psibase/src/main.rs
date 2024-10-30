@@ -90,7 +90,7 @@ enum Command {
 
         /// Configure compression level for boot package file uploads
         /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
         compression_level: u32,
     },
 
@@ -184,7 +184,7 @@ enum Command {
 
         /// Configure compression level
         /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
         compression_level: u32,
     },
 
@@ -213,7 +213,7 @@ enum Command {
 
         /// Configure compression level to use for uploaded files
         /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4")]
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
         compression_level: u32,
     },
 
@@ -281,15 +281,6 @@ fn to_hex(bytes: &[u8]) -> String {
         result.push(DIGITS[(byte & 0x0f) as usize]);
     }
     String::from_utf8(result).unwrap()
-}
-
-fn validate_compression(compression_level: u32) -> Result<(), anyhow::Error> {
-    if compression_level < 1 || compression_level > 11 {
-        return Err(anyhow!(
-            "Accepted compression levels: 1 (fastest) to 11 (most compression)"
-        ));
-    }
-    Ok(())
 }
 
 fn store_sys(
@@ -504,8 +495,6 @@ async fn upload(
         "/".to_string() + Path::new(source).file_name().unwrap().to_str().unwrap()
     };
 
-    validate_compression(compression_level)?;
-
     let actions = vec![store_sys(
         sender.into(),
         &normalized_dest,
@@ -670,8 +659,6 @@ async fn boot(
     services: &Vec<OsString>,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    validate_compression(compression_level)?;
-
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec {
         seconds: now_plus_120secs.timestamp() as u32,
@@ -758,8 +745,6 @@ async fn upload_tree(
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let normalized_dest = normalize_upload_path(dest);
-
-    validate_compression(compression_level)?;
 
     let mut actions = Vec::new();
     fill_tree(
@@ -903,8 +888,6 @@ async fn install(
     reinstall: bool,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    validate_compression(compression_level)?;
-
     let installed = PackageList::installed(&args.api, &mut client).await?;
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(packages)?;
