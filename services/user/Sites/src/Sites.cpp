@@ -215,7 +215,7 @@ namespace SystemService
          return serveSitesApp(request);
       }
 
-      if (request.method == "GET")
+      if (request.method == "GET" || request.method == "HEAD")
       {
          Tables tables{};
          auto   target = normalizeTarget(request.target);
@@ -321,10 +321,13 @@ namespace SystemService
                         return make406("Requested encoding not supported.");
                      }
 
-                     // Decompress the content
-                     Actor<DecompressorInterface> decoder(Sites::service,
-                                                          AccountNumber{*decompressor});
-                     content->content = decoder.decompress(content->content);
+                     // Decompress the content (don't bother if it's a HEAD request)
+                     if (request.method != "HEAD")
+                     {
+                        Actor<DecompressorInterface> decoder(Sites::service,
+                                                             AccountNumber{*decompressor});
+                        content->content = decoder.decompress(content->content);
+                     }
                      headers.push_back({"Content-Encoding", "identity"});
                   }
                }
@@ -341,11 +344,17 @@ namespace SystemService
                }
             }
 
-            return HttpReply{
+            auto reply = HttpReply{
                 .contentType = content->contentType,
-                .body        = content->content,
                 .headers     = std::move(headers),
             };
+
+            if (request.method != "HEAD")
+            {
+               reply.body = content->content;
+            }
+
+            return reply;
          }
       }
 
