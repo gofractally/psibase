@@ -36,12 +36,12 @@ impl SmartAuth for AuthSig {
         _actions: Vec<Action>,
     ) -> Result<Vec<Claim>, CommonTypes::Error> {
         if !from_transact() {
-            return Err(Unauthorized.err("get_claims"));
+            return Err(Unauthorized("get_claims").into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
         if !ManagedKeys::has(&pubkey) {
-            return Err(KeyNotFound.err("get_claims"));
+            return Err(KeyNotFound("get_claims").into());
         }
 
         Ok(vec![Claim {
@@ -55,7 +55,7 @@ impl SmartAuth for AuthSig {
         transaction_hash: Vec<u8>,
     ) -> Result<Vec<Proof>, CommonTypes::Error> {
         if !from_transact() {
-            return Err(Unauthorized.err("get_proofs"));
+            return Err(Unauthorized("get_proofs").into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
@@ -78,11 +78,11 @@ impl KeyVault for AuthSig {
 
         let private_key = signing_key
             .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?
+            .map_err(|e| CryptoError(e.to_string()))?
             .to_string();
         let public_key = verifying_key
             .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+            .map_err(|e| CryptoError(e.to_string()))?;
 
         Ok(Keypair {
             public_key,
@@ -92,13 +92,13 @@ impl KeyVault for AuthSig {
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
-        let signing_key = SigningKey::from_pkcs8_der(&pem.contents())
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+        let signing_key =
+            SigningKey::from_pkcs8_der(&pem.contents()).map_err(|e| CryptoError(e.to_string()))?;
         let verifying_key = signing_key.verifying_key();
 
         Ok(verifying_key
             .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?)
+            .map_err(|e| CryptoError(e.to_string()))?)
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
@@ -107,11 +107,11 @@ impl KeyVault for AuthSig {
     }
 
     fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
-        let signing_key = SigningKey::from_pkcs8_der(&private_key)
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+        let signing_key =
+            SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
         let signature: Signature = signing_key
             .sign_prehash(&hashed_message)
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+            .map_err(|e| CryptoError(e.to_string()))?;
         Ok(signature.to_bytes().to_vec())
     }
 }
@@ -124,7 +124,7 @@ impl Actions for AuthSig {
             app == psibase::services::auth_sig::SERVICE.to_string()
         });
         if !auth {
-            return Err(Unauthorized.err("set_key"));
+            return Err(Unauthorized("set_key").into());
         }
 
         Transact::add_action_to_transaction(
