@@ -17,11 +17,11 @@ pub mod service {
     use crate::utils::increment_last_char;
 
     // An App can't have more than 3 tags
-    const MAX_APP_TAGS: usize = 3;
-    const MAX_TAG_LENGTH: usize = 30;
-    const MAX_APP_NAME_LENGTH: usize = 30;
-    const MAX_APP_SHORT_DESCRIPTION_LENGTH: usize = 100;
-    const MAX_APP_LONG_DESCRIPTION_LENGTH: usize = 1000;
+    pub const MAX_APP_TAGS: usize = 3;
+    pub const MAX_TAG_LENGTH: usize = 30;
+    pub const MAX_APP_NAME_LENGTH: usize = 30;
+    pub const MAX_APP_SHORT_DESCRIPTION_LENGTH: usize = 100;
+    pub const MAX_APP_LONG_DESCRIPTION_LENGTH: usize = 1000;
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
@@ -33,7 +33,7 @@ pub mod service {
 
     /// Holds tags
     #[table(name = "TagsTable", index = 1)]
-    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
+    #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject, PartialEq)]
     pub struct TagRecord {
         /// The unique identifier for the tag
         #[primary_key]
@@ -558,48 +558,139 @@ pub mod service {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::{AppStatus, AppStatusU32};
-    use psibase::account;
+    use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord, MAX_APP_NAME_LENGTH};
+    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointSec};
+
+    fn default_metadata() -> AppMetadata {
+        AppMetadata {
+            account_id: AccountNumber::new(0),
+            status: AppStatus::Draft as AppStatusU32,
+            created_at: TimePointSec::from(0),
+            redirect_uris: vec!["http://localhost:3000/callback".to_string()],
+            owners: vec![account!("alice"), account!("bob")],
+            name: "Super Cooking App".to_string(),
+            short_description: "Alice's Cooking App".to_string(),
+            long_description: "Super cooking app".to_string(),
+            icon: "icon-as-base64".to_string(),
+            icon_mime_type: "image/png".to_string(),
+            tos_subpage: "/tos".to_string(),
+            privacy_policy_subpage: "/privacy-policy".to_string(),
+            app_homepage_subpage: "/".to_string(),
+        }
+    }
+
+    fn default_tags() -> Vec<String> {
+        vec![
+            "cozy".to_string(),
+            "cuisine".to_string(),
+            "cooking".to_string(),
+        ]
+    }
+
+    fn push_set_metadata(
+        chain: &psibase::Chain,
+        metadata: AppMetadata,
+        tags: Vec<String>,
+    ) -> ChainEmptyResult {
+        Wrapper::push_from(chain, account!("alice")).setMetadata(
+            metadata.name,
+            metadata.short_description,
+            metadata.long_description,
+            metadata.icon,
+            metadata.icon_mime_type,
+            metadata.tos_subpage,
+            metadata.privacy_policy_subpage,
+            metadata.app_homepage_subpage,
+            tags,
+            metadata.redirect_uris,
+            metadata.owners,
+        )
+    }
 
     #[psibase::test_case(packages("AppRegistry"))]
     fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
 
-        Wrapper::push_from(&chain, account!("alice"))
-            .setMetadata(
-                "Super Cooking App".to_string(),
-                "Alice's Cooking App".to_string(),
-                "Super cooking app".to_string(),
-                "icon-as-base64".to_string(),
-                "image/png".to_string(),
-                "/tos".to_string(),
-                "/privacy-policy".to_string(),
-                "/".to_string(),
-                vec![
-                    "cozy".to_string(),
-                    "cuisine".to_string(),
-                    "cooking".to_string(),
-                ],
-                vec!["http://localhost:3000/callback".to_string()],
-                vec![account!("alice"), account!("bob")],
-            )
-            .get()?;
+        push_set_metadata(&chain, default_metadata(), default_tags()).get()?;
 
-        let metadata = Wrapper::push(&chain)
+        let app_metadata_with_tags = Wrapper::push(&chain)
             .getMetadata(account!("alice"))
             .get()?
             .unwrap();
 
-        assert_eq!(metadata.metadata.name, "Super Cooking App");
-        assert_eq!(metadata.metadata.short_description, "Alice's Cooking App");
-        assert_eq!(metadata.metadata.long_description, "Super cooking app");
-        assert_eq!(metadata.metadata.icon, "icon-as-base64");
-        assert_eq!(metadata.metadata.icon_mime_type, "image/png");
-        assert_eq!(metadata.metadata.tos_subpage, "/tos");
-        assert_eq!(metadata.metadata.privacy_policy_subpage, "/privacy-policy");
-        assert_eq!(metadata.metadata.app_homepage_subpage, "/");
-        assert_eq!(metadata.metadata.status, 0);
-        assert_eq!(metadata.metadata.status, AppStatus::Draft as AppStatusU32);
+        let metadata = app_metadata_with_tags.metadata;
+        let tags = app_metadata_with_tags.tags;
+
+        assert_eq!(metadata.name, "Super Cooking App");
+        assert_eq!(metadata.short_description, "Alice's Cooking App");
+        assert_eq!(metadata.long_description, "Super cooking app");
+        assert_eq!(metadata.icon, "icon-as-base64");
+        assert_eq!(metadata.icon_mime_type, "image/png");
+        assert_eq!(metadata.tos_subpage, "/tos");
+        assert_eq!(metadata.privacy_policy_subpage, "/privacy-policy");
+        assert_eq!(metadata.app_homepage_subpage, "/");
+        assert_eq!(metadata.status, 0);
+        assert_eq!(metadata.status, AppStatus::Draft as AppStatusU32);
+
+        assert_eq!(tags.len(), 3);
+        assert!(tags.contains(&TagRecord {
+            id: 1,
+            tag: "cozy".to_string(),
+        }));
+        assert!(tags.contains(&TagRecord {
+            id: 2,
+            tag: "cuisine".to_string(),
+        }));
+        assert!(tags.contains(&TagRecord {
+            id: 3,
+            tag: "cooking".to_string(),
+        }));
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("AppRegistry"))]
+    fn test_tags_max_limit(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.new_account(account!("alice"))?;
+
+        let mut tags = default_tags();
+        tags.push("new-tag".to_string());
+
+        let error = push_set_metadata(&chain, default_metadata(), tags)
+            .trace
+            .error
+            .unwrap();
+        assert!(
+            error.contains("App can only have up to 3 tags"),
+            "error = {}",
+            error
+        );
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("AppRegistry"))]
+    fn test_app_name_max_length(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.new_account(account!("alice"))?;
+
+        let mut metadata = default_metadata();
+        metadata.name = "a".repeat(MAX_APP_NAME_LENGTH + 1);
+
+        let error = push_set_metadata(&chain, metadata, default_tags())
+            .trace
+            .error
+            .unwrap();
+        assert!(
+            error.contains(
+                format!(
+                    "App name can only be up to {} characters long",
+                    MAX_APP_NAME_LENGTH
+                )
+                .as_str()
+            ),
+            "error = {}",
+            error
+        );
 
         Ok(())
     }

@@ -101,14 +101,14 @@ pub fn query_app_metadata(
     query_graphql(&query, AppMetadataResponseData::from_gql)
 }
 
-pub fn query_all_related_tags(tag: String) -> Result<TagsResponseData, CommonTypes::Error> {
+pub fn query_all_related_tags(tag_substr: String) -> Result<TagsResponseData, CommonTypes::Error> {
     let query = format!(
         r#"query {{
-            allRelatedTags(tag: "{tag}") {{
+            allRelatedTags(tag_substr: "{tag_substr}") {{
                 tags
             }}
         }}"#,
-        tag = tag
+        tag_substr = tag_substr
     );
     query_graphql(&query, TagsResponseData::from_gql)
 }

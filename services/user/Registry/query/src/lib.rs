@@ -10,7 +10,7 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Get the app metadata for a specific app ID
+        /// Get the app metadata for a specific app ID, including the associated app tags
         async fn app_metadata(
             &self,
             account_id: AccountNumber,
@@ -22,8 +22,10 @@ mod service {
                     tags: res.tags,
                 })
         }
-        async fn all_related_tags(&self, tag: String) -> service::RelatedTags {
-            let tags = ServiceWrapper::call().getRelatedTags(tag);
+
+        /// Get a list of tags that contain the given substring
+        async fn all_related_tags(&self, tag_substr: String) -> service::RelatedTags {
+            let tags = ServiceWrapper::call().getRelatedTags(tag_substr);
             tags
         }
     }
