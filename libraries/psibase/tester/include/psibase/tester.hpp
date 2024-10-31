@@ -402,6 +402,8 @@ namespace psibase
 
       auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
 
+      std::uint32_t nativeHandle() const { return id; }
+
       /// Get a key-value pair, if any
       std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key);
 

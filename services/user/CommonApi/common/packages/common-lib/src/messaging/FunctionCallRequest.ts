@@ -53,6 +53,7 @@ export function toString(item: FunctionCallArgs): string {
 
 export interface FunctionCallRequest {
     type: typeof FUNCTION_CALL_REQUEST;
+    id: string;
     args: QualifiedFunctionCallArgs;
 }
 

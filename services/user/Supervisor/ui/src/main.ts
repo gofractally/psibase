@@ -35,7 +35,7 @@ const shouldHandleMessage = (message: MessageEvent) => {
 // When the supervisor is first loaded, all it does is register some handlers for
 //   calls from the parent window, and also tells the parent window that it's ready.
 addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
-    supervisor.entry(msg.origin, msg.data.args),
+    supervisor.entry(msg.origin, msg.data.id, msg.data.args),
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
     supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),

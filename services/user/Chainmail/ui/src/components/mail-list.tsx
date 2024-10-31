@@ -1,6 +1,7 @@
 import type { Mailbox } from "src/types";
 
 import { formatDistanceToNow } from "date-fns";
+import { Pin } from "lucide-react";
 
 import { cn } from "@lib/utils";
 import { ScrollArea } from "@shadcn/scroll-area";
@@ -81,21 +82,24 @@ const MailItem = ({
                                 </TooltipContent>
                             </Tooltip>
                         ) : null}
-                        {/* {!item.read && (
-                                        <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-                                    )} */}
                     </div>
                     <div
                         className={cn(
-                            "ml-auto text-xs",
+                            "ml-auto flex items-center justify-center gap-2",
                             selectedMessage?.id === item.id
                                 ? "text-foreground"
                                 : "text-muted-foreground",
                         )}
                     >
-                        {formatDistanceToNow(new Date(item.datetime), {
-                            addSuffix: true,
-                        })}
+                        <p className="text-xs">
+                            {formatDistanceToNow(new Date(item.datetime), {
+                                addSuffix: true,
+                            })}
+                        </p>
+                        {/* TODO: If message is saved, display a pin here */}
+                        {/* {item.saved ? (
+                            <Pin size={14} className="mt-0.5" />
+                        ) : null} */}
                     </div>
                 </div>
                 <div className="text-xs font-medium">{item.subject}</div>

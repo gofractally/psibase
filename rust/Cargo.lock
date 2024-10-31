@@ -402,7 +402,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "burst-transfer"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -937,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "elections"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "fracpack",
  "psibase",
@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "example"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "custom_error",
  "indexmap 2.2.6",
@@ -1187,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -1730,9 +1730,9 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leb128"
@@ -1831,7 +1831,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "clap",
  "pulldown-cmark 0.9.6",
@@ -2441,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2495,7 +2495,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2507,7 +2507,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "seahash",
 ]
@@ -2553,7 +2553,7 @@ dependencies = [
 
 [[package]]
 name = "r-tpack"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3079,7 +3079,7 @@ checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "sites"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "async-graphql",
  "fracpack",
@@ -3222,7 +3222,7 @@ dependencies = [
 
 [[package]]
 name = "subjective"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "psibase",
  "psibase_macros",
@@ -3366,7 +3366,7 @@ dependencies = [
 
 [[package]]
 name = "test-contract"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3375,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -3386,7 +3386,7 @@ dependencies = [
 
 [[package]]
 name = "test_package"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "r-tpack",
  "tpack",
@@ -3571,7 +3571,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpack"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3580,7 +3580,7 @@ dependencies = [
 
 [[package]]
 name = "tpack-plugin"
-version = "0.1.0"
+version = "0.13.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt",

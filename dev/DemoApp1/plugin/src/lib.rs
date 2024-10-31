@@ -1,10 +1,10 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::host::common::types as CommonTypes;
-use bindings::transact::plugin::intf as Transact;
 use bindings::exports::demoapp1::example::intf::Guest as Intf;
+use bindings::host::common::types as CommonTypes;
 use bindings::invite;
+use bindings::transact::plugin::intf as Transact;
 use bindings::Guest as MainInterface;
 
 use psibase::fracpack::Pack;
@@ -20,7 +20,7 @@ impl MainInterface for Component {
 
 impl Intf for Component {
     fn helloworld2() -> Result<String, CommonTypes::Error> {
-        Ok(invite::plugin::inviter::generate_invite("/subpath")?)
+        Ok(invite::plugin::inviter::generate_invite()?)
     }
 
     fn multiply(a: u32, b: u32) -> Result<String, CommonTypes::Error> {

@@ -79,6 +79,22 @@ namespace psibase::net
    };
    PSIO_REFLECT(BlockMessage, block)
 
+   struct StateChecksumMessage
+   {
+      static const unsigned    type = 42;
+      Checksum256              blockId;
+      snapshot::StateChecksum  state;
+      snapshot::StateSignature signature;
+      std::string              to_string() const
+      {
+         return "state checksum: id=" + loggers::to_string(blockId) +
+                " producer=" + signature.account.str() +
+                " service=" + loggers::to_string(state.serviceRoot) +
+                " native=" + loggers::to_string(state.nativeRoot);
+      }
+   };
+   PSIO_REFLECT(StateChecksumMessage, blockId, state, signature)
+
    // A producer-to-producer message with contents completely defined by services.
    struct WasmProducerMessage
    {
@@ -189,8 +205,11 @@ namespace psibase::net
 
       loggers::common_logger logger;
 
-      using message_type =
-          std::variant<HelloRequest, HelloResponse, BlockMessage, WasmProducerMessage>;
+      using message_type = std::variant<HelloRequest,
+                                        HelloResponse,
+                                        BlockMessage,
+                                        StateChecksumMessage,
+                                        WasmProducerMessage>;
 
       peer_connection& get_connection(peer_id id)
       {
@@ -341,6 +360,20 @@ namespace psibase::net
       void load_producers()
       {
          chain().addSocket(prods_socket);
+         chain().onCommit(
+             [this](BlockHeaderState* state)
+             {
+                if (chain().should_make_snapshot(state))
+                {
+                   auto fn       = chain().snapshot_builder(state);
+                   auto checksum = fn();
+                   if (auto sig = chain().on_state_checksum(state->blockId(), checksum, self))
+                   {
+                      network().multicast(
+                          StateChecksumMessage{state->blockId(), checksum, std::move(*sig)});
+                   }
+                }
+             });
          current_term = chain().get_head()->term;
          consensus().set_producers(chain().getProducers());
       }
@@ -752,6 +785,14 @@ namespace psibase::net
             return true;
          }
          return chain().is_ancestor(id, connection.last_received);
+      }
+
+      void recv(peer_id origin, const StateChecksumMessage& msg)
+      {
+         if (chain().on_state_signature(msg.blockId, msg.state, msg.signature))
+         {
+            network().multicast(msg);
+         }
       }
 
       void recv(peer_id origin, const WasmProducerMessage& msg)

@@ -1,4 +1,4 @@
-import { PencilLine, Send, Inbox } from "lucide-react";
+import { PencilLine, Send, Inbox, Archive } from "lucide-react";
 
 import { Separator } from "@shadcn/separator";
 import { cn } from "@lib/utils";
@@ -53,6 +53,12 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                         icon: Send,
                         variant: at === "/sent" ? "default" : "ghost",
                         href: "/sent",
+                    },
+                    {
+                        title: "Archived",
+                        icon: Archive,
+                        variant: at === "/archived" ? "default" : "ghost",
+                        href: "/archived",
                     },
                 ]}
             />

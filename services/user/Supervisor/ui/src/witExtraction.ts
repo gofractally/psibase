@@ -1,15 +1,20 @@
+export interface FuncShape {
+    name: string;
+    dynamicLink: boolean;
+}
+
 export interface Interface {
     namespace: string;
     package: string;
     name: string;
-    funcs: string[];
+    funcs: FuncShape[];
 }
 
 export interface Functions {
     namespace: string;
     package: string;
     interfaces: Interface[];
-    funcs: string[];
+    funcs: FuncShape[];
 }
 
 export interface ComponentAPI {

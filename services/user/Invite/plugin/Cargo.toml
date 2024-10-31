@@ -38,3 +38,4 @@ world = "impl"
 "auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }

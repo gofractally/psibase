@@ -1,22 +1,24 @@
 #[allow(warnings)]
 mod bindings;
-use base64::{engine::general_purpose::URL_SAFE, Engine};
+mod errors;
+mod types;
+
 use bindings::accounts::plugin as Accounts;
+use bindings::auth_invite::plugin::intf as AuthInvite;
 use bindings::auth_sig::plugin::{keyvault, types::Pem};
 use bindings::exports::invite;
+use bindings::exports::invite::plugin::advanced::Guest as Advanced;
+use bindings::exports::invite::plugin::advanced::InvKeys as InviteKeys;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
-use bindings::invite::plugin::types::{Invite, InviteId, InviteState, Url};
+use bindings::invite::plugin::types::{Invite, InviteState, InviteToken};
 use bindings::transact::plugin::intf as Transact;
 use chrono::DateTime;
+use errors::ErrorType::*;
 use fracpack::Pack;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
-use psibase::services::invite as InviteService;
+use psibase::services::invite::{self as InviteService, action_structs::*};
+use types::*;
 use CommonTypes::OriginationData;
-
-use serde::{Deserialize, Serialize};
-
-mod errors;
-use errors::ErrorType::*;
 
 /* TODO:
     /// This doesn't need to be exposed, it can just be jammed into various plugin functions
@@ -26,79 +28,13 @@ use errors::ErrorType::*;
     void delExpired(uint32_t maxDeleted);
 */
 
-#[derive(Serialize, Deserialize)]
-struct InviteParams {
-    app: String,
-    pk: String,
-    cb: String,
-}
+struct InvitePlugin;
 
-#[derive(Deserialize)]
-struct ResponseRoot<T> {
-    data: T,
-}
-trait TryParseGqlResponse: Sized {
-    fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
-}
-
-//#[qgl_query(name="getInvite")] // <-- Todo: Create this procedural macro ...
-#[allow(non_snake_case)]
-#[derive(Deserialize)]
-struct InviteRecordSubset {
-    inviter: psibase::AccountNumber,
-    actor: psibase::AccountNumber,
-    expiry: u32,
-    state: u8,
-}
-
-//                                           ...Such that something like the below code is generated:
-#[allow(non_snake_case)]
-#[derive(Deserialize)]
-struct GetInviteResponse {
-    getInvite: Option<InviteRecordSubset>,
-}
-impl TryParseGqlResponse for InviteRecordSubset {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        let response_root: ResponseRoot<GetInviteResponse> =
-            serde_json::from_str(&response).map_err(|e| QueryError.err(&e.to_string()))?;
-        Ok(response_root.data.getInvite.ok_or_else(|| {
-            QueryError.err("Unable to extract InviteRecordSubset from query response")
-        })?)
-    }
-}
-//                                            />
-
-struct Component;
-
-impl From<InviteParams> for InviteId {
-    fn from(params: InviteParams) -> Self {
-        let params_str = serde_json::to_string(&params).unwrap();
-        URL_SAFE.encode(params_str)
-    }
-}
-
-trait TryFromInviteId: Sized {
-    fn try_from_invite_id(id: InviteId) -> Result<Self, CommonTypes::Error>;
-}
-
-impl TryFromInviteId for InviteParams {
-    fn try_from_invite_id(id: InviteId) -> Result<Self, CommonTypes::Error> {
-        let bytes = URL_SAFE
-            .decode(id.to_owned())
-            .map_err(|_| DecodeInviteError.err("Error decoding base64"))?;
-
-        let str = String::from_utf8(bytes)
-            .map_err(|_| DecodeInviteError.err("Error converting from UTF8"))?;
-
-        let result: InviteParams = serde_json::from_str(&str)
-            .map_err(|_| DecodeInviteError.err("Error deserializing JSON string into object"))?;
-
-        Ok(result)
-    }
-}
-
-impl Invitee for Component {
-    fn accept_with_new_account(account: String, id: InviteId) -> Result<(), CommonTypes::Error> {
+impl Invitee for InvitePlugin {
+    fn accept_with_new_account(
+        account: String,
+        token: InviteToken,
+    ) -> Result<(), CommonTypes::Error> {
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
             return Err(InvalidAccount.err(&account));
         })?;
@@ -107,12 +43,14 @@ impl Invitee for Component {
             return Err(AccountExists.err("accept_with_new_account"));
         }
 
-        let invite_params = InviteParams::try_from_invite_id(id)?;
+        AuthInvite::notify(&token)?;
+
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
         let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
 
         Transact::add_action_to_transaction(
-            "acceptCreate",
-            &InviteService::action_structs::acceptCreate {
+            acceptCreate::ACTION_NAME,
+            &acceptCreate {
                 inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
                 acceptedBy: accepted_by,
                 newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
@@ -123,12 +61,42 @@ impl Invitee for Component {
         Ok(())
     }
 
-    fn reject(_id: InviteId) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("reject"))
+    fn accept(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        AuthInvite::notify(&token)?;
+
+        Transact::add_action_to_transaction(
+            accept::ACTION_NAME,
+            &accept {
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
     }
 
-    fn decode_invite(id: InviteId) -> Result<Invite, CommonTypes::Error> {
-        let invite_params = InviteParams::try_from_invite_id(id)?;
+    fn reject(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        AuthInvite::notify(&token)?;
+
+        Transact::add_action_to_transaction(
+            reject::ACTION_NAME,
+            &reject {
+                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+            }
+            .packed(),
+        )?;
+
+        Ok(())
+    }
+
+    fn decode_invite(token: InviteToken) -> Result<Invite, CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
 
         let query = format!(
             r#"query {{
@@ -161,43 +129,39 @@ impl Invitee for Component {
             state: state,
             actor: invite.actor.to_string(),
             expiry,
-            callback: invite_params.cb,
         })
     }
 }
 
-impl Inviter for Component {
-    fn generate_invite(callback_subpath: String) -> Result<Url, CommonTypes::Error> {
+impl Inviter for InvitePlugin {
+    fn generate_invite() -> Result<InviteToken, CommonTypes::Error> {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         Transact::add_action_to_transaction(
-            "createInvite",
-            &InviteService::action_structs::createInvite {
+            createInvite::ACTION_NAME,
+            &createInvite {
                 inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
             }
             .packed(),
         )?;
 
-        let link_root = format!("{}{}", Client::my_service_origin(), "/invited");
-
         let OriginationData { origin, app } = Client::get_sender_app();
-        let cb = format!("{}{}", origin, callback_subpath);
 
         let params = InviteParams {
             app: app.unwrap_or(origin.clone()),
             pk: keypair.private_key,
-            cb,
         };
 
-        let query_string = format!("id={}", InviteId::from(params));
-        Ok(format!("{}?{}", link_root, query_string))
+        Ok(InviteToken::from(params))
     }
 
-    fn delete_invite(invite_public_key: Vec<u8>) -> Result<(), CommonTypes::Error> {
+    fn delete_invite(token: InviteToken) -> Result<(), CommonTypes::Error> {
+        let invite_keys = Self::deserialize(token)?;
+
         Transact::add_action_to_transaction(
             "delInvite",
             &InviteService::action_structs::delInvite {
-                inviteKey: invite_public_key.into(),
+                inviteKey: invite_keys.pub_key.into(),
             }
             .packed(),
         )?;
@@ -206,4 +170,16 @@ impl Inviter for Component {
     }
 }
 
-bindings::export!(Component with_types_in bindings);
+impl Advanced for InvitePlugin {
+    fn deserialize(token: InviteToken) -> Result<InviteKeys, CommonTypes::Error> {
+        let invite_params = InviteParams::try_from_invite_id(&token)?;
+        let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_params.pk)?;
+
+        Ok(InviteKeys {
+            pub_key: keyvault::to_der(&invite_pubkey)?,
+            priv_key: keyvault::to_der(&invite_params.pk)?,
+        })
+    }
+}
+
+bindings::export!(InvitePlugin with_types_in bindings);

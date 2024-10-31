@@ -11,6 +11,7 @@ import { TooltipProvider } from "@shadcn/tooltip";
 import DefaultLayout from "./layouts/default";
 
 import "./styles/globals.css";
+import Archived from "@routes/archived";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,11 @@ const router = createBrowserRouter([
             {
                 path: "/sent",
                 element: <Sent />,
+                children: [],
+            },
+            {
+                path: "/archived",
+                element: <Archived />,
                 children: [],
             },
         ],

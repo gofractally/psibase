@@ -1026,6 +1026,7 @@ class Schema:
         else:
             self.types = {}
             SchemaParser(types, self, custom)
+        self.custom = custom
     def __contains__(self, name):
         return name in self.types
     def __setitem__(self, name, ty):

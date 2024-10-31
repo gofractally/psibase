@@ -1,22 +1,72 @@
 import { Code, FilePath, ImportDetails, PkgId } from "../importDetails";
+import { FuncShape } from "../../witExtraction";
+
+const col = (col: number): string => {
+    return " ".repeat(col * 4);
+};
 
 class Func {
     name: string;
+    service: string;
+    plugin: string;
+    intfName: string;
+    isDynamic: boolean;
 
-    constructor(name: string) {
-        this.name = name;
+    constructor(
+        service: string,
+        plugin: string,
+        intfName: string,
+        name: string,
+        isDynamic: boolean,
+    ) {
+        // Name might look like `[constructor]classname` or `[method]classname.func-name`
+        if (name.includes("[method]")) {
+            this.name = name.split("]")[1].split(".")[1];
+        } else if (name.includes("[constructor]")) {
+            this.name = "constructor";
+        } else {
+            this.name = name;
+        }
+
+        this.service = service;
+        this.plugin = plugin;
+        this.intfName = intfName;
+        this.isDynamic = isDynamic;
     }
 
+    private proxy = (): string => {
+        let service = `"${this.service}"`;
+        let plugin = `"${this.plugin}"`;
+
+        if (this.isDynamic) {
+            service = `plugin_ref.name`;
+            plugin = `"plugin"`;
+        }
+        return [
+            `${col(2)}return host.syncCall({`,
+            `${col(3)}service: ${service},`,
+            `${col(3)}plugin: ${plugin},`,
+            `${col(3)}intf: "${this.intfName}",`,
+            `${col(3)}method: "${this.name}",`,
+            `${col(3)}params: args`,
+            `${col(2)}});`,
+            ``,
+        ].join("\n");
+    };
+
     private pre = (): string => {
-        return `    ${this.name}(...args) {\n`;
+        if (!this.isDynamic) {
+            return `${col(1)}${this.name}(...args) {\n`;
+        }
+        return `${col(1)}${this.name}(plugin_ref, ...args) {\n`;
     };
 
     private post = (): string => {
         return `    },\n`;
     };
 
-    code = (proxy: string): string => {
-        return this.pre() + proxy + this.post();
+    code = (): string => {
+        return this.pre() + this.proxy() + this.post();
     };
 }
 
@@ -24,9 +74,20 @@ class Intf {
     name: string;
     funcs: Func[];
 
-    constructor(name: string, funcs: string[]) {
-        this.name = name;
-        this.funcs = funcs.map((f) => new Func(f));
+    constructor(
+        service: string,
+        plugin: string,
+        intfName: string,
+        funcs: FuncShape[],
+    ) {
+        // Todo (Resource support): Split funcs array into subsets if there are resources
+        //   with grouped methods.
+        // Functions that are directly part of an interface can be added as normal,
+        //   but resource methods should be added in their own resource object.
+        this.name = intfName;
+        this.funcs = funcs.map(
+            (f) => new Func(service, plugin, intfName, f.name, f.dynamicLink),
+        );
     }
 
     private pre = (): string => {
@@ -37,10 +98,8 @@ class Intf {
         return `};\n`;
     };
 
-    code = (proxy: (intfName: string, funcName: string) => string): string => {
-        const functions: string[] = this.funcs.map((f) =>
-            f.code(proxy(this.name, f.name)),
-        );
+    code = (): string => {
+        const functions: string[] = this.funcs.map((f) => f.code());
         return this.pre() + functions.join("\n") + this.post();
     };
 }
@@ -69,24 +128,6 @@ export class ProxyPkg {
         return `./proxy-shim_${this.namespace}_${this.id}.js`;
     };
 
-    private proxy = (): ((intfName: string, funcName: string) => string) => {
-        const col = (col: number): string => {
-            return " ".repeat(col * 4);
-        };
-        return (intfName: string, funcName: string): string => {
-            return [
-                `${col(2)}return host.syncCall({`,
-                `${col(3)}service: "${this.namespace}",`,
-                `${col(3)}plugin: "${this.id}",`,
-                `${col(3)}intf: "${intfName}",`,
-                `${col(3)}method: "${funcName}",`,
-                `${col(3)}params: args`,
-                `${col(2)}});`,
-                ``,
-            ].join("\n");
-        };
-    };
-
     private pre = (): string => {
         return `\n/////// SHIM FILE FOR ${this.namespace}:${this.id} ///////////\n\n`;
     };
@@ -95,8 +136,8 @@ export class ProxyPkg {
         return `\n\n`;
     };
 
-    add = (intf: string, funcs: string[]) => {
-        this.interfaces.push(new Intf(intf, funcs));
+    add = (intf: string, funcs: FuncShape[]) => {
+        this.interfaces.push(new Intf(this.namespace, this.id, intf, funcs));
     };
 
     getImportDetails = (): ImportDetails => {
@@ -106,9 +147,7 @@ export class ProxyPkg {
             `${this.getShimName()}#*`,
         ]);
 
-        const interfaces: string[] = this.interfaces.map((i) =>
-            i.code(this.proxy()),
-        );
+        const interfaces: string[] = this.interfaces.map((i) => i.code());
         const code = this.pre() + interfaces.join("\n") + this.post();
         const shimFile: [FilePath, Code] = [this.getShimName(), code];
 
