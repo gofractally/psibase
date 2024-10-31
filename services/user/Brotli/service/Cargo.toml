@@ -18,4 +18,4 @@ psibase = { path = "../../../../rust/psibase/" }
 serde = { version = "1.0.213", features = ["derive"] }
 
 [dev-dependencies]
-brotli_package = { path = "..", version = "0.12.0" }
+brotli_package = { path = "..", version = "0.13.0" }
