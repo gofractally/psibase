@@ -1,18 +1,20 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::*;
-    use psibase::*;
     use ::registry::service;
     use ::registry::Wrapper as ServiceWrapper;
+    use async_graphql::*;
+    use psibase::*;
 
     pub struct Query;
 
     #[Object]
     impl Query {
         /// Get the app metadata for a specific app ID
-        async fn app_metadata(&self, account_id: AccountNumber) -> Option<service::AppMetadataWithTags> {
-            println!("getting app_metadata: {}", account_id);
+        async fn app_metadata(
+            &self,
+            account_id: AccountNumber,
+        ) -> Option<service::AppMetadataWithTags> {
             ServiceWrapper::call()
                 .getMetadata(account_id)
                 .map(|res| service::AppMetadataWithTags {
@@ -20,7 +22,7 @@ mod service {
                     tags: res.tags,
                 })
         }
-        async fn all_related_tags(&self, tag: String) -> Option<service::RelatedTags> {
+        async fn all_related_tags(&self, tag: String) -> service::RelatedTags {
             let tags = ServiceWrapper::call().getRelatedTags(tag);
             tags
         }

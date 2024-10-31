@@ -21,6 +21,7 @@ psibase = { path = "../../../../rust/psibase" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "7.0.7"
 serde_json = "1.0.120"
+url = "2.5.2"
 
 [dev-dependencies]
 registry_package = { path = ".." }

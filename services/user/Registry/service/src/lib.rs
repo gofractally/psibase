@@ -3,19 +3,36 @@ mod utils;
 #[psibase::service(name = "registry")]
 #[allow(non_snake_case)]
 pub mod service {
+    use std::collections::HashSet;
+
     use async_graphql::*;
     use serde::{Deserialize, Serialize};
+    use url::Url;
 
+    use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::services::transact;
     use psibase::*;
+    use services::events::Wrapper as EventsSvc;
 
     use crate::utils::increment_last_char;
 
     // An App can't have more than 3 tags
     const MAX_APP_TAGS: usize = 3;
+    const MAX_TAG_LENGTH: usize = 30;
+    const MAX_APP_NAME_LENGTH: usize = 30;
+    const MAX_APP_SHORT_DESCRIPTION_LENGTH: usize = 100;
+    const MAX_APP_LONG_DESCRIPTION_LENGTH: usize = 1000;
+
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
 
     /// Holds tags
-    #[table(name = "TagsTable", index = 0)]
+    #[table(name = "TagsTable", index = 1)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct TagRecord {
         /// The unique identifier for the tag
@@ -28,14 +45,36 @@ pub mod service {
 
     impl TagRecord {
         #[secondary_key(1)]
-        fn by_tags(&self) -> (String, u32) {
-            (self.tag.clone(), self.id)
+        fn by_tags(&self) -> String {
+            self.tag.clone()
+        }
+
+        /// Validate the tag is lowercase alphanumeric and dashes, under the max length
+        fn check_valid(&self) {
+            check(self.tag.len() > 0, "Tag cannot be empty");
+
+            check(
+                self.tag
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+                "Tags must be lowercase and can only contain dashes",
+            );
+
+            check(
+                !self.tag.starts_with('-') && !self.tag.ends_with('-'),
+                "Tag cannot start or end with a dash",
+            );
+
+            check(
+                self.tag.len() <= MAX_TAG_LENGTH,
+                format!("Tag can only be up to {} characters long", MAX_TAG_LENGTH).as_str(),
+            );
         }
     }
 
     pub type AppStatusU32 = u32;
 
-    enum AppStatus {
+    pub enum AppStatus {
         Draft = 0,
         Published = 1,
         Unpublished = 2,
@@ -53,7 +92,7 @@ pub mod service {
     }
 
     /// Holds metadata for a registered app
-    #[table(name = "AppMetadataTable", index = 1)]
+    #[table(name = "AppMetadataTable", index = 2)]
     #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     #[serde(rename_all = "camelCase")]
     pub struct AppMetadata {
@@ -91,22 +130,128 @@ pub mod service {
         /// The timestamp of when the app was created
         pub created_at: psibase::TimePointSec,
 
+        /// The redirect URIs for the app
         pub redirect_uris: Vec<String>,
 
+        /// The owners of the app
         pub owners: Vec<AccountNumber>,
     }
 
-    #[table(name = "AppTagsTable", index = 2)]
+    impl AppMetadata {
+        fn check_valid(&self) {
+            check(
+                self.name.len() <= MAX_APP_NAME_LENGTH,
+                format!(
+                    "App name can only be up to {} characters long",
+                    MAX_APP_NAME_LENGTH
+                )
+                .as_str(),
+            );
+            check(
+                self.short_description.len() <= MAX_APP_SHORT_DESCRIPTION_LENGTH,
+                format!(
+                    "App short description can only be up to {} characters long",
+                    MAX_APP_SHORT_DESCRIPTION_LENGTH
+                )
+                .as_str(),
+            );
+            check(
+                self.long_description.len() <= MAX_APP_LONG_DESCRIPTION_LENGTH,
+                format!(
+                    "App long description can only be up to {} characters long",
+                    MAX_APP_LONG_DESCRIPTION_LENGTH
+                )
+                .as_str(),
+            );
+
+            // Check subpages start with "/"
+            check(
+                self.tos_subpage.starts_with("/"),
+                "TOS subpage must start with /",
+            );
+            check(
+                self.privacy_policy_subpage.starts_with("/"),
+                "Privacy policy subpage must start with /",
+            );
+            check(
+                self.app_homepage_subpage.starts_with("/"),
+                "App homepage subpage must start with /",
+            );
+
+            // Validate icon
+            if self.icon.len() > 0 {
+                check(
+                    self.icon_mime_type.len() > 0,
+                    "Icon MIME type is required if icon is present",
+                );
+
+                // validate the mime type is a valid image mime type for icons
+                check(
+                    self.icon_mime_type == "image/png"
+                        || self.icon_mime_type == "image/jpeg"
+                        || self.icon_mime_type == "image/svg+xml"
+                        || self.icon_mime_type == "image/x-icon"
+                        || self.icon_mime_type == "image/vnd.microsoft.icon",
+                    "Icon MIME type must be png, jpeg, svg, x-icon, or vnd.microsoft.icon",
+                );
+            }
+
+            for uri in &self.redirect_uris {
+                check(
+                    Url::parse(uri).is_ok(),
+                    format!("Invalid redirect URI format: {}", uri).as_str(),
+                );
+            }
+
+            for owner in &self.owners {
+                check(
+                    AccountsSvc::call().exists(*owner),
+                    format!("Owner account does not exist: {}", owner).as_str(),
+                );
+            }
+
+            if self.status == AppStatus::Published as AppStatusU32 {
+                let publishing_required_fields = [
+                    ("account_id", &self.account_id.to_string()),
+                    ("name", &self.name),
+                    ("short_description", &self.short_description),
+                    ("long_description", &self.long_description),
+                    ("tos_subpage", &self.tos_subpage),
+                    ("privacy_policy_subpage", &self.privacy_policy_subpage),
+                    ("app_homepage_subpage", &self.app_homepage_subpage),
+                ];
+                for (field_name, field_value) in publishing_required_fields {
+                    check(
+                        field_value.len() > 0,
+                        format!("{} is required for published apps", field_name).as_str(),
+                    );
+                }
+
+                // TODO: check each of those subpages exist
+                // in the caller's namespace in sites.
+            }
+        }
+    }
+
+    #[table(name = "AppTagsTable", index = 3)]
     #[derive(Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
-    pub struct AppTags {
+    pub struct AppTag {
+        /// The unique identifier for the app
         pub app_id: AccountNumber,
+
+        /// The unique identifier for the tag
         pub tag_id: u32,
     }
 
-    impl AppTags {
+    impl AppTag {
         #[primary_key]
         fn by_app_tag_ids(&self) -> (AccountNumber, u32) {
             (self.app_id, self.tag_id)
+        }
+
+        #[secondary_key(1)]
+        fn by_tag_id_apps(&self) -> (u32, AccountNumber) {
+            (self.tag_id, self.app_id)
         }
     }
 
@@ -122,6 +267,26 @@ pub mod service {
     }
 
     #[action]
+    fn init() {
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+
+        EventsSvc::call().setSchema(create_schema::<Wrapper>());
+        EventsSvc::call().addIndex(
+            DbId::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("appMetadataChanged"),
+            0,
+        );
+        EventsSvc::call().addIndex(
+            DbId::HistoryEvent,
+            SERVICE,
+            MethodNumber::from("appStatusChanged"),
+            1,
+        );
+    }
+
+    #[action]
     fn setMetadata(
         name: String,
         short_description: String,
@@ -131,27 +296,25 @@ pub mod service {
         tos_subpage: String,
         privacy_policy_subpage: String,
         app_homepage_subpage: String,
-        status: AppStatusU32,
         tags: Vec<String>,
         redirect_uris: Vec<String>,
         owners: Vec<AccountNumber>,
     ) {
         let app_metadata_table = AppMetadataTable::new();
         let account_id = get_sender();
-        let created_at = transact::Wrapper::call().currentBlock().time;
-
-        check(
-            tags.len() <= MAX_APP_TAGS,
-            format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
-        );
-
-        // Validate status
-        let status = AppStatus::from(status);
-
         let mut metadata = app_metadata_table
             .get_index_pk()
             .get(&account_id)
             .unwrap_or_default();
+
+        let is_new_app = metadata.account_id.value == 0;
+
+        let status: AppStatusU32 = if is_new_app {
+            AppStatus::Draft as AppStatusU32
+        } else {
+            metadata.status
+        };
+
         metadata.account_id = account_id;
         metadata.name = name;
         metadata.short_description = short_description;
@@ -161,24 +324,75 @@ pub mod service {
         metadata.tos_subpage = tos_subpage;
         metadata.privacy_policy_subpage = privacy_policy_subpage;
         metadata.app_homepage_subpage = app_homepage_subpage;
-        metadata.status = status as AppStatusU32;
-        metadata.created_at = if metadata.created_at.seconds == 0 {
-            created_at
-        } else {
-            metadata.created_at
-        };
+        metadata.status = status;
         metadata.redirect_uris = redirect_uris;
         metadata.owners = owners;
 
-        println!("metadata to be inserted: {:?}", metadata);
+        // If the app is new, set the created_at to the current time
+        if is_new_app {
+            let created_at = transact::Wrapper::call().currentBlock().time;
+            metadata.created_at = created_at;
+        }
+
+        metadata.check_valid();
+
+        check(
+            tags.len() <= MAX_APP_TAGS,
+            format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
+        );
+
+        // check there are no duplicate tags in the input
+        let unique_tags = (&tags).into_iter().collect::<HashSet<_>>();
+        check(unique_tags.len() == tags.len(), "Tags must be unique");
 
         app_metadata_table.put(&metadata).unwrap();
 
         updateAppTags(account_id, &tags);
 
-        println!("metadata inserted !!!");
-
         Wrapper::emit().history().appMetadataChanged(metadata);
+    }
+
+    #[action]
+    fn publish(account_id: AccountNumber) {
+        let app_metadata_table = AppMetadataTable::new();
+        let mut metadata = app_metadata_table.get_index_pk().get(&account_id).unwrap();
+        let sender = get_sender();
+        check(
+            account_id == sender || metadata.owners.contains(&sender),
+            "Only app owners can unpublish the app",
+        );
+        check(
+            metadata.status != AppStatus::Published as AppStatusU32,
+            "App is already published",
+        );
+        metadata.status = AppStatus::Published as AppStatusU32;
+        metadata.check_valid();
+        app_metadata_table.put(&metadata).unwrap();
+
+        Wrapper::emit()
+            .history()
+            .appStatusChanged(account_id, metadata.status);
+    }
+
+    #[action]
+    fn unpublish(account_id: AccountNumber) {
+        let app_metadata_table = AppMetadataTable::new();
+        let mut metadata = app_metadata_table.get_index_pk().get(&account_id).unwrap();
+        let sender = get_sender();
+        check(
+            account_id == sender || metadata.owners.contains(&sender),
+            "Only app owners can unpublish the app",
+        );
+        check(
+            metadata.status == AppStatus::Published as AppStatusU32,
+            "App is not published",
+        );
+        metadata.status = AppStatus::Unpublished as AppStatusU32;
+        app_metadata_table.put(&metadata).unwrap();
+
+        Wrapper::emit()
+            .history()
+            .appStatusChanged(account_id, metadata.status);
     }
 
     #[action]
@@ -186,7 +400,6 @@ pub mod service {
         let app_metadata_table = AppMetadataTable::new();
         let app_tags_table = AppTagsTable::new();
         let tags_table = TagsTable::new();
-        // Get the app metadata
         let metadata = app_metadata_table.get_index_pk().get(&account_id)?;
 
         // Get the app tag IDs
@@ -212,7 +425,7 @@ pub mod service {
     }
 
     #[action]
-    fn getRelatedTags(partial_tag: String) -> Option<RelatedTags> {
+    fn getRelatedTags(partial_tag: String) -> RelatedTags {
         let table = TagsTable::new();
         let idx = table.get_index_by_tags();
 
@@ -220,22 +433,25 @@ pub mod service {
         let excluded_to = increment_last_char(from.clone());
 
         let tags: Vec<String> = idx
-            .range((from, 0)..(excluded_to, 0))
+            .range(from..excluded_to)
             .take(10)
             .map(|tag_row| tag_row.tag)
             .collect();
 
-        Some(RelatedTags { tags })
+        RelatedTags { tags }
     }
 
     #[event(history)]
     fn appMetadataChanged(app_metadata: AppMetadata) {}
 
+    #[event(history)]
+    fn appStatusChanged(app_account_id: AccountNumber, status: AppStatusU32) {}
+
     fn process_tag(
         tag: &str,
         account_id: AccountNumber,
-        existing_app_tags: &Vec<AppTags>,
-    ) -> AppTags {
+        existing_app_tags: &Vec<AppTag>,
+    ) -> AppTag {
         if let Some(existing_tag) = find_existing_app_tag(tag, existing_app_tags) {
             existing_tag.clone()
         } else {
@@ -243,10 +459,10 @@ pub mod service {
         }
     }
 
-    fn create_new_app_tag(tag: &str, account_id: AccountNumber) -> AppTags {
+    fn create_new_app_tag(tag: &str, account_id: AccountNumber) -> AppTag {
         let app_tags_table = AppTagsTable::new();
         let tag_id = get_or_create_tag_id(tag);
-        let new_app_tag = AppTags {
+        let new_app_tag = AppTag {
             app_id: account_id,
             tag_id,
         };
@@ -254,7 +470,7 @@ pub mod service {
         new_app_tag
     }
 
-    fn find_existing_app_tag(tag: &str, existing_app_tags: &Vec<AppTags>) -> Option<AppTags> {
+    fn find_existing_app_tag(tag: &str, existing_app_tags: &Vec<AppTag>) -> Option<AppTag> {
         let tags_table = TagsTable::new();
         existing_app_tags
             .iter()
@@ -272,7 +488,7 @@ pub mod service {
         let app_tags_table = AppTagsTable::new();
 
         // Get existing app tags
-        let existing_app_tags: Vec<AppTags> = app_tags_table
+        let existing_app_tags: Vec<AppTag> = app_tags_table
             .get_index_pk()
             .range((account_id, 0)..(account_id, u32::MAX))
             .collect();
@@ -285,17 +501,15 @@ pub mod service {
         }
 
         remove_obsolete_tags(&existing_app_tags, &new_app_tags);
-
-        // todo: validate if tags are valid (lowercase alphanumeric and dashes)
     }
 
     fn get_or_create_tag_id(tag: &str) -> u32 {
         let tags_table = TagsTable::new();
         let idx = tags_table.get_index_by_tags();
-        idx.range((tag.to_string(), 0)..(tag.to_string(), u32::MAX))
-            .find(|tag_row| tag_row.tag == tag)
+        let tag_str = tag.to_string();
+        idx.get(&tag_str)
             .map(|tag_row| tag_row.id)
-            .unwrap_or_else(|| create_new_tag(tag.to_string()))
+            .unwrap_or_else(|| create_new_tag(tag_str))
     }
 
     fn create_new_tag(tag: String) -> u32 {
@@ -310,11 +524,12 @@ pub mod service {
             id: new_id,
             tag: tag.to_string(),
         };
+        new_tag.check_valid();
         tags_table.put(&new_tag).unwrap();
         new_id
     }
 
-    fn remove_obsolete_tags(existing_app_tags: &[AppTags], new_app_tags: &[AppTags]) {
+    fn remove_obsolete_tags(existing_app_tags: &[AppTag], new_app_tags: &[AppTag]) {
         let app_tags_table = AppTagsTable::new();
         for existing_tag in existing_app_tags {
             if !new_app_tags
@@ -322,7 +537,19 @@ pub mod service {
                 .any(|at| at.tag_id == existing_tag.tag_id)
             {
                 app_tags_table.remove(existing_tag);
-                // TODO: Check if there are any apps using the tag from tags_table and remove if not
+
+                // If there are no apps using the tag, remove the tag
+                let tag_apps_count = app_tags_table
+                    .get_index_by_tag_id_apps()
+                    .range(
+                        (existing_tag.tag_id, AccountNumber::new(0))
+                            ..(existing_tag.tag_id + 1, AccountNumber::new(0)),
+                    )
+                    .count();
+                if tag_apps_count == 0 {
+                    let tags_table = TagsTable::new();
+                    tags_table.erase(&existing_tag.tag_id);
+                }
             }
         }
     }
@@ -331,10 +558,11 @@ pub mod service {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::{AppStatus, AppStatusU32};
     use psibase::account;
 
-    #[psibase::test_case(packages("RegistryPackage"))]
-    fn test_foo(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    #[psibase::test_case(packages("AppRegistry"))]
+    fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
 
         Wrapper::push_from(&chain, account!("alice"))
@@ -347,7 +575,6 @@ mod tests {
                 "/tos".to_string(),
                 "/privacy-policy".to_string(),
                 "/".to_string(),
-                0, // DRAFT
                 vec![
                     "cozy".to_string(),
                     "cuisine".to_string(),
@@ -372,6 +599,7 @@ mod tests {
         assert_eq!(metadata.metadata.privacy_policy_subpage, "/privacy-policy");
         assert_eq!(metadata.metadata.app_homepage_subpage, "/");
         assert_eq!(metadata.metadata.status, 0);
+        assert_eq!(metadata.metadata.status, AppStatus::Draft as AppStatusU32);
 
         Ok(())
     }

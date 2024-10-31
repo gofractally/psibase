@@ -8,15 +8,15 @@ rust-version = "1.64"
 edition = "2021"
 publish = false
 repository = "https://github.com/gofractally/psibase"
-homepage = "https://psibase.io"
+homepage = "https://github.com/gofractally/psibase"
 
 [package]
-edition = "2021"
 name = "registry_package"
-version = "0.1.0"
+edition.workspace = true
+version.workspace = true
 
 [package.metadata.psibase]
-package-name = "RegistryPackage"
+package-name = "AppRegistry"
 description = "Registry for psibase apps"
 services = ["registry"]
 
