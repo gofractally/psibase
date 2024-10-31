@@ -7,6 +7,7 @@
 #include <psibase/serveSchema.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <regex>
+#include <services/system/Accounts.hpp>
 #include <sstream>
 
 using namespace psibase;
@@ -324,8 +325,12 @@ namespace SystemService
                      // Decompress the content (don't bother if it's a HEAD request)
                      if (request.method != "HEAD")
                      {
-                        Actor<DecompressorInterface> decoder(Sites::service,
-                                                             AccountNumber{*decompressor});
+                        auto decompressorAccount = AccountNumber{*decompressor};
+
+                        check(to<Accounts>().exists(decompressorAccount),
+                              "[Fallback decompression error] Decompressor account not found");
+
+                        Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
                         content->content = decoder.decompress(content->content);
                      }
                      headers.push_back({"Content-Encoding", "identity"});
