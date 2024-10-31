@@ -12,17 +12,15 @@ The `sites` service is used to host content for an account and serve it over HTT
 
 The `Content-Security-Policy` header aids security efforts, as modern browsers restrict the capabilities of the document on the client-side according to the policy expressed in this header. The sites server uses a permissive baseline CSP header that should permit most common requirements.
 
-Default policy:
-
-```
-          "default-src 'self';"
-          "font-src 'self' https:;"
-          "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"
-          "img-src *;"
-          "style-src 'self' 'unsafe-inline';"
-          "frame-src *;"
-          "connect-src * blob:;"
-```
+| Default policy | Values                                           |
+| -------------- | ------------------------------------------------ |
+| `default-src`  | `self`                                           |
+| `font-src`     | `self, https:`                                   |
+| `script-src`   | `self, unsafe-eval, unsafe-inline, blob: https:` |
+| `img-src`      | `*`                                              |
+| `style-src`    | `self, unsafe-inline`                            |
+| `frame-src`    | `*`                                              |
+| `connect-src`  | `*, blob:`                                       |
 
 ### Dynamic CSP
 
@@ -30,7 +28,7 @@ If the baseline CSP is insufficient, the `sites` service allows users to customi
 
 The priority of the CSP header applied to content is given to a header set for a specific path, then the header set for an entire site, and finally will default to the default policy if no custom headers were provided.
 
-## Http caching
+## HTTP caching
 
 On upload, the `sites` server calculates and stores a hash of the content at each path. The server now returns the hash in an [`etag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag) header, as well as setting the `cache-control` header to `no-cache`.
 
@@ -44,18 +42,18 @@ Uploading assets to a psibase network using the the psibase CLI will automatical
 
 Automatically compressed types:
 
-- "text/plain"
-- "text/html"
-- "text/css"
-- "application/javascript"
-- "application/json"
-- "application/xml"
-- "application/rss+xml"
-- "application/atom+xml"
-- "image/svg+xml"
-- "font/ttf"
-- "font/otf"
-- "application/wasm"
+- text/plain
+- text/html
+- text/css
+- application/javascript
+- application/json
+- application/xml
+- application/rss+xml
+- application/atom+xml
+- image/svg+xml
+- font/ttf
+- font/otf
+- application/wasm
 
 Compression level can be specified in every CLI where it makes sense:
 
@@ -68,6 +66,6 @@ The compression level ranges from 1-11, where 1 is the fastest and 11 is the bes
 
 ### Fallback decompression
 
-If the client uses the "Accept-Encoding" HTTP request header to indicate that it does not support the encoding type of the requested content, and the server knows how to decompress the content, then the server will automatically decompress the content before serving it to the client.
+If the client uses the `Accept-Encoding` HTTP request header to indicate that it does not support the encoding type of the requested content, and the server knows how to decompress the content, then the server will automatically decompress the content before serving it to the client.
 
 The only encoding type that currently supports fallback decompression is Brotli.
