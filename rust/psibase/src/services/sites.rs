@@ -89,6 +89,15 @@ mod service {
         unimplemented!()
     }
 
+    /// Checks whether a request for content on a site at the given path is valid (such a request will not produce a 404).
+    ///
+    /// Note: For single-page applications, static assets (e.g. 'style.css') can be checked normally. However, all other assets
+    /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
+    #[action]
+    fn isValidPath(site: crate::AccountNumber, path: String) -> bool {
+        unimplemented!()
+    }
+
     /// Enables/disables single-page application mode.
     /// When enabled, all content requests return the root document.
     #[action]

@@ -94,6 +94,12 @@ namespace SystemService
       /// Removes content from the caller's subdomain
       void removeSys(std::string path);
 
+      /// Checks whether a request for content on a site at the given path is valid (such a request will not produce a 404).
+      ///
+      /// Note: For single-page applications, static assets (e.g. 'style.css') can be checked normally. However, all other assets
+      /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
+      bool isValidPath(psibase::AccountNumber site, std::string path);
+
       /// Enables/disables single-page application mode.
       /// When enabled, all content requests return the root document.
       void enableSpa(bool enable);
@@ -124,6 +130,7 @@ namespace SystemService
                 method(serveSys, request),
                 method(storeSys, path, contentType, contentEncoding, content),
                 method(removeSys, path),
+                method(isValidPath, site, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
                 method(enableCache, enable))

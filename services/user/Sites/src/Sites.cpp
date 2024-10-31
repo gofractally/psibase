@@ -67,6 +67,7 @@ namespace SystemService
          return AccountNumber(serviceName);
       }
 
+      // Checks for an extension to determine if it is a static asset
       bool isStaticAsset(const std::string& target)
       {
          auto last_slash_pos = target.find_last_of('/');
@@ -400,6 +401,39 @@ namespace SystemService
       Tables tables{};
       auto   table = tables.open<SitesContentTable>();
       table.erase(SitesContentKey{getSender(), path});
+   }
+
+   bool Sites::isValidPath(AccountNumber site, std::string path)
+   {
+      auto target = normalizeTarget(path);
+      auto isSpa  = useSpa(site);
+
+      // For a single-page application, all we can do is verify static assets and the root document
+      if (isSpa)
+      {
+         if (!isStaticAsset(target))
+         {
+            target = "/index.html";
+         }
+
+         auto content = Tables{}.open<SitesContentTable>().get(SitesContentKey{site, target});
+         return !!content;
+      }
+      else
+      {
+         // For traditional multi-page apps, we verify the path, and if it's not a static asset then we also
+         // automatically check for `target/index.html`
+         auto index   = Tables{}.open<SitesContentTable>().getIndex<0>();
+         auto content = index.get(SitesContentKey{site, target});
+         if (!content)
+         {
+            if (target.ends_with('/'))
+               content = index.get(SitesContentKey{site, target + "index.html"});
+            else if (!isStaticAsset(target))
+               content = index.get(SitesContentKey{site, target + "/index.html"});
+         }
+         return !!content;
+      }
    }
 
    void Sites::enableSpa(bool enable)
