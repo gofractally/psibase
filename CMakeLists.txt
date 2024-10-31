@@ -808,7 +808,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts AuthAny AuthSig Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
