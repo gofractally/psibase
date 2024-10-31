@@ -2,20 +2,20 @@
 
 #include <psibase/psibase.hpp>
 #include <psio/view.hpp>
+#include <vector>
 
 namespace UserService
 {
+   /// The Brotli service is used to decompress content encoded with the Brotli algorithm.
+   ///
+   /// It implements the `Sites` DecompressorInterface
    struct Brotli
    {
-      static constexpr auto service = psibase::AccountNumber("brotli");
-      std::string           compress(const psio::view<std::string>& input);
-      std::string           decompress(const psio::view<std::string>& input);
+      static constexpr auto service = psibase::AccountNumber("psi-brotli");
+
+      /// Decompresses a Brotli-compressed byte array
+      std::vector<char> decompress(const std::vector<char>& content);
    };
 
-   // clang-format off
-   PSIO_REFLECT(Brotli,
-      method(compress, input),
-      method(decompress, input),
-   );
-   // clang-format on
+   PSIO_REFLECT(Brotli, method(decompress, content), );
 }  // namespace UserService
