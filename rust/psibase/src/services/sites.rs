@@ -68,11 +68,6 @@ mod service {
 
     /// Serves a request by looking up the content uploaded to the specified subdomain
     #[action]
-    fn enableSpa(enable: bool) {
-        unimplemented!()
-    }
-
-    #[action]
     fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }
