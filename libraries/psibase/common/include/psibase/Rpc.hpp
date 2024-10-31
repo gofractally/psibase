@@ -35,6 +35,7 @@ namespace psibase
       ok                  = 200,
       notModified         = 304,
       notFound            = 404,
+      notAcceptable       = 406,
       internalServerError = 500,
    };
 

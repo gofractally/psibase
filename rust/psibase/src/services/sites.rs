@@ -40,6 +40,27 @@ struct GlobalCspRow {
     csp: String,
 }
 
+/// Decompress content
+///
+/// `DecompressorInterface` is implemented by services that can decompress content
+/// with a specific encoding.
+///
+/// Decompressor services should not inherit from this struct,
+/// instead they should define actions with matching signatures.
+///
+/// The `sites` service uses decompressor services who implement this interface to
+/// decompress content when the client's accepted encodings do not include the
+/// content's encoding.
+#[allow(dead_code)]
+struct DecompressorInterface;
+impl DecompressorInterface {
+    /// Decompresses content compressed with some algorithm
+    #[allow(dead_code, unused_variables)]
+    fn decompress(content: Vec<u8>) -> Vec<u8> {
+        unimplemented!()
+    }
+}
+
 #[crate::service(name = "sites", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {

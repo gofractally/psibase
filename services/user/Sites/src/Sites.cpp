@@ -6,6 +6,8 @@
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSchema.hpp>
 #include <psibase/serveSimpleUI.hpp>
+#include <regex>
+#include <sstream>
 
 using namespace psibase;
 
@@ -13,6 +15,31 @@ namespace SystemService
 {
    namespace
    {
+      std::string to_lower(const std::string& str)
+      {
+         std::string lower;
+         std::transform(str.begin(), str.end(), std::back_inserter(lower), ::tolower);
+         return lower;
+      }
+
+      template <typename T>
+      bool contains(const std::vector<T>& vec, const T& value)
+      {
+         return std::find(vec.begin(), vec.end(), value) != vec.end();
+      }
+
+      std::vector<std::string> split(const std::string& str, char delimiter)
+      {
+         std::vector<std::string> tokens;
+         std::stringstream        ss(str);
+         std::string              token;
+         while (std::getline(ss, token, delimiter))
+         {
+            tokens.push_back(to_lower(token));
+         }
+         return tokens;
+      }
+
       bool isSubdomain(const psibase::HttpRequest& req)
       {
          return req.host.size() > req.rootHost.size() + 1  //
@@ -80,14 +107,97 @@ namespace SystemService
           ;
 
       // Accepted content encodings
-      const std::array<std::string, 2> validEncodings = {"gzip", "br"};
+      const std::array<std::string, 2> validEncodings = {"br", "gzip"};
+
+      // Content-coding-identifier, e.g. "br", "gzip", etc.
+      using cci = std::string;
+      // The account that holds the service code implementing the DecompressorInterface
+      using decompressor_account                                              = std::string;
+      const std::array<std::pair<cci, decompressor_account>, 1> decompressors = {
+          {{"br", "psi-brotli"}}  //
+      };
+
+      std::vector<std::string> clarify_accepted_encodings(
+          const std::vector<std::string>& accepted_encodings)
+      {
+         // Any encodings specified with ;q=0 are being explicitly rejected by the client. Remove them.
+         // Any other quality values should be ignored, as we do not support server side compression.
+         // If identity is not explicitly rejected, ensure it's assumed to be supported.
+         //
+         // Justification on ignoring qvalues from RFC 7231:
+         //   "Note: Most HTTP/1.0 applications do not recognize or obey qvalues
+         //   associated with content-codings.  This means that qvalues might
+         //   not work..."
+         std::vector<std::string> rejected;
+         std::vector<std::string> encodings;
+         for (const auto& encoding : accepted_encodings)
+         {
+            auto reject_index = encoding.find(";q=0");
+            if (reject_index != encoding.npos)
+            {
+               rejected.push_back(encoding.substr(0, reject_index));
+               continue;
+            }
+
+            auto quality_index = encoding.find(";q=");
+            if (quality_index != encoding.npos)
+            {
+               encodings.push_back(encoding.substr(0, quality_index));
+            }
+            else
+            {
+               encodings.push_back(encoding);
+            }
+         }
+
+         // If identity was not already added
+         if (!contains<std::string>(encodings, "identity"))
+         {
+            // And it was not explicitly rejected
+            if (!contains<std::string>(rejected, "identity") &&
+                !contains<std::string>(rejected, "*"))
+            {
+               // Add it
+               encodings.push_back("identity");
+            }
+         }
+
+         return encodings;
+      }
+
+      std::optional<std::string> get_decompressor(const std::string& encoding)
+      {
+         auto it = std::find_if(decompressors.begin(), decompressors.end(),
+                                [encoding](const auto& pair) { return pair.first == encoding; });
+         if (it == decompressors.end())
+            return std::nullopt;
+         return it->second;
+      }
+
+      std::optional<std::string> get_header_value(const HttpRequest& request,
+                                                  const std::string& name)
+      {
+         auto it = std::find_if(request.headers.begin(), request.headers.end(),
+                                [name](const HttpHeader& header)
+                                { return to_lower(header.name) == to_lower(name); });
+         if (it == request.headers.end())
+            return std::nullopt;
+         return it->value;
+      }
+
+      HttpReply make406(std::string_view message)
+      {
+         return HttpReply{
+             .status      = HttpStatus::notAcceptable,
+             .contentType = "text/plain",
+             .body        = std::vector<char>(message.begin(), message.end()),
+         };
+      }
 
       bool shouldCache(const HttpRequest& request, const std::string& etag)
       {
-         auto it =
-             std::find_if(request.headers.begin(), request.headers.end(),
-                          [](const HttpHeader& header) { return header.name == "If-None-Match"; });
-         return it != request.headers.end() && it->value == etag;
+         auto ifNoneMatch = get_header_value(request, "If-None-Match");
+         return ifNoneMatch && *ifNoneMatch == etag;
       }
 
    }  // namespace
@@ -160,9 +270,75 @@ namespace SystemService
                 {"Cache-Control", "no-cache"},
                 {"ETag", etag},
             }};
-            if (content->contentEncoding)
+
+            // RFC 7231
+            // "A request without an Accept-Encoding header field implies that the
+            // user agent has no preferences regarding content-codings.
+            //
+            // ...If a non-empty Accept-Encoding header field is present in a request and
+            // none of the available representations for the response have a content
+            // coding that is listed as acceptable, the origin server SHOULD send a
+            // response without any content coding unless the identity coding is
+            // indicated as unacceptable.""
+            auto acceptEncoding = get_header_value(request, "Accept-Encoding");
+            if (acceptEncoding)
             {
-               headers.push_back({"Content-Encoding", *content->contentEncoding});
+               auto trimmed           = std::regex_replace(*acceptEncoding, std::regex("\\s+"), "");
+               auto acceptedEncodings = split(trimmed, ',');
+               acceptedEncodings      = clarify_accepted_encodings(acceptedEncodings);
+
+               auto is_accepted = [&acceptedEncodings](const std::string& e) {  //
+                  return contains<std::string>(acceptedEncodings, e);
+               };
+
+               if (!content->contentEncoding)
+               {
+                  if (is_accepted("identity"))
+                  {
+                     headers.push_back({"Content-Encoding", "identity"});
+                  }
+                  else
+                  {
+                     return make406(
+                         "Requested encoding not supported. Requested content uses "
+                         "identity encoding.");
+                  }
+               }
+               else  // Requested content has an encoding
+               {
+                  const auto encoding = *content->contentEncoding;
+                  if (is_accepted(encoding))
+                  {
+                     headers.push_back({"Content-Encoding", encoding});
+                  }
+                  else
+                  {
+                     auto decompressor = get_decompressor(encoding);
+                     // If identity is accepted and we can decompress the content, do that
+                     // Otherwise, 406
+                     if (!is_accepted("identity") || !decompressor)
+                     {
+                        return make406("Requested encoding not supported.");
+                     }
+
+                     // Decompress the content
+                     Actor<DecompressorInterface> decoder(Sites::service,
+                                                          AccountNumber{*decompressor});
+                     content->content = decoder.decompress(content->content);
+                     headers.push_back({"Content-Encoding", "identity"});
+                  }
+               }
+            }
+            else  // Request does not specify accepted encodings
+            {
+               if (content->contentEncoding)
+               {
+                  headers.push_back({"Content-Encoding", *content->contentEncoding});
+               }
+               else
+               {
+                  headers.push_back({"Content-Encoding", "identity"});
+               }
             }
 
             return HttpReply{

@@ -50,6 +50,24 @@ namespace SystemService
    PSIO_REFLECT(GlobalCspRow, account, csp)
    using GlobalCspTable = psibase::Table<GlobalCspRow, &GlobalCspRow::account>;
 
+   /// Decompress content
+   ///
+   /// `DecompressorInterface` is implemented by services that can decompress content
+   /// with a specific encoding.
+   ///
+   /// Decompressor services should not inherit from this struct,
+   /// instead they should define actions with matching signatures.
+   ///
+   /// The `sites` service uses decompressor services who implement this interface to
+   /// decompress content when the client's accepted encodings do not include the
+   /// content's encoding.
+   struct DecompressorInterface
+   {
+      /// Decompresses content compressed with some algorithm
+      std::vector<char> decompress(const std::vector<char>& content);
+   };
+   PSIO_REFLECT(DecompressorInterface, method(decompress, content))
+
    /// Provide web hosting
    ///
    /// This service provides web hosting to all accounts. It is the default server that handles
