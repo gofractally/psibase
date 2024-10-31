@@ -46,7 +46,7 @@ impl Intf for TransactPlugin {
 
         let service = Host::client::get_sender_app()
             .app
-            .ok_or_else(|| OnlyAvailableToPlugins.err("add_action_to_transaction"))?;
+            .ok_or_else(|| OnlyAvailableToPlugins("add_action_to_transaction"))?;
 
         CurrentActions::push(service, method_name, packed_args);
 
@@ -83,13 +83,13 @@ impl Admin for TransactPlugin {
             proofs: get_proofs(&sender, &sha256(&tx.packed()))?,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
-            return Err(ClaimProofMismatch.err("Number of proofs does not match number of claims"));
+            return Err(ClaimProofMismatch.into());
         }
 
         let trace = from_str::<TransactionTrace>(&signed_tx.publish()?).unwrap();
 
         match trace.error {
-            Some(err) => Err(TransactionError.err(&err)),
+            Some(err) => Err(TransactionError(err).into()),
             None => {
                 println!("Transaction executed successfully");
                 Ok(())
