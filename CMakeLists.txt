@@ -766,7 +766,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage
+                    Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
 
 psibase_package(
