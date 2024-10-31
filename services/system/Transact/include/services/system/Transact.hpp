@@ -192,6 +192,15 @@ namespace SystemService
 
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
 
+   struct SnapshotInfo
+   {
+      psibase::TimePointSec lastSnapshot;
+      std::uint32_t         snapshotInterval;
+      auto                  key() const { return psibase::SingletonKey(); }
+   };
+   PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
+   using SnapshotInfoTable = psibase::Table<SnapshotInfo, &SnapshotInfo::key>;
+
    /// All transactions enter the chain through this service
    ///
    /// This privileged service dispatches top-level actions to other
@@ -210,8 +219,11 @@ namespace SystemService
       static constexpr uint64_t serviceFlags =
           psibase::CodeRow::allowSudo | psibase::CodeRow::allowWriteNative;
 
-      using Tables = psibase::
-          ServiceTables<TransactStatusTable, BlockSummaryTable, IncludedTrxTable, CallbacksTable>;
+      using Tables = psibase::ServiceTables<TransactStatusTable,
+                                            BlockSummaryTable,
+                                            IncludedTrxTable,
+                                            CallbacksTable,
+                                            SnapshotInfoTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
       ///
@@ -233,6 +245,12 @@ namespace SystemService
 
       /// Called by native code at the beginning of each block
       void startBlock();
+
+      /// Sets the time between snapshots
+      ///
+      /// A value of 0 will disable snapshots. This is a chain-wide
+      /// setting because snapshots are signed by the block producers.
+      void setSnapTime(std::uint32_t seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
@@ -297,6 +315,7 @@ namespace SystemService
                 method(startBoot, bootTransactions),
                 method(finishBoot),
                 method(startBlock),
+                method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),

@@ -1,5 +1,5 @@
-import { Plugin } from "./plugin/plugin";
-import { HostInterface } from "./hostInterface";
+import { Plugin } from "./plugin";
+import { HostInterface } from "../hostInterface";
 
 export interface LoadedPlugin {
     plugin: Plugin;

@@ -23,17 +23,6 @@ pub enum DbId {
     /// The first 64 bits of the key match the service.
     WriteOnly,
 
-    /// Data that is not part of consensus
-    ///
-    /// Only accessible to subjective services during transactions,
-    /// but readable by all services during RPC. Doesn't undo
-    /// from aborting transactions, aborting blocks, or forking
-    /// blocks. Individual nodes may modify this database or wipe
-    //  it entirely at will.
-    ///
-    /// The first 64 bits of the key match the service.
-    Subjective,
-
     /// Tables used by native code
     ///
     /// This database enforces constraints during write. Only
@@ -125,11 +114,38 @@ pub enum DbId {
     /// block signatures
     BlockProof,
 
+    /// Not accessible to WASM. During joint consensus, this holds a
+    /// subset of native as of the last irreversible block. Outside
+    /// joint consensus, it is empty.
+    PrevAuthServices,
+
     /// Number of defined databases
     ///
     /// This number may grow in the future
-    NumDatabases,
+    NumChainDatabases,
+
+    /// Data that is not part of consensus
+    ///
+    /// Only accessible to subjective services during transactions,
+    /// but readable by all services during RPC. Doesn't undo
+    /// from aborting transactions, aborting blocks, or forking
+    /// blocks. Individual nodes may modify this database or wipe
+    //  it entirely at will.
+    ///
+    /// The first 64 bits of the key match the service.
+    Subjective = BEGIN_INDEPENDENT,
+
+    /// Subjective tables used by native code
+    ///
+    /// Not fully implemented yet and not available to services. Doesn't
+    /// undo from aborting transactions, aborting blocks, or forking
+    /// blocks.
+    NativeSubjective,
+
+    EndIndependent,
 }
+
+const BEGIN_INDEPENDENT: u32 = 64;
 
 impl Pack for DbId {
     const FIXED_SIZE: u32 = 4;
@@ -147,14 +163,17 @@ impl<'a> Unpack<'a> for DbId {
 
     fn unpack(src: &'a [u8], pos: &mut u32) -> fracpack::Result<Self> {
         let u32_form = u32::unpack(src, pos)?;
-        if u32_form >= DbId::NumDatabases as u32 {
+        if u32_form >= DbId::NumChainDatabases as u32
+            && !(BEGIN_INDEPENDENT..(DbId::EndIndependent as u32)).contains(&u32_form)
+        {
             return Err(fracpack::Error::BadEnumIndex);
         }
         Ok(unsafe { std::mem::transmute(u32_form) })
     }
 
     fn verify(src: &'a [u8], pos: &mut u32) -> fracpack::Result<()> {
-        u32::verify(src, pos)
+        DbId::unpack(src, pos)?;
+        Ok(())
     }
 }
 
