@@ -22,7 +22,7 @@ namespace psibase
    {
       std::string             host;         ///< Fully-qualified domain name
       std::string             rootHost;     ///< host, but without service subdomain
-      std::string             method;       ///< "GET" or "POST"
+      std::string             method;       ///< "GET", "POST", "OPTIONS", "HEAD"
       std::string             target;       ///< Absolute path, e.g. "/index.js"
       std::string             contentType;  ///< "application/json", "text/html", ...
       std::vector<HttpHeader> headers;      ///< HTTP Headers

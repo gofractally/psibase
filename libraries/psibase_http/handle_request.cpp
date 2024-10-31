@@ -344,7 +344,7 @@ namespace psibase::http
          if (!server.http_config->allow_origin.empty() && req_allow_cors)
          {
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS");
+            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
             res.set(bhttp::field::access_control_allow_headers, "*");
          }
       };
@@ -627,10 +627,10 @@ namespace psibase::http
                   {
                      return send(ok_no_content());
                   }
-                  else if (req.method() != bhttp::verb::get)
+                  else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
                   {
-                     return send(
-                         method_not_allowed(req.target(), req.method_string(), "GET, OPTIONS"));
+                     return send(method_not_allowed(req.target(), req.method_string(),
+                                                    "GET, OPTIONS, HEAD"));
                   }
 
                   std::vector<char> contents;
@@ -673,6 +673,8 @@ namespace psibase::http
                data.method = "GET";
             else if (req.method() == bhttp::verb::post)
                data.method = "POST";
+            else if (req.method() == bhttp::verb::head)
+               data.method = "HEAD";
             else
                return send(
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
