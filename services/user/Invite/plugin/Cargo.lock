@@ -1523,6 +1523,7 @@ dependencies = [
  "psibase_names",
  "quote",
  "syn 1.0.109",
+ "toml",
 ]
 
 [[package]]

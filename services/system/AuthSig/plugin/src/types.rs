@@ -24,6 +24,6 @@ pub trait TryFromPemStr: Sized {
 
 impl TryFromPemStr for pem::Pem {
     fn try_from_pem_str(key_string: &Pem) -> Result<Self, CommonTypes::Error> {
-        Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError.err(&e.to_string()))?)
+        Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError(e.to_string()))?)
     }
 }
