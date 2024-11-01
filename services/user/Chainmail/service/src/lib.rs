@@ -16,8 +16,8 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        anyhow, check, create_schema, get_sender, AccountNumber, DbId, Fracpack, HttpReply,
-        HttpRequest, MethodNumber, Table, TimePointSec, ToSchema,
+        anyhow, check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
+        HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
@@ -140,10 +140,33 @@ mod service {
     #[event(history)]
     pub fn archive(msg_id: String) {}
 
+    use async_graphql::connection::Connection;
+    struct Query;
+
+    #[async_graphql::Object]
+    impl Query {
+        async fn get_saved_msgs(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
+            TableQuery::new(SavedMessagesTable::new().get_index_pk())
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+        }
+    }
+
     /// Serve REST calls
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_rest_api(&request))
+        None.or_else(|| serve_graphql(&request, Query))
+            .or_else(|| serve_rest_api(&request))
     }
 }

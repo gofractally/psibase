@@ -1,8 +1,23 @@
+use chrono::DateTime;
 use psibase::TimePointSec;
 use serde::{de, Deserialize};
 use serde_aux::prelude::*;
 
 use crate::bindings::exports::chainmail::plugin::queries::Message;
+
+// #[derive(Deserialize)]
+// #[serde(remote = "Message")]
+// struct MessageDef {
+//     msg_id: u64,
+//     receiver: String,
+//     sender: String,
+//     subject: String,
+//     body: String,
+//     datetime: u32,
+// }
+
+// #[derive(Deserialize)]
+// struct Helper(#[serde(with = "MessageDef")] Message);
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TempMessageForDeserialization {
@@ -31,7 +46,9 @@ impl Into<Message> for TempMessageForDeserialization {
             sender: self.sender,
             subject: self.subject,
             body: self.body,
-            datetime: self.datetime,
+            datetime: DateTime::from_timestamp(self.datetime as i64, 0)
+                .unwrap()
+                .to_string(),
         }
     }
 }

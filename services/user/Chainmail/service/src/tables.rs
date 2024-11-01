@@ -1,3 +1,4 @@
+use async_graphql::SimpleObject;
 use psibase::{AccountNumber, Fracpack, TableRecord, TimePointSec};
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +12,7 @@ impl TableRecord for SavedMessage {
     }
 }
 
-#[derive(Debug, Fracpack, Serialize, Deserialize)]
+#[derive(Debug, Fracpack, Serialize, Deserialize, SimpleObject)]
 pub struct SavedMessage {
     pub msg_id: u64,
     pub receiver: AccountNumber,

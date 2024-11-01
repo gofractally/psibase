@@ -10,7 +10,9 @@ fn parse_query(query: &str) -> HashMap<String, String> {
 
     let itr = query.split("&");
     for p in itr {
-        let kv = p.split_once("=").unwrap();
+        let kv = p
+            .split_once("=")
+            .expect(&format!("Invalid http query str: {}", query));
         params.insert(kv.0.to_string(), kv.1.trim_start_matches('=').to_string());
     }
     params
@@ -44,7 +46,7 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
     }
 
     let mut r_clause = String::new();
-    let r_opt = params.get(&String::from("receiver"));
+    let r_opt = params.get("receiver");
     if let Some(r) = r_opt {
         if !validate_user(r) {
             return None;
@@ -85,15 +87,15 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
         select_clause,
         from_clause,
         where_clause_archived_or_not,
-        if s_opt.is_some() || r_opt.is_some() {
-            "AND"
-        } else {
-            ""
-        },
         if params.contains_key("id") {
             format!("AND sent.rowid = {}", params.get("id")?)
         } else {
             String::from("")
+        },
+        if s_opt.is_some() || r_opt.is_some() {
+            "AND"
+        } else {
+            ""
         },
         where_clause_sender_receiver,
     ))

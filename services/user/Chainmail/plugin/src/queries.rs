@@ -5,17 +5,18 @@ use crate::{
     serde_structs::TempMessageForDeserialization,
 };
 
-pub fn get_msg_by_id(msg_id: u64) -> Result<TempMessageForDeserialization, Error> {
+pub fn get_msg_by_id(msg_id: u64) -> Result<Message, Error> {
     let api_root = String::from("/api");
 
     let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
 
-    let msg = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
+    let mut msgs = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-    if msg.len() == 1 {
-        let msg = msg.get(0).unwrap();
-        return Ok(msg.clone());
+    if msgs.len() == 1 {
+        // let msg = msgs.get(0).unwrap();
+        let msg = msgs.pop().unwrap();
+        return Ok(msg.into());
     } else {
         return Err(ErrorType::InvalidMsgId.err(&msg_id.to_string()));
     }
