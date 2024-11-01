@@ -10,7 +10,7 @@ pub fn get_pubkey(account_name: &str) -> Result<Pem, CommonTypes::Error> {
     ))?;
 
     let summary_val = serde_json::from_str::<Response>(&user_key_json)
-        .map_err(|e| JsonDecodeError.err(&e.to_string()))?;
+        .map_err(|e| JsonDecodeError(e.to_string()))?;
 
     Ok(summary_val.data.account.pubkey)
 }

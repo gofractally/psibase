@@ -1,49 +1,10 @@
-use crate::bindings::host::common::types::{Error, PluginId};
+use psibase::plugin_error;
 
-#[derive(PartialEq, Eq, Hash)]
-pub enum ErrorType {
-    OnlyAvailableToPlugins,
-    InvalidActionName,
-    NotLoggedIn,
-    TransactionError,
-    ClaimProofMismatch,
-}
-
-fn my_plugin_id() -> PluginId {
-    return PluginId {
-        service: "transact".to_string(),
-        plugin: "plugin".to_string(),
-    };
-}
-
-impl ErrorType {
-    pub fn err(self, msg: &str) -> Error {
-        match self {
-            ErrorType::OnlyAvailableToPlugins => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("This functionality is only available to plugins: {}", msg),
-            },
-            ErrorType::InvalidActionName => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Invalid action name: {}", msg),
-            },
-            ErrorType::NotLoggedIn => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Requires a logged-in user: {}", msg),
-            },
-            ErrorType::TransactionError => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Transaction error: {}", msg),
-            },
-            ErrorType::ClaimProofMismatch => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Number of proofs does not match number of claims: {}", msg),
-            },
-        }
-    }
+plugin_error! {
+    pub ErrorType<'a>
+    OnlyAvailableToPlugins(msg: &'a str) => "This functionality is only available to plugins: {msg}",
+    InvalidActionName(msg: &'a str) => "Invalid action name: {msg}",
+    NotLoggedIn(msg: &'a str) => "Requires a logged-in user: {msg}",
+    TransactionError(msg: String) => "Transaction error: {msg}",
+    ClaimProofMismatch => "Number of proofs does not match number of claims",
 }

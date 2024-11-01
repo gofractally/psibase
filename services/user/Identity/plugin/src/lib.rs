@@ -27,7 +27,7 @@ struct Attestation {
 impl Api for IdentityPlugin {
     fn attest_identity_claim(subject: String, score: f32) -> Result<(), CommonTypes::Error> {
         if !(score >= 0.0 && score <= 1.0) {
-            return Err(InvalidClaim.err(&format!("{score}")));
+            return Err(InvalidClaim(score).into());
         }
 
         accounts::get_account(&subject)?;
@@ -73,7 +73,7 @@ impl QueriesApi for IdentityPlugin {
         let summary_val = serde_json::from_str::<IdentitySummaryResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         )
-        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+        .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(Some(IdentityTypes::IdentitySummary {
             perc_high_confidence: (summary_val.data.subjectStats.numHighConfAttestations as f32
