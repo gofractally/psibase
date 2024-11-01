@@ -275,14 +275,8 @@ pub mod service {
         EventsSvc::call().addIndex(
             DbId::HistoryEvent,
             SERVICE,
-            MethodNumber::from("appMetadataChanged"),
-            0,
-        );
-        EventsSvc::call().addIndex(
-            DbId::HistoryEvent,
-            SERVICE,
             MethodNumber::from("appStatusChanged"),
-            1,
+            0,
         );
     }
 
@@ -349,7 +343,11 @@ pub mod service {
 
         updateAppTags(account_id, &tags);
 
-        Wrapper::emit().history().appMetadataChanged(metadata);
+        if is_new_app {
+            Wrapper::emit()
+                .history()
+                .appStatusChanged(account_id, status);
+        }
     }
 
     #[action]
@@ -440,9 +438,6 @@ pub mod service {
 
         RelatedTags { tags }
     }
-
-    #[event(history)]
-    fn appMetadataChanged(app_metadata: AppMetadata) {}
 
     #[event(history)]
     fn appStatusChanged(app_account_id: AccountNumber, status: AppStatusU32) {}
