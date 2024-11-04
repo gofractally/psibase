@@ -736,6 +736,7 @@ namespace psibase::http
             }
             if (!tc.ownedSockets.owns(*system->sockets, *socket))
             {
+               trace.error  = atrace.error;
                auto  error  = trace.error;
                auto& logger = send.logger;
                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
