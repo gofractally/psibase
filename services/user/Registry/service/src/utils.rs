@@ -3,9 +3,9 @@
 ///
 /// Example: "abc" -> "abd"
 pub fn increment_last_char(s: String) -> String {
-    let mut chars: Vec<char> = s.chars().collect();
-    if let Some(last) = chars.last_mut() {
-        *last = char::from_u32((*last as u32) + 1).unwrap_or(*last);
+    let mut bytes = s.into_bytes();
+    if let Some(last) = bytes.last_mut() {
+        *last = *last + 1;
     }
-    chars.into_iter().collect()
+    String::from_utf8(bytes).unwrap()
 }
