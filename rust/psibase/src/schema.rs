@@ -1,5 +1,5 @@
 use crate::{AccountNumber, MethodNumber};
-use fracpack::{AnyType, FunctionType, SchemaBuilder};
+use fracpack::{AnyType, FunctionType, Pack, SchemaBuilder, ToSchema, Unpack};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,8 @@ type EventMap = IndexMap<MethodNumber, AnyType>;
 
 type ActionMap = IndexMap<MethodNumber, FunctionType>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct Schema {
     pub service: AccountNumber,
     pub types: fracpack::Schema,
@@ -15,6 +16,12 @@ pub struct Schema {
     pub ui: EventMap,
     pub history: EventMap,
     pub merkle: EventMap,
+}
+
+impl ToSchema for Schema {
+    fn schema(_builder: &mut SchemaBuilder) -> AnyType {
+        todo!()
+    }
 }
 
 pub trait ToActionsSchema {

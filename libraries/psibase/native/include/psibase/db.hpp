@@ -8,13 +8,16 @@
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
+#include <triedent/file_fwd.hpp>
 
-#include <boost/filesystem/path.hpp>
+#include <array>
+#include <filesystem>
 
 namespace triedent
 {
    class write_session;
    class root;
+   struct database_config;
 }  // namespace triedent
 
 namespace psibase
@@ -49,22 +52,28 @@ namespace psibase
       void               onWrite(std::span<const char> key);
    };
 
+   using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
+   using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
+
    struct SharedDatabaseImpl;
    struct SharedDatabase
    {
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const boost::filesystem::path& dir,
-                     uint64_t                       hot_addr_bits  = 1ull << 32,
-                     uint64_t                       warm_addr_bits = 1ull << 32,
-                     uint64_t                       cool_addr_bits = 1ull << 32,
-                     uint64_t                       cold_addr_bits = 1ull << 32);
+      SharedDatabase(const std::filesystem::path&     dir,
+                     const triedent::database_config& config,
+                     triedent::open_mode              mode = triedent::open_mode::create);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
       SharedDatabase& operator=(const SharedDatabase&) = default;
       SharedDatabase& operator=(SharedDatabase&&)      = default;
+
+      // Returns a fork of the database.
+      // Warning: this should only be used for temporary databases as
+      // the storage is shared.
+      SharedDatabase clone() const;
 
       ConstRevisionPtr getHead();
       ConstRevisionPtr emptyRevision();
@@ -73,22 +82,17 @@ namespace psibase
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
-      void                             setBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key,
-                                                    std::span<const char> value);
-      std::optional<std::vector<char>> getBlockData(Writer&               writer,
-                                                    const Checksum256&    blockId,
-                                                    std::span<const char> key);
+      void kvPutSubjective(Writer& writer, std::span<const char> key, std::span<const char> value);
+      std::optional<std::vector<char>> kvGetSubjective(Writer& writer, std::span<const char> key);
 
-      DbPtr getSubjective();
-      bool  commitSubjective(Writer&             writer,
-                             DbPtr&              original,
-                             DbPtr               updated,
-                             DbChangeSet&&       changes,
-                             SocketChangeSet&&   socketChanges,
-                             Sockets&            sockets,
-                             SocketAutoCloseSet& closing);
+      IndependentRevision getSubjective();
+      bool                commitSubjective(Writer&                writer,
+                                           IndependentRevision&   original,
+                                           IndependentRevision    updated,
+                                           IndependentChangeSet&& changes,
+                                           SocketChangeSet&&      socketChanges,
+                                           Sockets&               sockets,
+                                           SocketAutoCloseSet&    closing);
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
@@ -163,6 +167,9 @@ namespace psibase
       ConstRevisionPtr writeRevision(Session& session, const Checksum256& blockId);
       void             abort(Session&);
 
+      ConstRevisionPtr getPrevAuthServices();
+      void             setPrevAuthServices(ConstRevisionPtr revision);
+
       // Manage access to subjective database
       void checkoutSubjective();
       bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
@@ -190,8 +197,9 @@ namespace psibase
       std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
 
       template <typename K, typename V>
-      auto kvPut(DbId db, const K& key, const V& value)
-          -> std::enable_if_t<!psio::is_std_optional<V>(), void>
+      auto kvPut(DbId     db,
+                 const K& key,
+                 const V& value) -> std::enable_if_t<!psio::is_std_optional<V>(), void>
       {
          kvPutRaw(db, psio::convert_to_key(key), psio::convert_to_frac(value));
       }

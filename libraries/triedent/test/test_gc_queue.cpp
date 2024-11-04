@@ -57,7 +57,8 @@ TEST_CASE("gc_queue")
    std::this_thread::sleep_for(10ms);
    done = true;
 
-   for( auto& t : threads ) {
+   for (auto& t : threads)
+   {
       t.join();
    }
 

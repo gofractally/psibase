@@ -1,0 +1,13 @@
+package auth-invite:plugin;
+
+world impl {
+    include host:common/imports;
+    include clientdata:plugin/imports;
+    include invite:plugin/imports;
+    include auth-sig:plugin/imports;
+    import accounts:smart-auth/types;
+    import transact:plugin/auth-notifier;
+
+    export accounts:smart-auth/smart-auth;
+    export intf;
+}

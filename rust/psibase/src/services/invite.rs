@@ -1,5 +1,5 @@
 pub use crate::services::auth_sig::SubjectPublicKeyInfo;
-use crate::AccountNumber;
+use crate::{account, AccountNumber};
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -44,19 +44,17 @@ pub struct NewAccountRecord {
     invitee: AccountNumber,
 }
 
+use crate as psibase;
+pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
+
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::{http::HttpRequest, AccountNumber, Hex};
+    use crate::{http::HttpRequest, AccountNumber};
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
-        unimplemented!()
-    }
-
-    #[action]
-    fn storeSys(path: String, contentType: String, content: Hex<Vec<u8>>) {
         unimplemented!()
     }
 

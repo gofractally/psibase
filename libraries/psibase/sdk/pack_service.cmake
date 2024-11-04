@@ -306,3 +306,42 @@ function(psibase_package)
     )
     add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
 endfunction()
+
+# Description:              - Use this function when you want to add additional details to a package that is 
+#                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
+# OUTPUT <filename>         - [Required] The package file.
+# PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `services/user/Branding`).
+# DEPENDS <targets>...      - Targets that this target depends on
+function(cargo_psibase_package)
+    cmake_parse_arguments(ARG "" "PATH;OUTPUT;DEPENDS" "" ${ARGN})
+
+    if(NOT ARG_PATH OR NOT ARG_OUTPUT)
+        message(FATAL_ERROR "Both PATH and OUTPUT must be specified for cargo_psibase_package")
+    endif()
+
+    # Set variables
+    get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
+    get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
+
+    # Build the package if needed
+    ExternalProject_Add(${TARGET_NAME}_ext
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}
+        BUILD_BYPRODUCTS ${PACKAGE_OUTPUT}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase package
+            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
+        INSTALL_COMMAND ""
+        BUILD_ALWAYS 1
+        DEPENDS ${ARG_DEPENDS} cargo-psibase
+    )
+
+    add_custom_command(
+        OUTPUT ${ARG_OUTPUT}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PACKAGE_OUTPUT} ${ARG_OUTPUT}
+        DEPENDS ${PACKAGE_OUTPUT}
+        DEPENDS ${TARGET_NAME}_ext
+        VERBATIM
+    )
+    add_custom_target(${TARGET_NAME} ALL DEPENDS ${ARG_OUTPUT} cargo-psibase)
+endfunction()

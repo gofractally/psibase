@@ -1,10 +1,9 @@
-#include <services/system/RTransact.hpp>
-
-#include <psibase/serveContent.hpp>
 #include <services/system/HttpServer.hpp>
+#include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <psibase/serveSchema.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -184,16 +183,12 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       if (pushTransaction(id, trx))
          forwardTransaction(trx);
    }
-   else if (auto result = serveContent(request, ServiceTables<WebContentTable>{getReceiver()}))
-      return result;
-   return {};
-}
+   else if (auto res = serveSchema<Transact>(request))
+   {
+      return res;
+   }
 
-void RTransact::storeSys(std::string path, std::string contentType, std::vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   psibase::storeContent(std::move(path), std::move(contentType), std::move(content),
-                         ServiceTables<WebContentTable>{getReceiver()});
+   return {};
 }
 
 PSIBASE_DISPATCH(RTransact)

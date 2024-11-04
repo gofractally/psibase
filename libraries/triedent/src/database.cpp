@@ -3,12 +3,20 @@
 
 namespace triedent
 {
-   database::database(const std::filesystem::path& dir,
-                      const config&                cfg,
-                      access_mode                  mode,
-                      bool                         allow_gc)
-       : _ring{dir / "data", cfg, mode, allow_gc},
-         _file{dir / "db", mode},
+   namespace
+   {
+      void create_db_dirs(const std::filesystem::path& dir, open_mode mode)
+      {
+         if (mode == open_mode::create || mode == open_mode::trunc || mode == open_mode::create_new)
+         {
+            std::filesystem::create_directories(dir / "data");
+         }
+      }
+   }  // namespace
+
+   database::database(const std::filesystem::path& dir, const config& cfg, open_mode mode)
+       : _ring{(create_db_dirs(dir, mode), get_subpath(dir, "data", mode)), cfg, mode},
+         _file{get_subpath(dir, "db", mode), mode},
          _root_release_session{_ring}
    {
       if (_file.size() == 0)
@@ -29,8 +37,8 @@ namespace triedent
          throw std::runtime_error("Not a triedent db file: " + (dir / "db").native());
    }
 
-   database::database(const std::filesystem::path& dir, access_mode mode, bool allow_gc)
-       : database(dir, config{}, mode, allow_gc)
+   database::database(const std::filesystem::path& dir, open_mode mode)
+       : database(dir, config{}, mode)
    {
    }
 
@@ -44,7 +52,7 @@ namespace triedent
 
       std::filesystem::create_directories(dir / "data");
 
-      (void)database{dir, cfg, access_mode::read_write};
+      (void)database{dir, cfg, open_mode::create_new};
    }
 
    void database::print_stats(std::ostream& os, bool detail)

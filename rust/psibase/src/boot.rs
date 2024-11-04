@@ -1,8 +1,8 @@
-use crate::services::{accounts, auth_delegate, producers, transact};
+use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
-    Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
-    PackagedService, ProducerConfigRow, SignedTransaction, Tapos, TimePointSec, Transaction,
+    method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
+    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
+    MethodNumber, PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
 use serde_bytes::ByteBuf;
@@ -19,9 +19,9 @@ macro_rules! method {
 }
 
 fn set_producers_action(name: AccountNumber, key: Claim) -> Action {
-    producers::Wrapper::pack().setProducers(vec![ProducerConfigRow {
-        producerName: name,
-        producerAuth: key,
+    producers::Wrapper::pack().setProducers(vec![Producer {
+        name: name,
+        auth: key,
     }])
 }
 
@@ -101,16 +101,22 @@ pub fn get_initial_actions<R: Read + Seek>(
         s.postinstall(&mut actions)?;
     }
 
-    actions.push(set_producers_action(
-        initial_producer,
-        match initial_key {
-            Some(k) => to_claim(k),
-            None => Claim {
-                service: AccountNumber::new(0),
-                rawData: Default::default(),
-            },
-        },
-    ));
+    // Create producer account
+    actions.push(new_account_action(accounts::SERVICE, initial_producer));
+
+    let mut claim = Claim {
+        service: AccountNumber::new(0),
+        rawData: Default::default(),
+    };
+    if let Some(key) = initial_key {
+        // Set transaction signing key for producer
+        actions.push(set_key_action(initial_producer, &key));
+        actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
+        claim = to_claim(&key);
+    }
+
+    // Set the producers
+    actions.push(set_producers_action(initial_producer, claim));
 
     actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
     actions.push(

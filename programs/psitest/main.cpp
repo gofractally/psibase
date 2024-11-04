@@ -171,6 +171,13 @@ struct assert_exception : std::exception
    const char* what() const noexcept override { return msg.c_str(); }
 };
 
+struct exit_exception : std::exception
+{
+   explicit exit_exception(std::uint32_t code) : code(code) {}
+   virtual const char* what() const noexcept override { return "exit"; }
+   std::int32_t        code;
+};
+
 struct NullProver : psibase::Prover
 {
    std::vector<char> prove(std::span<const char>, const psibase::Claim&) const { return {}; }
@@ -183,6 +190,24 @@ struct file;
 struct HttpSocket;
 struct test_chain;
 
+struct WasmMemoryCache
+{
+   std::vector<std::vector<psibase::ExecutionMemory>> memories;
+   void                                               init(psibase::SystemContext& ctx)
+   {
+      if (!memories.empty())
+      {
+         ctx.executionMemories = std::move(memories.back());
+         memories.pop_back();
+      }
+   }
+   void cleanup(psibase::SystemContext& ctx)
+   {
+      if (!ctx.executionMemories.empty())
+         memories.push_back(std::move(ctx.executionMemories));
+   }
+};
+
 struct state
 {
    const char*                              wasm;
@@ -193,6 +218,8 @@ struct state
    cl_flags_t                               additional_args;
    std::vector<file>                        files;
    std::vector<std::shared_ptr<HttpSocket>> sockets;
+   psibase::WasmCache                       shared_wasm_cache{128};
+   WasmMemoryCache                          shared_memory_cache;
    std::vector<std::unique_ptr<test_chain>> chains;
    std::shared_ptr<WatchdogManager>         watchdogManager = std::make_shared<WatchdogManager>();
    std::vector<char>                        result_key;
@@ -218,14 +245,16 @@ struct test_chain_ref
 
 struct test_chain
 {
-   ::state&                                     state;
-   std::set<test_chain_ref*>                    refs;
-   boost::filesystem::path                      dir;
-   psibase::SharedDatabase                      db;
-   psibase::WriterPtr                           writer;
-   std::unique_ptr<psibase::SystemContext>      sys;
-   std::shared_ptr<const psibase::Revision>     revisionAtBlockStart;
-   std::unique_ptr<psibase::BlockContext>       blockContext;
+   ::state&                                 state;
+   std::set<test_chain_ref*>                refs;
+   psibase::SharedDatabase                  db;
+   psibase::WriterPtr                       writer;
+   std::unique_ptr<psibase::SystemContext>  sys;
+   std::shared_ptr<const psibase::Revision> revisionAtBlockStart;
+   std::shared_ptr<const psibase::Revision> head;
+   std::unique_ptr<psibase::BlockContext>   blockContext;
+   // altBlockContext is created on demand to handle db reads between blocks
+   std::unique_ptr<psibase::BlockContext>       altBlockContext;
    std::unique_ptr<psibase::TransactionTrace>   nativeFunctionsTrace;
    std::unique_ptr<psibase::TransactionContext> nativeFunctionsTransactionContext;
    std::unique_ptr<psibase::ActionContext>      nativeFunctionsActionContext;
@@ -247,21 +276,48 @@ struct test_chain
    }
    const std::string& getName() { return name; }
 
-   test_chain(::state& state,
-              uint64_t hot_bytes,
-              uint64_t warm_bytes,
-              uint64_t cool_bytes,
-              uint64_t cold_bytes)
-       : state{state}
+   test_chain(::state& state, psibase::SharedDatabase&& db) : state{state}, db{std::move(db)}
    {
-      dir    = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
-      db     = {dir, hot_bytes, warm_bytes, cool_bytes, cold_bytes};
-      writer = db.createWriter();
-      sys    = std::make_unique<psibase::SystemContext>(psibase::SystemContext{
-          db, {128}, {}, state.watchdogManager, std::make_shared<psibase::Sockets>()});
+      writer = this->db.createWriter();
+      sys    = std::make_unique<psibase::SystemContext>(
+          psibase::SystemContext{this->db,
+                                 state.shared_wasm_cache,
+                                    {},
+                                 state.watchdogManager,
+                                 std::make_shared<psibase::Sockets>()});
+      state.shared_memory_cache.init(*sys);
+      head = this->db.getHead();
    }
 
-   test_chain(const test_chain&)            = delete;
+   test_chain(::state&                         state,
+              const std::filesystem::path&     path,
+              const triedent::database_config& config,
+              triedent::open_mode              mode)
+       : test_chain{state, {path, config, mode}}
+   {
+   }
+
+   explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()} {}
+
+   bool setFork(const psibase::Checksum256& id)
+   {
+      if (auto newHead = db.getRevision(*writer, id))
+      {
+         nativeFunctions.reset();
+         nativeFunctionsActionContext.reset();
+         nativeFunctionsTransactionContext.reset();
+         blockContext.reset();
+         altBlockContext.reset();
+         revisionAtBlockStart.reset();
+         head = std::move(newHead);
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+
    test_chain& operator=(const test_chain&) = delete;
 
    ~test_chain()
@@ -272,11 +328,12 @@ struct test_chain
       nativeFunctionsActionContext.reset();
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
+      altBlockContext.reset();
       revisionAtBlockStart.reset();
+      state.shared_memory_cache.cleanup(*sys);
       sys.reset();
       writer = {};
       db     = {};
-      boost::filesystem::remove_all(dir);
    }
 
    // TODO: Support sub-second block times
@@ -284,7 +341,12 @@ struct test_chain
    {
       // TODO: undo control
       finishBlock();
-      revisionAtBlockStart = db.getHead();
+      revisionAtBlockStart = head;
+      nativeFunctions.reset();
+      nativeFunctionsActionContext.reset();
+      nativeFunctionsTransactionContext.reset();
+      altBlockContext.reset();
+
       blockContext =
           std::make_unique<psibase::BlockContext>(*sys, revisionAtBlockStart, writer, true);
 
@@ -293,7 +355,7 @@ struct test_chain
           blockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
       if (status.has_value())
       {
-         if (status->nextConsensus)
+         if (status->consensus.next)
          {
             std::visit(
                 [&](const auto& c)
@@ -303,10 +365,10 @@ struct test_chain
                       producer = c.producers.front().name;
                    }
                 },
-                std::get<0>(*status->nextConsensus));
+                status->consensus.next->consensus.data);
          }
-         if (!status->nextConsensus ||
-             status->current.commitNum < std::get<1>(*status->nextConsensus))
+         if (!status->consensus.next ||
+             status->current.commitNum < status->consensus.next->blockNum)
          {
             std::visit(
                 [&](const auto& c)
@@ -316,7 +378,7 @@ struct test_chain
                       producer = c.producers.front().name;
                    }
                 },
-                status->consensus);
+                status->consensus.current.data);
          }
       }
 
@@ -340,6 +402,7 @@ struct test_chain
          nativeFunctionsActionContext.reset();
          nativeFunctionsTransactionContext.reset();
          auto [revision, blockId] = blockContext->writeRevision(NullProver{}, psibase::Claim{});
+         head                     = revision;
          db.setHead(*writer, revision);
          db.removeRevisions(*writer, blockId);  // temp rule: head is now irreversible
          PSIBASE_LOG_CONTEXT_BLOCK(logger, blockContext->current.header, blockId);
@@ -349,12 +412,39 @@ struct test_chain
       }
    }
 
+   psibase::BlockContext* readBlockContext()
+   {
+      if (blockContext)
+         return blockContext.get();
+      else
+      {
+         if (!altBlockContext)
+            altBlockContext = std::make_unique<psibase::BlockContext>(*sys, head, writer, true);
+         return altBlockContext.get();
+      }
+   }
+
+   void writeRevision()
+   {
+      psibase::check(!blockContext, "may not call writeRevision while building a block");
+      if (altBlockContext)
+      {
+         auto status = altBlockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
+                                                                     psibase::statusKey());
+         psibase::check(status.has_value(), "missing status record");
+         auto revision = altBlockContext->session.writeRevision(status->head->blockId);
+         head          = revision;
+         db.setHead(*writer, revision);
+      }
+   }
+
    psibase::NativeFunctions& native()
    {
       static const psibase::SignedTransaction dummyTransaction;
       static const psibase::Action            dummyAction;
       if (!nativeFunctions)
       {
+         auto* blockContext = readBlockContext();
          if (!blockContext)
             throw std::runtime_error("no block context to read database from");
          nativeFunctionsTrace = std::make_unique<psibase::TransactionTrace>();
@@ -376,7 +466,25 @@ struct test_chain
       }
       return *nativeFunctions;
    }
+
+   psibase::Database& database() { return native().database; }
 };  // test_chain
+
+struct ScopedCheckoutSubjective
+{
+   ScopedCheckoutSubjective(psibase::DbId db) : db(db) {}
+   ScopedCheckoutSubjective(test_chain& chain, psibase::DbId db) : impl(&chain.native()), db(db)
+   {
+      impl->checkoutSubjective();
+   }
+   ~ScopedCheckoutSubjective()
+   {
+      if (impl && !impl->commitSubjective())
+         psibase::abortMessage("commitSubjective failure should not happen without concurrency");
+   }
+   psibase::NativeFunctions* impl = nullptr;
+   psibase::DbId             db;
+};
 
 test_chain_ref::test_chain_ref(test_chain& chain)
 {
@@ -608,11 +716,7 @@ struct callbacks
       throw std::runtime_error("called testerAbort");
    }
 
-   void wasi_proc_exit(int32_t code)
-   {
-      backtrace();
-      throw std::runtime_error("called testerExit");
-   }
+   void wasi_proc_exit(int32_t code) { throw exit_exception(code); }
 
    int32_t wasi_sched_yield() { return 0; }
 
@@ -1061,9 +1165,61 @@ struct callbacks
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
    {
-      state.chains.push_back(
-          std::make_unique<test_chain>(state, hot_bytes, warm_bytes, cool_bytes, cold_bytes));
+      state.chains.push_back(std::make_unique<test_chain>(
+          state, std::filesystem::temp_directory_path(),
+          triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
+          triedent::open_mode::temporary));
       return state.chains.size() - 1;
+   }
+
+   uint32_t testerOpenChain(span<const char>                          path,
+                            wasi_oflags_t                             oflags,
+                            wasi_rights_t                             fs_rights_base,
+                            wasm_ptr<const triedent::database_config> config)
+   {
+      bool read   = fs_rights_base & wasi_rights_fd_read;
+      bool write  = fs_rights_base & wasi_rights_fd_write;
+      bool create = oflags & wasi_oflags_creat;
+      bool excl   = oflags & wasi_oflags_excl;
+      bool trunc  = oflags & wasi_oflags_trunc;
+
+      psibase::check(read, "Chain cannot be opened without read access");
+
+      triedent::open_mode mode;
+      if (!write)
+      {
+         if (create || excl || trunc)
+            throw std::runtime_error("Unsupported combination of flags for openChain");
+         mode = triedent::open_mode::read_only;
+      }
+      else if (!create && !excl && !trunc)
+         mode = triedent::open_mode::read_write;
+      else if (create && !excl && !trunc)
+         mode = triedent::open_mode::create;
+      else if (create && excl && !trunc)
+         mode = triedent::open_mode::create_new;
+      else if (create && !excl && trunc)
+         mode = triedent::open_mode::trunc;
+      else
+         throw std::runtime_error("Unsupported combination of flags for openChain");
+
+      state.chains.push_back(std::make_unique<test_chain>(
+          state, std::string_view{path.data(), path.size()},
+          create ? *config : triedent::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27}, mode));
+      return state.chains.size() - 1;
+   }
+
+   uint32_t testerCloneChain(uint32_t chain)
+   {
+      auto& c = assert_chain(chain);
+      state.chains.push_back(std::make_unique<test_chain>(c));
+      return state.chains.size() - 1;
+   }
+
+   void testerGetFork(uint32_t chain, wasm_ptr<psibase::Checksum256> id)
+   {
+      if (!assert_chain(chain).setFork(*id))
+         psibase::abortMessage("Cannot find state for block " + psibase::loggers::to_string(*id));
    }
 
    void testerDestroyChain(uint32_t chain)
@@ -1085,13 +1241,6 @@ struct callbacks
       c.db = {};
    }
 
-   uint32_t testerGetChainPath(uint32_t chain, span<char> dest)
-   {
-      auto& c = assert_chain(chain, false);
-      memcpy(dest.data(), c.dir.c_str(), std::min(dest.size(), c.dir.size()));
-      return c.dir.size();
-   }
-
    // TODO: Support sub-second block times
    void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
    {
@@ -1101,6 +1250,33 @@ struct callbacks
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
+
+   uint32_t testerVerify(uint32_t chain_index, span<const char> args_packed)
+   {
+      auto&              chain = assert_chain(chain_index);
+      psio::input_stream s     = {args_packed.data(), args_packed.size()};
+      auto               act   = psio::from_frac<psibase::Action>(args_packed);
+
+      BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
+      BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
+      psibase::TransactionTrace trace;
+      try
+      {
+         chain.readBlockContext()->execExport("verify", std::move(act), trace);
+      }
+      catch (const std::exception& e)
+      {
+         if (!trace.error)
+         {
+            trace.error = e.what();
+         }
+      }
+
+      state.result_value = psio::convert_to_frac(trace);
+      state.result_key.clear();
+      psibase::check(state.result_value.size() <= 0xffff'ffffu, "Transaction trace too large");
+      return state.result_value.size();
+   }
 
    uint32_t testerPushTransaction(uint32_t chain_index, span<const char> args_packed)
    {
@@ -1124,7 +1300,7 @@ struct callbacks
                         "proofs and claims must have same size");
 
          for (size_t i = 0; i < signedTrx.proofs.size(); ++i)
-            proofBC.verifyProof(signedTrx, trace, i, std::nullopt);
+            proofBC.verifyProof(signedTrx, trace, i, std::nullopt, &*chain.blockContext);
 
          if (!proofBC.needGenesisAction)
          {
@@ -1137,7 +1313,8 @@ struct callbacks
             // cost to this since numExecutionMemories may bounce back
             // and forth.
             auto saveTrace = trace;
-            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt);
+            chain.blockContext->checkFirstAuth(signedTrx, trace, std::nullopt,
+                                               &*chain.blockContext);
             trace = std::move(saveTrace);
          }
 
@@ -1182,7 +1359,7 @@ struct callbacks
       psibase::TransactionTrace trace;
       psibase::ActionTrace&     atrace = trace.actionTraces.emplace_back();
 
-      psibase::BlockContext bc{*chain.sys, chain.sys->sharedDatabase.getHead(), chain.writer, true};
+      psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
       psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
       psibase::SignedTransaction  trx;
@@ -1265,10 +1442,96 @@ struct callbacks
       return assert_chain(chain_index).native();
    }
 
+   psibase::Database& database(std::uint32_t chain_index)
+   {
+      return assert_chain(chain_index).database();
+   }
+
    void setResult(psibase::NativeFunctions& n)
    {
       state.result_key   = std::move(n.result_key);
       state.result_value = std::move(n.result_value);
+   }
+
+   uint32_t setResult(const std::optional<psio::input_stream>& o)
+   {
+      state.result_key.clear();
+      if (o)
+      {
+         state.result_value.assign(o->pos, o->end);
+         return state.result_value.size();
+      }
+      else
+      {
+         state.result_value.clear();
+         return -1;
+      }
+   }
+   uint32_t setResult(const std::optional<psibase::Database::KVResult>& o)
+   {
+      if (!o)
+      {
+         state.result_key.clear();
+         state.result_value.clear();
+         return -1;
+      }
+      else
+      {
+         state.result_key.assign(o->key.pos, o->key.end);
+         state.result_value.assign(o->value.pos, o->value.end);
+         return state.result_value.size();
+      }
+   }
+
+   ScopedCheckoutSubjective getDbRead(test_chain& chain, std::uint32_t db)
+   {
+      switch (db)
+      {
+         case uint32_t(psibase::DbId::service):
+         case uint32_t(psibase::DbId::native):
+         case uint32_t(psibase::DbId::writeOnly):
+         case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::blockProof):
+         case uint32_t(psibase::DbId::prevAuthServices):
+            return (psibase::DbId)db;
+         case uint32_t(psibase::DbId::subjective):
+         case uint32_t(psibase::DbId::nativeSubjective):
+            return {chain, (psibase::DbId)db};
+         default:
+            throw std::runtime_error("may not read this db, or must use another intrinsic");
+      }
+   }
+
+   ScopedCheckoutSubjective getDbWrite(test_chain& chain, std::uint32_t db)
+   {
+      switch (db)
+      {
+         case uint32_t(psibase::DbId::service):
+         case uint32_t(psibase::DbId::native):
+         case uint32_t(psibase::DbId::prevAuthServices):
+            psibase::check(!chain.blockContext, "may not write this db while building a block");
+            return (psibase::DbId)db;
+         case uint32_t(psibase::DbId::subjective):
+         case uint32_t(psibase::DbId::nativeSubjective):
+            return {chain, (psibase::DbId)db};
+         case uint32_t(psibase::DbId::writeOnly):
+         case uint32_t(psibase::DbId::blockLog):
+         case uint32_t(psibase::DbId::blockProof):
+            return (psibase::DbId)db;
+         default:
+            throw std::runtime_error("may not write this db, or must use another intrinsic");
+      }
+   }
+
+   psibase::DbId getDbReadSequential(std::uint32_t db)
+   {
+      if (db == uint32_t(psibase::DbId::historyEvent))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::uiEvent))
+         return (psibase::DbId)db;
+      if (db == uint32_t(psibase::DbId::merkleEvent))
+         return (psibase::DbId)db;
+      throw std::runtime_error("may not read this db, or must use another intrinsic");
    }
 
    uint32_t getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -1289,18 +1552,15 @@ struct callbacks
 
    uint32_t kvGet(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvGet(db, key);
-      setResult(n);
-      return result;
+      auto& chain = assert_chain(chain_index);
+      return setResult(
+          chain.database().kvGetRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
 
    uint32_t getSequential(std::uint32_t chain_index, uint32_t db, uint64_t indexNumber)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.getSequential(db, indexNumber);
-      setResult(n);
-      return result;
+      return setResult(database(chain_index)
+                           .kvGetRaw(getDbReadSequential(db), psio::convert_to_key(indexNumber)));
    }
 
    uint32_t kvGreaterEqual(std::uint32_t               chain_index,
@@ -1308,10 +1568,10 @@ struct callbacks
                            eosio::vm::span<const char> key,
                            uint32_t                    matchKeySize)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvGreaterEqual(db, key, matchKeySize);
-      setResult(n);
-      return result;
+      psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+      auto& chain = assert_chain(chain_index);
+      return setResult(chain.database().kvGreaterEqualRaw(getDbRead(chain, db).db,
+                                                          {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvLessThan(std::uint32_t               chain_index,
@@ -1319,19 +1579,53 @@ struct callbacks
                        eosio::vm::span<const char> key,
                        uint32_t                    matchKeySize)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvLessThan(db, key, matchKeySize);
-      setResult(n);
-      return result;
+      psibase::check(matchKeySize <= key.size(), "matchKeySize is larger than key");
+      auto& chain = assert_chain(chain_index);
+      return setResult(chain.database().kvLessThanRaw(getDbRead(chain, db).db,
+                                                      {key.data(), key.size()}, matchKeySize));
    }
 
    uint32_t kvMax(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
    {
-      auto& n      = native(chain_index);
-      auto  result = n.kvMax(db, key);
-      setResult(n);
-      return result;
+      auto& chain = assert_chain(chain_index);
+      return setResult(
+          chain.database().kvMaxRaw(getDbRead(chain, db).db, {key.data(), key.size()}));
    }
+
+   void kvPut(std::uint32_t               chain_index,
+              uint32_t                    db,
+              eosio::vm::span<const char> key,
+              eosio::vm::span<const char> value)
+   {
+      auto& chain = assert_chain(chain_index);
+      state.result_key.clear();
+      state.result_value.clear();
+      chain.database().kvPutRaw(getDbWrite(chain, db).db, {key.data(), key.size()},
+                                {value.data(), value.size()});
+   }
+
+   void kvRemove(std::uint32_t chain_index, uint32_t db, eosio::vm::span<const char> key)
+   {
+      auto& chain = assert_chain(chain_index);
+      state.result_key.clear();
+      state.result_value.clear();
+      chain.database().kvRemoveRaw(getDbWrite(chain, db).db, {key.data(), key.size()});
+   }
+
+   void checkoutSubjective(std::uint32_t chain_index)
+   {
+      assert_chain(chain_index).native().checkoutSubjective();
+   }
+   bool commitSubjective(std::uint32_t chain_index)
+   {
+      return assert_chain(chain_index).native().commitSubjective();
+   }
+   void abortSubjective(std::uint32_t chain_index)
+   {
+      assert_chain(chain_index).native().abortSubjective();
+   }
+
+   void commitState(std::uint32_t chain_index) { assert_chain(chain_index).writeRevision(); }
 
    uint32_t kvGetTransactionUsage(std::uint32_t chain_index)
    {
@@ -1361,15 +1655,24 @@ void register_callbacks()
    rhf_t::add<&callbacks::kvGreaterEqual>("psibase", "kvGreaterEqual");
    rhf_t::add<&callbacks::kvLessThan>("psibase", "kvLessThan");
    rhf_t::add<&callbacks::kvMax>("psibase", "kvMax");
+   rhf_t::add<&callbacks::kvPut>("psibase", "kvPut");
+   rhf_t::add<&callbacks::kvRemove>("psibase", "kvRemove");
    rhf_t::add<&callbacks::kvGetTransactionUsage>("psibase", "kvGetTransactionUsage");
 
    // Tester Intrinsics
    rhf_t::add<&callbacks::testerCreateChain>("psibase", "createChain");
+   rhf_t::add<&callbacks::testerOpenChain>("psibase", "openChain");
+   rhf_t::add<&callbacks::testerCloneChain>("psibase", "cloneChain");
+   rhf_t::add<&callbacks::testerGetFork>("psibase", "getFork");
    rhf_t::add<&callbacks::testerDestroyChain>("psibase", "destroyChain");
    rhf_t::add<&callbacks::testerShutdownChain>("psibase", "shutdownChain");
-   rhf_t::add<&callbacks::testerGetChainPath>("psibase", "getChainPath");
    rhf_t::add<&callbacks::testerStartBlock>("psibase", "startBlock");
    rhf_t::add<&callbacks::testerFinishBlock>("psibase", "finishBlock");
+   rhf_t::add<&callbacks::checkoutSubjective>("psibase", "checkoutSubjective");
+   rhf_t::add<&callbacks::commitSubjective>("psibase", "commitSubjective");
+   rhf_t::add<&callbacks::abortSubjective>("psibase", "abortSubjective");
+   rhf_t::add<&callbacks::commitState>("psibase", "commitState");
+   rhf_t::add<&callbacks::testerVerify>("psibase", "verify");
    rhf_t::add<&callbacks::testerPushTransaction>("psibase", "pushTransaction");
    rhf_t::add<&callbacks::testerHttpRequest>("psibase", "httpRequest");
    rhf_t::add<&callbacks::testerSocketRecv>("psibase", "socketRecv");
@@ -1614,6 +1917,10 @@ int main(int argc, char* argv[])
    catch (eosio::vm::exception& e)
    {
       std::cerr << "vm::exception: " << e.detail() << "\n";
+   }
+   catch (::exit_exception& e)
+   {
+      return e.code;
    }
    catch (std::exception& e)
    {

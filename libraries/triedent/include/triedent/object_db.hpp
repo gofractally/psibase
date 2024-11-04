@@ -67,10 +67,7 @@ namespace triedent
      public:
       using object_id = triedent::object_id;
 
-      object_db(gc_queue&             gc,
-                std::filesystem::path idfile,
-                access_mode           mode,
-                bool                  allow_gc = false);
+      object_db(gc_queue& gc, std::filesystem::path idfile, open_mode mode);
 
       // Bumps the reference count by 1 if possible
       bool bump_count(object_id id)
@@ -259,10 +256,7 @@ namespace triedent
       }
    };
 
-   inline object_db::object_db(gc_queue&             gc,
-                               std::filesystem::path idfile,
-                               access_mode           mode,
-                               bool                  allow_gc)
+   inline object_db::object_db(gc_queue& gc, std::filesystem::path idfile, open_mode mode)
        : _gc(gc), _region(idfile, mode, true)
    {
       if (_region.size() == 0)
@@ -289,7 +283,8 @@ namespace triedent
       if ((_header->flags & file_type_mask) != file_type_index)
          throw std::runtime_error("Not a triedent obj_ids file: " + idfile.native());
 
-      if (!allow_gc && mode == access_mode::read_write && (_header->flags.load() & running_gc_flag))
+      if (mode != open_mode::gc && mode != open_mode::read_only &&
+          (_header->flags.load() & running_gc_flag))
          throw std::runtime_error("garbage collection in progress");
 
       if (_header->max_unallocated.id > (existing_size - sizeof(object_db_header)) / 8 - 1)

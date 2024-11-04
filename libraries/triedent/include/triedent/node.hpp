@@ -26,9 +26,7 @@ namespace triedent
    template <typename T>
    concept key_builder = requires(T& t, cache_allocator& a, std::unique_lock<gc_session>& session) {
       reload_key(a, session, t);
-      {
-         t.size()
-      } -> std::convertible_to<std::size_t>;
+      { t.size() } -> std::convertible_to<std::size_t>;
       requires std::convertible_to<T, std::string_view>;
    };
 

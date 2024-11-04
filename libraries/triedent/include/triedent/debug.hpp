@@ -41,11 +41,12 @@ namespace triedent
       std::cerr << "\n";
    }
 
-   inline auto set_current_thread_name( const char* name ) { 
+   inline auto set_current_thread_name(const char* name)
+   {
 #ifdef __APPLE__
-      return pthread_setname_np(name); 
+      return pthread_setname_np(name);
 #else
-      return pthread_setname_np( pthread_self(), name); 
+      return pthread_setname_np(pthread_self(), name);
 #endif
    }
 

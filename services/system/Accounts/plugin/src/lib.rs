@@ -2,17 +2,17 @@
 mod bindings;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine};
+use bindings::accounts::plugin::types::{self as AccountTypes};
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::accounts::plugin::accounts::Guest as Accounts;
-use bindings::exports::accounts::plugin::admin::Guest as Admin;
-use bindings::host::common::{client as Client, types as CommonTypes, server as Server};
+use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
+use bindings::host::privileged::intf as Privileged;
 use bindings::transact::plugin::intf as Transact;
-use bindings::accounts::plugin::types::{self as AccountTypes};
 use psibase::fracpack::Pack;
 use psibase::services::accounts::{self as AccountsService};
 use psibase::AccountNumber;
-use url::Url;
 use serde::Deserialize;
+use url::Url;
 
 mod errors;
 use errors::ErrorType::*;
@@ -56,49 +56,68 @@ fn login_key(origin: String) -> String {
     return key_pre + "." + &encoded;
 }
 
-fn from_supervisor() -> bool {
-    Client::get_sender_app()
-        .app
-        .map_or(false, |app| app == "supervisor")
-}
-
-impl Admin for AccountsPlugin {
-    fn force_login(domain: String, user: String) {
-        assert!(from_supervisor(), "unauthorized");
-        Keyvalue::set(&login_key(domain), &user.as_bytes()).expect("Failed to set logged-in user");
-    }
-
-    fn get_logged_in_user(caller_app: String, domain: String) -> Result<Option<String>, CommonTypes::Error> {
-        let sender = Client::get_sender_app().app;
-        assert!(
-            sender.is_some() && sender.as_ref().unwrap() == "supervisor",
-            "unauthorized"
-        );
-
-        // Todo: Allow other apps to ask for the logged in user by popping up an authorization window.
-        if caller_app != "transact" && caller_app != "supervisor" {
-            return Err(Unauthorized.err("Temporarily, only transact can ask for the logged-in user."));
-        }
-
-        if let Some(user) = Keyvalue::get(&login_key(domain)) {
-            Ok(Some(String::from_utf8(user).unwrap()))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
 impl Accounts for AccountsPlugin {
     fn login() -> Result<(), CommonTypes::Error> {
         println!("Login with popup window not yet supported.");
-        return Err(NotYetImplemented.err("login"));
+        return Err(NotYetImplemented("login").into());
+    }
+
+    fn logout() -> Result<(), CommonTypes::Error> {
+        let sender = Client::get_sender_app();
+        let top_level_domain = Privileged::get_active_app_domain();
+
+        if sender.origin == top_level_domain || sender.app == Some("supervisor".to_string()) {
+            Keyvalue::delete(&login_key(top_level_domain));
+        } else {
+            return Err(
+                Unauthorized("logout can only be called by the top-level app domain").into(),
+            );
+        }
+
+        Ok(())
     }
 
     fn login_temp(user: String) -> Result<(), CommonTypes::Error> {
         let origin = Client::get_sender_app().origin;
+        let top_level_domain = Privileged::get_active_app_domain();
 
-        Client::login_temp(&origin, &user)?;
+        if origin != top_level_domain {
+            return Err(
+                Unauthorized("login-temp can only be called by the top-level app domain").into(),
+            );
+        }
+
+        Keyvalue::set(&login_key(top_level_domain), &user.as_bytes())
+            .expect("Failed to set logged-in user");
+
         Ok(())
+    }
+
+    fn is_logged_in() -> bool {
+        let active_domain = Privileged::get_active_app_domain();
+        Keyvalue::get(&login_key(active_domain)).is_some()
+    }
+
+    fn get_logged_in_user() -> Result<Option<String>, CommonTypes::Error> {
+        let sender = Client::get_sender_app();
+        let active_domain = Privileged::get_active_app_domain();
+        let sender_domain = sender.origin;
+
+        if sender_domain != active_domain {
+            if let Some(sender_app) = sender.app {
+                if sender_app != "supervisor" && sender_app != "transact" {
+                    return Err(Unauthorized("Only callable by the top-level app domain").into());
+                }
+            } else {
+                return Err(Unauthorized("Only callable by the top-level app domain").into());
+            }
+        }
+
+        if let Some(user) = Keyvalue::get(&login_key(active_domain)) {
+            Ok(Some(String::from_utf8(user).unwrap()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_available_accounts() -> Result<Vec<String>, CommonTypes::Error> {
@@ -106,38 +125,39 @@ impl Accounts for AccountsPlugin {
     }
 
     fn add_auth_service(_: String) -> Result<(), CommonTypes::Error> {
-        Err(NotYetImplemented.err("add_auth_service"))
+        Err(NotYetImplemented("add_auth_service").into())
     }
 
     fn get_account(name: String) -> Result<Option<AccountTypes::Account>, CommonTypes::Error> {
-        let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName.err(err.to_string().as_str()))?;
+        let acct_num =
+            AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
             "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
-            acct_num 
+            acct_num
         );
 
-        let response_str = Server::post_graphql_get_json(&query).map_err(|e| QueryError.err(&e.message))?;
-        let response_root = serde_json::from_str::<ResponseRoot>(&response_str).map_err(|e| QueryError.err(&e.to_string()))?;
+        let response_str =
+            Server::post_graphql_get_json(&query).map_err(|e| QueryError(e.message))?;
+        let response_root = serde_json::from_str::<ResponseRoot>(&response_str)
+            .map_err(|e| QueryError(e.to_string()))?;
 
         match response_root.data.getAccount {
-            Some(acct_val) => {
-                Ok(Some(AccountTypes::Account {
-                    account_num: acct_val.accountNum.to_string(),
-                    auth_service: acct_val.authService.to_string(),
-                    resource_balance: Some(match acct_val.resourceBalance {
-                        Some(val) => val.value,
-                        None => 0,
-                    }),
-                }))
-            },
-            None => Ok(None)
+            Some(acct_val) => Ok(Some(AccountTypes::Account {
+                account_num: acct_val.accountNum.to_string(),
+                auth_service: acct_val.authService.to_string(),
+                resource_balance: Some(match acct_val.resourceBalance {
+                    Some(val) => val.value,
+                    None => 0,
+                }),
+            })),
+            None => Ok(None),
         }
     }
 
     fn set_auth_service(service_name: String) -> Result<(), CommonTypes::Error> {
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
-            .map_err(|_| InvalidAccountName.err(&service_name))?;
+            .map_err(|_| InvalidAccountName(service_name))?;
         Transact::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {

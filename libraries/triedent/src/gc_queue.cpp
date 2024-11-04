@@ -133,7 +133,7 @@ namespace triedent
       {
          if constexpr (debug_gc)
          {
-         //   std::osyncstream(std::cout) << "run gc: " << start << std::endl;
+            //   std::osyncstream(std::cout) << "run gc: " << start << std::endl;
          }
          out.push_back(std::move(_queue[start]));
          --_size;

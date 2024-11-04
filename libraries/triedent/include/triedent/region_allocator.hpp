@@ -25,7 +25,7 @@ namespace triedent
       region_allocator(gc_queue&                    gc,
                        object_db&                   obj_ids,
                        const std::filesystem::path& path,
-                       access_mode                  mode,
+                       open_mode                    mode,
                        std::uint64_t                initial_size = 64 * 1024 * 1024);
       ~region_allocator();
       void* try_allocate(std::unique_lock<gc_session>& session,

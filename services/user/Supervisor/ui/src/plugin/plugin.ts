@@ -36,10 +36,10 @@ export class Plugin {
             const foundInterface = exportedFuncs.interfaces.find(
                 (i) => i.name === intf,
             );
-            return foundInterface?.funcs.some((f) => f === method);
+            return foundInterface?.funcs.some((f) => f.name === method);
         }
 
-        return exportedFuncs.funcs.some((f) => f === method);
+        return exportedFuncs.funcs.some((f) => f.name === method);
     }
 
     private async doFetchPlugin(): Promise<Uint8Array> {
@@ -64,12 +64,20 @@ export class Plugin {
     }
 
     async getDependencies(): Promise<QualifiedPluginId[]> {
-        const api = await this.parsed;
-
-        return api.importedFuncs.interfaces.map((intf) => ({
-            service: intf.namespace,
-            plugin: intf.package,
-        }));
+        let api: ComponentAPI | undefined;
+        try {
+            api = await this.parsed;
+            return api.importedFuncs.interfaces.map((intf) => ({
+                service: intf.namespace,
+                plugin: intf.package,
+            }));
+        } catch (e: any) {
+            if (e instanceof PluginDownloadFailed) {
+                return [];
+            } else {
+                throw e;
+            }
+        }
     }
 
     private async doReady(): Promise<void> {

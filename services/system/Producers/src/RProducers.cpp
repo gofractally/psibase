@@ -1,7 +1,6 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
-#include <psibase/serveContent.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
 #include <psibase/serveSimpleUI.hpp>
@@ -12,8 +11,6 @@
 
 using namespace SystemService;
 using namespace psibase;
-
-using Tables = psibase::ServiceTables<psibase::WebContentTable>;
 
 struct ProducerQuery
 {
@@ -27,26 +24,26 @@ struct ProducerQuery
          return std::visit([](const auto& c) { return c.producers; }, *c);
       return {};
    }
-   Consensus consensus() const
+   ConsensusData consensus() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
       if (!status)
          return {};
-      return std::move(status->consensus);
+      return std::move(status->consensus.current.data);
    }
-   std::optional<Consensus> nextConsensus() const
+   std::optional<ConsensusData> nextConsensus() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      if (!status || !status->nextConsensus)
+      if (!status || !status->consensus.next)
          return {};
-      return std::move(std::get<0>(*status->nextConsensus));
+      return std::move(status->consensus.next->consensus.data);
    }
    std::optional<BlockNum> jointStart() const
    {
       auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
-      if (!status || !status->nextConsensus)
+      if (!status || !status->consensus.next)
          return {};
-      return std::get<1>(*status->nextConsensus);
+      return status->consensus.next->blockNum;
    }
 };
 PSIO_REFLECT(ProducerQuery,
@@ -64,9 +61,6 @@ std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
    if (auto result = serveSchema<Producers>(request))
       return result;
 
-   if (auto result = serveContent(request, Tables{getReceiver()}))
-      return result;
-
    if (auto result = serveGraphQL(request, ProducerQuery{}))
       return result;
 
@@ -74,12 +68,6 @@ std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
       return result;
 
    return {};
-}
-
-void RProducers::storeSys(std::string path, std::string contentType, std::vector<char> content)
-{
-   check(getSender() == getReceiver(), "wrong sender");
-   storeContent(std::move(path), std::move(contentType), std::move(content), Tables{getReceiver()});
 }
 
 PSIBASE_DISPATCH(SystemService::RProducers)

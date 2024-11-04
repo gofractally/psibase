@@ -1,0 +1,15 @@
+/// This is a special host interface with functionality
+/// that is restricted to specific plugins.
+package host:privileged;
+
+/// Host interface for privileged functionality
+interface intf {
+    use host:common/types.{origination-data, error};
+
+    /// Get active app domain
+    get-active-app-domain: func() -> string;
+}
+
+world imports {
+    import intf;
+}

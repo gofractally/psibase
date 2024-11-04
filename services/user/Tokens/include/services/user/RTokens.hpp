@@ -8,11 +8,10 @@ namespace UserService
       static constexpr auto service = psibase::AccountNumber("r-tokens");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
-      void storeSys(std::string path, std::string contentType, std::vector<char> content);
 
      private:
       std::optional<psibase::HttpReply> _serveRestEndpoints(psibase::HttpRequest& request);
    };
-   PSIO_REFLECT(RTokens, method(serveSys, request), method(storeSys, path, contentType, content))
+   PSIO_REFLECT(RTokens, method(serveSys, request))
 
 }  // namespace UserService

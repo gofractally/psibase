@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Args as _, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
@@ -21,10 +21,11 @@ use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 
 mod cli;
@@ -66,8 +67,12 @@ struct Args {
     #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
     console: bool,
 
+    /// Print help
+    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
+    help: Option<Vec<OsString>>,
+
     #[clap(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -159,9 +164,6 @@ enum Command {
 
     /// Upload a file to a service
     Upload {
-        /// Service to upload to
-        service: ExactAccountNumber,
-
         /// Source filename to upload
         source: String,
 
@@ -176,9 +178,9 @@ enum Command {
         #[clap(short = 'r', long)]
         recursive: bool,
 
-        /// Sender to use; defaults to <SERVICE>
-        #[clap(short = 'S', long, value_name = "SENDER")]
-        sender: Option<ExactAccountNumber>,
+        /// Sender to use (required). Files are uploaded to this account's subdomain.
+        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+        sender: ExactAccountNumber,
     },
 
     /// Install apps to the chain
@@ -258,6 +260,12 @@ enum Command {
     /// Setup the psibase local config file
     #[command(subcommand)]
     Config(ConfigCommand),
+
+    /// Print help for the subcommands
+    Help { command: Vec<OsString> },
+
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[allow(dead_code)] // TODO: move to lib if still needed
@@ -271,14 +279,8 @@ fn to_hex(bytes: &[u8]) -> String {
     String::from_utf8(result).unwrap()
 }
 
-fn store_sys(
-    service: AccountNumber,
-    sender: AccountNumber,
-    path: &str,
-    content_type: &str,
-    content: &[u8],
-) -> Action {
-    sites::Wrapper::pack_from_to(sender, service).storeSys(
+fn store_sys(sender: AccountNumber, path: &str, content_type: &str, content: &[u8]) -> Action {
+    sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
         path.to_string(),
         content_type.to_string(),
         content.to_vec().into(),
@@ -453,18 +455,11 @@ async fn deploy(
 async fn upload(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     content_type: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let deduced_content_type = match content_type {
         Some(t) => t.clone(),
         None => {
@@ -487,8 +482,7 @@ async fn upload(
     };
 
     let actions = vec![store_sys(
-        service,
-        sender,
+        sender.into(),
         &normalized_dest,
         &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
@@ -514,7 +508,6 @@ async fn upload(
 }
 
 fn fill_tree(
-    service: AccountNumber,
     sender: AccountNumber,
     actions: &mut Vec<(String, Action)>,
     dest: &str,
@@ -529,7 +522,6 @@ fn fill_tree(
             actions.push((
                 dest.to_owned(),
                 store_sys(
-                    service,
                     sender,
                     dest,
                     t.essence_str(),
@@ -547,14 +539,7 @@ fn fill_tree(
         for path in read_dir(source)? {
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
-            fill_tree(
-                service,
-                sender,
-                actions,
-                &d,
-                path.path().to_str().unwrap(),
-                false,
-            )?;
+            fill_tree(sender, actions, &d, path.path().to_str().unwrap(), false)?;
         }
     } else {
         if top {
@@ -596,6 +581,27 @@ async fn monitor_trx(
         progress.inc(n);
     }
     Ok(())
+}
+
+fn find_psitest() -> OsString {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psitest = format!("psitest{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psitest);
+                if sibling.is_file() {
+                    return sibling.into();
+                }
+                if parent.ends_with("rust/release") {
+                    let in_build_dir = parent.parent().unwrap().parent().unwrap().join(psitest);
+                    if in_build_dir.exists() {
+                        return in_build_dir.into();
+                    }
+                }
+            }
+        }
+    }
+    "psitest".to_string().into()
 }
 
 fn data_directory() -> Result<PathBuf, anyhow::Error> {
@@ -721,28 +727,14 @@ fn normalize_upload_path(path: &Option<String>) -> String {
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     source: &str,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let normalized_dest = normalize_upload_path(dest);
 
     let mut actions = Vec::new();
-    fill_tree(
-        service,
-        sender,
-        &mut actions,
-        &normalized_dest,
-        source,
-        true,
-    )?;
+    fill_tree(sender.into(), &mut actions, &normalized_dest, source, true)?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
     let mut running = Vec::new();
@@ -1175,6 +1167,113 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+fn get_external(name: &OsString) -> Option<&str> {
+    name.to_str()?
+        .strip_prefix("psibase-")?
+        .strip_suffix(".wasm")
+}
+
+fn list_external() -> Result<Vec<String>, anyhow::Error> {
+    let command_path = data_directory()?.join("wasm");
+    let mut result = Vec::new();
+    for dir in command_path.read_dir()? {
+        if let Some(name) = get_external(&dir?.file_name()) {
+            result.push(name.to_string())
+        }
+    }
+    Ok(result)
+}
+
+fn unrecognized_subcommand(command: &mut clap::Command, name: &OsString) -> ! {
+    let mut command = std::mem::take(command)
+        .disable_help_subcommand(false)
+        .disable_help_flag(false);
+    let mut err = clap::Error::new(clap::error::ErrorKind::InvalidSubcommand).with_cmd(&command);
+    err.insert(
+        clap::error::ContextKind::InvalidSubcommand,
+        clap::error::ContextValue::String(name.to_string_lossy().to_string()),
+    );
+    err.insert(
+        clap::error::ContextKind::Usage,
+        clap::error::ContextValue::StyledStr(command.render_usage()),
+    );
+    err.exit();
+}
+
+fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
+    let psitest = find_psitest();
+    let command_path = data_directory()?.join("wasm");
+    let mut filename: OsString = "psibase-".to_string().into();
+    filename.push(&args[0]);
+    filename.push(".wasm");
+    let wasm_file = command_path.join(filename);
+    if !wasm_file.is_file() {
+        let command = clap::Command::new("psibase");
+        let mut command = Args::augment_args(command)
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
+        command.build();
+        unrecognized_subcommand(&mut command, &args[0]);
+    }
+    Err(std::process::Command::new(psitest)
+        .arg(wasm_file)
+        .args(&args[1..])
+        .exec())?
+}
+
+fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
+    mut iter: I,
+    command: &mut clap::Command,
+) {
+    if let Some(name) = iter.next() {
+        if let Some(subcommand) = command.find_subcommand_mut(name) {
+            print_subcommand_help(iter, subcommand)
+        } else {
+            unrecognized_subcommand(command, name);
+        }
+    } else {
+        command.print_help().unwrap();
+    }
+}
+
+fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    if !subcommand.is_empty() {
+        command.build();
+        let mut iter = subcommand.iter();
+        if let Some(command) = command.find_subcommand_mut(iter.next().unwrap()) {
+            print_subcommand_help(iter, command);
+        } else {
+            let mut subcommand: Vec<_> = subcommand.iter().cloned().collect();
+            subcommand.push(OsStr::new("--help").to_os_string());
+            handle_external(&subcommand)?;
+        }
+    } else {
+        command = command
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
+        if let Ok(subcommands) = list_external() {
+            for sub in subcommands {
+                command = command.subcommand(clap::Command::new(sub));
+            }
+        }
+        command.build();
+        command.print_help()?;
+    }
+    Ok(())
+}
+
+fn parse_args() -> Result<Args, anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    command.build();
+    command = command
+        .disable_help_subcommand(true)
+        .disable_help_flag(true);
+    Ok(Args::from_arg_matches(&command.get_matches())?)
+}
+
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
     Ok((builder.gzip(true).build()?, result))
@@ -1191,9 +1290,15 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let args = Args::parse();
+    let args = parse_args()?;
     let (client, _proxy) = build_client(&args).await?;
-    match &args.command {
+    if let Some(help) = &args.help {
+        return print_help(help);
+    }
+    let Some(command) = &args.command else {
+        return print_help(&[]);
+    };
+    match command {
         Command::Boot {
             key,
             producer,
@@ -1242,7 +1347,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .await?
         }
         Command::Upload {
-            service,
             source,
             dest,
             content_type,
@@ -1253,18 +1357,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 if content_type.is_some() {
                     return Err(anyhow!("--recursive is incompatible with --content-type"));
                 }
-                upload_tree(&args, client, (*service).into(), *sender, dest, source).await?
+                upload_tree(&args, client, *sender, dest, source).await?
             } else {
-                upload(
-                    &args,
-                    client,
-                    (*service).into(),
-                    *sender,
-                    dest,
-                    content_type,
-                    source,
-                )
-                .await?
+                upload(&args, client, *sender, dest, content_type, source).await?
             }
         }
         Command::Install {
@@ -1304,6 +1399,8 @@ async fn main() -> Result<(), anyhow::Error> {
             mode,
         } => create_token(Duration::seconds(*expires_after), mode)?,
         Command::Config(config) => handle_cli_config_cmd(config)?,
+        Command::Help { command } => print_help(command)?,
+        Command::External(argv) => handle_external(argv)?,
     }
 
     Ok(())

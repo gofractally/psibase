@@ -1,6 +1,7 @@
 //! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
+use component_name_macro::component_name_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
@@ -11,6 +12,7 @@ use service_macro::service_macro_impl;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
+mod component_name_macro;
 mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
@@ -262,7 +264,7 @@ pub fn to_schema(input: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[psibase::service(
-///     name = see_blow,            // Account service is normally installed on
+///     name = see_below,           // Account service is normally installed on
 ///     recursive = false,          // Allow service to be recursively entered?
 ///     constant = "SERVICE",       // Name of generated constant
 ///     actions = "Actions",        // Name of generated struct
@@ -421,4 +423,10 @@ pub fn table_query(item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn table_query_subindex(item: TokenStream) -> TokenStream {
     table_query_subindex_macro_impl(item)
+}
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn component_name(_item: TokenStream) -> TokenStream {
+    component_name_macro_impl()
 }

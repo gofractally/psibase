@@ -3,6 +3,7 @@ import { FunctionCallArgs } from "./index";
 
 export interface FunctionCallResponse {
     type: typeof FUNCTION_CALL_RESPONSE;
+    id: string;
     call: FunctionCallArgs;
     result: any;
 }
@@ -14,11 +15,13 @@ export const isFunctionCallResponse = (
 };
 
 export const buildFunctionCallResponse = (
+    id: string,
     call: FunctionCallArgs,
     result: any,
 ): FunctionCallResponse => {
     return {
         type: FUNCTION_CALL_RESPONSE,
+        id,
         call,
         result,
     };
