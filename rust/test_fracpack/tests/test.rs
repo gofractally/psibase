@@ -1,4 +1,5 @@
-use fracpack::{Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use serde::Deserialize;
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -733,6 +734,135 @@ fn test_trailing_options_unextensible() {
         &empty_trailing_options,
         "01000000020000000000000010000000010000000100000001000000020000006869",
     );
+}
+
+#[derive(Deserialize)]
+struct SchemaTestCase {
+    #[serde(rename = "type")]
+    type_: String,
+    #[serde(default)]
+    json: Option<serde_json::Value>,
+    fracpack: String,
+    #[serde(default)]
+    error: bool,
+    #[serde(default)]
+    compat: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SchemaTestFile {
+    schema: fracpack::Schema,
+    values: Vec<SchemaTestCase>,
+}
+
+fn fuzzy_equal(lhs: &serde_json::Value, rhs: &serde_json::Value) -> bool {
+    use serde_json::Value::*;
+    match (lhs, rhs) {
+        (Null, Null) => true,
+        (Bool(l), Bool(r)) => l == r,
+        (Number(l), Number(r)) => {
+            if let (Some(v), Some(w)) = (l.as_i64(), r.as_i64()) {
+                v == w
+            } else {
+                l.as_f64() == r.as_f64()
+            }
+        }
+        (Number(l), String(r)) => &l.to_string() == r,
+        (String(l), String(r)) => {
+            if (l == "inf" || l == "Infinity") && (r == "inf" || r == "Infinity") {
+                true
+            } else if (l == "-inf" || l == "-Infinity") && (r == "-inf" || r == "-Infinity") {
+                true
+            } else {
+                l == r
+            }
+        }
+        (Array(l), Array(r)) => l.iter().zip(r.iter()).all(|(l, r)| fuzzy_equal(l, r)),
+        (Object(l), Object(r)) => {
+            for (k, v) in l {
+                if let Some(w) = r.get(k) {
+                    if v != w {
+                        return false;
+                    }
+                } else {
+                    if !v.is_null() {
+                        return false;
+                    }
+                }
+            }
+            for (k, v) in r {
+                if !l.contains_key(k) && !v.is_null() {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+#[test]
+fn schema_json() -> Result<()> {
+    let builtin = fracpack::standard_types();
+    let all_tests: Vec<SchemaTestFile> = serde_json::from_str(include_str!(
+        "../../../libraries/psio/tests/fracpack-tests.json"
+    ))
+    .unwrap();
+    for tests in all_tests {
+        let cschema = CompiledSchema::new(&tests.schema, &builtin);
+        for test in tests.values {
+            println!("type: {}", test.type_);
+            let fracpack = hex::decode(&test.fracpack).unwrap();
+            if let Some(expected) = test.json {
+                let ty = cschema.get(&test.type_).unwrap();
+                let actual = cschema.to_value(ty, &fracpack)?; //frac2json(&cschema, ty, &fracpack)?;
+                assert!(
+                    fuzzy_equal(&actual, &expected),
+                    "`{actual}` != `{expected}`"
+                );
+                cschema.verify(ty, &fracpack)?;
+                cschema.verify_strict(ty, &fracpack)?;
+                for i in 0..fracpack.len() {
+                    let truncated = &fracpack[0..i];
+                    cschema
+                        .to_value(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify_strict(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                }
+                if let Some(compat) = test.compat {
+                    let compat = hex::decode(&compat).unwrap();
+                    let compat_json = cschema.to_value(ty, &compat)?;
+                    assert_eq!(compat_json, actual);
+                    cschema.verify(ty, &compat)?;
+                    cschema
+                        .verify_strict(ty, &compat)
+                        .expect_err(&format!("expected HasUnknown for {}", &test.fracpack));
+                }
+                let reverse = cschema.from_value(ty, &expected).unwrap();
+                assert_eq!(reverse, fracpack);
+                let roundtrip = cschema.from_value(ty, &actual).unwrap();
+                assert_eq!(roundtrip, fracpack);
+            }
+            if test.error {
+                let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
+                cschema
+                    .to_value(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                cschema
+                    .verify(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                cschema
+                    .verify_strict(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>
