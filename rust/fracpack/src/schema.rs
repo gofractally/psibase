@@ -540,7 +540,7 @@ impl<'a> FracInputStream<'a> {
         let Some(pos) = self.pos.checked_add(len) else {
             return Err(Error::ReadPastEnd);
         };
-        if self.pos as usize > self.data.len() {
+        if pos as usize > self.data.len() {
             return Err(Error::ReadPastEnd);
         }
         let result = FracInputStream {

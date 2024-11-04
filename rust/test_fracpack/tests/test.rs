@@ -822,6 +822,18 @@ fn schema_json() -> Result<()> {
                 );
                 cschema.verify(ty, &fracpack)?;
                 cschema.verify_strict(ty, &fracpack)?;
+                for i in 0..fracpack.len() {
+                    let truncated = &fracpack[0..i];
+                    cschema
+                        .to_value(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify_strict(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                }
                 if let Some(compat) = test.compat {
                     let compat = hex::decode(&compat).unwrap();
                     let compat_json = cschema.to_value(ty, &compat)?;
