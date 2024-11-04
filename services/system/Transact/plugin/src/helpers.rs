@@ -1,4 +1,5 @@
-use crate::bindings::accounts::plugin::accounts::{get_account, get_logged_in_user};
+use crate::bindings::accounts::plugin::active_app::get_logged_in_user;
+use crate::bindings::accounts::plugin::api::get_account;
 use crate::bindings::accounts::smart_auth::smart_auth::{
     self as SmartAuth, Action as PartialAction,
 };

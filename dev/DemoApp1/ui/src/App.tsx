@@ -10,15 +10,15 @@ const supervisor = new Supervisor();
 enum InviteState {
   Pending = "Pending",
   Accepted = "Accepted",
-  Rejected = "Rejected"
+  Rejected = "Rejected",
 }
 interface Invite {
-  inviter: string,
-  app: string,
-  state: InviteState,
-  actor: string,
-  expiry: string,
-  callback: string,
+  inviter: string;
+  app: string;
+  state: InviteState;
+  actor: string;
+  expiry: string;
+  callback: string;
 }
 
 interface ErrorType {
@@ -96,7 +96,6 @@ function App() {
     }
   };
 
-  
   const run3 = async () => {
     try {
       const inviteUrl: string = (await supervisor.functionCall({
@@ -197,8 +196,8 @@ function App() {
     try {
       await supervisor.functionCall({
         service: "accounts",
-        intf: "accounts",
-        method: "loginTemp",
+        intf: "activeApp",
+        method: "login",
         params: ["alice"],
       });
 
@@ -211,8 +210,8 @@ function App() {
 
       await supervisor.functionCall({
         service: "accounts",
-        intf: "accounts",
-        method: "loginTemp",
+        intf: "activeApp",
+        method: "login",
         params: ["bob"],
       });
 
@@ -222,7 +221,6 @@ function App() {
         method: "credit",
         params: ["1", "alice", "6.0000", ""],
       });
-
     } catch (e) {
       if (e instanceof Error) {
         console.error(`Error: ${e.message}\nStack: ${e.stack}`);

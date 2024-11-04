@@ -39,7 +39,7 @@ impl Invitee for InvitePlugin {
             return Err(InvalidAccount.err(&account));
         })?;
 
-        if Accounts::accounts::get_account(&account)?.is_some() {
+        if Accounts::api::get_account(&account)?.is_some() {
             return Err(AccountExists.err("accept_with_new_account"));
         }
 
