@@ -52,6 +52,12 @@ namespace psibase
          }
          if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
+         if (db == uint32_t(DbId::nativeSubjective))
+         {
+            if ((self.code.flags & CodeRow::allowNativeSubjective) &&
+                ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective))
+               return (DbId)db;
+         }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
@@ -98,6 +104,11 @@ namespace psibase
              (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
+            return {(DbId)db, false, false};
+
+         if (db == uint32_t(DbId::nativeSubjective) &&
+             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
+             (self.code.flags & CodeRow::allowNativeSubjective))
             return {(DbId)db, false, false};
 
          check(self.allowDbRead,

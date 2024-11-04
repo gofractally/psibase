@@ -105,6 +105,7 @@ impl CodeRow {
     pub const IS_AUTH_SERVICE: u64 = 1u64 << 6;
     pub const FORCE_REPLAY: u64 = 1u64 << 7;
     pub const ALLOW_SOCKET: u64 = 1u64 << 8;
+    pub const ALLOW_NATIVE_SUBJECTIVE: u64 = 1u64 << 9;
     pub fn key(&self) -> (NativeTable, NativeIndex, AccountNumber) {
         (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.codeNum)
     }

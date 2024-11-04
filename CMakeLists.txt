@@ -389,7 +389,7 @@ psibase_package(
         DATA ${COMPONENT_BIN_DIR}/${TransactPlugin_OUTPUT_FILE} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
-        FLAGS allowWriteSubjective
+        FLAGS allowWriteSubjective allowNativeSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${TransactPlugin_DEP}

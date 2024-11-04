@@ -10,7 +10,7 @@ using namespace SystemService;
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
-   check(getSender() == Transact::service, "Wrong sender");
+   check(getSender() == AccountNumber{}, "Wrong sender");
    auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
    auto nextSequence =
        unapplied.get(SingletonKey{}).value_or(UnappliedTransactionRecord{0}).nextSequence;
@@ -143,6 +143,27 @@ namespace
                               .count())},
                       .sequence   = sequence});
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+
+         // Tell native that we have a transaction
+         {
+            auto key = notifyKey(NotifyType::nextTransaction);
+            if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+            {
+               if (!std::ranges::any_of(existing->actions, [](const auto& act)
+                                        { return act.service == RTransact::service; }))
+               {
+                  existing->actions.push_back(
+                      {.service = RTransact::service, .method = MethodNumber{"next"}});
+                  kvPut(DbId::nativeSubjective, key, *existing);
+               }
+            }
+            else
+            {
+               kvPut(DbId::nativeSubjective, key,
+                     NotifyRow{NotifyType::nextTransaction,
+                               {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
+            }
+         }
       }
       return true;
    }

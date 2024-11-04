@@ -1533,32 +1533,9 @@ namespace psibase
          auto bc = getBlockContext();
          if (!bc || bc->needGenesisAction)
             return {};
-         Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
-         std::optional<SignedTransaction> result;
-         TransactionTrace                 trace;
-         try
-         {
-            auto& atrace = bc->execExport("nextTransaction", std::move(action), trace);
-            if (!psio::from_frac(result, atrace.rawRetval))
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-               PSIBASE_LOG(bc->trxLogger, warning) << "failed to deserialize result of "
-                                                   << action.service.str() << "::nextTransaction";
-               result.reset();
-            }
-            else
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-               PSIBASE_LOG(bc->trxLogger, debug)
-                   << action.service.str() << "::nextTransaction succeeded";
-            }
-         }
-         catch (std::exception& e)
-         {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc->trxLogger, warning)
-                << action.service.str() << "::nextTransaction failed: " << e.what();
-         }
+         auto session = bc->db.startWrite(writer);
+         auto result  = bc->callNextTransaction();
+         session.commit();
          return result;
       }
 
