@@ -27,10 +27,10 @@ impl ConnectedAccounts {
 }
 
 // A database with a separate namespace for each app within the `accounts` namespace
-pub struct App {
+pub struct AppsTable {
     origin: String,
 }
-impl App {
+impl AppsTable {
     pub fn new(origin: String) -> Self {
         Self { origin }
     }

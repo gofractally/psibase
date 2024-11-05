@@ -1,8 +1,8 @@
-pub mod app;
-pub use app::*;
+pub mod apps_table;
+pub use apps_table::*;
 
-pub mod db;
-pub use db::*;
+pub mod tokens_table;
+pub use tokens_table::*;
 
 pub mod keys;
 pub use keys::*;

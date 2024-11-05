@@ -60,13 +60,13 @@ impl ConnectionTokens {
 }
 
 // A database using the global `accounts` namespace
-pub struct Db {}
-impl Db {
+pub struct TokensTable {}
+impl TokensTable {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn create_connection_token(&self, app_origin: &str, app: Option<String>) -> String {
+    pub fn add_connection_token(&self, app_origin: &str, app: Option<String>) -> String {
         let mut tokens = Keyvalue::get(&DbKeys::CONNECT_TOKENS)
             .map(|t| <ConnectionTokens>::unpacked(&t).expect("Failed to unpack connection tokens"))
             .unwrap_or_default();
@@ -83,7 +83,7 @@ impl Db {
         URL_SAFE.encode(packed_token)
     }
 
-    pub fn decode_connection_token(&self, token: &str) -> Option<ConnectionToken> {
+    pub fn decode(&self, token: &str) -> Option<ConnectionToken> {
         let tokens = Keyvalue::get(&DbKeys::CONNECT_TOKENS)
             .map(|t| <ConnectionTokens>::unpacked(&t).expect("Failed to unpack connection tokens"))
             .unwrap_or_default();

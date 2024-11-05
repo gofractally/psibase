@@ -21,11 +21,11 @@ impl Admin for AccountsPlugin {
         assert!(account_details.is_some(), "Invalid account name");
 
         let app_domain = sibling_url_of(&app, &caller_domain).expect("Invalid app domain");
-        App::new(app_domain).login(user);
+        AppsTable::new(app_domain).login(user);
     }
 
     fn decode_connection_token(token: String) -> Option<AppDetails> {
-        if let Some(token) = Db::new().decode_connection_token(&token) {
+        if let Some(token) = TokensTable::new().decode(&token) {
             Some(AppDetails {
                 origin: token.app_origin,
                 app: token.app,
