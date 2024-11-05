@@ -180,8 +180,8 @@ export class PluginHost implements HostInterface {
         return res;
     }
 
-    getActiveAppDomain(): string {
-        return this.supervisor.getActiveAppDomain(this.self);
+    getActiveApp(): OriginationData {
+        return this.supervisor.getActiveApp(this.self);
     }
 
     // Client interface
