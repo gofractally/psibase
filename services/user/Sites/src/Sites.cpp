@@ -32,11 +32,9 @@ namespace SystemService
       std::vector<std::string> split(const std::string& str, char delimiter)
       {
          std::vector<std::string> tokens;
-         std::stringstream        ss(str);
-         std::string              token;
-         while (std::getline(ss, token, delimiter))
+         for (auto&& part : str | std::views::split(delimiter))
          {
-            tokens.push_back(to_lower(token));
+            tokens.emplace_back(to_lower(std::string(part.begin(), part.end())));
          }
          return tokens;
       }
