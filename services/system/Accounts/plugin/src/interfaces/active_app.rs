@@ -1,11 +1,19 @@
 use crate::bindings::exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
+use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::db::*;
+use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
+        let account_details =
+            AccountsPlugin::get_account(user.clone()).expect("Get account failed");
+        if account_details.is_none() {
+            return Err(InvalidAccountName.err("Invalid account name"));
+        }
+
         let app_domain = get_assert_top_level_app("login", &vec![])?;
         App::new(app_domain).login(user);
         Ok(())
