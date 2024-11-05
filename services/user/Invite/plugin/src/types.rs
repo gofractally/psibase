@@ -39,9 +39,9 @@ pub struct GetInviteResponse {
 impl TryParseGqlResponse for InviteRecordSubset {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
         let response_root: ResponseRoot<GetInviteResponse> =
-            serde_json::from_str(&response).map_err(|e| QueryError.err(&e.to_string()))?;
+            serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
         Ok(response_root.data.getInvite.ok_or_else(|| {
-            QueryError.err("Unable to extract InviteRecordSubset from query response")
+            QueryError("Unable to extract InviteRecordSubset from query response".to_string())
         })?)
     }
 }
@@ -61,13 +61,13 @@ impl TryFromInviteToken for InviteParams {
     fn try_from_invite_id(id: &str) -> Result<Self, CommonTypes::Error> {
         let bytes = URL_SAFE
             .decode(id)
-            .map_err(|_| DecodeInviteError.err("Error decoding base64"))?;
+            .map_err(|_| DecodeInviteError("Error decoding base64"))?;
 
         let str = String::from_utf8(bytes)
-            .map_err(|_| DecodeInviteError.err("Error converting from UTF8"))?;
+            .map_err(|_| DecodeInviteError("Error converting from UTF8"))?;
 
         let result: InviteParams = serde_json::from_str(&str)
-            .map_err(|_| DecodeInviteError.err("Error deserializing JSON string into object"))?;
+            .map_err(|_| DecodeInviteError("Error deserializing JSON string into object"))?;
 
         Ok(result)
     }

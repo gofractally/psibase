@@ -18,3 +18,4 @@ proc-macro2 = "1.0.36"
 psibase_names = { version = "0.13.0", path = "../psibase_names" }
 quote = "1.0.15"
 syn = {version = "1.0.86", features = ["full", "visit-mut"] }
+toml = "0.8.19"

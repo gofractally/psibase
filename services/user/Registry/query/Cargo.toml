@@ -1,0 +1,18 @@
+[package]
+name = "r-registry"
+description = "Query service for Registry"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase" }
+serde = "1.0"
+registry = { path = "../service" }
+async-graphql = "7.0.7"
+
+[dev-dependencies]
+registry_package = { path = ".." }

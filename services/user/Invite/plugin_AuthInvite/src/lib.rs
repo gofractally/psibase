@@ -30,11 +30,11 @@ impl Intf for AuthInvite {
     fn notify(token: InviteToken) -> Result<(), Error> {
         if let Some(app) = Client::get_sender_app().app {
             if app != psibase::services::invite::SERVICE.to_string() {
-                return Err(Unauthorized.err("notify"));
+                return Err(Unauthorized("notify").into());
             }
         }
 
-        let inv_keys = deserialize(&token).map_err(|_| DecodeInviteError.err("notify"))?;
+        let inv_keys = deserialize(&token).map_err(|_| DecodeInviteError("notify"))?;
 
         InviteKeys::add(&inv_keys);
 
@@ -54,7 +54,7 @@ impl SmartAuth for AuthInvite {
 
     fn get_proofs(_account_name: String, transaction_hash: Vec<u8>) -> Result<Vec<Proof>, Error> {
         if !from_transact() {
-            return Err(Unauthorized.err("get_proofs"));
+            return Err(Unauthorized("get_proofs").into());
         }
 
         let signature = KeyVault::sign(&transaction_hash, &InviteKeys::get_private_key())?;

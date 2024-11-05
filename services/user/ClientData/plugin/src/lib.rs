@@ -42,7 +42,7 @@ impl KeyValue for ClientData {
     fn set(key: String, value: Vec<u8>) -> Result<(), CommonTypes::Error> {
         // Don't set empty records
         if value.len() == 0 {
-            return Err(EmptyValue.err(&key));
+            return Err(EmptyValue(key).into());
         }
 
         let bucket =

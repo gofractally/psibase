@@ -45,7 +45,7 @@ impl Sites for SitesPlugin {
         .packed();
 
         if packed.len() >= TX_SIZE_LIMIT {
-            return Err(ErrorType::FileTooLarge.err(&file.path));
+            return Err(ErrorType::FileTooLarge(&file.path).into());
         }
 
         Transact::add_action_to_transaction("storeSys", &packed)?;
@@ -67,7 +67,7 @@ impl Sites for SitesPlugin {
             .packed();
 
             if index == 0 && packed.len() >= TX_SIZE_LIMIT {
-                return Err(ErrorType::FileTooLarge.err(&file.path));
+                return Err(ErrorType::FileTooLarge(&file.path).into());
             }
 
             accumulated_size += packed.len();
