@@ -18,10 +18,11 @@ pub fn get_assert_top_level_app(
     }
 
     if sender.origin != top_level_app.origin {
-        return Err(Unauthorized.err(&format!(
+        return Err(Unauthorized(&format!(
             "{} can only be called by the top-level app",
             context
-        )));
+        ))
+        .into());
     }
 
     Ok(top_level_app)

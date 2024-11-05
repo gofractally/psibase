@@ -21,7 +21,7 @@ pub fn validate_action_name(action_name: &str) -> Result<(), Host::types::Error>
     if re.is_match(action_name) {
         return Ok(());
     }
-    Err(InvalidActionName.err(action_name))
+    Err(InvalidActionName(action_name).into())
 }
 
 pub fn assert_from_supervisor() {
@@ -118,7 +118,7 @@ pub fn get_tx_sender(actions: &[PartialAction]) -> Result<AccountNumber, Host::t
     }
 
     if sender.is_none() {
-        return Err(NotLoggedIn.err("get_tx_sender"));
+        return Err(NotLoggedIn("get_tx_sender").into());
     }
 
     Ok(AccountNumber::from(sender.unwrap().as_str()))

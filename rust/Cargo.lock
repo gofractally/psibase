@@ -1036,9 +1036,12 @@ name = "fracpack"
 version = "0.13.0"
 dependencies = [
  "custom_error",
+ "hex",
  "indexmap 2.2.6",
  "psibase_macros",
  "serde",
+ "serde-aux",
+ "serde_json",
 ]
 
 [[package]]
@@ -2466,6 +2469,7 @@ dependencies = [
  "psibase_names",
  "quote",
  "syn 1.0.109",
+ "toml 0.8.19",
 ]
 
 [[package]]
@@ -2958,6 +2962,7 @@ version = "1.0.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "455182ea6142b14f93f4bc5320a2b31c1f266b66a4a5c858b013302a5d8cbfc3"
 dependencies = [
+ "indexmap 2.2.6",
  "itoa 1.0.11",
  "ryu",
  "serde",
@@ -3345,6 +3350,8 @@ dependencies = [
  "fracpack",
  "hex",
  "psibase_macros",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

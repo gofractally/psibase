@@ -10,7 +10,7 @@ impl ActiveApp for AccountsPlugin {
         let account_details =
             AccountsPlugin::get_account(user.clone()).expect("Get account failed");
         if account_details.is_none() {
-            return Err(InvalidAccountName.err("Invalid account name"));
+            return Err(InvalidAccountName("Invalid account name".to_string()).into());
         }
 
         let app = get_assert_top_level_app("login", &vec![])?;

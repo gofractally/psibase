@@ -28,15 +28,15 @@ impl API for AccountsPlugin {
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
-        let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName.err(err.to_string().as_str()))?;
+        let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
             "query {{ getAccount(account: \"{}\") {{ accountNum, authService, resourceBalance }} }}",
             acct_num 
         );
 
-        let response_str = Server::post_graphql_get_json(&query).map_err(|e| QueryError.err(&e.message))?;
-        let response_root = serde_json::from_str::<ResponseRoot>(&response_str).map_err(|e| QueryError.err(&e.to_string()))?;
+        let response_str = Server::post_graphql_get_json(&query).map_err(|e| QueryError(e.message))?;
+        let response_root = serde_json::from_str::<ResponseRoot>(&response_str).map_err(|e| QueryError(e.to_string()))?;
 
         match response_root.data.getAccount {
             Some(acct_val) => {
@@ -56,11 +56,11 @@ impl API for AccountsPlugin {
     fn set_auth_service(service_name: String) -> Result<(), Error> {
         // Restrict to "homepage" app for now
         if Client::get_sender_app().app.is_none() || Client::get_sender_app().app.as_ref().unwrap() != "homepage" {
-            return Err(Unauthorized.err("set_auth_service can only be called by the homepage app"));
+            return Err(Unauthorized("set_auth_service can only be called by the homepage app").into());
         }
 
         let account_num: AccountNumber = AccountNumber::from_exact(&service_name)
-            .map_err(|_| InvalidAccountName.err(&service_name))?;
+            .map_err(|_| InvalidAccountName(service_name))?;
         Transact::add_action_to_transaction(
             "setAuthServ",
             &AccountsService::action_structs::setAuthServ {

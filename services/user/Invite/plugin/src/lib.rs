@@ -35,11 +35,11 @@ impl Invitee for InvitePlugin {
         token: InviteToken,
     ) -> Result<(), CommonTypes::Error> {
         let accepted_by = psibase::AccountNumber::from_exact(&account).or_else(|_| {
-            return Err(InvalidAccount.err(&account));
+            return Err(InvalidAccount(&account));
         })?;
 
         if Accounts::api::get_account(&account)?.is_some() {
-            return Err(AccountExists.err("accept_with_new_account"));
+            return Err(AccountExists("accept_with_new_account").into());
         }
 
         AuthInvite::notify(&token)?;
@@ -111,14 +111,14 @@ impl Invitee for InvitePlugin {
         let invite = InviteRecordSubset::from_gql(Server::post_graphql_get_json(&query)?)?;
 
         let expiry = DateTime::from_timestamp(invite.expiry as i64, 0)
-            .ok_or(DatetimeError.err("decode_invite"))?
+            .ok_or(DatetimeError("decode_invite"))?
             .to_string();
         let state = match invite.state {
             0 => InviteState::Pending,
             1 => InviteState::Accepted,
             2 => InviteState::Rejected,
             _ => {
-                return Err(InvalidInviteState.err("decode_invite"));
+                return Err(InvalidInviteState("decode_invite").into());
             }
         };
 

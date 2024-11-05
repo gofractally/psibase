@@ -67,7 +67,9 @@ fn query_messages_endpoint(
     let resp = serde_json::from_str::<Vec<MessageSerde>>(&CommonServer::get_json(&endpoint)?);
     let mut resp_val: Vec<MessageSerde>;
     if resp.is_err() {
-        return Err(errors::ErrorType::QueryResponseParseError.err(&resp.unwrap_err().to_string()));
+        return Err(
+            errors::ErrorType::QueryResponseParseError(resp.unwrap_err().to_string()).into(),
+        );
     } else {
         resp_val = resp.unwrap();
     }
@@ -80,7 +82,7 @@ fn query_messages_endpoint(
             msg_id: m
                 .msg_id
                 .parse::<u64>()
-                .map_err(|err| QueryResponseParseError.err(&err.to_string()))
+                .map_err(|err| QueryResponseParseError(err.to_string()))
                 .unwrap(),
             receiver: m.receiver,
             sender: m.sender,
