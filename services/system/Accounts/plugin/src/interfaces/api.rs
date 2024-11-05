@@ -24,7 +24,7 @@ struct Data {
 
 impl API for AccountsPlugin {
     fn is_logged_in() -> bool {
-        AppsTable::new(Privileged::get_active_app_domain()).get_logged_in_user().is_some()
+        AppsTable::new(&Privileged::get_active_app()).get_logged_in_user().is_some()
     }
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {

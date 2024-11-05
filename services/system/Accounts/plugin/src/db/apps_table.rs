@@ -1,4 +1,6 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::{
+    accounts::plugin::types::AppDetails, clientdata::plugin::keyvalue as Keyvalue,
+};
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use psibase::fracpack::{Pack, Unpack};
 use url::Url;
@@ -26,18 +28,47 @@ impl ConnectedAccounts {
     }
 }
 
+#[derive(Pack, Unpack)]
+struct ConnectedApps {
+    apps: Vec<String>,
+}
+
+impl Default for ConnectedApps {
+    fn default() -> Self {
+        Self { apps: vec![] }
+    }
+}
+
+impl ConnectedApps {
+    pub fn add(&mut self, app: &AppDetails) {
+        let app = app.app.as_ref();
+
+        if app.is_none() {
+            return;
+        }
+
+        let app = app.unwrap();
+
+        if self.apps.contains(app) {
+            return;
+        }
+
+        self.apps.push(app.clone());
+    }
+}
+
 // A database with a separate namespace for each app within the `accounts` namespace
 pub struct AppsTable {
-    origin: String,
+    app: AppDetails,
 }
 impl AppsTable {
-    pub fn new(origin: String) -> Self {
-        Self { origin }
+    pub fn new(app: &AppDetails) -> Self {
+        Self { app: app.clone() }
     }
 
     fn prefix(&self) -> String {
         // Do not namespace app data by protocol
-        let url = Url::parse(&self.origin).unwrap();
+        let url = Url::parse(&self.app.origin).unwrap();
         let mut origin = url.domain().unwrap().to_string();
         if let Some(port) = url.port() {
             origin += ":";
@@ -63,12 +94,16 @@ impl AppsTable {
         // Add to connected accounts if not already present
         let connected_accounts = Keyvalue::get(&self.key(DbKeys::CONNECTED_ACCOUNTS));
         let mut connected_accounts = connected_accounts
-            .map(|c| {
-                <ConnectedAccounts>::unpacked(&c).expect("Failed to unpack connected accounts")
-            })
+            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
-
         connected_accounts.add(&user);
+
+        // Add to connected apps if not already present
+        let connected_apps = Keyvalue::get(&DbKeys::CONNECTED_APPS);
+        let mut connected_apps = connected_apps
+            .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
+            .unwrap_or_default();
+        connected_apps.add(&self.app);
 
         Keyvalue::set(
             &self.key(DbKeys::CONNECTED_ACCOUNTS),
@@ -84,10 +119,16 @@ impl AppsTable {
     pub fn get_connected_accounts(&self) -> Vec<String> {
         let connected_accounts = Keyvalue::get(&self.key(DbKeys::CONNECTED_ACCOUNTS));
         connected_accounts
-            .map(|c| {
-                <ConnectedAccounts>::unpacked(&c).expect("Failed to unpack connected accounts")
-            })
+            .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default()
             .accounts
+    }
+
+    pub fn get_connected_apps() -> Vec<String> {
+        let connected_apps = Keyvalue::get(&DbKeys::CONNECTED_APPS);
+        connected_apps
+            .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
+            .unwrap_or_default()
+            .apps
     }
 }

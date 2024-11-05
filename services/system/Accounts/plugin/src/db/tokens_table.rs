@@ -1,4 +1,6 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::{
+    accounts::plugin::types::OriginationData, clientdata::plugin::keyvalue as Keyvalue,
+};
 use crate::db::DbKeys;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use psibase::fracpack::{Pack, Unpack};
@@ -12,11 +14,11 @@ pub struct ConnectionToken {
 }
 
 impl ConnectionToken {
-    pub fn new(app_origin: &str, app: Option<String>) -> Self {
+    pub fn new(sender: &OriginationData) -> Self {
         let expiration_time = SystemTime::now() + Duration::from_secs(10 * 60); // 10 minutes
         Self {
-            app_origin: app_origin.to_string(),
-            app,
+            app_origin: sender.origin.to_string(),
+            app: sender.app.clone(),
             expiration_time: expiration_time
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
@@ -66,14 +68,14 @@ impl TokensTable {
         Self {}
     }
 
-    pub fn add_connection_token(&self, app_origin: &str, app: Option<String>) -> String {
+    pub fn add_connection_token(&self, sender: &OriginationData) -> String {
         let mut tokens = Keyvalue::get(&DbKeys::CONNECT_TOKENS)
             .map(|t| <ConnectionTokens>::unpacked(&t).expect("Failed to unpack connection tokens"))
             .unwrap_or_default();
 
         tokens.remove_expired();
 
-        let token = ConnectionToken::new(app_origin, app);
+        let token = ConnectionToken::new(sender);
         let packed_token = &token.packed();
 
         tokens.add(token);

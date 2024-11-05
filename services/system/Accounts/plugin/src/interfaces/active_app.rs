@@ -1,6 +1,5 @@
 use crate::bindings::exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
 use crate::bindings::exports::accounts::plugin::api::Guest;
-use crate::bindings::host::common::client as Client;
 use crate::db::*;
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
@@ -14,30 +13,29 @@ impl ActiveApp for AccountsPlugin {
             return Err(InvalidAccountName.err("Invalid account name"));
         }
 
-        let app_domain = get_assert_top_level_app("login", &vec![])?;
-        AppsTable::new(app_domain).login(user);
+        let app = get_assert_top_level_app("login", &vec![])?;
+        AppsTable::new(&app).login(user);
         Ok(())
     }
 
     fn logout() -> Result<(), Error> {
-        let app_domain = get_assert_top_level_app("logout", &vec!["supervisor"])?;
-        AppsTable::new(app_domain).logout();
+        let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
+        AppsTable::new(&app).logout();
         Ok(())
     }
 
     fn get_logged_in_user() -> Result<Option<String>, Error> {
-        let app_domain =
-            get_assert_top_level_app("get_logged_in_user", &vec!["supervisor", "transact"])?;
-        Ok(AppsTable::new(app_domain).get_logged_in_user())
+        let app = get_assert_top_level_app("get_logged_in_user", &vec!["supervisor", "transact"])?;
+        Ok(AppsTable::new(&app).get_logged_in_user())
     }
 
     fn get_connected_accounts() -> Result<Vec<String>, Error> {
-        let app_domain = get_assert_top_level_app("get_available_accounts", &vec!["supervisor"])?;
-        Ok(AppsTable::new(app_domain).get_connected_accounts())
+        let app = get_assert_top_level_app("get_available_accounts", &vec!["supervisor"])?;
+        Ok(AppsTable::new(&app).get_connected_accounts())
     }
 
     fn create_connection_token() -> Result<String, Error> {
-        let app_domain = get_assert_top_level_app("get_connection_token", &vec![])?;
-        Ok(TokensTable::new().add_connection_token(&app_domain, Client::get_sender_app().app))
+        let app = get_assert_top_level_app("get_connection_token", &vec![])?;
+        Ok(TokensTable::new().add_connection_token(&app))
     }
 }
