@@ -18,8 +18,8 @@ namespace SystemService
    {
       std::string to_lower(const std::string& str)
       {
-         std::string lower;
-         std::transform(str.begin(), str.end(), std::back_inserter(lower), ::tolower);
+         std::string lower(str.size(), '\0');
+         std::ranges::transform(str, lower.begin(), ::tolower);
          return lower;
       }
 
