@@ -18,7 +18,6 @@ use fracpack::Pack;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
 use psibase::services::invite::{self as InviteService, action_structs::*};
 use types::*;
-use CommonTypes::OriginationData;
 
 /* TODO:
     /// This doesn't need to be exposed, it can just be jammed into various plugin functions
@@ -126,6 +125,7 @@ impl Invitee for InvitePlugin {
         Ok(Invite {
             inviter: invite.inviter.to_string(),
             app: invite_params.app,
+            app_domain: invite_params.app_domain,
             state: state,
             actor: invite.actor.to_string(),
             expiry,
@@ -145,10 +145,11 @@ impl Inviter for InvitePlugin {
             .packed(),
         )?;
 
-        let OriginationData { origin, app } = Client::get_sender_app();
+        let sender_app = Client::get_sender_app();
 
         let params = InviteParams {
-            app: app.unwrap_or(origin.clone()),
+            app: sender_app.app,
+            app_domain: sender_app.origin,
             pk: keypair.private_key,
         };
 
