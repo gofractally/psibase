@@ -8,7 +8,8 @@ interface types {
         subject: string,
         body: string,
         // ISO 8601 datetime *with* µs and offset/timezone, i.e., 2001-07-08T00:34:60.026490+09:30
-        datetime: string
+        datetime: string,
+        is-saved-msg: bool
     }
 }
 
@@ -16,8 +17,13 @@ interface queries {
     use host:common/types.{error};
     use types.{message};
 
+    /// Retrieve non-archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     get-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    /// Retrieve archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     get-archived-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    /// Retrieve saved messages
     get-saved-msgs: func(receiver: option<string>) -> result<list<message>, error>;
 }
 

@@ -8,6 +8,8 @@ mod errors;
 mod queries;
 mod serde_structs;
 
+use std::cmp::Ordering;
+
 use bindings::accounts::plugin::accounts as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
@@ -20,7 +22,7 @@ use errors::ErrorType;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 use queries::{get_msg_by_id, query_messages_endpoint};
-use serde_structs::TempMessageForDeserialization;
+use serde_structs::{TempMessageForDeserGql, TempMessageForDeserGqlResponse};
 
 /// Struct that implements the Api as well as the Query interfaces
 struct ChainmailPlugin;
@@ -78,81 +80,48 @@ impl Api for ChainmailPlugin {
     }
 }
 
-// use serde::de::{self, Visitor};
-// use std::fmt;
+impl PartialEq for Message {
+    fn eq(&self, other: &Self) -> bool {
+        self.msg_id == other.msg_id
+    }
+}
 
-// impl<'de> Visitor<'de> for Message {
-//     type Value = i32;
+impl Eq for Message {}
 
-//     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-//         formatter.write_str("message fields")
-//     }
+impl PartialOrd for Message {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.msg_id.partial_cmp(&other.msg_id)
+    }
+}
 
-//     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-//     where
-//         E: de::Error,
-//     {
-//         Ok(value)
-//     }
-
-//     fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-//     where
-//         E: de::Error,
-//     {
-//         Ok(value)
-//     }
-// }
-
-// impl<'de> Deserializer<'de> for Message {
-//     fn from_str<'a, T>(s: &'a str) -> Result<T, E>
-//     where
-//         T: Deserialize<'a>,
-//     {
-//         let mut deserializer = Message::from_str(s);
-//         let t = T::deserialize(&mut deserializer)?;
-//         if deserializer.input.is_empty() {
-//             Ok(t)
-//         } else {
-//             Err(Error::TrailingCharacters)
-//         }
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for Message {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         // deserializer.deserialize_struct(name, fields, visitor)
-//         // fails because it consumes the deserializer, leaving nothing for the later fields
-//         // deserializer.deserialize_struct(name, fields, visitor)
-//         let msg_id = u64::deserialize(deserializer)?;
-//         let receiver = String::deserialize(deserializer)?;
-//         let sender = String::deserialize(deserializer)?;
-//         let subject = String::deserialize(deserializer)?;
-//         let body = String::deserialize(deserializer)?;
-//         let datetime = TimePointSec::deserialize(deserializer)?.seconds;
-
-//         Ok(Message {
-//             msg_id,
-//             receiver,
-//             sender,
-//             subject,
-//             body,
-//             datetime,
-//         })
-//     }
-// }
+impl Ord for Message {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.msg_id < other.msg_id {
+            Ordering::Less
+        } else if self.msg_id == other.msg_id {
+            Ordering::Equal
+        } else {
+            Ordering::Greater
+        }
+    }
+}
 
 impl Query for ChainmailPlugin {
-    /// Retrieve non-archived messages
-    /// - Messages can be filtered by one or both of sender and/or receiver
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
-        Ok(query_messages_endpoint(sender, receiver, false)?)
+        let inbox_msgs = query_messages_endpoint(sender, receiver.clone(), false)?;
+        let mut saved_msgs = Self::get_saved_msgs(receiver)?;
+
+        for msg in &mut saved_msgs {
+            msg.is_saved_msg = true;
+        }
+
+        let mut all_msgs = [inbox_msgs, saved_msgs].concat();
+        all_msgs.sort();
+        all_msgs.dedup();
+        all_msgs.sort_by_key(|k| k.datetime.clone());
+        Ok(all_msgs)
     }
 
-    /// Retrieve archived messages
-    /// - Messages can be filtered by one or both of sender and/or receiver
     fn get_archived_msgs(
         sender: Option<String>,
         receiver: Option<String>,
@@ -160,23 +129,30 @@ impl Query for ChainmailPlugin {
         Ok(query_messages_endpoint(sender, receiver, true)?)
     }
 
-    /// Retrieve saved messages
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
+        println!("get_saved_msgs().top");
         let rcvr = match receiver {
             Some(r) => r,
             None => AccountPlugin::get_logged_in_user()?.expect("No receiver specified"),
         };
+        // lib: construct gql query from types; generate schema
+        // - generate obj based on gql schema with query methods on it
         let graphql_str = format!(
-            "query {{ getSavedMsgs(receiver:\"{}\") {{ msgId, receiver, sender, subject, body, datetime {{ seconds }} }} }}",
+            "query {{ getSavedMsgs(receiver:\"{}\") {{ nodes {{ msgId, receiver, sender, subject, body, datetime {{ seconds }} }} }} }}",
             rcvr
         );
 
-        let summary_val = serde_json::from_str::<Vec<TempMessageForDeserialization>>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        )
-        .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+        let gql_res_str = CommonServer::post_graphql_get_json(&graphql_str)?;
+        let summary_val = serde_json::from_str::<TempMessageForDeserGqlResponse>(&gql_res_str)
+            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-        Ok(summary_val.into_iter().map(|m| m.into()).collect())
+        Ok(summary_val
+            .data
+            .getSavedMsgs
+            .nodes
+            .into_iter()
+            .map(|m| m.into())
+            .collect())
     }
 }
 

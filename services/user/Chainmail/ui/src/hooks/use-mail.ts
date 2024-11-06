@@ -114,6 +114,41 @@ export function useArchivedMessages() {
     };
 }
 
+const getSavedMessages = async (account: string | undefined) => {
+    const supervisor = await getSupervisor();
+    console.info(`calling getSavedMsgs() w receiver = [${account}]`);
+    let rawMessages = (await supervisor.functionCall({
+        service: "chainmail",
+        intf: "queries",
+        method: "getSavedMsgs",
+        params: [account],
+    })) as RawMessage[];
+
+    console.info(`savedMessages: ${rawMessages}`);
+    return transformRawMessagesToMessages(rawMessages);
+};
+
+const savedMsgAtom = atom<Message["id"]>("");
+export function useSavedMessages() {
+    const { user } = useUser();
+    const query = useQuery({
+        queryKey: ["saved", user],
+        queryFn: () => getSavedMessages(user),
+        enabled: Boolean(user),
+    });
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
+    const selectedMessage = query.data?.find(
+        (msg) => msg.id === selectedMessageId,
+    );
+
+    return {
+        query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
+}
+
 const getSentMessages = async (account: string | undefined) => {
     const supervisor = await getSupervisor();
     let rawMessages = (await supervisor.functionCall({

@@ -16,16 +16,18 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        anyhow, check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
-        HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
+        anyhow, check, create_schema, get_sender, serve_graphiql, serve_graphql, AccountNumber,
+        DbId, Fracpack, HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery,
+        TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
     /// Saved Messages Table
     /// Messages are "stored" and accessed as events and via event queries, with nothing in state.
     /// This table stores messages a user wants to keep around past a message pruning expiration time.
-    #[table(name = "SavedMessagesTable", record = "SavedMessage", index = 1)]
-    pub struct SavedMessagesTable;
+    // #[table(name = "SavedMessageTable", record = "SavedMessage", index = 1)]
+    // pub struct SavedMessageTable;
+    use crate::tables::SavedMessageTable;
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
@@ -65,7 +67,7 @@ mod service {
     /// by emiting an `archived` event
     #[action]
     fn archive(msg_id: u64) {
-        let saved_messages_table = SavedMessagesTable::new();
+        let saved_messages_table = SavedMessageTable::new();
         if let Some(rec) = saved_messages_table.get_index_pk().get(&msg_id) {
             unsave(
                 msg_id,
@@ -98,7 +100,7 @@ mod service {
             &format!("only receiver of email can save it"),
         );
 
-        let saved_messages_table = SavedMessagesTable::new();
+        let saved_messages_table = SavedMessageTable::new();
         saved_messages_table
             .put(&SavedMessage {
                 msg_id,
@@ -115,7 +117,7 @@ mod service {
     /// `unsave` releases the state storage for a previously saved message
     #[action]
     fn unsave(msg_id: u64, sender: AccountNumber, subject: String, body: String, datetime: u32) {
-        let saved_messages_table = SavedMessagesTable::new();
+        let saved_messages_table = SavedMessageTable::new();
 
         saved_messages_table.remove(&SavedMessage {
             msg_id,
@@ -147,18 +149,22 @@ mod service {
     impl Query {
         async fn get_saved_msgs(
             &self,
+            receiver: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
-            TableQuery::new(SavedMessagesTable::new().get_index_pk())
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-                .await
+            TableQuery::subindex::<AccountNumber>(
+                SavedMessageTable::new().get_index_by_receiver(),
+                &receiver,
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
     }
 
@@ -167,6 +173,7 @@ mod service {
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, Query))
+            .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_rest_api(&request))
     }
 }

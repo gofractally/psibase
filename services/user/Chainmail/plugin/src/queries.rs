@@ -2,7 +2,7 @@ use crate::{
     bindings::exports::chainmail::plugin::queries::Message,
     bindings::host::common::{server as CommonServer, types::Error},
     errors::ErrorType,
-    serde_structs::TempMessageForDeserialization,
+    serde_structs::TempMessageForDeserEvents,
 };
 
 pub fn get_msg_by_id(msg_id: u64) -> Result<Message, Error> {
@@ -10,7 +10,7 @@ pub fn get_msg_by_id(msg_id: u64) -> Result<Message, Error> {
 
     let res = CommonServer::get_json(&format!("{}/messages?id={}", api_root, &msg_id.to_string()))?;
 
-    let mut msgs = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&res)
+    let mut msgs = serde_json::from_str::<Vec<TempMessageForDeserEvents>>(&res)
         .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
     if msgs.len() == 1 {
@@ -41,10 +41,9 @@ pub fn query_messages_endpoint(
         endpoint += &format!("receiver={}", receiver.unwrap());
     }
 
-    let resp = serde_json::from_str::<Vec<TempMessageForDeserialization>>(&CommonServer::get_json(
-        &endpoint,
-    )?)
-    .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+    let resp =
+        serde_json::from_str::<Vec<TempMessageForDeserEvents>>(&CommonServer::get_json(&endpoint)?)
+            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
     Ok(resp.into_iter().map(|m| m.into()).collect())
 }
