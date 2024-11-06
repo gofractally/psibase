@@ -113,6 +113,28 @@ export const SettingsDropdown = () => {
     const init = async () => {
         await supervisor.onLoaded();
         supervisor.preLoadPlugins([{ service: "accounts" }]);
+        console.log("starting...");
+        const res = z
+            .string()
+            .array()
+            .parse(
+                await supervisor.functionCall({
+                    method: "getAvailableAccounts",
+                    params: [],
+                    service: "accounts",
+                    intf: "accounts",
+                })
+            );
+        console.log(res, "was the accounts return");
+
+        const res2 = await supervisor.functionCall({
+            method: "loginTemp",
+            params: [res[0]],
+            service: "accounts",
+            intf: "accounts",
+        });
+
+        console.log({ res2 });
     };
 
     useEffect(() => {
