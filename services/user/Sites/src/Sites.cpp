@@ -107,7 +107,7 @@ namespace SystemService
           ;
 
       // Accepted content encodings
-      const std::array<std::string, 2> validEncodings = {"br", "gzip"};
+      const std::array<std::string, 2> validEncodings = {"br", "gzip"};  // KEEP SORTED
 
       // Content-coding-identifier, e.g. "br", "gzip", etc.
       using cci = std::string;
@@ -378,8 +378,7 @@ namespace SystemService
 
       if (contentEncoding)
       {
-         check(std::find(validEncodings.begin(), validEncodings.end(), *contentEncoding) !=
-                   validEncodings.end(),
+         check(std::ranges::binary_search(validEncodings, *contentEncoding),
                "Unsupported content encoding");
       }
 
