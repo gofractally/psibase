@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
     Dialog,
@@ -63,13 +63,6 @@ const fetchInvite = async (): Promise<string> => {
     await wait(2000);
 
     try {
-        await supervisor.functionCall({
-            service: "accounts",
-            intf: "accounts",
-            method: "loginTemp",
-            params: ["alice"],
-        });
-
         const inviteRes = z.string().parse(
             await supervisor.functionCall({
                 service: "invite",
@@ -110,6 +103,8 @@ export const SettingsDropdown = () => {
         },
     });
 
+    const [accounts, setAccounts] = useState<string[]>([]);
+
     const init = async () => {
         await supervisor.onLoaded();
         supervisor.preLoadPlugins([{ service: "accounts" }]);
@@ -126,16 +121,26 @@ export const SettingsDropdown = () => {
                 })
             );
         console.log(res, "was the accounts return");
+        setAccounts(res);
 
-        const res2 = await supervisor.functionCall({
+        void (await supervisor.functionCall({
             method: "loginTemp",
             params: [res[0]],
             service: "accounts",
             intf: "accounts",
+        }));
+
+        const res3 = await supervisor.functionCall({
+            method: "getLoggedInUser",
+            params: [],
+            service: "accounts",
+            intf: "accounts",
         });
 
-        console.log({ res2 });
+        console.log({ res3 });
     };
+
+    console.log({ accounts }, "are available accounts");
 
     useEffect(() => {
         init();
