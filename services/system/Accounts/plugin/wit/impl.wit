@@ -1,10 +1,27 @@
 package accounts:plugin;
 
+/// This interface is only callable by the accounts app itself.
+interface admin {
+    use types.{app-details};
+
+    /// Logs the specified user into the specified app without any user interaction.
+    /// This function is only callable by the accounts app itself.
+    login-direct: func(app: app-details, user: string);
+
+    /// Gets app details
+    decode-connection-token: func(token: string) -> option<app-details>;
+
+    /// Gets the names of all apps to which the user has connected
+    get-connected-apps: func() -> list<string>;
+}
+
 world impl {
     include host:common/imports;
     include host:privileged/imports;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
 
-    export accounts;
+    export api;
+    export active-app;
+    export admin;
 }

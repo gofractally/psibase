@@ -60,15 +60,17 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        if (callerOrigin === supervisorDomain) {
-            console.info(
-                "TODO: handle calls directly from the rootdomain itself",
-            );
+        if (callerOrigin === siblingUrl(null, null, null, true)) {
+            this.parentOrigination = {
+                app: "homepage",
+                origin: siblingUrl(null, "homepage"),
+            };
+        } else {
+            this.parentOrigination = {
+                app: serviceFromOrigin(callerOrigin),
+                origin: callerOrigin,
+            };
         }
-        this.parentOrigination = {
-            app: serviceFromOrigin(callerOrigin),
-            origin: callerOrigin,
-        };
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
@@ -125,7 +127,7 @@ export class Supervisor implements AppInterface {
         let getLoggedInUser = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "activeApp",
             "getLoggedInUser",
             [],
         );
@@ -138,7 +140,7 @@ export class Supervisor implements AppInterface {
         const getAccount = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "api",
             "getAccount",
             [user],
         );
@@ -152,7 +154,7 @@ export class Supervisor implements AppInterface {
         const logout = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "activeApp",
             "logout",
             [],
         );
@@ -186,18 +188,18 @@ export class Supervisor implements AppInterface {
         });
     }
 
-    getActiveAppDomain(sender: OriginationData): string {
+    getActiveApp(sender: OriginationData): OriginationData {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveAppDomain] Unauthorized - only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - only callable by Accounts plugin",
         );
         assert(
             sender.app === "accounts",
-            "[supervisor:getActiveAppDomain] Unauthorized - Only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by Accounts plugin",
         );
 
-        return this.parentOrigination.origin;
+        return this.parentOrigination;
     }
 
     // Called by the current plugin looking to identify its caller

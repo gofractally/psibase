@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct InviteParams {
-    pub app: String,
+    pub app: Option<String>,
+    pub app_domain: String,
     pub pk: String,
 }
 

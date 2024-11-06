@@ -13,6 +13,7 @@ interface types {
     /// Fields:
     /// * `inviter` - The account responsible for generating the invite
     /// * `app` - The app responsible for generating the invite
+    /// * `app_domain` - The domain of the app responsible for generating the invite
     /// * `state` - The state of the invite
     /// * `actor` - The name of the account to most recently accept or reject the invite
     /// * `expiry` - The UTC timestamp of the invite's expiration
@@ -22,7 +23,8 @@ interface types {
     ///    used.
     record invite {
         inviter: string,
-        app: string,
+        app: option<string>,
+        app-domain: string,
         state: invite-state,
         actor: string,
         expiry: string,

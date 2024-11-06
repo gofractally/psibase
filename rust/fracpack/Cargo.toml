@@ -13,6 +13,9 @@ path = "src/fracpack.rs"
 
 [dependencies]
 custom_error = "1.9.2"
+hex = "0.3.1"
 indexmap = { version = "2.2.6", features = ["std", "serde"] }
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0", features = ["preserve_order"]}
+serde-aux = "4.4"
 psibase_macros = { version = "0.13.0", path = "../psibase_macros" }
