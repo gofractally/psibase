@@ -14,8 +14,6 @@ mod errors;
 use errors::ErrorType;
 struct SitesPlugin;
 
-const COMPRESSION_QUALITY: u32 = 11;
-
 // Add a leading slash if missing and remove trailing slashes.
 fn normalize_path(path: &String) -> String {
     let mut result = String::new();
@@ -29,12 +27,28 @@ fn normalize_path(path: &String) -> String {
     result
 }
 
-const TX_SIZE_LIMIT: usize = 64 * 1024; // 64kb
+const TX_SIZE_LIMIT: usize = 1 * 1024 * 1024; // 1mb
+
+fn validate_compression_quality(quality: u8) -> Result<(), Error> {
+    if quality > 11 {
+        return Err(ErrorType::InvalidCompressionQuality(quality).into());
+    }
+    Ok(())
+}
 
 impl Sites for SitesPlugin {
-    fn upload(file: File) -> Result<(), Error> {
-        let (content, content_encoding) =
-            compress_content(&file.content, &file.content_type, COMPRESSION_QUALITY);
+    fn upload(file: File, compression_quality: u8) -> Result<(), Error> {
+        validate_compression_quality(compression_quality)?;
+
+        let (content, content_encoding) = if compression_quality > 0 {
+            compress_content(
+                &file.content,
+                &file.content_type,
+                compression_quality as u32,
+            )
+        } else {
+            (file.content, None)
+        };
 
         let packed = SitesService::action_structs::storeSys {
             path: file.path.clone(),
@@ -52,11 +66,20 @@ impl Sites for SitesPlugin {
         Ok(())
     }
 
-    fn upload_tree(files: Vec<File>) -> Result<u16, Error> {
+    fn upload_tree(files: Vec<File>, compression_quality: u8) -> Result<u16, Error> {
+        validate_compression_quality(compression_quality)?;
+
         let mut accumulated_size = 0;
-        for (index, file) in files.iter().enumerate() {
-            let (content, content_encoding) =
-                compress_content(&file.content, &file.content_type, COMPRESSION_QUALITY);
+        for (index, file) in files.into_iter().enumerate() {
+            let (content, content_encoding) = if compression_quality > 0 {
+                compress_content(
+                    &file.content,
+                    &file.content_type,
+                    compression_quality as u32,
+                )
+            } else {
+                (file.content, None)
+            };
 
             let packed = SitesService::action_structs::storeSys {
                 path: normalize_path(&file.path),

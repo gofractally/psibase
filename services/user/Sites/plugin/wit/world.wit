@@ -17,17 +17,27 @@ interface sites {
     /// This file will be accessible at the subdomain of the caller, 
     /// at the specified path.
     /// 
-    /// Maximum quality Brotli file compression is automatically applied to 
-    /// the file if compression on its content type is supported.
-    upload: func(file: file) -> result<_, error>;
+    /// Brotli file compression is applied at the specified level if the 
+    /// file-type of the content is supported. Compression-quality must be 
+    /// within 1-11 (inclusive). Specifying level 0 will disable compression.
+    /// 
+    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// file (after compression if applied).
+    upload: func(file: file, compression-quality: u8) -> result<_, error>;
 
     /// Upload multiple files to Sites.
     /// 
     /// These files will be accessible at the subdomain of the caller, 
     /// at the specified paths.
     /// 
-    /// Maximum quality Brotli file compression is automatically applied to 
-    /// the files if compression on their content type is supported.
+    /// Brotli file compression is applied at the specified level if the 
+    /// file-type of the content is supported. Compression-quality must be 
+    /// within 1-11 (inclusive). Specifying level 0 will disable compression.
+    /// 
+    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// file (after compression if applied).
     /// 
     /// If the transaction size limit is exceeded, returns the index of the
     /// first file that was not uploaded.
@@ -37,7 +47,7 @@ interface sites {
     /// If the first file in the list exceeds the transaction size limit,
     /// the transaction will be aborted and the error will contain the path
     /// of the file that caused the error.
-    upload-tree: func(files: list<file>) -> result<u16, error>;
+    upload-tree: func(files: list<file>, compression-quality: u8) -> result<u16, error>;
 
     /// Enable or disable single-page application mode.
     /// When enabled, all content requests return the root document
