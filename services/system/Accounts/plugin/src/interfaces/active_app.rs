@@ -39,6 +39,6 @@ impl ActiveApp for AccountsPlugin {
 
     fn create_connection_token() -> Result<String, Error> {
         let app = get_assert_top_level_app("get_connection_token", &vec![])?;
-        Ok(URL_SAFE.encode(&ConnectionToken::new(&app).packed()))
+        Ok(URL_SAFE.encode(&ConnectionToken::new(app).packed()))
     }
 }

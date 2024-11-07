@@ -32,7 +32,7 @@ impl Admin for AccountsPlugin {
         assert_caller_admin();
 
         ConnectionToken::from_str(&token).map(|t| AppDetails {
-            origin: t.app_origin,
+            origin: t.origin,
             app: t.app,
         })
     }
