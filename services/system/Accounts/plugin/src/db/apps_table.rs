@@ -7,15 +7,9 @@ use url::Url;
 
 use crate::db::keys::DbKeys;
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, Default)]
 struct ConnectedAccounts {
     accounts: Vec<String>,
-}
-
-impl Default for ConnectedAccounts {
-    fn default() -> Self {
-        Self { accounts: vec![] }
-    }
 }
 
 impl ConnectedAccounts {
@@ -79,20 +73,20 @@ impl AppsTable {
         URL_SAFE.encode(origin)
     }
 
-    fn key(&self, key: &str) -> String {
+    fn prefixed_key(&self, key: &str) -> String {
         self.prefix() + "." + key
     }
 
     pub fn get_logged_in_user(&self) -> Option<String> {
-        Keyvalue::get(&self.key(DbKeys::LOGGED_IN)).map(|a| String::from_utf8(a).unwrap())
+        Keyvalue::get(&self.prefixed_key(DbKeys::LOGGED_IN)).map(|a| String::from_utf8(a).unwrap())
     }
 
     pub fn login(&self, user: String) {
-        Keyvalue::set(&self.key(DbKeys::LOGGED_IN), &user.as_bytes())
+        Keyvalue::set(&self.prefixed_key(DbKeys::LOGGED_IN), &user.as_bytes())
             .expect("Failed to set logged-in user");
 
         // Add to connected accounts if not already present
-        let connected_accounts = Keyvalue::get(&self.key(DbKeys::CONNECTED_ACCOUNTS));
+        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
         let mut connected_accounts = connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default();
@@ -104,20 +98,22 @@ impl AppsTable {
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_apps.add(&self.app);
+        Keyvalue::set(&DbKeys::CONNECTED_APPS, &connected_apps.packed())
+            .expect("Failed to set connected apps");
 
         Keyvalue::set(
-            &self.key(DbKeys::CONNECTED_ACCOUNTS),
+            &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
             &connected_accounts.packed(),
         )
         .expect("Failed to set connected accounts");
     }
 
     pub fn logout(&self) {
-        Keyvalue::delete(&self.key(DbKeys::LOGGED_IN));
+        Keyvalue::delete(&self.prefixed_key(DbKeys::LOGGED_IN));
     }
 
     pub fn get_connected_accounts(&self) -> Vec<String> {
-        let connected_accounts = Keyvalue::get(&self.key(DbKeys::CONNECTED_ACCOUNTS));
+        let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
         connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
             .unwrap_or_default()
