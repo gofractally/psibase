@@ -61,7 +61,10 @@ impl AppsTable {
     }
 
     fn prefix(&self) -> String {
-        // Do not namespace app data by protocol
+        // App data is already namespaced by protocol because plugins
+        //  are loaded on the same protocol that the supervisor uses.
+        //  e.g. https supervisor will load https plugins and store
+        //  https data.
         let url = Url::parse(&self.app.origin).unwrap();
         let mut origin = url.domain().unwrap().to_string();
         if let Some(port) = url.port() {
