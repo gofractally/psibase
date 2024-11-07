@@ -26,12 +26,12 @@ struct ChainmailPlugin;
 
 fn get_u32_unix_time_from_iso8601_str(dt_str: String) -> Result<u32, Error> {
     let dt_i64 = DateTime::parse_from_str(dt_str.as_str(), "%+")
-        .map_err(|e| ErrorType::DateTimeConversion.err(e.to_string().as_str()))?
+        .map_err(|e| ErrorType::DateTimeConversion(e.to_string()))?
         .timestamp();
     if dt_i64 >= 0 && dt_i64 < u32::MAX as i64 {
         return Ok(dt_i64 as u32);
     } else {
-        return Err(ErrorType::DateTimeConversion.err(dt_str.as_str()));
+        return Err(ErrorType::DateTimeConversion(dt_str).into());
     };
 }
 
@@ -113,7 +113,7 @@ impl Query for ChainmailPlugin {
 
         let gql_res_str = CommonServer::post_graphql_get_json(&graphql_str)?;
         let summary_val = serde_json::from_str::<TempMessageForDeserGqlResponse>(&gql_res_str)
-            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
+            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(summary_val
             .data

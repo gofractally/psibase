@@ -17,14 +17,14 @@ impl SmartAuth for AuthDelegate {
         _account_name: String,
         _actions: Vec<Action>,
     ) -> Result<Vec<Claim>, CommonTypes::Error> {
-        Err(NotYetImplemented.err("get_claims"))
+        Err(NotYetImplemented("get_claims"))?
     }
 
     fn get_proofs(
         _account_name: String,
         _transaction_hash: Vec<u8>,
     ) -> Result<Vec<Proof>, CommonTypes::Error> {
-        Err(NotYetImplemented.err("get_proofs"))
+        Err(NotYetImplemented("get_proofs"))?
     }
 }
 

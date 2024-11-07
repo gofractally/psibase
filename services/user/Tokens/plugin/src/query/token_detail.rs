@@ -59,9 +59,9 @@ pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error>
     );
 
     let res = server::post_graphql_get_json(&query)
-        .map_err(|e| ErrorType::QueryError.err(&e.message))
+        .map_err(|e| ErrorType::QueryError(e.message))
         .and_then(|result| {
-            serde_json::from_str(&result).map_err(|e| ErrorType::QueryError.err(&e.to_string()))
+            serde_json::from_str(&result).map_err(|e| ErrorType::QueryError(e.to_string()))
         })
         .and_then(|response_root: Response| Ok(response_root.data.token_details))
         .and_then(|token_details| {
@@ -76,7 +76,9 @@ pub fn fetch_token(token_number: u32) -> Result<TokenDetail, CommonTypes::Error>
     if res.id == token_number {
         Ok(res)
     } else {
-        Err(ErrorType::TokenNumberMismatch
-            .err("token_number requested does not match response token_id"))
+        Err(ErrorType::TokenNumberMismatch(
+            "token_number requested does not match response token_id",
+        )
+        .into())
     }
 }

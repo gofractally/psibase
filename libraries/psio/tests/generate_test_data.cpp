@@ -149,6 +149,11 @@ struct Empty
 };
 PSIO_REFLECT(Empty, definitionWillNotChange())
 
+struct Empty2
+{
+};
+PSIO_REFLECT(Empty2, definitionWillNotChange())
+
 namespace nnn
 {
    struct string
@@ -242,7 +247,6 @@ PSIO_REFLECT(EmptyTrailing, v0, v1)
 int main()
 {
    test_builder builder;
-   builder.builder.expandNested();
    builder.add<std::int8_t>("i8", {0, 1, -1});
    builder.add<std::uint8_t>("u8", {0, 1, 0xffu});
    builder.add<std::int16_t>("i16", {0, 1, -1});
@@ -286,7 +290,7 @@ int main()
    builder.add<std::vector<unsigned char>>("hex", {{}, {23, 45, 67}});
    builder.add<std::tuple<std::vector<unsigned char>>>("(hex)", {{{}}, {{23, 45, 67}}});
    builder.add<psio::shared_view_ptr<std::int64_t>>("nestedhex", {42});
-   builder.add_nested<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty", {{Empty{}}});
+   builder.add_nested<std::tuple<psio::shared_view_ptr<Empty2>>>("nested-empty", {{Empty2{}}});
    builder.add<std::tuple<psio::shared_view_ptr<Empty>>>("nested-empty-hex", {{Empty{}}});
    builder.add<std::tuple<std::optional<std::optional<std::vector<std::int8_t>>>>>(
        "OptionOption", {{std::optional{std::vector<std::int8_t>()}}});
