@@ -116,7 +116,6 @@ export function useArchivedMessages() {
 
 const getSavedMessages = async (account: string | undefined) => {
     const supervisor = await getSupervisor();
-    console.info(`calling getSavedMsgs() w receiver = [${account}]`);
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
@@ -124,7 +123,6 @@ const getSavedMessages = async (account: string | undefined) => {
         params: [account],
     })) as RawMessage[];
 
-    console.info(`savedMessages: ${rawMessages}`);
     return transformRawMessagesToMessages(rawMessages);
 };
 

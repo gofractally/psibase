@@ -16,9 +16,8 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        anyhow, check, create_schema, get_sender, serve_graphiql, serve_graphql, AccountNumber,
-        DbId, Fracpack, HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery,
-        TimePointSec, ToSchema,
+        anyhow, check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
+        HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
