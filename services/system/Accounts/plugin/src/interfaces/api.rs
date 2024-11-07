@@ -1,15 +1,16 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
 use crate::bindings::host::privileged::intf as Privileged;
-use crate::db::*;
+use crate::bindings::transact::plugin::intf as Transact;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
+use crate::db::apps_table::*;
 
 use psibase::AccountNumber;
 use psibase::services::accounts as AccountsService;
 use psibase::fracpack::Pack;
 use serde::Deserialize;
-use crate::bindings::transact::plugin::intf as Transact;
+
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {

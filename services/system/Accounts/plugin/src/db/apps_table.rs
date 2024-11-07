@@ -22,15 +22,9 @@ impl ConnectedAccounts {
     }
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, Default)]
 struct ConnectedApps {
     apps: Vec<String>,
-}
-
-impl Default for ConnectedApps {
-    fn default() -> Self {
-        Self { apps: vec![] }
-    }
 }
 
 impl ConnectedApps {

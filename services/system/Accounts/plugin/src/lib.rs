@@ -1,5 +1,6 @@
 #[allow(warnings)]
 mod bindings;
+mod connection_token;
 mod db;
 mod errors;
 mod helpers;

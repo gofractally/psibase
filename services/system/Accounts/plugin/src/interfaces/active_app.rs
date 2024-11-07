@@ -1,9 +1,12 @@
 use crate::bindings::exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
 use crate::bindings::exports::accounts::plugin::api::Guest;
-use crate::db::*;
+use crate::connection_token::*;
+use crate::db::apps_table::*;
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
+use base64::{engine::general_purpose::URL_SAFE, Engine};
+use psibase::fracpack::Pack;
 
 impl ActiveApp for AccountsPlugin {
     fn login(user: String) -> Result<(), Error> {
@@ -36,6 +39,6 @@ impl ActiveApp for AccountsPlugin {
 
     fn create_connection_token() -> Result<String, Error> {
         let app = get_assert_top_level_app("get_connection_token", &vec![])?;
-        Ok(TokensTable::new().add_connection_token(&app))
+        Ok(URL_SAFE.encode(&ConnectionToken::new(&app).packed()))
     }
 }
