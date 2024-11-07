@@ -8,8 +8,6 @@ mod errors;
 mod queries;
 mod serde_structs;
 
-use std::cmp::Ordering;
-
 use bindings::accounts::plugin::accounts as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
@@ -22,9 +20,8 @@ use errors::ErrorType;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 use queries::{get_msg_by_id, query_messages_endpoint};
-use serde_structs::{TempMessageForDeserGql, TempMessageForDeserGqlResponse};
+use serde_structs::TempMessageForDeserGqlResponse;
 
-/// Struct that implements the Api as well as the Query interfaces
 struct ChainmailPlugin;
 
 fn get_u32_unix_time_from_iso8601_str(dt_str: String) -> Result<u32, Error> {
@@ -39,7 +36,6 @@ fn get_u32_unix_time_from_iso8601_str(dt_str: String) -> Result<u32, Error> {
 }
 
 impl Api for ChainmailPlugin {
-    /// Send a message
     fn send(receiver: String, subject: String, body: String) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "send",
@@ -80,32 +76,6 @@ impl Api for ChainmailPlugin {
     }
 }
 
-impl PartialEq for Message {
-    fn eq(&self, other: &Self) -> bool {
-        self.msg_id == other.msg_id
-    }
-}
-
-impl Eq for Message {}
-
-impl PartialOrd for Message {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.msg_id.partial_cmp(&other.msg_id)
-    }
-}
-
-impl Ord for Message {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.msg_id < other.msg_id {
-            Ordering::Less
-        } else if self.msg_id == other.msg_id {
-            Ordering::Equal
-        } else {
-            Ordering::Greater
-        }
-    }
-}
-
 impl Query for ChainmailPlugin {
     fn get_msgs(sender: Option<String>, receiver: Option<String>) -> Result<Vec<Message>, Error> {
         let inbox_msgs = query_messages_endpoint(sender, receiver.clone(), false)?;
@@ -130,7 +100,6 @@ impl Query for ChainmailPlugin {
     }
 
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
-        println!("get_saved_msgs().top");
         let rcvr = match receiver {
             Some(r) => r,
             None => AccountPlugin::get_logged_in_user()?.expect("No receiver specified"),

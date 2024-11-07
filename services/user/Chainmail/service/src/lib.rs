@@ -9,7 +9,7 @@ mod tables;
 #[psibase::service]
 mod service {
     use crate::event_query_helpers::serve_rest_api;
-    use crate::tables::SavedMessage;
+    use crate::tables::{SavedMessage, SavedMessageTable};
 
     use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::services::events::Wrapper as EventsSvc;
@@ -21,13 +21,6 @@ mod service {
         TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
-
-    /// Saved Messages Table
-    /// Messages are "stored" and accessed as events and via event queries, with nothing in state.
-    /// This table stores messages a user wants to keep around past a message pruning expiration time.
-    // #[table(name = "SavedMessageTable", record = "SavedMessage", index = 1)]
-    // pub struct SavedMessageTable;
-    use crate::tables::SavedMessageTable;
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
@@ -129,7 +122,6 @@ mod service {
         });
     }
 
-    /// History events
     #[event(history)]
     pub fn sent(
         sender: AccountNumber,
@@ -168,12 +160,11 @@ mod service {
         }
     }
 
-    /// Serve REST calls
+    /// Serve REST and GraphQL calls
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, Query))
-            .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_rest_api(&request))
     }
 }

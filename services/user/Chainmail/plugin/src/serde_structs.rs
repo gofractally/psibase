@@ -2,26 +2,35 @@ use chrono::DateTime;
 use psibase::TimePointSec;
 use serde::{de, Deserialize};
 use serde_aux::prelude::*;
+use std::cmp::Ordering;
 
 use crate::bindings::exports::chainmail::plugin::queries::Message;
 
-// #[derive(Deserialize)]
-// #[serde(remote = "Message")]
-// struct MessageDef {
-//     msg_id: u64,
-//     receiver: String,
-//     sender: String,
-//     subject: String,
-//     body: String,
-//     datetime: u32,
-// }
+impl PartialEq for Message {
+    fn eq(&self, other: &Self) -> bool {
+        self.msg_id == other.msg_id
+    }
+}
 
-// #[derive(Deserialize)]
-// struct Helper(#[serde(with = "MessageDef")] Message);
+impl Eq for Message {}
 
-// TODO: create traits/impls for data structs that provide serde helper functions
-// TODO: create From/Into impl for Common::Error
+impl PartialOrd for Message {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.msg_id.partial_cmp(&other.msg_id)
+    }
+}
 
+impl Ord for Message {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.msg_id < other.msg_id {
+            Ordering::Less
+        } else if self.msg_id == other.msg_id {
+            Ordering::Equal
+        } else {
+            Ordering::Greater
+        }
+    }
+}
 #[derive(Clone, Debug, Deserialize)]
 pub struct TempMessageForDeserEvents {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -35,6 +44,7 @@ pub struct TempMessageForDeserEvents {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[allow(non_snake_case)]
 pub struct TempMessageForDeserGql {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub msgId: u64,
@@ -50,6 +60,7 @@ pub struct TempMessageForDeserGqlResponseNodes {
     pub nodes: Vec<TempMessageForDeserGql>,
 }
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
 pub struct TempMessageForDeserGqlResponseData {
     pub getSavedMsgs: TempMessageForDeserGqlResponseNodes,
 }
