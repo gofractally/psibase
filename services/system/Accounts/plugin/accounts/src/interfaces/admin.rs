@@ -3,9 +3,9 @@ use crate::plugin::AccountsPlugin;
 use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client as Client;
-use crate::connection_token::*;
 use crate::db::apps_table::*;
 use crate::helpers::*;
+use crate::tokens::tokens::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn assert_caller_admin() {

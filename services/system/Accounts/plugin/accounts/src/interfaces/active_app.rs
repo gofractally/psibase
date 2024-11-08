@@ -1,10 +1,10 @@
 use crate::bindings::exports::accounts::plugin::active_app::{Guest as ActiveApp, *};
 use crate::bindings::exports::accounts::plugin::api::Guest;
-use crate::connection_token::*;
 use crate::db::apps_table::*;
 use crate::errors::ErrorType::*;
 use crate::helpers::*;
 use crate::plugin::AccountsPlugin;
+use crate::tokens::tokens::*;
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use psibase::fracpack::Pack;
 

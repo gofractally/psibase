@@ -36,6 +36,6 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }

@@ -318,7 +318,7 @@ add_rs_component(services/user/CommonApi/common/packages/component-parser:Compon
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component(services/system/Transact/plugin:TransactPlugin transact.wasm wasm32-wasi )
-add_rs_component(services/system/Accounts/plugin:AccountsPlugin accounts.wasm wasm32-wasi )
+add_rs_component(services/system/Accounts/plugin/accounts:AccountsPlugin accounts.wasm wasm32-wasi )
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/system/AuthDelegate/plugin:AuthDelegatePlugin auth_delegate.wasm wasm32-wasi )
 add_rs_component(services/system/AuthAny/plugin:AuthAnyPlugin auth_any.wasm wasm32-wasi )
@@ -328,6 +328,7 @@ add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-was
 add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
 add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
 add_rs_component(services/user/Sites/plugin:SitesPlugin sites.wasm wasm32-wasi )
+
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
