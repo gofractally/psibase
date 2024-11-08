@@ -1,6 +1,7 @@
 //! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
+use component_name_macro::component_name_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
@@ -11,12 +12,19 @@ use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
+mod component_name_macro;
 mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
 mod schema_macro;
 mod test_case_macro;
 mod to_key_macro;
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn component_name(_item: TokenStream) -> TokenStream {
+    component_name_macro_impl()
+}
 
 // TODO: remove
 #[proc_macro_derive(Fracpack, attributes(fracpack))]

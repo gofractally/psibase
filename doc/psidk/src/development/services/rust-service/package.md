@@ -36,16 +36,8 @@ description = "An example package"
 [package.metadata.psibase]
 # (required) Builds example.psi
 package-name = "example"
-# Most services besides the core system services don't need extra flags.
-flags = []
-# This service handles its own HTTP requests
-server = "example"
-# Plugin for the front end
-plugin = "example-plugin"
-# Run the service's init action; "0000" represents <no args> from the Facpack perspective
-postinstall = [{sender="tpack", service="tpack", method="init", rawData="0000"}]
-# Upload the UI
-data = [{src = "ui/", dst = "/"}]
+# package includes `service1` service
+services = ["service1"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.13.0"
