@@ -63,6 +63,11 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
+    BadScalar           = "Bad scalar value",
+    ExtraEmptyOptional  = "Trailing empty optionals must be omitted",
+    PtrEmptyList        = "A pointer to an empty list must use zero offset",
+    HasUnknown          = "Unknown fields not allowed",
+    UnknownType         = "Unknown type",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -312,24 +317,6 @@ fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE
     Ok(bytes)
 }
 
-// TODO: violates single-valid-serialization rule
-trait MissingBoolConversions {
-    fn from_le_bytes(bytes: [u8; 1]) -> bool;
-    fn to_le_bytes(self) -> [u8; 1];
-}
-
-impl MissingBoolConversions for bool {
-    fn from_le_bytes(bytes: [u8; 1]) -> bool {
-        bytes[0] != 0
-    }
-    fn to_le_bytes(self) -> [u8; 1] {
-        match self {
-            true => [1],
-            false => [0],
-        }
-    }
-}
-
 impl<'a, T: Pack> Pack for &'a T {
     const FIXED_SIZE: u32 = T::FIXED_SIZE;
     const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
@@ -353,6 +340,30 @@ impl<'a, T: Pack> Pack for &'a T {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         (*self).embedded_variable_pack(dest)
+    }
+}
+
+impl Pack for bool {
+    const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
+    const VARIABLE_SIZE: bool = false;
+    fn pack(&self, dest: &mut Vec<u8>) {
+        dest.push(if *self { 1 } else { 0 });
+    }
+}
+
+impl<'a> Unpack<'a> for bool {
+    const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
+    const VARIABLE_SIZE: bool = false;
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+        match u8::unpack(src, pos)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(Error::BadScalar),
+        }
+    }
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        Self::unpack(src, pos)?;
+        Ok(())
     }
 }
 
@@ -383,7 +394,6 @@ macro_rules! scalar_impl {
     };
 } // scalar_impl
 
-scalar_impl! {bool}
 scalar_impl! {i8}
 scalar_impl! {i16}
 scalar_impl! {i32}

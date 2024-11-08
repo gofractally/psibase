@@ -32,13 +32,13 @@ fn identify_token_type(token_id: String) -> Result<TokenType, CommonTypes::Error
     let first_char = token_id
         .chars()
         .next()
-        .ok_or(ErrorType::InvalidTokenId.err("token id is empty"))?;
+        .ok_or(ErrorType::InvalidTokenId("token id is empty"))?;
 
     Ok(if first_char.is_ascii_digit() {
         Number(
             token_id
                 .parse::<u32>()
-                .map_err(|_| ErrorType::InvalidTokenId.err("failed to parse token_id to u32"))?,
+                .map_err(|_| ErrorType::InvalidTokenId("failed to parse token_id to u32"))?,
         )
     } else {
         Symbol(token_id)
@@ -50,7 +50,7 @@ fn token_id_to_number(token_id: Wit::TokenId) -> Result<u32, CommonTypes::Error>
     match parsed {
         TokenType::Number(number) => Ok(number),
         TokenType::Symbol(_str) => {
-            Err(ErrorType::NotImplemented.err("Symbol to token number not ready"))
+            Err(ErrorType::NotImplemented("Symbol to token number not ready").into())
         }
     }
 }

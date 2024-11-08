@@ -49,9 +49,8 @@ impl Queries for BrandingPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
         );
 
-        let netname_val = netname_val
-            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))
-            .unwrap();
+        let netname_val =
+            netname_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(netname_val.data.network_name)
     }
