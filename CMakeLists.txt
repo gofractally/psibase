@@ -319,6 +319,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component(services/system/Transact/plugin:TransactPlugin transact.wasm wasm32-wasi )
 add_rs_component(services/system/Accounts/plugin/accounts:AccountsPlugin accounts.wasm wasm32-wasi )
+add_rs_component(services/system/Accounts/plugin/account_tokens:AccountTokensPlugin account_tokens.wasm wasm32-wasi )
 add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
 add_rs_component(services/system/AuthDelegate/plugin:AuthDelegatePlugin auth_delegate.wasm wasm32-wasi )
 add_rs_component(services/system/AuthAny/plugin:AuthAnyPlugin auth_any.wasm wasm32-wasi )
