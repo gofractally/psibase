@@ -764,7 +764,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
@@ -774,7 +774,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
