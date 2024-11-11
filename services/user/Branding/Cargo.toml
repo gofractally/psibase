@@ -21,7 +21,7 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "branding"
+package-name = "Branding"
 description = "Allow operators to rebrand their network easily"
 services = ["branding"]
 
