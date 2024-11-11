@@ -20,6 +20,7 @@ world impl {
     include host:privileged/imports;
     include clientdata:plugin/imports;
     include transact:plugin/imports;
+    include accounts:account-tokens/imports;
 
     export api;
     export active-app;

@@ -1,11 +1,11 @@
 use crate::plugin::AccountsPlugin;
 
+use crate::bindings::accounts::account_tokens::api::*;
 use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Admin};
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::helpers::*;
-use crate::tokens::tokens::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
 fn assert_caller_admin() {
@@ -31,10 +31,14 @@ impl Admin for AccountsPlugin {
     fn decode_connection_token(token: String) -> Option<AppDetails> {
         assert_caller_admin();
 
-        ConnectionToken::from_str(&token).map(|t| AppDetails {
-            origin: t.origin,
-            app: t.app,
-        })
+        if let Some(token) = deserialize_token(&token) {
+            match token {
+                Token::ConnectionToken(t) => return Some(t),
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 
     fn get_connected_apps() -> Vec<String> {

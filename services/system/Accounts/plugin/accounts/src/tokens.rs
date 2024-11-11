@@ -1,30 +1,14 @@
-pub mod tokens {
-    use crate::bindings::accounts::plugin::types::OriginationData;
-    use base64::{engine::general_purpose::URL_SAFE, Engine};
-    use psibase::fracpack::{Pack, Unpack};
+use crate::bindings::accounts::account_tokens::api::*;
+use crate::bindings::accounts::plugin::types::OriginationData;
 
-    #[derive(Pack, Unpack, Clone)]
-    pub struct ConnectionToken {
-        pub app: Option<String>,
-        pub origin: String,
+impl Token {
+    pub fn new_connection_token(sender: OriginationData) -> Self {
+        Token::ConnectionToken(sender)
     }
+}
 
-    impl ConnectionToken {
-        pub fn new(sender: OriginationData) -> Self {
-            Self {
-                app: sender.app.clone(),
-                origin: sender.origin.to_string(),
-            }
-        }
-
-        pub fn from_str(token: &str) -> Option<Self> {
-            if let Ok(token) = URL_SAFE.decode(token) {
-                if let Ok(token) = <ConnectionToken>::unpacked(&token) {
-                    return Some(token);
-                }
-            }
-
-            None
-        }
+impl From<Token> for String {
+    fn from(token: Token) -> Self {
+        serialize_token(&token)
     }
 }
