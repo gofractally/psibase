@@ -30,13 +30,12 @@ function App() {
       params: [user],
     });
 
-    const connectedAccounts: string[] = await supervisor.functionCall({
+    const connectedAccounts: string[] = (await supervisor.functionCall({
       service: "accounts",
       intf: "activeApp",
       method: "getConnectedAccounts",
       params: [],
-    }) as string[];
-
+    })) as string[];
 
     setRes(`Connected accounts: ${connectedAccounts.join(", ")}`);
   };
@@ -57,20 +56,28 @@ function App() {
 
   const generateInvite = async () => {
     try {
-      const inviteUrl: string = (await supervisor.functionCall({
+      const token: string = (await supervisor.functionCall({
         service: "invite",
         intf: "inviter",
         method: "generateInvite",
-        params: ["/subpath"],
+        params: [],
       })) as string;
-      console.log(`Got invite URL: ${inviteUrl}`);
+      setInviteToken(token);
+      console.log(`Got invite Token: ${token}`);
+    } catch (e) {
+      console.error(`${JSON.stringify(e, null, 2)}`);
+    }
+  };
 
-      const id: string | null = new URL(inviteUrl).searchParams.get("id");
-      if (id !== null) {
-        console.log(`Invite ID: ${id}`);
-      } else {
-        setRes("id in URL was null");
-      }
+  const decodeInvite = async () => {
+    try {
+      const inviteInfo: string = (await supervisor.functionCall({
+        service: "invite",
+        intf: "invitee",
+        method: "decodeInvite",
+        params: [inviteToken],
+      })) as string;
+      console.log(`Decoded invite: ${JSON.stringify(inviteInfo, null, 2)}`);
     } catch (e) {
       console.error(`${JSON.stringify(e, null, 2)}`);
     }
@@ -104,6 +111,7 @@ function App() {
   // };
 
   const [user, setUser] = useState<string>("");
+  const [inviteToken, setInviteToken] = useState<string>("");
 
   return (
     <>
@@ -157,6 +165,7 @@ function App() {
 
       <div className="card">
         <button onClick={() => generateInvite()}>{"Generate invite"}</button>
+        <button onClick={() => decodeInvite()}>{"Decode invite"}</button>
       </div>
     </>
   );
