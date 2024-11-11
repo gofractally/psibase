@@ -1,4 +1,4 @@
-package account-tokens:plugin;
+package accounts:account-tokens;
 
 world impl {
     include host:common/imports;

@@ -407,6 +407,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SERVER r-accounts
         DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${COMPONENT_BIN_DIR}/${AccountTokensPlugin_OUTPUT_FILE} /account-tokens.wasm
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm

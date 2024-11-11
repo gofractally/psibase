@@ -2,8 +2,8 @@
 mod bindings;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine};
-use bindings::account_tokens::plugin::types::*;
-use bindings::exports::account_tokens::plugin::api::Guest as API;
+use bindings::accounts::account_tokens::types::*;
+use bindings::exports::accounts::account_tokens::api::Guest as API;
 use psibase::fracpack::{Pack, Unpack};
 
 struct AccountTokens;

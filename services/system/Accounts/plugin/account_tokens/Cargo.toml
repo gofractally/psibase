@@ -19,7 +19,7 @@ strip = true
 lto = true
 
 [package.metadata.component]
-package = "account-tokens:plugin"
+package = "accounts:account-tokens"
 
 [package.metadata.component.target]
 world = "impl"
