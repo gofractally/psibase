@@ -28,7 +28,7 @@ impl ConnectedApps {
     }
 }
 
-// A database with a separate namespace for each app within the `accounts` namespace
+// A database with a separate namespace for each user within the `accounts` namespace
 pub struct UserTable {
     user: String,
 }
