@@ -48,4 +48,25 @@ mod tests {
 
         let _after = service_macro_impl(attr, before);
     }
+
+    #[test]
+    // `service` macro should expand without requiring a `use` to provide its deps
+    fn test_macro_hygiene() {
+        use quote::quote;
+
+        let attr = quote! {};
+        let before = quote! {
+            mod service {
+
+                #[action]
+                fn add(a: i32, b: i32) -> i32 {
+                    a + b
+                }
+                #[event(history)]
+                fn something() {}
+            }
+        };
+
+        service_macro_impl(attr, before);
+    }
 }
