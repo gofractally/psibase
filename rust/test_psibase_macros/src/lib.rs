@@ -2,7 +2,10 @@
 #[allow(non_snake_case)]
 mod service {}
 
+#[cfg(test)]
 mod tests {
+    use psibase::services::http_server;
+    use serde_json::{json, Value};
 
     #[psibase::test_case(packages("PsiMacroTest"))]
     // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
@@ -11,12 +14,15 @@ mod tests {
         use psibase::AccountNumber;
 
         println!("{}", Wrapper::SERVICE);
+        http_server::Wrapper::push_from(&chain, Wrapper::SERVICE).registerServer(Wrapper::SERVICE);
+
         assert_eq!(Wrapper::SERVICE, AccountNumber::from("basicwquery"));
 
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
-        // Q: How to call query function? Call serveSys with a graphql request
-        // TODO: from James: The unit test in test_contract_2 has an example of making a GET, POST, and a graphql POST on the chain object.
+        chain.finish_block();
+        let reply: Value = chain.graphql(Wrapper::SERVICE, r#"query { queryFn1 }"#)?;
+        assert_eq!(reply, json!({ "data": { "queryFn1": "Return value" }}));
 
         Ok(())
     }

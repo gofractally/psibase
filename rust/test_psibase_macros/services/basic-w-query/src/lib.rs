@@ -1,7 +1,7 @@
 #[psibase::service(name = "basicwquery")]
 #[allow(non_snake_case)]
 mod service {
-    use psibase::{anyhow, serve_simple_ui, HttpReply, HttpRequest};
+    use psibase::{anyhow, serve_graphql, serve_simple_ui, HttpReply, HttpRequest};
 
     #[action]
     fn add(a: i32, b: i32) -> i32 {
@@ -18,13 +18,14 @@ mod service {
 
     #[async_graphql::Object]
     impl Query {
-        async fn query_fn1(&self) -> String {
-            String::from("Return value")
+        async fn query_fn1(&self) -> Option<String> {
+            Some(String::from("Return value"))
         }
     }
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_simple_ui::<Wrapper>(&request))
+        None.or_else(|| serve_graphql(&request, Query))
+            .or_else(|| serve_simple_ui::<Wrapper>(&request))
     }
 }
