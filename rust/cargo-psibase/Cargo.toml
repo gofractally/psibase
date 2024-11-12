@@ -12,7 +12,7 @@ license = "MIT"
 anyhow = "1.0"
 wasm-opt = "0.116.0"
 cargo_metadata = "0.18.1"
-clap = { version = "4.4", features = ["derive"]}
+clap = { version = "4.4", features = ["derive"] }
 console = "0.15.2"
 psibase = { version = "0.13.0", path = "../psibase" }
 regex = "1"
@@ -22,12 +22,18 @@ sha2 = "0.10"
 tokio = { version = "1", features = ["full"] }
 url = "2.3"
 walrus = "0.20.3"
-wasmparser = { version = "0.201.0"}
+wasmparser = { version = "0.201.0" }
 tempfile = { version = "3.10" }
-zip = { version = "0.6", default-features = false, features = ["deflate"]}
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "json",
+    "rustls-tls",
+    "gzip",
+] }
+toml = "0.8.19"
 
 [dev-dependencies]
-wasmprinter = { version = "0.201.0"}
+wasmprinter = { version = "0.201.0" }
 wat = { version = "1.201.0" }
 
 [build-dependencies]

@@ -52,6 +52,15 @@ struct Args {
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<PrivateKey>,
 
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
+    #[clap(
+        short = 'a',
+        long,
+        value_name = "URL_OR_HOST_ALIAS",
+        env = "PSINODE_URL"
+    )]
+    api: Option<String>,
+
     /// Path to Cargo.toml
     #[clap(long, global = true, value_name = "PATH")]
     manifest_path: Option<PathBuf>,
@@ -66,15 +75,6 @@ struct Args {
 
 #[derive(Parser, Debug)]
 struct DeployCommand {
-    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
-    #[clap(
-        short = 'a',
-        long,
-        value_name = "URL_OR_HOST_ALIAS",
-        env = "PSINODE_URL"
-    )]
-    api: Option<String>,
-
     /// Account to deploy service on
     account: Option<ExactAccountNumber>,
 
@@ -101,15 +101,6 @@ struct DeployCommand {
 
 #[derive(Parser, Debug)]
 struct InstallCommand {
-    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
-    #[clap(
-        short = 'a',
-        long,
-        value_name = "URL_OR_HOST_ALIAS",
-        env = "PSINODE_URL"
-    )]
-    api: Option<String>,
-
     /// Sender to use for installing. The packages and all accounts
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER")]
@@ -581,28 +572,28 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["--suppress-ok".into()];
-    if let Some(api) = &opts.api {
-        args.push("--api".into());
-        args.push(api.to_string());
+    let mut psibase_args = vec!["--suppress-ok".into()];
+    if let Some(api) = &args.api {
+        psibase_args.push("--api".into());
+        psibase_args.push(api.to_string());
     }
-    args.push("deploy".into());
+    psibase_args.push("deploy".into());
     if let Some(key) = &opts.create_account {
-        args.append(&mut vec!["--create-account".into(), key.to_string()]);
+        psibase_args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
     if opts.create_insecure_account {
-        args.push("--create-insecure-account".into());
+        psibase_args.push("--create-insecure-account".into());
     }
     if opts.register_proxy {
-        args.push("--register-proxy".into());
+        psibase_args.push("--register-proxy".into());
     }
-    args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
-    args.push(account.clone());
-    args.push(files[0].to_string_lossy().into());
+    psibase_args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
+    psibase_args.push(account.clone());
+    psibase_args.push(files[0].to_string_lossy().into());
 
-    let msg = format!("Failed running: psibase {}", args.join(" "));
+    let msg = format!("Failed running: psibase {}", psibase_args.join(" "));
     if !std::process::Command::new("psibase")
-        .args(args)
+        .args(psibase_args)
         .status()
         .context(msg.clone())?
         .success()
@@ -637,7 +628,7 @@ async fn install(
     let mut command = std::process::Command::new("psibase");
 
     command.arg("--suppress-ok");
-    if let Some(api) = &opts.api {
+    if let Some(api) = &args.api {
         command.args(["--api", api.as_str()]);
     }
     command.arg("install");
