@@ -6,7 +6,10 @@ interface types {
         receiver: string,
         sender: string,
         subject: string,
-        body: string
+        body: string,
+        // ISO 8601 datetime *with* µs and offset/timezone, i.e., 2001-07-08T00:34:60.026490+09:30
+        datetime: string,
+        is-saved-msg: bool
     }
 }
 
@@ -14,8 +17,14 @@ interface queries {
     use host:common/types.{error};
     use types.{message};
 
+    /// Retrieve non-archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     get-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    /// Retrieve archived messages
+    /// - Messages can be filtered by one or both of sender and/or receiver
     get-archived-msgs: func(sender: option<string>, receiver: option<string>) -> result<list<message>, error>;
+    /// Retrieve saved messages
+    get-saved-msgs: func(receiver: option<string>) -> result<list<message>, error>;
 }
 
 interface api {
@@ -25,7 +34,13 @@ interface api {
     send: func(receiver: string, subject: string, body: string) -> result<_, error>;
     
     // Archive an email
+    // Archiving is equivalent to deleting, given message can't be truly deleted.
+    // Archiving is a proactive action equivalent to a node pruning an message (an message's historical event)
     archive: func(msg-id: u64) -> result<_, error>;
+    
+    // Save an email
+    // Saving a message moves it to state, making it long-lasting (immune to pruning)
+    save: func(msg-id: u64) -> result<_, error>;
 }
 
 world imports {
