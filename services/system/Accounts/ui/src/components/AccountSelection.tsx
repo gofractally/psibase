@@ -223,12 +223,10 @@ export const AccountSelection = () => {
 
   const { data: invite, isLoading: isLoadingInvite } = useQuery({
     queryKey: ["invite", token],
-    queryFn: async () => {
-      return {
-        inviter: "Barry",
-        expiry: randomDate(),
-      };
-    },
+    queryFn: async () => ({
+      inviter: "Barry",
+      expiry: randomDate(),
+    }),
   });
 
   const inviter = invite?.inviter;

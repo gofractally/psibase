@@ -11,8 +11,10 @@ import { Supervisor, siblingUrl } from "@psibase/common-lib";
 
 const queryClient = new QueryClient();
 
+const supervisorSrc = siblingUrl(undefined, "supervisor", undefined, false);
+
 export const supervisor = new Supervisor({
-    supervisorSrc: siblingUrl(undefined, "supervisor", undefined, false),
+    supervisorSrc,
 });
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

@@ -52,18 +52,12 @@ import { supervisor } from "@/main";
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const parseTokenFromInviteLink = (inviteLink: string): string => {
-    const url = new URL(inviteLink);
-    const params = new URLSearchParams(url.search);
-    return z.string().parse(params.get("id"));
-};
-
 const fetchInvite = async (): Promise<string> => {
     console.log("fetching invite..");
     await wait(2000);
 
     try {
-        const inviteRes = z.string().parse(
+        const token = z.string().parse(
             await supervisor.functionCall({
                 service: "invite",
                 intf: "inviter",
@@ -72,16 +66,16 @@ const fetchInvite = async (): Promise<string> => {
             })
         );
 
-        const token = parseTokenFromInviteLink(inviteRes);
+        console.log(token, "is invite res");
 
         const res = modifyUrlParams(
-            siblingUrl(undefined, undefined, "invite", false),
+            siblingUrl(undefined, "accounts", null, false),
             {
                 token,
             }
         );
 
-        console.log({ res, res1: inviteRes });
+        console.log({ res });
 
         return res as string;
     } catch (e) {
@@ -114,27 +108,31 @@ export const SettingsDropdown = () => {
             .array()
             .parse(
                 await supervisor.functionCall({
-                    method: "getAvailableAccounts",
+                    method: "getConnectedAccounts",
                     params: [],
                     service: "accounts",
-                    intf: "accounts",
+                    intf: "activeApp",
                 })
             );
         console.log(res, "was the accounts return");
         setAccounts(res);
 
-        void (await supervisor.functionCall({
-            method: "loginTemp",
-            params: [res[0]],
-            service: "accounts",
-            intf: "accounts",
-        }));
+        try {
+            void (await supervisor.functionCall({
+                method: "login",
+                params: ["aa"],
+                service: "accounts",
+                intf: "activeApp",
+            }));
+        } catch (e) {
+            console.error("there was an error hitting login", e);
+        }
 
         const res3 = await supervisor.functionCall({
             method: "getLoggedInUser",
             params: [],
             service: "accounts",
-            intf: "accounts",
+            intf: "activeApp",
         });
 
         console.log({ res3 });
