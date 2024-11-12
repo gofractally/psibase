@@ -56,6 +56,7 @@ struct Args {
     #[clap(
         short = 'a',
         long,
+        global = true,
         value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL"
     )]
