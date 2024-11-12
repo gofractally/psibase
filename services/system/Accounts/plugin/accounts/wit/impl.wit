@@ -12,7 +12,7 @@ interface admin {
     decode-connection-token: func(token: string) -> option<app-details>;
 
     /// Gets the names of all apps to which the user has connected
-    get-connected-apps: func() -> list<string>;
+    get-connected-apps: func(user: string) -> list<string>;
 }
 
 world impl {

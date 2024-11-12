@@ -5,6 +5,7 @@ use crate::bindings::exports::accounts::plugin::admin::{AppDetails, Guest as Adm
 use crate::bindings::exports::accounts::plugin::api::Guest as API;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
+use crate::db::user_table::*;
 use crate::helpers::*;
 
 // Asserts that the caller is the active app, and that it's the `accounts` app.
@@ -25,7 +26,8 @@ impl Admin for AccountsPlugin {
             AccountsPlugin::get_account(user.to_string()).expect("Get account failed");
         assert!(account_details.is_some(), "Invalid account name");
 
-        AppsTable::new(&app).login(user);
+        AppsTable::new(&app).login(&user);
+        UserTable::new(&user).add_connected_app(&app);
     }
 
     fn decode_connection_token(token: String) -> Option<AppDetails> {
@@ -41,12 +43,12 @@ impl Admin for AccountsPlugin {
         }
     }
 
-    fn get_connected_apps() -> Vec<String> {
+    fn get_connected_apps(user: String) -> Vec<String> {
         let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
         assert!(
             caller.app.is_some() && caller.app.unwrap() == "homepage",
             "get_connected_apps only callable by `homepage`"
         );
-        AppsTable::get_connected_apps()
+        UserTable::new(&user).get_connected_apps()
     }
 }
