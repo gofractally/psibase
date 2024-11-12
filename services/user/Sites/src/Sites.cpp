@@ -107,7 +107,11 @@ namespace SystemService
           ;
 
       // Accepted content encodings
-      const std::array<std::string, 2> validEncodings = {"br", "gzip"};  // KEEP SORTED
+      constexpr std::string_view validEncodings[] = {
+          // KEEP SORTED
+          "br",
+          "gzip",
+      };
 
       // Content-coding-identifier, e.g. "br", "gzip", etc.
       using cci = std::string;
