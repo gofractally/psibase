@@ -13,14 +13,25 @@
 
 namespace psibase
 {
+
+   struct CompareMethodNumber
+   {
+      using is_transparent = void;
+      bool operator()(const auto& lhs, const auto& rhs) const
+      {
+         return MethodNumber(lhs) < MethodNumber(rhs);
+      }
+   };
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
       psibase::AccountNumber service;
       psio::Schema           types;
-      using ActionMap = std::map<psibase::MethodNumber, psio::schema_types::FunctionType>;
+      using ActionMap =
+          std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
-      using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
+      using EventMap = std::map<std::string, psio::schema_types::AnyType, CompareMethodNumber>;
       EventMap ui;
       EventMap history;
       EventMap merkle;
@@ -72,7 +83,7 @@ namespace psibase
                 std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
                 using m                            = psio::MemberPtrType<decltype(member)>;
                 auto [pos, inserted]               = out.try_emplace(
-                    psibase::MethodNumber{names[0]},
+                    names[0],
                     psio::schema_types::FunctionType{makeParams<m>(builder, names.subspan(1)),
                                                      makeResult<typename m::ReturnType>(builder)});
                 if (inserted)
@@ -90,23 +101,23 @@ namespace psibase
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
          std::size_t i = 0;
-         psio::for_each_member_type(
-             (typename psio::reflect<T>::member_functions*)nullptr,
-             [&](auto member)
-             {
-                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
-                using m                            = psio::MemberPtrType<decltype(member)>;
-                if constexpr (m::isFunction)
-                {
-                   auto [pos, inserted] = out.try_emplace(psibase::MethodNumber{names[0]},
-                                                          makeParams<m>(builder, names.subspan(1)));
-                   if (inserted)
-                   {
-                      eventTypes.push_back(&pos->second);
-                   }
-                }
-                ++i;
-             });
+         psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
+                                    [&](auto member)
+                                    {
+                                       std::span<const char* const> names =
+                                           psio::reflect<T>::member_function_names[i];
+                                       using m = psio::MemberPtrType<decltype(member)>;
+                                       if constexpr (m::isFunction)
+                                       {
+                                          auto [pos, inserted] = out.try_emplace(
+                                              names[0], makeParams<m>(builder, names.subspan(1)));
+                                          if (inserted)
+                                          {
+                                             eventTypes.push_back(&pos->second);
+                                          }
+                                       }
+                                       ++i;
+                                    });
       }
 
      public:
@@ -156,7 +167,7 @@ namespace psibase
       }
 
      public:
-      const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
+      const psio::schema_types::AnyType* getType(psibase::DbId db, MethodNumber event)
       {
          if (const auto* dbTypes = getDb(db))
             if (auto pos = dbTypes->find(event); pos != dbTypes->end())

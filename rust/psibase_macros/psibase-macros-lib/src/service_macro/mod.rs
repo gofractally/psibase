@@ -1,82 +1,39 @@
-use darling::FromMeta;
-use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
-use proc_macro_error::{abort, emit_error};
-use quote::{quote, ToTokens};
-use std::{collections::HashMap, str::FromStr};
-use syn::{
-    parse_macro_input, parse_quote, AttrStyle, Attribute, Field, FnArg, ImplItem, Item, ItemFn,
-    ItemImpl, ItemMod, ItemStruct, Meta, NestedMeta, Pat, ReturnType, Type,
+mod actions;
+mod dispatch;
+mod events;
+mod graphql;
+mod tables;
+
+use actions::{process_action_args, process_action_callers, process_action_schema, Options};
+use darling::ast::NestedMeta;
+use darling::{Error, FromMeta};
+use dispatch::{add_unknown_action_check_to_dispatch_body, process_dispatch_body};
+use events::{
+    parse_event_attr, process_event_callers, process_event_name, process_event_schema, EventType,
 };
-
-#[derive(Debug, FromMeta)]
-#[darling(default)]
-pub struct TableOptions {
-    name: String,
-    record: Option<String>,
-    index: u16,
-    db: String,
-}
-
-impl Default for TableOptions {
-    fn default() -> Self {
-        TableOptions {
-            name: "".into(),
-            record: None,
-            index: 0,
-            db: "Service".into(),
-        }
-    }
-}
-
-#[derive(Debug, FromMeta)]
-#[darling(default)]
-pub struct Options {
-    name: String,
-    recursive: bool,
-    constant: String,
-    actions: String,
-    wrapper: String,
-    structs: String,
-    history_events: String,
-    ui_events: String,
-    merkle_events: String,
-    event_structs: String,
-    dispatch: Option<bool>,
-    pub_constant: bool,
-    psibase_mod: String,
-    gql: bool,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Options {
-            name: "".into(),
-            recursive: false,
-            constant: "SERVICE".into(),
-            actions: "Actions".into(),
-            wrapper: "Wrapper".into(),
-            structs: "action_structs".into(),
-            history_events: "HistoryEvents".into(),
-            ui_events: "UiEvents".into(),
-            merkle_events: "MerkleEvents".into(),
-            event_structs: "event_structs".into(),
-            dispatch: None,
-            pub_constant: true,
-            psibase_mod: "psibase".into(),
-            gql: true,
-        }
-    }
-}
+use graphql::{process_gql_union, process_gql_union_member};
+use proc_macro2::TokenStream;
+use proc_macro_error::abort;
+use quote::quote;
+use std::{collections::HashMap, str::FromStr};
+use syn::{parse_quote, AttrStyle, Attribute, Ident, Item, ItemMod, ReturnType, Type};
+use tables::{is_table_attr, process_service_tables};
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr = parse_macro_input!(attr as syn::AttributeArgs);
-    let mut options = match Options::from_list(&attr) {
+    let attr_args = match NestedMeta::parse_meta_list(attr) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(Error::from(e).write_errors());
+        }
+    };
+
+    let mut options: Options = match Options::from_list(&attr_args) {
         Ok(val) => val,
         Err(err) => {
             return err.write_errors().into();
         }
     };
+
     if options.name.is_empty() {
         options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
     }
@@ -86,8 +43,9 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
         options.dispatch = Some(false);
     }
+
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
-    let item = parse_macro_input!(item as Item);
+    let item = syn::parse2::<syn::Item>(item).unwrap();
     match item {
         Item::Mod(impl_mod) => process_mod(&options, &psibase_mod, impl_mod),
         _ => {
@@ -96,61 +54,17 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+fn is_event_attr(attr: &Attribute) -> bool {
+    matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("event")
+}
+
 fn is_action_attr(attr: &Attribute) -> bool {
     if let AttrStyle::Outer = attr.style {
-        if attr.path.is_ident("action") {
+        if attr.meta.path().is_ident("action") {
             return true;
         }
     }
     false
-}
-
-fn is_table_attr(attr: &Attribute) -> bool {
-    if let AttrStyle::Outer = attr.style {
-        if attr.path.is_ident("table") {
-            return true;
-        }
-    }
-    false
-}
-
-#[derive(PartialEq, Eq, Hash)]
-enum EventType {
-    History,
-    Ui,
-    Merkle,
-}
-
-fn parse_event_attr(attr: &Attribute) -> Option<EventType> {
-    if let AttrStyle::Outer = attr.style {
-        if attr.path.is_ident("event") {
-            match attr.parse_meta() {
-                Ok(Meta::List(list)) => {
-                    if list.nested.len() == 1 {
-                        if let Some(NestedMeta::Meta(Meta::Path(inner))) = list.nested.first() {
-                            if inner.is_ident("history") {
-                                return Some(EventType::History);
-                            } else if inner.is_ident("ui") {
-                                return Some(EventType::Ui);
-                            } else if inner.is_ident("merkle") {
-                                return Some(EventType::Merkle);
-                            } else {
-                                emit_error!(inner, "expected history, ui, or merkle");
-                                return None;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            emit_error!(attr, "invalid event attribute");
-        }
-    }
-    None
-}
-
-fn is_event_attr(attr: &Attribute) -> bool {
-    matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("event")
 }
 
 fn process_mod(
@@ -292,7 +206,9 @@ fn process_mod(
         let doc = impl_mod
             .attrs
             .iter()
-            .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
+            .filter(|attr| {
+                matches!(attr.style, AttrStyle::Outer) && attr.meta.path().is_ident("doc")
+            })
             .fold(quote! {}, |a, b| quote! {#a #b});
         items.push(parse_quote! {
             #[derive(Debug, Clone)]
@@ -322,7 +238,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::FunctionType> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::FunctionType> {
                     let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
                     #action_schema_init
                     actions
@@ -614,7 +530,7 @@ fn process_mod(
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::AnyType> {
+                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
                             Default::default()
                         }
                     }
@@ -702,7 +618,7 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::AnyType> {
+                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
                         let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events
@@ -842,670 +758,6 @@ fn process_mod(
     }
     .into()
 } // process_mod
-
-struct PkIdentData {
-    ident: Ident,
-    ty: proc_macro2::TokenStream,
-    call_ident: proc_macro2::TokenStream,
-}
-
-impl PkIdentData {
-    fn new(
-        ident: Ident,
-        ty: proc_macro2::TokenStream,
-        call_ident: proc_macro2::TokenStream,
-    ) -> Self {
-        Self {
-            ident,
-            ty,
-            call_ident,
-        }
-    }
-}
-
-struct SkIdentData {
-    ident: Ident,
-    idx: u8,
-    ty: proc_macro2::TokenStream,
-}
-
-impl SkIdentData {
-    fn new(ident: Ident, idx: u8, ty: proc_macro2::TokenStream) -> Self {
-        Self { ident, idx, ty }
-    }
-}
-
-fn process_service_tables(
-    psibase_mod: &proc_macro2::TokenStream,
-    table_record_struct_name: &Ident,
-    items: &mut Vec<Item>,
-    table_idxs: &Vec<usize>,
-) -> u16 {
-    let mut pk_data: Option<PkIdentData> = None;
-    let mut secondary_keys = Vec::new();
-    let mut table_options: Option<TableOptions> = None;
-    let mut table_vis = None;
-    let mut preset_table_record: Option<String> = None;
-
-    for idx in table_idxs {
-        match &mut items[*idx] {
-            Item::Struct(s) => {
-                process_table_attrs(s, &mut table_options);
-                preset_table_record = table_options
-                    .as_ref()
-                    .and_then(|opts| opts.record.to_owned());
-                if preset_table_record.is_none() {
-                    process_table_fields(s, &mut pk_data);
-                } else {
-                    let fields_named: syn::FieldsNamed =
-                        parse_quote! {{ db_id: #psibase_mod::DbId, prefix: Vec<u8> }};
-                    s.fields = syn::Fields::Named(fields_named);
-                }
-                table_vis = Some(s.vis.clone());
-            }
-            Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys),
-            item => abort!(item, "Unknown table item to be processed"),
-        }
-    }
-
-    if table_options.is_none() {
-        abort!(table_record_struct_name, "Table name and index not defined");
-    }
-    let table_options = table_options.unwrap();
-
-    if pk_data.is_none() && preset_table_record.is_none() {
-        abort!(
-            table_record_struct_name,
-            "Table record has not defined a primary key"
-        );
-    }
-
-    secondary_keys.sort_by_key(|sk| sk.idx);
-    let mut sks_fns = quote! {};
-    let mut sks = quote! {};
-    let sks_len = secondary_keys.len() as u8;
-    for (idx, secondary_key) in secondary_keys.iter().enumerate() {
-        let sk_ident = &secondary_key.ident;
-        let sk_idx = secondary_key.idx;
-        let sk_ty = &secondary_key.ty;
-
-        let expected_idx = idx + 1;
-        if sk_idx as usize != expected_idx {
-            abort!(sk_ident, format!("Missing expected secondary index {}; indexes may not have gaps and may not be removed or reordered", expected_idx));
-        }
-
-        sks = quote! { #sks #psibase_mod::RawKey::new(self.#sk_ident().to_key()), };
-
-        let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
-
-        sks_fns = quote! {
-            #sks_fns
-            fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
-                use #psibase_mod::Table;
-                self.get_index(#sk_idx)
-            }
-        }
-    }
-
-    if preset_table_record.is_none() {
-        let pk_data = pk_data.unwrap();
-        let pk_ty = pk_data.ty;
-        let pk_call_ident = pk_data.call_ident;
-        let db = Ident::new(&table_options.db, Span::mixed_site());
-
-        let table_record_impl = quote! {
-            impl #psibase_mod::TableRecord for #table_record_struct_name {
-                type PrimaryKey = #pk_ty;
-                const SECONDARY_KEYS: u8 = #sks_len;
-                const DB: #psibase_mod::DbId = #psibase_mod::DbId::#db;
-
-                fn get_primary_key(&self) -> Self::PrimaryKey {
-                    self.#pk_call_ident
-                }
-
-                fn get_secondary_keys(&self) -> Vec<#psibase_mod::RawKey> {
-                    vec![#sks]
-                }
-            }
-        };
-        items.push(parse_quote! {#table_record_impl});
-    }
-
-    let table_index = table_options.index;
-    let table_index = quote! { #table_index };
-
-    let (table_name_id, record_name_id) = if let Some(preset_table_record) = preset_table_record {
-        (
-            table_record_struct_name.clone(),
-            Ident::new(
-                preset_table_record.as_str(),
-                table_record_struct_name.span(),
-            ),
-        )
-    } else {
-        let table_name = Ident::new(table_options.name.as_str(), table_record_struct_name.span());
-        let table_struct = quote! {
-            #table_vis struct #table_name {
-                db_id: #psibase_mod::DbId,
-                prefix: Vec<u8>,
-            }
-        };
-        items.push(parse_quote! {#table_struct});
-        (table_name, table_record_struct_name.clone())
-    };
-
-    // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
-    let table_record_type_id = Ident::new(
-        format!("{}Record", table_name_id).as_str(),
-        table_record_struct_name.span(),
-    );
-
-    let table_record_type_impl = quote! {
-        type #table_record_type_id = #record_name_id;
-    };
-    items.push(parse_quote! {#table_record_type_impl});
-
-    let table_impl = quote! {
-        impl #psibase_mod::Table<#record_name_id> for #table_name_id {
-            const TABLE_INDEX: u16 = #table_index;
-
-            fn with_prefix(db_id: #psibase_mod::DbId, prefix: Vec<u8>) -> Self {
-                #table_name_id{db_id, prefix}
-            }
-
-            fn prefix(&self) -> &[u8] {
-                &self.prefix
-            }
-
-            fn db_id(&self) -> #psibase_mod::DbId {
-                self.db_id
-            }
-        }
-    };
-    items.push(parse_quote! {#table_impl});
-
-    let table_struct_impl = quote! {
-        impl #table_name_id {
-            #sks_fns
-        }
-    };
-    items.push(parse_quote! {#table_struct_impl});
-
-    table_options.index
-}
-
-fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option<TableOptions>) {
-    // Parse table name and remove #[table]
-    if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
-        let attr = &table_struct.attrs[i];
-
-        match TableOptions::from_meta(&attr.parse_meta().unwrap()) {
-            Ok(options) => {
-                *table_options = Some(options);
-            }
-            Err(err) => {
-                abort!(attr, format!("Invalid service table attribute, expected `#[table(name = \"TableName\", index = N)]\n{}`", err));
-            }
-        };
-
-        // TODO: Think about this sugar attribute #[table(TableName, 1)]
-        // *table_name = syn::parse2::<Group>(attr.tokens.clone())
-        //     .and_then(|group| syn::parse2::<Ident>(group.stream()))
-        //     .map(|ident| quote! {#ident})
-        //     .unwrap_or_else(|_| {
-        //         abort!(
-        //             attr,
-        //             "Invalid service table attribute, expected is `#[table(TableName)]`"
-        //         )
-        //     });
-
-        table_struct.attrs.remove(i);
-    }
-}
-
-fn process_table_fields(table_record_struct: &mut ItemStruct, pk_data: &mut Option<PkIdentData>) {
-    for field in table_record_struct.fields.iter_mut() {
-        let mut removable_attr_idxs = Vec::new();
-
-        for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
-            if field_attr.style == AttrStyle::Outer && field_attr.path.is_ident("primary_key") {
-                process_table_pk_field(pk_data, field);
-                removable_attr_idxs.push(field_attr_idx);
-            }
-        }
-
-        for i in removable_attr_idxs {
-            field.attrs.remove(i);
-        }
-    }
-}
-
-fn process_table_impls(
-    table_impl: &mut ItemImpl,
-    pk_data: &mut Option<PkIdentData>,
-    secondary_keys: &mut Vec<SkIdentData>,
-) {
-    for impl_item in table_impl.items.iter_mut() {
-        if let ImplItem::Method(method) = impl_item {
-            let mut removable_attr_idxs = Vec::new();
-
-            for (attr_idx, attr) in method.attrs.iter().enumerate() {
-                if attr.style == AttrStyle::Outer {
-                    if attr.path.is_ident("primary_key") {
-                        let pk_method = &method.sig.ident;
-                        check_unique_pk(pk_data, pk_method);
-
-                        if let ReturnType::Type(_, return_type) = &method.sig.output {
-                            let pk_type = quote! {#return_type};
-                            let pk_call = quote! {#pk_method()};
-                            *pk_data = Some(PkIdentData::new(pk_method.clone(), pk_type, pk_call));
-                        } else {
-                            let pk_type = quote! {()};
-                            let pk_call = quote! {#pk_method()};
-                            *pk_data = Some(PkIdentData::new(pk_method.clone(), pk_type, pk_call));
-                        }
-
-                        removable_attr_idxs.push(attr_idx);
-                    } else if attr.path.is_ident("secondary_key") {
-                        if let Ok(lit) = attr.parse_args::<syn::LitInt>() {
-                            if let Ok(idx) = lit.base10_parse::<u8>() {
-                                if idx == 0 {
-                                    abort!(method, "Index 0 is reserved for Primary Key, secondary keys needs to be at least 1");
-                                }
-
-                                if let ReturnType::Type(_, return_type) = &method.sig.output {
-                                    let sk_method = &method.sig.ident;
-                                    let sk_type = quote! {#return_type};
-                                    secondary_keys.push(SkIdentData::new(
-                                        sk_method.clone(),
-                                        idx,
-                                        sk_type,
-                                    ));
-                                } else {
-                                    abort!(impl_item, "Invalid secondary key return type, make sure it is a valid ToKey.");
-                                }
-                            } else {
-                                abort!(
-                                    method,
-                                    "Invalid secondary key index number it needs to be a valid u8."
-                                );
-                            }
-                        } else {
-                            abort!(method, "Unable to parse secondary key index number.");
-                        }
-
-                        removable_attr_idxs.push(attr_idx);
-                    }
-                }
-            }
-
-            for i in removable_attr_idxs {
-                method.attrs.remove(i);
-            }
-        }
-    }
-}
-
-fn check_unique_pk(pk_data: &Option<PkIdentData>, item_ident: &Ident) {
-    if pk_data.is_some() {
-        abort!(
-            item_ident,
-            format!(
-                "Primary key already set on {}.",
-                pk_data.as_ref().unwrap().ident
-            )
-        )
-    }
-}
-
-fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) {
-    let pk_field_ident = field
-        .ident
-        .as_ref()
-        .expect("Attempt to add a Primary key field with no ident");
-    check_unique_pk(pk_data, pk_field_ident);
-
-    let pk_fn_name = quote! {#pk_field_ident};
-    let pk_type = &field.ty;
-    let pk_type = quote! {#pk_type};
-
-    *pk_data = Some(PkIdentData::new(
-        pk_field_ident.clone(),
-        pk_type,
-        pk_fn_name,
-    ));
-}
-
-fn process_action_args(
-    options: &Options,
-    gql: bool,
-    event_db: Option<&proc_macro2::TokenStream>,
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    new_items: &mut proc_macro2::TokenStream,
-    invoke_args: &mut proc_macro2::TokenStream,
-    invoke_struct_args: &mut proc_macro2::TokenStream,
-) {
-    let mut struct_members = proc_macro2::TokenStream::new();
-    for input in f.sig.inputs.iter() {
-        match input {
-            FnArg::Receiver(_) => (), // Compiler generates errors on self args
-            FnArg::Typed(pat_type) => match &*pat_type.pat {
-                Pat::Ident(name) => {
-                    let ty = &*pat_type.ty;
-                    struct_members = quote! {
-                        #struct_members
-                        pub #name: #ty,
-                    };
-                    *invoke_args = quote! {
-                        #invoke_args
-                        #name,
-                    };
-                    *invoke_struct_args = quote! {
-                        #invoke_struct_args
-                        args.#name,
-                    };
-                }
-                _ => abort!(*pat_type.pat, "expected identifier"),
-            },
-        };
-    }
-    let fn_name = &f.sig.ident;
-    let psibase_mod_str = psibase_mod.to_string();
-    let fracpack_mod = psibase_mod_str.clone() + "::fracpack";
-
-    let doc = format!(
-        "This structure has the same JSON and Fracpack format as the arguments to [{actions}::{fn_name}]({actions}::{fn_name}).",
-        actions=options.actions, fn_name=fn_name.to_string());
-
-    let gql_object_attr = if gql && !f.sig.inputs.is_empty() {
-        quote! { , async_graphql::SimpleObject }
-    } else {
-        quote! {}
-    };
-
-    *new_items = quote! {
-        #new_items
-        #[derive(Debug, Clone, #psibase_mod::Pack, #psibase_mod::Unpack, #psibase_mod::fracpack::ToSchema, serde::Deserialize, serde::Serialize #gql_object_attr)]
-        #[fracpack(fracpack_mod = #fracpack_mod)]
-        #[doc = #doc]
-        pub struct #fn_name {
-            #struct_members
-        }
-
-        impl #fn_name {
-            pub const ACTION_NAME: &'static str = stringify!(#fn_name);
-        }
-    };
-
-    if let Some(db) = event_db {
-        *new_items = quote! {
-            #new_items
-            impl #psibase_mod::EventDb for #fn_name {
-                fn db() -> #psibase_mod::DbId {
-                    #psibase_mod::DbId::#db
-                }
-            }
-        }
-    }
-}
-
-fn process_action_callers(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    action_callers: &mut proc_macro2::TokenStream,
-    invoke_args: &proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-    let inputs = &f.sig.inputs;
-
-    let inner_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Inner(_)) && attr.path.is_ident("doc"))
-        .fold(quote! {}, |a, b| quote! {#a #b});
-    let outer_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
-        .fold(quote! {}, |a, b| quote! {#a #b});
-
-    #[allow(unused_variables)]
-    let fn_ret = match &f.sig.output {
-        ReturnType::Default => quote! {()},
-        ReturnType::Type(_, ty) => ty.to_token_stream(),
-    };
-
-    let caller_ret;
-    let call;
-    if fn_ret.to_string() == "()" {
-        caller_ret = quote! {T::ReturnsNothing};
-        call = quote! {call_returns_nothing};
-    } else {
-        caller_ret = quote! {T::ReturnType::<#fn_ret>};
-        call = quote! {call::<#fn_ret, _>};
-    }
-
-    *action_callers = quote! {
-        #action_callers
-
-        #outer_doc
-        pub fn #name(&self, #inputs) -> #caller_ret {
-            #inner_doc
-            self.caller.#call(#method_number, (#invoke_args))
-        }
-    };
-}
-
-fn process_action_schema(
-    psibase_mod: &proc_macro2::TokenStream,
-    action_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    insertions: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-
-    let ret = match &f.sig.output {
-        ReturnType::Default => quote! { None },
-        ReturnType::Type(_, ty) => {
-            quote! { Some(builder.insert::<#ty>() ) }
-        }
-    };
-
-    *insertions = quote! {
-        #insertions
-        actions.insert(#method_number, #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
-    }
-}
-
-fn process_dispatch_body(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    dispatch_body: &mut proc_macro2::TokenStream,
-    invoke_struct_args: proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-
-    let args_unpacking = if !invoke_struct_args.is_empty() {
-        quote! { let args = <super::action_structs::#name as #psibase_mod::fracpack::Unpack>::unpack(&act.rawData, &mut 0)?; }
-    } else {
-        quote! {}
-    };
-
-    let action_invoking = if f.sig.output == ReturnType::Default {
-        quote! {
-            super::#name(#invoke_struct_args);
-        }
-    } else {
-        quote! {
-            let val = super::#name(#invoke_struct_args);
-            #psibase_mod::set_retval(&val);
-        }
-    };
-
-    let method_comparison = quote! { act.method == #psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str)) };
-
-    let if_block = if dispatch_body.is_empty() {
-        quote! { if }
-    } else {
-        quote! { else if }
-    };
-
-    *dispatch_body = quote! {
-        #dispatch_body
-        #if_block #method_comparison {
-            #args_unpacking
-            #action_invoking
-        }
-    };
-}
-
-fn add_unknown_action_check_to_dispatch_body(
-    psibase_mod: &proc_macro2::TokenStream,
-    dispatch_body: &mut proc_macro2::TokenStream,
-) {
-    if !dispatch_body.is_empty() {
-        *dispatch_body = quote! {
-            #dispatch_body
-            else {
-                #psibase_mod::abort_message(&format!(
-                    "unknown service action: {}",
-                    act.method.to_string()
-                ));
-            }
-        };
-    }
-}
-
-fn process_event_callers(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    event_callers: &mut proc_macro2::TokenStream,
-    invoke_args: &proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-    let inputs = &f.sig.inputs;
-
-    let inner_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Inner(_)) && attr.path.is_ident("doc"))
-        .fold(quote! {}, |a, b| quote! {#a #b});
-    let outer_doc = f
-        .attrs
-        .iter()
-        .filter(|attr| matches!(attr.style, AttrStyle::Outer) && attr.path.is_ident("doc"))
-        .fold(quote! {}, |a, b| quote! {#a #b});
-
-    *event_callers = quote! {
-        #event_callers
-
-        #outer_doc
-        pub fn #name(&self, #inputs) -> u64 {
-            #inner_doc
-            #psibase_mod::put_sequential(self.event_log, self.sender, &#method_number, &(#invoke_args))
-        }
-    };
-}
-
-fn process_event_name(
-    psibase_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    structs: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-
-    *structs = quote! {
-        #structs
-
-        impl #psibase_mod::NamedEvent for #name {
-            fn name() -> #psibase_mod::MethodNumber { #method_number }
-        }
-    }
-}
-
-fn process_event_schema(
-    psibase_mod: &proc_macro2::TokenStream,
-    event_mod: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    insertions: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
-
-    *insertions = quote! {
-        #insertions
-        events.insert(#method_number, builder.insert::<#event_mod::#name>());
-    }
-}
-
-fn process_gql_union_member(
-    psibase_mod: &proc_macro2::TokenStream,
-    event_struct: &proc_macro2::TokenStream,
-    f: &ItemFn,
-    enumerators: &mut proc_macro2::TokenStream,
-    dispatch: &mut proc_macro2::TokenStream,
-) {
-    let name = &f.sig.ident;
-    let name_str = name.to_string();
-
-    *enumerators = quote! {
-        #enumerators
-        #name(#name),
-    };
-    *dispatch = quote! {
-        #dispatch
-
-        #psibase_mod::method_raw!(#name_str) => {
-            Ok(#event_struct::#name(#psibase_mod::decode_event_data::<#name>(gql_imp_data)?))
-        },
-    };
-}
-
-fn process_gql_union(
-    psibase_mod: &proc_macro2::TokenStream,
-    event_struct: &proc_macro2::TokenStream,
-    enumerators: &proc_macro2::TokenStream,
-    dispatch: &proc_macro2::TokenStream,
-    db: &proc_macro2::TokenStream,
-    out: &mut proc_macro2::TokenStream,
-) {
-    *out = quote! {
-        #out
-        #[derive(async_graphql::Union)]
-        pub enum #event_struct {
-            #enumerators
-        }
-        impl #psibase_mod::DecodeEvent for #event_struct {
-            fn decode(gql_imp_type: #psibase_mod::MethodNumber, gql_imp_data: &[u8]) -> Result<#event_struct, anyhow::Error> {
-                match gql_imp_type.value {
-                    #dispatch
-                    _ => { Err(anyhow::anyhow!("Unknown event type")) }
-                }
-            }
-        }
-        impl #psibase_mod::EventDb for #event_struct {
-            fn db() -> #psibase_mod::DbId {
-                #psibase_mod::DbId::#db
-            }
-        }
-    };
-}
 
 fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     quote! {
