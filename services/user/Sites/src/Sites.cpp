@@ -8,7 +8,6 @@
 #include <psibase/serveSimpleUI.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
-#include <sstream>
 
 using namespace psibase;
 
@@ -121,6 +120,71 @@ namespace SystemService
           {{"br", "psi-brotli"}}  //
       };
 
+      // Remove leading and trailing whitespace from a string
+      void trimSpaceAround(std::string& str)
+      {
+         auto isNotSpace = [](unsigned char ch) { return !std::isspace(ch); };
+         auto firstChar  = std::ranges::find_if(str, isNotSpace);
+         auto lastChar   = std::ranges::find_if(str.rbegin(), str.rend(), isNotSpace).base();
+         str.erase(str.begin(), firstChar);
+         str.erase(lastChar, str.end());
+      }
+
+      // Parses the encoding into a pair of encoding identifier and quality
+      // Example: "  br  ;   q=0.901   "
+      // Returns: Some(pair("br", 901))
+      std::pair<std::string, uint16_t> parseEncoding(const std::string& encoding)
+      {
+         // Overview:
+         //    Split by semicolon
+         //    Trim each part of trailing/leading whitespace
+         //    Parse the quality value as a float between 0 and 1
+         //    Convert the quality value into a uint between 0 and 1000 for comparison
+
+         auto parts = split(encoding, ';');
+         if (parts.empty()) {
+            check(false, "Invalid encoding: " + encoding);
+         }
+
+         auto& identifier = parts[0];
+         trimSpaceAround(identifier);
+
+         float quality = 1.0f;
+         if (parts.size() > 1)
+         {
+            auto q = parts[1];
+            trimSpaceAround(q);
+
+            if (!q.starts_with("q="))
+            {
+               check(false, "Invalid encoding q value for: " + identifier);
+            }
+
+            q.erase(0, 2);
+
+            // Use regex to match the q value specified in rfc 7231:
+            // qvalue = ( "0" [ "." 0*3DIGIT ] )
+            //        / ( "1" [ "." 0*3("0") ] )
+            std::regex qualityRegex(R"(^(0(\.[0-9]{0,3})?|1(\.0{0,3})?)$)");
+            if (!std::regex_match(q, qualityRegex))
+            {
+               check(false, "Invalid value for q: " + q);
+            }
+
+            char* end;
+            float parsedQuality = std::strtof(q.c_str(), &end);
+            if (*end != '\0')
+            {
+               check(false, "Invalid value for q: " + q);
+            }
+
+            quality = parsedQuality;
+         }
+
+         // Convert quality into a uint between 0 and 1000
+         return std::make_pair(identifier, static_cast<uint16_t>(quality * 1000));
+      }
+
       std::vector<std::string> clarify_accepted_encodings(
           const std::vector<std::string>& accepted_encodings)
       {
@@ -136,22 +200,15 @@ namespace SystemService
          std::vector<std::string> encodings;
          for (const auto& encoding : accepted_encodings)
          {
-            auto reject_index = encoding.find(";q=0");
-            if (reject_index != encoding.npos)
+            auto [identifier, quality] = parseEncoding(encoding);
+
+            if (quality == 0)
             {
-               rejected.push_back(encoding.substr(0, reject_index));
+               rejected.push_back(identifier);
                continue;
             }
 
-            auto quality_index = encoding.find(";q=");
-            if (quality_index != encoding.npos)
-            {
-               encodings.push_back(encoding.substr(0, quality_index));
-            }
-            else
-            {
-               encodings.push_back(encoding);
-            }
+            encodings.push_back(identifier);
          }
 
          // If identity was not already added
@@ -287,8 +344,7 @@ namespace SystemService
             auto acceptEncoding = get_header_value(request, "Accept-Encoding");
             if (acceptEncoding)
             {
-               auto trimmed           = std::regex_replace(*acceptEncoding, std::regex("\\s+"), "");
-               auto acceptedEncodings = split(trimmed, ',');
+               auto acceptedEncodings = split(*acceptEncoding, ',');
                acceptedEncodings      = clarify_accepted_encodings(acceptedEncodings);
 
                auto is_accepted = [&acceptedEncodings](const std::string& e) {  //
