@@ -21,9 +21,13 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "branding"
+package-name = "Branding"
 description = "Allow operators to rebrand their network easily"
 services = ["branding"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.13.0"
+Sites = "0.13.0"
 
 [lib]
 crate-type = ["rlib"]

@@ -65,19 +65,17 @@ pub fn process_event_name(
 }
 
 pub fn process_event_schema(
-    psibase_mod: &proc_macro2::TokenStream,
+    _psibase_mod: &proc_macro2::TokenStream,
     event_mod: &proc_macro2::TokenStream,
     f: &ItemFn,
     insertions: &mut proc_macro2::TokenStream,
 ) {
     let name = &f.sig.ident;
     let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
 
     *insertions = quote! {
         #insertions
-        events.insert(#method_number, builder.insert::<#event_mod::#name>());
+        events.insert(#name_str.to_string(), builder.insert::<#event_mod::#name>());
     }
 }
 

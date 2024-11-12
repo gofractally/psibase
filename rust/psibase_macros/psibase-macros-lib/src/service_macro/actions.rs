@@ -177,8 +177,6 @@ pub fn process_action_schema(
 ) {
     let name = &f.sig.ident;
     let name_str = name.to_string();
-    let method_number =
-        quote! {#psibase_mod::MethodNumber::new(#psibase_mod::method_raw!(#name_str))};
 
     let ret = match &f.sig.output {
         ReturnType::Default => quote! { None },
@@ -189,6 +187,6 @@ pub fn process_action_schema(
 
     *insertions = quote! {
         #insertions
-        actions.insert(#method_number, #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
+        actions.insert(#name_str.to_string(), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
 }

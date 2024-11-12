@@ -232,19 +232,7 @@ fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
 
-        // Goal: Vec<syn::Attribute, Global> --> Vec<NestedMeta>
-        // let attr_args: Vec<NestedMeta> = table_struct.attrs.into();
-        // darling::FromMeta::from_meta
-
-        // let attr_args = match NestedMeta::parse_meta_list(nestedMeta_vec) {
-        //     Ok(v) => v,
-        //     Err(e) => {
-        //         abort!(table_struct, e);
-        //     }
-        // };
-
         match TableOptions::from_meta(&attr.meta) {
-            // match TableOptions::from_list(&attr_args) {
             Ok(options) => {
                 *table_options = Some(options);
             }

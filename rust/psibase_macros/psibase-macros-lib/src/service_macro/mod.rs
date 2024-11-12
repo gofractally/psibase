@@ -20,12 +20,8 @@ use syn::{parse_quote, AttrStyle, Attribute, Ident, Item, ItemMod, ReturnType, T
 use tables::{is_table_attr, process_service_tables};
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
-    // println!("attr: {:#?}", attr);
     let attr_args = match NestedMeta::parse_meta_list(attr) {
-        Ok(v) => {
-            // println!("v in match: {:#?}", v);
-            v
-        }
+        Ok(v) => v,
         Err(e) => {
             return TokenStream::from(Error::from(e).write_errors());
         }
@@ -242,7 +238,7 @@ fn process_mod(
         items.push(parse_quote! {
             #[automatically_derived]
             impl<T: #psibase_mod::Caller> #psibase_mod::ToActionsSchema for #actions<T> {
-                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::FunctionType> {
+                fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::FunctionType> {
                     let mut actions = #psibase_mod::fracpack::indexmap::IndexMap::new();
                     #action_schema_init
                     actions
@@ -534,7 +530,7 @@ fn process_mod(
             if !event_fns.contains_key(&id) {
                 items.push( parse_quote! {
                     impl #psibase_mod::ToEventsSchema for #event_name {
-                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::AnyType> {
+                        fn to_schema(_builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
                             Default::default()
                         }
                     }
@@ -622,7 +618,7 @@ fn process_mod(
             items.push(parse_quote! {
                 #[automatically_derived]
                 impl #psibase_mod::ToEventsSchema for #event_name {
-                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<#psibase_mod::MethodNumber, #psibase_mod::fracpack::AnyType> {
+                    fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> #psibase_mod::fracpack::indexmap::IndexMap<String, #psibase_mod::fracpack::AnyType> {
                         let mut events = #psibase_mod::fracpack::indexmap::IndexMap::new();
                         #event_schema_init
                         events
