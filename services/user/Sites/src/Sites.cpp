@@ -142,7 +142,8 @@ namespace SystemService
          //    Convert the quality value into a uint between 0 and 1000 for comparison
 
          auto parts = split(encoding, ';');
-         if (parts.empty()) {
+         if (parts.empty())
+         {
             check(false, "Invalid encoding: " + encoding);
          }
 
@@ -353,11 +354,7 @@ namespace SystemService
 
                if (!content->contentEncoding)
                {
-                  if (is_accepted("identity"))
-                  {
-                     headers.push_back({"Content-Encoding", "identity"});
-                  }
-                  else
+                  if (!is_accepted("identity"))
                   {
                      return make406(
                          "Requested encoding not supported. Requested content uses "
@@ -392,7 +389,6 @@ namespace SystemService
                         Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
                         content->content = decoder.decompress(content->content);
                      }
-                     headers.push_back({"Content-Encoding", "identity"});
                   }
                }
             }
@@ -401,10 +397,6 @@ namespace SystemService
                if (content->contentEncoding)
                {
                   headers.push_back({"Content-Encoding", *content->contentEncoding});
-               }
-               else
-               {
-                  headers.push_back({"Content-Encoding", "identity"});
                }
             }
 
