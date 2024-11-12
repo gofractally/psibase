@@ -63,7 +63,7 @@ export class Supervisor implements AppInterface {
         if (callerOrigin === siblingUrl(null, null, null, true)) {
             this.parentOrigination = {
                 app: "homepage",
-                origin: siblingUrl(null, "homepage"),
+                origin: callerOrigin,
             };
         } else {
             this.parentOrigination = {
