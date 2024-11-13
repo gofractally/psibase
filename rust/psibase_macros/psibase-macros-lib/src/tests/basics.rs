@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[test]
-    // `service` macro should expand without requiring a `use` to provide its deps
+    // `service` macro should expand and compile without requiring a `use` to provide the anyhow dep
     fn test_macro_hygiene() {
         use quote::quote;
 
