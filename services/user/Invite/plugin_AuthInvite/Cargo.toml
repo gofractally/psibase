@@ -1,6 +1,6 @@
 [package]
 name = "auth-invite"
-version = "0.12.0"
+version.workspace = true
 edition = "2021"
 
 [dependencies]
@@ -9,13 +9,6 @@ psibase = { path = "../../../../rust/psibase/" }
 
 [lib]
 crate-type = ["cdylib"]
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.component.target]
 world = "impl"
