@@ -266,8 +266,7 @@ struct test_chain
    {
       if (blockContext)
       {
-         return std::chrono::system_clock::time_point{
-             std::chrono::seconds{blockContext->current.header.time.seconds}};
+         return blockContext->current.header.time;
       }
       else
       {
@@ -1245,8 +1244,9 @@ struct callbacks
    void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
    {
       assert_chain(chain_index)
-          .startBlock(time_seconds ? std::optional{psibase::TimePointSec{time_seconds}}
-                                   : std::nullopt);
+          .startBlock(time_seconds
+                          ? std::optional{psibase::TimePointSec{psibase::Seconds{time_seconds}}}
+                          : std::nullopt);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }

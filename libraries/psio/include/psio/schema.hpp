@@ -969,6 +969,11 @@ namespace psio
       template <typename Rep, typename Period>
       constexpr bool is_duration_v<std::chrono::duration<Rep, Period>> = true;
 
+      template <typename T>
+      constexpr bool is_time_point_v = false;
+      template <typename Clock, typename Duration>
+      constexpr bool is_time_point_v<std::chrono::time_point<Clock, Duration>> = true;
+
       template <typename S, typename... T>
       std::vector<Member> insert_variant_alternatives(S& schema, std::variant<T...>*)
       {
@@ -1075,6 +1080,10 @@ namespace psio
                else if constexpr (is_duration_v<T>)
                {
                   schema.insert(name, insert<typename T::rep>());
+               }
+               else if constexpr (is_time_point_v<T>)
+               {
+                  schema.insert(name, insert<typename T::duration>());
                }
                else if constexpr (std::numeric_limits<T>::is_iec559)
                {

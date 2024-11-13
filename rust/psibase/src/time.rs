@@ -25,12 +25,20 @@ use std::ops::{Add, Sub};
 #[to_key(psibase_mod = "crate")]
 #[graphql(input_name = "TimePointSecInput")]
 pub struct TimePointSec {
-    pub seconds: u32,
+    pub seconds: i64,
 }
 
-impl From<u32> for TimePointSec {
-    fn from(seconds: u32) -> Self {
+impl From<i64> for TimePointSec {
+    fn from(seconds: i64) -> Self {
         TimePointSec { seconds }
+    }
+}
+
+impl From<chrono::DateTime<chrono::Utc>> for TimePointSec {
+    fn from(seconds: chrono::DateTime<chrono::Utc>) -> Self {
+        TimePointSec {
+            seconds: seconds.timestamp(),
+        }
     }
 }
 

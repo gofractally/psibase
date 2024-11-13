@@ -237,9 +237,7 @@ pub fn js_create_boot_transactions(
         services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
     }
     let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
     let (boot_transactions, transactions) = js_err(create_boot_transactions(

@@ -195,7 +195,7 @@ namespace SystemService
    struct SnapshotInfo
    {
       psibase::TimePointSec lastSnapshot;
-      std::uint32_t         snapshotInterval;
+      psibase::Seconds      snapshotInterval;
       auto                  key() const { return psibase::SingletonKey(); }
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
@@ -250,7 +250,7 @@ namespace SystemService
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
       /// setting because snapshots are signed by the block producers.
-      void setSnapTime(std::uint32_t seconds);
+      void setSnapTime(psibase::Seconds seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction

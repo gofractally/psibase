@@ -136,12 +136,9 @@ namespace
          available.put({sequence + 1});
          pending.put({.id         = id,
                       .expiration = trx.transaction->tapos().expiration(),
-                      .ctime      = {static_cast<std::uint32_t>(
-                          std::chrono::time_point_cast<std::chrono::seconds>(
-                              std::chrono::system_clock::now())
-                              .time_since_epoch()
-                              .count())},
-                      .sequence   = sequence});
+                      .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
+                          std::chrono::system_clock::now()),
+                      .sequence = sequence});
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
       }
       return true;

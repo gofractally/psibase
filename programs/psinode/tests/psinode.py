@@ -517,7 +517,7 @@ class Node(API):
                 timestamp = node.get_block_header()['time']
             except requests.exceptions.HTTPError as e:
                 return False
-            if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) <= now:
+            if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")) <= now:
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)

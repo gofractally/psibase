@@ -24,7 +24,7 @@ def new_block():
     def result(node):
         timestamp = node.get_block_header()['time']
         print(timestamp)
-        return calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) + 1 > now
+        return calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")) + 1 > now
     return result
 
 def irreversible(num):

@@ -128,7 +128,7 @@ void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
    pushTransaction(
        ctx,
        Transaction{
-           .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
+           .tapos   = {.expiration = {ctx->current.header.time + Seconds(1)}},
            .actions = {Action{.sender  = Transact::service,
                               .service = Transact::service,
                               .method  = MethodNumber{"startBoot"},
@@ -148,7 +148,7 @@ void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
 static Tapos getTapos(const BlockInfo& info)
 {
    Tapos result;
-   result.expiration.seconds = info.header.time.seconds + 2;
+   result.expiration = info.header.time + Seconds(2);
    std::memcpy(&result.refBlockSuffix,
                info.blockId.data() + info.blockId.size() - sizeof(result.refBlockSuffix),
                sizeof(result.refBlockSuffix));
@@ -159,7 +159,7 @@ static Tapos getTapos(const BlockInfo& info)
 static Tapos getTapos(psibase::BlockContext* ctx)
 {
    Tapos result;
-   result.expiration.seconds = ctx->current.header.time.seconds + 1;
+   result.expiration = ctx->current.header.time + Seconds(1);
    std::memcpy(&result.refBlockSuffix,
                ctx->current.header.previous.data() + ctx->current.header.previous.size() -
                    sizeof(result.refBlockSuffix),
@@ -212,12 +212,12 @@ TestBlock makeBlock(const BlockInfo&                   info,
 {
    SignedBlock    newBlock;
    JointConsensus newState{state};
-   newBlock.block.header.previous     = info.blockId;
-   newBlock.block.header.blockNum     = info.header.blockNum + 1;
-   newBlock.block.header.time.seconds = info.header.time.seconds + 1;
-   newBlock.block.header.producer     = AccountNumber{producer};
-   newBlock.block.header.term         = view;
-   newBlock.block.header.commitNum    = commitNum;
+   newBlock.block.header.previous  = info.blockId;
+   newBlock.block.header.blockNum  = info.header.blockNum + 1;
+   newBlock.block.header.time      = info.header.time + Seconds(1);
+   newBlock.block.header.producer  = AccountNumber{producer};
+   newBlock.block.header.term      = view;
+   newBlock.block.header.commitNum = commitNum;
    Merkle m;
    if (newState.next && newState.next->blockNum <= info.header.commitNum)
    {

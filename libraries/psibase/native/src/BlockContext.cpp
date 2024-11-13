@@ -76,12 +76,12 @@ namespace psibase
          current.header.blockNum = status->head->header.blockNum + 1;
          if (time)
          {
-            check(time->seconds > status->head->header.time.seconds, "block is in the past");
+            check(time > status->head->header.time, "block is in the past");
             current.header.time = *time;
          }
          else
          {
-            current.header.time.seconds = status->head->header.time.seconds + 1;
+            current.header.time = status->head->header.time + Seconds(1);
          }
       }
       else
@@ -421,9 +421,9 @@ namespace psibase
       // the illusion that they're running during the production of a new
       // block. This helps to give them a consistent view between production
       // and RPC modes.
-      status->current.previous     = status->head->blockId;
-      status->current.blockNum     = status->head->header.blockNum + 1;
-      status->current.time.seconds = status->head->header.time.seconds + 1;
+      status->current.previous = status->head->blockId;
+      status->current.blockNum = status->head->header.blockNum + 1;
+      status->current.time     = status->head->header.time + Seconds(1);
 
       db.kvPut(StatusRow::db, status->key(), *status);
 
@@ -628,7 +628,7 @@ namespace psibase
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status || !(status->head))
       {
-         return psibase::TimePointSec{0};
+         return psibase::TimePointSec{};
       }
       else
       {

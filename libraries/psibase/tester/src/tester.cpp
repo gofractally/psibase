@@ -199,23 +199,24 @@ void psibase::TestChain::setAutoBlockStart(bool enable)
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
    auto time = status ? status->current.time : TimePointSec{};
-   startBlock(TimePointSec{time.seconds + 1 + uint32_t(skip_miliseconds / 1000)});
+   startBlock(time + std::chrono::seconds{1 + skip_miliseconds / 1000});
 }
 
 void psibase::TestChain::startBlock(std::string_view time)
 {
-   uint64_t value;
-   auto     data = time.data();
-   check(stringToUtcMicroseconds(value, data, data + time.size(), true), "bad time");
-   startBlock(TimePointSec{.seconds = uint32_t(value / 1000)});
+   std::int64_t  sec;
+   std::uint32_t nsec;
+   if (!psio::parse_system_time(time, sec, nsec))
+      abortMessage("bad time");
+   startBlock(TimePointSec{std::chrono::seconds{sec}});
 }
 
 void psibase::TestChain::startBlock(TimePointSec tp)
 {
    // Guarantee that there is a recent block for fillTapos to use.
-   if (status && status->current.time.seconds + 1 < tp.seconds)
-      tester::raw::startBlock(id, tp.seconds - 1);
-   tester::raw::startBlock(id, tp.seconds);
+   if (status && status->current.time + std::chrono::seconds(1) < tp)
+      tester::raw::startBlock(id, tp.time_since_epoch().count() - 1);
+   tester::raw::startBlock(id, tp.time_since_epoch().count());
    status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
 }
@@ -229,10 +230,11 @@ void psibase::TestChain::finishBlock()
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
    ScopedSelectChain s{id};
-   t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
-   auto [index, suffix]       = SystemService::headTapos();
-   t.tapos.refBlockIndex      = index;
-   t.tapos.refBlockSuffix     = suffix;
+   t.tapos.expiration =
+       (status ? status->current.time : TimePointSec{}) + std::chrono::seconds(expire_sec);
+   auto [index, suffix]   = SystemService::headTapos();
+   t.tapos.refBlockIndex  = index;
+   t.tapos.refBlockSuffix = suffix;
 }
 
 psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions,

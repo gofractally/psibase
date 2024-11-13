@@ -86,11 +86,11 @@ void Invite::createInvite(Spki inviteKey)
    }
 
    // Add invite
-   uint32_t     secondsInWeek{60 * 60 * 24 * 7};
+   Seconds      secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
        .pubkey          = inviteKey,
        .inviter         = inviter,
-       .expiry          = to<Transact>().currentBlock().time.seconds + secondsInWeek,
+       .expiry          = to<Transact>().currentBlock().time + secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
    };
@@ -112,7 +112,7 @@ void Invite::accept(Spki inviteKey)
          "Call 'accept' with the accepting account as the sender.");
    check(invite->state != InviteStates::rejected, "This invite was already rejected");
 
-   auto now = to<Transact>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time;
    check(invite->expiry > now, inviteExpired.data());
 
    invite->actor = acceptedBy;
@@ -132,7 +132,7 @@ void Invite::acceptCreate(Spki inviteKey, AccountNumber acceptedBy, Spki newAcco
 
    to<AuthInvite>().requireAuth(inviteKey);
 
-   auto now = to<Transact>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time;
    check(invite->expiry > now, inviteExpired.data());
 
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
@@ -183,7 +183,7 @@ void Invite::reject(Spki inviteKey)
    check(invite->state != InviteStates::accepted, alreadyAccepted.data());
    check(invite->state != InviteStates::rejected, alreadyRejected.data());
 
-   auto now = to<Transact>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time;
    check(invite->expiry > now, inviteExpired.data());
 
    auto sender = getSender();
@@ -215,7 +215,7 @@ void Invite::delInvite(Spki inviteKey)
 
 void Invite::delExpired(uint32_t maxDeleted)
 {
-   auto now = to<Transact>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time;
 
    auto table = Tables().open<InviteTable>();
 
@@ -323,7 +323,7 @@ bool Invite::isExpired(Spki pubkey)
    auto invite      = inviteTable.get(pubkey);
    check(invite.has_value(), inviteDNE.data());
 
-   auto now = to<Transact>().currentBlock().time.seconds;
+   auto now = to<Transact>().currentBlock().time;
    return now >= invite->expiry;
 }
 

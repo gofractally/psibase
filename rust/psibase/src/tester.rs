@@ -126,10 +126,10 @@ impl Chain {
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time.seconds + 1 < time.seconds {
-                unsafe { tester_raw::startBlock(self.chain_handle, time.seconds - 1) }
+                unsafe { tester_raw::startBlock(self.chain_handle, (time.seconds - 1) as u32) }
             }
         }
-        unsafe { tester_raw::startBlock(self.chain_handle, time.seconds) }
+        unsafe { tester_raw::startBlock(self.chain_handle, time.seconds as u32) }
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
         self.producing.replace(true);
     }
@@ -153,11 +153,11 @@ impl Chain {
     ///
     /// `expire_seconds` is relative to the most-recent block.
     pub fn fill_tapos(&self, trx: &mut Transaction, expire_seconds: u32) {
-        trx.tapos.expiration.seconds = expire_seconds;
+        trx.tapos.expiration.seconds = expire_seconds as i64;
         trx.tapos.refBlockIndex = 0;
         trx.tapos.refBlockSuffix = 0;
         if let Some(status) = &*self.status.borrow() {
-            trx.tapos.expiration.seconds = status.current.time.seconds + expire_seconds;
+            trx.tapos.expiration.seconds = status.current.time.seconds + expire_seconds as i64;
             if let Some(head) = &status.head {
                 let mut suffix = [0; 4];
                 suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);
