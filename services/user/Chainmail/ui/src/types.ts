@@ -1,1 +1,1 @@
-export type Mailbox = "inbox" | "sent" | "drafts" | "archived";
+export type Mailbox = "inbox" | "sent" | "drafts" | "archived" | "saved";
