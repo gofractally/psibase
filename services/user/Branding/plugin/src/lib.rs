@@ -21,11 +21,14 @@ impl Api for BrandingPlugin {
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
-        upload(&File {
-            path: String::from("/network_logo.svg"),
-            content_type: String::from("image/svg+xml"),
-            content: logo,
-        })
+        upload(
+            &File {
+                path: String::from("/network_logo.svg"),
+                content_type: String::from("image/svg+xml"),
+                content: logo,
+            },
+            11,
+        )
         .expect("Failed to upload logo");
     }
 }
