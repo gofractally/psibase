@@ -286,50 +286,28 @@ foreach(ROW ${JS_DIRS})
     add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
 endforeach()
 
-# A function that can be used to add a new target that builds a wasm component from rust
-set(COMPONENT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/components)
-function(add_rs_component TARGET_TUPLE OUTPUT_FILE TARGET_ARCH)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
-    set(OUTPUT_FILEPATH ${COMPONENT_BIN_DIR}/${OUTPUT_FILE})
-
-    ExternalProject_Add(${TARGET_NAME}
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}
-        BUILD_BYPRODUCTS ${OUTPUT_FILEPATH}
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND cargo component build -r
-            --target ${TARGET_ARCH}
-            --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/Cargo.toml 
-            --target-dir    ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/target/${TARGET_ARCH}/release/${OUTPUT_FILE} ${OUTPUT_FILEPATH}
-        BUILD_ALWAYS 1
-        INSTALL_COMMAND ""
-    )
-
-    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
-    set(${TARGET_NAME}_OUTPUT_FILE ${OUTPUT_FILE} PARENT_SCOPE)
-endfunction()
-
 # Static (not built) resource dependencies
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
 
 # Build each component
+include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
-add_rs_component(services/system/Transact/plugin:TransactPlugin transact.wasm wasm32-wasi )
-add_rs_component(services/system/Accounts/plugin/accounts:AccountsPlugin accounts.wasm wasm32-wasi )
-add_rs_component(services/system/Accounts/plugin/account_tokens:AccountTokensPlugin account_tokens.wasm wasm32-wasi )
-add_rs_component(services/system/AuthSig/plugin:AuthPlugin auth_sig.wasm wasm32-wasi )
-add_rs_component(services/system/AuthDelegate/plugin:AuthDelegatePlugin auth_delegate.wasm wasm32-wasi )
-add_rs_component(services/system/AuthAny/plugin:AuthAnyPlugin auth_any.wasm wasm32-wasi )
-add_rs_component(services/user/Invite/plugin:InvitesPlugin invite.wasm wasm32-wasi )
-add_rs_component(services/user/Invite/plugin_AuthInvite:AuthInvitePlugin auth_invite.wasm wasm32-wasi )
-add_rs_component(services/user/Tokens/plugin:TokensPlugin tokens.wasm wasm32-wasi )
-add_rs_component(services/user/Supervisor/plugin:TestsPlugin test.wasm wasm32-wasi )
-add_rs_component(services/user/ClientData/plugin:ClientDataPlugin clientdata.wasm wasm32-wasi )
-add_rs_component(services/user/Sites/plugin:SitesPlugin sites.wasm wasm32-wasi )
+add_rs_component_workspace(services/:Plugins 
+    accounts
+    account-tokens
+    auth-any
+    auth-delegate
+    auth-invite
+    auth-sig
+    clientdata
+    invite
+    sites
+    test
+    tokens
+    transact
+)
 
 
 set(WASM_PSIBASE_BYPRODUCTS
@@ -389,13 +367,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
         FLAGS allowSudo allowWriteNative
         SERVER r-transact
-        DATA ${COMPONENT_BIN_DIR}/${TransactPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         FLAGS allowWriteSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
-    DEPENDS ${TransactPlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
@@ -407,13 +385,13 @@ psibase_package(
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SERVER r-accounts
-        DATA ${COMPONENT_BIN_DIR}/${AccountsPlugin_OUTPUT_FILE} /plugin.wasm
-        DATA ${COMPONENT_BIN_DIR}/${AccountTokensPlugin_OUTPUT_FILE} /account-tokens.wasm
+        DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
     DEPENDS wasm
-    DEPENDS ${AccountsPlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
@@ -424,8 +402,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
     SERVICE clientdata
-        DATA ${COMPONENT_BIN_DIR}/${ClientDataPlugin_OUTPUT_FILE} /plugin.wasm
-    DEPENDS ${ClientDataPlugin_DEP}
+        DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
 )
 
 cargo_psibase_package(
@@ -447,7 +425,7 @@ psibase_package(
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
-        DATA ${COMPONENT_BIN_DIR}/${AuthPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
@@ -455,7 +433,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
     DEPENDS wasm
-    DEPENDS ${AuthPlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
@@ -498,9 +476,9 @@ psibase_package(
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
         SERVER auth-delegate
-        DATA ${COMPONENT_BIN_DIR}/${AuthDelegatePlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
     DEPENDS wasm
-    DEPENDS ${AuthDelegatePlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
@@ -511,9 +489,9 @@ psibase_package(
     DESCRIPTION "Insecure auth service that allows any access"
     SERVICE auth-any
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthAny.wasm
-        DATA ${COMPONENT_BIN_DIR}/${AuthAnyPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_auth_any} /plugin.wasm
     DEPENDS wasm
-    DEPENDS ${AuthAnyPlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})"
 )
 
@@ -549,7 +527,6 @@ psibase_package(
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS ${Homepage_js_DEP}
-    
 )
 
 psibase_package(
@@ -570,9 +547,9 @@ psibase_package(
     SERVICE sites
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
         SERVER sites
-        DATA ${COMPONENT_BIN_DIR}/${SitesPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_sites} /plugin.wasm
     DEPENDS wasm
-    DEPENDS ${SitesPlugin_DEP}
+    DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
 )
 
@@ -662,13 +639,12 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SERVER invite
         INIT
-        DATA ${COMPONENT_BIN_DIR}/${InvitesPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     SERVICE auth-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
-        DATA ${COMPONENT_BIN_DIR}/${AuthInvitePlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_auth_invite} /plugin.wasm
     DEPENDS wasm
-    DEPENDS ${InvitesPlugin_DEP}
-    DEPENDS ${AuthInvitePlugin_DEP}
+    DEPENDS ${Plugins_DEP}
 )
 
 psibase_package(
@@ -699,8 +675,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
     SERVICE sup-test
-        DATA ${COMPONENT_BIN_DIR}/${TestsPlugin_OUTPUT_FILE} /test.wasm
-    DEPENDS ${TestsPlugin_DEP}
+        DATA ${Plugins_OUTPUT_FILE_test} /test.wasm
+    DEPENDS ${Plugins_DEP}
 )
 
 psibase_package(
@@ -712,12 +688,13 @@ psibase_package(
     SERVICE tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/* /
-        DATA ${COMPONENT_BIN_DIR}/${TokensPlugin_OUTPUT_FILE} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_tokens} /plugin.wasm
         SERVER r-tokens
         INIT
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
     DEPENDS ${Tokens_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
+    DEPENDS ${Plugins_DEP}
     DEPENDS wasm
 )
 
