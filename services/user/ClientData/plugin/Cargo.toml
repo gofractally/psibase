@@ -1,7 +1,7 @@
 [package]
-version.workspace = true
 name = "clientdata"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.33.0", features = ["bitflags"] }
