@@ -1,7 +1,7 @@
-use darling::FromMeta;
+use darling::{ast::NestedMeta, util::PathList, FromMeta};
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
-use syn::{AttrStyle, FnArg, ItemFn, Pat, ReturnType};
+use syn::{AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, ReturnType};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -189,4 +189,122 @@ pub fn process_action_schema(
         #insertions
         actions.insert(#name_str.to_string(), #psibase_mod::fracpack::FunctionType{ params: builder.insert::<#action_mod::#name>(), result: #ret });
     }
+}
+
+pub struct PreAction {
+    pub exists: bool,
+    pub fn_name: Option<Ident>,
+    pub exclude: PathList,
+}
+
+impl Default for PreAction {
+    fn default() -> Self {
+        PreAction {
+            exists: false,
+            fn_name: None,
+            exclude: PathList::from(vec![]),
+        }
+    }
+}
+
+fn is_pre_action_attr(attr: &Attribute) -> bool {
+    if let AttrStyle::Outer = attr.style {
+        if attr.meta.path().is_ident("pre_action") {
+            return true;
+        }
+    }
+    false
+}
+
+#[derive(Debug, FromMeta)]
+struct PreActionOptions {
+    exclude: PathList,
+}
+
+pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
+    // println!("check_for_pre_action().top");
+    for (_item_index, item) in items.iter_mut().enumerate() {
+        if let Item::Fn(f) = item {
+            if f.attrs.iter().any(is_pre_action_attr) {
+                let temp = f.attrs.clone();
+                let pre_action_attr = temp.iter().find(|el| is_pre_action_attr(el)).unwrap();
+                // println!("pre_action_attr {:?}", pre_action_attr);
+                pre_action_info.exists = true;
+                pre_action_info.fn_name = Some(f.sig.ident.clone());
+                //TODO: decode attrs and get `exclude` arg
+                // println!("1: processing pre_action_attr args");
+                let attr_args_ts = match pre_action_attr.meta.clone() {
+                    Meta::List(args) => {
+                        // println!("List: {:?}", args);
+                        args.tokens
+                    }
+                    Meta::Path(args) => abort!(
+                        args,
+                        "Invalid pre_action attributes: expected list; got path."
+                    ),
+                    Meta::NameValue(args) => {
+                        // println!("NameValue: {:?}", args);
+                        args.value.to_token_stream()
+                    }
+                };
+                let attr_args = match NestedMeta::parse_meta_list(attr_args_ts.clone()) {
+                    Ok(v) => {
+                        // println!("v in match: {:#?}", v);
+                        v
+                    }
+                    Err(e) => {
+                        abort!(
+                            attr_args_ts,
+                            format!("Invalid pre_action arguments: {}", e.to_string())
+                        );
+                    }
+                };
+                // println!("2: parsing attr args into options...");
+                // println!("attr_args: {:#?}", attr_args);
+
+                let options: PreActionOptions =
+                    match PreActionOptions::from_list(&attr_args.clone()) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            abort!(
+                                attr_args_ts,
+                                format!("Invalid pre_action arguments: {}", err.to_string())
+                            );
+                        }
+                    };
+                // println!("pre-action options: {:?}", options);
+                pre_action_info.exclude = options.exclude;
+
+                if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
+                    f.attrs.remove(pre_action_pos);
+                }
+            }
+        }
+    }
+}
+
+pub fn add_pre_action_call(pre_action_info: &PreAction, f: &mut ItemFn) {
+    // println!("adding check_init to {}", f.sig.ident.to_string());
+    if pre_action_info
+        .exclude
+        .to_strings()
+        .contains(&f.sig.ident.to_string())
+    {
+        // println!(
+        //     "{} is in exclude list; skipping adding pre_action call",
+        //     f.sig.ident.to_string()
+        // );
+        return;
+    }
+    let fn_name = pre_action_info.fn_name.clone();
+    let new_line_ts = quote! {
+        #fn_name();
+    };
+    let new_line = syn::parse2(new_line_ts).unwrap();
+    f.block.stmts.insert(0, new_line);
+    // println!(
+    //     "add_check_init() ==> 1st line of {} is {:#?}",
+    //     f.sig.ident.to_string(),
+    //     f.block.stmts[0].clone()
+    // );
 }
