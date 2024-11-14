@@ -114,6 +114,11 @@ struct InstallCommand {
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER")]
     sender: Option<ExactAccountNumber>,
+
+    /// Configure compression level for package file uploads
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL")]
+    compression_level: Option<u32>,
 }
 
 #[derive(Parser, Debug)]
@@ -643,6 +648,10 @@ async fn install(
     command.arg("install");
     if let Some(sender) = &opts.sender {
         command.args(["--sender", &sender.to_string()]);
+    }
+
+    if let Some(compression_level) = opts.compression_level {
+        command.args(["--compression-level", &compression_level.to_string()]);
     }
 
     // Get package files

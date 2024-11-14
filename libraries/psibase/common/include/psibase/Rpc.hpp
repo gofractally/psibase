@@ -14,26 +14,28 @@ namespace psibase
       PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
    };
 
-   // TODO: consider adding headers to this
    /// An HTTP Request
    ///
    /// Most services receive this via their `serveSys` action.
    /// [SystemService::HttpServer] receives it via its `serve` exported function.
    struct HttpRequest
    {
-      std::string       host;         ///< Fully-qualified domain name
-      std::string       rootHost;     ///< host, but without service subdomain
-      std::string       method;       ///< "GET" or "POST"
-      std::string       target;       ///< Absolute path, e.g. "/index.js"
-      std::string       contentType;  ///< "application/json", "text/html", ...
-      std::vector<char> body;         ///< Request body, e.g. POST data
-      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, body)
+      std::string             host;         ///< Fully-qualified domain name
+      std::string             rootHost;     ///< host, but without service subdomain
+      std::string             method;       ///< "GET", "POST", "OPTIONS", "HEAD"
+      std::string             target;       ///< Absolute path, e.g. "/index.js"
+      std::string             contentType;  ///< "application/json", "text/html", ...
+      std::vector<HttpHeader> headers;      ///< HTTP Headers
+      std::vector<char>       body;         ///< Request body, e.g. POST data
+      PSIO_REFLECT(HttpRequest, host, rootHost, method, target, contentType, headers, body)
    };
 
    enum class HttpStatus : std::uint16_t
    {
       ok                  = 200,
+      notModified         = 304,
       notFound            = 404,
+      notAcceptable       = 406,
       internalServerError = 500,
    };
 

@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 anyhow = "1.0"
 async-graphql = "7.0.6"
 async-trait = "0.1.77"
+brotli = "7.0.0"
 chrono = "0.4"
 const_format = "0.2"
 custom_error = "1.9"
@@ -50,6 +51,7 @@ toml = "0.8.19"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = {version = "4.5", features = ["derive", "env", "string"]}
+
 hmac = "0.12"
 indicatif = "0.17"
 jwt = "0.16"
