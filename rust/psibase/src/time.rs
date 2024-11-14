@@ -1,6 +1,11 @@
 use crate::{Pack, ToKey, ToSchema, Unpack};
 use async_graphql::{InputObject, SimpleObject};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, FixedOffset, Utc};
+use serde::{
+    de::{Deserializer, Error as _},
+    ser::Serializer,
+    Deserialize, Serialize,
+};
 use std::ops::{Add, Sub};
 
 #[derive(
@@ -16,8 +21,6 @@ use std::ops::{Add, Sub};
     Unpack,
     ToKey,
     ToSchema,
-    Serialize,
-    Deserialize,
     SimpleObject,
     InputObject,
 )]
@@ -34,8 +37,8 @@ impl From<i64> for TimePointSec {
     }
 }
 
-impl From<chrono::DateTime<chrono::Utc>> for TimePointSec {
-    fn from(seconds: chrono::DateTime<chrono::Utc>) -> Self {
+impl From<DateTime<Utc>> for TimePointSec {
+    fn from(seconds: DateTime<Utc>) -> Self {
         TimePointSec {
             seconds: seconds.timestamp(),
         }
@@ -62,7 +65,26 @@ impl Sub for TimePointSec {
     }
 }
 
+impl Serialize for TimePointSec {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(
+            &DateTime::<Utc>::from_timestamp(self.seconds, 0)
+                .unwrap()
+                .to_rfc3339(),
+        )
+    }
+}
+
+impl<'de> Deserialize<'de> for TimePointSec {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(s)
+            .map_err(|e| D::Error::custom(e.to_string()))?
+            .to_utc()
+            .into())
+    }
+}
+
 // TODO: TimePointSec is both a time point and a duration
 // TODO: string conversions
-// TODO: JSON
 // TODO: implement trait with the time functions helpers

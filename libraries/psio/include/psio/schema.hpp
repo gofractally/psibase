@@ -959,6 +959,21 @@ namespace psio
          return false;
       }
 
+      template <typename Rep>
+      constexpr bool psio_custom_schema(
+          std::chrono::time_point<std::chrono::system_clock, std::chrono::duration<Rep>>*)
+      {
+         return true;
+      }
+
+      template <typename Rep>
+      constexpr bool psio_custom_schema(
+          std::chrono::time_point<std::chrono::system_clock,
+                                  std::chrono::duration<Rep, std::micro>>*)
+      {
+         return true;
+      }
+
       template <typename T>
       constexpr bool is_shared_view_ptr_v = false;
       template <typename T>
