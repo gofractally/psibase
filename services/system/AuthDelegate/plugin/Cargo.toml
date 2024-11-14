@@ -1,7 +1,7 @@
 [package]
 name = "auth-delegate"
-version = "0.13.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
@@ -9,13 +9,6 @@ psibase = { path = "../../../../rust/psibase/" }
 
 [lib]
 crate-type = ["cdylib"]
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [package.metadata.component]
 package = "auth-delegate:plugin"

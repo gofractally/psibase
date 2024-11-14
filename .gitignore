@@ -28,3 +28,4 @@ psinode_db_secure
 __pycache__
 ccache.conf
 bindings.rs
+target/
