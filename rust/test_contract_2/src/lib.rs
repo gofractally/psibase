@@ -131,7 +131,7 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let reply: Value = chain.get(SERVICE, "/action_templates")?.json()?;
     assert_eq!(
         reply,
-        json!({"add":{"a":0, "b": 0}, "multiply": {"a": 0, "b": 0}, "servesys": {"request": {"body": "", "contentType": "", "host": "", "method": "", "rootHost": "", "target": ""}}})
+        json!({"add":{"a":0, "b": 0}, "multiply": {"a": 0, "b": 0}, "serveSys": {"request": {"body": "", "contentType": "", "headers": [{"name": "", "value": ""}], "host": "", "method": "", "rootHost": "", "target": ""}}})
     );
 
     Ok(())

@@ -13,6 +13,8 @@ psibase = { path = "../../../../rust/psibase/" }
 chainmail = { path = "../service" }
 serde_json = "1.0.128"
 serde = "1.0.210"
+serde-aux = "4.5.0"
+chrono = "0.4"
 
 [dev-dependencies]
 chainmail_package = { path = "..", version = "0.13.0" }
@@ -29,3 +31,4 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }

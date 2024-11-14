@@ -15,6 +15,7 @@ pub mod invite;
 pub mod nft;
 pub mod packages;
 pub mod producers;
+pub mod psi_brotli;
 pub mod r_events;
 pub mod setcode;
 pub mod sites;

@@ -1,0 +1,23 @@
+[package]
+name = "mincallrecvr"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[package.metadata.psibase]
+package-name = "mincallrecvr"
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.13.0"
+
+[dependencies]
+psibase = { path = "../../../psibase" }
+psibase_macros = { path = "../../../psibase_macros" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+
+[dev-dependencies]
+psimacrotest = { path = "../.." }

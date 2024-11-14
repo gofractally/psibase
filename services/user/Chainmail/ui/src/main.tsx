@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
-import { Drafts, Editor, Home, Sent, Viewer } from "@routes";
+import { Drafts, Editor, Home, Sent, Saved, Viewer } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
 
 import DefaultLayout from "./layouts/default";
@@ -27,6 +27,11 @@ const router = createBrowserRouter([
             {
                 path: "/drafts",
                 element: <Drafts />,
+                children: [],
+            },
+            {
+                path: "/saved",
+                element: <Saved />,
                 children: [],
             },
             {
