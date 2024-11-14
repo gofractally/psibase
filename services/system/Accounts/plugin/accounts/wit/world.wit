@@ -16,9 +16,9 @@ interface types {
 /// The "top-level" app is the app with which the user is directly interacting.
 interface active-app {
     use host:common/types.{error};
-    
-    /// Temporary function that will be deprecated once popup login windows are supported.
-    /// This function will log in the specified user with zero error checking.
+
+    /// Directly log in a user by their account name.
+    /// The user must have already been connected to the app.
     login: func(user: string) -> result<_, error>;
 
     /// Logs out the currently logged-in user.
@@ -34,7 +34,8 @@ interface active-app {
     ///  third-party integration with your plugin.
     get-logged-in-user: func() -> result<option<string>, error>;
 
-    /// Retrieves a list of accounts to which the user can log in.
+    /// Retrieves a list of accounts that the user has connected to this app.
+    /// The user may only log in to accounts that have been connected.
     get-connected-accounts: func() -> result<list<string>, error>;
 
     /// Create a connection token. This is passed to the `accounts` login page to allow it to link 
