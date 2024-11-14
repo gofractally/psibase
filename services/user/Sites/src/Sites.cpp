@@ -1,5 +1,6 @@
 #include "services/user/Sites.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
@@ -111,6 +112,7 @@ namespace SystemService
           "br",
           "gzip",
       };
+      static_assert(std::ranges::is_sorted(validEncodings));
 
       // Content-coding-identifier, e.g. "br", "gzip", etc.
       using cci = std::string;
@@ -119,16 +121,6 @@ namespace SystemService
       const std::array<std::pair<cci, decompressor_account>, 1> decompressors = {
           {{"br", "psi-brotli"}}  //
       };
-
-      // Remove leading and trailing whitespace from a string
-      void trimSpaceAround(std::string& str)
-      {
-         auto isNotSpace = [](unsigned char ch) { return !std::isspace(ch); };
-         auto firstChar  = std::ranges::find_if(str, isNotSpace);
-         auto lastChar   = std::ranges::find_if(str.rbegin(), str.rend(), isNotSpace).base();
-         str.erase(str.begin(), firstChar);
-         str.erase(lastChar, str.end());
-      }
 
       // Parses the encoding into a pair of encoding identifier and quality
       // Example: "  br  ;   q=0.901   "
@@ -147,15 +139,13 @@ namespace SystemService
             check(false, "Invalid encoding: " + encoding);
          }
 
-         auto& identifier = parts[0];
-         trimSpaceAround(identifier);
-
+         std::string identifier = parts[0];
+         boost::algorithm::trim(identifier);
          float quality = 1.0f;
          if (parts.size() > 1)
          {
             auto q = parts[1];
-            trimSpaceAround(q);
-
+            boost::algorithm::trim(q);
             if (!q.starts_with("q="))
             {
                check(false, "Invalid encoding q value for: " + identifier);
