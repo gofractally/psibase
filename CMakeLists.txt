@@ -410,6 +410,7 @@ psibase_package(
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
+    DEPENDS ${Accounts_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/index.html
     DEPENDS wasm
     DEPENDS ${AccountsPlugin_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
