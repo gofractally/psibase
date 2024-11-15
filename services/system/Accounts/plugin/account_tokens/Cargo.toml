@@ -1,0 +1,26 @@
+[package]
+name = "account-tokens"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
+psibase = { path = "../../../../../rust/psibase" }
+base64 = "0.22"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "accounts:account-tokens"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.dependencies]
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../../user/CommonApi/common/packages/wit/host-common.wit" }
+
+[package.metadata.component.bindings]
+derives = ["psibase::Pack", "psibase::Unpack"]

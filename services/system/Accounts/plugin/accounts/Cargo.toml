@@ -1,0 +1,31 @@
+[package]
+name = "accounts"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+url = "2.5.2"
+wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
+psibase = { path = "../../../../../rust/psibase/" }
+base64 = "0.22"
+serde = "1.0.204"
+serde_json = "1.0.120"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "accounts:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"host:privileged" = { path = "../../../../user/CommonApi/common/packages/wit/host-privileged.wit" }
+"transact:plugin" = { path = "../../../Transact/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../../../user/ClientData/plugin/wit/world.wit" }
+"accounts:account-tokens" = { path = "../account_tokens/wit/world.wit" }
+
+[package.metadata.component.bindings]
+derives = ["serde::Deserialize"]

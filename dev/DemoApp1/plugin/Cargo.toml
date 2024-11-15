@@ -19,6 +19,6 @@ package = "demoapp1:example"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../services/user/CommonApi/common/packages/wit/host-common.wit" }
 "invite:plugin" = { path = "../../../services/user/Invite/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/accounts/wit/world.wit" }
 "transact:plugin" = { path = "../../../services/system/Transact/plugin/wit/world.wit" }
 "auth-sig:plugin" = { path = "../../../services/system/AuthSig/plugin/wit/world.wit" }

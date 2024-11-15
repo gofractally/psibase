@@ -2,8 +2,9 @@ use psibase::plugin_error;
 
 plugin_error! {
     pub ErrorType<'a>
-    NotYetImplemented(msg: &'a str) => "Not yet implemented: {msg}",
     Unauthorized(msg: &'a str) => "Unauthorized access: {msg}",
     InvalidAccountName(msg: String) => "Invalid account name: {msg}",
+    InvalidApp(msg: String) => "Invalid app: {msg}",
     QueryError(msg: String) => "Graphql query error: {msg}",
+    NotConnected(user: String) => "User {user} is not connected to this app",
 }

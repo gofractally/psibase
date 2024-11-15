@@ -13,6 +13,7 @@ interface types {
     /// Fields:
     /// * `inviter` - The account responsible for generating the invite
     /// * `app` - The app responsible for generating the invite
+    /// * `app_domain` - The domain of the app responsible for generating the invite
     /// * `state` - The state of the invite
     /// * `actor` - The name of the account to most recently accept or reject the invite
     /// * `expiry` - The UTC timestamp of the invite's expiration
@@ -22,14 +23,14 @@ interface types {
     ///    used.
     record invite {
         inviter: string,
-        app: string,
+        app: option<string>,
+        app-domain: string,
         state: invite-state,
         actor: string,
         expiry: string,
     }
 
     type url = string;
-    type invite-token = string;
 }
 
 // interface admin {
@@ -52,7 +53,6 @@ interface types {
 /// Functionality exposed for the inviter
 interface inviter {
     use host:common/types.{error};
-    use types.{invite-token};
 
     /// Allows a user to generate an invite token that can be used to 
     /// invite someone (with or without a preexisting account) to an 
@@ -61,7 +61,7 @@ interface inviter {
     /// Successful return value:
     ///  * The invite token that was created. This token can
     ///    be sent to a user to invite them to the app.
-    generate-invite: func() -> result<invite-token, error>;
+    generate-invite: func() -> result<string, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database. An invite can be deleted regardless of whether it has been
@@ -70,7 +70,7 @@ interface inviter {
     /// Parameters
     /// * `token`: The token that was generated during the creation of the 
     /// invite.
-    delete-invite: func(token: invite-token) -> result<_, error>;
+    delete-invite: func(token: string) -> result<_, error>;
 }
 
 
@@ -78,34 +78,34 @@ interface inviter {
 interface invitee {
     use host:common/types.{error};
 
-    use types.{invite, invite-token};
+    use types.{invite};
 
     /// Retrieves details about the invite from the invite token.
     /// 
     /// Parameters: 
     /// * `token`: The token that was generated during the creation of the 
     /// invite.
-    decode-invite: func(token: invite-token) -> result<invite, error>;
+    decode-invite: func(token: string) -> result<invite, error>;
 
     /// Creates a new account and accepts the specified invite with it.
     /// 
     /// Parameters
     /// * `account`: The name of the new account being created
-    /// * `invite-token`: The token of the invite being accepted
-    accept-with-new-account: func(account: string, token: invite-token) -> result<_, error>;
+    /// * `token`: The token of the invite being accepted
+    accept-with-new-account: func(account: string, token: string) -> result<_, error>;
 
     /// Accepts an invite with an existing account (the currently logged-in account).
     /// 
     /// Parameters
     /// * `token`: The token of the invite being accepted
-    accept: func(token: invite-token) -> result<_, error>;
+    accept: func(token: string) -> result<_, error>;
 
     /// Rejects an invite. Once an invite is rejected, it cannot be accepted or used to
     /// create a new account.
     /// 
     /// Parameters
-    /// * `invite-token`: The token of the invite being rejected
-    reject: func(token: invite-token) -> result<_, error>;
+    /// * `token`: The token of the invite being rejected
+    reject: func(token: string) -> result<_, error>;
 }
 
 interface adv-types {
@@ -117,12 +117,12 @@ interface adv-types {
 }
 
 interface advanced {
-    use types.{invite-token, invite};
+    use types.{invite};
     use host:common/types.{error};
     use adv-types.{inv-keys};
 
     /// Deserializes an invite token into just the creator app + private key
-    deserialize: func(token: invite-token) -> result<inv-keys, error>;
+    deserialize: func(token: string) -> result<inv-keys, error>;
 }
 
 world imports {

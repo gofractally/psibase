@@ -296,6 +296,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
     accounts
+    account-tokens
     auth-any
     auth-delegate
     auth-invite
@@ -307,6 +308,7 @@ add_rs_component_workspace(services/:Plugins
     tokens
     transact
 )
+
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -384,6 +386,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SERVER r-accounts
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
