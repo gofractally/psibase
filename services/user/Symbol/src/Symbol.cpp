@@ -1,14 +1,14 @@
 #include <services/user/Symbol.hpp>
 
+#include <cmath>
+#include <psibase/serveSimpleUI.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
-
-#include <cmath>
-#include <psibase/serveSimpleUI.hpp>
-#include "services/user/Nft.hpp"
-#include "services/user/Tokens.hpp"
+#include <services/user/Events.hpp>
+#include <services/user/Nft.hpp>
+#include <services/user/Tokens.hpp>
 
 using namespace UserService;
 using namespace psibase;
@@ -102,6 +102,14 @@ void Symbol::init()
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
+
+   // Register event indices and schema
+   to<EventIndex>().setSchema(ServiceSchema::make<Symbol>());
+
+   // Event indices:
+   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 2);
 }
 
 void Symbol::create(SID newSymbol, Quantity maxDebit)
@@ -131,14 +139,11 @@ void Symbol::create(SID newSymbol, Quantity maxDebit)
    {
       to<Nft>().credit(newSym.ownerNft, sender, nftCreditMemo);
    }
+   Tables().open<SymbolTable>().put(newSym);
 
    // Update symbol type statistics
    symType.createCounter++;
    symType.lastPriceUpdateTime = to<Transact>().headBlockTime();
-
-   newSym.eventHead = emit().history().symCreated(0, newSymbol, sender, cost);
-
-   Tables().open<SymbolTable>().put(newSym);
    Tables().open<SymbolLengthTable>().put(symType);
 }
 
@@ -159,9 +164,6 @@ void Symbol::listSymbol(SID symbol, Quantity price)
    nftService.debit(nft, debitMemo);
    symbolRecord.saleDetails.salePrice = price;
    symbolRecord.saleDetails.seller    = seller;
-
-   symbolRecord.eventHead =
-       emit().history().symListed(symbolRecord.eventHead, symbol, seller, price);
 
    Tables().open<SymbolTable>().put(symbolRecord);
 }
@@ -184,11 +186,9 @@ void Symbol::buySymbol(SID symbol)
 
    symbolRecord.saleDetails.seller    = AccountNumber{0};
    symbolRecord.saleDetails.salePrice = 0;
-
-   symbolRecord.eventHead =
-       emit().history().symSold(symbolRecord.eventHead, symbol, buyer, seller, salePrice);
-
    Tables().open<SymbolTable>().put(symbolRecord);
+
+   emit().history().symSold(symbol, buyer, seller, salePrice);
 }
 
 void Symbol::unlistSymbol(SID symbol)
@@ -203,8 +203,6 @@ void Symbol::unlistSymbol(SID symbol)
    to<Nft>().credit(symbolRecord.ownerNft, seller, unlistMemo);
 
    symbolRecord.saleDetails = SaleDetails{};
-   symbolRecord.eventHead   = emit().history().symUnlisted(symbolRecord.eventHead, symbol, seller);
-
    Tables().open<SymbolTable>().put(symbolRecord);
 }
 
@@ -282,13 +280,6 @@ void Symbol::updatePrices()
          priceChanged                   = true;
       }
 
-      if (priceChanged)
-      {
-         auto blockNum        = to<Transact>().currentBlock().blockNum;
-         symbolType.eventHead = emit().history().newCreatePrice(
-             symbolType.eventHead, symbolType.symbolLength, blockNum, symbolType.activePrice);
-      }
-
       symLengthTable.put(symbolType);
    }
 }
@@ -298,36 +289,18 @@ bool Symbol::exists(SID symbol)
    return Tables().open<SymbolTable>().get(symbol).has_value();
 }
 
-auto symbolService = QueryableService<Symbol::Tables, Symbol::Events>{Symbol::service};
 struct SymbolQuery
 {
-   auto events() const
-   {  //
-      return symbolService.allEvents();
-   }
-   auto symbolEvents(SID symbolId, optional<uint32_t> first, const optional<string>& after) const
-   {
-      return symbolService.eventIndex<Symbol::SymbolEvents>(symbolId, first, after);
-   }
-   auto lengthEvents(uint8_t length, optional<uint32_t> first, const optional<string>& after) const
-   {
-      return symbolService.eventIndex<Symbol::SymbolTypeEvents>(length, first, after);
-   }
    auto symbolTypes() const
    {  //
-      return symbolService.index<SymbolLengthTable, 0>();
+      return Symbol::Tables(Symbol::service).open<SymbolLengthTable>().getIndex<0>();
    }
    auto symbols() const
    {  //
-      return symbolService.index<SymbolTable, 0>();
+      return Symbol::Tables(Symbol::service).open<SymbolTable>().getIndex<0>();
    }
 };
-PSIO_REFLECT(SymbolQuery,
-             method(events),
-             method(symbolEvents, symbolId, first, after),
-             method(lengthEvents, length, first, after),
-             method(symbolTypes),
-             method(symbols));
+PSIO_REFLECT(SymbolQuery, method(symbolTypes), method(symbols));
 
 optional<HttpReply> Symbol::serveSys(HttpRequest request)
 {
