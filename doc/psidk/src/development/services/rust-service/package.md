@@ -34,7 +34,7 @@ version = "0.1.0"
 description = "An example package"
 
 [package.metadata.psibase]
-# (required) Builds example.psi
+# (required) Builds example.psi (<package-name>.psi (case-sensitive))
 package-name = "example"
 # package includes `service1` service
 services = ["service1"]

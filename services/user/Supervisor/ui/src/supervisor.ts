@@ -60,10 +60,17 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        this.parentOrigination = {
-            app: callerOrigin === siblingUrl(null, null, null, true) ? "homepage" : serviceFromOrigin(callerOrigin),
-            origin: callerOrigin,
-        };
+        if (callerOrigin === siblingUrl(null, null, null, true)) {
+            this.parentOrigination = {
+                app: "homepage",
+                origin: callerOrigin,
+            };
+        } else {
+            this.parentOrigination = {
+                app: serviceFromOrigin(callerOrigin),
+                origin: callerOrigin,
+            };
+        }
     }
 
     private async preload(plugins: QualifiedPluginId[]) {

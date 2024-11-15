@@ -1,0 +1,25 @@
+[package]
+name = "psimacrotest"
+edition = "2021"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[package.metadata.psibase]
+# Relates to test cases specification of packages that should be loaded on the chain
+package-name = "PsiMacroTest"
+# services installed by the package
+services = ["basicwquery", "mincallrecvr"]
+
+[dependencies]
+psibase = { path = "../psibase" }
+psibase_macros = { path = "../psibase_macros" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+basicwquery = { path = "services/basic-w-query" }
+mincallrecvr = { path = "services/min-call-recvr" }
+serde_json = "1.0.132"
