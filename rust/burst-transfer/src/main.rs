@@ -148,9 +148,7 @@ async fn transfer_impl(
         to = args.accounts[rand::random::<usize>() % args.accounts.len()];
     }
     let now_plus_10secs = chrono::Utc::now() + chrono::Duration::seconds(10);
-    let expiration = psibase::TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
-    };
+    let expiration = psibase::TimePointSec::from(now_plus_10secs);
     let mut actions = Vec::new();
     for _ in 0..args.actions {
         let memo = format!(
