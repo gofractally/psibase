@@ -210,7 +210,7 @@ namespace psibase
    {
       Checksum256   previous = {};
       BlockNum      blockNum = 0;  // TODO: pack into previous instead?
-      TimePointSec  time;          // TODO: switch to microseconds
+      TimePointUSec time;
       AccountNumber producer;
       TermNum       term;
       BlockNum      commitNum;

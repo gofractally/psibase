@@ -9,8 +9,8 @@
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
     AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, PackageRegistry, SignedTransaction, StatusRow, TimePointSec, Transaction,
-    TransactionTrace,
+    InnerTraceEnum, PackageRegistry, Seconds, SignedTransaction, StatusRow, TimePointSec,
+    TimePointUSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -122,16 +122,18 @@ impl Chain {
     /// then starts a new block 1 second after the most recent.
     ///
     /// TODO: Support sub-second block times
-    pub fn start_block_at(&self, time: TimePointSec) {
+    pub fn start_block_at(&self, time: TimePointUSec) {
         let status = &mut *self.status.borrow_mut();
 
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
-            if status.current.time.seconds + 1 < time.seconds {
-                unsafe { tester_raw::startBlock(self.chain_handle, (time.seconds - 1) as u32) }
+            if status.current.time + Seconds::new(1) < time {
+                unsafe {
+                    tester_raw::startBlock(self.chain_handle, (time - Seconds::new(1)).microseconds)
+                }
             }
         }
-        unsafe { tester_raw::startBlock(self.chain_handle, time.seconds as u32) }
+        unsafe { tester_raw::startBlock(self.chain_handle, time.microseconds) }
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
         self.producing.replace(true);
     }
@@ -140,7 +142,7 @@ impl Chain {
     ///
     /// Starts a new block 1 second after the most recent.
     pub fn start_block(&self) {
-        self.start_block_at(TimePointSec { seconds: 0 })
+        self.start_block_at(TimePointUSec { microseconds: 0 })
     }
 
     /// Finish a block
@@ -159,7 +161,8 @@ impl Chain {
         trx.tapos.refBlockIndex = 0;
         trx.tapos.refBlockSuffix = 0;
         if let Some(status) = &*self.status.borrow() {
-            trx.tapos.expiration.seconds = status.current.time.seconds + expire_seconds as i64;
+            trx.tapos.expiration =
+                status.current.time.seconds() + Seconds::new(expire_seconds as i64);
             if let Some(head) = &status.head {
                 let mut suffix = [0; 4];
                 suffix.copy_from_slice(&head.blockId[head.blockId.len() - 4..]);

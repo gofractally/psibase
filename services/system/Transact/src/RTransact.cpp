@@ -71,7 +71,7 @@ void RTransact::onBlock()
    auto commitNum  = stat->current.commitNum;
    auto reversible = WriteOnly{}.open<ReversibleBlocksTable>();
    reversible.put({.blockNum = stat->current.blockNum, .time = stat->current.time});
-   TimePointSec irreversibleTime = {};
+   TimePointUSec irreversibleTime = {};
    for (auto r : reversible.getIndex<0>())
    {
       if (r.blockNum > commitNum)

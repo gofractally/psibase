@@ -215,7 +215,7 @@ namespace psibase
 
       void startBlock(std::string_view time);
 
-      void startBlock(TimePointSec tp);
+      void startBlock(TimePointUSec tp);
 
       /**
        * Finish the current pending block.  If no block is pending, creates an empty block.

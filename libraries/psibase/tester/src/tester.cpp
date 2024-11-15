@@ -199,7 +199,7 @@ void psibase::TestChain::setAutoBlockStart(bool enable)
 void psibase::TestChain::startBlock(int64_t skip_miliseconds)
 {
    auto time = status ? status->current.time : TimePointSec{};
-   startBlock(time + std::chrono::seconds{1 + skip_miliseconds / 1000});
+   startBlock(time + MicroSeconds{(1000 + skip_miliseconds) * 1000});
 }
 
 void psibase::TestChain::startBlock(std::string_view time)
@@ -208,14 +208,14 @@ void psibase::TestChain::startBlock(std::string_view time)
    std::uint32_t nsec;
    if (!psio::parse_system_time(time, sec, nsec))
       abortMessage("bad time");
-   startBlock(TimePointSec{std::chrono::seconds{sec}});
+   startBlock(TimePointUSec{Seconds{sec} + MicroSeconds{nsec / 1000}});
 }
 
-void psibase::TestChain::startBlock(TimePointSec tp)
+void psibase::TestChain::startBlock(TimePointUSec tp)
 {
    // Guarantee that there is a recent block for fillTapos to use.
-   if (status && status->current.time + std::chrono::seconds(1) < tp)
-      tester::raw::startBlock(id, tp.time_since_epoch().count() - 1);
+   if (status && status->current.time + Seconds(1) < tp)
+      tester::raw::startBlock(id, (tp - Seconds(1)).time_since_epoch().count());
    tester::raw::startBlock(id, tp.time_since_epoch().count());
    status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
@@ -231,7 +231,8 @@ void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
    ScopedSelectChain s{id};
    t.tapos.expiration =
-       (status ? status->current.time : TimePointSec{}) + std::chrono::seconds(expire_sec);
+       (status ? std::chrono::time_point_cast<Seconds>(status->current.time) : TimePointSec{}) +
+       Seconds(expire_sec);
    auto [index, suffix]   = SystemService::headTapos();
    t.tapos.refBlockIndex  = index;
    t.tapos.refBlockSuffix = suffix;

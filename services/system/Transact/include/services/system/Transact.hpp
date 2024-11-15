@@ -194,9 +194,9 @@ namespace SystemService
 
    struct SnapshotInfo
    {
-      psibase::TimePointSec lastSnapshot;
-      psibase::Seconds      snapshotInterval;
-      auto                  key() const { return psibase::SingletonKey(); }
+      psibase::TimePointUSec lastSnapshot;
+      psibase::Seconds       snapshotInterval;
+      auto                   key() const { return psibase::SingletonKey(); }
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, &SnapshotInfo::key>;
@@ -309,7 +309,7 @@ namespace SystemService
       ///
       /// This is *not* the currently executing block time.
       /// TODO: remove
-      psibase::TimePointSec headBlockTime() const;
+      psibase::TimePointUSec headBlockTime() const;
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),

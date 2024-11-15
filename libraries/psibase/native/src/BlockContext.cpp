@@ -49,10 +49,10 @@ namespace psibase
    }
 
    // TODO: (or elsewhere) graceful shutdown when db size hits threshold
-   StatusRow BlockContext::start(std::optional<TimePointSec> time,
-                                 AccountNumber               producer,
-                                 TermNum                     term,
-                                 BlockNum                    irreversible)
+   StatusRow BlockContext::start(std::optional<TimePointUSec> time,
+                                 AccountNumber                producer,
+                                 TermNum                      term,
+                                 BlockNum                     irreversible)
    {
       check(!started, "block has already been started");
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
@@ -623,7 +623,7 @@ namespace psibase
       }
    }
 
-   psibase::TimePointSec BlockContext::getHeadBlockTime()
+   psibase::TimePointUSec BlockContext::getHeadBlockTime()
    {
       auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status || !(status->head))

@@ -335,8 +335,7 @@ struct test_chain
       db     = {};
    }
 
-   // TODO: Support sub-second block times
-   void startBlock(std::optional<psibase::TimePointSec> time = std::nullopt)
+   void startBlock(std::optional<psibase::TimePointUSec> time = std::nullopt)
    {
       // TODO: undo control
       finishBlock();
@@ -1240,12 +1239,11 @@ struct callbacks
       c.db = {};
    }
 
-   // TODO: Support sub-second block times
-   void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
+   void testerStartBlock(uint32_t chain_index, int64_t time_us)
    {
       assert_chain(chain_index)
-          .startBlock(time_seconds
-                          ? std::optional{psibase::TimePointSec{psibase::Seconds{time_seconds}}}
+          .startBlock(time_us
+                          ? std::optional{psibase::TimePointUSec{psibase::MicroSeconds{time_us}}}
                           : std::nullopt);
    }
 

@@ -128,7 +128,8 @@ void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
    pushTransaction(
        ctx,
        Transaction{
-           .tapos   = {.expiration = {ctx->current.header.time + Seconds(1)}},
+           .tapos = {.expiration = std::chrono::time_point_cast<Seconds>(ctx->current.header.time) +
+                                   Seconds(1)},
            .actions = {Action{.sender  = Transact::service,
                               .service = Transact::service,
                               .method  = MethodNumber{"startBoot"},
@@ -148,7 +149,7 @@ void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
 static Tapos getTapos(const BlockInfo& info)
 {
    Tapos result;
-   result.expiration = info.header.time + Seconds(2);
+   result.expiration = std::chrono::time_point_cast<Seconds>(info.header.time) + Seconds(2);
    std::memcpy(&result.refBlockSuffix,
                info.blockId.data() + info.blockId.size() - sizeof(result.refBlockSuffix),
                sizeof(result.refBlockSuffix));
@@ -159,7 +160,7 @@ static Tapos getTapos(const BlockInfo& info)
 static Tapos getTapos(psibase::BlockContext* ctx)
 {
    Tapos result;
-   result.expiration = ctx->current.header.time + Seconds(1);
+   result.expiration = std::chrono::time_point_cast<Seconds>(ctx->current.header.time) + Seconds(1);
    std::memcpy(&result.refBlockSuffix,
                ctx->current.header.previous.data() + ctx->current.header.previous.size() -
                    sizeof(result.refBlockSuffix),

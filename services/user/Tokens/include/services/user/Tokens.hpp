@@ -90,8 +90,8 @@ namespace UserService
             void tokenConfSet(TID tokenId, Account setter, psibase::EnumElement flag, bool enable) {}
             void symbolMapped(TID tokenId, Account account, SID symbolId) {}
             // TODO: time is redundant with which block the event was written in
-            void transferred(TID tokenId, psibase::TimePointSec time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
-            void recalled(TID tokenId, psibase::TimePointSec time, Account from, Quantity amount, MemoView memo) {}
+            void transferred(TID tokenId, psibase::TimePointUSec time, Account sender, Account receiver, Quantity amount, MemoView memo) {}
+            void recalled(TID tokenId, psibase::TimePointUSec time, Account from, Quantity amount, MemoView memo) {}
          };
 
          struct Ui {};

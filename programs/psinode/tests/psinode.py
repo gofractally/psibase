@@ -5,6 +5,7 @@ import subprocess
 import os
 import tempfile
 import time
+import datetime
 import calendar
 from collections import namedtuple
 import psibase
@@ -511,13 +512,13 @@ class Node(API):
         if producer is None:
             raise RuntimeError("Producer required for boot")
         self.run_psibase(['boot', '-p', producer] + packages)
-        now = time.time_ns() // 1000000000
+        now = datetime.datetime.now(datetime.UTC)
         def isbooted(node):
             try:
                 timestamp = node.get_block_header()['time']
             except requests.exceptions.HTTPError as e:
                 return False
-            if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ")) <= now:
+            if datetime.datetime.fromisoformat(timestamp) <= now:
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)

@@ -88,9 +88,10 @@ void Invite::createInvite(Spki inviteKey)
    // Add invite
    Seconds      secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
-       .pubkey          = inviteKey,
-       .inviter         = inviter,
-       .expiry          = to<Transact>().currentBlock().time + secondsInWeek,
+       .pubkey  = inviteKey,
+       .inviter = inviter,
+       .expiry  = std::chrono::time_point_cast<Seconds>(to<Transact>().currentBlock().time) +
+                 secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
    };

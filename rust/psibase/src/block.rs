@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
-use crate::{AccountNumber, Hex, MethodNumber, Pack, TimePointSec, ToKey, ToSchema, Unpack};
+use crate::{
+    AccountNumber, Hex, MethodNumber, Pack, TimePointSec, TimePointUSec, ToKey, ToSchema, Unpack,
+};
 use async_graphql::{InputObject, SimpleObject, Union};
 use serde::{Deserialize, Serialize};
 
@@ -352,7 +354,7 @@ pub struct BlockHeaderCode {
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
-    pub time: TimePointSec,
+    pub time: TimePointUSec,
     pub producer: AccountNumber,
     pub term: TermNum,
     pub commitNum: BlockNum,

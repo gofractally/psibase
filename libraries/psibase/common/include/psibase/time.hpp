@@ -7,7 +7,7 @@
 namespace psibase
 {
    using Seconds       = std::chrono::duration<std::int64_t>;
-   using MicroSec      = std::chrono::duration<std::int64_t, std::micro>;
+   using MicroSeconds  = std::chrono::duration<std::int64_t, std::micro>;
    using TimePointSec  = std::chrono::time_point<std::chrono::system_clock, Seconds>;
-   using TimePointUSec = std::chrono::time_point<std::chrono::system_clock, MicroSec>;
+   using TimePointUSec = std::chrono::time_point<std::chrono::system_clock, MicroSeconds>;
 }  // namespace psibase

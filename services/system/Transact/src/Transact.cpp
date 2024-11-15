@@ -332,7 +332,7 @@ namespace SystemService
       return stat.head->header;
    }
 
-   psibase::TimePointSec Transact::headBlockTime() const
+   psibase::TimePointUSec Transact::headBlockTime() const
    {
       auto& stat = getStatus();
       if (stat.head)
