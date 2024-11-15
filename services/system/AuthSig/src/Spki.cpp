@@ -12,7 +12,14 @@ namespace SystemService
    {
       bool SubjectPublicKeyInfo::validate(const std::vector<unsigned char>& data)
       {
-         Botan::X509::load_key({data.data(), data.size()});  // Throws if decoding fails
+         Botan::AlgorithmIdentifier algorithm;
+         std::vector<std::uint8_t>  key;
+
+         Botan::BER_Decoder(data)
+             .start_sequence()
+             .decode(algorithm)
+             .decode(key, Botan::ASN1_Type::BitString)
+             .end_cons();
          return true;
       }
 
@@ -29,12 +36,9 @@ namespace SystemService
                            "Pem->SPKI: Expected label \"PUBLIC KEY\", got label: " + label_got);
          }
 
-         Botan::BER_Decoder(ber)
-             .start_sequence()
-             .decode(algorithm)
-             .decode(key, Botan::ASN1_Type::BitString)
-             .end_cons();
-         return std::vector<unsigned char>(ber.begin(), ber.end());
+         auto result = std::vector<unsigned char>(ber.begin(), ber.end());
+         SubjectPublicKeyInfo::validate(result);
+         return result;
       }
 
       std::vector<unsigned char> parseSubjectPublicKeyInfo(std::string_view s)
