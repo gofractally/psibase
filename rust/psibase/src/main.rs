@@ -364,8 +364,8 @@ enum Command {
     Config(ConfigCommand),
     // /// Print help for the subcommands
     // Help { command: Vec<OsString> },
-    #[command(external_subcommand)]
-    External(Vec<OsString>),
+    // #[command(external_subcommand)]
+    // External(Vec<OsString>),
 }
 
 #[allow(dead_code)] // TODO: move to lib if still needed
@@ -717,6 +717,7 @@ fn find_psitest() -> OsString {
 }
 
 fn data_directory() -> Result<PathBuf, anyhow::Error> {
+    println!("data_directory().top");
     let exe = std::env::current_exe()?.canonicalize()?;
     let Some(parent) = exe.parent() else {
         return Err(anyhow!("Parent not found"));
@@ -1332,18 +1333,25 @@ fn unrecognized_subcommand(command: &mut clap::Command, name: &OsString) -> ! {
 }
 
 fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
+    println!("1");
     let psitest = find_psitest();
+    println!("2");
     let command_path = data_directory()?.join("wasm");
+    println!("3");
     let mut filename: OsString = "psibase-".to_string().into();
     filename.push(&args[0]);
     filename.push(".wasm");
     let wasm_file = command_path.join(filename);
+    println!("4");
     if !wasm_file.is_file() {
         let command = clap::Command::new("psibase");
+        println!("5");
         let mut command = BasicArgs::augment_args(command)
             .disable_help_subcommand(true)
             .disable_help_flag(true);
+        println!("6");
         command.build();
+        println!("7");
         unrecognized_subcommand(&mut command, &args[0]);
     }
     Err(std::process::Command::new(psitest)
@@ -1363,6 +1371,7 @@ fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
             unrecognized_subcommand(command, name);
         }
     } else {
+        println!("print_subcommand_help.3");
         command.print_help().unwrap();
     }
 }
@@ -1373,6 +1382,7 @@ fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
     if !subcommand.is_empty() {
         command.build();
         let mut iter = subcommand.iter();
+        println!("print_help().4");
         if let Some(command) = command.find_subcommand_mut(iter.next().unwrap()) {
             print_subcommand_help(iter, command);
         } else {
@@ -1454,7 +1464,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
         Command::Config(config) => handle_cli_config_cmd(config)?,
         // Command::Help { command } => print_help(command)?,
-        Command::External(argv) => handle_external(argv)?,
+        // Command::External(argv) => handle_external(argv)?,
     }
 
     Ok(())
