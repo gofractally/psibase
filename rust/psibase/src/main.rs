@@ -35,10 +35,9 @@ use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct BasicArgs {
-    /// Print help
-    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
-    help: Option<Vec<OsString>>,
-
+    // /// Print help
+    // #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
+    // help: Option<Vec<OsString>>,
     #[clap(subcommand)]
     command: Option<Command>,
 }
@@ -363,10 +362,8 @@ enum Command {
     /// Setup the psibase local config file
     #[command(subcommand)]
     Config(ConfigCommand),
-
-    /// Print help for the subcommands
-    Help { command: Vec<OsString> },
-
+    // /// Print help for the subcommands
+    // Help { command: Vec<OsString> },
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
@@ -1427,9 +1424,9 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = parse_args()?;
-    if let Some(help) = &args.help {
-        return print_help(help);
-    }
+    // if let Some(help) = &args.help {
+    //     return print_help(help);
+    // }
     let Some(command) = &args.command else {
         return print_help(&[]);
     };
@@ -1456,7 +1453,7 @@ async fn main() -> Result<(), anyhow::Error> {
             create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
         Command::Config(config) => handle_cli_config_cmd(config)?,
-        Command::Help { command } => print_help(command)?,
+        // Command::Help { command } => print_help(command)?,
         Command::External(argv) => handle_external(argv)?,
     }
 
