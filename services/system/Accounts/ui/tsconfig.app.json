@@ -16,9 +16,15 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "/common": ["../../../user/CommonApi/common"],
+      "@psibase/common-lib": [
+        "../../../user/CommonApi/common/packages/common-lib/src"
+      ],
+      "@psibase/common-lib/*": [
+        "../../../user/CommonApi/common/packages/common-lib/src/*"
+      ]
     },
-
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

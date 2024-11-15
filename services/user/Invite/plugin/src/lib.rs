@@ -12,7 +12,7 @@ use bindings::exports::invite::plugin::advanced::InvKeys as InviteKeys;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteState, InviteToken};
 use bindings::transact::plugin::intf as Transact;
-use chrono::DateTime;
+use chrono::{DateTime, SecondsFormat};
 use errors::ErrorType::*;
 use fracpack::Pack;
 use invite::plugin::{invitee::Guest as Invitee, inviter::Guest as Inviter};
@@ -112,7 +112,7 @@ impl Invitee for InvitePlugin {
 
         let expiry = DateTime::from_timestamp(invite.expiry as i64, 0)
             .ok_or(DatetimeError("decode_invite"))?
-            .to_string();
+            .to_rfc3339_opts(SecondsFormat::Millis, true);
         let state = match invite.state {
             0 => InviteState::Pending,
             1 => InviteState::Accepted,

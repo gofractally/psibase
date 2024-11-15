@@ -80,7 +80,10 @@ export class Supervisor {
             messageEvent.origin !== myOrigin &&
             messageEvent.origin !== this.supervisorSrc
         ) {
-            console.log("Received unauthorized message. Ignoring.");
+            console.log(
+                "Received unauthorized message. Ignoring.",
+                messageEvent,
+            );
             return;
         }
 

@@ -46,6 +46,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
 import { useSearchParams } from "react-router-dom";
+import { supervisor } from "@/main";
 
 dayjs.extend(relativeTime);
 
@@ -54,8 +55,6 @@ enum Status {
   Unavailable,
   Available,
 }
-
-const randomId = (): string => Math.random().toString().slice(2);
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -108,34 +107,23 @@ interface AccountType {
   id: string;
 }
 
-const hardCodedAccounts: AccountType[] = [
-  {
-    id: randomId(),
-    account: "derp",
-  },
-  {
-    id: randomId(),
-    account: "barry",
-  },
-];
-
 const formSchema = z.object({
   username: z.string().min(3).max(50),
 });
-
-const randomDate = (): Date => {
-  const inFuture = Math.random() > 0.5;
-  const oneWeek = 1000 * 60 * 60 * 24 * 7;
-
-  return inFuture
-    ? new Date(new Date().valueOf() + oneWeek)
-    : new Date(new Date().valueOf() - oneWeek);
-};
 
 const isAccountAvailable = async (accountName: string): Promise<boolean> => {
   await wait(1000);
   return accountName.length > 5 || Math.random() > 0.5;
 };
+
+const DecodedToken = z.object({
+  inviter: z.string(),
+  app: z.string(),
+  appDomain: z.string().url(),
+  state: z.string(),
+  actor: z.string(),
+  expiry: z.string().datetime(),
+});
 
 export const AccountSelection = () => {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -164,6 +152,42 @@ export const AccountSelection = () => {
 
   const [debouncedAccount, setDebouncedAccount] = useState<string>();
 
+  const {
+    data: accounts,
+    isLoading: isFetching,
+    error,
+  } = useQuery({
+    queryKey: ["availableAccounts"],
+    queryFn: async (): Promise<AccountType[]> => {
+      console.log("loading...");
+      // await supervisor.onLoaded();
+      console.log("loaded");
+      supervisor.preLoadPlugins([{ service: "accounts" }]);
+
+      console.log("getting the connected account");
+      const res = z
+        .string()
+        .array()
+        .parse(
+          await supervisor.functionCall({
+            method: "getConnectedAccounts",
+            params: [],
+            service: "accounts",
+            intf: "activeApp",
+          })
+        );
+      console.log(res, "was the accounts return");
+
+      return z
+        .string()
+        .array()
+        .parse(res)
+        .map((x) => ({ account: x, id: x }));
+    },
+  });
+
+  console.log({ error }, "was the error");
+
   const { data: accountIsAvailable, isLoading: debounceIsLoading } = useQuery({
     queryKey: ["userAccount", debouncedAccount],
     queryFn: async () => isAccountAvailable(debouncedAccount!),
@@ -178,16 +202,7 @@ export const AccountSelection = () => {
     ? Status.Available
     : Status.Unavailable;
 
-  const { data: accounts, isFetching } = useQuery({
-    queryFn: async (): Promise<AccountType[]> => {
-      await wait(2000);
-      return hardCodedAccounts;
-    },
-    queryKey: ["userAccounts"],
-  });
-
   const isAccountsLoading = isFetching && !accounts;
-  console.log({ isAccountsLoading });
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
 
   useEffect(() => {
@@ -221,12 +236,27 @@ export const AccountSelection = () => {
   const token = searchParams.get("token");
   const redirect = searchParams.get("redirect");
 
+  console.log(token, "is the token");
+
   const { data: invite, isLoading: isLoadingInvite } = useQuery({
     queryKey: ["invite", token],
-    queryFn: async () => ({
-      inviter: "Barry",
-      expiry: randomDate(),
-    }),
+    queryFn: async () => {
+      await supervisor.onLoaded();
+      const tokenRes = DecodedToken.parse(
+        await supervisor.functionCall({
+          service: "invite",
+          intf: "invitee",
+          method: "decodeInvite",
+          params: [token],
+        })
+      );
+      console.log(tokenRes, "is the token res");
+
+      return {
+        ...tokenRes,
+        expiry: new Date(tokenRes.expiry),
+      };
+    },
   });
 
   const inviter = invite?.inviter;
@@ -240,13 +270,30 @@ export const AccountSelection = () => {
     mutationFn: async () => {
       console.log("hit reject");
       // TODO: reject the invite
+
+      // TODO:
+      await supervisor.functionCall({
+        service: "invite",
+        intf: "invitee",
+        method: "decodeInvite",
+        params: [token],
+      });
+
+      await supervisor.functionCall({
+        service: "invite",
+        intf: "invitee",
+        method: "decodeInvite",
+        params: [token],
+      });
     },
   });
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data: unknown) => {
       // TODO: accept the invite
 
+      console.log(data, "is the data");
+      console.log(z.string().parse(data), "user");
       if (window.location && window.location.href && redirect) {
         window.location.href = redirect;
       }
@@ -254,7 +301,7 @@ export const AccountSelection = () => {
   });
 
   const isTxInProgress = isRejecting || isAccepting;
-  console.log({ chainName, isTxInProgress });
+  console.log({ chainName, isTxInProgress, wtf: false });
 
   if (isLoadingInvite) {
     return (
@@ -434,7 +481,7 @@ export const AccountSelection = () => {
               <Button
                 onClick={() => {
                   console.log("pressed");
-                  acceptInvite();
+                  acceptInvite(username);
                 }}
                 className="w-full"
                 disabled={!selectedAccount || form.formState.isLoading}
