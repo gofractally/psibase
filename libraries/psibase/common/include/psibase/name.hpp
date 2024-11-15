@@ -502,9 +502,8 @@ namespace psibase
       constexpr account_id_type(uint64_t n = 0) : value(n) {}
 
       uint64_t value = 0;
-               operator std::string() const { return number_to_name(value); }
+      operator std::string() const { return number_to_name(value); }
+      PSIO_REFLECT(account_id_type, value);
    };
-
-   PSIO_REFLECT(account_id_type, value);
 
 }  // namespace psibase

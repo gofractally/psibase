@@ -1,7 +1,6 @@
 #include <psibase/bft.hpp>
 #include <psibase/cft.hpp>
 
-#include <psibase/fork_database.hpp>
 #include <psibase/log.hpp>
 #include <psibase/mock_routing.hpp>
 #include <psibase/mock_timer.hpp>
@@ -45,14 +44,14 @@ namespace psibase
       return os;
    }
 
-   std::ostream& operator<<(std::ostream& os, const Consensus& consensus)
+   std::ostream& operator<<(std::ostream& os, const ConsensusData& consensus)
    {
       std::visit([&os](const auto& obj) { os << obj; }, consensus);
       return os;
    }
 }  // namespace psibase
 
-std::vector<std::pair<Consensus, Consensus>> transitions = {
+std::vector<std::pair<ConsensusData, ConsensusData>> transitions = {
     {cft("a"), cft("b")},
     {cft("a"), cft("a", "b", "c")},
     {cft("a"), cft("b", "c", "d")},
@@ -123,21 +122,27 @@ std::vector<std::pair<Consensus, Consensus>> transitions = {
 };
 
 template <typename N>
-void add_producers(NodeSet<N>& nodes, const Consensus& consensus)
+void add_producers(NodeSet<N>& nodes, const ConsensusData& consensus)
 {
    std::visit(
        [&nodes](auto& consensus)
        {
           for (Producer prod : consensus.producers)
           {
-             if (std::find_if(nodes.nodes.begin(), nodes.nodes.end(),
-                              [prod](const auto& n) {
-                                 return n->node.producer_name() == prod.name;
-                              }) == nodes.nodes.end())
+             if (std::find_if(nodes.nodes.begin(), nodes.nodes.end(), [prod](const auto& n)
+                              { return n->node.producer_name() == prod.name; }) ==
+                 nodes.nodes.end())
                 nodes.add(prod.name);
           }
        },
        consensus);
+}
+
+ProducerSet removeServices(const ProducerSet& other)
+{
+   ProducerSet result(other);
+   result.authState.reset();
+   return result;
 }
 
 TEST_CASE("joint consensus", "[combined]")
@@ -170,7 +175,7 @@ TEST_CASE("joint consensus", "[combined]")
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
    CHECK(!final_state->nextProducers);
-   CHECK(*final_state->producers == ProducerSet(change));
+   CHECK(removeServices(*final_state->producers) == ProducerSet(change));
 }
 
 TEST_CASE("joint consensus crash", "[combined]")
@@ -217,7 +222,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    // TODO: Once we have better transaction handling, the change should always
    // take effect.
    CHECK_THAT((std::vector{ProducerSet(start), ProducerSet(change)}),
-              Catch::Matchers::VectorContains(*final_state->producers));
+              Catch::Matchers::VectorContains(removeServices(*final_state->producers)));
 }
 
 TEST_CASE("fork at commit consensus change", "[combined]")
@@ -236,21 +241,21 @@ TEST_CASE("fork at commit consensus change", "[combined]")
       ctx.poll();
       ctx.reset();
    };
-   auto boot_block = nodes[0].chain().get_head_state()->info;
+   auto boot_block = nodes.nodes[0]->head();
 
    auto transition = makeBlock(boot_block, "d", 2, setProducers(cft("e", "f", "g")));
    auto block1     = makeBlock(transition, "b", 4);
    auto block2 =
        makeBlock(transition, "c", 5, makeBlockConfirm(transition, {"b", "c", "d"}, {"e", "f"}));
    auto block3 = makeBlock(block2, "e", 6, block2);
-   send(transition);
-   send(block1);
+   send(transition.block);
+   send(block1.block);
 
    send(makePrepare(block1, "b"));
    send(makePrepare(block1, "c"));
    send(makePrepare(block1, "d"));
 
-   send(block2);
-   send(block3);
-   CHECK(nodes[0].chain().get_head_state()->blockId() == BlockInfo{block3.block->block()}.blockId);
+   send(block2.block);
+   send(block3.block);
+   CHECK(nodes[0].chain().get_head_state()->blockId() == block3.id());
 }

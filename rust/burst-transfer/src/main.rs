@@ -2,6 +2,7 @@ use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
+use psibase::{AnyPrivateKey, TraceFormat};
 
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]
@@ -18,7 +19,7 @@ struct Args {
 
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<psibase::PrivateKey>,
+    sign: Vec<AnyPrivateKey>,
 
     /// Token symbol
     #[clap(required = true)]
@@ -40,6 +41,15 @@ struct Args {
     /// maintain <BURST_SIZE> transactions in flight.
     #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
+
+    /// Controls how transaction traces are reported. Possible values are
+    /// error, stack, full, or json
+    #[clap(long, value_name = "FORMAT", default_value = "stack")]
+    trace: TraceFormat,
+
+    /// Controls whether the transaction's console output is shown
+    #[clap(long, action=clap::ArgAction::Set, require_equals=true, default_value="true", default_missing_value="true")]
+    console: bool,
 }
 
 // Get the url for a service's path
@@ -96,7 +106,7 @@ async fn lookup_token(
         reqwest::Client::new()
             .get(get_url(
                 api,
-                psibase::account!("token-sys"),
+                psibase::account!("tokens"),
                 "/api/getTokenTypes",
             )?)
             .send()
@@ -114,8 +124,8 @@ async fn lookup_token(
 }
 
 // Interface to the action we need
-mod token_sys {
-    #[psibase::service(name = "token-sys", dispatch = false)]
+mod tokens {
+    #[psibase::service(name = "tokens", dispatch = false)]
     #[allow(non_snake_case, unused_variables)]
     mod service {
         #[action]
@@ -148,7 +158,7 @@ async fn transfer_impl(
             counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
         );
         // println!("{} -> {} {}", from, to, memo);
-        actions.push(token_sys::Wrapper::pack_from(from.into()).credit(
+        actions.push(tokens::Wrapper::pack_from(from.into()).credit(
             token_id,
             to.into(),
             (1u64,),
@@ -169,6 +179,9 @@ async fn transfer_impl(
         &args.api,
         reqwest::Client::new(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
+        args.console,
+        None,
     )
     .await?;
     Ok(())

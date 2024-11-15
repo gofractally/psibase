@@ -33,7 +33,7 @@ env:
               "categories": [
                 {
                     "title": "## 💻 Development experience",
-                    "labels": ["Dev Experience", "Front-end Infra"],
+                    "labels": ["Dev Experience", "Plugin Infra"],
                     "exclude_labels": ["documentation", "bug"]
                 },
                 {
@@ -42,8 +42,8 @@ env:
                     "exhaustive": true
                 },
                 {
-                    "title": "### Front-end bugfixes",
-                    "labels": ["Front-end Infra", "bug"],
+                    "title": "### Plugin bugfixes",
+                    "labels": ["Plugin Infra", "bug"],
                     "exhaustive": true
                 },
                 {
@@ -52,8 +52,8 @@ env:
                     "exhaustive": true
                 },
                 {
-                    "title": "### Front-end docs",
-                    "labels": ["Front-end Infra", "documentation"],
+                    "title": "### Plugin-related docs",
+                    "labels": ["Plugin Infra", "documentation"],
                     "exhaustive": true
                 },
                 {
@@ -125,7 +125,7 @@ jobs:
         run: |
           echo "${{ steps.build_changelog.outputs.changelog }}" > changelog.md
       - name: Upload changelog
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: changelog.md
           path: changelog.md
@@ -152,7 +152,7 @@ jobs:
         run: |
           echo "${{ steps.build_changelog.outputs.changelog }}" > changelog.md
       - name: Upload changelog
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v4
         with:
           name: changelog.md
           path: changelog.md

@@ -100,16 +100,14 @@ struct WasmMemoryCache
 struct TempDatabase
 {
    TempDatabase()
-       : dir("psibase-test"),
-         sharedState{std::make_shared<psibase::SharedState>(
-             psibase::SharedDatabase{dir.path.native(), 1ull << 27, 1ull << 27, 1ull << 27,
-                                     1ull << 27},
+       : sharedState{std::make_shared<psibase::SharedState>(
+             psibase::SharedDatabase{std::filesystem::temp_directory_path(),
+                                     {1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27},
+                                     triedent::open_mode::temporary},
              psibase::WasmCache{16})}
    {
-      dir.reset();
    }
-   auto    getSystemContext() { return sharedState->getSystemContext(); }
-   TempDir dir;
+   auto getSystemContext() { return sharedState->getSystemContext(); }
    std::shared_ptr<psibase::SharedState> sharedState;
 };
 
@@ -140,6 +138,7 @@ struct TestNode
    Node                                    node;
    // accessors
    auto& chain() { return node.chain(); }
+   auto  head() { return std::pair{node.chain().get_head_state(), system.get()}; }
 };
 
 struct NetworkPartition
@@ -309,16 +308,16 @@ std::ostream& operator<<(std::ostream& os, const NodeSet<Node>& nodes)
 }
 
 void pushTransaction(psibase::BlockContext* ctx, psibase::Transaction trx);
-void setProducers(psibase::BlockContext* ctc, const psibase::Consensus& producers);
+void setProducers(psibase::BlockContext* ctc, const psibase::ConsensusData& producers);
 
-psibase::Transaction setProducers(const psibase::Consensus& producers);
+psibase::Transaction setProducers(const psibase::ConsensusData& producers);
 
 std::vector<psibase::AccountNumber> makeAccounts(
     const std::vector<std::string_view>& producer_names);
 
-void boot(psibase::BlockContext*    ctx,
-          const psibase::Consensus& producers,
-          bool                      enableEcdsa = false);
+void boot(psibase::BlockContext*        ctx,
+          const psibase::ConsensusData& producers,
+          bool                          enableEcdsa = false);
 
 template <typename C>
 void boot(psibase::BlockContext* ctx, const std::vector<psibase::AccountNumber>& producers)
@@ -356,7 +355,7 @@ void setup(NodeSet<N>& nodes, const std::vector<std::string_view>& producer_name
 }
 
 template <typename C>
-psibase::Consensus makeConsensus(std::initializer_list<psibase::AccountNumber> names)
+psibase::ConsensusData makeConsensus(std::initializer_list<psibase::AccountNumber> names)
 {
    C consensus;
    for (auto account : names)
@@ -376,28 +375,41 @@ auto bft(auto... args)
    return makeConsensus<psibase::BftConsensus>({psibase::AccountNumber(args)...});
 }
 
-struct BlockArg
+struct TestBlock
 {
-   BlockArg(const psibase::BlockInfo& info) : info(info) {}
-   BlockArg(const BlockMessage& msg) : info(msg.block->block()) {}
-   operator psibase::BlockInfo() const { return info; }
-   BlockArg(const psio::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
-   psibase::BlockInfo info;
+   BlockMessage            block;
+   psibase::JointConsensus state;
+   operator BlockMessage() const { return block; }
+   psibase::BlockInfo   info() const { return psibase::BlockInfo{block.block->block()}; }
+   psibase::Checksum256 id() const { return info().blockId; }
 };
 
-BlockMessage makeBlock(const BlockArg& prev, std::string_view producer, psibase::TermNum view);
-BlockMessage makeBlock(const BlockArg&             prev,
-                       std::string_view            producer,
-                       psibase::TermNum            view,
-                       const psibase::Transaction& trx);
-BlockMessage makeBlock(const BlockArg&     prev,
-                       std::string_view    producer,
-                       psibase::TermNum    view,
-                       const BlockMessage& irreversible);
-BlockMessage makeBlock(const BlockArg&                   info,
-                       std::string_view                  producer,
-                       psibase::TermNum                  view,
-                       const psibase::net::BlockConfirm& irreversible);
+struct BlockArg
+{
+   BlockArg(const TestBlock& block) : info(block.block.block->block()), state(block.state) {}
+   BlockArg(std::pair<const psibase::BlockHeaderState*, psibase::SystemContext*> head)
+       : info(head.first->info), state(head.first->readState(head.second))
+   {
+   }
+   operator psibase::BlockInfo() const { return info; }
+   BlockArg(const psio::shared_view_ptr<psibase::SignedBlock>& block) : info(block->block()) {}
+   psibase::BlockInfo      info;
+   psibase::JointConsensus state;
+};
+
+TestBlock makeBlock(const BlockArg& prev, std::string_view producer, psibase::TermNum view);
+TestBlock makeBlock(const BlockArg&             prev,
+                    std::string_view            producer,
+                    psibase::TermNum            view,
+                    const psibase::Transaction& trx);
+TestBlock makeBlock(const BlockArg&     prev,
+                    std::string_view    producer,
+                    psibase::TermNum    view,
+                    const BlockMessage& irreversible);
+TestBlock makeBlock(const BlockArg&                   info,
+                    std::string_view                  producer,
+                    psibase::TermNum                  view,
+                    const psibase::net::BlockConfirm& irreversible);
 
 psibase::net::BlockConfirm makeBlockConfirm(const BlockArg&                      committed,
                                             const std::vector<std::string_view>& prods,
@@ -439,10 +451,13 @@ struct SingleNode
       nodes[1].sendto(nodes[0].producer_name(), message);
       ctx.poll();
    };
+   void send(TestBlock& message) { send(message.block); };
    void send0(auto&& message) { nodes[1].sendto(nodes[0].producer_name(), message); }
+   void send0(TestBlock& message) { send0(message.block); }
    void poll() { ctx.poll(); }
    auto head() { return nodes[0].chain().get_head_state()->info; }
    auto clientHead() { return nodes[2].chain().get_head_state()->info; }
+   auto headState() { return nodes.nodes[0]->head(); }
 };
 
 #define TEST_START(logger)                                                              \

@@ -7,6 +7,9 @@ import tempfile
 import time
 import calendar
 from collections import namedtuple
+import psibase
+from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
+import fracpack
 
 class _LocalConnection(urllib3.connection.HTTPConnection):
     def __init__(self, *args, **kwargs):
@@ -112,14 +115,31 @@ class Cluster(object):
 
 def _get_producer_claim(producer):
     if isinstance(producer, str):
-        return {'name': producer}
+        return {'name': producer, 'auth':{'service':'', 'rawData': ''}}
     elif isinstance(producer, Node):
-        return {'name': producer.producer}
+        return {'name': producer.producer, 'auth':{'service':'', 'rawData': ''}}
     else:
         return producer
 
-Action = namedtuple('Action', ['sender', 'service', 'method', 'data'])
-Transaction = namedtuple('Transaction', ['tapos', 'actions', 'claims'], defaults=[[]])
+class ChainPackContext:
+    def __init__(self, api):
+        self._api = api
+        self._schemas = {}
+        self._custom = dict(**psibase.default_custom, **{"Action": Action.with_context(self)})
+    def pack(self, value, ty=None):
+        return fracpack.pack(value, ty, custom=self._custom)
+    def pack_action_data(self, service, method, data):
+        if isinstance(type(data), fracpack.TypeBase):
+            return fracpack.pack(data, custom=self._custom)
+        if isinstance(method, str):
+            method = MethodNumber(method)
+        return fracpack.pack(data, self.get_schema(service).actions[method].params)
+    def get_schema(self, service):
+        if service not in self._schemas:
+            with self._api.get('/schema', service) as reply:
+                reply.raise_for_status()
+                self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
+        return self._schemas[service]
 
 class TransactionError(Exception):
     def __init__(self, trace):
@@ -176,23 +196,17 @@ class API:
     # Transaction processing
     def pack_action(self, act):
         '''Pack an action and return a json object suitable for use in pack_transaction'''
-        with self.post('/pack_action/%s' % act.method, service=act.service, json=act.data) as result:
-            result.raise_for_status()
-            return {'sender':act.sender, 'service':act.service, 'method': act.method, 'rawData': result.content.hex()}
+        return ChainPackContext(self).pack(trx, Action)
     def pack_transaction(self, trx):
         '''Pack a transaction and return the result as bytes'''
-        with self.post('/common/pack/Transaction', json={'tapos':trx.tapos, 'actions':[self.pack_action(act) for act in trx.actions], 'claims': trx.claims}) as result:
-            result.raise_for_status()
-            return result.content
+        return ChainPackContext(self).pack(trx, Transaction)
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
         if isinstance(trx, bytes):
             trx = trx.hex()
         elif isinstance(trx, Transaction):
             trx = self.pack_transaction(trx).hex()
-        with self.post('/common/pack/SignedTransaction', json={'transaction': trx, 'proofs':signatures}) as result:
-            result.raise_for_status()
-            return result.content
+        return SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
     def push_transaction(self, trx):
         '''
         Push a transaction to the chain and return the transaction trace
@@ -200,7 +214,7 @@ class API:
         Raise TransactionError if the transaction fails
         '''
         packed = self.pack_signed_transaction(trx)
-        with self.post('/native/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+        with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
@@ -212,10 +226,7 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        tapos = tapos=self.get_tapos()
-        tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + 10))
-        tapos['flags'] = 0
-        return self.push_transaction(Transaction(tapos, actions=[Action(sender, service, method, data)]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]))
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
@@ -229,12 +240,12 @@ class API:
         '''
         producers = [_get_producer_claim(p) for p in prods]
         if algorithm is None:
-            return self.push_action('producer-sys', 'producer-sys', 'setProducers', {'producers': producers})
+            return self.push_action('producers', 'producers', 'setProducers', {'producers': producers})
         elif algorithm == 'cft':
             mode = 'CftConsensus'
         elif algorithm == 'bft':
             mode = 'BftConsensus'
-        return self.push_action('producer-sys', 'producer-sys', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
+        return self.push_action('producers', 'producers', 'setConsensus', {'consensus':{mode: {'producers': producers}}})
 
     # Queries
     def graphql(self, service, query):
@@ -250,17 +261,20 @@ class API:
                 raise GraphQLError(json)
             return json['data']
 
-    def get_tapos(self):
+    def get_tapos(self, timeout=10, flags=0):
         '''Returns TaPoS for the current head block'''
         with  self.get('/common/tapos/head') as result:
             result.raise_for_status()
-            return result.json()
+            tapos = result.json()
+            tapos['expiration'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time_ns() // 1000000000 + timeout))
+            tapos['flags'] = flags
+            return tapos
 
     def get_producers(self):
         '''Returns a tuple of (current producers, next producers). The next producers are empty except when the chain is in the process of changing block producers.'''
         def flatten(producers):
             return [p['name'] for p in producers]
-        result = self.graphql('producer-sys', 'query { producers { name } nextProducers { name } }')
+        result = self.graphql('producers', 'query { producers { name } nextProducers { name } }')
         return (flatten(result['producers']), flatten(result['nextProducers']))
 
     def get_block_header(self, num=-1):
@@ -273,7 +287,7 @@ class API:
                 if num < 0:
                     return None
             args = 'first:1 ge:%d' % num
-        result = self.graphql('explore-sys', '''
+        result = self.graphql('explorer', '''
             query {
                 blocks(%s) {
                     edges {
@@ -297,15 +311,60 @@ class API:
         else:
             return edges[0]['node']['header']
 
+class Service(object):
+    def __init__(self, api, service=None):
+        self.api = api
+        if service is not None:
+            self.service = service
+
+    def request(self, method, path, **kw):
+        '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
+        return self.api.request(method, path, self.service, **kw)
+    def head(self, path, **kw):
+        '''HTTP HEAD request'''
+        return self.request('HEAD', path, **kw)
+    def get(self, path, **kw):
+        '''HTTP GET request'''
+        return self.request('GET', path, **kw)
+    def post(self, path, **kw):
+        '''HTTP POST request'''
+        return self.request('POST', path, **kw)
+    def put(self, path, **kw):
+        '''HTTP PUT request'''
+        return self.request('PUT', path, **kw)
+    def patch(self, path, **kw):
+        '''HTTP PATCH request'''
+        return self.request('PATCH', path, **kw)
+    def delete(self, path, **kw):
+        '''HTTP DELETE request'''
+        return self.request('DELETE', path, **kw)
+
+    def push_action(self, sender, method, data):
+        '''
+        Push a transaction consisting of a single action to the chain and return the transaction trace
+
+        Raise TransactionError if the transaction fails
+        '''
+        return self.api.push_action(sender, self.service, method, data)
+    def graphql(self, query):
+        '''
+        Sends a GraphQL query to a service and returns the result as json
+
+        Raise GraphQLError if the query fails
+        '''
+        return self.api.graphql(self.service, query)
+
 _default_config = '''# psinode config
-service  = localhost:$PSIBASE_DATADIR/services/admin-sys
-service  = 127.0.0.1:$PSIBASE_DATADIR/services/admin-sys
-service  = [::1]:$PSIBASE_DATADIR/services/admin-sys
-service  = admin-sys.:$PSIBASE_DATADIR/services/admin-sys
+service  = localhost:$PSIBASE_DATADIR/services/x-admin
+service  = 127.0.0.1:$PSIBASE_DATADIR/services/x-admin
+service  = [::1]:$PSIBASE_DATADIR/services/x-admin
+service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
 
 admin-authz = r:any
 admin-authz = rw:loopback
+
+http-timeout = 4
 
 [logger.stderr]
 type   = console
@@ -313,7 +372,7 @@ filter = %s
 format = %s
 '''
 _default_log_filter = 'Severity >= info'
-_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
 def _write_config(dir, log_filter, log_format):
     logfile = os.path.join(dir, 'config')
@@ -326,7 +385,7 @@ def _write_config(dir, log_filter, log_format):
             f.write(_default_config % (log_filter, log_format))
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -350,7 +409,8 @@ class Node(API):
             listen = [listen]
         self.listen = listen
         self.p2p = p2p
-        self.start(database_cache_size=database_cache_size)
+        if start:
+            self.start(database_cache_size=database_cache_size)
     def start(self, database_cache_size=None):
         args = [self.executable, "-l", self.socketpath]
         for interface in self.listen:
@@ -367,6 +427,14 @@ class Node(API):
         with open(self.logpath, 'a') as logfile:
             self.child = subprocess.Popen(args, stderr=logfile)
         self._wait_for_startup()
+
+    def new_api(self):
+        '''
+        Creates an independent API object
+        '''
+        session = requests.Session()
+        session.mount('http://', _LocalAdapter(self.socketpath))
+        return API(self.url, session)
 
     def __enter__(self):
         return self
@@ -392,10 +460,15 @@ class Node(API):
             self.tempdir.cleanup()
     def shutdown(self):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='admin-sys', json={}):
+        with self.post('/native/admin/shutdown', service='x-admin', json={}):
             pass
         self.session.close()
-        self.child.wait()
+        try:
+            self.child.wait(timeout=10)
+        except:
+            self.child.kill()
+            self.child.wait()
+        del self.child
     def wait(self, cond, timeout=10):
         '''
         Wait until cond(self) is true.
@@ -413,16 +486,16 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        with self.post('/native/admin/connect', service='admin-sys', json={'url':url}):
+        with self.post('/native/admin/connect', service='x-admin', json={'url':url}):
             pass
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
-            result = self.post('/native/admin/disconnect', service='admin-sys', json={'id': other})
+            result = self.post('/native/admin/disconnect', service='x-admin', json={'id': other})
             result.raise_for_status()
             return True
         elif isinstance(other, str):
-            with self.get('/native/admin/peers', service='admin-sys') as peers:
+            with self.get('/native/admin/peers', service='x-admin') as peers:
                 peers.raise_for_status()
                 for peer in peers.json():
                     if peer['url'] == other:
@@ -450,13 +523,16 @@ class Node(API):
         self.wait(isbooted)
     def run_psibase(self, args):
         self._find_psibase()
-        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args)
+        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args).check_returncode()
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):
-        with self.log() as f:
-            for line in f.readlines():
-                print(line, end='')
+        try:
+            with self.log() as f:
+                for line in f.readlines():
+                    print(line, end='')
+        except FileNotFoundError:
+            pass
     def _find_psibase(self):
         if not hasattr(self, 'psibase'):
             dirname = os.path.dirname(self.executable)
@@ -472,8 +548,11 @@ class Node(API):
         while not self._is_ready():
             time.sleep(0.1)
     def _is_ready(self):
+        if self.child.poll() is not None:
+            self.print_log()
+            raise Exception("Failed to start psinode")
         try:
-            with self.get('/native/admin/status', service='admin-sys') as result:
+            with self.get('/native/admin/status', service='x-admin') as result:
                 return result.status_code == requests.codes.ok and 'startup' not in result.json()
         except requests.exceptions.ConnectionError as e:
             return False

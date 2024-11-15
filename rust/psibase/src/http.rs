@@ -1,17 +1,17 @@
 #![allow(non_snake_case)]
 
-use crate::{Hex, Pack, Reflect, ToKey, Unpack};
-use serde::{Deserialize, Serialize};
+use crate::{Hex, Pack, ToKey, ToSchema, Unpack};
+use anyhow::anyhow;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// An HTTP header
 ///
-/// Note: `proxy-sys` aborts when most services set HTTP headers. It only allows services
+/// Note: `http-server` aborts when most services set HTTP headers. It only allows services
 /// it trust to set them in order to enforce security rules.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpHeader {
     /// Name of header, e.g. "Content-Security-Policy"
@@ -24,14 +24,12 @@ pub struct HttpHeader {
 /// An HTTP Request
 ///
 /// Most services receive this via their [serveSys](crate::server_interface::ServerActions::serveSys)
-/// action. [proxy-sys](https://doc-sys.psibase.io/default-apps/proxy-sys.html) receives it via
-/// its `serve` exported function.
+/// action. The `http-server` service receives it via its `serve` exported function.
 
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToKey, ToSchema, Serialize, Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpRequest {
     /// Fully-qualified domain name
@@ -49,20 +47,44 @@ pub struct HttpRequest {
     /// "application/json", "text/html", ...
     pub contentType: String,
 
+    /// HTTP Headers
+    pub headers: Vec<HttpHeader>,
+
     /// Request body, e.g. POST data
     pub body: Hex<Vec<u8>>,
+}
+
+pub struct HttpBody {
+    pub contentType: String,
+    pub body: Hex<Vec<u8>>,
+}
+
+impl HttpBody {
+    pub fn json(data: &str) -> Self {
+        HttpBody {
+            contentType: "application/json".into(),
+            body: data.to_string().into_bytes().into(),
+        }
+    }
+    pub fn graphql(query: &str) -> Self {
+        HttpBody {
+            contentType: "application/graphql".into(),
+            body: query.to_string().into_bytes().into(),
+        }
+    }
 }
 
 /// An HTTP reply
 ///
 /// Services return this from their [serveSys](crate::server_interface::ServerActions::serveSys) action.
 #[derive(
-    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, Reflect, ToKey, Serialize, Deserialize,
+    Debug, Default, PartialEq, Eq, Clone, Pack, Unpack, ToSchema, ToKey, Serialize, Deserialize,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[to_key(psibase_mod = "crate")]
 pub struct HttpReply {
+    pub status: u16,
+
     /// "application/json", "text/html", ...
     pub contentType: String,
 
@@ -71,4 +93,22 @@ pub struct HttpReply {
 
     /// HTTP Headers
     pub headers: Vec<HttpHeader>,
+}
+
+impl HttpReply {
+    pub fn text(self) -> Result<String, anyhow::Error> {
+        Ok(String::from_utf8(self.body.0)?)
+    }
+    pub fn json<T: DeserializeOwned>(self) -> Result<T, anyhow::Error> {
+        if self.status != 200 {
+            let status = self.status;
+            if self.contentType == "text/html" {
+                if let Ok(msg) = self.text() {
+                    Err(anyhow!("Request returned {} {}", status, msg))?
+                }
+            }
+            return Err(anyhow!("Request returned {}", status));
+        }
+        Ok(serde_json::de::from_str(&self.text()?)?)
+    }
 }

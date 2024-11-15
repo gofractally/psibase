@@ -2,6 +2,7 @@
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/BlockContext.hpp>
+#include <psibase/Socket.hpp>
 
 namespace eosio::vm
 {
@@ -19,7 +20,7 @@ namespace psibase
 
    // TODO: handle unpacking within TransactionContext?
    //       * Verify unpack of signed, no extra fields
-   //       * Allow inner Transaction to have extra fields; transaction_sys should verify instead
+   //       * Allow inner Transaction to have extra fields; transact should verify instead
    //       Might be redundant elsewhere?
    struct TransactionContext
    {
@@ -33,15 +34,20 @@ namespace psibase
       bool                                allowDbRead;
       bool                                allowDbWrite;
       bool                                allowDbReadSubjective;
+      bool                                allowDbWriteSubjective;
       std::vector<std::vector<char>>      subjectiveData;
       size_t                              nextSubjectiveRead = 0;
+
+      // sockets that will be closed when the transaction context finishes
+      SocketAutoCloseSet ownedSockets;
 
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
                          TransactionTrace&        transactionTrace,
                          bool                     allowDbRead,
                          bool                     allowDbWrite,
-                         bool                     allowDbReadSubjective);
+                         bool                     allowDbReadSubjective,
+                         bool                     allowDbWriteSubjective = false);
       ~TransactionContext();
 
       // Caution: each call to exec*(), except execCalledAction(),
@@ -55,6 +61,7 @@ namespace psibase
       void execNonTrxAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execCalledAction(uint64_t callerFlags, const Action& act, ActionTrace& atrace);
       void execServe(const Action& act, ActionTrace& atrace);
+      void execExport(std::string_view fn, const Action& action, ActionTrace& atrace);
 
       ExecutionContext& getExecutionContext(AccountNumber service);
 

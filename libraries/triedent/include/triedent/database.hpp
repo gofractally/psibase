@@ -27,6 +27,7 @@ namespace triedent
    struct mutable_deref;
 
    inline key_type from_key6(const key_view sixb);
+   inline key_view to_key6(key_type& key_buf, key_view v);
 
    // Write thread usage notes:
    // * To create a new tree, default-initialize a shared_ptr<root>
@@ -184,20 +185,43 @@ namespace triedent
                    std::vector<char>*                  result_bytes,
                    std::vector<std::shared_ptr<root>>* result_roots) const;
 
+      // Returns true iff r does not have any keys in the range [lower, upper)
+      //
+      // If upper is empty, it is considered greater than any key.
+      bool is_empty(const std::shared_ptr<root>& r,
+                    std::span<const char>        lower,
+                    std::span<const char>        upper) const;
+
+      // Returns true if r1 and r2 have a common ancestor and the sequence
+      //   of operations used to create r1 and r2 from the nearest common ancestor
+      //   did not modify any keys in the range [lower, upper)
+      // Returns false if r1 and r2 are different over the range [lower, upper)
+      // Otherwise the result is unspecified
+      //
+      // If upper is empty it is considered greater than any key.
+      bool is_equal_weak(const std::shared_ptr<root>& r1,
+                         const std::shared_ptr<root>& r2,
+                         std::span<const char>        lower,
+                         std::span<const char>        upper) const;
+
       void print(const std::shared_ptr<root>& r);
       void validate(const std::shared_ptr<root>& r);
 
       session(std::shared_ptr<database> db);
       ~session();
 
+      inline deref<node> get_by_id(session_lock_ref<> l, object_id i) const;
+      inline deref<node> get_by_id(session_lock_ref<> l, object_id i, bool& unique) const;
+      inline id          retain(std::unique_lock<gc_session>&, id);
+      inline void        release(session_lock_ref<> l, id);
+      cache_allocator&   ring() const;
+
      protected:
       session(const session&) = delete;
 
-      inline object_id   get_id(const std::shared_ptr<root>& r) const;
-      void               validate(session_lock_ref<> l, id);
-      void               print(id n, string_view prefix = "", std::string k = "");
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i) const;
-      inline deref<node> get_by_id(session_lock_ref<> l, object_id i, bool& unique) const;
+      inline object_id get_id(const std::shared_ptr<root>& r) const;
+      void             validate(session_lock_ref<> l, id);
+      void             print(id n, string_view prefix = "", std::string k = "");
 
       bool unguarded_get(session_lock_ref<>                            l,
                          const std::shared_ptr<triedent::root>&        ancestor,
@@ -239,13 +263,8 @@ namespace triedent
                              std::vector<char>*                            result_bytes,
                              std::vector<std::shared_ptr<triedent::root>>* result_roots) const;
 
-      inline id   retain(std::unique_lock<gc_session>&, id);
-      inline void release(session_lock_ref<> l, id);
-
       friend class database;
       std::shared_ptr<database> _db;
-
-      cache_allocator& ring() const;
    };
    using read_session = session<read_access>;
 
@@ -271,6 +290,18 @@ namespace triedent
 
       int remove(std::shared_ptr<root>& r, std::span<const char> key);
 
+      // removes all elements of r outside [lower, upper)
+      // if upper is empty it is considered higher than any key
+      void take(std::shared_ptr<root>& r, std::span<const char> lower, std::span<const char> upper);
+
+      // replaces the range [lower, upper) in r1 with the same range from r2.
+      //
+      // r1 = r1(-inf, lower) + r2[lower, upper) + r1[upper, inf)
+      inline void splice(std::shared_ptr<root>&       r1,
+                         const std::shared_ptr<root>& r2,
+                         std::span<const char>        lower,
+                         std::span<const char>        upper);
+
       /**
           *  These methods are used to recover the database after a crash,
           *  start_collect_garbage resets all non-zero refcounts to 1,
@@ -289,6 +320,7 @@ namespace triedent
 
       void recursive_retain(session_lock_ref<> l, object_id id);
 
+     public:
       mutable_deref<value_node> make_value(std::unique_lock<gc_session>& session,
                                            node_type                     type,
                                            string_view                   k,
@@ -323,6 +355,7 @@ namespace triedent
                                                    object_id                     val,
                                                    uint64_t                      branches);
 
+     private:
       template <typename T>
       inline mutable_deref<T> lock(const deref<T>& obj, session_lock_ref<> session);
 
@@ -381,11 +414,8 @@ namespace triedent
       using string_view = std::string_view;
       using id          = object_id;
 
-      database(const std::filesystem::path& dir,
-               const config&                cfg,
-               access_mode                  mode,
-               bool                         allow_gc = false);
-      database(const std::filesystem::path& dir, access_mode mode, bool allow_gc = false);
+      database(const std::filesystem::path& dir, const config& cfg, open_mode mode);
+      database(const std::filesystem::path& dir, open_mode mode);
       ~database();
 
       static void create(std::filesystem::path dir, config);
@@ -397,6 +427,9 @@ namespace triedent
 
       bool is_slow() const { return _ring.is_slow(); }
       auto span() const { return _ring.span(); }
+
+      // returns true if there are no allocated nodes.
+      bool is_empty() const { return _ring.is_empty(); }
 
      private:
       inline void release(session_lock_ref<> l, id);
@@ -459,12 +492,24 @@ namespace triedent
       deref(id i, void* p, node_type t) : _id(i), ptr(p), _type(t) {}
 
       explicit inline operator bool() const { return bool(_id); }
-      inline operator id() const { return _id; }
+      inline          operator id() const { return _id; }
 
       auto         type() const { return _type; }
       bool         is_leaf_node() const { return _type != node_type::inner; }
       inline auto& as_value_node() const { return *reinterpret_cast<const value_node*>(ptr); }
       inline auto& as_inner_node() const { return *reinterpret_cast<const inner_node*>(ptr); }
+
+      std::string_view get_key() const
+      {
+         return is_leaf_node() ? as_value_node().key() : as_inner_node().key();
+      }
+      id branch(std::uint8_t b) const { return is_leaf_node() ? id{} : as_inner_node().branch(b); }
+      id value() const { return is_leaf_node() ? _id : as_inner_node().value(); }
+      auto branches() const { return is_leaf_node() ? 0 : as_inner_node().branches(); }
+      id   maybe_branch(std::uint8_t b) const
+      {
+         return is_leaf_node() ? id{} : as_inner_node().maybe_branch(b);
+      }
 
       inline const T* operator->() const { return reinterpret_cast<const T*>(ptr); }
       inline const T& operator*() const { return *reinterpret_cast<const T*>(ptr); }
@@ -1432,6 +1477,675 @@ namespace triedent
       }
    }  // unguarded_get_max
 
+   namespace detail
+   {
+
+      struct static_key_base
+      {
+         bool starts_with(const std::string_view&) const { return false; }
+         char operator[](std::size_t) const
+         {
+            assert(!"operator[] should be gated on starts_with");
+            __builtin_unreachable();
+         }
+         void remove_prefix(std::size_t) const
+         {
+            assert(!"remove_prefix should be gated on starts_with");
+            __builtin_unreachable();
+         }
+         std::string_view substr(std::size_t, std::size_t = 0) const
+         {
+            assert(!"substr should be gated on starts_with");
+            __builtin_unreachable();
+         }
+      };
+
+      struct lowest_key : static_key_base
+      {
+      };
+      inline auto operator<=>(const lowest_key&, const std::string_view&)
+      {
+         return std::strong_ordering::less;
+      }
+      struct highest_key : static_key_base
+      {
+      };
+      inline auto operator<=>(const highest_key&, const std::string_view&)
+      {
+         return std::strong_ordering::greater;
+      }
+
+      template <typename T>
+      concept extended_key_type = std::same_as<T, std::string_view> ||
+                                  std::same_as<T, lowest_key> || std::same_as<T, highest_key>;
+
+      struct range_info
+      {
+         bool intersects;
+         bool has_lower;
+         bool has_upper;
+      };
+
+      inline range_info prefix_overlap(std::string_view       prefix,
+                                       extended_key_type auto lower,
+                                       extended_key_type auto upper,
+                                       std::size_t            offset = 0)
+      {
+         if constexpr (std::is_same_v<decltype(lower), std::string_view>)
+            lower.remove_prefix(offset);
+         if constexpr (std::is_same_v<decltype(upper), std::string_view>)
+            upper.remove_prefix(offset);
+         if (prefix < lower && !lower.starts_with(prefix) || prefix >= upper)
+            return {false, false, false};
+         range_info result = {true};
+         if (prefix < lower)
+            result.has_lower = true;
+         if (upper.starts_with(prefix))
+            result.has_upper = true;
+         return result;
+      }
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    database::id           id,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper);
+
+      // key represents the key of in. key, lower, and upper should all start
+      // at the same position.
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    const inner_node&      in,
+                                    std::string_view       key,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         auto [intersects, has_lower, has_upper] = prefix_overlap(key, lower, upper);
+         if (!intersects)
+            return true;
+         auto offset = key.size();
+
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+            return is_empty_in_range(session, l, in.maybe_branch(lower[offset]),
+                                     lower.substr(offset + 1), upper.substr(offset + 1));
+
+         auto lmask = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+         auto umask = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+         auto mask  = lmask & umask;
+
+         if (in.branches() & mask)
+            return false;
+
+         if (!has_lower && in.value())
+            return false;
+
+         if (has_lower && !is_empty_in_range(session, l, in.maybe_branch(lower[offset]),
+                                             lower.substr(offset + 1), highest_key{}))
+            return false;
+         if (has_upper && !is_empty_in_range(session, l, in.maybe_branch(upper[offset]),
+                                             lowest_key{}, upper.substr(offset + 1)))
+            return false;
+         return true;
+      }
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    database::id           id,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         if (!id)
+            return true;
+         auto n = session.get_by_id(l, id);
+         if (n.is_leaf_node())
+         {
+            auto key = n.as_value_node().key();
+            return key < lower || key >= upper;
+         }
+         else
+         {
+            auto& in  = n.as_inner_node();
+            auto  key = in.key();
+            return is_empty_in_range(session, l, in, key, lower, upper);
+         }
+      }
+
+   }  // namespace detail
+
+   template <typename AccessMode>
+   bool session<AccessMode>::is_empty(const std::shared_ptr<root>& r,
+                                      std::span<const char>        lower,
+                                      std::span<const char>        upper) const
+   {
+      swap_guard g(*this);
+      auto       lower6 = to_key6({lower.data(), lower.size()});
+      if (upper.empty())
+      {
+         return detail::is_empty_in_range(*this, g, get_id(r), lower6, detail::highest_key{});
+      }
+      key_type upper_buf;
+      auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+      return detail::is_empty_in_range(*this, g, get_id(r), lower6, upper6);
+   }
+
+   namespace detail
+   {
+      // represents a subtree with a specific prefix
+      // The prefix might not correspond exactly to a node due to prefix compression
+      struct subtree_t
+      {
+         database::id id;
+         std::size_t  skip_prefix = 0;
+         explicit     operator bool() const { return static_cast<bool>(id); }
+      };
+      inline bool operator==(const subtree_t& lhs, const database::id& rhs)
+      {
+         return lhs.id == rhs && lhs.skip_prefix == 0;
+      }
+
+      struct subtree_deref
+      {
+         subtree_deref(const read_session& session, session_lock_ref<> l, const subtree_t& t)
+             : impl(session.get_by_id(l, t.id)), skip_prefix(t.skip_prefix)
+         {
+         }
+         void reload(write_session& session, std::unique_lock<gc_session>& l)
+         {
+            impl.reload(session.ring(), l);
+         }
+         subtree_t maybe_branch(std::uint8_t b) const
+         {
+            if (impl->key_size() == skip_prefix)
+            {
+               return {impl.maybe_branch(b)};
+            }
+            else if (static_cast<std::uint8_t>(impl.get_key()[skip_prefix]) == b)
+            {
+               return {impl, skip_prefix + 1};
+            }
+            else
+            {
+               return {};
+            }
+         }
+         auto branches() const
+         {
+            if (impl->key_size() == skip_prefix)
+            {
+               return impl.branches();
+            }
+            else
+            {
+               return inner_node::mask_eq(impl.get_key()[skip_prefix]);
+            }
+         }
+         auto         get_key() const { return impl.get_key().substr(skip_prefix); }
+         database::id value() const
+         {
+            if (impl->key_size() == skip_prefix)
+            {
+               return impl.value();
+            }
+            else
+            {
+               return {};
+            }
+         }
+         // \pre the branch must exist
+         subtree_t branch_by_index(std::size_t index)
+         {
+            if (impl->key_size() == skip_prefix)
+            {
+               assert(index < std::popcount(impl.branches()));
+               return {impl.as_inner_node().children()[index]};
+            }
+            else
+            {
+               assert(index == 0);
+               return {impl, skip_prefix + 1};
+            }
+         }
+         // \pre must be at an inner node
+         const database::id* children() const
+         {
+            assert(skip_prefix == impl->key_size());
+            assert(!impl.is_leaf_node());
+            return impl.as_inner_node().children();
+         }
+         deref<node> impl;
+         std::size_t skip_prefix = 0;
+      };
+
+      inline database::id clone_with_prefix(write_session&                session,
+                                            std::unique_lock<gc_session>& l,
+                                            database::id                  id,
+                                            auto&&... prefix)
+      {
+         auto        n = session.get_by_id(l, id);
+         std::string new_key;
+         ((new_key += prefix), ...);
+
+         if (n.is_leaf_node())
+         {
+            auto& vn = n.as_value_node();
+            new_key += vn.key();
+            return session.clone_value(l, n, n.type(), new_key, vn.data());
+         }
+         else
+         {
+            auto& in = n.as_inner_node();
+            new_key += in.key();
+            return session.clone_inner(l, n, in, new_key, in.value(), in.branches());
+         }
+      }
+
+      inline database::id clone_remove_prefix(write_session&                session,
+                                              std::unique_lock<gc_session>& l,
+                                              database::id                  id,
+                                              std::size_t                   prefix_len)
+      {
+         if (prefix_len == 0)
+            return bump_refcount_or_copy(session.ring(), l, id);
+         auto n = session.get_by_id(l, id);
+         if (n.is_leaf_node())
+         {
+            auto& vn = n.as_value_node();
+            return session.clone_value(l, n, n.type(), vn.key(), prefix_len, vn.data());
+         }
+         else
+         {
+            auto& in = n.as_inner_node();
+            return session.clone_inner(l, n, in, in.key(), prefix_len, in.value(), in.branches());
+         }
+      }
+
+      template <typename T>
+      concept node_child_builder = requires(const T&                      t,
+                                            write_session&                session,
+                                            std::unique_lock<gc_session>& l,
+                                            std::string_view              key,
+                                            database::id                  child) {
+         { t.branches() } -> std::same_as<std::uint64_t>;
+         { t.children() } -> std::ranges::input_range;
+         t.clone_child(session, l, child);
+         t.clone_child_with_prefix(session, l, key, child);
+      };
+
+      // Component for building a new node. Selects a range of children from a node
+      struct node_children
+      {
+         template <typename T>
+         node_children(const deref<T>& n, std::uint64_t mask)
+         {
+            assert(std::popcount(((mask - 1) | mask) + 1) <= 1 && "mask must not have gaps");
+            if (n.is_leaf_node())
+            {
+               _branches = 0;
+               _children = {};
+            }
+            else
+            {
+               auto& in           = n.as_inner_node();
+               _branches          = in.branches() & mask;
+               std::size_t offset = std::popcount(in.branches() & (((mask - 1) ^ mask) >> 1));
+               std::size_t count  = std::popcount(_branches);
+               _children          = {in.children() + offset, count};
+            }
+         }
+         auto                          branches() const { return _branches; }
+         std::span<const database::id> children() const { return _children; }
+         auto                          clone_child(write_session&                session,
+                                                   std::unique_lock<gc_session>& l,
+                                                   object_id                     child) const
+         {
+            return bump_refcount_or_copy(session.ring(), l, child);
+         }
+         auto clone_child_with_prefix(write_session&                session,
+                                      std::unique_lock<gc_session>& l,
+                                      std::string_view              key,
+                                      database::id                  child) const
+         {
+            return clone_with_prefix(session, l, child, key,
+                                     static_cast<char>(std::countr_zero(_branches)));
+         }
+         std::span<const database::id> _children;
+         std::uint64_t                 _branches;
+      };
+
+      // Component for building a new node. Selects a range of children from a subtree
+      struct subtree_children
+      {
+         subtree_children(const subtree_children&) = delete;
+         subtree_children(const subtree_deref& t, std::uint64_t mask)
+         {
+            assert(std::popcount(((mask - 1) | mask) + 1) <= 1 && "mask must not have gaps");
+            if (t.skip_prefix == t.impl->key_size())
+            {
+               if (t.impl.is_leaf_node())
+               {
+                  _branches    = 0;
+                  _children    = {};
+                  _skip_prefix = 0;
+               }
+               else
+               {
+                  auto& in           = t.impl.as_inner_node();
+                  _branches          = in.branches() & mask;
+                  std::size_t offset = std::popcount(in.branches() & (((mask - 1) ^ mask) >> 1));
+                  std::size_t count  = std::popcount(_branches);
+                  _children          = {in.children() + offset, count};
+                  _skip_prefix       = 0;
+               }
+            }
+            else
+            {
+               _branches = mask & inner_node::mask_eq(t.impl.get_key()[t.skip_prefix]);
+               if (_branches)
+               {
+                  _child       = t.impl;
+                  _children    = {&_child, 1};
+                  _skip_prefix = t.skip_prefix + 1;
+               }
+               else
+               {
+                  _children    = {};
+                  _skip_prefix = 0;
+               }
+            }
+         }
+         std::span<const object_id> _children;
+         object_id                  _child;
+         std::uint64_t              _branches;
+         std::size_t                _skip_prefix;
+         auto                       branches() const { return _branches; }
+         auto                       children() const { return _children; }
+         auto                       clone_child(write_session&                session,
+                                                std::unique_lock<gc_session>& l,
+                                                object_id                     child) const
+         {
+            return clone_remove_prefix(session, l, child, _skip_prefix);
+         }
+         auto clone_child_with_prefix(write_session&                session,
+                                      std::unique_lock<gc_session>& l,
+                                      std::string_view              key,
+                                      database::id                  child) const
+         {
+            if (_skip_prefix == 0)
+            {
+               return clone_with_prefix(session, l, child, key,
+                                        static_cast<char>(std::countr_zero(_branches)));
+            }
+            else if (key.size() <= _skip_prefix - 1)
+            {
+               return clone_remove_prefix(session, l, child, _skip_prefix - key.size() - 1);
+            }
+            else
+            {
+               key.remove_suffix(_skip_prefix - 1);
+               return clone_with_prefix(session, l, child, key);
+            }
+         }
+      };
+
+      // Utility for building a new node. Represents a single child.
+      // If clone is true, then the child is part of another tree and
+      // will be cloned. If clone is false, then the child is owned
+      // by this object and will be moved into the new node. id can
+      // be null in which case this object will not create a child
+      // in the new node.
+      struct maybe_clone_one
+      {
+         object_id     id;
+         std::uint8_t  b;
+         bool          clone = true;
+         std::uint64_t branches() const
+         {
+            if (id)
+               return inner_node::mask_eq(b);
+            else
+               return 0;
+         }
+         std::span<const database::id> children() const
+         {
+            if (id)
+               return {&id, 1};
+            else
+               return {};
+         }
+
+         auto clone_child(write_session&                session,
+                          std::unique_lock<gc_session>& l,
+                          database::id                  child) const
+         {
+            if (clone)
+               return bump_refcount_or_copy(session.ring(), l, child);
+            else
+               return child;
+         }
+         auto clone_child_with_prefix(write_session&                session,
+                                      std::unique_lock<gc_session>& l,
+                                      std::string_view              key,
+                                      database::id                  child) const
+         {
+            auto result = clone_with_prefix(session, l, child, key, b);
+            if (!clone)
+            {
+               session.release(l, child);
+            }
+            return result;
+         }
+      };
+
+      void do_clone_children(write_session&                session,
+                             std::unique_lock<gc_session>& l,
+                             auto&                         r,
+                             std::span<object_id>          children)
+      {
+         for (database::id& child : children)
+         {
+            child = r.clone_child(session, l, child);
+         }
+      }
+
+      // Constructs a node from its key prefix and children.
+      // Handles all combinations that require the node to be compressed.
+      //
+      // children must be non-overlapping and in order.
+      database::id build_node(write_session&                session,
+                              std::unique_lock<gc_session>& l,
+                              key_builder auto              key,
+                              object_id                     val,
+                              bool                          always_clone_value,
+                              node_child_builder auto&&... children)
+      {
+         auto              branches = (children.branches() | ...);
+         const std::size_t n        = std::popcount(branches);
+         // Handle cases that cause this node to be compressed
+         if (branches == 0)
+         {
+            if (!val)
+            {
+               return database::id{};
+            }
+            else
+            {
+               auto  n  = session.get_by_id(l, val);
+               auto& vn = n.as_value_node();
+               if (key.size() == vn.key_size())
+               {
+                  if (always_clone_value)
+                     return bump_refcount_or_copy(session.ring(), l, val);
+                  else
+                     return val;
+               }
+               return session.clone_value(l, n, n.type(), key, -1, vn.data());
+            }
+         }
+         else if (n == 1 && !val)
+         {
+            bool         found = false;
+            database::id result;
+            // find the child that is actually present, and extend its prefix
+            (((!found && children.branches() != 0)
+                  ? (void)(result = children.clone_child_with_prefix(session, l, key,
+                                                                     children.children()[0]),
+                           found  = true)
+                  : (void)0),
+             ...);
+            return result;
+         }
+         // collect children in a temporary buffer
+         object_id   children_buf[n];
+         object_id*  positions[sizeof...(children)];
+         object_id** pos = positions;
+         object_id*  out = children_buf;
+         ((out = *pos++ = std::ranges::copy(children.children(), out).out), ...);
+         // clone children (once we start this, children.children() is not safe to use)
+         if (always_clone_value)
+         {
+            val = bump_refcount_or_copy(session.ring(), l, val);
+         }
+         else
+         {
+            // val might have a key, which we need to strip off
+            auto n = session.get_by_id(l, val);
+            if (n->key_size() != 0)
+            {
+               val = session.clone_value(l, n, n.type(), "", -1, n.as_value_node().data());
+            }
+            else
+            {
+               val = bump_refcount_or_copy(session.ring(), l, val);
+            }
+         }
+         out = children_buf;
+         pos = positions;
+         ((detail::do_clone_children(session, l, children, std::span{out, *pos}), out = *pos++),
+          ...);
+
+         return inner_node::make(session.ring(), l, key, val, branches, children_buf)
+             .first.get_id();
+      }
+
+      inline bool is_empty_in_range(const read_session&    session,
+                                    session_lock_ref<>     l,
+                                    subtree_t              tree,
+                                    extended_key_type auto lower,
+                                    extended_key_type auto upper)
+      {
+         if (!tree.id)
+            return true;
+         auto n = session.get_by_id(l, tree.id);
+         if (n.is_leaf_node())
+         {
+            auto key = n.as_value_node().key().substr(tree.skip_prefix);
+            return key < lower || key >= upper;
+         }
+         else
+         {
+            auto& in  = n.as_inner_node();
+            auto  key = in.key().substr(tree.skip_prefix);
+            return detail::is_empty_in_range(session, l, in, key, lower, upper);
+         }
+      }
+
+      inline bool is_equal_in_range_weak(const read_session&    session,
+                                         session_lock_ref<>     l,
+                                         subtree_t              lhs,
+                                         subtree_t              rhs,
+                                         extended_key_type auto lower,
+                                         extended_key_type auto upper)
+      {
+         if (!lhs)
+            return detail::is_empty_in_range(session, l, rhs, lower, upper);
+         if (!rhs)
+            return detail::is_empty_in_range(session, l, lhs, lower, upper);
+
+         auto n_lhs = subtree_deref{session, l, lhs};
+         auto n_rhs = subtree_deref{session, l, rhs};
+
+         auto lhs_key                            = n_lhs.get_key();
+         auto rhs_key                            = n_rhs.get_key();
+         auto prefix                             = common_prefix(lhs_key, rhs_key);
+         auto [intersects, has_lower, has_upper] = prefix_overlap(prefix, lower, upper);
+         if (!intersects)
+            return true;
+
+         auto offset = prefix.size();
+         n_lhs.skip_prefix += prefix.size();
+         n_rhs.skip_prefix += prefix.size();
+
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+            return is_equal_in_range_weak(session, l, n_lhs.maybe_branch(lower[offset]),
+                                          n_rhs.maybe_branch(lower[offset]),
+                                          lower.substr(offset + 1), upper.substr(offset + 1));
+
+         if (has_lower && !is_equal_in_range_weak(session, l, n_lhs.maybe_branch(lower[offset]),
+                                                  n_rhs.maybe_branch(lower[offset]),
+                                                  lower.substr(offset + 1), highest_key{}))
+            return false;
+         if (has_upper && !is_equal_in_range_weak(session, l, n_lhs.maybe_branch(upper[offset]),
+                                                  n_rhs.maybe_branch(upper[offset]), lowest_key{},
+                                                  upper.substr(offset + 1)))
+            return false;
+
+         // check branches between bounds
+         auto lmask = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+         auto umask = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+         auto mask  = lmask & umask;
+         if ((n_lhs.branches() & mask) != (n_rhs.branches() & mask))
+            return false;
+         auto        lhs_offset = std::popcount(n_lhs.branches() & ~lmask);
+         auto        rhs_offset = std::popcount(n_rhs.branches() & ~lmask);
+         std::size_t count      = std::popcount(n_lhs.branches() & mask);
+         // check the value
+         if (!has_lower)
+         {
+            auto lhs_val = n_lhs.value();
+            auto rhs_val = n_rhs.value();
+            if (count == 0 && lhs_val && rhs_val)
+            {
+               // This could be transformed into a value node and back,
+               // so we need to compare the value, not just the pointers
+               return session.get_by_id(l, lhs_val).as_value_node().data() ==
+                      session.get_by_id(l, rhs_val).as_value_node().data();
+            }
+            if (lhs_val != rhs_val)
+               return false;
+         }
+         if (count == 0)
+            return true;
+         else if (count == 1)
+         {
+            // special case because changes to children ouside [lower, upper) can
+            // remove and re-add this node, which will create new child nodes.
+            return is_equal_in_range_weak(session, l, n_lhs.branch_by_index(lhs_offset),
+                                          n_rhs.branch_by_index(rhs_offset), lowest_key{},
+                                          highest_key{});
+         }
+         return std::ranges::equal(std::span{n_lhs.children() + lhs_offset, count},
+                                   std::span{n_rhs.children() + rhs_offset, count});
+      }
+
+   }  // namespace detail
+   template <typename AccessMode>
+   bool session<AccessMode>::is_equal_weak(const std::shared_ptr<root>& r1,
+                                           const std::shared_ptr<root>& r2,
+                                           std::span<const char>        lower,
+                                           std::span<const char>        upper) const
+   {
+      swap_guard g(*this);
+      auto       lower6 = to_key6({lower.data(), lower.size()});
+      if (upper.empty())
+      {
+         return detail::is_equal_in_range_weak(*this, g, {get_id(r1)}, {get_id(r2)}, lower6,
+                                               detail::highest_key{});
+      }
+      key_type upper_buf;
+      auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+      return detail::is_equal_in_range_weak(*this, g, {get_id(r1)}, {get_id(r2)}, lower6, upper6);
+   }
+
    inline int write_session::remove(std::shared_ptr<root>& r, std::span<const char> key)
    {
       std::unique_lock<gc_session> l(*this);
@@ -1441,6 +2155,377 @@ namespace triedent
                                    removed_size);
       update_root(l, r, new_root);
       return removed_size;
+   }
+
+   namespace detail
+   {
+      // lower and upper are only used to derive the key prefix
+      inline database::id take_all(write_session&                session,
+                                   std::unique_lock<gc_session>& l,
+                                   database::id                  id,
+                                   extended_key_type auto        lower,
+                                   extended_key_type auto        upper,
+                                   std::size_t                   offset,
+                                   std::size_t                   skip_prefix)
+      {
+         if (offset == skip_prefix)
+            return id;
+         // Check whether the desired prefix is completely contained in the original key
+         if (skip_prefix >= offset)
+            return clone_remove_prefix(session, l, id, skip_prefix - offset);
+         // the prefix is from either upper or lower
+         auto prefix = !std::is_same_v<decltype(lower), lowest_key>
+                           ? lower.substr(0, offset - skip_prefix)
+                           : upper.substr(0, offset - skip_prefix);
+         return clone_with_prefix(session, l, id, prefix);
+      }
+
+      inline database::id take_range(write_session&                session,
+                                     std::unique_lock<gc_session>& l,
+                                     database::id                  id,
+                                     extended_key_type auto        lower,
+                                     extended_key_type auto        upper,
+                                     std::size_t                   offset      = 0,
+                                     std::size_t                   skip_prefix = 0)
+      {
+         if (!id)
+            return {};
+         auto n                                  = session.get_by_id(l, id);
+         auto key                                = n.get_key().substr(skip_prefix);
+         auto [intersects, has_lower, has_upper] = prefix_overlap(key, lower, upper, offset);
+         if (!intersects)
+            return {};
+         if (!has_lower && !has_upper)
+            return take_all(session, l, id, lower, upper, offset, skip_prefix);
+
+         offset += key.size();
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+         {
+            return take_range(session, l, n.maybe_branch(lower[offset]), lower, upper, offset + 1);
+         }
+         else
+         {
+            auto lmask      = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+            auto umask      = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+            auto mask       = lmask & umask;
+            auto outer_mask = (has_lower ? inner_node::mask_lt(lower[offset]) : 0ull) |
+                              (has_upper ? inner_node::mask_gt(upper[offset]) : 0ull);
+            auto lower_child = has_lower ? n.maybe_branch(lower[offset]) : database::id{};
+            auto upper_child = has_upper ? n.maybe_branch(upper[offset]) : database::id{};
+            auto branches    = n.branches() & mask;
+            // Try to short circuit if we know that there is only one child. This
+            // avoids repeatedly cloning the same node with successively longer prefixes.
+            //
+            // Try upper first because n.value() needs to be tested before n is invalidated
+            if (upper_child && !branches && !lower_child && (has_lower || !n.value()))
+               return take_range(session, l, upper_child, lowest_key{}, upper, offset + 1);
+            auto new_upper_child = upper_child ? take_range(session, l, upper_child, lowest_key{},
+                                                            upper.substr(offset + 1))
+                                               : database::id{};
+            if (lower_child && !branches && !new_upper_child)
+               return take_range(session, l, lower_child, lower, highest_key{}, offset + 1);
+            auto new_lower_child = lower_child ? take_range(session, l, lower_child,
+                                                            lower.substr(offset + 1), highest_key{})
+                                               : database::id{};
+            // If we constructed any nodes, n is no longer valid
+            n.reload(session.ring(), l);
+            // check whether we can return the original node
+            if (offset == key.size() && skip_prefix == 0 && (n.branches() & outer_mask) == 0 &&
+                (!has_lower || !n.value()) && new_lower_child == lower_child &&
+                new_upper_child == upper_child)
+               return id;
+
+            std::uint8_t lower_b = has_lower ? lower[offset] : 0;
+            std::uint8_t upper_b = has_upper ? upper[offset] : 0;
+
+            auto value = !has_lower ? n.value() : database::id{};
+
+            auto prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
+            return detail::build_node(
+                session, l, prefix, value, value != id,
+                maybe_clone_one{new_lower_child, lower_b, new_lower_child == lower_child},
+                node_children{n, mask},
+                maybe_clone_one{new_upper_child, upper_b, new_upper_child == upper_child});
+         }
+      }
+
+      inline database::id take_range(write_session&                session,
+                                     std::unique_lock<gc_session>& l,
+                                     subtree_t                     id,
+                                     extended_key_type auto        lower,
+                                     extended_key_type auto        upper,
+                                     std::size_t                   offset = 0)
+      {
+         return take_range(session, l, id.id, lower, upper, offset, id.skip_prefix);
+      }
+
+      inline database::id remove_range(write_session&                session,
+                                       std::unique_lock<gc_session>& l,
+                                       database::id                  id,
+                                       extended_key_type auto        lower,
+                                       extended_key_type auto        upper,
+                                       std::size_t                   offset      = 0,
+                                       std::size_t                   skip_prefix = 0)
+      {
+         if (!id)
+            return {};
+         auto n                                  = session.get_by_id(l, id);
+         auto key                                = n.get_key().substr(skip_prefix);
+         auto [intersects, has_lower, has_upper] = prefix_overlap(key, lower, upper, offset);
+         if (!intersects)
+            return take_all(session, l, id, lower, upper, offset, skip_prefix);
+
+         if (!has_lower && !has_upper)
+            return {};
+
+         offset += key.size();
+
+         auto lmask             = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+         auto umask             = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+         auto inner_mask        = lmask & umask;
+         auto before_lower_mask = has_lower ? inner_node::mask_lt(lower[offset]) : 0ull;
+         auto after_upper_mask  = has_upper ? inner_node::mask_gt(upper[offset]) : 0ull;
+         auto outer_mask        = before_lower_mask | after_upper_mask;
+
+         auto branches = n.branches() & outer_mask;
+
+         database::id lower_child{};
+         database::id upper_child{};
+         database::id new_lower_child{};
+         database::id new_upper_child{};
+         auto         value = has_lower ? n.value() : database::id{};
+         if (has_lower)
+            lower_child = n.maybe_branch(lower[offset]);
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+         {
+            new_lower_child = remove_range(session, l, lower_child, lower.substr(offset + 1),
+                                           upper.substr(offset + 1));
+         }
+         else
+         {
+            if (has_upper)
+            {
+               upper_child = n.maybe_branch(upper[offset]);
+               if (!branches && !value && !lower_child)
+               {
+                  return remove_range(session, l, upper_child, lowest_key{}, upper, offset + 1);
+               }
+               new_upper_child =
+                   remove_range(session, l, upper_child, lowest_key{}, upper.substr(offset + 1));
+            }
+            if (lower_child)
+            {
+               if (!branches && !value && !new_upper_child)
+               {
+                  return remove_range(session, l, lower_child, lower, highest_key{}, offset + 1);
+               }
+               new_lower_child =
+                   remove_range(session, l, lower_child, lower.substr(offset + 1), highest_key{});
+            }
+         }
+         n.reload(session.ring(), l);
+         // check whether we can return the original node
+         if (offset == 0 && skip_prefix == 0 && (has_lower || !n.value()) &&
+             lower_child == new_lower_child && upper_child == new_upper_child &&
+             !(n.branches() & inner_mask))
+            return id;
+
+         std::uint8_t lower_b = has_lower ? lower[offset] : 0;
+         std::uint8_t upper_b = has_upper ? upper[offset] : 0;
+
+         auto prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
+         return detail::build_node(
+             session, l, prefix, value, value != id, node_children{n, before_lower_mask},
+             maybe_clone_one{new_lower_child, lower_b, new_lower_child == lower_child},
+             maybe_clone_one{new_upper_child, upper_b, new_upper_child == upper_child},
+             node_children{n, after_upper_mask});
+      }
+
+      inline database::id remove_range(write_session&                session,
+                                       std::unique_lock<gc_session>& l,
+                                       subtree_t                     id,
+                                       extended_key_type auto        lower,
+                                       extended_key_type auto        upper,
+                                       std::size_t                   offset = 0)
+      {
+         return remove_range(session, l, id.id, lower, upper, offset, id.skip_prefix);
+      }
+
+      inline database::id splice_range(write_session&                session,
+                                       std::unique_lock<gc_session>& l,
+                                       subtree_t                     dest,
+                                       subtree_t                     src,
+                                       extended_key_type auto        lower,
+                                       extended_key_type auto        upper,
+                                       std::size_t                   offset = 0)
+      {
+         if (!dest.id)
+            return take_range(session, l, src, lower, upper, offset);
+         if (!src.id)
+            return remove_range(session, l, dest, lower, upper, offset);
+         // find common prefix
+         auto n_dest                             = subtree_deref{session, l, dest};
+         auto n_src                              = subtree_deref{session, l, src};
+         auto dest_key                           = n_dest.get_key();
+         auto src_key                            = n_src.get_key();
+         auto prefix                             = common_prefix(dest_key, src_key);
+         auto [intersects, has_lower, has_upper] = prefix_overlap(prefix, lower, upper, offset);
+         if (!intersects)
+            return take_all(session, l, dest.id, lower, upper, offset, dest.skip_prefix);
+
+         if (!has_lower && !has_upper)
+            return take_all(session, l, src.id, lower, upper, offset, src.skip_prefix);
+
+         n_dest.skip_prefix += prefix.size();
+         n_src.skip_prefix += prefix.size();
+         offset += prefix.size();
+
+         auto lmask             = has_lower ? inner_node::mask_gt(lower[offset]) : ~0ull;
+         auto umask             = has_upper ? inner_node::mask_lt(upper[offset]) : ~0ull;
+         auto inner_mask        = lmask & umask;
+         auto before_lower_mask = has_lower ? inner_node::mask_lt(lower[offset]) : 0ull;
+         auto after_upper_mask  = has_upper ? inner_node::mask_gt(upper[offset]) : 0ull;
+         auto outer_mask        = before_lower_mask | after_upper_mask;
+
+         // < lower from dest
+         // lower recurse
+         // >lower, <upper from src
+         // upper recurse
+         // > upper from dest
+         auto branches = (n_dest.branches() & outer_mask) | (n_src.branches() & inner_mask);
+         auto value    = has_lower ? n_dest.value() : n_src.value();
+
+         subtree_t    lower_child_src{};
+         subtree_t    lower_child_dest{};
+         subtree_t    upper_child_src{};
+         subtree_t    upper_child_dest{};
+         database::id new_lower_child{};
+         database::id new_upper_child{};
+         if (has_lower)
+         {
+            lower_child_dest = n_dest.maybe_branch(lower[offset]);
+            lower_child_src  = n_src.maybe_branch(lower[offset]);
+         }
+         if (has_lower && has_upper && lower[offset] == upper[offset])
+         {
+            if ((n_dest.branches() & ~inner_node::mask_eq(lower[offset])) || value)
+            {
+               new_lower_child = splice_range(session, l, lower_child_dest, lower_child_src,
+                                              lower.substr(offset + 1), upper.substr(offset + 1));
+               if (offset == dest.skip_prefix + prefix.size() &&
+                   new_lower_child == lower_child_dest.id)
+               {
+                  return dest.id;
+               }
+            }
+            else
+            {
+               return splice_range(session, l, lower_child_dest, lower_child_src, lower, upper,
+                                   offset + 1);
+            }
+         }
+         else
+         {
+            if (has_upper)
+            {
+               upper_child_src  = n_src.maybe_branch(upper[offset]);
+               upper_child_dest = n_dest.maybe_branch(upper[offset]);
+               if (!branches && !value && !lower_child_src && !lower_child_dest)
+               {
+                  return splice_range(session, l, upper_child_dest, upper_child_src, lowest_key{},
+                                      upper, offset + 1);
+               }
+               new_upper_child = splice_range(session, l, upper_child_dest, upper_child_src,
+                                              lowest_key{}, upper.substr(offset + 1));
+            }
+            if (has_lower)
+            {
+               if (!branches && !value && !new_upper_child)
+               {
+                  return splice_range(session, l, lower_child_dest, lower_child_src, lower,
+                                      highest_key{}, offset + 1);
+               }
+               new_lower_child = splice_range(session, l, lower_child_dest, lower_child_src,
+                                              lower.substr(offset + 1), highest_key{});
+            }
+         }
+
+         n_src.reload(session, l);
+         n_dest.reload(session, l);
+
+         // check whether the result is equivalent to one of the inputs
+         if (offset == src.skip_prefix + prefix.size() && !(n_src.branches() & outer_mask) &&
+             !(branches & outer_mask) && value == n_src.value() &&
+             new_lower_child == lower_child_src && new_upper_child == upper_child_src)
+            return src.id;
+         if (offset == dest.skip_prefix + prefix.size() && !(n_dest.branches() & inner_mask) &&
+             !(branches & inner_mask) && value == n_dest.value() &&
+             new_lower_child == lower_child_dest && new_upper_child == upper_child_dest)
+            return dest.id;
+
+         bool lower_unchanged =
+             new_lower_child == lower_child_src || new_lower_child == lower_child_dest;
+         bool upper_unchanged =
+             new_upper_child == upper_child_src || new_upper_child == upper_child_dest;
+         std::uint8_t lower_b = has_lower ? lower[offset] : 0;
+         std::uint8_t upper_b = has_upper ? upper[offset] : 0;
+
+         auto result_prefix = has_lower ? lower.substr(0, offset) : upper.substr(0, offset);
+         return detail::build_node(session, l, result_prefix, value, value != src && value != dest,
+                                   subtree_children{n_dest, before_lower_mask},
+                                   maybe_clone_one{new_lower_child, lower_b, lower_unchanged},
+                                   subtree_children{n_src, inner_mask},
+                                   maybe_clone_one{new_upper_child, upper_b, upper_unchanged},
+                                   subtree_children{n_dest, after_upper_mask});
+      }
+   }  // namespace detail
+
+   inline void write_session::take(std::shared_ptr<root>& r,
+                                   std::span<const char>  lower,
+                                   std::span<const char>  upper)
+   {
+      std::unique_lock<gc_session> l(*this);
+
+      auto lower6 = to_key6({lower.data(), lower.size()});
+      id   new_root;
+      if (upper.empty())
+      {
+         new_root = detail::take_range(*this, l, get_id(r), lower6, detail::highest_key{});
+      }
+      else
+      {
+         key_type upper_buf;
+         auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+         new_root        = detail::take_range(*this, l, get_id(r), lower6, upper6);
+      }
+      update_root(l, r, new_root);
+   }
+
+   inline void write_session::splice(std::shared_ptr<root>&       r1,
+                                     const std::shared_ptr<root>& r2,
+                                     std::span<const char>        lower,
+                                     std::span<const char>        upper)
+   {
+      std::unique_lock<gc_session> l(*this);
+
+      auto lower6 = to_key6({lower.data(), lower.size()});
+      id   new_root;
+      if (upper.empty())
+      {
+         new_root = detail::splice_range(*this, l, {get_id(r1)}, {get_id(r2)}, lower6,
+                                         detail::highest_key{});
+      }
+      else
+      {
+         key_type upper_buf;
+         auto     upper6 = triedent::to_key6(upper_buf, {upper.data(), upper.size()});
+         new_root = detail::splice_range(*this, l, {get_id(r1)}, {get_id(r2)}, lower6, upper6);
+      }
+
+      // new_root == r2 need its refcount bumped
+      if (r1 != r2 && r2 && r2->db && r2->id == new_root)
+         new_root = bump_refcount_or_copy(ring(), l, new_root);
+      update_root(l, r1, new_root);
    }
 
    inline database::id write_session::remove_child(std::unique_lock<gc_session>& session,

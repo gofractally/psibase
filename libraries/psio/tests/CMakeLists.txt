@@ -21,8 +21,13 @@ if(DEFINED IS_NATIVE)
         test_std_array.cpp
         test_chrono.cpp
         test_view.cpp
+        test_schema.cpp
+        test_key.cpp
     )
     target_link_libraries(psio-tests psio catch2 Threads::Threads )
+
+    add_executable(generate_test_data generate_test_data.cpp)
+    target_link_libraries(generate_test_data psio)
 endif()
 
 if(DEFINED IS_WASM)

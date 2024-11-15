@@ -156,30 +156,32 @@ namespace psibase::net
                       const ProducerSet& prods)
       {
          AccountNumber prevAccount{};
-         check(confirms.size() >= prods.threshold(), "Not enough confirmations");
+         if (confirms.size() < prods.threshold())
+            check(false, "Not enough confirmations: " + std::to_string(confirms.size()) + "/" +
+                             std::to_string(prods.threshold()) + " (" + prods.to_string() + ")");
          for (const ProducerConfirm& confirm : confirms)
          {
             const auto& [prod, sig] = confirm;
             // mostly to guarantee that the producers are unique
             check(prevAccount < prod, "Confirmations must be ordered by producer");
             auto claim = prods.getClaim(prod);
-            check(!!claim, "Not a valid producer: " + prod.str());
+            if (!claim)
+               check(false, "Not a valid producer: " + prod.str() + " (" + prods.to_string() + ")");
             M    originalMsg{id, prod, *claim};
             auto msg = network().serialize_unsigned_message(originalMsg);
             chain().verify(revision, {msg.data(), msg.size()}, *claim, sig);
          }
       }
 
-      void verifyIrreversibleSignature(const auto&             revision,
-                                       const BlockConfirm&     commits,
-                                       const BlockHeaderState* state)
+      void verifyIrreversibleSignature(const BlockConfirm& commits, const BlockHeaderState* state)
       {
-         verifyMsig<CommitMessage>(revision, state->blockId(), commits.commits, *state->producers);
+         verifyMsig<CommitMessage>(state->getProdsAuthRevision(), state->blockId(), commits.commits,
+                                   *state->producers);
          if (state->nextProducers)
          {
             check(!!commits.nextCommits, "nextCommits required during joint consensus");
-            verifyMsig<CommitMessage>(revision, state->blockId(), *commits.nextCommits,
-                                      *state->nextProducers);
+            verifyMsig<CommitMessage>(state->nextProducers->authState->revision, state->blockId(),
+                                      *commits.nextCommits, *state->nextProducers);
          }
          else
          {
@@ -459,14 +461,13 @@ namespace psibase::net
          if (new_producers || active_producers[1] != prods.second)
          {
             PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
-                                      << print_function{
-                                             [&](std::ostream& os)
-                                             {
-                                                if (prods.second)
-                                                {
-                                                   os << ", " << *prods.second;
-                                                }
-                                             }};
+                                      << print_function{[&](std::ostream& os)
+                                                        {
+                                                           if (prods.second)
+                                                           {
+                                                              os << ", " << *prods.second;
+                                                           }
+                                                        }};
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -709,24 +710,17 @@ namespace psibase::net
             PSIBASE_LOG(logger, warning) << "invalid view change: wrong term";
             return false;
          }
-         auto verifyState = chain().get_state(state->info.header.previous);
-         if (!verifyState)
-         {
-            // TODO: This implies that state is LIB. The need for this check
-            // is yet another symptom of the problems with the way we're handling
-            // the services for signature verification
-            return true;
-         }
          try
          {
-            verifyMsig<PrepareMessage>(verifyState->authState->revision, state->blockId(),
+            verifyMsig<PrepareMessage>(state->getProdsAuthRevision(), state->blockId(),
                                        info.best_message->data->prepares(), *state->producers);
             if (state->nextProducers && state->nextProducers->algorithm == ConsensusAlgorithm::bft)
             {
                if (auto nextPrepares = info.best_message->data->nextPrepares())
                {
-                  verifyMsig<PrepareMessage>(verifyState->authState->revision, state->blockId(),
-                                             *nextPrepares, *state->nextProducers);
+                  verifyMsig<PrepareMessage>(state->nextProducers->authState->revision,
+                                             state->blockId(), *nextPrepares,
+                                             *state->nextProducers);
                }
                else
                {
@@ -742,7 +736,10 @@ namespace psibase::net
          }
          catch (std::runtime_error& e)
          {
-            PSIBASE_LOG(logger, warning) << "invalid view change: " << e.what();
+            PSIBASE_LOG(logger, warning)
+                << "invalid view change term=" << info.best_message->data->term()
+                << " producer=" << info.best_message->data->producer().unpack().str() << ": "
+                << e.what();
             return false;
          }
          return true;
@@ -798,6 +795,11 @@ namespace psibase::net
                            state            = check_state;
                         }
                      }
+                     else
+                     {
+                        PSIBASE_LOG(logger, debug)
+                            << "Cannot find subtree associated with view change";
+                     }
                   }
                }
             }
@@ -810,14 +812,18 @@ namespace psibase::net
                load_prepares(state, *best_view_change->best_message);
                sync_current_term();
             }
+            state             = chain().get_state(orderToXid(best_prepared).id());
+            auto commit_index = chain().commit_index();
+            if (!state || state->blockNum() < commit_index)
+            {
+               state = chain().get_state(chain().get_block_id(commit_index));
+            }
+            chain().set_subtree(state, "best prepared");
          }
-         // Because we accept view changes even if we don't have the referenced block,
-         // it's possible to trigger a view change without being able to set the subtree.
-         if (!state)
+         else
          {
-            state = chain().get_state(chain().get_block_id(chain().commit_index()));
+            chain().set_subtree(state, "view change from current leader");
          }
-         chain().set_subtree(state, "view change from current leader");
       }
 
       ViewChangeMessage make_view_change(BlockHeaderState* state)
@@ -916,7 +922,7 @@ namespace psibase::net
          if (term > current_term)
          {
             PSIBASE_LOG(logger, info)
-                << "view change: " << term << " "
+                << "view change: term=" << term << " leader="
                 << active_producers[0]->activeProducers.nth(get_leader_index(term))->first.str();
             current_term = term;
             chain().setTerm(current_term);
@@ -1020,13 +1026,20 @@ namespace psibase::net
             }
             if (_state == producer_state::follower)
             {
-               if (is_leader() && is_term_ready())
+               if (is_leader())
                {
-                  _state = producer_state::leader;
+                  if (is_term_ready())
+                  {
+                     _state = producer_state::leader;
 
-                  PSIBASE_LOG(logger, info) << "Starting block production for term " << current_term
-                                            << " as " << self.str();
-                  start_leader();
+                     PSIBASE_LOG(logger, info) << "Starting block production for term "
+                                               << current_term << " as " << self.str();
+                     start_leader();
+                  }
+                  else
+                  {
+                     PSIBASE_LOG(logger, debug) << "Cannot start block production";
+                  }
                }
             }
             else if (_state == producer_state::leader)
@@ -1066,18 +1079,29 @@ namespace psibase::net
          }
       }
 
-      void check_view_change_threshold()
+      TermNum minimum_viable_view(int group) const
       {
+         if (producer_views[group].empty())
+            return 0;
          std::vector<TermNum> view_copy;
-         for (const auto& [term, _] : producer_views[0])
+         for (const auto& [term, _] : producer_views[group])
          {
             view_copy.push_back(term);
          }
-         auto offset = active_producers[0]->size() * 2 / 3;
+         auto offset = active_producers[group]->size() * 2 / 3;
          // if > 1/3 are ahead of current view trigger view change
          std::nth_element(view_copy.begin(), view_copy.begin() + offset, view_copy.end());
-         auto new_term = std::max(view_copy[offset], current_term);
-         new_term      = skip_advanced_leaders(new_term);
+         return view_copy[offset];
+      }
+
+      TermNum minimum_viable_view() const
+      {
+         return std::max({minimum_viable_view(0), minimum_viable_view(1), current_term});
+      }
+
+      void check_view_change_threshold()
+      {
+         auto new_term = skip_advanced_leaders(minimum_viable_view());
          if (new_term > current_term)
          {
             set_view(new_term);
@@ -1360,9 +1384,7 @@ namespace psibase::net
                return;
             }
          }
-         auto verifyState = chain().get_state(state->info.header.previous);
-         assert(verifyState && "accept_block_header requires the previous block to be known");
-         verifyIrreversibleSignature(verifyState->authState->revision, data, committed);
+         verifyIrreversibleSignature(data, committed);
          if (committed->producers->algorithm == ConsensusAlgorithm::bft)
          {
             chain().setBlockData(committed->blockId(), aux);

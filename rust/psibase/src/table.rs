@@ -22,6 +22,7 @@ custom_error! {
 pub trait TableRecord: Pack + UnpackOwned {
     type PrimaryKey: ToKey;
     const SECONDARY_KEYS: u8;
+    const DB: DbId = DbId::Service;
 
     fn get_primary_key(&self) -> Self::PrimaryKey;
 
@@ -44,12 +45,12 @@ pub trait Table<Record: TableRecord>: Sized {
 
     fn new() -> Self {
         let prefix = (get_service(), Self::TABLE_INDEX).to_key();
-        Self::with_prefix(DbId::Service, prefix)
+        Self::with_prefix(<Record as TableRecord>::DB, prefix)
     }
 
     fn with_service(service: AccountNumber) -> Self {
         let prefix = (service, Self::TABLE_INDEX).to_key();
-        Self::with_prefix(DbId::Service, prefix)
+        Self::with_prefix(<Record as TableRecord>::DB, prefix)
     }
 
     /// Returns one of the table indexes: 0 = Primary Key Index, else secondary indexes
@@ -199,6 +200,12 @@ pub trait Table<Record: TableRecord>: Sized {
             kv_remove_bytes(self.db_id(), key);
         }
     }
+}
+
+pub struct SingletonKey {}
+
+impl ToKey for SingletonKey {
+    fn append_key(&self, _key: &mut Vec<u8>) {}
 }
 
 #[derive(Clone)]

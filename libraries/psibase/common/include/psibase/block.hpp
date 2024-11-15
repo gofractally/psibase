@@ -24,8 +24,10 @@ namespace psibase
       AccountNumber     service;  ///< Service to execute the action
       MethodNumber      method;   ///< Service method to execute
       std::vector<char> rawData;  ///< Data for the method
+      //
+      friend bool operator==(const Action&, const Action&) = default;
+      PSIO_REFLECT(Action, sender, service, method, rawData)
    };
-   PSIO_REFLECT(Action, sender, service, method, rawData)
 
    struct GenesisService
    {
@@ -34,8 +36,8 @@ namespace psibase
       uint8_t           vmType    = 0;
       uint8_t           vmVersion = 0;
       std::vector<char> code      = {};
+      PSIO_REFLECT(GenesisService, service, flags, vmType, vmVersion, code)
    };
-   PSIO_REFLECT(GenesisService, service, flags, vmType, vmVersion, code)
 
    // The genesis action is the first action of the first transaction of
    // the first block. The action struct's fields are ignored, except
@@ -44,23 +46,23 @@ namespace psibase
    {
       std::string                 memo;
       std::vector<GenesisService> services;
+      PSIO_REFLECT(GenesisActionData, memo, services)
    };
-   PSIO_REFLECT(GenesisActionData, memo, services)
 
    struct Claim
    {
       AccountNumber     service;
       std::vector<char> rawData;
       friend bool       operator==(const Claim&, const Claim&) = default;
+      PSIO_REFLECT(Claim, service, rawData)
    };
-   PSIO_REFLECT(Claim, service, rawData)
 
    struct ClaimKey
    {
       AccountNumber     service;
       std::vector<char> rawData;
+      PSIO_REFLECT(ClaimKey, service, rawData)
    };
-   PSIO_REFLECT(ClaimKey, service, rawData)
 
    // Rules for TAPOS:
    // * Reference block's number must be either:
@@ -68,7 +70,7 @@ namespace psibase
    //    * A multiple of 8192. For this case, refBlockIndex = (blockNum >> 13) | 0x80
    // * refBlockSuffix = last 4 bytes of the block ID, bit-casted to uint32_t.
    //
-   // TransactionSys maintains block suffixes for:
+   // Transact maintains block suffixes for:
    // * The most-recent 128 blocks. This allows transactions to depend on other recent transactions.
    // * The most-recent 128 blocks which have block numbers which are a multiple of 8192. This gives
    //   users which sign transactions offline plenty of time to do so.
@@ -80,7 +82,7 @@ namespace psibase
    // A transaction will be rejected if:
    // * It is expired.
    // * It arrives earlier than (expired - maxTrxLifetime). maxTrxLifetime
-   //   is defined in TransactionSys.cpp and may be changed in the future.
+   //   is defined in Transact.cpp and may be changed in the future.
    // * It references a block that isn't on the current fork, or a block which
    //   is too old. For best results, use the most-recent irreversible block which
    //   meets the criteria.
@@ -93,8 +95,13 @@ namespace psibase
       uint32_t     refBlockSuffix = 0;
       uint16_t     flags          = 0;
       uint8_t      refBlockIndex  = 0;
+      PSIO_REFLECT(Tapos,
+                   definitionWillNotChange(),
+                   expiration,
+                   refBlockSuffix,
+                   flags,
+                   refBlockIndex)
    };
-   PSIO_REFLECT(Tapos, definitionWillNotChange(), expiration, refBlockSuffix, flags, refBlockIndex)
 
    // TODO: separate native-defined fields from service-defined fields
    struct Transaction
@@ -102,8 +109,8 @@ namespace psibase
       Tapos               tapos;
       std::vector<Action> actions;
       std::vector<Claim>  claims;  // TODO: Is there standard terminology that we could use?
+      PSIO_REFLECT(Transaction, tapos, actions, claims)
    };
-   PSIO_REFLECT(Transaction, tapos, actions, claims)
 
    // TODO: pruning proofs?
    // TODO: compression? There's a time/space tradeoff and it complicates client libraries.
@@ -116,37 +123,10 @@ namespace psibase
       std::vector<std::vector<char>> proofs;
 
       std::optional<std::vector<std::vector<char>>> subjectiveData;
+      PSIO_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
    };
-   PSIO_REFLECT(SignedTransaction, transaction, proofs, subjectiveData)
 
    using TermNum = uint32_t;
-
-   struct Producer
-   {
-      AccountNumber name;
-      Claim         auth;
-      friend bool   operator==(const Producer&, const Producer&) = default;
-   };
-   PSIO_REFLECT(Producer, name, auth);
-
-   struct CftConsensus
-   {
-      std::vector<Producer> producers;
-   };
-   PSIO_REFLECT(CftConsensus, producers);
-
-   struct BftConsensus
-   {
-      std::vector<Producer> producers;
-   };
-   PSIO_REFLECT(BftConsensus, producers);
-
-   using Consensus = std::variant<CftConsensus, BftConsensus>;
-
-   inline auto get_gql_name(Consensus*)
-   {
-      return "Consensus";
-   }
 
    struct BlockHeaderAuthAccount
    {
@@ -157,8 +137,45 @@ namespace psibase
       uint8_t     vmVersion                                 = 0;
       friend bool operator==(const BlockHeaderAuthAccount&,
                              const BlockHeaderAuthAccount&) = default;
+      PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
    };
-   PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
+
+   struct Producer
+   {
+      AccountNumber name;
+      Claim         auth;
+      friend bool   operator==(const Producer&, const Producer&) = default;
+      PSIO_REFLECT(Producer, name, auth);
+   };
+
+   struct CftConsensus
+   {
+      std::vector<Producer> producers;
+      friend bool           operator==(const CftConsensus&, const CftConsensus&) = default;
+      PSIO_REFLECT(CftConsensus, producers);
+   };
+
+   struct BftConsensus
+   {
+      std::vector<Producer> producers;
+      friend bool           operator==(const BftConsensus&, const BftConsensus&) = default;
+      PSIO_REFLECT(BftConsensus, producers);
+   };
+
+   using ConsensusData = std::variant<CftConsensus, BftConsensus>;
+
+   inline auto get_gql_name(ConsensusData*)
+   {
+      return "ConsensusData";
+   }
+
+   struct Consensus
+   {
+      ConsensusData                       data;
+      std::vector<BlockHeaderAuthAccount> services;
+      friend bool                         operator==(const Consensus&, const Consensus&) = default;
+      PSIO_REFLECT(Consensus, data, services)
+   };
 
    struct BlockHeaderCode
    {
@@ -166,8 +183,23 @@ namespace psibase
       uint8_t vmVersion = 0;
 
       std::vector<uint8_t> code = {};
+      PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
    };
-   PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
+
+   struct PendingConsensus
+   {
+      Consensus consensus;
+      BlockNum  blockNum;
+      PSIO_REFLECT(PendingConsensus, consensus, blockNum)
+   };
+
+   // This commits to all the state used to verify block signatures.
+   struct JointConsensus
+   {
+      Consensus                       current;
+      std::optional<PendingConsensus> next;
+      PSIO_REFLECT(JointConsensus, current, next)
+   };
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
    // TODO: Consensus fields
@@ -183,6 +215,9 @@ namespace psibase
       TermNum       term;
       BlockNum      commitNum;
 
+      // Holds a sha256 of the current JointConsensus
+      Checksum256 consensusState;
+
       // Holds a merkle root of the transactions in the block.
       // This does not depend on execution, so that it can be
       // verified early. The leaves of the tree have type
@@ -196,28 +231,25 @@ namespace psibase
       // this block. Joint consensus must not be active already.
       // Joint consensus ends after this block becomes irreversible.
       std::optional<Consensus> newConsensus;
-      // If this is specified, it should should contain the full set of
-      // of services that can be used for verifying block signatures.
-      std::optional<std::vector<BlockHeaderAuthAccount>> authServices;
       // This contains the code for authServices
       // It MUST contain all code that was added in this block
       // It MUST NOT contain code that is not in authServices
       // It MAY contain code that is unchanged from the previous block
       // authCode MUST NOT be included when calculating a block hash.
       std::optional<std::vector<BlockHeaderCode>> authCode;
+      PSIO_REFLECT(BlockHeader,
+                   previous,
+                   blockNum,
+                   time,
+                   producer,
+                   term,
+                   commitNum,
+                   consensusState,
+                   trxMerkleRoot,
+                   eventMerkleRoot,
+                   newConsensus,
+                   authCode)
    };
-   PSIO_REFLECT(BlockHeader,
-                previous,
-                blockNum,
-                time,
-                producer,
-                term,
-                commitNum,
-                trxMerkleRoot,
-                eventMerkleRoot,
-                newConsensus,
-                authServices,
-                authCode)
 
    struct TransactionInfo
    {
@@ -232,24 +264,24 @@ namespace psibase
       // TODO: Is there ever a reason to prune an individual signature?
       Checksum256 signatureHash;
       Checksum256 subjectiveDataHash;
+      PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
    };
-   PSIO_REFLECT(TransactionInfo, transactionId, signatureHash, subjectiveDataHash)
 
    struct EventInfo
    {
       std::uint64_t id;
       // TODO: Should we use a hash instead of including the data directly?
       std::span<const char> data;
+      PSIO_REFLECT(EventInfo)
    };
-   PSIO_REFLECT(EventInfo)
 
    // TODO: switch fields to shared_view_ptr?
    struct Block
    {
       BlockHeader                    header;
       std::vector<SignedTransaction> transactions;
+      PSIO_REFLECT(Block, header, transactions)
    };
-   PSIO_REFLECT(Block, header, transactions)
 
    /// TODO: you have signed block headers, not signed blocks
    struct SignedBlock
@@ -258,8 +290,8 @@ namespace psibase
       std::vector<char> signature;
       // Contains additional signatures if required by the consensus algorithm
       std::optional<std::vector<char>> auxConsensusData;
+      PSIO_REFLECT(SignedBlock, block, signature, auxConsensusData)
    };
-   PSIO_REFLECT(SignedBlock, block, signature, auxConsensusData)
 
    struct BlockInfo
    {
@@ -278,13 +310,9 @@ namespace psibase
       }
 
       BlockInfo(const Block& b) : BlockInfo{b.header} {}
-      static Checksum256 makeBlockId(BlockHeader header)
-      {
-         header.authCode.reset();
-         return sha256(header);
-      }
+      static Checksum256 makeBlockId(BlockHeader header);
+      PSIO_REFLECT(BlockInfo, header, blockId)
    };
-   PSIO_REFLECT(BlockInfo, header, blockId)
 
    struct BlockSignatureInfo
    {

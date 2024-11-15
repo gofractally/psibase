@@ -1,0 +1,33 @@
+[package]
+name = "invite"
+version.workspace = true
+edition.workspace = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pem = "3.0.4"
+spki = "0.7.3"
+wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
+psibase = { path = "../../../../rust/psibase/" }
+urlencoding = "2.1.3"
+fracpack = { path = "../../../../rust/fracpack" }
+serde = "1.0"
+serde_json = "1.0"
+base64 = "0.22"
+chrono = "0.4"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "invite:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }

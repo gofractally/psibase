@@ -1,0 +1,24 @@
+[package]
+name = "chainmail"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
+
+[package.metadata.psibase]
+server = "chainmail"
+plugin = "plugin"
+data = [{ src = "../ui/dist/", dst = "/" }]
+postinstall = [
+    { sender = "chainmail", service = "chainmail", method = "init", rawData = "0000" },
+]
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+
+[dev-dependencies]
+chainmail_package = { path = "..", version = "0.13.0" }

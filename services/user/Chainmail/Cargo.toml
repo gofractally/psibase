@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.13.0"
+rust-version = "1.64"
+edition = "2021"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
+publish = false
+
+[package]
+name = "chainmail_package"
+description = "Message-sending application"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "Chainmail"
+services = ["chainmail"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.13.0"
+Supervisor = "0.13.0"
+Events = "0.13.0"
+SetCode = "0.13.0"
+Accounts = "0.13.0"
+CommonApi = "0.13.0"
+Sites = "0.13.0"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+chainmail = { path = "service", version = "0.13.0" }
+plugin = { path = "plugin", version = "0.13.0" }

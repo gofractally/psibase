@@ -1,0 +1,16 @@
+package demoapp1:example;
+
+interface intf {
+    use host:common/types.{error};
+    helloworld2: func() -> result<string, error>;
+    multiply: func(a: u32, b: u32) -> result<string, error>;
+}
+
+world impl {
+    import invite:plugin/inviter;
+    include host:common/imports;
+    include transact:plugin/imports;
+
+    export helloworld: func() -> string;
+    export intf;
+}

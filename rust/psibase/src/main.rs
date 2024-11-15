@@ -1,39 +1,48 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Parser, Subcommand};
+use clap::{Args as _, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::psispace_sys;
+use psibase::services::{accounts, auth_delegate, sites};
 use psibase::{
-    account, apply_proxy, as_json, create_boot_transactions, get_tapos_for_head,
-    new_account_action, push_transaction, reg_server, set_auth_service_action, set_code_action,
-    set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey, AnyPublicKey,
-    AutoAbort, DirectoryRegistry, ExactAccountNumber, HTTPRegistry, JointRegistry, PackageList,
-    PackageRegistry, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction,
+    account, apply_proxy, as_json, compress_content, create_boot_transactions,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
+    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
+    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry,
+    JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry,
+    ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
+
+mod cli;
+use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
 /// Interact with a running psinode
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// API Endpoint
+    /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
         short = 'a',
         long,
-        value_name = "URL",
+        value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
+        default_value = "http://psibase.127.0.0.1.sslip.io:8080/",
+        value_parser = parse_api_endpoint
     )]
     api: Url,
 
@@ -54,8 +63,16 @@ struct Args {
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
 
+    /// Controls whether the transaction's console output is shown
+    #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
+    console: bool,
+
+    /// Print help
+    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
+    help: Option<Vec<OsString>>,
+
     #[clap(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -74,7 +91,12 @@ enum Command {
         #[clap(long, value_name = "URL")]
         package_source: Vec<String>,
 
-        services: Vec<String>,
+        services: Vec<OsString>,
+
+        /// Configure compression level for boot package file uploads
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+        compression_level: u32,
     },
 
     /// Create or modify an account
@@ -95,12 +117,7 @@ enum Command {
         insecure: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
@@ -140,31 +157,27 @@ enum Command {
         #[clap(short = 'i', long)]
         create_insecure_account: bool,
 
-        /// Register the service with ProxySys. This allows the service to host a
+        /// Register the service with HttpServer. This allows the service to host a
         /// website, serve RPC requests, and serve GraphQL requests.
         #[clap(short = 'p', long)]
         register_proxy: bool,
 
         /// Sender to use when creating the account.
-        #[clap(
-            short = 'S',
-            long,
-            value_name = "SENDER",
-            default_value = "account-sys"
-        )]
+        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
         sender: ExactAccountNumber,
     },
 
     /// Upload a file to a service
     Upload {
-        /// Service to upload to
-        service: ExactAccountNumber,
-
         /// Source filename to upload
         source: String,
 
         /// Destination path within service
         dest: Option<String>,
+
+        /// Sender to use (required). Files are uploaded to this account's subdomain.
+        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+        sender: ExactAccountNumber,
 
         /// MIME content type of file
         #[clap(short = 't', long, value_name = "MIME-TYPE")]
@@ -174,15 +187,17 @@ enum Command {
         #[clap(short = 'r', long)]
         recursive: bool,
 
-        /// Sender to use; defaults to <SERVICE>
-        #[clap(short = 'S', long, value_name = "SENDER")]
-        sender: Option<ExactAccountNumber>,
+        /// Configure compression level
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+        compression_level: u32,
     },
 
     /// Install apps to the chain
     Install {
         /// Packages to install
-        packages: Vec<String>,
+        #[clap(required = true)]
+        packages: Vec<OsString>,
 
         /// Set all accounts to authenticate using this key
         #[clap(short = 'k', long, value_name = "KEY")]
@@ -196,6 +211,15 @@ enum Command {
         /// that they create will be owned by this account.
         #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
         sender: ExactAccountNumber,
+
+        /// Install the package even if it is already installed
+        #[clap(long)]
+        reinstall: bool,
+
+        /// Configure compression level to use for uploaded files
+        /// (1=fastest, 11=most compression)
+        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+        compression_level: u32,
     },
 
     /// Prints a list of apps
@@ -218,7 +242,19 @@ enum Command {
     /// Find packages
     Search {
         /// Regular expressions to search for in package names and descriptions
+        #[clap(required = true)]
         patterns: Vec<String>,
+
+        /// A URL or path to a package repository (repeatable)
+        #[clap(long, value_name = "URL")]
+        package_source: Vec<String>,
+    },
+
+    /// Shows package contents
+    Info {
+        /// Packages to show
+        #[clap(required = true)]
+        packages: Vec<OsString>,
 
         /// A URL or path to a package repository (repeatable)
         #[clap(long, value_name = "URL")]
@@ -235,6 +271,16 @@ enum Command {
         #[clap(short = 'm', long, default_value = "rw")]
         mode: String,
     },
+
+    /// Setup the psibase local config file
+    #[command(subcommand)]
+    Config(ConfigCommand),
+
+    /// Print help for the subcommands
+    Help { command: Vec<OsString> },
+
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[allow(dead_code)] // TODO: move to lib if still needed
@@ -249,16 +295,19 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 fn store_sys(
-    service: AccountNumber,
     sender: AccountNumber,
     path: &str,
     content_type: &str,
     content: &[u8],
+    compression_level: u32,
 ) -> Action {
-    psispace_sys::Wrapper::pack_from_to(sender, service).storeSys(
+    let (content, content_encoding) = compress_content(content, content_type, compression_level);
+
+    sites::Wrapper::pack_from_to(sender, sites::SERVICE).storeSys(
         path.to_string(),
         content_type.to_string(),
-        content.to_vec().into(),
+        content_encoding,
+        content.into(),
     )
 }
 
@@ -312,6 +361,8 @@ async fn create(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -342,7 +393,7 @@ async fn modify(
     }
 
     if insecure {
-        actions.push(set_auth_service_action(account, account!("auth-any-sys")));
+        actions.push(set_auth_service_action(account, account!("auth-any")));
     }
 
     let trx = with_tapos(
@@ -354,6 +405,8 @@ async fn modify(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -413,6 +466,8 @@ async fn deploy(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -424,18 +479,12 @@ async fn deploy(
 async fn upload(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     content_type: &Option<String>,
     source: &str,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let deduced_content_type = match content_type {
         Some(t) => t.clone(),
         None => {
@@ -458,11 +507,11 @@ async fn upload(
     };
 
     let actions = vec![store_sys(
-        service,
-        sender,
+        sender.into(),
         &normalized_dest,
         &deduced_content_type,
         &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+        compression_level,
     )];
     let trx = with_tapos(
         &get_tapos_for_head(&args.api, client.clone()).await?,
@@ -474,6 +523,8 @@ async fn upload(
         client,
         sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
+        args.console,
+        None,
     )
     .await?;
     if !args.suppress_ok {
@@ -483,12 +534,12 @@ async fn upload(
 }
 
 fn fill_tree(
-    service: AccountNumber,
     sender: AccountNumber,
     actions: &mut Vec<(String, Action)>,
     dest: &str,
     source: &str,
     top: bool,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let md = metadata(source)?;
     if md.is_file() {
@@ -498,11 +549,11 @@ fn fill_tree(
             actions.push((
                 dest.to_owned(),
                 store_sys(
-                    service,
                     sender,
                     dest,
                     t.essence_str(),
                     &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
+                    compression_level,
                 ),
             ));
         } else {
@@ -517,12 +568,12 @@ fn fill_tree(
             let path = path?;
             let d = dest.to_owned() + "/" + path.file_name().to_str().unwrap();
             fill_tree(
-                service,
                 sender,
                 actions,
                 &d,
                 path.path().to_str().unwrap(),
                 false,
+                compression_level,
             )?;
         }
     } else {
@@ -543,7 +594,15 @@ async fn monitor_trx(
     progress: ProgressBar,
     n: u64,
 ) -> Result<(), anyhow::Error> {
-    let result = push_transaction(&args.api, client.clone(), trx.packed(), args.trace).await;
+    let result = push_transaction(
+        &args.api,
+        client.clone(),
+        trx.packed(),
+        args.trace,
+        args.console,
+        Some(&progress),
+    )
+    .await;
     if let Err(err) = result {
         progress.suspend(|| {
             println!("=====\n{:?}", err);
@@ -557,6 +616,27 @@ async fn monitor_trx(
         progress.inc(n);
     }
     Ok(())
+}
+
+fn find_psitest() -> OsString {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psitest = format!("psitest{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psitest);
+                if sibling.is_file() {
+                    return sibling.into();
+                }
+                if parent.ends_with("rust/release") {
+                    let in_build_dir = parent.parent().unwrap().parent().unwrap().join(psitest);
+                    if in_build_dir.exists() {
+                        return in_build_dir.into();
+                    }
+                }
+            }
+        }
+    }
+    "psitest".to_string().into()
 }
 
 fn data_directory() -> Result<PathBuf, anyhow::Error> {
@@ -574,11 +654,11 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
     Ok(base.join("share/psibase"))
 }
 
-async fn get_package_registry(
+async fn add_package_registry(
     sources: &Vec<String>,
     client: reqwest::Client,
-) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
-    let mut result = JointRegistry::new();
+    result: &mut JointRegistry<BufReader<File>>,
+) -> Result<(), anyhow::Error> {
     if sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
@@ -590,6 +670,15 @@ async fn get_package_registry(
             }
         }
     }
+    Ok(())
+}
+
+async fn get_package_registry(
+    sources: &Vec<String>,
+    client: reqwest::Client,
+) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
+    let mut result = JointRegistry::new();
+    add_package_registry(sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -599,30 +688,48 @@ async fn boot(
     key: &Option<AnyPublicKey>,
     producer: ExactAccountNumber,
     package_source: &Vec<String>,
-    services: &Vec<String>,
+    services: &Vec<OsString>,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    let now_plus_30secs = Utc::now() + Duration::seconds(30);
+    let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec {
-        seconds: now_plus_30secs.timestamp() as u32,
+        seconds: now_plus_120secs.timestamp() as u32,
     };
-    let default_services = vec!["Default".to_string()];
-    let package_registry = get_package_registry(package_source, client.clone()).await?;
-    let mut packages = package_registry
-        .resolve(if services.is_empty() {
-            &default_services[..]
-        } else {
-            &services[..]
-        })
-        .await?;
-    let (boot_transactions, transactions) =
-        create_boot_transactions(key, producer.into(), true, expiration, &mut packages)?;
+    let mut package_registry = JointRegistry::new();
+    let package_names = if services.is_empty() {
+        vec!["DevDefault".to_string()]
+    } else {
+        let (files, packages) = FileSetRegistry::from_files(services)?;
+        package_registry.push(files)?;
+        packages
+    };
+    add_package_registry(package_source, client.clone(), &mut package_registry).await?;
+    let mut packages = package_registry.resolve(&package_names).await?;
+
+    let (boot_transactions, transactions) = create_boot_transactions(
+        key,
+        producer.into(),
+        true,
+        expiration,
+        &mut packages,
+        compression_level,
+    )?;
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
         .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
-    push_boot(args, &client, boot_transactions.packed()).await?;
+
+    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
     progress.inc(1);
     for transaction in transactions {
-        push_transaction(&args.api, client.clone(), transaction.packed(), args.trace).await?;
+        push_transaction(
+            &args.api,
+            client.clone(),
+            transaction.packed(),
+            args.trace,
+            args.console,
+            Some(&progress),
+        )
+        .await?;
         progress.inc(1)
     }
     if !args.suppress_ok {
@@ -635,11 +742,15 @@ async fn push_boot(
     args: &Args,
     client: &reqwest::Client,
     packed: Vec<u8>,
+    progress: &ProgressBar,
 ) -> Result<(), anyhow::Error> {
+    let trace: TransactionTrace =
+        as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?;
+    if args.console {
+        progress.suspend(|| print!("{}", trace.console()));
+    }
     args.trace
-        .error_for_trace(
-            as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?,
-        )
+        .error_for_trace(trace, Some(progress))
         .context("Failed to boot")
 }
 
@@ -660,27 +771,21 @@ fn normalize_upload_path(path: &Option<String>) -> String {
 async fn upload_tree(
     args: &Args,
     client: reqwest::Client,
-    service: AccountNumber,
-    sender: Option<ExactAccountNumber>,
+    sender: ExactAccountNumber,
     dest: &Option<String>,
     source: &str,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    let sender = if let Some(s) = sender {
-        s.into()
-    } else {
-        service
-    };
-
     let normalized_dest = normalize_upload_path(dest);
 
     let mut actions = Vec::new();
     fill_tree(
-        service,
-        sender,
+        sender.into(),
         &mut actions,
         &normalized_dest,
         source,
         true,
+        compression_level,
     )?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
@@ -726,130 +831,176 @@ async fn upload_tree(
     Ok(())
 }
 
-async fn monitor_install_trx(
-    args: &Args,
-    client: &reqwest::Client,
-    tapos: &TaposRefBlock,
-    actions: Vec<Action>,
-    progress: ProgressBar,
-    n: u64,
+fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
+    accounts: Vec<AccountNumber>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
 ) -> Result<(), anyhow::Error> {
-    let trx = with_tapos(tapos, actions);
-
-    let result = push_transaction(
-        &args.api,
-        client.clone(),
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-    )
-    .await;
-
-    if let Err(err) = result {
-        progress.abandon_with_message(format!("{}: {:?}", progress.message(), err));
-        return Err(err);
+    for account in accounts {
+        out.set_label(format!("Creating {}", account));
+        let group = vec![
+            accounts::Wrapper::pack().newAccount(account, account!("auth-any"), true),
+            auth_delegate::Wrapper::pack_from(account).setOwner(sender),
+            set_auth_service_action(account, auth_delegate::SERVICE),
+        ];
+        out.push(group)?;
     }
-    progress.inc(n);
+    Ok(())
+}
+
+async fn apply_packages<
+    R: PackageRegistry,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    reg: &R,
+    ops: Vec<PackageOp>,
+    accounts: &mut Vec<AccountNumber>,
+    out: &mut TransactionBuilder<F>,
+    sender: AccountNumber,
+    key: &Option<AnyPublicKey>,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                // TODO: verify ownership of existing accounts
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true, compression_level)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Replace(meta, info) => {
+                let mut package = reg.get_by_info(&info).await?;
+                accounts.extend_from_slice(package.get_accounts());
+                // TODO: skip unmodified files (?)
+                out.set_label(format!(
+                    "Updating {}-{} -> {}-{}",
+                    &meta.name, &meta.version, &info.name, &info.version
+                ));
+                // Remove out-dated files. This needs to happen before installing
+                // new files, to handle the case where a service that stores
+                // data files is replaced by a service that does not provide
+                // removeSys.
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.upgrade(package.manifest(), out)?;
+                // Install the new package
+                let mut account_actions = vec![];
+                package.install_accounts(&mut account_actions, sender, key)?;
+                out.push_all(account_actions)?;
+                let mut actions = vec![];
+                package.install(&mut actions, sender, true, compression_level)?;
+                out.push_all(actions)?;
+            }
+            PackageOp::Remove(meta) => {
+                out.set_label(format!("Removing {}", &meta.name));
+                let old_manifest =
+                    get_installed_manifest(base_url, client, &meta.name, sender).await?;
+                old_manifest.remove(out)?;
+            }
+        }
+    }
     Ok(())
 }
 
 async fn install(
     args: &Args,
     mut client: reqwest::Client,
-    packages: &[String],
+    packages: &[OsString],
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     sources: &Vec<String>,
+    reinstall: bool,
+    compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let installed = PackageList::installed(&args.api, &mut client).await?;
-    let package_registry = get_package_registry(sources, client.clone()).await?;
-    let to_install = installed.resolve_new(&package_registry, packages).await?;
-
-    let mut all_account_actions = vec![];
-    let mut all_init_actions = vec![];
-    for mut package in to_install {
-        let mut account_actions = vec![];
-        package.install_accounts(&mut account_actions, sender, key)?;
-        all_account_actions.push((account_actions, package.name().to_string()));
-        let mut actions = vec![];
-        package.install(&mut actions, sender, true)?;
-        all_init_actions.push((actions, package.name().to_string()));
-    }
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    package_registry.push(files)?;
+    add_package_registry(sources, client.clone(), &mut package_registry).await?;
+    let to_install = installed
+        .resolve_changes(&package_registry, &packages, reinstall)
+        .await?;
 
     let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
-    let progress = ProgressBar::new(all_account_actions.len() as u64).with_style(
-        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
-    );
+
+    let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+        if actions.first().unwrap().sender != sender {
+            actions.insert(
+                0,
+                Action {
+                    sender,
+                    service: account!("nop"),
+                    method: method!("nop"),
+                    rawData: Default::default(),
+                },
+            );
+        }
+        Ok(sign_transaction(with_tapos(&tapos, actions), &args.sign)?)
+    };
 
     let action_limit: usize = 64 * 1024;
 
-    // create all accounts
-    {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_account_actions {
-            progress.set_message("Deploying ".to_string() + &name);
-            for group in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-                for act in group {
-                    size += act.rawData.len();
-                    trx_actions.push(act);
-                }
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
-    }
+    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let mut new_accounts = vec![];
 
-    // Wait for a new block after the accounts are created, so the
-    // first auth check doesn't fail
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    progress.set_position(0);
+    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+    apply_packages(
+        &args.api,
+        &mut client,
+        &package_registry,
+        to_install,
+        &mut new_accounts,
+        &mut trx_builder,
+        sender,
+        key,
+        compression_level,
+    )
+    .await?;
+
+    new_accounts = get_accounts_to_create(&args.api, &mut client, &new_accounts, sender).await?;
+    create_accounts(new_accounts, &mut account_builder, sender)?;
+
+    let account_transactions = account_builder.finish()?;
+    let transactions = trx_builder.finish()?;
 
     {
-        let mut n: u64 = 0;
-        let mut size: usize = 0;
-        let mut trx_actions = vec![];
-        for (actions, name) in all_init_actions {
-            progress.set_message("Initializing ".to_string() + &name);
-            for act in actions {
-                if size >= action_limit {
-                    monitor_install_trx(
-                        args,
-                        &client,
-                        &tapos,
-                        trx_actions.drain(..).collect(),
-                        progress.clone(),
-                        n,
-                    )
-                    .await?;
-                    n = 0;
-                    size = 0;
-                }
-
-                size += act.rawData.len();
-                trx_actions.push(act);
-            }
-            n += 1;
-        }
-        if !trx_actions.is_empty() {
-            monitor_install_trx(args, &client, &tapos, trx_actions, progress.clone(), n).await?;
-        }
+        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
+        );
+        push_transactions(
+            &args.api,
+            client.clone(),
+            account_transactions,
+            args.trace,
+            args.console,
+            &progress,
+        )
+        .await?;
+        progress.finish_and_clear();
     }
+
+    let progress = ProgressBar::new(transactions.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
+    );
+
+    push_transactions(
+        &args.api,
+        client.clone(),
+        transactions,
+        args.trace,
+        args.console,
+        &progress,
+    )
+    .await?;
+
     if !args.suppress_ok {
         progress.finish_with_message("Ok");
     } else {
@@ -868,19 +1019,19 @@ async fn list(
     sources: &Vec<String>,
 ) -> Result<(), anyhow::Error> {
     if all || (installed && available) || (!all & !installed && !available) {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
         }
     } else if installed {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         for name in installed.into_vec() {
             println!("{}", name);
         }
     } else if available {
-        let installed = PackageList::installed(&args.api, &mut client).await?;
+        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
         let package_registry = get_package_registry(sources, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
@@ -933,6 +1084,126 @@ async fn search(
     Ok(())
 }
 
+struct ServicePrinter<'a> {
+    service: AccountNumber,
+    info: Option<&'a ServiceInfo>,
+    data: &'a [PackageDataFile],
+}
+
+impl fmt::Display for ServicePrinter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(info) = &self.info {
+            writeln!(f, "service: {}", self.service)?;
+            if !info.flags.is_empty() {
+                write!(f, "  flags:")?;
+                for flag in &info.flags {
+                    write!(f, " {}", flag)?;
+                }
+                writeln!(f, "")?;
+            }
+            if let Some(server) = &info.server {
+                writeln!(f, "  server: {}", server)?;
+            }
+        } else {
+            writeln!(f, "account: {}", self.service)?;
+        }
+        if !self.data.is_empty() {
+            writeln!(f, "  files:")?;
+            for file in self.data {
+                writeln!(f, "    {}", &file.filename)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn get_service_data(s: &[PackageDataFile], account: AccountNumber) -> &[PackageDataFile] {
+    let key = account.to_string();
+    let lower = s.partition_point(|file| &file.account.to_string() < &key);
+    let upper = s.partition_point(|file| &file.account.to_string() <= &key);
+    &s[lower..upper]
+}
+
+async fn show_package<T: PackageRegistry + ?Sized>(
+    reg: &T,
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    package: &Meta,
+    origin: &PackageOrigin,
+) -> Result<(), anyhow::Error> {
+    let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
+    println!("name: {}-{}", &package.name, &package.version);
+    println!("description: {}", &package.description);
+    let mut services: Vec<_> = manifest.services.into_iter().collect();
+    services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
+    manifest.data.sort_by(|lhs, rhs| {
+        (
+            lhs.account.to_string(),
+            lhs.service.to_string(),
+            &lhs.filename,
+        )
+            .cmp(&(
+                rhs.account.to_string(),
+                rhs.service.to_string(),
+                &rhs.filename,
+            ))
+    });
+
+    for account in &package.accounts {
+        let info = services
+            .binary_search_by(|service| service.0.to_string().cmp(&account.to_string()))
+            .map_or(None, |idx| Some(&services[idx].1));
+        print!(
+            "{}",
+            &ServicePrinter {
+                service: *account,
+                info,
+                data: get_service_data(&manifest.data, *account)
+            }
+        );
+    }
+    Ok(())
+}
+
+// an unbooted chain has no packages installed
+fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+    if let Err(e) = &list {
+        if e.root_cause()
+            .to_string()
+            .contains("Need genesis block; use 'psibase boot' to boot chain")
+        {
+            return Ok(PackageList::new());
+        }
+    }
+    list
+}
+
+async fn package_info(
+    args: &Args,
+    mut client: reqwest::Client,
+    packages: &Vec<OsString>,
+    sources: &Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    package_registry.push(files)?;
+    add_package_registry(sources, client.clone(), &mut package_registry).await?;
+    let reglist = PackageList::from_registry(&package_registry)?;
+
+    for package in &packages {
+        if let Some((meta, origin)) = installed.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+        } else {
+            eprintln!("Package {} not found", package);
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize)]
 struct TokenData<'a> {
     exp: i64,
@@ -951,22 +1222,156 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+fn get_external(name: &OsString) -> Option<&str> {
+    name.to_str()?
+        .strip_prefix("psibase-")?
+        .strip_suffix(".wasm")
+}
+
+fn list_external() -> Result<Vec<String>, anyhow::Error> {
+    let command_path = data_directory()?.join("wasm");
+    let mut result = Vec::new();
+    for dir in command_path.read_dir()? {
+        if let Some(name) = get_external(&dir?.file_name()) {
+            result.push(name.to_string())
+        }
+    }
+    Ok(result)
+}
+
+fn unrecognized_subcommand(command: &mut clap::Command, name: &OsString) -> ! {
+    let mut command = std::mem::take(command)
+        .disable_help_subcommand(false)
+        .disable_help_flag(false);
+    let mut err = clap::Error::new(clap::error::ErrorKind::InvalidSubcommand).with_cmd(&command);
+    err.insert(
+        clap::error::ContextKind::InvalidSubcommand,
+        clap::error::ContextValue::String(name.to_string_lossy().to_string()),
+    );
+    err.insert(
+        clap::error::ContextKind::Usage,
+        clap::error::ContextValue::StyledStr(command.render_usage()),
+    );
+    err.exit();
+}
+
+fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
+    let psitest = find_psitest();
+    let command_path = data_directory()?.join("wasm");
+    let mut filename: OsString = "psibase-".to_string().into();
+    filename.push(&args[0]);
+    filename.push(".wasm");
+    let wasm_file = command_path.join(filename);
+    if !wasm_file.is_file() {
+        let command = clap::Command::new("psibase");
+        let mut command = Args::augment_args(command)
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
+        command.build();
+        unrecognized_subcommand(&mut command, &args[0]);
+    }
+    Err(std::process::Command::new(psitest)
+        .arg(wasm_file)
+        .args(&args[1..])
+        .exec())?
+}
+
+fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
+    mut iter: I,
+    command: &mut clap::Command,
+) {
+    if let Some(name) = iter.next() {
+        if let Some(subcommand) = command.find_subcommand_mut(name) {
+            print_subcommand_help(iter, subcommand)
+        } else {
+            unrecognized_subcommand(command, name);
+        }
+    } else {
+        command.print_help().unwrap();
+    }
+}
+
+fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    if !subcommand.is_empty() {
+        command.build();
+        let mut iter = subcommand.iter();
+        if let Some(command) = command.find_subcommand_mut(iter.next().unwrap()) {
+            print_subcommand_help(iter, command);
+        } else {
+            let mut subcommand: Vec<_> = subcommand.iter().cloned().collect();
+            subcommand.push(OsStr::new("--help").to_os_string());
+            handle_external(&subcommand)?;
+        }
+    } else {
+        command = command
+            .disable_help_subcommand(true)
+            .disable_help_flag(true);
+        if let Ok(subcommands) = list_external() {
+            for sub in subcommands {
+                command = command.subcommand(clap::Command::new(sub));
+            }
+        }
+        command.build();
+        command.print_help()?;
+    }
+    Ok(())
+}
+
+fn parse_args() -> Result<Args, anyhow::Error> {
+    let command = clap::Command::new("psibase");
+    let mut command = Args::augment_args(command);
+    command.build();
+    command = command
+        .disable_help_subcommand(true)
+        .disable_help_flag(true);
+    Ok(Args::from_arg_matches(&command.get_matches())?)
+}
+
 async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
-    Ok((builder.build()?, result))
+    Ok((builder.gzip(true).build()?, result))
+}
+
+pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
+    if let Ok(api_url) = Url::parse(api_str) {
+        Ok(api_url)
+    } else {
+        let host_url = read_host_url(api_str)?;
+        Ok(Url::parse(&host_url)?)
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let args = Args::parse();
+    let args = parse_args()?;
     let (client, _proxy) = build_client(&args).await?;
-    match &args.command {
+    if let Some(help) = &args.help {
+        return print_help(help);
+    }
+    let Some(command) = &args.command else {
+        return print_help(&[]);
+    };
+    match command {
         Command::Boot {
             key,
             producer,
             package_source,
             services,
-        } => boot(&args, client, key, *producer, package_source, services).await?,
+            compression_level,
+        } => {
+            boot(
+                &args,
+                client,
+                key,
+                *producer,
+                package_source,
+                services,
+                *compression_level,
+            )
+            .await?
+        }
         Command::Create {
             account,
             key,
@@ -1009,27 +1414,27 @@ async fn main() -> Result<(), anyhow::Error> {
             .await?
         }
         Command::Upload {
-            service,
             source,
             dest,
             content_type,
             recursive,
             sender,
+            compression_level,
         } => {
             if *recursive {
                 if content_type.is_some() {
                     return Err(anyhow!("--recursive is incompatible with --content-type"));
                 }
-                upload_tree(&args, client, (*service).into(), *sender, dest, source).await?
+                upload_tree(&args, client, *sender, dest, source, *compression_level).await?
             } else {
                 upload(
                     &args,
                     client,
-                    (*service).into(),
                     *sender,
                     dest,
                     content_type,
                     source,
+                    *compression_level,
                 )
                 .await?
             }
@@ -1039,6 +1444,8 @@ async fn main() -> Result<(), anyhow::Error> {
             key,
             package_source,
             sender,
+            reinstall,
+            compression_level,
         } => {
             install(
                 &args,
@@ -1047,6 +1454,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 (*sender).into(),
                 key,
                 package_source,
+                *reinstall,
+                *compression_level,
             )
             .await?
         }
@@ -1060,10 +1469,17 @@ async fn main() -> Result<(), anyhow::Error> {
             patterns,
             package_source,
         } => search(&args, client, patterns, package_source).await?,
+        Command::Info {
+            packages,
+            package_source,
+        } => package_info(&args, client, packages, package_source).await?,
         Command::CreateToken {
             expires_after,
             mode,
         } => create_token(Duration::seconds(*expires_after), mode)?,
+        Command::Config(config) => handle_cli_config_cmd(config)?,
+        Command::Help { command } => print_help(command)?,
+        Command::External(argv) => handle_external(argv)?,
     }
 
     Ok(())

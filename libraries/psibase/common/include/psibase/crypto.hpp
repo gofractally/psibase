@@ -29,24 +29,24 @@ namespace psibase
       variant_type data;
 
       bool operator==(const PublicKey& other) const { return data == other.data; }
+      PSIO_REFLECT(PublicKey, definitionWillNotChange(), data)
    };
-   PSIO_REFLECT(PublicKey, definitionWillNotChange(), data)
 
    using EccPrivateKey = std::array<uint8_t, 32>;
    struct PrivateKey
    {
       using variant_type = std::variant<EccPrivateKey, EccPrivateKey>;  // k1, r1
       variant_type data;
+      PSIO_REFLECT(PrivateKey, definitionWillNotChange(), data)
    };
-   PSIO_REFLECT(PrivateKey, definitionWillNotChange(), data)
 
    using EccSignature = std::array<uint8_t, 64>;
    struct Signature
    {
       using variant_type = std::variant<EccSignature, EccSignature>;  // k1, r1
       variant_type data;
+      PSIO_REFLECT(Signature, definitionWillNotChange(), data)
    };
-   PSIO_REFLECT(Signature, definitionWillNotChange(), data)
 
    std::string publicKeyToString(const PublicKey& obj);
    PublicKey   publicKeyFromString(std::string_view s);
@@ -136,8 +136,10 @@ namespace psibase
          psio::to_frac(value, stream);
          return sha256(result.data(), result.size());
       }
-      void push_impl(const Checksum256& hash);
+
+      static Checksum256 combine(const Checksum256& lhs, const Checksum256& rhs);
+      void               push_impl(const Checksum256& hash);
+      PSIO_REFLECT(Merkle, i, stack)
    };
-   PSIO_REFLECT(Merkle, i, stack)
 
 }  // namespace psibase

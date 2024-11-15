@@ -7,10 +7,12 @@
 #include <string>
 #include <string_view>
 
-#include <simdjson.h>
+#include <rapidjson/encodings.h>
+#include <rapidjson/memorystream.h>
 
 namespace psibase
 {
+
    /// A memo is a human readable string that is passed as an action argument.
    /// A memo must be valid UTF-8 and not longer than 80 bytes.
    struct Memo
@@ -24,11 +26,24 @@ namespace psibase
       static bool validate(std::string_view str)
       {
          psibase::check(str.size() <= maxBytes, "Memo exceeds 80 bytes");
-         psibase::check(simdjson::validate_utf8(str), "Memo must be valid UTF-8");
+         struct NullStream
+         {
+            char*  PutBegin() { return 0; }
+            void   Put(char) {}
+            void   Flush() {}
+            size_t PutEnd(char*) { return 0; }
+         };
+         rapidjson::MemoryStream in(str.data(), str.size());
+         NullStream              out;
+         while (in.Tell() != str.size())
+         {
+            if (!rapidjson::UTF8<>::Validate(in, out))
+               psibase::check(false, "Memo must be valid UTF-8");
+         }
          return true;
       }
+      PSIO_REFLECT(Memo, contents);
    };
-   PSIO_REFLECT(Memo, contents);
 
    void from_json(Memo& s, auto& stream)
    {

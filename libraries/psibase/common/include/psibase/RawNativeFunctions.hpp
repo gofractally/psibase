@@ -144,6 +144,69 @@ namespace psibase
       /// Sets the transaction timer to expire a given number of nanoseconds
       /// after the beginning of the current transaction.
       PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
+
+      /// Loads the subjective database
+      ///
+      /// - The subjective database may not be accessed without calling this first
+      /// - If the subjective database is already checked out, this will create a nested checkout
+      /// - If an action checks out the subjective database and does not commit it before
+      ///   returning, any changes will be discarded.
+      ///
+      /// There exists a total ordering of all top-level checkouts. Every read of the subjective
+      /// database returns the most recent write in the current checkout or in previous checkouts
+      /// that were successfully committed.
+      ///
+      /// The following state is controlled by checkoutSubjective
+      /// - DbId::subjective
+      /// - Socket auto-close
+      ///
+      /// State that is not affected includes
+      /// - Databases that follow forks
+      /// - WASM linear memory
+      /// - Socket messages sent
+      PSIBASE_NATIVE(checkoutSubjective) void checkoutSubjective();
+      /// Attempts to commit changes to the subjective database
+      ///
+      /// - If changes were committed successfully, returns true and closes the subjective database
+      /// - If changes were not successfully committed, returns false and reloads the subjective database, starting a new checkout
+      /// - It is an error if the current action did not check out the subjective database
+      ///
+      /// If there were no writes to the subjective database or if this is a nested checkout, commit always succeeds.
+      PSIBASE_NATIVE(commitSubjective) bool commitSubjective();
+      /// Closes the current checkout and discards any changes made to
+      /// the subjective database
+      PSIBASE_NATIVE(abortSubjective) void abortSubjective();
+
+      /// Send a message to a socket
+      ///
+      /// Returns 0 on success or an error code on failure
+      ///
+      /// Errors:
+      /// - `EBADF`: fd is not a valid file descriptor
+      /// - `ENOTSOCK`: fd is not a socket
+      PSIBASE_NATIVE(socketSend)
+      std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
+
+      /// Tells the current transaction/query/callback context to take or release
+      /// ownership of a socket.
+      ///
+      /// Any sockets that are owned by a context will be closed when it finishes.
+      /// - HTTP socket: send a 500 response with an error message in the body
+      /// - Other sockets may not be set to auto-close
+      ///
+      /// If this function is called within a subjectiveCheckout, it will only take
+      /// effect if the top-level commit succeeds. If another context takes ownership
+      /// of the socket, subjectiveCommit may fail.
+      ///
+      /// Returns 0 on success or an error code on failure.
+      ///
+      /// Errors:
+      /// - `EBADF`: fd is not a valid file descriptor
+      /// - `ENOTSUP`: The socket does not support auto-close
+      /// - `ENOTSOCK`: fd is not a socket
+      /// - `EACCES`: The socket is owned by another context
+      PSIBASE_NATIVE(socketAutoClose)
+      std::int32_t socketAutoClose(std::int32_t fd, bool value);
    }  // namespace raw
 
    /// Get result
@@ -535,6 +598,92 @@ namespace psibase
    inline void writeConsole(const std::string_view& sv)
    {
       raw::writeConsole(sv.data(), sv.size());
+   }
+
+   using raw::abortSubjective;
+   using raw::checkoutSubjective;
+   using raw::commitSubjective;
+
+   struct SubjectiveTransaction
+   {
+      SubjectiveTransaction() { psibase::checkoutSubjective(); }
+      ~SubjectiveTransaction()
+      {
+         if (!done)
+         {
+            psibase::abortSubjective();
+         }
+      }
+      void commit()
+      {
+         if (!done)
+         {
+            done = psibase::commitSubjective();
+         }
+      }
+      bool done = false;
+   };
+
+   /// The `PSIBASE_SUBJECTIVE_TX` macro creates a scope in which
+   /// the subjective database is accessible.
+   ///
+   /// ```
+   /// PSIBASE_SUBJECTIVE_TX stmt
+   /// ```
+   ///
+   /// The statement will be executed one or more times until
+   /// it is successfully committed.
+   ///
+   /// Unstructured control flow that exits the statement, including break,
+   /// return, and exceptions, will discard any changes made to the
+   /// subjective database.
+#define PSIBASE_SUBJECTIVE_TX \
+   for (::psibase::SubjectiveTransaction _psibase_s_tx; !_psibase_s_tx.done; _psibase_s_tx.commit())
+
+   /// Send a message to a socket
+   ///
+   /// Returns 0 on success. On failure returns -1 and sets errno.
+   ///
+   /// Errors:
+   /// - `EBADF`: fd is not a valid file descriptor
+   /// - `ENOTSOCK`: fd is not a socket
+   inline int socketSend(int fd, std::span<const char> data)
+   {
+      if (auto err = raw::socketSend(fd, data.data(), data.size()))
+      {
+         errno = err;
+         return -1;
+      }
+      return 0;
+   }
+   static constexpr int producer_multicast = 0;
+
+   /// Tells the current transaction/query/callback context to take or release
+   /// ownership of a socket.
+   ///
+   /// Any sockets that are owned by a context will be closed when it finishes.
+   /// - HTTP socket: send a 500 response with an error message in the body
+   /// - Other sockets may not be set to auto-close
+   ///
+   /// If this function is called within a subjectiveCheckout, it will only take
+   /// effect if the top-level commit succeeds. If another context takes ownership
+   /// of the socket, subjectiveCommit may fail.
+   ///
+   /// Returns 0 on success. On failure returns -1 and sets errno.
+   ///
+   /// Errors:
+   /// - `EBADF`: fd is not a valid file descriptor
+   /// - `ENOTSUP`: The socket does not support auto-close
+   /// - `ENOTSOCK`: fd is not a socket
+   /// - `EACCES`: The socket is owned by another context
+   inline int socketAutoClose(std::int32_t fd, bool value)
+   {
+      if (auto err = raw::socketAutoClose(fd, value))
+      {
+         errno = err;
+         return -1;
+      }
+      return 0;
    }
 
 }  // namespace psibase

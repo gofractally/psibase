@@ -4,11 +4,15 @@
 #include <boost/log/attributes/constant.hpp>
 #include <iostream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/KvMerkle.hpp>
 #include <psibase/Prover.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/VerifyProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/db.hpp>
+#include <psibase/headerValidation.hpp>
 #include <psibase/log.hpp>
+#include <psibase/serviceEntry.hpp>
 
 #include <ranges>
 
@@ -56,12 +60,17 @@ namespace psibase
    {
    };
 
+   struct BlockAuthState;
+
    struct ProducerSet
    {
       ConsensusAlgorithm                               algorithm;
       boost::container::flat_map<AccountNumber, Claim> activeProducers;
+      // Holds the services that can be used to verify producer
+      // signatures.
+      std::shared_ptr<BlockAuthState> authState;
       ProducerSet() = default;
-      ProducerSet(const Consensus& c)
+      ProducerSet(const ConsensusData& c)
       {
          const auto& [alg, prods] = std::visit([](auto& c) { return split(c); }, c);
          algorithm                = alg;
@@ -72,6 +81,7 @@ namespace psibase
          }
          activeProducers.adopt_sequence(std::move(result));
       }
+      ProducerSet(const Consensus& c) : ProducerSet(c.data) {}
       bool isProducer(AccountNumber producer) const
       {
          return activeProducers.find(producer) != activeProducers.end();
@@ -126,34 +136,51 @@ namespace psibase
             return activeProducers.size() * 2 / 3 + 1;
          }
       }
+      std::size_t weak_threshold() const
+      {
+         if (algorithm == ConsensusAlgorithm::cft)
+         {
+            return 1;
+         }
+         else
+         {
+            assert(algorithm == ConsensusAlgorithm::bft);
+            return (activeProducers.size() + 2) / 3;
+         }
+      }
+      std::string to_string() const
+      {
+         std::string result;
+         if (algorithm == ConsensusAlgorithm::cft)
+         {
+            result += "CFT:";
+         }
+         else if (algorithm == ConsensusAlgorithm::bft)
+         {
+            result += "BFT:";
+         }
+         result += '[';
+         bool first = true;
+         for (const auto& [name, auth] : activeProducers)
+         {
+            if (first)
+            {
+               first = false;
+            }
+            else
+            {
+               result += ',';
+            }
+            result += name.str();
+         }
+         result += ']';
+         return result;
+      }
    };
 
    inline std::ostream& operator<<(std::ostream& os, const ProducerSet& prods)
    {
-      if (prods.algorithm == ConsensusAlgorithm::cft)
-      {
-         os << "CFT:";
-      }
-      else if (prods.algorithm == ConsensusAlgorithm::bft)
-      {
-         os << "BFT:";
-      }
-      os << '[';
-      bool first = true;
-      for (const auto& [name, auth] : prods.activeProducers)
-      {
-         if (first)
-         {
-            first = false;
-         }
-         else
-         {
-            os << ',';
-         }
-         os << name.str();
-      }
-      os << ']';
-      return os;
+      return os << prods.to_string();
    }
 
    struct BlockAuthState
@@ -161,124 +188,112 @@ namespace psibase
       ConstRevisionPtr                    revision;
       std::vector<BlockHeaderAuthAccount> services;
 
-      static auto makeCodeIndex(const BlockHeader* header)
-      {
-         using K = decltype(codeByHashKey(Checksum256(), 0, 0));
-         using R = boost::container::flat_map<K, const BlockHeaderCode*>;
-         R::sequence_type seq;
-         for (const auto& code : *header->authCode)
-         {
-            auto codeHash = sha256(code.code.data(), code.code.size());
-            auto key      = codeByHashKey(codeHash, code.vmType, code.vmVersion);
-            seq.push_back({key, &code});
-         }
-         R result;
-         result.adopt_sequence(std::move(seq));
-         return result;
-      }
-
-      static void writeServices(Database& db, const std::vector<BlockHeaderAuthAccount>& accounts)
-      {
-         for (const auto& account : accounts)
-         {
-            CodeRow row{.codeNum   = account.codeNum,
-                        .flags     = 0,
-                        .codeHash  = account.codeHash,
-                        .vmType    = account.vmType,
-                        .vmVersion = account.vmVersion};
-            db.kvPut(CodeRow::db, row.key(), row);
-         }
-      }
-
-      static void updateServices(Database&                                  db,
-                                 const std::vector<BlockHeaderAuthAccount>& oldServices,
-                                 const std::vector<BlockHeaderAuthAccount>& services)
-      {
-         std::vector<AccountNumber> removedAccounts;
-         auto codeNumView = std::views::transform([](auto& p) { return p.codeNum; });
-         std::ranges::set_difference(oldServices | codeNumView, services | codeNumView,
-                                     std::back_inserter(removedAccounts));
-         for (AccountNumber account : removedAccounts)
-         {
-            db.kvRemove(CodeRow::db, codeKey(account));
-         }
-         writeServices(db, services);
-      }
-
-      // Read state at revision
-      BlockAuthState(SystemContext*   systemContext,
-                     const WriterPtr& writer,
-                     Database&        db,
-                     const BlockInfo& info)
+      // Reads the next or current state
+      BlockAuthState(SystemContext* systemContext, const WriterPtr& writer, Database& db)
       {
          revision = systemContext->sharedDatabase.emptyRevision();
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
             Database dst{systemContext->sharedDatabase, revision};
             auto     session = dst.startWrite(writer);
-            services         = status->authServices;
-            auto keys        = getCodeKeys(services);
-            for (const auto& key : keys)
+            if (status->consensus.next)
             {
-               if (auto row = db.kvGet<CodeByHashRow>(CodeByHashRow::db, key))
-               {
-                  dst.kvPut(CodeByHashRow::db, key, *row);
-               }
-               else
-               {
-                  check(false, "Missing code for auth service");
-               }
+               services = status->consensus.next->consensus.services;
             }
-            writeServices(dst, services);
+            else
+            {
+               services = status->consensus.current.services;
+            }
+            copyServices(dst, db, services);
             revision = dst.getModifiedRevision();
          }
       }
 
-      BlockAuthState(SystemContext*        systemContext,
-                     const WriterPtr&      writer,
-                     const BlockAuthState& prev,
-                     const BlockHeader&    header)
+      // Loads the current state
+      BlockAuthState(SystemContext*   systemContext,
+                     const WriterPtr& writer,
+                     Database&        db,
+                     ConstRevisionPtr revision)
+          : revision(revision ? std::move(revision) : systemContext->sharedDatabase.emptyRevision())
       {
-         if (header.authServices)
+         if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
+         {
+            services = status->consensus.current.services;
+         }
+      }
+
+      const std::vector<BlockHeaderAuthAccount>* getUpdatedAuthServices(
+          const BlockHeader& header) const
+      {
+         if (header.newConsensus)
+         {
+            auto& result = header.newConsensus->services;
+            if (result != services)
+               return &result;
+         }
+         return nullptr;
+      }
+
+      static std::shared_ptr<BlockAuthState> next(SystemContext*   systemContext,
+                                                  const WriterPtr& writer,
+                                                  const std::shared_ptr<BlockAuthState>& prev,
+                                                  const BlockHeader&                     header)
+      {
+         if (const auto* newServices = prev->getUpdatedAuthServices(header))
          {
             check(!!header.authCode, "code must be provided when changing auth services");
-            services                    = *header.authServices;
-            auto               prevKeys = getCodeKeys(prev.services);
-            auto               nextKeys = getCodeKeys(*header.authServices);
-            decltype(prevKeys) removed, added;
-            std::ranges::set_difference(prevKeys, nextKeys, std::back_inserter(removed));
-            std::ranges::set_difference(nextKeys, prevKeys, std::back_inserter(added));
-            auto code = makeCodeIndex(&header);
-            check(std::ranges::includes(
-                      nextKeys,
-                      code | std::views::transform([](auto& arg) -> auto& { return arg.first; })),
-                  "Wrong code");
-            Database db{systemContext->sharedDatabase, prev.revision};
-            auto     session = db.startWrite(writer);
-            for (const auto& r : removed)
-            {
-               db.kvRemove(CodeByHashRow::db, r);
-            }
-            for (const auto& a : added)
-            {
-               const auto& [prefix, index, codeHash, vmType, vmVersion] = a;
-               auto iter                                                = code.find(a);
-               check(iter != code.end(), "Missing required code");
-               CodeByHashRow code{.codeHash  = codeHash,
-                                  .vmType    = vmType,
-                                  .vmVersion = vmVersion,
-                                  .numRefs   = 0,
-                                  .code      = iter->second->code};
-               db.kvPut(CodeByHashRow::db, a, code);
-            }
-            updateServices(db, prev.services, services);
-            revision = db.getModifiedRevision();
+            return std::make_shared<BlockAuthState>(systemContext, writer, *prev, header,
+                                                    *newServices);
          }
          else
          {
             check(!header.authCode, "authCode unexpected");
+            return prev;
          }
       }
+
+      BlockAuthState(SystemContext*                             systemContext,
+                     const WriterPtr&                           writer,
+                     const BlockAuthState&                      prev,
+                     const BlockHeader&                         header,
+                     const std::vector<BlockHeaderAuthAccount>& newServices)
+      {
+         check(!!header.authCode, "code must be provided when changing auth services");
+         services = newServices;
+         Database db{systemContext->sharedDatabase, prev.revision};
+         auto     session = db.startWrite(writer);
+         updateServices(db, prev.services, services, *header.authCode);
+         revision = db.getModifiedRevision();
+      }
+   };
+
+   struct BuildStateChecksum
+   {
+      snapshot::StateChecksum operator()()
+      {
+         Database                db{sharedDatabase, revision};
+         auto                    session = db.startRead();
+         snapshot::StateChecksum result{.serviceRoot = hash(db, DbId::service),
+                                        .nativeRoot  = hash(db, DbId::native)};
+         return result;
+      }
+      Checksum256 hash(Database& database, DbId db)
+      {
+         KvMerkle       merkle;
+         KvMerkle::Item item{{}, {}};
+         while (true)
+         {
+            auto key = item.key();
+            auto kv  = database.kvGreaterEqualRaw(db, key, 0);
+            if (!kv)
+               return std::move(merkle).root();
+            item.from(kv->key, kv->value);
+            merkle.push(item);
+            item.nextKey();
+         }
+      }
+      ConstRevisionPtr revision;
+      SharedDatabase   sharedDatabase;
    };
 
    struct BlockHeaderState
@@ -293,9 +308,6 @@ namespace psibase
       BlockNum nextProducersBlockNum;
       // Set to true if this block or an ancestor failed validation
       bool invalid = false;
-      // Holds the services that can be used to verify producer
-      // signatures for the next block.
-      std::shared_ptr<BlockAuthState> authState;
       // Creates the initial state
       BlockHeaderState() : info()
       {
@@ -319,10 +331,10 @@ namespace psibase
          }
          else
          {
-            producers = std::make_shared<ProducerSet>(status->consensus);
-            if (status->nextConsensus)
+            producers = std::make_shared<ProducerSet>(status->consensus.current);
+            if (status->consensus.next)
             {
-               const auto& [prods, num] = *status->nextConsensus;
+               const auto& [prods, num] = *status->consensus.next;
                nextProducers            = std::make_shared<ProducerSet>(prods);
                nextProducersBlockNum    = num;
             }
@@ -347,12 +359,20 @@ namespace psibase
          if (info.header.newConsensus)
          {
             nextProducers = std::make_shared<ProducerSet>(*info.header.newConsensus);
+            if (producers->authState)
+            {
+               nextProducers->authState =
+                   BlockAuthState::next(systemContext, writer, producers->authState, info.header);
+            }
+            else
+            {
+               loadAuthState(systemContext, writer);
+            }
             // N.B. joint consensus with two identical producer sets
             // is functionally indistinguishable from non-joint consensus.
             // Don't both detecting this case here.
             nextProducersBlockNum = info.header.blockNum;
          }
-         initAuthState(systemContext, writer, prev);
       }
       // initAuthState and loadAuthState should only be used when
       // loading blocks from the database. initAuthState is preferred
@@ -361,22 +381,54 @@ namespace psibase
                          const WriterPtr&        writer,
                          const BlockHeaderState& prev)
       {
-         if (info.header.authServices)
+         if (prev.endsJointConsensus())
          {
-            authState = std::make_shared<BlockAuthState>(systemContext, writer, *prev.authState,
-                                                         info.header);
+            producers->authState = prev.nextProducers->authState;
+         }
+         else
+         {
+            producers->authState = prev.producers->authState;
+         }
+         if (nextProducers)
+         {
+            if (producers->authState)
+            {
+               auto prevAuthState =
+                   (prev.nextProducers ? prev.nextProducers : prev.producers)->authState;
+               nextProducers->authState =
+                   BlockAuthState::next(systemContext, writer, prevAuthState, info.header);
+            }
+            else
+            {
+               loadAuthState(systemContext, writer);
+            }
          }
          else
          {
             check(!info.header.authCode, "Unexpected authCode");
-            authState = prev.authState;
          }
       }
       void loadAuthState(SystemContext* systemContext, const WriterPtr& writer)
       {
+         auto&    authState = nextProducers ? nextProducers->authState : producers->authState;
          Database db{systemContext->sharedDatabase, revision};
          auto     session = db.startRead();
-         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db, info);
+         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db);
+         if (nextProducers)
+         {
+            producers->authState = std::make_shared<BlockAuthState>(systemContext, writer, db,
+                                                                    db.getPrevAuthServices());
+         }
+      }
+      JointConsensus readState(SystemContext* systemContext) const
+      {
+         Database db{systemContext->sharedDatabase, revision};
+         auto     session = db.startRead();
+         if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
+         {
+            return status->consensus;
+         }
+         return JointConsensus{};
       }
       bool endsJointConsensus() const
       {
@@ -409,6 +461,41 @@ namespace psibase
             }
          }
          return {};
+      }
+      ConstRevisionPtr getProdsAuthRevision() const
+      {
+         check(!!producers->authState,
+               "Auth services not loaded (this should only be possible for blocks that are already "
+               "committed, which we shouldn't need signatures for...)");
+         return producers->authState->revision;
+      }
+      ConstRevisionPtr getNextAuthRevision() const
+      {
+         if (endsJointConsensus())
+         {
+            return nextProducers->authState->revision;
+         }
+         else
+         {
+            return getProdsAuthRevision();
+         }
+      }
+      ConstRevisionPtr getAuthRevision(AccountNumber producer, const Claim& claim)
+      {
+         if (producers->getIndex(producer, claim))
+         {
+            return getProdsAuthRevision();
+         }
+         else if (nextProducers && nextProducers->getIndex(producer, claim))
+         {
+            return nextProducers->authState->revision;
+         }
+         else
+         {
+            abortMessage(producer.str() + " is not an active producer at block " +
+                         loggers::to_string(info.blockId));
+            return nullptr;
+         }
       }
       // The block that finalizes a swap to a new producer set needs to
       // contain proof that the block that started the switch is irreversible.
@@ -563,9 +650,12 @@ namespace psibase
          {
             Database db{systemContext->sharedDatabase, head->revision};
             auto     session = db.startRead();
-            if (auto block = db.kvGet<Block>(DbId::blockLog, num))
+            if (auto next = db.kvGet<Block>(DbId::blockLog, num + 1))
             {
-               // TODO: we can look up the next block and get prev instead of calculating the hash
+               return next->header.previous;
+            }
+            else if (auto block = db.kvGet<Block>(DbId::blockLog, num))
+            {
                return BlockInfo{*block}.blockId;
             }
             else
@@ -612,12 +702,13 @@ namespace psibase
       void set_subtree(const BlockHeaderState* root, const char* reason)
       {
          assert(root->info.header.term <= currentTerm);
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, root->info.header, root->blockId());
          if (root->invalid)
          {
-            PSIBASE_LOG_CONTEXT_BLOCK(logger, root->info.header, root->blockId());
             PSIBASE_LOG(logger, critical) << "Consensus failure: invalid block " << reason;
             throw consensus_failure{};
          }
+         PSIBASE_LOG(logger, debug) << "Setting subtree " << reason;
          if (byOrderIndex.find(root->order()) == byOrderIndex.end())
          {
             // The new root is not a descendant of the current root.
@@ -778,7 +869,7 @@ namespace psibase
       // sends a correct block with the wrong signature.
       Claim validateBlockSignature(BlockHeaderState* prev, const BlockInfo& info, const auto& sig)
       {
-         BlockContext verifyBc(*systemContext, prev->authState->revision);
+         BlockContext verifyBc(*systemContext, prev->getNextAuthRevision());
          VerifyProver prover{verifyBc, sig};
          auto         claim = prev->getNextProducerClaim(info.header.producer);
          if (!claim)
@@ -800,7 +891,7 @@ namespace psibase
             for (std::size_t i = 0; i < trx.proofs.size(); ++i)
             {
                TransactionTrace trace;
-               verifyBc.verifyProof(trx, trace, i, std::nullopt);
+               verifyBc.verifyProof(trx, trace, i, std::nullopt, nullptr);
             }
          }
       }
@@ -820,8 +911,8 @@ namespace psibase
                validateTransactionSignatures(ctx.current, prev->revision);
                ctx.callStartBlock();
                ctx.execAllInBlock();
-               auto [newRevision, id] =
-                   ctx.writeRevision(FixedProver(blockPtr->signature()), claim);
+               auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
+                                                          state->getProdsAuthRevision());
                // TODO: diff header fields
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
@@ -889,6 +980,8 @@ namespace psibase
       {
          auto newCommitIndex = std::max(std::min(num, head->blockNum()), commitIndex);
          auto result         = newCommitIndex != commitIndex;
+         if (result)
+            PSIBASE_LOG(logger, debug) << "Committing block " << newCommitIndex;
          for (auto i = commitIndex; i < newCommitIndex; ++i)
          {
             auto id    = get_block_id(i);
@@ -904,6 +997,7 @@ namespace psibase
                   setBlockData(id, *pos->second->auxConsensusData());
                }
             }
+            onCommitFn(state);
          }
          // ensure that only descendants of the committed block
          // are considered when searching for the best block.
@@ -913,7 +1007,7 @@ namespace psibase
          {
             // no error is possible, because the committed block is in the
             // current chain.
-            set_subtree(get_state(get_block_id(newCommitIndex)), "");
+            set_subtree(get_state(get_block_id(newCommitIndex)), "commitIndex");
          }
          commitIndex = newCommitIndex;
          return result;
@@ -921,14 +1015,21 @@ namespace psibase
 
       void setBlockData(const Checksum256& id, std::vector<char>&& data)
       {
-         char key[] = {0};
-         systemContext->sharedDatabase.setBlockData(*writer, id, key, data);
+         BlockDataRow row{id, std::move(data)};
+         systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
+                                                       psio::to_frac(row));
       }
 
       std::optional<std::vector<char>> getBlockData(const Checksum256& id) const
       {
-         char key[] = {0};
-         return systemContext->sharedDatabase.getBlockData(*writer, id, key);
+         if (auto data = systemContext->sharedDatabase.kvGetSubjective(
+                 *writer, psio::convert_to_key(blockDataKey(id))))
+         {
+            auto row = psio::from_frac<BlockDataRow>(*data);
+            if (row.auxConsensusData)
+               return std::move(*row.auxConsensusData);
+         }
+         return {};
       }
 
       // removes blocks and states before irreversible
@@ -936,13 +1037,26 @@ namespace psibase
       {
          for (auto iter = blocks.begin(), end = blocks.end(); iter != end;)
          {
-            auto blockNum = getBlockNum(iter->first);
-            if (blockNum < commitIndex ||
-                (blockNum == commitIndex &&
-                 !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
-                (blockNum > commitIndex &&
-                 states.find(iter->second->block().header().previous()) == states.end()))
+            auto        blockNum = getBlockNum(iter->first);
+            bool        remove   = false;
+            const char* msg      = nullptr;
+            if (blockNum < commitIndex)
             {
+               msg    = "block before irreversible";
+               remove = true;
+            }
+            else if ((blockNum == commitIndex &&
+                      !in_best_chain(ExtendedBlockId{iter->first, blockNum})) ||
+                     (blockNum > commitIndex &&
+                      states.find(iter->second->block().header().previous()) == states.end()))
+            {
+               msg    = "forked block";
+               remove = true;
+            }
+            if (remove)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(blockLogger, iter->second->block().header(), iter->first);
+               PSIBASE_LOG(blockLogger, debug) << "GC " << msg;
                f(iter->first);
                auto state_iter = states.find(iter->first);
                if (state_iter != states.end())
@@ -994,13 +1108,24 @@ namespace psibase
             {
                id = get_ancestor(id, t.num() - iter->first);
             }
-            else if (get_block_id(t.num()) == t.id())
-            {
-               return t;
-            }
             else
             {
-               throw std::runtime_error("block number is irreversible but block id does not match");
+               auto existing = get_block_id(t.num());
+               if (existing == t.id())
+               {
+                  return t;
+               }
+               else if (existing != Checksum256{})
+               {
+                  throw std::runtime_error("Cannot find common ancestor for block " +
+                                           loggers::to_string(t.id()) +
+                                           " because it has been irreversibly forked");
+               }
+               else
+               {
+                  throw std::runtime_error("Cannot find common ancestor for block " +
+                                           loggers::to_string(t.id()) + " because it is not known");
+               }
             }
          }
          while (true)
@@ -1072,6 +1197,205 @@ namespace psibase
          assert(!!blockContext);
          blockContext.reset();
       }
+      // Returns a function that can safely be run in another thread
+      auto snapshot_builder(const BlockHeaderState* state)
+      {
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, state->info.header, state->info.blockId);
+         PSIBASE_LOG(logger, info) << "Calculating state checksum";
+         return BuildStateChecksum{state->revision, systemContext->sharedDatabase};
+      }
+      bool should_make_snapshot(const BlockHeaderState* state)
+      {
+         Database db(systemContext->sharedDatabase, state->revision);
+         auto     session = db.startRead();
+         if (db.kvGet<ScheduledSnapshotRow>(ScheduledSnapshotRow::db,
+                                            scheduledSnapshotKey(state->info.header.blockNum)))
+         {
+            return true;
+         }
+         return false;
+      }
+
+      enum class ChecksumLog
+      {
+         never,
+         exact,
+         always,
+      };
+
+      std::optional<snapshot::StateSignature> on_state_checksum(
+          const Checksum256&             id,
+          const snapshot::StateChecksum& checksum,
+          AccountNumber                  me)
+      {
+         auto        revision = systemContext->sharedDatabase.getRevision(*writer, id);
+         auto        status   = getStatus(revision);
+         ProducerSet producers(status.consensus.current.data);
+         bool        inserted = false;
+         SnapshotRow row{.id = id};
+         auto        key = psio::convert_to_key(row.key());
+         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         {
+            psio::from_frac(row, *bytes);
+         }
+         // Check whether there are existing signatures for the same state
+         auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+         if (pos != row.other.end())
+         {
+            row.state = std::move(*pos);
+            row.other.erase(pos);
+         }
+         else
+         {
+            row.state = {.state = checksum};
+         }
+         // Add my signature
+         if (auto claim = producers.getClaim(me))
+         {
+            if (std::ranges::find(row.state->signatures, me, &snapshot::StateSignature::account) ==
+                row.state->signatures.end())
+            {
+               auto sig = prover.prove(snapshot::StateSignatureInfo{checksum}, *claim);
+               row.state->signatures.push_back({me, *claim, sig});
+               inserted = true;
+            }
+         }
+         systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+         PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+         verify_state_checksum(row, producers, ChecksumLog::always);
+         if (inserted)
+         {
+            return std::move(row.state->signatures.back());
+         }
+         else
+         {
+            return {};
+         }
+      }
+
+      StatusRow getStatus(ConstRevisionPtr revision)
+      {
+         check(!!revision, "Missing revision for state signature");
+         // look up active producers
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         check(!!status, "Missing status row");
+         check(!!status->head, "StatusRow missing head");
+         return std::move(*status);
+      }
+
+      // This can lag significantly behind irreversibility, so we can't rely
+      // on the BlockHeaderState being available
+      // Returns true if the signature is new
+      bool on_state_signature(const Checksum256&              id,
+                              const snapshot::StateChecksum&  checksum,
+                              const snapshot::StateSignature& sig)
+      {
+         auto        revision = systemContext->sharedDatabase.getRevision(*writer, id);
+         auto        status   = getStatus(revision);
+         ProducerSet producers(status.consensus.current.data);
+         if (!producers.getIndex(sig.account, sig.claim))
+         {
+            abortMessage(sig.account.str() + " is not a producer for block " +
+                         loggers::to_string(id));
+         }
+         auto authRevision = revision;
+         if (status.consensus.next)
+         {
+            Database db{systemContext->sharedDatabase, revision};
+            auto     session = db.startRead();
+            authRevision     = db.getPrevAuthServices();
+         }
+         verify(authRevision, snapshot::StateSignatureInfo{checksum}, sig.claim, sig.rawData);
+
+         // Check whether we already have a signature from this producers
+         // and insert it if we don't.
+         bool        inserted = false;
+         auto        log      = ChecksumLog::never;
+         SnapshotRow row{.id = id};
+         auto        key = psio::convert_to_key(row.key());
+         if (auto bytes = systemContext->sharedDatabase.kvGetSubjective(*writer, key))
+         {
+            psio::from_frac(row, *bytes);
+         }
+         if (row.state && row.state->state == checksum)
+         {
+            if (std::ranges::find(row.state->signatures, sig.account,
+                                  &snapshot::StateSignature::account) ==
+                row.state->signatures.end())
+            {
+               row.state->signatures.push_back(sig);
+               inserted = true;
+            }
+            log = ChecksumLog::exact;
+         }
+         else
+         {
+            auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+            if (pos == row.other.end())
+            {
+               row.other.push_back({.state = checksum, .signatures = {sig}});
+               inserted = true;
+            }
+            else
+            {
+               if (std::ranges::find(pos->signatures, sig.account,
+                                     &snapshot::StateSignature::account) == pos->signatures.end())
+               {
+                  pos->signatures.push_back(sig);
+                  inserted = true;
+               }
+            }
+         }
+         if (inserted)
+         {
+            systemContext->sharedDatabase.kvPutSubjective(*writer, key, psio::to_frac(row));
+            PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+            verify_state_checksum(row, producers, log);
+         }
+         return inserted;
+      }
+
+      // returns true if the number of producers is exactly the threshold
+      void verify_state_checksum(const SnapshotRow& row,
+                                 const ProducerSet& prods,
+                                 ChecksumLog        shouldLog)
+      {
+         auto        threshold = prods.weak_threshold();
+         std::size_t total     = 0;
+         std::size_t max       = 0;
+         for (const auto& item : row.other)
+         {
+            total += item.signatures.size();
+            max = std::max(max, item.signatures.size());
+         }
+         if (row.state)
+         {
+            if (total >= threshold)
+            {
+               PSIBASE_LOG(logger, critical) << "Consensus failure: state does not match producers";
+               throw consensus_failure{};
+            }
+            if (shouldLog == ChecksumLog::exact && row.state->signatures.size() == threshold ||
+                shouldLog == ChecksumLog::always && row.state->signatures.size() >= threshold)
+            {
+               PSIBASE_LOG(logger, info) << "Verified state checksum";
+            }
+            else if (shouldLog == ChecksumLog::always)
+            {
+               PSIBASE_LOG(logger, info) << "Finished state checksum";
+            }
+         }
+         else
+         {
+            if (total - max >= threshold)
+            {
+               PSIBASE_LOG(logger, critical) << "Consensus failure: producer state has diverged";
+               throw consensus_failure{};
+            }
+         }
+      }
       BlockHeaderState* finish_block(auto&& makeData)
       {
          assert(!!blockContext);
@@ -1088,7 +1412,8 @@ namespace psibase
             assert(!!claim);
             // If the head block is changed, the pending block needs to be cancelled.
             assert(blockContext->current.header.previous == head->blockId());
-            auto [revision, id] = blockContext->writeRevision(prover, *claim);
+            auto [revision, id] =
+                blockContext->writeRevision(prover, *claim, head->getNextAuthRevision());
             systemContext->sharedDatabase.setHead(*writer, revision);
             assert(head->blockId() == blockContext->current.header.previous);
             BlockInfo info;
@@ -1115,6 +1440,153 @@ namespace psibase
          }
       }
 
+      void pushTransaction(SignedTransaction&& trx)
+      {
+         auto bc = getBlockContext();
+
+         auto             revisionAtBlockStart = getHeadRevision();
+         TransactionTrace trace;
+         try
+         {
+            if (bc->needGenesisAction)
+               trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+            else
+            {
+               check(trx.proofs.size() == trx.transaction->claims().size(),
+                     "proofs and claims must have same size");
+               // All proofs execute as of the state at block begin. This will allow
+               // consistent parallel execution of all proofs within a block during
+               // replay. Proofs don't have direct database access, but they do rely
+               // on the set of services stored within the database. They may call
+               // other services; e.g. to call crypto functions.
+               //
+               // TODO: move proof execution to background threads
+               // TODO: track CPU usage of proofs and pass it somehow to the main
+               //       execution for charging
+               // TODO: If by the time the transaction executes it's on a different
+               //       block than the proofs were verified on, then either the proofs
+               //       need to be rerun, or the hashes of the services which ran
+               //       during the proofs need to be compared against the current
+               //       service hashes. This will prevent a poison block.
+               // TODO: If the first proof and the first auth pass, but the transaction
+               //       fails (including other proof failures), then charge the first
+               //       authorizer
+               BlockContext proofBC{*systemContext, revisionAtBlockStart};
+               proofBC.start(bc->current.header.time);
+               for (size_t i = 0; i < trx.proofs.size(); ++i)
+               {
+                  proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, bc);
+               }
+
+               // TODO: in another thread: check first auth and first proof. After
+               //       they pass, schedule the remaining proofs. After they pass,
+               //       schedule the transaction for execution in the main thread.
+               //
+               // The first auth check is a prefiltering measure and is mostly redundant
+               // with main execution. Unlike the proofs, the first auth check is allowed
+               // to run with any state on any fork. This is OK since the main execution
+               // checks all auths including the first; the worst that could happen is
+               // the transaction being rejected because it passes on one fork but not
+               // another, potentially charging the user for the failed transaction. The
+               // first auth check, when not part of the main execution, runs in read-only
+               // mode. Transact lets the account's auth service know it's in a
+               // read-only mode so it doesn't fail the transaction trying to update its
+               // tables.
+               //
+               // Replay doesn't run the first auth check separately. This separate
+               // execution is a subjective measure; it's possible, but not advisable,
+               // for a modified node to skip it during production. This won't hurt
+               // consensus since replay never uses read-only mode for auth checks.
+               auto saveTrace = trace;
+               proofBC.checkFirstAuth(trx, trace, std::nullopt, bc);
+               trace = std::move(saveTrace);
+
+               // TODO: RPC: don't forward failed transactions to P2P; this gives users
+               //       feedback.
+               // TODO: P2P: do forward failed transactions; this enables producers to
+               //       bill failed transactions which have tied up P2P nodes.
+               // TODO: If the first authorizer doesn't have enough to bill for failure,
+               //       then drop before running any other checks. Don't propagate.
+               // TODO: Don't propagate failed transactions which have
+               //       do_not_broadcast_flag.
+               // TODO: Revisit all of this. It doesn't appear to eliminate the need to
+               //       shadow bill, and once shadow billing is in place, failed
+               //       transaction billing seems unnecessary.
+
+               bc->pushTransaction(std::move(trx), trace, std::nullopt);
+            }
+         }
+         catch (std::bad_alloc&)
+         {
+            throw;
+         }
+         catch (...)
+         {
+            // Don't give a false positive
+            if (!trace.error)
+               throw;
+         }
+      }
+
+      std::optional<SignedTransaction> nextTransaction()
+      {
+         auto bc = getBlockContext();
+         if (!bc || bc->needGenesisAction)
+            return {};
+         Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
+         std::optional<SignedTransaction> result;
+         TransactionTrace                 trace;
+         try
+         {
+            auto& atrace = bc->execExport("nextTransaction", std::move(action), trace);
+            if (!psio::from_frac(result, atrace.rawRetval))
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, warning) << "failed to deserialize result of "
+                                                   << action.service.str() << "::nextTransaction";
+               result.reset();
+            }
+            else
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(bc->trxLogger, debug)
+                   << action.service.str() << "::nextTransaction succeeded";
+            }
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc->trxLogger, warning)
+                << action.service.str() << "::nextTransaction failed: " << e.what();
+         }
+         return result;
+      }
+
+      void recvMessage(const Socket& sock, const std::vector<char>& data)
+      {
+         Action action{.service = proxyServiceNum,
+                       .rawData = psio::to_frac(std::tuple(sock.id, data))};
+
+         // TODO: This can run concurrently
+         BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
+                         systemContext->sharedDatabase.createWriter(), true};
+         TransactionTrace trace;
+         try
+         {
+            auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << action.service.str() << "::recv failed: " << e.what();
+         }
+      }
+
+      void addSocket(const std::shared_ptr<Socket>& sock) { systemContext->sockets->add(sock); }
+
       std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
       {
          Database db{systemContext->sharedDatabase, std::move(revision)};
@@ -1128,6 +1600,8 @@ namespace psibase
             return {};
          }
       }
+
+      void onCommit(std::function<void(BlockHeaderState*)> fn) { onCommitFn = std::move(fn); }
 
       bool isProducing() const { return !!blockContext; }
 
@@ -1161,37 +1635,16 @@ namespace psibase
          {
             // Add blocks in [irreversible, head]
             // for now ignore other forks
-            auto blockNum = status->head->header.blockNum;
+            auto blockId  = status->head->blockId;
+            auto revision = sc->sharedDatabase.getHead();
             do
             {
-               auto block = db.kvGet<Block>(DbId::blockLog, blockNum);
-               if (!block)
-               {
-                  break;
-               }
-               BlockInfo info{*block};
-               auto      revision = sc->sharedDatabase.getRevision(*this->writer, info.blockId);
-               if (!revision)
-               {
-                  if (blocks.empty())
-                  {
-                     revision = sc->sharedDatabase.getHead();
-                  }
-                  else
-                  {
-                     break;
-                  }
-               }
-               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum);
-               if (!proof)
-               {
-                  proof.emplace();
-               }
-               blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
+               // Initialize state
+               BlockInfo info = readHead(revision);
                auto [state_iter, _] =
                    states.try_emplace(info.blockId, info, systemContext, revision);
                byOrderIndex.try_emplace(state_iter->second.order(), info.blockId);
-               byBlocknumIndex.try_emplace(blockNum, info.blockId);
+               byBlocknumIndex.try_emplace(info.header.blockNum, info.blockId);
                if (!head)
                {
                   head = &state_iter->second;
@@ -1199,7 +1652,24 @@ namespace psibase
                   PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
                   PSIBASE_LOG(logger, debug) << "Read head block";
                }
-            } while (blockNum--);
+
+               // load block
+               auto block = db.kvGet<Block>(DbId::blockLog, info.header.blockNum);
+               if (!block)
+               {
+                  break;
+               }
+               auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, info.header.blockNum);
+               if (!proof)
+               {
+                  proof.emplace();
+               }
+               blocks.try_emplace(info.blockId, SignedBlock{*block, *proof});
+
+               // Find the previous block
+               blockId  = info.header.previous;
+               revision = sc->sharedDatabase.getRevision(*this->writer, blockId);
+            } while (revision);
             const auto& info = states.begin()->second.info;
             PSIBASE_LOG_CONTEXT_BLOCK(logger, info.header, info.blockId);
             PSIBASE_LOG(logger, debug) << "Read last committed block";
@@ -1245,38 +1715,28 @@ namespace psibase
       }
 
       // Verifies a signature on a message associated with a block.
-      // The signature is verified using the state at the end of
-      // the previous block
       void verify(const Checksum256&       blockId,
                   std::span<char>          data,
+                  AccountNumber            producer,
                   const Claim&             claim,
                   const std::vector<char>& signature)
       {
          auto stateIter = states.find(blockId);
          check(stateIter != states.end(), "Unknown block");
-         stateIter = states.find(stateIter->second.info.header.previous);
-         check(stateIter != states.end(), "Previous block unknown");
-         BlockContext verifyBc(*systemContext, stateIter->second.authState->revision);
-         VerifyProver prover{verifyBc, signature};
-         prover.prove(data, claim);
+         // TODO: if the producer has the same key but the authServices changed, should
+         // we check the signature twice?
+         verify(stateIter->second.getAuthRevision(producer, claim), data, claim, signature);
       }
 
-      void verify(std::span<char> data, const Claim& claim, const std::vector<char>& signature)
+      void verify(std::span<const char>    data,
+                  const Claim&             claim,
+                  const std::vector<char>& signature)
       {
-         auto iter = byBlocknumIndex.find(commitIndex);
-         // The last committed block is guaranteed to be present
-         assert(iter != byBlocknumIndex.end());
-         auto stateIter = states.find(iter->second);
-         // We'd better have a state for this block
-         assert(stateIter != states.end());
-         assert(stateIter->second.revision);
-         BlockContext verifyBc(*systemContext, stateIter->second.revision);
-         VerifyProver prover{verifyBc, signature};
-         prover.prove(data, claim);
+         verify(head->getProdsAuthRevision(), data, claim, signature);
       }
 
       void verify(ConstRevisionPtr         revision,
-                  std::span<char>          data,
+                  std::span<const char>    data,
                   const Claim&             claim,
                   const std::vector<char>& signature)
       {
@@ -1285,7 +1745,18 @@ namespace psibase
          prover.prove(data, claim);
       }
 
+      BlockInfo readHead(ConstRevisionPtr revision)
+      {
+         Database db{systemContext->sharedDatabase, std::move(revision)};
+         auto     session = db.startRead();
+         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         check(status && status->head, "Missing head");
+         return *status->head;
+      }
+
      private:
+      // TODO: Use command line argument (read from database?, rearrange so services can set it explicitly?)
+      std::chrono::microseconds                                 proofWatchdogLimit{200000};
       std::optional<BlockContext>                               blockContext;
       SystemContext*                                            systemContext = nullptr;
       WriterPtr                                                 writer;
@@ -1298,6 +1769,8 @@ namespace psibase
 
       std::map<decltype(std::declval<BlockHeaderState>().order()), Checksum256> byOrderIndex;
       std::map<BlockNum, Checksum256>                                           byBlocknumIndex;
+
+      std::function<void(BlockHeaderState*)> onCommitFn;
 
       loggers::common_logger logger;
       loggers::common_logger blockLogger;

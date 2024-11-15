@@ -1,4 +1,5 @@
-use fracpack::{Pack, Result, Unpack, UnpackOwned};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use serde::Deserialize;
 use test_fracpack::*;
 
 fn get_tests1() -> [OuterStruct; 3] {
@@ -319,6 +320,7 @@ fn round_trip_fields(index: usize, obj: &OuterStruct) {
     do_rt!(index, obj, field_option_sns);
     println!("compared sns");
     do_rt!(index, obj, field_option_inner);
+    do_rt!(index, obj, field_option_u_inner);
     do_rt!(index, obj, field_o_o_i8);
     do_rt!(index, obj, field_o_o_str);
     do_rt!(index, obj, field_o_o_str2);
@@ -337,6 +339,11 @@ fn t1() -> Result<()> {
         assert_eq!(*t, unpacked);
         test_fracpack::bridge::ffi::round_trip_outer_struct(i, &packed[..]);
         // TODO: optionals after fixed-data portion ends
+
+        let mut builder = SchemaBuilder::new();
+        builder.insert_named::<OuterStruct>("OuterStruct".to_string());
+        let schema = builder.build().packed();
+        test_fracpack::bridge::ffi::round_trip_with_schema(i, &schema[..], &packed[..]);
     }
     Ok(())
 }
@@ -455,6 +462,407 @@ fn test_tuples() {
         &sws_tuple,
         "16000A0000000B000000000000000C0008000000A4709D3F020000006869",
     );
+}
+
+#[test]
+fn test_full_outer_struct() {
+    let outer_struct = &get_tests1()[0];
+    pack_and_compare(outer_struct, "8200010200030000000400000000000000FBFAFFF9FFFFFFF8FFFFFFFFFFFFFF000000000AD7134100000000000025C0540000006200000000000000A4000000A1000000010000009B0000009F000000010000009800000001000000000000009000000001000000010000000100000001000000010000000100000001000000740000001000D204000001000000010000000000000000000000003400000000000100000000000000000000000000000000000100000021000000000000000000000001000000000000000000000000040000000000000000000000000000000B0C000D00000000000000F2F1FFFFFF00008CC100000000");
+}
+
+#[test]
+fn test_trailing_options() {
+    let all_values_present = MultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: Some(4),
+    };
+    pack_and_compare(
+        &all_values_present,
+        "1C000100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
+    );
+
+    let empty_last_option = MultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_option,
+        "18000100000002000000000000000C0000000E0000000E0000000200000068690300000003000000627965",
+    );
+
+    let empty_last_two_options = MultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_two_options,
+        "1400010000000200000000000000080000000A00000002000000686903000000",
+    );
+
+    let empty_trailing_options = MultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: None,
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_trailing_options,
+        "100001000000020000000000000004000000020000006869",
+    );
+
+    let inner_struct = InnerStruct {
+        inner_u32: 1234,
+        var: None,
+        inner_option_u32: None,
+        inner_option_str: Some("".to_string()),
+        inner_option_vec_u16: None,
+        inner_o_vec_o_u16: None,
+    };
+    pack_and_compare(&inner_struct, "1000D2040000010000000100000000000000");
+}
+
+#[test]
+fn test_aliased_trailing_options() {
+    let all_values_present = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: Some(4),
+    };
+    pack_and_compare(
+        &all_values_present,
+        "1C000100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
+    );
+
+    let empty_last_option = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_option,
+        "18000100000002000000000000000C0000000E0000000E0000000200000068690300000003000000627965",
+    );
+
+    let empty_last_two_options = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_two_options,
+        "1400010000000200000000000000080000000A00000002000000686903000000",
+    );
+
+    let empty_trailing_options = TrailingWithAliasedOptionType {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: None,
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_trailing_options,
+        "100001000000020000000000000004000000020000006869",
+    );
+}
+
+#[test]
+fn options_but_not_trailing() {
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 1);
+    let x = vec![
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, usize::MAX);
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <Option<String> as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 0);
+    let x = vec![
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+        <u64 as fracpack::Pack>::IS_OPTIONAL,
+    ];
+    let last_non_optional_index = x
+        .iter()
+        .rposition(|&is_optional| !is_optional)
+        .unwrap_or(usize::MAX);
+    assert_eq!(last_non_optional_index, 1);
+
+    let empty_middle_option = OptionInTheMiddle {
+        a: 1,
+        opt_b: None,
+        c: 2,
+    };
+    pack_and_compare(&empty_middle_option, "0C00010000000100000002000000");
+
+    let def_wont_change_inner_struct = DefWontChangeInnerStruct {
+        field_bool: false,
+        field_u32: 0,
+        field_var: Variant::ItemU32(0),
+        field_i16: 0,
+        field_o_var: None,
+        field_str: "".to_string(),
+        field_a_i16_3: [0, 0, 0],
+        field_f32: 0.0,
+        field_o_v_i8: None,
+        field_a_s_2: ["".to_string(), "".to_string()],
+        field_f64: 0.0,
+        field_o_str: None,
+        field_v_u16: vec![],
+        field_i32: 0,
+    };
+    pack_and_compare(
+        &def_wont_change_inner_struct,
+        "0000000000340000000000010000000000000000000000000000000000010000002100000000000000000000000100000000000000000000000004000000000000000000000000000000",
+    );
+
+    let def_wont_change_inner_struct2 = DefWontChangeInnerStruct {
+        field_bool: true,
+        field_u32: 44,
+        field_var: Variant::ItemStr("xyz".to_string()),
+        field_i16: 55,
+        field_o_var: Some(Variant::ItemU32(88)),
+        field_str: "byebye".to_string(),
+        field_a_i16_3: [77, 88, 99],
+        field_f32: 6.4,
+        field_o_v_i8: Some(vec![44, 55, 66]),
+        field_a_s_2: ["aa".to_string(), "bb".to_string()],
+        field_f64: 128.128,
+        field_o_str: Some("lo".to_string()),
+        field_v_u16: vec![3, 2, 1],
+        field_i32: -999,
+    };
+    pack_and_compare(
+        &def_wont_change_inner_struct2,
+        "012C0000003400000037003A0000003F0000004D0058006300CDCCCC403B0000003E0000006ABC749318046040460000004800000019FCFFFF01070000000300000078797A00040000005800000006000000627965627965030000002C3742080000000A000000020000006161020000006262020000006C6F06000000030002000100",
+    );
+}
+
+#[test]
+fn test_trailing_options_unextensible() {
+    let all_values_present = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: Some(4),
+    };
+    pack_and_compare(
+        &all_values_present,
+        "0100000002000000000000001000000012000000120000001500000002000000686903000000030000006279650400000000000000",
+    );
+
+    let empty_last_option = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: Some("bye".to_string()),
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_option,
+        "010000000200000000000000100000001200000012000000010000000200000068690300000003000000627965",
+    );
+
+    let empty_last_two_options = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: Some(3),
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_last_two_options,
+        "0100000002000000000000001000000012000000010000000100000002000000686903000000",
+    );
+
+    let empty_trailing_options = UnextensibleMultipleTrailingOptions {
+        a: 1,
+        b: 2,
+        s: "hi".to_string(),
+        opt_x: None,
+        opt_y: None,
+        opt_z: None,
+    };
+    pack_and_compare(
+        &empty_trailing_options,
+        "01000000020000000000000010000000010000000100000001000000020000006869",
+    );
+}
+
+#[derive(Deserialize)]
+struct SchemaTestCase {
+    #[serde(rename = "type")]
+    type_: String,
+    #[serde(default)]
+    json: Option<serde_json::Value>,
+    fracpack: String,
+    #[serde(default)]
+    error: bool,
+    #[serde(default)]
+    compat: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SchemaTestFile {
+    schema: fracpack::Schema,
+    values: Vec<SchemaTestCase>,
+}
+
+fn fuzzy_equal(lhs: &serde_json::Value, rhs: &serde_json::Value) -> bool {
+    use serde_json::Value::*;
+    match (lhs, rhs) {
+        (Null, Null) => true,
+        (Bool(l), Bool(r)) => l == r,
+        (Number(l), Number(r)) => {
+            if let (Some(v), Some(w)) = (l.as_i64(), r.as_i64()) {
+                v == w
+            } else {
+                l.as_f64() == r.as_f64()
+            }
+        }
+        (Number(l), String(r)) => &l.to_string() == r,
+        (String(l), String(r)) => {
+            if (l == "inf" || l == "Infinity") && (r == "inf" || r == "Infinity") {
+                true
+            } else if (l == "-inf" || l == "-Infinity") && (r == "-inf" || r == "-Infinity") {
+                true
+            } else {
+                l == r
+            }
+        }
+        (Array(l), Array(r)) => l.iter().zip(r.iter()).all(|(l, r)| fuzzy_equal(l, r)),
+        (Object(l), Object(r)) => {
+            for (k, v) in l {
+                if let Some(w) = r.get(k) {
+                    if v != w {
+                        return false;
+                    }
+                } else {
+                    if !v.is_null() {
+                        return false;
+                    }
+                }
+            }
+            for (k, v) in r {
+                if !l.contains_key(k) && !v.is_null() {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+#[test]
+fn schema_json() -> Result<()> {
+    let builtin = fracpack::standard_types();
+    let all_tests: Vec<SchemaTestFile> = serde_json::from_str(include_str!(
+        "../../../libraries/psio/tests/fracpack-tests.json"
+    ))
+    .unwrap();
+    for tests in all_tests {
+        let cschema = CompiledSchema::new(&tests.schema, &builtin);
+        for test in tests.values {
+            println!("type: {}", test.type_);
+            let fracpack = hex::decode(&test.fracpack).unwrap();
+            if let Some(expected) = test.json {
+                let ty = cschema.get(&test.type_).unwrap();
+                let actual = cschema.to_value(ty, &fracpack)?; //frac2json(&cschema, ty, &fracpack)?;
+                assert!(
+                    fuzzy_equal(&actual, &expected),
+                    "`{actual}` != `{expected}`"
+                );
+                cschema.verify(ty, &fracpack)?;
+                cschema.verify_strict(ty, &fracpack)?;
+                for i in 0..fracpack.len() {
+                    let truncated = &fracpack[0..i];
+                    cschema
+                        .to_value(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                    cschema
+                        .verify_strict(ty, truncated)
+                        .expect_err(&format!("expected error for {}", hex::encode(truncated)));
+                }
+                if let Some(compat) = test.compat {
+                    let compat = hex::decode(&compat).unwrap();
+                    let compat_json = cschema.to_value(ty, &compat)?;
+                    assert_eq!(compat_json, actual);
+                    cschema.verify(ty, &compat)?;
+                    cschema
+                        .verify_strict(ty, &compat)
+                        .expect_err(&format!("expected HasUnknown for {}", &test.fracpack));
+                }
+                let reverse = cschema.from_value(ty, &expected).unwrap();
+                assert_eq!(reverse, fracpack);
+                let roundtrip = cschema.from_value(ty, &actual).unwrap();
+                assert_eq!(roundtrip, fracpack);
+            }
+            if test.error {
+                let ty = cschema.get(tests.schema.get(&test.type_).unwrap()).unwrap();
+                cschema
+                    .to_value(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                cschema
+                    .verify(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+                cschema
+                    .verify_strict(ty, &fracpack)
+                    .expect_err(&format!("expected error for {}", &test.fracpack));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn pack_and_compare<T>(src_struct: &T, expected_hex: &str) -> Vec<u8>

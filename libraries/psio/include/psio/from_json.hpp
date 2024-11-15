@@ -67,96 +67,7 @@ namespace psio
       unspecific_syntax_error,
    };  // from_json_error
 
-   constexpr inline std::string_view error_to_str(from_json_error e)
-   {
-      switch (e)
-      {
-            // clang-format off
-               case from_json_error::no_error:                            return "No error";
-
-               case from_json_error::expected_end:                        return "Expected end of json";
-               case from_json_error::expected_null:                       return "Expected null";
-               case from_json_error::expected_bool:                       return "Expected true or false";
-               case from_json_error::expected_string:                     return "Expected string";
-               case from_json_error::expected_hex_string:                 return "Expected string containing hex";
-               case from_json_error::hex_string_incorrect_length:         return "Hex string has incorrect length";
-               case from_json_error::invalid_signature:                   return "Invalid signature format";
-               case from_json_error::invalid_name:                        return "Invalid name";
-               case from_json_error::expected_start_object:               return "Expected {";
-               case from_json_error::expected_key:                        return "Expected key";
-               case from_json_error::expected_end_object:                 return "Expected }";
-               case from_json_error::expected_start_array:                return "Expected [";
-               case from_json_error::expected_end_array:                  return "Expected ]";
-               case from_json_error::expected_positive_uint:              return "Expected positive integer";
-               case from_json_error::expected_field:                      return "Expected field";
-               case from_json_error::expected_variant:                    return R"(Expected variant: {"type": value})";
-               case from_json_error::expected_public_key:                 return "Expected public key";
-               case from_json_error::expected_private_key:                return "Expected private key";
-               case from_json_error::expected_signature:                  return "Expected signature";
-               case from_json_error::expected_number:                     return "Expected number or boolean";
-               case from_json_error::expected_int:                        return "Expected integer";
-               case from_json_error::expected_time_point:                 return "Expected time point";
-               case from_json_error::expected_symbol_code:                return "Expected symbol code";
-               case from_json_error::expected_symbol:                     return "Expected symbol";
-               case from_json_error::expected_asset:                      return "Expected asset";
-               case from_json_error::invalid_type_for_variant:            return "Invalid type for variant";
-               case from_json_error::unexpected_field:                    return "Unexpected field";
-               case from_json_error::number_out_of_range:                 return "number is out of range";
-               case from_json_error::from_json_no_pair:                   return "from_json does not support std::pair";
-
-               case from_json_error::document_empty:                      return "The document is empty";
-               case from_json_error::document_root_not_singular:          return "The document root must not follow by other values";
-               case from_json_error::value_invalid:                       return "Invalid value";
-               case from_json_error::object_miss_name:                    return "Missing a name for object member";
-               case from_json_error::object_miss_colon:                   return "Missing a colon after a name of object member";
-               case from_json_error::object_miss_comma_or_curly_bracket:  return "Missing a comma or '}' after an object member";
-               case from_json_error::array_miss_comma_or_square_bracket:  return "Missing a comma or ']' after an array element";
-               case from_json_error::string_unicode_escape_invalid_hex:   return "Incorrect hex digit after \\u escape in string";
-               case from_json_error::string_unicode_surrogate_invalid:    return "The surrogate pair in string is invalid";
-               case from_json_error::string_escape_invalid:               return "Invalid escape character in string";
-               case from_json_error::string_miss_quotation_mark:          return "Missing a closing quotation mark in string";
-               case from_json_error::string_invalid_encoding:             return "Invalid encoding in string";
-               case from_json_error::number_too_big:                      return "Number too big to be stored in double";
-               case from_json_error::number_miss_fraction:                return "Miss fraction part in number";
-               case from_json_error::number_miss_exponent:                return "Miss exponent in number";
-               case from_json_error::terminated:                          return "Parsing was terminated";
-               case from_json_error::unspecific_syntax_error:             return "Unspecific syntax error";
-            // clang-format on
-
-         default:
-            return "unknown";
-      }
-   }
-
-   inline from_json_error convert_error(rapidjson::ParseErrorCode err)
-   {
-      switch (err)
-      {
-            // clang-format off
-         case rapidjson::kParseErrorNone:                            return from_json_error::no_error;
-         case rapidjson::kParseErrorDocumentEmpty:                   return from_json_error::document_empty;
-         case rapidjson::kParseErrorDocumentRootNotSingular:         return from_json_error::document_root_not_singular;
-         case rapidjson::kParseErrorValueInvalid:                    return from_json_error::value_invalid;
-         case rapidjson::kParseErrorObjectMissName:                  return from_json_error::object_miss_name;
-         case rapidjson::kParseErrorObjectMissColon:                 return from_json_error::object_miss_colon;
-         case rapidjson::kParseErrorObjectMissCommaOrCurlyBracket:   return from_json_error::object_miss_comma_or_curly_bracket;
-         case rapidjson::kParseErrorArrayMissCommaOrSquareBracket:   return from_json_error::array_miss_comma_or_square_bracket;
-         case rapidjson::kParseErrorStringUnicodeEscapeInvalidHex:   return from_json_error::string_unicode_escape_invalid_hex;
-         case rapidjson::kParseErrorStringUnicodeSurrogateInvalid:   return from_json_error::string_unicode_surrogate_invalid;
-         case rapidjson::kParseErrorStringEscapeInvalid:             return from_json_error::string_escape_invalid;
-         case rapidjson::kParseErrorStringMissQuotationMark:         return from_json_error::string_miss_quotation_mark;
-         case rapidjson::kParseErrorStringInvalidEncoding:           return from_json_error::string_invalid_encoding;
-         case rapidjson::kParseErrorNumberTooBig:                    return from_json_error::number_too_big;
-         case rapidjson::kParseErrorNumberMissFraction:              return from_json_error::number_miss_fraction;
-         case rapidjson::kParseErrorNumberMissExponent:              return from_json_error::number_miss_exponent;
-         case rapidjson::kParseErrorTermination:                     return from_json_error::terminated;
-         case rapidjson::kParseErrorUnspecificSyntaxError:           return from_json_error::unspecific_syntax_error;
-            // clang-format on
-
-         default:
-            return from_json_error::unspecific_syntax_error;
-      }
-   }
+   std::string_view error_to_str(from_json_error e);
 
    enum class json_token_type
    {
@@ -190,175 +101,53 @@ namespace psio
       json_token current_token;
 
       // This modifies json (an optimization inside rapidjson)
-      json_token_stream(char* json) : ss{json} { reader.IterativeParseInit(); }
+      json_token_stream(char* json);
 
-      bool complete() { return reader.IterativeParseComplete(); }
+      bool complete();
 
-      std::reference_wrapper<const json_token> peek_token()
-      {
-         if (current_token.type != json_token_type::type_unread)
-            return current_token;
-         else if (reader.IterativeParseNext<
-                      rapidjson::kParseInsituFlag | rapidjson::kParseValidateEncodingFlag |
-                      rapidjson::kParseIterativeFlag | rapidjson::kParseNumbersAsStringsFlag>(
-                      ss, *this))
-            return current_token;
-         else
-            abort_error(convert_error(reader.GetParseErrorCode()));
-      }
+      std::reference_wrapper<const json_token> peek_token();
 
-      void eat_token() { current_token.type = json_token_type::type_unread; }
+      void eat_token();
 
-      void get_end()
-      {
-         if (current_token.type != json_token_type::type_unread || !complete())
-            abort_error(from_json_error::expected_end);
-      }
+      void get_end();
 
-      bool get_null_pred()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_null)
-            return false;
-         eat_token();
-         return true;
-      }
-      void get_null() { check(get_null_pred(), from_json_error::expected_null); }
+      bool get_null_pred();
+      void get_null();
 
-      bool get_bool()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_bool)
-            abort_error(from_json_error::expected_bool);
-         eat_token();
-         return t.get().value_bool;
-      }
+      bool get_bool();
 
-      std::string_view get_string()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_string)
-            abort_error(from_json_error::expected_string);
-         eat_token();
-         return t.get().value_string;
-      }
+      std::string_view get_string();
 
-      void get_start_object()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_start_object)
-            abort_error(from_json_error::expected_start_object);
-         eat_token();
-      }
+      void get_start_object();
 
-      std::string_view get_key()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_key)
-            abort_error(from_json_error::expected_key);
-         eat_token();
-         return t.get().key;
-      }
+      std::string_view get_key();
 
-      std::optional<std::string_view> maybe_get_key()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_key)
-            return {};
-         eat_token();
-         return t.get().key;
-      }
+      std::optional<std::string_view> maybe_get_key();
 
-      bool get_end_object_pred()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_end_object)
-            return false;
-         eat_token();
-         return true;
-      }
-      void get_end_object()
-      {
-         if (!get_end_object_pred())
-            abort_error(from_json_error::expected_end_object);
-      }
+      bool get_end_object_pred();
+      void get_end_object();
 
-      bool get_start_array_pred()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_start_array)
-            return false;
-         eat_token();
-         return true;
-      }
-      void get_start_array()
-      {
-         check(get_start_array_pred(), from_json_error::expected_start_array);
-      }
+      bool get_start_array_pred();
+      void get_start_array();
 
-      bool get_end_array_pred()
-      {
-         auto t = peek_token();
-         if (t.get().type != json_token_type::type_end_array)
-            return false;
-         eat_token();
-         return true;
-      }
-      void get_end_array() { check(get_end_array_pred(), from_json_error::expected_end_array); }
+      bool get_end_array_pred();
+      void get_end_array();
 
       // BaseReaderHandler methods
-      bool Null()
-      {
-         current_token.type = json_token_type::type_null;
-         return true;
-      }
-      bool Bool(bool v)
-      {
-         current_token.type       = json_token_type::type_bool;
-         current_token.value_bool = v;
-         return true;
-      }
-      bool RawNumber(const char* v, rapidjson::SizeType length, bool copy)
-      {
-         return String(v, length, copy);
-      }
-      bool Int(int v) { return false; }
-      bool Uint(unsigned v) { return false; }
-      bool Int64(int64_t v) { return false; }
-      bool Uint64(uint64_t v) { return false; }
-      bool Double(double v) { return false; }
-      bool String(const char* v, rapidjson::SizeType length, bool)
-      {
-         current_token.type         = json_token_type::type_string;
-         current_token.value_string = {v, length};
-         return true;
-      }
-      bool StartObject()
-      {
-         current_token.type = json_token_type::type_start_object;
-         return true;
-      }
-      bool Key(const char* v, rapidjson::SizeType length, bool)
-      {
-         current_token.key  = {v, length};
-         current_token.type = json_token_type::type_key;
-         return true;
-      }
-      bool EndObject(rapidjson::SizeType)
-      {
-         current_token.type = json_token_type::type_end_object;
-         return true;
-      }
-      bool StartArray()
-      {
-         current_token.type = json_token_type::type_start_array;
-         return true;
-      }
-      bool EndArray(rapidjson::SizeType)
-      {
-         current_token.type = json_token_type::type_end_array;
-         return true;
-      }
+      bool Null();
+      bool Bool(bool v);
+      bool RawNumber(const char* v, rapidjson::SizeType length, bool copy);
+      bool Int(int v);
+      bool Uint(unsigned v);
+      bool Int64(int64_t v);
+      bool Uint64(uint64_t v);
+      bool Double(double v);
+      bool String(const char* v, rapidjson::SizeType length, bool);
+      bool StartObject();
+      bool Key(const char* v, rapidjson::SizeType length, bool);
+      bool EndObject(rapidjson::SizeType);
+      bool StartArray();
+      bool EndArray(rapidjson::SizeType);
    };  // json_token_stream
 
    template <typename SrcIt, typename DestIt>
@@ -668,8 +457,26 @@ namespace psio
       from_json_hex(obj, stream);
    }
 
-   template <typename S>
-   void from_json(std::vector<signed char>& obj, S& stream)
+   template <typename T, std::size_t N, typename S>
+      requires std::same_as<T, char> || std::same_as<T, unsigned char> ||
+               std::same_as<T, signed char>
+   void from_json_hex(std::array<T, N>& result, S& stream)
+   {
+      auto s = stream.get_string();
+      if (s.size() != 2 * N)
+         abort_error(from_json_error::expected_hex_string);
+      if (!unhex(result.data(), s.begin(), s.end()))
+         abort_error(from_json_error::expected_hex_string);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<char, N>& obj, S& stream)
+   {
+      from_json_hex(obj, stream);
+   }
+
+   template <std::size_t N, typename S>
+   void from_json(std::array<unsigned char, N>& obj, S& stream)
    {
       from_json_hex(obj, stream);
    }
@@ -708,6 +515,11 @@ namespace psio
       } while (depth);
    }
 
+   template <typename T>
+   concept PackValidatable = requires(T obj) {
+      { clio_validate_packable(obj) } -> std::same_as<bool>;
+   };
+
    /// \output_section Parse JSON (Reflected Objects)
    /// Parse JSON and convert to `obj`. This overload works with
    /// [reflected objects](standardese://reflection/).
@@ -716,29 +528,24 @@ namespace psio
    {
       if constexpr (reflect<T>::is_struct)
       {
-         from_json_object(
-             stream,
-             [&](std::string_view key) -> void
-             {
-                bool found = false;
-                reflect<T>::get(
-                    key,
-                    [&](auto member)
-                    {
-                       if constexpr (not std::is_member_function_pointer_v<decltype(member)>)
-                       {
-                          from_json(obj.*member, stream);
-                          found = true;
-                       }
-                       else
-                       {
-                       }
-                    });
-                if (not found)
-                {
-                   from_json_skip_value(stream);
-                }
-             });
+         from_json_object(stream,
+                          [&](std::string_view key) -> void
+                          {
+                             bool found = psio::get_data_member<T>(
+                                 key, [&](auto member) { from_json(obj.*member, stream); });
+                             if (not found)
+                             {
+                                from_json_skip_value(stream);
+                             }
+                          });
+
+         if constexpr (PackValidatable<T>)
+         {
+            if (!clio_validate_packable(obj))
+            {
+               check(false, std::string(psio::reflect<T>::name) + " failed unpack validation.");
+            }
+         }
       }
       else
       {

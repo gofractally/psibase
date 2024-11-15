@@ -1,273 +1,147 @@
 # Plugins
 
-Plugins run within a client's browser in the context of the [supervisor](./supervisor.md). They are intended to facilitate interactions between user interfaces and services.
-
-```mermaid
-sequenceDiagram 
-
-box rgb(85,85,85) client-side
-actor Alice
-participant UI
-participant Plugin
-end
-
-box rgb(85,85,85) server-side
-participant psinode
-end
-
-Alice->>UI: Click
-UI->>Plugin: Call action
-note over Plugin: Internal logic
-Plugin->>psinode: Submit transaction
-
-```
-
-# Communication with plugins
-
-Apps built on psibase make use of shared infrastructure, and as such have the option to interoperate in ways that are difficult or impossible for traditional web apps. On the server side, psibase services can simply call synchronous actions on each other. On the client-side, plugins can also make calls between each other.
-
-On the client-side, an app may call a function defined in another app's plugin. When this happens, a message is passed from the user interface of one app to the [supervisor](./supervisor.md), which then instantiates the target plugin in its own app domain, which ensures that local app data remains isolated except that which is intentionally exposed through an plugin.
-
-```mermaid
-sequenceDiagram 
-
-box rgb(85,85,85) client-side, Domain 1
-actor Alice
-participant UI
-participant Plugin
-end
-
-box rgb(85,85,85) client-side, Domain 2
-participant Plugin2
-end
-
-box rgb(85,85,85) server-side
-participant psinode
-end
-
-Alice->>UI: Click
-UI->>Plugin: Action
-Note over Plugin: Requires client-side<br>data from App 2
-Plugin->>Plugin2: Query
-Plugin2-->>Plugin: Response
-Plugin->>psinode: Submit transaction
-
-```
-
-## Cross-domain communication
-
-Calls made across domains are done so via `Window.PostMessage`.
-
-According to the [Window.postMessage documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage):
-
-> After postMessage() is called, the MessageEvent will be dispatched only after all pending execution contexts have finished.
-
-Therefore `postMessage` does not immediately (synchronously) post to the other domain. Instead it schedules a payload to be dispatched after the completion of all remaining execution contexts. In order for cross-domain calls to appear synchronous, the caller should await the asynchronous call.
-
-## Cross-domain security considerations
-
-Cross-domain messaging can be dangerous if the proper checks are not in place to ensure that the messages are going to/from whoever is intended. 
-
-The supervisor listens for cross-domain messages from its parent window and from the plugins it instantiates, and plugins will only listen for messages that come directly from the supervisor.
-
-If plugins make use of the standard psibase development libraries, then many of the security concerns are handled automatically. For example, it is automatically enforced that messages into your plugin are only allowed to come from the supervisor.
-
-# Transaction packing
-
-Transactions contain the data and authentication payload necessary to execute a service action on the server. Transactions may contain multiple actions. Plugins are responsible for filling the transaction objects with actions.
-
-A plugin is by default ignorant of all actions added into a transaction except any that it was itself responsible for adding. This improves privacy on the client-side by ensuring that plugins are only aware of the user's actions that are relevant to it.
-
-Actions are added to transactions in a FIFO queue. For example, the following sequence diagram will finally submit a transaction containing actions in the order: A, B, C.
-
-```mermaid
-sequenceDiagram 
-
-box rgb(85,85,85) client-side, Domain 1
-actor Alice
-participant UI
-participant Plugin
-end
-
-box rgb(85,85,85) client-side, Domain 2
-participant Plugin2
-end
-
-box rgb(85,85,85) server-side
-participant psinode
-end
-
-Alice->>UI: Click
-UI->>Plugin: Do C
-Note over Plugin: Action A
-Plugin->>Plugin2: Action
-Note over Plugin2: Action B
-Plugin2-->>Plugin: Response
-Note over Plugin: Action C
-Plugin->>psinode: Submit transaction
-```
-
-# Transaction submission
-
-For simplicity, the previous diagrams have shown the plugin as the component that submits the final transaction. But that would conflict with the principle of only allowing a plugin to know about the actions that it was itself responsible for adding to the transaction.
-
-Instead, that responsibility is given to the [supervisor](./supervisor.md).
-
-The sequence looks more like the following, if we include the Root domain: 
-
-```mermaid
-sequenceDiagram 
-
-box rgb(85,85,85) client-side, Domain 1
-actor Alice
-participant UI
-participant Plugin
-end
-
-box rgb(85,85,85) client-side, Supervisor domain
-participant supervisor
-end
-
-box rgb(85,85,85) server-side
-participant psinode
-end
-
-Alice->>UI: Click
-UI->>supervisor: Call action
-supervisor->>Plugin: Call action
-activate Plugin
-Plugin->>supervisor: Action A
-activate supervisor
-note over supervisor: transaction { A }
-supervisor-->>Plugin: Ok
-deactivate supervisor
-Plugin-->>supervisor: Ok
-deactivate Plugin
-supervisor->>psinode: Submit transaction
-
-```
-
-# A complete interaction
-
-The following sequence diagram shows an example of a complete interaction involving an app, the supervisor, as well as multiple plugins. The diagram also includes transaction packing and submission. It attempts to show how the cross-domain messaging only occurs after the completion of all active execution contexts (EC). A key interaction that is intentionally left out of the following diagram for simplicity is the supervisor's process for the aggregation of digital signatures and other authorization payloads.
-
-```mermaid
-%%{init: { 'sequence': {'noteAlign': 'left'} }}%%
-sequenceDiagram 
-
-box rgb(85,85,85) client-side, Domain 1
-participant UI
-participant plugin
-end
-
-box rgb(85,85,85) client-side, Supervisor domain
-participant supervisor
-end
-
-box rgb(85,85,85) client-side, Domain 2
-participant plugin_2
-end
-
-box rgb(85,85,85) server-side
-participant psinode
-end
-
-Note over UI: [IAC - Wait on EC]
-UI->>supervisor: Call action@plugin
-activate supervisor
-
-supervisor->>psinode: Get plugin
-psinode-->>supervisor: reply
-note over supervisor: [IAC - Wait on EC]
-supervisor->>plugin: action
-activate plugin
-
-note over plugin: [IAC - Wait on EC]
-plugin->>supervisor: Call action2@plugin2
-activate supervisor
-
-supervisor->>psinode: Get plugin2
-psinode-->>supervisor: reply
-note over supervisor: [IAC - Wait on EC]
-supervisor->>plugin_2: action2
-activate plugin_2
-
-note over plugin_2: [IAC - Wait on EC]
-plugin_2->>supervisor: Call action@serviceA
-activate supervisor
-
-note over supervisor: transaction { action@serviceA }
-
-note over supervisor: [IAC - Wait on EC]
-supervisor-->>plugin_2: reply
-deactivate supervisor
-note over plugin_2: [IAC - Wait on EC]
-plugin_2-->>supervisor: reply
-deactivate plugin_2
-
-note over supervisor: [IAC - Wait on EC]
-supervisor-->>plugin: reply
-deactivate supervisor
-
-note over plugin: [IAC - Wait on EC]
-plugin->>supervisor: Call action@serviceB
-activate supervisor
-note over supervisor: transaction { <br> action@serviceA,<br> action@serviceB<br>}
-note over supervisor: [IAC - Wait on EC]
-supervisor-->>plugin: reply
-deactivate supervisor
-note over plugin: [IAC - Wait on EC]
-plugin-->>supervisor: reply
-deactivate plugin
-
-note over supervisor: [IAC - Wait on EC]
-supervisor->>psinode: Submit transaction
-psinode-->>supervisor: reply
-supervisor-->>UI: reply
-deactivate supervisor
-
-```
-
-# Simplified mental model
-
-Plugin communication is a complex coordination process facilitated by the [supervisor](./supervisor.md). However, for most purposes, UI and plugin developers do not need to understand this complexity. For most purposes, it is sufficient to imagine that calls into plugins are simple and direct.
-
-With this simplified mental model, it is easier to see how these capabilities lead to powerful client-side app composability. Consider the following example of an app that manages the creation of a token using some of the psibase example Token and Symbol services & plugins.
+Plugins manage client-side user interactions and enable external integrations with psibase apps. Typically, they are stored in and served from a service and they run within a users's browser.
 
 ```mermaid
 sequenceDiagram
 
 box rgb(85,85,85) client-side
-participant TokenCreator app
-participant Token plugin
-participant Symbol plugin
+actor Alice
+participant UI
+participant Supervisor
 end
+
+box rgb(85,85,85) server-side
 participant psinode
+end
 
-Note over TokenCreator app: Alice submits form with new token<br>characteristics and symbol name
+Alice->>UI: Click
+UI->>Supervisor: Call action
+note over Supervisor: Instantiate plugin
+note over Supervisor: Call action on plugin
+Supervisor->>psinode: Submit transaction
 
-TokenCreator app->>Token plugin: CreateToken
-    Token plugin->>Symbol plugin: BuySymbol
-        Symbol plugin->>psinode: [Action] credit@token-sys
-        Symbol plugin->>psinode: [Action] buySymbol@symbol-sys
-        Symbol plugin-->>Token plugin: reply
-    Token plugin->>psinode: [Action] mapToNewToken@symbol-sys
-    Token plugin-->>TokenCreator app: reply
 ```
 
-As you can see, someone creating an app to facilitate the creation of tokens would simply need to call the correct Token plugin action. The Token plugin allows you to specify a symbol and will automatically purchase a symbol from a symbol market and map it to the new token. All of the various interactions result in calling three separate actions in psibase services. Those three actions will automatically be packaged into one single transaction, enabling maximally efficient processing of the action on the server (authentication logic only runs once to verify the sender is authorized for the whole transaction, rather than authorization logic executing once for each action submitted in separate transactions).
+Similar to services, they run within a WebAssembly VM, except that they run on the client-side rather than on the server-side. This gives them unique capabilities that are unavailable to services, such as the ability to directly interact with the user and work with private user data.
 
+## Plugin anatomy
 
-# Plugin developers
+Plugins are compiled to and stored on the server as [WebAssembly Components](https://component-model.bytecodealliance.org/). This gives them statically-analyzable capability-based security through the use of explicit import and export declarations written in the [WIT](https://component-model.bytecodealliance.org/design/wit.html) interface description language (IDL).
 
-Although the code executes client-side, plugins are very similar to services. For example, just as in the context of the execution of a service action the service has full control over its own database, plugins are permitted to silently call actions on their own service (Without additional confirmation prompts to the end user). Therefore, failing to include the proper security checks in the plugin could allow the service to be exploited, corrupting shared data. This is unlike the more familiar concerns of UI developers which are traditionally much more limited. 
+This means that plugins are only able to execute functionality that is explicilty provided to them and they are only able to be interacted with via an explicitly exported function interface. This import and export interface are defined at compile-time, and therefore we can confirm before execution that these programs don't perform undesirable activities (e.g. "calling home" to some server to export private user data and violate user privacy).
 
-Furthermore, writing a plugin often requires detailed knowledge about how to correctly call service actions, and in what order. 
+Furthermore, the fact that they are WebAssembly components means that plugin development benefits from all independent efforts on component development tooling. Plugins can be written in any language that is able to be used to write WebAssembly components, which opens up plugin development to a growing number of potential "guest languages" such as Rust, C/C++, Go, Javascript, and others.
 
-For these reasons, plugins should be thought of as the responsibility of the back-end / service developer. Correspondingly, they can be written in the same programming language as services.
+## Plugin mechanics
 
-# Updating plugins
+The user interface of one app can use a front-end library to send a message to the [supervisor](./supervisor.md), attempting to call an action on a plugin. The plugin is then downloaded from the corresponding service and instantiated in the browser.
 
-The intention is that the only code bundled in with a front-end app is the plugin API, not the entire plugin binary itself. The binary is requested at run-time by the client's browser. This is similar to how calls made to services will be bundled in with user interfaces and other client-code, but the implementation of the service actions are server side.
+Plugins have many capabilities at their disposal, such as client-side storage management, making synchronous calls to other plugins, and adding actions into transactions. All of this functionality is available in libraries that are dynamically generated by bindings-generators in whatever language is being used to author the plugin.
 
-This implies that any changes to the plugin API can break client code, just as changes to the service API can break client code. However, just as service implementations can be seamlessly updated to fix bugs or make improvements, plugin implementations can also change, and all users of the plugin will automatically use the updated code.
+### Synchronous calls
+
+Plugins can synchronously call functionality exported by other app's plugins. This allows for psibase apps to engage in OAuth-like interactions and in general operate in a more modular way than is typically available to Web3 applications.
+
+### Transactions
+
+Transactions contain the data and authentication payload necessary to execute an action on a service. Transactions may contain multiple actions. Plugins are unable to see the entire transaction being constructed and are only aware of the actions they have explicitly added.
+
+Actions are added to transactions in a FIFO queue. For example, the following sequence diagram will finally submit a transaction containing actions in the order: C, A, B.
+
+```mermaid
+sequenceDiagram
+
+box rgb(85,85,85) client-side
+actor Alice
+participant UI
+participant Supervisor
+participant Plugin
+participant Plugin2
+end
+
+box rgb(85,85,85) server-side
+participant psinode
+end
+
+Alice->>UI: Click
+UI->>Supervisor: A@Plugin
+Supervisor->>Plugin: Do A
+Plugin->>Plugin2: sync call
+Note over Plugin2: Add action C
+Plugin2-->>Plugin: Response
+Note over Plugin: Add action A
+Note over Plugin: Add action B
+Plugin-->>Supervisor: Result
+Supervisor->>psinode: Submit transaction
+```
+
+## Plugin Benefits
+
+### Security and user experience
+
+In other Web3 application frameworks, front-ends are untrusted by the authenticator ("wallet"). Therefore, the authenticator requires that any transaction proposed by an application front-end must be explicitly confirmed by the user. However, the authenticator does not understand the payload, as it contains packed data that is specific to the callee context.
+
+With psibase apps, authentication works differently. There is no external authenticator. In general, when a front-end of an application is calling into its own plugin to execute a transaction on its own service, there is no explicit user-confirmation needed, because the identity of the actor responsible for proposing the transaction is already known to have been served directly from the service that is the target of the transaction. In other words, the UI itself _is_ the authenticator for any transactions sent to the server.
+
+Plugins are themselves permitted to define how to acquire explicit user confirmation in cases where external applications are accessing their functionality. Typically, this should look similar to a standard OAuth flow, where the user given a context-aware authorization window in which to evaluate whether they consent to the proposed transaction. This "context-aware" property means that each app is responsible for defining its own user experience as it relates to transaction authorization. This is important not only for user experience, but also for security, so that it is clear to what a user is consenting. Contrast this with a traditional Web3 application experience wherein the authentication prompt is opaque and context-unaware, and users rarely know exactly what they are signing and instead rely on the reputation of the user-interface that generated the proposed transaction.
+
+Therefore, it is anticipated that the number of authentication prompts will be signficantly reduced for psibase apps, and furthermore, those prompts that remain will be context-aware rather than context-unaware, allowing for a much more secure and user-friendly authentication experience.
+
+### Dynamic updates
+
+Plugins are dynamically linked at runtime to facilitate potentially complex interactions between a user and many applications. This dynamic linkage means that an application can update its plugin with changes and bugfixes without breaking downstream applications by maintaining a consistent API.
+
+For example, in a traditional Web3 context, a smart contract API update could break all downstream user-interfaces that interacted with an older version of the smart contract. In psibase, a service action interface could change and all foreign integrations that depend on the updated application will continue to function without requiring any changes since all integration happens through its plugin.
+
+### Composability
+
+In general, this plugin architecture allows for unprecedented collaboration between Web3 apps. With psibase apps, a website or application can access resources or execute code hosted by other apps on behalf of a user.
+
+For example, if a user has provided her address or credit card information in one application, other applications can simply make use this data without requiring the user to re-enter the same information. And all of this information can remain client-side, protecting user privacy.
+
+### Simplicity
+
+Interactions with smart-contracts can get complex. It often requires specialized knowledge from the development team to know how to correctly integrate with it. For apps on a psibase network, the development team will have created a plugin that abstracts the complexity of the interactions with the service into a streamlined user-facing API that can be used to much more easily integrate with the service.
+
+For example, consider an application that requires the user to submit a custom zero-knowledge proof in order to call a particular service action. This would ordinarily likely require the use of complicated cryptographic libraries to generate a proof of the correct type and format expected by the service. In the case of a psibase app, the zero-knowledge app would have a plugin used by their own UI that does the proof generation. This plugin would automatically be available for use by other third-party applications to exercise the same functionality for simpler integration.
+
+### Private user data
+
+Blockchains typically only have public data. If private client-side data is collected, it's siloed in the application that does the collection. Libraries built on top of client-side synchronous calls can be used to create a private client-side data layer for application to leverage private user data.
+
+## Local data storage
+
+### Access to database operations
+
+The psibase plugin host provides a `wasi:keyvalue` interface for plugins to use. However, the wasi-keyvalue interface [proposal](https://github.com/WebAssembly/wasi-keyvalue) is still early in the standardization process, and therefore the implementation provided by the host is subject to change.
+
+For more stable interactions with the database, a plugin should import the `clientdata` plugin, which is a wrapper around the host's `wasi:keyvalue` interface.
+
+This `clientdata` plugin provides a high level key/value API for plugins.
+
+```
+    get: func(key: string) -> option<list<u8>>;
+    set: func(key: string, value: list<u8>) -> result<_, error>;
+    delete: func(key: string);
+```
+
+Every plugin has its own independent key space, and can only directly read/write its own data. Data may be shared between plugins only if explicilty exposed through the plugin's API.
+
+### Data backing
+
+The `wasi-keyvalue` implementation currently uses LocalStorage as its data backing, because it is a synchronous interface which is easiest to integrate with wasm.
+
+Note: This imposes a major restriction on the amount of local data storage available for psibase plugins: Currently there is [a hard limit](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#web_storage) for the total amount of data stored in LocalStorage across all psibase apps in a given browser, since storage across all apps is managed by a single domain. This restriction will be lifted in a future implementation of plugin storage that uses a different data backing layer such as IndexedDB.
+
+### Persistence
+
+When a plugin writes private user data, it is immediately persisted.
+
+### Concurrency
+
+All reads/writes are currently synchronous, with no concurrency.
+
+### Synchronization across devices
+
+Plugins all run within the domain of the supervisor, which ensures that all plugin data is written-to/read-from a storage backing tied to the supervisor domain. Cloning storage in the supervisor domain between top-level domains is a way to synchronize plugin data across devices.

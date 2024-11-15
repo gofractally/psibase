@@ -3,6 +3,8 @@ cmake_policy(VERSION 3.16)
 project(wasm)
 enable_testing()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(IS_WASM YES)
 set(BUILD_STATIC ON)
 get_filename_component(ROOT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/.. ABSOLUTE)
@@ -208,6 +210,7 @@ endif()
 
 add_subdirectory(../external external)
 add_subdirectory(boost)
+add_subdirectory(sqlite3)
 add_subdirectory(../libraries libraries)
 add_subdirectory(../services services)
 add_subdirectory(../programs programs)

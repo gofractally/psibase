@@ -49,8 +49,8 @@ namespace psibase
       /// Compares by 64-bit `value`. This does not sort by the
       /// string (name) form.
       friend auto operator<=>(const AccountNumber&, const AccountNumber&) = default;
+      PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
    };
-   PSIO_REFLECT(AccountNumber, definitionWillNotChange(), value)
 
    template <typename S>
    void to_json(const AccountNumber& n, S& s)
@@ -65,6 +65,11 @@ namespace psibase
    }
 
    inline constexpr bool use_json_string_for_gql(AccountNumber*)
+   {
+      return true;
+   }
+
+   inline constexpr bool psio_custom_schema(AccountNumber*)
    {
       return true;
    }

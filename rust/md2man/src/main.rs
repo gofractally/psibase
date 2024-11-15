@@ -127,7 +127,7 @@ fn md2man<'a, S: Write, I: Iterator<Item = Event<'a>>>(
                 _ => {}
             },
             Event::Text(s) => {
-                let format = stack[stack.len() - 1].clone();
+                let format = stack[stack.len() - 1];
                 if format != current {
                     write!(out, "{}", format)?;
                     current = format;

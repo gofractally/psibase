@@ -1,0 +1,17 @@
+[package]
+name = "test"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "supervisor:test"
+
+[package.metadata.component.target.dependencies]
+"wasi:keyvalue" = { path = "../../CommonApi/common/packages/wit/wasi-keyvalue.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }

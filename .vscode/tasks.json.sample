@@ -19,7 +19,7 @@
         // {
         //     "label": "Test NFT",
         //     "type": "shell",
-        //     "command": "cd build && psitest NftSys-test-debug.wasm -s -r compact",
+        //     "command": "cd build && psitest Nft-test-debug.wasm -s -r compact",
         //     "group": {
         //         "kind": "test",
         //         "isDefault": false

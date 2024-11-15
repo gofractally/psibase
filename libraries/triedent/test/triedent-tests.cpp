@@ -1,5 +1,6 @@
 #include <triedent/database.hpp>
 
+#include "temp_database.hpp"
 #include "temp_directory.hpp"
 
 #include <random>
@@ -30,18 +31,6 @@ std::optional<std::string_view> osv(const std::optional<std::vector<char>>& v)
 std::optional<std::string_view> osv(std::string_view s)
 {
    return std::optional{s};
-}
-
-auto createDb(const database::config& cfg = database::config{
-                  .hot_bytes  = 1ull << 30,
-                  .warm_bytes = 1ull << 30,
-                  .cool_bytes = 1ull << 30,
-                  .cold_bytes = 1ull << 30,
-              })
-{
-   temp_directory dir("triedent-test");
-   database::create(dir.path, cfg);
-   return std::make_shared<database>(dir.path, cfg, access_mode::read_write);
 }
 
 bool next_key(std::string& buf, std::size_t max_len)
@@ -178,7 +167,7 @@ TEST_CASE("recover")
    temp_directory dir("triedent-test");
    database::create(dir.path, database::config{1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27});
    {
-      auto db = std::make_shared<database>(dir.path, access_mode::read_write);
+      auto db = std::make_shared<database>(dir.path, open_mode::read_write);
       std::shared_ptr<triedent::root> root;
       auto                            session = db->start_write_session();
       session->upsert(root, "abc"s, "v0"s);
@@ -189,23 +178,23 @@ TEST_CASE("recover")
       session->set_top_root(top_root);
    }
    {
-      auto db      = std::make_shared<database>(dir.path, access_mode::read_write, true);
+      auto db      = std::make_shared<database>(dir.path, open_mode::gc);
       auto session = db->start_write_session();
       session->start_collect_garbage();
    }
    // An interrupted gc may leave reference counts too low.
    // Access MUST be forbidden until gc is finished to prevent
    // corruption.
-   CHECK_THROWS(std::make_shared<database>(dir.path, access_mode::read_write));
+   CHECK_THROWS(std::make_shared<database>(dir.path, open_mode::read_write));
    {
-      auto db      = std::make_shared<database>(dir.path, access_mode::read_write, true);
+      auto db      = std::make_shared<database>(dir.path, open_mode::gc);
       auto session = db->start_write_session();
       session->start_collect_garbage();
       session->recursive_retain();
       session->end_collect_garbage();
    }
    {
-      auto db      = std::make_shared<database>(dir.path, access_mode::read_write);
+      auto db      = std::make_shared<database>(dir.path, open_mode::read_write);
       auto session = db->start_write_session();
       auto root    = session->get_top_root();
       std::vector<std::shared_ptr<triedent::root>> roots;

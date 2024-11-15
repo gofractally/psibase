@@ -8,7 +8,7 @@
 | 4           | service | `/common*` | [Common endpoints](#common-endpoints). Registered services only.                    |
 | 5 (lowest)  | service | `*`        | [Service-provided endpoints](#service-provided-endpoints). Registered services only.|
 
-The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [proxy-sys service](../../../default-apps/proxy-sys.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
+The above table describes how psinode normally routes HTTP requests. Only the highest-priority rule is fixed. The [http-server service](../../../default-apps/http-server.md), which handles the remaining routing rules, is customizable, both by distinct networks and by individual infrastructure providers.
 
 ## CORS and authorization
 
@@ -45,12 +45,12 @@ Future psinode versions may trim the action traces when not in a developer mode.
 
 ## Common endpoints
 
-The [common-sys service](../../../default-apps/common-sys.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
+The [common-api service](../../../default-apps/common-api.md) endpoints which start with the `/common*` path across all domains. It handles RPC requests and serves files.
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `GET`  | `/common/tapos/head`             | Returns [TaPoS](#tapos) for the current head block                                                                       | 
-| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-sys"` |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-api"` |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                 |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-signed-transaction)                                                                   |
@@ -114,14 +114,14 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 ```json
 {
   "service": "...",     // The service which verifies the proof meets
-                        // the claim, e.g. "verifyec-sys"
+                        // the claim, e.g. "verify-sig"
   "rawData": "..."      // Hex string containing the claim data.
-                        // e.g. `verifyec-sys` expects a public key
+                        // e.g. `verify-sig` expects a public key
                         // in fracpack format.
 }
 ```
 
-`Proof` is a hex string containing data which proves the claim. e.g. `verifyec-sys` expects a signature in fracpack format. See [Signing (js)](#signing-js) to fill claims and proofs.
+`Proof` is a hex string containing data which proves the claim. e.g. `verify-sig` expects a signature. See [Signing (js)](#signing-js) to fill claims and proofs.
 
 ### Pack signed transaction
 
@@ -129,21 +129,19 @@ TaPoS must be attached to every transaction submitted to a psibase network. In a
 
 ### Common files
 
-`common-sys` serves files stored in its tables. Chain operators may add files using the `storeSys` action (`psibase upload`). 
-Booting the network with either the psibase CLI tool or with the admin-sys app will automatically install this default set of files:
+There are special rules in the standard psibase HTTP server that allow for common files to be accessed at a special path on any subdomain. Any files added to the `common-api` subdomain by the infrastructure providers can be served from any subdomain through this mechanism.
 
-| Path                          | Description                                                                                                                                                           |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/common/SimpleUI.mjs`        | Default UI for services under development ([Learn more](../../services/cpp-service/minimal-ui/))                                                                      |
-| `/common/rpc.mjs`             | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js) |
-| `/common/keyConversions.mjs`  | [Key Conversions (js)](#key-conversions-js)                                                                                                                           |
-| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                   |
+Default common files:
+
+| Path                          | Description                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/common/SimpleUI.mjs`        | Default UI for services under development ([Learn more](../../services/cpp-service/minimal-ui/))                                                                                                                      |
+| `/common/common-lib.js`       | [Simple RPC wrappers (js)](#simple-rpc-wrappers-js)<br/>[Conversions (js)](#conversions-js)<br/>[Transactions (js)](#transactions-js)<br/>[Signing (js)](#signing-js)<br/>[Key Conversions (js)](#key-conversions-js) |
+| `/common/useGraphQLQuery.mjs` | [React GraphQL hooks (js)](#react-graphql-hooks-js)                                                                                                                                                                   |
 
 ## Root endpoints
 
-The root domain always serves the code for the [supervisor](../../../specifications/app-architecture/supervisor.md). If a subpage of the root domain is accessed, the supervisor client-code is what evaluates the subpage and determines how to react.
-
-Currently, the supervisor uses the `/applet/` prefix to trigger loading a psibase app within a managed iframe according to the supervisor specification.
+The root document at `/` is the homepage of the network.
 
 ## Service-provided endpoints
 

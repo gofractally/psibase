@@ -2,56 +2,34 @@
 
 ## Routing
 
-```svgbob
-+-----------+      +---------+      +---------+
-| proxy-sys |      |         |      | HTTP    |
-| service   |<---- | psinode |<---- | Request |
-|           |      |         |      |         |
-+-----------+      +---------+      +---------+
-         |
-         |
-         v
-  +--------------+           +-----------------+
- /                \  yes     | common-sys      |
-/  target begins   \ ------> | service's       |
-\  with "/common?" /         | serveSys action |
- \                /          +-----------------+
-  +--------------+                    ^
-         | no                         |
-         |                +-----------+
-         v                |
-  +----------------+      |  +-----------------+
- /                  \  no |  | psispace-sys    |
-/  on a subdomain?   \ ---+  | service's       |
-\                    /       | serveSys action |
- \                  /        +-----------------+
-  +----------------+                  ^
-         | yes                        |
-         |           +----------------+
-         v           |
-  +------------+  no |       +-----------------+
- /              \ ---+       | registered      |
-/  registered?   \           | service's       |
-\                / yes   +-->| serveSys action |
- \              / -------+   +-----------------+
-  +------------+
+```mermaid
+flowchart TD
+   200[200 OK]
+   404[404 Not Found]
+
+   A[HTTP Request]
+   B[psinode]
+   C[http-server service]
+   D[sites service's serveSys action]
+
+   A --> B --> C --> D --> E{{was site data found?}} -->|yes| 200
+   E -->|no| G{{target begins with '/common'?}} -->|yes| H['common-api' service's serveSys action]
+   G -->|no| I{{on a subdomain?}} -->|no| 404
+   I -->|yes| J{{Has registered server?}} -->|no| 404
+   J -->|yes| L[registered server's serveSys action]
 ```
 
-`psinode` passes most HTTP requests to the [SystemService::ProxySys] service, which then routes requests to the appropriate service's [serveSys](https://docs.rs/psibase/latest/psibase/server_interface/struct.ServerActions.html#method.serveSys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId](https://docs.rs/psibase/latest/psibase/enum.DbId.html).
+`psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](https://docs.rs/psibase/latest/psibase/server_interface/struct.ServerActions.html#method.serveSys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId](https://docs.rs/psibase/latest/psibase/enum.DbId.html).
 
-[SystemService::CommonSys] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
+[SystemService::CommonApi] provides services common to all domains under the `/common` tree. It also serves the chain's main page.
 
-[SystemService::PsiSpaceSys] provides web hosting to non-service accounts.
+[SystemService::Sites] provides web hosting for non-service accounts or service accounts that did not [register](#registration) for HTTP handling.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/push_transaction`. Services don't serve these.
 
 ## Registration
 
-Services which wish to serve HTTP requests need to register using the [SystemService::ProxySys] service's [SystemService::ProxySys::registerServer] action. There are multiple ways to do this:
-
-- `psibase deploy` and `cargo psibase deploy` have a `--register-proxy` option (shortcut `-p`) that can do this while deploying the service.
-- `psibase register-proxy` can also do it. TODO: implement `psibase register-proxy`.
-- A service may call `registerServer` during its own initialization action.
+Services which wish to serve HTTP requests need to register using the [SystemService::HttpServer] service's [SystemService::HttpServer::registerServer] action. This is usually done by setting the `package.metadata.psibase.server` field in `Cargo.toml` to add this action to the package installation process.
 
 A service doesn't have to serve HTTP requests itself; it may delegate this to another service during registration.
 
@@ -62,7 +40,6 @@ Services which serve HTTP implement these interfaces:
 - [psibase::server_interface](https://docs.rs/psibase/latest/psibase/server_interface/index.html) (required)
   - [psibase::HttpRequest](https://docs.rs/psibase/latest/psibase/struct.HttpRequest.html)
   - [psibase::HttpReply](https://docs.rs/psibase/latest/psibase/struct.HttpReply.html)
-- [psibase::storage_interface](https://docs.rs/psibase/latest/psibase/storage_interface/index.html) (optional)
 
 ## Helpers
 

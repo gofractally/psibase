@@ -1,0 +1,24 @@
+package transact:plugin;
+
+interface admin {
+    use host:common/types.{error};
+
+    /// Opens a new tx context. Adding actions using add-action-to-transaction will 
+    /// refer to this open context.
+    start-tx: func();
+
+    /// Closes the current transaction context, constructs and submits the final 
+    /// signed transaction.
+    finish-tx: func() -> result<_, error>;
+}
+
+world impl {
+    include host:common/imports;
+    include clientdata:plugin/imports;
+    include accounts:smart-auth/imports;
+    include accounts:plugin/imports;
+
+    export admin;
+    export intf;
+    export auth-notifier;
+}

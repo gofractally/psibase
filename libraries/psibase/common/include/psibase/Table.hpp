@@ -6,8 +6,8 @@
 #include <concepts>
 #include <cstdint>
 #include <functional>
-#include <psibase/blob.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/blob.hpp>
 #include <psibase/serviceState.hpp>
 #include <psio/to_key.hpp>
 #include <span>
@@ -392,7 +392,7 @@ namespace psibase
       KvIterator<T> lower_bound(K2&& k) const
       {
          KeyView       key_base{{prefix.data(), prefix.size()}};
-         auto          key = psio::convert_to_key(std::tie(key_base, k));
+         auto          key = psio::composite_key(key_base, k);
          auto          res = raw::kvGreaterEqual(db, key.data(), key.size(), prefix.size());
          KvIterator<T> result(db, std::move(key), prefix.size(), is_secondary, true);
          result.moveTo(res);
@@ -409,7 +409,7 @@ namespace psibase
       KvIterator<T> upper_bound(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    key = psio::convert_to_key(std::tie(key_base, k));
+         auto    key = psio::composite_key(key_base, k);
          while (true)
          {
             if (key.size() <= prefix.size())
@@ -438,7 +438,7 @@ namespace psibase
       TableIndex<T, KeySuffix<K2, K>> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    key = psio::convert_to_key(std::tie(key_base, k));
+         auto    key = psio::composite_key(key_base, k);
          return TableIndex<T, KeySuffix<K2, K>>(db, std::move(key), is_secondary);
       }
 
@@ -450,7 +450,7 @@ namespace psibase
       std::optional<T> get(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         auto    buffer = psio::convert_to_key(std::tie(key_base, k));
+         auto    buffer = psio::composite_key(key_base, k);
          int     res    = raw::kvGet(db, buffer.data(), buffer.size());
          if (res < 0)
          {
@@ -491,6 +491,20 @@ namespace psibase
       }
       raw::kvPut(db, key, key_len, value, value_len);
    }
+
+   namespace detail
+   {
+      template <typename T, typename C>
+      decltype(auto) invoke(T C::*f, const C& value)
+      {
+         return (value.*f);
+      }
+      template <typename R, typename C, typename... A>
+      decltype(auto) invoke(R (C::*f)(A...) const, const C& value, A&&... a)
+      {
+         return (value.*f)(static_cast<A&&>(a)...);
+      }
+   }  // namespace detail
 
    /// Stores objects in the key-value database
    ///
@@ -541,7 +555,7 @@ namespace psibase
    {
      public:
       static_assert(1 + sizeof...(Secondary) <= 255, "Too many indices");
-      using key_type   = std::remove_cvref_t<decltype(std::invoke(Primary, std::declval<T>()))>;
+      using key_type   = std::remove_cvref_t<decltype(detail::invoke(Primary, std::declval<T>()))>;
       using value_type = T;
 
       /// Construct table with prefix
@@ -564,7 +578,7 @@ namespace psibase
       /// then `put` aborts the transaction.
       void put(const T& value)
       {
-         auto pk = serialize_key(0, std::invoke(Primary, value));
+         auto pk = serialize_key(0, detail::invoke(Primary, value));
          if constexpr (sizeof...(Secondary) > 0)
          {
             int               sz         = raw::kvGet(db, pk.data(), pk.size());
@@ -577,8 +591,8 @@ namespace psibase
                auto data              = psio::from_frac<T>(psio::prevalidated{std::move(buffer)});
                auto replace_secondary = [&](uint8_t& idx, auto wrapped)
                {
-                  auto old_key = std::invoke(decltype(wrapped)::value, data);
-                  auto new_key = std::invoke(decltype(wrapped)::value, value);
+                  auto old_key = detail::invoke(decltype(wrapped)::value, data);
+                  auto new_key = detail::invoke(decltype(wrapped)::value, value);
                   if (old_key != new_key)
                   {
                      key_buffer.back() = idx;
@@ -598,7 +612,7 @@ namespace psibase
             {
                auto write_secondary = [&](uint8_t& idx, auto wrapped)
                {
-                  auto key          = std::invoke(decltype(wrapped)::value, value);
+                  auto key          = detail::invoke(decltype(wrapped)::value, value);
                   key_buffer.back() = idx;
                   psio::convert_to_key(key, key_buffer);
                   kvInsertUnique(db, key_buffer.data(), key_buffer.size(), pk.data(), pk.size());
@@ -641,7 +655,7 @@ namespace psibase
          key_buffer.push_back(0);
          auto erase_key = [&](std::uint8_t& idx, auto wrapped)
          {
-            auto key          = std::invoke(decltype(wrapped)::value, oldValue);
+            auto key          = detail::invoke(decltype(wrapped)::value, oldValue);
             key_buffer.back() = idx;
             psio::convert_to_key(key, key_buffer);
             raw::kvRemove(db, key_buffer.data(), key_buffer.size());
@@ -666,7 +680,7 @@ namespace psibase
          using key_extractor =
              boost::mp11::mp_at_c<boost::mp11::mp_list<wrap<Primary>, wrap<Secondary>...>, Idx>;
          using key_type =
-             std::remove_cvref_t<decltype(std::invoke(key_extractor::value, std::declval<T>()))>;
+             std::remove_cvref_t<decltype(detail::invoke(key_extractor::value, std::declval<T>()))>;
          auto index_prefix = prefix;
          index_prefix.push_back(static_cast<char>(Idx));
          return TableIndex<T, key_type>(db, std::move(index_prefix), Idx > 0);
@@ -679,7 +693,7 @@ namespace psibase
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
-         return psio::convert_to_key(std::tie(key_base, idx, k));
+         return psio::composite_key(key_base, idx, k);
       }
       DbId              db;
       std::vector<char> prefix;
@@ -687,15 +701,16 @@ namespace psibase
 
    template <typename T>
    concept TableType = requires(T table) {
-                          typename decltype(table)::key_type;
-                          typename decltype(table)::value_type;
-                       };
+      typename decltype(table)::key_type;
+      typename decltype(table)::value_type;
+   };
 
    // TODO: allow tables to be forward declared.  The simplest method is:
    // struct xxx : Table<...> {};
    /// Defines the set of tables in a service
    ///
    /// Template arguments:
+   /// - `Db`: the database holding the tables
    /// - `Tables`: one or more [Table] types; one for each table the service supports.
    ///
    /// #### Modifying table set
@@ -708,24 +723,24 @@ namespace psibase
    ///
    /// #### Prefix format
    ///
-   /// `ServiceTables` gives each table the following prefix. See [Data format](#data-format).
+   /// `DbTables` gives each table the following prefix. See [Data format](#data-format).
    ///
    /// | Field | Size | Description |
    /// | ----- | ---- | ----------- |
    /// | account | 64 bits | Service account |
    /// | table | 16 bits | Table number. First table is 0. |
-   template <typename... Tables>
-   struct ServiceTables
+   template <DbId Db, typename... Tables>
+   struct DbTables
    {
       /// Default constructor
       ///
       /// Assumes the desired service is running on the current action receiver account.
-      ServiceTables() : account(getReceiver()) {}
+      DbTables() : account(getReceiver()) {}
 
       /// Constructor
       ///
       /// `account` is the account the service runs on.
-      explicit constexpr ServiceTables(AccountNumber account) : account(account) {}
+      explicit constexpr DbTables(AccountNumber account) : account(account) {}
 
       /// Open by table number
       ///
@@ -737,8 +752,8 @@ namespace psibase
       template <std::uint16_t Table>
       auto open() const
       {
-         std::vector<char> key_prefix = psio::convert_to_key(std::tuple(account, Table));
-         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(DbId::service,
+         std::vector<char> key_prefix = psio::composite_key(account, Table);
+         return boost::mp11::mp_at_c<boost::mp11::mp_list<Tables...>, Table>(Db,
                                                                              std::move(key_prefix));
       }
 
@@ -780,11 +795,22 @@ namespace psibase
       AccountNumber account;  ///< the service runs on this account
    };
 
+   /// Defines tables in the `service` database
+   template <typename... Tables>
+   using ServiceTables = DbTables<DbId::service, Tables...>;
+
+   /// Defines tables in the `writeOnly` database
+   template <typename... Tables>
+   using WriteOnlyTables = DbTables<DbId::writeOnly, Tables...>;
+
+   /// Defines tables in the `subjective` database
+   template <typename... Tables>
+   using SubjectiveTables = DbTables<DbId::subjective, Tables...>;
+
    // An empty key that can be used for any singleton table
    struct SingletonKey
    {
+      PSIO_REFLECT(SingletonKey);
    };
-   PSIO_REFLECT(SingletonKey);
-
 
 }  // namespace psibase

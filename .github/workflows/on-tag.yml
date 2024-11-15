@@ -3,11 +3,10 @@ name: On Tag - Release Draft
 on:
   push:
     tags:
-      - 'v*.*.*'
-      - 'v*.*.*-*'
+      - "v*.*.*"
+      - "v*.*.*-*"
 
 jobs:
-
   build-psibase:
     name: Run Builds
     uses: ./.github/workflows/ubuntu-builder.yml
@@ -46,7 +45,7 @@ jobs:
       - generate-changelog
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Create new Github Release
         id: create_release
@@ -55,7 +54,9 @@ jobs:
           files: |
             psidk-ubuntu-2004/psidk-ubuntu-2004.tar.gz
             psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz
+            psidk-ubuntu-2404/psidk-ubuntu-2404.tar.gz
             psidk-book/psidk-book.tar.gz
+          fail_on_unmatched_files: true
           draft: true
           prerelease: ${{needs.prerelease-check.outputs.prerelease}}
           name: ${{ github.ref_name }}

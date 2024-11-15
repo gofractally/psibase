@@ -7,7 +7,10 @@ function(add suffix)
     add_library(psibase${suffix})
     target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto)
     target_sources(psibase${suffix} PRIVATE
+        common/src/block.cpp
         common/src/crypto.cpp
+        common/src/KvMerkle.cpp
+        common/src/nativeTables.cpp
         common/src/time.cpp
         common/src/trace.cpp
     )
@@ -115,35 +118,21 @@ function(add suffix)
             tester/src/tester.cpp
             tester/src/DefaultTestChain.cpp
             tester/src/package.cpp
+            tester/src/semver.cpp
             tester/src/zip.cpp
             tester/src/testUtils.cpp
             service/src/intrinsic.cpp
             service/src/ossl.c
             service/src/time.c
-            tester/src/tester_intrinsics.cpp
-            tester/src/wasi_polyfill/__wasi_args_get.cpp
-            tester/src/wasi_polyfill/__wasi_args_sizes_get.cpp
-            tester/src/wasi_polyfill/__wasi_clock_time_get.cpp
-            tester/src/wasi_polyfill/__wasi_environ_get.cpp
-            tester/src/wasi_polyfill/__wasi_environ_sizes_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_close.cpp
-            tester/src/wasi_polyfill/__wasi_fd_fdstat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_fdstat_set_flags.cpp
-            tester/src/wasi_polyfill/__wasi_fd_filestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_prestat_dir_name.cpp
-            tester/src/wasi_polyfill/__wasi_fd_prestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_fd_read.cpp
-            tester/src/wasi_polyfill/__wasi_fd_readdir.cpp
-            tester/src/wasi_polyfill/__wasi_fd_seek.cpp
-            tester/src/wasi_polyfill/__wasi_fd_write.cpp
-            tester/src/wasi_polyfill/__wasi_path_filestat_get.cpp
-            tester/src/wasi_polyfill/__wasi_path_open.cpp
-            tester/src/wasi_polyfill/__wasi_proc_exit.cpp
+            tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
+            tester/src/wasi_polyfill/init_cwd.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC
             psibase${suffix}
+            Spki${suffix}
+            PrivateKeyInfo${suffix}
             catch2
             boost
             -lz
@@ -158,28 +147,27 @@ function(add suffix)
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
             tester/include
-            ../../services/system/AccountSys/include
-            ../../services/system/ProducerSys/include
-            ../../services/system/AuthDelegateSys/include
-            ../../services/system/AuthEcSys/include
-            ../../services/system/AuthAnySys/include
-            ../../services/system/CpuSys/include
-            ../../services/system/ProxySys/include
-            ../../services/system/SetCodeSys/include
-            ../../services/system/TransactionSys/include
-            ../../services/system/VerifyEcSys/include
-            ../../services/user/CommonSys/include
-            ../../services/user/ExploreSys/include
-            ../../services/user/FractalSys/include
-            ../../services/user/InviteSys/include
-            ../../services/user/NftSys/include
-            ../../services/user/PackageSys/include
-            ../../services/user/PsiSpaceSys/include
-            ../../services/user/SymbolSys/include
-            ../../services/user/TokenSys/include
+            ../../services/system/Accounts/include
+            ../../services/system/Producers/include
+            ../../services/system/AuthDelegate/include
+            ../../services/system/AuthSig/include
+            ../../services/system/AuthAny/include
+            ../../services/system/CpuLimit/include
+            ../../services/system/HttpServer/include
+            ../../services/system/SetCode/include
+            ../../services/system/Transact/include
+            ../../services/user/CommonApi/include
+            ../../services/user/Explorer/include
+            ../../services/user/Fractal/include
+            ../../services/user/Invite/include
+            ../../services/user/Nft/include
+            ../../services/user/Packages/include
+            ../../services/user/Sites/include
+            ../../services/user/Symbol/include
+            ../../services/user/Tokens/include
         )
         target_mapped_include_directories(psitestlib${suffix} PRIVATE
-            ../../services/system/VerifyEcSys/include
+            ../../services/system/VerifySig/include
         )
         target_link_options(psitestlib${suffix} PUBLIC
             -Wl,--entry,_start
@@ -206,6 +194,7 @@ function(add suffix)
             native/src/PKCS11Prover.cpp
             native/src/prefix.cpp
             native/src/Prover.cpp
+            native/src/Socket.cpp
             native/src/SystemContext.cpp
             native/src/TransactionContext.cpp
             native/src/useTriedent.cpp

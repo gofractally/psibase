@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/ForkDb.hpp>
+#include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
 #include <psio/reflect.hpp>
 
@@ -11,6 +12,9 @@
 #include <memory>
 #include <variant>
 #include <vector>
+
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/post.hpp>
 
 namespace psibase::net
 {
@@ -75,6 +79,34 @@ namespace psibase::net
    };
    PSIO_REFLECT(BlockMessage, block)
 
+   struct StateChecksumMessage
+   {
+      static const unsigned    type = 42;
+      Checksum256              blockId;
+      snapshot::StateChecksum  state;
+      snapshot::StateSignature signature;
+      std::string              to_string() const
+      {
+         return "state checksum: id=" + loggers::to_string(blockId) +
+                " producer=" + signature.account.str() +
+                " service=" + loggers::to_string(state.serviceRoot) +
+                " native=" + loggers::to_string(state.nativeRoot);
+      }
+   };
+   PSIO_REFLECT(StateChecksumMessage, blockId, state, signature)
+
+   // A producer-to-producer message with contents completely defined by services.
+   struct WasmProducerMessage
+   {
+      static constexpr unsigned type = 64;
+      std::vector<char>         data;
+      AccountNumber             producer;
+      Claim                     signer;
+
+      std::string to_string() const { return "wasm prod: producer=" + producer.str(); }
+   };
+   PSIO_REFLECT(WasmProducerMessage, data, producer, signer)
+
    // This class manages production and distribution of blocks
    // The consensus algorithm is provided by the derived class
    template <typename Derived, typename Timer>
@@ -95,7 +127,11 @@ namespace psibase::net
       };
 
       template <typename ExecutionContext>
-      explicit blocknet(ExecutionContext& ctx) : _block_timer(ctx)
+      explicit blocknet(ExecutionContext& ctx)
+          : _ioctx(ctx),
+            _trx_timer(ctx),
+            _block_timer(ctx),
+            prods_socket(std::make_shared<ProducerMulticastSocket>(this))
       {
          logger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("consensus")));
@@ -120,6 +156,31 @@ namespace psibase::net
          bool         hello_sent;
       };
 
+      struct ProducerMulticastSocket : Socket
+      {
+         ProducerMulticastSocket(blocknet* self) : self(self) {}
+         blocknet* self;
+         void      send(std::span<const char> data)
+         {
+            boost::asio::post(
+                self->_ioctx,
+                [this, data = std::vector(data.begin(), data.end())]
+                {
+                   auto state = self->_state;
+                   if (state == producer_state::leader || state == producer_state::follower ||
+                       state == producer_state::candidate)
+                   {
+                      self->for_each_key(
+                          [&](const Claim& key)
+                          {
+                             self->network().multicast_producers(WasmProducerMessage{
+                                 .data = data, .producer = self->self, .signer = key});
+                          });
+                   }
+                });
+         }
+      };
+
       producer_id                  self = null_producer;
       std::shared_ptr<ProducerSet> active_producers[2];
       TermNum                      current_term = 0;
@@ -130,15 +191,25 @@ namespace psibase::net
       // that it is trying to produce has been aborted.
       std::uint64_t _leader_cancel = 0;
 
+      boost::asio::io_context&  _ioctx;
+      Timer                     _trx_timer;
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
 
+      bool _trx_loop_running = false;
+
       std::vector<std::unique_ptr<peer_connection>> _peers;
+
+      std::shared_ptr<ProducerMulticastSocket> prods_socket;
 
       loggers::common_logger logger;
 
-      using message_type = std::variant<HelloRequest, HelloResponse, BlockMessage>;
+      using message_type = std::variant<HelloRequest,
+                                        HelloResponse,
+                                        BlockMessage,
+                                        StateChecksumMessage,
+                                        WasmProducerMessage>;
 
       peer_connection& get_connection(peer_id id)
       {
@@ -150,6 +221,7 @@ namespace psibase::net
             }
          }
          assert(!"Unknown peer connection");
+         __builtin_unreachable();
       }
 
       void disconnect(peer_id id)
@@ -284,8 +356,24 @@ namespace psibase::net
          connection.peer_ready = true;
       }
 
+      // TODO: rename this function to a more generic init routine
       void load_producers()
       {
+         chain().addSocket(prods_socket);
+         chain().onCommit(
+             [this](BlockHeaderState* state)
+             {
+                if (chain().should_make_snapshot(state))
+                {
+                   auto fn       = chain().snapshot_builder(state);
+                   auto checksum = fn();
+                   if (auto sig = chain().on_state_checksum(state->blockId(), checksum, self))
+                   {
+                      network().multicast(
+                          StateChecksumMessage{state->blockId(), checksum, std::move(*sig)});
+                   }
+                }
+             });
          current_term = chain().get_head()->term;
          consensus().set_producers(chain().getProducers());
       }
@@ -475,6 +563,7 @@ namespace psibase::net
                    }
                 }
              });
+         schedule_process_transactions();
       }
 
       // \pre common invariants
@@ -487,6 +576,39 @@ namespace psibase::net
             _block_timer.cancel();
             PSIBASE_LOG(consensus().logger, info) << log_message;
             chain().abort_block();
+         }
+      }
+
+      // This async loop is active when running as the leader and
+      // there is at least one pending transaction
+      void process_transactions()
+      {
+         if (_state == producer_state::leader)
+         {
+            if (auto trx = chain().nextTransaction())
+            {
+               chain().pushTransaction(std::move(*trx));
+               _trx_timer.expires_after(std::chrono::microseconds{0});
+            }
+            else
+            {
+               _trx_timer.expires_after(std::chrono::milliseconds{100});
+            }
+            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
+         }
+         else
+         {
+            _trx_loop_running = false;
+         }
+      }
+
+      void schedule_process_transactions()
+      {
+         if (!_trx_loop_running && _state == producer_state::leader)
+         {
+            _trx_loop_running = true;
+            _trx_timer.expires_after(std::chrono::microseconds{0});
+            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
          }
       }
 
@@ -663,6 +785,19 @@ namespace psibase::net
             return true;
          }
          return chain().is_ancestor(id, connection.last_received);
+      }
+
+      void recv(peer_id origin, const StateChecksumMessage& msg)
+      {
+         if (chain().on_state_signature(msg.blockId, msg.state, msg.signature))
+         {
+            network().multicast(msg);
+         }
+      }
+
+      void recv(peer_id origin, const WasmProducerMessage& msg)
+      {
+         chain().recvMessage(*prods_socket, msg.data);
       }
 
       // Default implementations

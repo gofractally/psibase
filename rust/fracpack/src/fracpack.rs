@@ -2,9 +2,9 @@
 // TODO: option to allow/disallow unknown fields during verify and unpack
 // TODO: replace 'a with 'de; change macro to look for 'de specifically instead of assuming
 
-//! Rust support for the [fracpack format](https://doc-sys.psibase.io/format/fracpack.html)
+//! Rust support for the fracpack format.
 //!
-//! [Psibase](https://about.psibase.io) uses a new binary format, `fracpack`, which has the following goals:
+//! [Psibase](https://psibase.io) uses a new binary format, `fracpack`, which has the following goals:
 //!
 //! - Quickly pack and unpack data, making it suitable for service-to-service communication, node-to-node communication, blockchain-to-outside communication, and database storage.
 //! - Forwards and backwards compatibility; it supports adding new optional fields to the end of structs and tuples, even when they are embedded in variable-length vectors, fixed-length arrays, optional, and other structs and tuples.
@@ -50,9 +50,11 @@
 //! for the two types.
 
 use custom_error::custom_error;
-use std::{cell::RefCell, mem, rc::Rc, sync::Arc};
+pub use psibase_macros::{Pack, ToSchema, Unpack};
+use std::{cell::RefCell, hash::Hash, mem, rc::Rc, sync::Arc};
 
-pub use psibase_macros::{Pack, Unpack};
+mod schema;
+pub use schema::*;
 
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
@@ -61,6 +63,11 @@ custom_error! {pub Error
     BadUTF8             = "Bad UTF-8 encoding",
     BadEnumIndex        = "Bad enum index",
     ExtraData           = "Extra data in buffer",
+    BadScalar           = "Bad scalar value",
+    ExtraEmptyOptional  = "Trailing empty optionals must be omitted",
+    PtrEmptyList        = "A pointer to an empty list must use zero offset",
+    HasUnknown          = "Unknown fields not allowed",
+    UnknownType         = "Unknown type",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -132,6 +139,11 @@ pub trait Pack {
 
     #[doc(hidden)]
     fn is_empty_container(&self) -> bool {
+        false
+    }
+
+    #[doc(hidden)]
+    fn is_empty_optional(&self) -> bool {
         false
     }
 
@@ -248,6 +260,17 @@ pub trait Unpack<'a>: Sized {
     }
 
     #[doc(hidden)]
+    fn check_opt_embedded_unpack(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+        _not_trailing: bool,
+        _has_opt_bytes: bool,
+    ) -> Result<Self> {
+        Self::embedded_unpack(src, fixed_pos, heap_pos)
+    }
+
+    #[doc(hidden)]
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
         if Self::VARIABLE_SIZE {
             Self::embedded_variable_unpack(src, fixed_pos, heap_pos)
@@ -294,24 +317,6 @@ fn read_u8_arr<const SIZE: usize>(src: &[u8], pos: &mut u32) -> Result<[u8; SIZE
     Ok(bytes)
 }
 
-// TODO: violates single-valid-serialization rule
-trait MissingBoolConversions {
-    fn from_le_bytes(bytes: [u8; 1]) -> bool;
-    fn to_le_bytes(self) -> [u8; 1];
-}
-
-impl MissingBoolConversions for bool {
-    fn from_le_bytes(bytes: [u8; 1]) -> bool {
-        bytes[0] != 0
-    }
-    fn to_le_bytes(self) -> [u8; 1] {
-        match self {
-            true => [1],
-            false => [0],
-        }
-    }
-}
-
 impl<'a, T: Pack> Pack for &'a T {
     const FIXED_SIZE: u32 = T::FIXED_SIZE;
     const VARIABLE_SIZE: bool = T::VARIABLE_SIZE;
@@ -335,6 +340,30 @@ impl<'a, T: Pack> Pack for &'a T {
 
     fn embedded_variable_pack(&self, dest: &mut Vec<u8>) {
         (*self).embedded_variable_pack(dest)
+    }
+}
+
+impl Pack for bool {
+    const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
+    const VARIABLE_SIZE: bool = false;
+    fn pack(&self, dest: &mut Vec<u8>) {
+        dest.push(if *self { 1 } else { 0 });
+    }
+}
+
+impl<'a> Unpack<'a> for bool {
+    const FIXED_SIZE: u32 = mem::size_of::<Self>() as u32;
+    const VARIABLE_SIZE: bool = false;
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+        match u8::unpack(src, pos)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(Error::BadScalar),
+        }
+    }
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        Self::unpack(src, pos)?;
+        Ok(())
     }
 }
 
@@ -365,7 +394,6 @@ macro_rules! scalar_impl {
     };
 } // scalar_impl
 
-scalar_impl! {bool}
 scalar_impl! {i8}
 scalar_impl! {i16}
 scalar_impl! {i32}
@@ -487,6 +515,10 @@ impl<T: Pack> Pack for Option<T> {
         Self::embedded_variable_pack(self, dest);
     }
 
+    fn is_empty_optional(&self) -> bool {
+        self.is_none()
+    }
+
     fn embedded_fixed_pack(&self, dest: &mut Vec<u8>) {
         if T::IS_OPTIONAL || !T::VARIABLE_SIZE {
             dest.extend_from_slice(&1u32.to_le_bytes())
@@ -533,6 +565,20 @@ impl<'a, T: Unpack<'a>> Unpack<'a> for Option<T> {
         let mut fixed_pos = *pos;
         *pos += 4;
         Self::embedded_verify(src, &mut fixed_pos, pos)
+    }
+
+    fn check_opt_embedded_unpack(
+        src: &'a [u8],
+        fixed_pos: &mut u32,
+        heap_pos: &mut u32,
+        not_trailing: bool,
+        has_opt_bytes: bool,
+    ) -> Result<Self> {
+        if not_trailing || has_opt_bytes {
+            Self::embedded_unpack(src, fixed_pos, heap_pos)
+        } else {
+            Ok(None)
+        }
     }
 
     fn embedded_unpack(src: &'a [u8], fixed_pos: &mut u32, heap_pos: &mut u32) -> Result<Self> {
@@ -789,6 +835,87 @@ impl<'a, T: Unpack<'a>, const N: usize> Unpack<'a> for [T; N] {
         Ok(())
     }
 }
+
+macro_rules! container_impl {
+    (impl<$($n:ident),+> Pack+Unpack for $t:ty $(where $($w:tt)*)?) =>
+    {
+        impl <$($n:Pack),+> Pack for $t $(where $($w)*)?
+{
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn pack(&self, dest: &mut Vec<u8>) {
+        let num_bytes = self.len() as u32 * <&$t as IntoIterator>::Item::FIXED_SIZE;
+        dest.extend_from_slice(&num_bytes.to_le_bytes());
+        dest.reserve(num_bytes as usize);
+        let start = dest.len();
+        for x in self {
+            <&$t as IntoIterator>::Item::embedded_fixed_pack(&x, dest);
+        }
+        for (i, x) in self.into_iter().enumerate() {
+            let heap_pos = dest.len() as u32;
+            <&$t as IntoIterator>::Item::embedded_fixed_repack(&x, start as u32 + (i as u32) * <&$t as IntoIterator>::Item::FIXED_SIZE, heap_pos, dest);
+            <&$t as IntoIterator>::Item::embedded_variable_pack(&x, dest);
+        }
+    }
+
+    fn is_empty_container(&self) -> bool {
+        self.into_iter().next().is_none()
+    }
+}
+
+impl<'a, $($n: Unpack<'a>),+> Unpack<'a> for $t $(where $($w)*)? {
+    const FIXED_SIZE: u32 = 4;
+    const VARIABLE_SIZE: bool = true;
+
+    fn unpack(src: &'a [u8], pos: &mut u32) -> Result<Self> {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
+        let len = (num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE) as usize;
+        let mut err = Ok(());
+        let result = (0..len).map_while(|_| {
+            match <$t as IntoIterator>::Item::embedded_unpack(src, pos, &mut heap_pos) {
+                Ok(item) => { Some(item) },
+                Err(e) => { err = Err(e); None }
+            }
+        }).collect();
+        err?;
+        *pos = heap_pos;
+        Ok(result)
+    }
+
+    fn verify(src: &'a [u8], pos: &mut u32) -> Result<()> {
+        let num_bytes = u32::unpack(src, pos)?;
+        if num_bytes % <$t as IntoIterator>::Item::FIXED_SIZE != 0 {
+            return Err(Error::BadSize);
+        }
+        let hp = *pos as u64 + num_bytes as u64;
+        let mut heap_pos = hp as u32;
+        if heap_pos as u64 != hp {
+            return Err(Error::ReadPastEnd);
+        }
+        for _ in 0..num_bytes / <$t as IntoIterator>::Item::FIXED_SIZE {
+            <$t as IntoIterator>::Item::embedded_verify(src, pos, &mut heap_pos)?;
+        }
+        *pos = heap_pos;
+        Ok(())
+    }
+
+    fn new_empty_container() -> Result<Self> {
+        Ok(Default::default())
+    }
+}
+    }
+}
+
+container_impl!(impl<K, V> Pack+Unpack for indexmap::IndexMap<K, V> where K: Hash, K: Eq);
 
 macro_rules! tuple_impls {
     ($($len:expr => ($($n:tt $name:ident)*))+) => {

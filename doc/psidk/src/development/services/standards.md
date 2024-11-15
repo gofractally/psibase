@@ -1,8 +1,8 @@
 # Standards
 
-## Standard account names
+## Reserved account names
 
-Trusted system services have account names which end with `-sys`. Only chain operators may create accounts with this suffix.
+By convention, apps that are specific to an individual node operator are hosted at subdomains that begin with "x-". Therefore, to avoid being overshadowed by these apps, user account names may not begin with "x-".
 
 ## Standard actions
 
@@ -11,6 +11,5 @@ psibase standard action names end with `Sys` or `_Sys` (case insensitive). Do no
 The following standard actions exist for both Rust and C++, though only the C++ code examples are listed below.
 
 - *serveSys* - `optional<HttpReply> serveSys(HttpRequest request)`
-- *storeSys* - `void storeSys(std::string path, std::string contentType, std::vector<char> content)`
 
 > ➕ TODO - Document other standard actions

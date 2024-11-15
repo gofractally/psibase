@@ -30,22 +30,15 @@ function(add_libs suffix)
         set(lib-suffix $<$<CONFIG:Debug>:-debug>)
     endif()
 
-    add_library(simdjson${suffix} INTERFACE)
-    target_include_directories(simdjson${suffix} INTERFACE @ROOT_SOURCE_DIR@/external/simdjson/include)
-    target_link_libraries(simdjson${suffix} INTERFACE
-        -L@ROOT_BINARY_DIR@/wasm/external/simdjson
-        -lsimdjson # TODO: ${suffix}
-    )
-
     add_library(psio${suffix} INTERFACE)
     target_include_directories(psio${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psio/include
-        @ROOT_SOURCE_DIR@/libraries/psio/consthash/include
         @ROOT_SOURCE_DIR@/external/rapidjson/include
     )
     target_link_libraries(psio${suffix} INTERFACE
+        -L@ROOT_BINARY_DIR@/wasm/libraries/psio
+        -lpsio
         boost
-        simdjson${suffix}
         wasm-base${suffix}
     )
     target_compile_features(psio${suffix} INTERFACE cxx_std_20)
@@ -54,21 +47,20 @@ function(add_libs suffix)
     target_include_directories(psibase${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psibase/common/include
         @ROOT_SOURCE_DIR@/libraries/psibase/wasm32-wasi
-        @ROOT_SOURCE_DIR@/services/system/AccountSys/include
-        @ROOT_SOURCE_DIR@/services/system/AuthAnySys/include
-        @ROOT_SOURCE_DIR@/services/system/AuthEcSys/include
-        @ROOT_SOURCE_DIR@/services/system/ProducerSys/include
-        @ROOT_SOURCE_DIR@/services/system/ProxySys/include
-        @ROOT_SOURCE_DIR@/services/system/SetCodeSys/include
-        @ROOT_SOURCE_DIR@/services/system/TransactionSys/include
-        @ROOT_SOURCE_DIR@/services/system/VerifyEcSys/include
-        @ROOT_SOURCE_DIR@/services/user/CommonSys/include
-        @ROOT_SOURCE_DIR@/services/user/ExploreSys/include
-        @ROOT_SOURCE_DIR@/services/user/NftSys/include
-        @ROOT_SOURCE_DIR@/services/user/PsiSpaceSys/include
-        @ROOT_SOURCE_DIR@/services/user/SymbolSys/include
-        @ROOT_SOURCE_DIR@/services/user/TokenSys/include
-        @ROOT_SOURCE_DIR@/services/user/InviteSys/include
+        @ROOT_SOURCE_DIR@/services/system/Accounts/include
+        @ROOT_SOURCE_DIR@/services/system/AuthAny/include
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
+        @ROOT_SOURCE_DIR@/services/system/Producers/include
+        @ROOT_SOURCE_DIR@/services/system/HttpServer/include
+        @ROOT_SOURCE_DIR@/services/system/SetCode/include
+        @ROOT_SOURCE_DIR@/services/system/Transact/include
+        @ROOT_SOURCE_DIR@/services/user/CommonApi/include
+        @ROOT_SOURCE_DIR@/services/user/Explorer/include
+        @ROOT_SOURCE_DIR@/services/user/Nft/include
+        @ROOT_SOURCE_DIR@/services/user/Sites/include
+        @ROOT_SOURCE_DIR@/services/user/Symbol/include
+        @ROOT_SOURCE_DIR@/services/user/Tokens/include
+        @ROOT_SOURCE_DIR@/services/user/Invite/include
     )
     target_link_libraries(psibase${suffix} INTERFACE
         -L@ROOT_BINARY_DIR@/wasm/libraries/psibase
@@ -139,6 +131,9 @@ function(add_libs suffix)
         -lc++abi
         -lc
         -lpsitestlib${lib-suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lSpki${suffix}
+        -lPrivateKeyInfo${suffix}
         ${LIBCLANG_RT_BUILTINS}
         ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
     )
@@ -148,6 +143,36 @@ function(add_libs suffix)
     target_link_options(Psibase::test${suffix} INTERFACE
         -Wl,--entry,_start
         -nostdlib
+    )
+
+    add_library(Spki${suffix} INTERFACE IMPORTED)
+    target_link_libraries(Spki${suffix} INTERFACE 
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
+        -lbotan-3
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lSpki${suffix}
+    )
+    target_include_directories(Spki${suffix} INTERFACE 
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
+        @ROOT_BINARY_DIR@/wasm/deps/include/botan-3 
+    )
+
+    add_library(PrivateKeyInfo${suffix} INTERFACE IMPORTED)
+    target_link_libraries(PrivateKeyInfo${suffix} INTERFACE 
+        -L@ROOT_BINARY_DIR@/wasm/deps/lib
+        -lbotan-3 
+        services_system${suffix} 
+        psibase${suffix} 
+        exception-stub${suffix}
+        -L@ROOT_BINARY_DIR@/wasm/services/system/AuthSig
+        -lPrivateKeyInfo${suffix}
+    )
+    target_include_directories(PrivateKeyInfo${suffix} INTERFACE 
+        @ROOT_SOURCE_DIR@/services/system/AuthSig/include
+        @ROOT_BINARY_DIR@/wasm/deps/include/botan-3 
     )
 endfunction()
 

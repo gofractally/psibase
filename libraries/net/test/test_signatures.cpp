@@ -1,4 +1,4 @@
-#include <psibase/EcdsaProver.hpp>
+#include <psibase/OpenSSLProver.hpp>
 
 #include <catch2/catch.hpp>
 
@@ -18,12 +18,12 @@ TEST_CASE("block signature")
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
    AccountNumber           prod{"prod"};
-   auto ecc    = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"});
-   auto prover = std::make_shared<CompoundProver>();
+   auto                    ecc    = std::make_shared<OpenSSLProver>(AccountNumber{"verify-sig"});
+   auto                    prover = std::make_shared<CompoundProver>();
    prover->add(ecc);
    nodes.add(AccountNumber{"prod"}, prover);
    nodes.add(AccountNumber{"client"});
-   boot(nodes.getBlockContext(), Consensus{CftConsensus{{Producer{prod, ecc->get()}}}}, true);
+   boot(nodes.getBlockContext(), ConsensusData{CftConsensus{{Producer{prod, ecc->get()}}}}, true);
    runFor(ctx, 5s);
    nodes.connect_all();
    runFor(ctx, 1s);
@@ -42,14 +42,14 @@ TEST_CASE("load signature state")
    TempDatabase  db;
    auto          system = db.getSystemContext();
    AccountNumber prod{"prod"};
-   auto prover = std::make_shared<EcdsaSecp256K1Sha256Prover>(AccountNumber{"verifyec-sys"});
+   auto          prover = std::make_shared<OpenSSLProver>(AccountNumber{"verify-sig"});
    {
       boost::asio::io_context ctx;
       node_type               node{ctx, system.get(), prover};
       node.set_producer_id(prod);
       node.load_producers();
-      boot(node.chain().getBlockContext(), Consensus{CftConsensus{{Producer{prod, prover->get()}}}},
-           true);
+      boot(node.chain().getBlockContext(),
+           ConsensusData{CftConsensus{{Producer{prod, prover->get()}}}}, true);
       runFor(ctx, 5s);
    }
    {

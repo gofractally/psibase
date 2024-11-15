@@ -9,12 +9,14 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
 `psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `info` *packages*\.\.\.  
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
+`psibase` *subcommand* [*args*\.\.\.]  
 
 ## DESCRIPTION
 
@@ -91,7 +93,7 @@ Create or modify an account
 
 - `-S`, `--sender` *account*
 
-  Sender to use when creating the account [default: account-sys].
+  Sender to use when creating the account [default: accounts].
 
 ### deploy
 
@@ -117,17 +119,31 @@ Deploy a service
 
 - `-p`, `--register-proxy`
 
-  Register the service with ProxySys. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
+  Register the service with HttpServer. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
   
 - `-S`, `--sender` *sender*
 
-  Sender to use when creating the account [default: account-sys]
+  Sender to use when creating the account [default: accounts]
+
+### info
+
+`psibase` [`-a` *url*] `info` *packages*\.\.\.  
+
+Displays the contents of packages
+
+- *packages*
+
+  Packages to show
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
 ### install
 
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 
-Install apps to the chain along with all dependencies. Packages that are already installed will not be modified.
+Install packages to the chain along with all dependencies. If any of the requested packages are already installed, they will be updated if a newer version is available.
 
 - *packages*
 
@@ -140,6 +156,10 @@ Install apps to the chain along with all dependencies. Packages that are already
   - A PKCS #11 URI
   - An EOS style base58-encoded public key beginning `PUB_K1_`
 
+- `--reinstall`
+
+  Packages that are requested directly (not dependencies) will be installed even if they are already installed and up-to-date.
+
 - `--package-source` *url*
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
@@ -148,7 +168,7 @@ Install apps to the chain along with all dependencies. Packages that are already
 
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 
-Prints a list of apps from the chain and/or package repositories
+Prints a list of packages from the chain and/or package repositories
 
 - `--all`
 
@@ -199,9 +219,9 @@ Search for packages
 
 ### upload
 
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *service* *source* [*dest*]  
+`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 
-Upload a file to a service. The service must provide a `storeSys` action.
+Upload a file to a service's subdomain. The file will be stored to and served from the sender's namespace within the `sites` service.
 
 - `-r`, `--recursive`
 
@@ -211,21 +231,17 @@ Upload a file to a service. The service must provide a `storeSys` action.
 
   MIME Content-Type of the file. If not specified, it will be guessed from the file name. Cannot be used with `-r`.
 
-- *service*
-
-  Service to upload to
-
 - *source*
 
   Source filename to upload
 
 - *dest*
 
-  Destination path within *service*. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
+  Destination path at the subdomain from which the file will be served. If not specified, defaults to the file name of *source* or `/` for recursive uploads.
 
 - `-S`, `--sender` *sender*
 
-  Account to use as the sender of the transaction. Defaults to the *service* account.
+  Account to use as the sender of the transaction. Required. Files are uploaded to this account's subdomain.
 
 ### create-token
 
@@ -240,3 +256,23 @@ Create an access token. `psibase` will prompt for the key to use to sign the tok
 - `-m`, `--mode` *mode*
 
   The permissions granted by the token. Should be `r` or `rw`. The default is `rw`.
+
+### Custom Commands
+
+`psibase` *subcommand* [*args*\.\.\.]__
+
+Additional `psibase` subcommands can be implemented in WASM. They will be found in *$PREFIX/share/psibase/wasm/*.
+
+## FILES
+
+- *$PREFIX/share/psibase/packages/index.json*
+
+  Local package repository
+
+- *$PREFIX/share/psibase/wasm/psibase-\*.wasm*
+
+  Custom subcommands
+
+## SEE ALSO
+
+[`psibase-create-snapshot`(1)](psibase-create-snapshot.md), [`psibase-load-snapshot`(1)](psibase-load-snapshot.md)

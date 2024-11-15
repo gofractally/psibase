@@ -8,7 +8,7 @@
 #include <psibase/zip.hpp>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
-#include <services/user/PackageSys.hpp>
+#include <services/user/Packages.hpp>
 #include <span>
 #include <string>
 #include <tuple>
@@ -18,17 +18,21 @@
 namespace psibase
 {
    using UserService::PackageMeta;
+   using UserService::PackageRef;
 
    struct PackageInfo
    {
       std::string                name;
+      std::string                version;
       std::string                description;
-      std::vector<std::string>   depends;
+      std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo, name, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PackageInfo, name, version, description, depends, accounts, sha256, file)
+
+   std::weak_ordering operator<=>(const PackageInfo&, const PackageInfo&);
 
    struct ServiceInfo
    {
@@ -62,6 +66,7 @@ namespace psibase
      public:
       DirectoryRegistry(std::string_view path);
       PackagedService              get(std::string_view name) const;
+      PackagedService              get(const PackageInfo& info) const;
       std::vector<PackagedService> resolve(std::span<const std::string> packages);
 
      private:

@@ -1,26 +1,60 @@
 #include <psibase/tester.hpp>
+#include <psibase/testerApi.hpp>
 
 #include <secp256k1.h>
-#include <services/system/TransactionSys.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/Transact.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-extern "C"
+namespace psibase::tester::raw
 {
-   // clang-format off
-   [[clang::import_name("testerCreateChain")]]      uint32_t testerCreateChain(uint64_t hot_addr_bits, uint64_t warm_addr_bits, uint64_t cool_addr_bits, uint64_t cold_addr_bits);
-   [[clang::import_name("testerDestroyChain")]]     void     testerDestroyChain(uint32_t chain);
-   [[clang::import_name("testerFinishBlock")]]      void     testerFinishBlock(uint32_t chain_index);
-   [[clang::import_name("testerGetChainPath")]]     uint32_t testerGetChainPath(uint32_t chain, char* dest, uint32_t dest_size);
-   [[clang::import_name("testerPushTransaction")]]  uint32_t testerPushTransaction(uint32_t chain_index, const char* args_packed, uint32_t args_packed_size);
-   [[clang::import_name("testerSelectChainForDb")]] void     testerSelectChainForDb(uint32_t chain_index);
-   [[clang::import_name("testerShutdownChain")]]    void     testerShutdownChain(uint32_t chain);
-   [[clang::import_name("testerStartBlock")]]       void     testerStartBlock(uint32_t chain_index, uint32_t time_seconds);
-   // clang-format on
-}
+   std::optional<std::uint32_t> selectedChain;
+   uint32_t                     getSelectedChain()
+   {
+      check(!!selectedChain, "no chain is selected");
+      return *selectedChain;
+   }
+}  // namespace psibase::tester::raw
+
+namespace
+{
+   std::uint32_t numPublicChains = 0;
+   struct ScopedSelectChain
+   {
+      ScopedSelectChain(std::uint32_t id) : saved(psibase::tester::raw::selectedChain)
+      {
+         psibase::tester::raw::selectedChain = id;
+      }
+      ~ScopedSelectChain() { psibase::tester::raw::selectedChain = saved; }
+      std::optional<std::uint32_t> saved;
+   };
+   __wasi_oflags_t get_wasi_oflags(int flags)
+   {
+      __wasi_oflags_t result = 0;
+      if (flags & O_CREAT)
+         result |= __WASI_OFLAGS_CREAT;
+      if (flags & O_EXCL)
+         result |= __WASI_OFLAGS_EXCL;
+      if (flags & O_TRUNC)
+         result |= __WASI_OFLAGS_TRUNC;
+      return result;
+   }
+   __wasi_rights_t get_wasi_rights(int flags)
+   {
+      __wasi_rights_t result = 0;
+      if ((flags & O_RDONLY) == O_RDONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_READ;
+      if ((flags & O_WRONLY) == O_WRONLY || (flags & O_RDWR) == O_RDWR)
+         result |= __WASI_RIGHTS_FD_WRITE;
+      return result;
+   }
+}  // namespace
+
+using psibase::tester::raw::selectedChain;
+using namespace SystemService::AuthSig;
 
 psibase::TraceResult::TraceResult(TransactionTrace&& t) : _t(t) {}
 
@@ -103,33 +137,24 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
    }
 }
 
-psibase::Signature psibase::sign(const PrivateKey& key, const Checksum256& digest)
+psibase::TestChain::TestChain(uint32_t chain_id, bool clone, bool pub)
+    : id{clone ? tester::raw::cloneChain(chain_id) : chain_id}, isPublicChain(pub)
 {
-   static auto context = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
-   auto*       k1      = std::get_if<0>(&key.data);
-   check(k1, "only k1 currently supported");
-
-   secp256k1_ecdsa_signature sig;
-   check(secp256k1_ecdsa_sign(context, &sig, reinterpret_cast<const unsigned char*>(digest.data()),
-                              k1->data(), nullptr, nullptr) == 1,
-         "sign failed");
-
-   EccSignature sigdata;
-   check(secp256k1_ecdsa_signature_serialize_compact(context, sigdata.data(), &sig) == 1,
-         "serialize signature failed");
-   return Signature{Signature::variant_type{std::in_place_index<0>, sigdata}};
+   if (pub && numPublicChains++ == 0)
+      psibase::tester::raw::selectedChain = id;
 }
 
-const psibase::PublicKey psibase::TestChain::defaultPubKey =
-    psibase::publicKeyFromString("PUB_K1_8UUMcamEE6dnK4kyrSPnAEAPTWZduZtE9SuFvURr3UjGDpF9LX");
-const psibase::PrivateKey psibase::TestChain::defaultPrivKey =
-    psibase::privateKeyFromString("PVT_K1_27Hseiioosmff4ue31Jv37pC1NWfhbjuKuSBxEkqCTzbJtxQD2");
+psibase::TestChain::TestChain(const TestChain& other, bool pub) : TestChain{other.id, true, pub}
+{
+   status = other.status;
+}
 
-psibase::TestChain::TestChain(const DatabaseConfig& dbconfig)
-    : id{::testerCreateChain(dbconfig.hotBytes,
-                             dbconfig.warmBytes,
-                             dbconfig.coolBytes,
-                             dbconfig.coldBytes)}
+psibase::TestChain::TestChain(const DatabaseConfig& dbconfig, bool pub)
+    : TestChain{tester::raw::createChain(dbconfig.hotBytes,
+                                         dbconfig.warmBytes,
+                                         dbconfig.coolBytes,
+                                         dbconfig.coldBytes),
+                false, pub}
 {
 }
 
@@ -137,26 +162,33 @@ psibase::TestChain::TestChain(uint64_t hot_bytes,
                               uint64_t warm_bytes,
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
-    : id{::testerCreateChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes)}
+    : TestChain(DatabaseConfig{hot_bytes, warm_bytes, cool_bytes, cold_bytes})
+{
+}
+
+psibase::TestChain::TestChain(std::string_view path, int flags, const DatabaseConfig& cfg, bool pub)
+    : TestChain(tester::raw::openChain(path.data(),
+                                       path.size(),
+                                       get_wasi_oflags(flags),
+                                       get_wasi_rights(flags),
+                                       &cfg),
+                false,
+                pub)
 {
 }
 
 psibase::TestChain::~TestChain()
 {
-   ::testerDestroyChain(id);
+   if (isPublicChain)
+      --numPublicChains;
+   tester::raw::destroyChain(id);
+   if (selectedChain && *selectedChain == id)
+      selectedChain.reset();
 }
 
 void psibase::TestChain::shutdown()
 {
-   ::testerShutdownChain(id);
-}
-
-std::string psibase::TestChain::getPath()
-{
-   size_t      len = testerGetChainPath(id, nullptr, 0);
-   std::string result(len, 0);
-   testerGetChainPath(id, result.data(), len);
-   return result;
+   tester::raw::shutdownChain(id);
 }
 
 void psibase::TestChain::setAutoBlockStart(bool enable)
@@ -182,30 +214,32 @@ void psibase::TestChain::startBlock(TimePointSec tp)
 {
    // Guarantee that there is a recent block for fillTapos to use.
    if (status && status->current.time.seconds + 1 < tp.seconds)
-      ::testerStartBlock(id, tp.seconds - 1);
-   ::testerStartBlock(id, tp.seconds);
-   status    = psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
+      tester::raw::startBlock(id, tp.seconds - 1);
+   tester::raw::startBlock(id, tp.seconds);
+   status    = kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
    producing = true;
 }
 
 void psibase::TestChain::finishBlock()
 {
-   ::testerFinishBlock(id);
+   tester::raw::finishBlock(id);
    producing = false;
 }
 
 void psibase::TestChain::fillTapos(Transaction& t, uint32_t expire_sec) const
 {
+   ScopedSelectChain s{id};
    t.tapos.expiration.seconds = (status ? status->current.time.seconds : 0) + expire_sec;
    auto [index, suffix]       = SystemService::headTapos();
    t.tapos.refBlockIndex      = index;
    t.tapos.refBlockSuffix     = suffix;
 }
 
-psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions) const
+psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& actions,
+                                                         uint32_t              expire_sec) const
 {
    Transaction t;
-   fillTapos(t);
+   fillTapos(t, expire_sec);
    t.actions = std::move(actions);
    return t;
 }
@@ -216,7 +250,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    if (!producing)
       startBlock();
    std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
-   auto              size       = ::testerPushTransaction(id, packed_trx.data(), packed_trx.size());
+   auto              size = tester::raw::pushTransaction(id, packed_trx.data(), packed_trx.size());
    return psio::from_frac<TransactionTrace>(getResult(size));
 }
 
@@ -225,13 +259,49 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
-          .service = SystemService::VerifyEcSys::service,
-          .rawData = psio::convert_to_frac(pub),
+          .service = SystemService::VerifySig::service,
+          .rawData = {pub.data.begin(), pub.data.end()},
       });
    SignedTransaction signedTrx;
    signedTrx.transaction = trx;
    auto hash             = sha256(signedTrx.transaction.data(), signedTrx.transaction.size());
    for (auto& [pub, priv] : keys)
-      signedTrx.proofs.push_back(psio::convert_to_frac(sign(priv, hash)));
+   {
+      auto proof = sign(priv, hash);
+      signedTrx.proofs.push_back({proof.begin(), proof.end()});
+   }
+
    return pushTransaction(signedTrx);
+}
+
+psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
+{
+   if (producing && isAutoBlockStart)
+      finishBlock();
+
+   std::vector<char> packed_request = psio::convert_to_frac(request);
+   auto        fd = tester::raw::httpRequest(id, packed_request.data(), packed_request.size());
+   std::size_t size;
+   if (auto err = tester::raw::socketRecv(fd, &size))
+   {
+      if (err == EAGAIN)
+      {
+         abortMessage("Query did not return a synchronous response");
+      }
+      else
+      {
+         abortMessage("Could not read response: " + std::to_string(err));
+      }
+   }
+
+   return psio::from_frac<HttpReply>(getResult(size));
+}
+
+std::optional<std::vector<char>> psibase::TestChain::kvGetRaw(psibase::DbId      db,
+                                                              psio::input_stream key)
+{
+   auto size = tester::raw::kvGet(id, db, key.pos, key.remaining());
+   if (size == -1)
+      return std::nullopt;
+   return psibase::getResult(size);
 }

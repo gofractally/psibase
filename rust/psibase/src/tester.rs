@@ -7,13 +7,18 @@
 //! These functions and types wrap the [Raw Native Functions](crate::tester_raw).
 
 use crate::{
-    kv_get, services, status_key, tester_raw, AccountNumber, Action, Caller, InnerTraceEnum,
-    Reflect, SignedTransaction, StatusRow, TimePointSec, Transaction, TransactionTrace,
+    create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
+    AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
+    InnerTraceEnum, PackageRegistry, SignedTransaction, StatusRow, TimePointSec, Transaction,
+    TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
+use futures::executor::block_on;
 use psibase_macros::account_raw;
+use serde::de::DeserializeOwned;
 use std::cell::{Cell, RefCell};
+use std::path::Path;
 use std::{marker::PhantomData, ptr::null_mut};
 
 /// Execute a shell command
@@ -23,42 +28,13 @@ pub fn execute(command: &str) -> i32 {
     unsafe { tester_raw::testerExecute(command.as_ptr(), command.len()) }
 }
 
-/// Read a file into memory. Returns `None` if failure.
-pub fn read_whole_file(filename: &str) -> Option<Vec<u8>> {
-    struct Context {
-        size: usize,
-        bytes: Vec<u8>,
-    }
-    let mut context = Context {
-        size: 0,
-        bytes: Vec::new(),
-    };
-    unsafe {
-        unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-            let context = &mut *(alloc_context as *mut Context);
-            context.size = size;
-            context.bytes.reserve(size);
-            context.bytes.as_mut_ptr()
-        }
-        if !tester_raw::testerReadWholeFile(
-            filename.as_ptr(),
-            filename.len(),
-            (&mut context) as *mut Context as *mut u8,
-            alloc,
-        ) {
-            return None;
-        }
-        context.bytes.set_len(context.size);
-        Some(context.bytes)
-    }
-}
-
 /// Block chain under test
 #[derive(Debug)]
 pub struct Chain {
     chain_handle: u32,
     status: RefCell<Option<StatusRow>>,
     producing: Cell<bool>,
+    is_auto_block_start: bool,
 }
 
 impl Default for Chain {
@@ -69,42 +45,74 @@ impl Default for Chain {
 
 impl Drop for Chain {
     fn drop(&mut self) {
-        unsafe { tester_raw::testerDestroyChain(self.chain_handle) }
+        unsafe { tester_raw::destroyChain(self.chain_handle) }
+        tester_raw::tester_clear_chain_for_db(self.chain_handle)
     }
 }
 
 impl Chain {
     /// Create a new chain and make it active for database native functions.
     ///
-    /// Shortcut for `Tester::create(1_000_000_000, 32, 32, 32, 38)`
+    /// Shortcut for `Tester::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)`
     pub fn new() -> Chain {
-        Self::create(1_000_000_000, 32, 32, 32, 38)
+        Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
+    }
+
+    /// Boot the tester chain with default services being deployed
+    pub fn boot(&self) -> Result<(), Error> {
+        let default_services: Vec<String> = vec!["DevDefault".to_string()];
+        self.boot_with(&Self::default_registry(), &default_services[..])
+    }
+
+    pub fn default_registry() -> DirectoryRegistry {
+        let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
+            .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
+        let packages_dir = Path::new(&psibase_data_dir).join("packages");
+        DirectoryRegistry::new(packages_dir)
+    }
+
+    pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
+        let mut services = block_on(reg.resolve(services))?;
+
+        const COMPRESSION_LEVEL: u32 = 4;
+        let (boot_tx, subsequent_tx) = create_boot_transactions(
+            &None,
+            AccountNumber::new(account_raw!("prod")),
+            false,
+            TimePointSec { seconds: 10 },
+            &mut services[..],
+            COMPRESSION_LEVEL,
+        )
+        .unwrap();
+
+        for trx in boot_tx {
+            self.push(&trx).ok()?;
+        }
+
+        for trx in subsequent_tx {
+            self.push(&trx).ok()?;
+        }
+
+        self.start_block();
+
+        Ok(())
     }
 
     /// Create a new chain and make it active for database native functions.
     ///
-    /// `max_objects` is the maximum number of objects the database can hold.
-    /// The remaining arguments are log-base-2 of file sizes for the database's
-    /// various files. e.g. `32` is 4 GB.
-    pub fn create(
-        max_objects: u64,
-        hot_addr_bits: u64,
-        warm_addr_bits: u64,
-        cool_addr_bits: u64,
-        cold_addr_bits: u64,
-    ) -> Chain {
-        unsafe {
-            Chain {
-                chain_handle: tester_raw::testerCreateChain(
-                    max_objects,
-                    hot_addr_bits,
-                    warm_addr_bits,
-                    cool_addr_bits,
-                    cold_addr_bits,
-                ),
-                status: None.into(),
-                producing: false.into(),
-            }
+    /// The arguments are the file sizes in bytes for the database's
+    /// various files.
+    pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
+        let chain_handle =
+            unsafe { tester_raw::createChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes) };
+        if chain_handle == 0 {
+            tester_raw::tester_select_chain_for_db(chain_handle)
+        }
+        Chain {
+            chain_handle,
+            status: None.into(),
+            producing: false.into(),
+            is_auto_block_start: true,
         }
     }
 
@@ -116,13 +124,14 @@ impl Chain {
     /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: TimePointSec) {
         let status = &mut *self.status.borrow_mut();
+
         // Guarantee that there is a recent block for fillTapos to use.
         if let Some(status) = status {
             if status.current.time.seconds + 1 < time.seconds {
-                unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds - 1) }
+                unsafe { tester_raw::startBlock(self.chain_handle, time.seconds - 1) }
             }
         }
-        unsafe { tester_raw::testerStartBlock(self.chain_handle, time.seconds) }
+        unsafe { tester_raw::startBlock(self.chain_handle, time.seconds) }
         *status = kv_get::<StatusRow, _>(StatusRow::DB, &status_key()).unwrap();
         self.producing.replace(true);
     }
@@ -138,7 +147,7 @@ impl Chain {
     ///
     /// This does nothing if a block isn't currently being produced.
     pub fn finish_block(&self) {
-        unsafe { tester_raw::testerFinishBlock(self.chain_handle) }
+        unsafe { tester_raw::finishBlock(self.chain_handle) }
         self.producing.replace(false);
     }
 
@@ -160,6 +169,13 @@ impl Chain {
         }
     }
 
+    /// By default, the TestChain will automatically advance blocks.
+    /// When disabled, the the chain will only advance blocks manually.
+    /// To manually advance a block, call start_block.
+    pub fn set_auto_block_start(&mut self, enable: bool) {
+        self.is_auto_block_start = enable;
+    }
+
     /// Push a transaction
     ///
     /// The returned trace includes detailed information about the execution,
@@ -170,31 +186,10 @@ impl Chain {
         }
 
         let transaction = transaction.packed();
-        struct Context {
-            size: usize,
-            bytes: Vec<u8>,
-        }
-        let mut context = Context {
-            size: 0,
-            bytes: Vec::new(),
+        let size = unsafe {
+            tester_raw::pushTransaction(self.chain_handle, transaction.as_ptr(), transaction.len())
         };
-        unsafe {
-            unsafe extern "C" fn alloc(alloc_context: *mut u8, size: usize) -> *mut u8 {
-                let context = &mut *(alloc_context as *mut Context);
-                context.size = size;
-                context.bytes.reserve(size);
-                context.bytes.as_mut_ptr()
-            }
-            tester_raw::testerPushTransaction(
-                self.chain_handle,
-                transaction.as_ptr(),
-                transaction.len(),
-                (&mut context) as *mut Context as *mut u8,
-                alloc,
-            );
-            context.bytes.set_len(context.size);
-            TransactionTrace::unpacked(&context.bytes).unwrap()
-        }
+        TransactionTrace::unpacked(&get_result_bytes(size)).unwrap()
     }
 
     /// Copy database to `path`
@@ -219,9 +214,9 @@ impl Chain {
     /// will corrupt the database and likely crash the `psitest` process running this
     /// wasm.
     pub unsafe fn get_path(&self) -> String {
-        let size = tester_raw::testerGetChainPath(self.chain_handle, null_mut(), 0);
+        let size = tester_raw::getChainPath(self.chain_handle, null_mut(), 0);
         let mut bytes = Vec::with_capacity(size);
-        tester_raw::testerGetChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
+        tester_raw::getChainPath(self.chain_handle, bytes.as_mut_ptr(), size);
         bytes.set_len(size);
         String::from_utf8_unchecked(bytes)
     }
@@ -237,20 +232,16 @@ impl Chain {
     /// * [`native_raw::kvLessThan`](crate::native_raw::kvLessThan)
     /// * [`native_raw::kvMax`](crate::native_raw::kvMax)
     pub fn select_chain(&self) {
-        unsafe { tester_raw::testerSelectChainForDb(self.chain_handle) }
+        tester_raw::tester_select_chain_for_db(self.chain_handle)
     }
 
     /// Create a new account
     ///
-    /// Create a new account which authenticates using `auth-any-sys`.
+    /// Create a new account which authenticates using `auth-any`.
     /// Doesn't fail if the account already exists.
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
-        services::account_sys::Wrapper::push(self)
-            .newAccount(
-                account,
-                AccountNumber::new(account_raw!("auth-any-sys")),
-                false,
-            )
+        services::accounts::Wrapper::push(self)
+            .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
             .get()
     }
 
@@ -259,10 +250,66 @@ impl Chain {
     /// Set code on an account. Also creates the account if needed.
     pub fn deploy_service(&self, account: AccountNumber, code: &[u8]) -> Result<(), anyhow::Error> {
         self.new_account(account)?;
-        // TODO: update setcode_sys::setCode to not need a vec. Needs changes to the service macro.
-        services::setcode_sys::Wrapper::push_from(self, account)
+        // TODO: update setcode::setCode to not need a vec. Needs changes to the service macro.
+        services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
+    }
+
+    pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
+        let packed_request = request.packed();
+        let fd = unsafe {
+            tester_raw::httpRequest(
+                self.chain_handle,
+                packed_request.as_ptr(),
+                packed_request.len(),
+            )
+        };
+        let mut size: u32 = 0;
+        let err = unsafe { tester_raw::socketRecv(fd, &mut size) };
+        if err != 0 {
+            Err(anyhow!("Could not read response: {}", err))?;
+        }
+
+        Ok(HttpReply::unpacked(&get_result_bytes(size))?)
+    }
+
+    pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            rootHost: "psibase.io".into(),
+            method: "GET".into(),
+            target: target.into(),
+            contentType: "".into(),
+            body: <Vec<u8>>::new().into(),
+            headers: vec![],
+        })
+    }
+
+    pub fn post(
+        &self,
+        account: AccountNumber,
+        target: &str,
+        data: HttpBody,
+    ) -> Result<HttpReply, anyhow::Error> {
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            rootHost: "psibase.io".into(),
+            method: "POST".into(),
+            target: target.into(),
+            contentType: data.contentType,
+            body: data.body,
+            headers: vec![],
+        })
+    }
+
+    pub fn graphql<T: DeserializeOwned>(
+        &self,
+        account: AccountNumber,
+        query: &str,
+    ) -> Result<T, anyhow::Error> {
+        self.post(account, "/graphql", HttpBody::graphql(query))?
+            .json()
     }
 }
 
@@ -294,20 +341,31 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         if let Some(e) = &self.trace.error {
             return Err(anyhow!("{}", e));
         }
-        if let Some(transact_sys) = self.trace.action_traces.last() {
-            let ret = transact_sys
+        if let Some(transact) = self.trace.action_traces.last() {
+            let ret = transact
                 .inner_traces
                 .iter()
+                // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        Some(&at.raw_retval)
+                        println!(
+                            ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
+                            at.action.method, at.raw_retval
+                        );
+                        if at.raw_retval.is_empty() {
+                            return None;
+                        } else {
+                            Some(&at.raw_retval)
+                        }
                     } else {
                         None
                     }
                 })
-                .last();
+                .next();
             if let Some(ret) = ret {
-                return Ok(T::unpacked(ret)?);
+                println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
+                let unpacked_ret = T::unpacked(ret)?;
+                return Ok(unpacked_ret);
             }
         }
         Err(anyhow!("Can't find action in trace"))
@@ -318,10 +376,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
     }
 }
 
-#[derive(Clone, Debug, Reflect)]
-#[reflect(psibase_mod = "crate")]
+#[derive(Clone, Debug)]
 pub struct ChainPusher<'a> {
-    #[reflect(skip)]
     pub chain: &'a Chain,
     pub sender: AccountNumber,
     pub service: AccountNumber,
@@ -351,6 +407,11 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
+        }
+
         ChainEmptyResult { trace }
     }
 
@@ -374,9 +435,15 @@ impl<'a> Caller for ChainPusher<'a> {
             transaction: trx.packed().into(),
             proofs: Default::default(),
         });
-        ChainResult::<Ret> {
+        let ret = ChainResult::<Ret> {
             trace,
             _marker: Default::default(),
+        };
+
+        if self.chain.is_auto_block_start {
+            self.chain.start_block();
         }
+
+        ret
     }
 }

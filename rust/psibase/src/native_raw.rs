@@ -108,4 +108,37 @@ extern "C" {
     /// Otherwise returns `u32::MAX` and clears result. Use [getResult] to get result
     /// and [getKey] to get found key.
     pub fn kvMax(db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+
+    pub fn checkoutSubjective();
+    pub fn commitSubjective() -> bool;
+    pub fn abortSubjective();
+
+    /// Send a message to a socket
+    ///
+    /// Returns 0 on success or an error code on failure
+    ///
+    /// Errors:
+    /// - `EBADF`: fd is not a valid file descriptor
+    /// - `ENOTSOCK`: fd is not a socket
+    pub fn socketSend(fd: i32, data: *const u8, len: usize) -> i32;
+
+    /// Tells the current transaction/query/callback context to take or release
+    /// ownership of a socket.
+    ///
+    /// Any sockets that are owned by a context will be closed when it finishes.
+    /// - HTTP socket: send a 500 response with an error message in the body
+    /// - Other sockets may not be set to auto-close
+    ///
+    /// If this function is called within a subjectiveCheckout, it will only take
+    /// effect if the top-level commit succeeds. If another context takes ownership
+    /// of the socket, subjectiveCommit may fail.
+    ///
+    /// Returns 0 on success or an error code on failure.
+    ///
+    /// Errors:
+    /// - `EBADF`: fd is not a valid file descriptor
+    /// - `ENOTSUP`: The socket does not support auto-close
+    /// - `ENOTSOCK`: fd is not a socket
+    /// - `EACCES`: The socket is owned by another context
+    pub fn socketAutoClose(fd: i32, value: bool) -> i32;
 }

@@ -25,17 +25,6 @@ namespace psibase
       /// The first 64 bits of the key match the service.
       writeOnly,
 
-      /// Data that is not part of consensus
-      ///
-      /// Only accessible to subjective services during transactions,
-      /// but readable by all services during RPC. Doesn't undo
-      /// from aborting transactions, aborting blocks, or forking
-      /// blocks. Individual nodes may modify this database or wipe
-      //  it entirely at will.
-      ///
-      /// The first 64 bits of the key match the service.
-      subjective,
-
       /// Tables used by native code
       ///
       /// This database enforces constraints during write. Only
@@ -49,14 +38,7 @@ namespace psibase
       /// then that node will reject the write. If the producers
       /// accepted the write into a block, then the node will stop
       /// following the chain until it's upgraded to a newer version.
-      nativeConstrained,
-
-      /// Tables used by native code
-      ///
-      /// This database doesn't enforce constraints during write.
-      /// Only writable by privileged services, but readable by all
-      /// services.
-      nativeUnconstrained,
+      native,
 
       /// Block log
       ///
@@ -135,13 +117,40 @@ namespace psibase
       /// block signatures
       blockProof,
 
-      /// Number of defined databases
+      /// Not accessible to WASM. During joint consensus, this holds a
+      /// subset of native as of the last irreversible block. Outside
+      /// joint consensus, it is empty.
+      prevAuthServices,
+
+      numChainDatabases,
+
+      beginIndependent = 64,
+
+      /// Data that is not part of consensus
       ///
-      /// This number may grow in the future
-      numDatabases,
+      /// Only accessible to subjective services and during RPC. Doesn't
+      /// undo from aborting transactions, aborting blocks, or forking
+      /// blocks. Individual nodes may modify this database or wipe
+      /// it entirely at will. Can only be accessed within
+      /// `PSIBASE_SUBJECTIVE_TX`.
+      ///
+      /// The first 64 bits of the key match the service. Services are
+      /// not allowed to read or write keys belonging to other services.
+      subjective = beginIndependent,
+
+      /// Subjective tables used by native code
+      ///
+      /// Not fully implemented yet and not available to services. Doesn't
+      /// undo from aborting transactions, aborting blocks, or forking
+      /// blocks.
+      nativeSubjective,
+
+      endIndependent,
    };
 
-   inline constexpr uint32_t numDatabases = (uint32_t)DbId::numDatabases;
+   inline constexpr uint32_t numChainDatabases = ((uint32_t)DbId::numChainDatabases);
+   inline constexpr uint32_t numIndependentDatabases =
+       ((std::uint32_t)DbId::endIndependent) - ((std::uint32_t)DbId::beginIndependent);
 
    struct KvResourceKey
    {
@@ -149,16 +158,16 @@ namespace psibase
       uint32_t      db      = {};
 
       friend auto operator<=>(const KvResourceKey&, const KvResourceKey&) = default;
+      PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), service, db)
    };
-   PSIO_REFLECT(KvResourceKey, definitionWillNotChange(), service, db)
 
    struct KvResourceDelta
    {
       int64_t records    = 0;
       int64_t keyBytes   = 0;
       int64_t valueBytes = 0;
+      PSIO_REFLECT(KvResourceDelta, definitionWillNotChange(), records, keyBytes, valueBytes)
    };
-   PSIO_REFLECT(KvResourceDelta, definitionWillNotChange(), records, keyBytes, valueBytes)
 
    struct KvResourcePair
    {
@@ -167,6 +176,6 @@ namespace psibase
 
       KvResourcePair() = default;
       KvResourcePair(KvResourceKey first, KvResourceDelta second) : first{first}, second{second} {}
+      PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
    };
-   PSIO_REFLECT(KvResourcePair, definitionWillNotChange(), first, second)
 }  // namespace psibase

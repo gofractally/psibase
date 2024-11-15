@@ -4,7 +4,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 ## RPC wrappers
 
-`/common/rpc.mjs` exports a set of utilities to aid interacting with psinode's RPC interface.
+`/common/common-lib.js` exports a set of utilities to aid interacting with psinode's RPC interface.
 
 | Function or Type                     |       | Description                                                                                                                                                                                        |
 | ------------------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 ## Conversions
 
-`/common/rpc.mjs` exports these conversion functions.
+`/common/common-lib.js` exports these conversion functions.
 
 | Function                | Description                            |
 | ----------------------- | -------------------------------------- |
@@ -36,7 +36,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 ## Transactions
 
-`/common/rpc.mjs` exports these functions for packing and pushing transactions.
+`/common/common-lib.js` exports these functions for packing and pushing transactions.
 
 | Function                                       |       | Description                                                                                                                                                                                                                                                                                     |
 | ---------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,7 +49,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 ## Signing
 
-`/common/rpc.mjs` exports these functions for signing and pushing transactions
+`/common/common-lib.js` exports these functions for signing and pushing transactions
 
 | Function                                                    |       | Description                                                                                                               |
 | ----------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -93,7 +93,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 
 ## Service utilities
 
-`/common/rpc.mjs` exports these utility functions:
+`/common/common-lib.js` exports these utility functions:
 
 | Function                                       |       | Description                                                                                                               |
 | ---------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -115,7 +115,7 @@ Example uses:
 
 ## Key Conversions
 
-`/common/keyConversions.mjs` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. 
+`/common/common-lib.js` exports functions which convert [Elliptic KeyPair objects](https://github.com/indutny/elliptic) and Elliptic Signature objects to and from psibase's text and fracpack forms. 
 
 | Function                                      | Description                                                                        |
 | --------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -145,8 +145,7 @@ PVT_R1_fJ6ASApAc9utAL4zfNE4qwo22p7JpgHHSCVJ9pQfw4vZPXCq3
 PUB_R1_7pGpnu7HZVwi8kiLLDK2MJ6aYYS23eRJYmDXSLq5WZFCN6WEqY
 ```
 
-The default auth app [auth-ec-sys](../../../default-apps/auth-ec-sys.md) only accepts K1 keys.
-The default auth app [auth-sys](../../../default-apps/auth-sys.md) accepts K1 or R1 keys.
+The default auth app [auth-sig](../../../default-apps/auth-sig.md) accepts K1 or R1 keys.
 
 ## React GraphQL hooks (js)
 

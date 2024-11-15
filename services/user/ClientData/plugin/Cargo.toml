@@ -1,0 +1,21 @@
+[package]
+name = "clientdata"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.33.0", features = ["bitflags"] }
+psibase = { path = "../../../../rust/psibase/" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "clientdata:plugin"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"wasi:keyvalue" = { path = "../../../user/CommonApi/common/packages/wit/wasi-keyvalue.wit" }
+
+[package.metadata.component.target]
+world = "impl"

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <psibase/tester.hpp>
+#include <services/system/Accounts.hpp>
+#include <services/system/AuthSig.hpp>
 
 namespace psibase
 {
@@ -10,14 +12,13 @@ namespace psibase
    class DefaultTestChain : public TestChain
    {
      public:
-      // default excludes DocSys and TokenUsers
-      DefaultTestChain(const std::vector<std::string>& packageNames =
-                           {"AccountSys", "AuthAnySys", "AuthDelegateSys", "AuthSys", "AuthEcSys",
-                            "CommonSys", "CpuSys", "ExploreSys", "FractalSys", "InviteSys",
-                            "NftSys", "PackageSys", "ProducerSys", "ProxySys", "PsiSpaceSys",
-                            "SetCodeSys", "SymbolSys", "TokenSys", "TransactionSys"},
-                       bool                  installUI = false,
-                       const DatabaseConfig& dbconfig  = {});
+      // default excludes Docs and TokenUsers
+      static std::vector<std::string> defaultPackages();
+      DefaultTestChain();
+      DefaultTestChain(const std::vector<std::string>& packageNames,
+                       bool                            installUI = false,
+                       const DatabaseConfig&           dbconfig  = {},
+                       bool                            pub       = true);
 
       AccountNumber addService(const char* acc, const char* filename, bool show = false);
       AccountNumber addService(AccountNumber acc, const char* filename, bool show = false);
@@ -38,17 +39,29 @@ namespace psibase
          }
       }
 
-      AccountNumber addAccount(const char* name, const PublicKey& public_key, bool show = false);
-      AccountNumber addAccount(AccountNumber name, const PublicKey& public_key, bool show = false);
+      template <typename AuthService>
+      void setAuth(AccountNumber name, const auto& pubkey)
+      {
+         auto n  = name.str();
+         auto t1 = this->from(name).to<AuthService>().setKey(pubkey);
+         check(psibase::show(false, t1.trace()) == "", "Failed to setkey for " + n);
+         auto t2 = this->from(name).to<SystemService::Accounts>().setAuthServ(AuthService::service);
+         check(psibase::show(false, t2.trace()) == "", "Failed to setAuthServ for " + n);
+      }
 
-      void setAuthEc(AccountNumber name, const PublicKey& pubkey, bool show = false);
+      AccountNumber addAccount(const char*                                         name,
+                               const SystemService::AuthSig::SubjectPublicKeyInfo& public_key,
+                               bool                                                show = false);
+      AccountNumber addAccount(AccountNumber                                       name,
+                               const SystemService::AuthSig::SubjectPublicKeyInfo& public_key,
+                               bool                                                show = false);
 
       AccountNumber addAccount(const char*   acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
 
       AccountNumber addAccount(AccountNumber acc,
-                               AccountNumber authService = AccountNumber("auth-any-sys"),
+                               AccountNumber authService = AccountNumber("auth-any"),
                                bool          show        = false);
    };
 }  // namespace psibase

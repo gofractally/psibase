@@ -47,7 +47,8 @@ TEST_CASE("location_lock")
    std::this_thread::sleep_for(100ms);
    done.store(true);
 
-   for( auto& t : threads ) {
+   for (auto& t : threads)
+   {
       t.join();
    }
 

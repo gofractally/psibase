@@ -16,4 +16,4 @@ The leader is selected from the old producers. The new producers commit, but do 
 
 ### BFT → BFT
 
-The leader is selected from the old producers. Activating a view, committing a block, and advancing irreversibility all require quorums of both the old and the new producers. View change auto triggers if f+1 of the old producers are ahead of the current term.
+The leader is selected from the old producers. Activating a view, committing a block, and advancing irreversibility all require quorums of both the old and the new producers. View change auto triggers if enough of either the old producers or the new producers have advanced to make consensus impossible in the current view.

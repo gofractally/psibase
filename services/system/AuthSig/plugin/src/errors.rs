@@ -1,0 +1,10 @@
+use psibase::plugin_error;
+
+plugin_error! {
+    pub ErrorType<'a>
+
+    CryptoError(msg: String) => "Crypto error: {msg}",
+    Unauthorized(msg: &'a str) => "Unauthorized: {msg}",
+    JsonDecodeError(msg: String) => "JSON decode error: {msg}",
+    KeyNotFound(msg: &'a str) => "Key not found: {msg}",
+}

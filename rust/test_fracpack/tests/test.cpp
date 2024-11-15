@@ -1,4 +1,5 @@
 #include "test_fracpack/tests/test.hpp"
+#include <psio/schema.hpp>
 
 using namespace std::literals;
 
@@ -65,7 +66,7 @@ OuterStruct tests1_data[] = {
         .field_inner =
             InnerStruct{
                 .inner_u32            = 1234,
-                .var                  = ""s,
+                .var                  = ItemStr{""s},
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = None,
                 .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -75,9 +76,9 @@ OuterStruct tests1_data[] = {
             DefWontChangeInnerStruct{
                 .field_bool    = true,
                 .field_u32     = 32,
-                .field_var     = "abcd",
+                .field_var     = ItemStr{"abcd"},
                 .field_i16     = 16,
-                .field_o_var   = Variant{std::in_place_type_t<uint32_t>{}, 99},
+                .field_o_var   = Variant{std::in_place_type_t<ItemU32>{}, 99},
                 .field_str     = "hello"s,
                 .field_a_i16_3 = {44, 55, 66},
                 .field_f32     = 3.2,
@@ -92,7 +93,7 @@ OuterStruct tests1_data[] = {
             {
                 InnerStruct{
                     .inner_u32            = 1234,
-                    .var                  = "var"s,
+                    .var                  = ItemStr{"var"s},
                     .inner_option_u32     = Some(0x1234),
                     .inner_option_str     = None,
                     .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -100,7 +101,7 @@ OuterStruct tests1_data[] = {
                 },
                 InnerStruct{
                     .inner_u32            = 0x9876,
-                    .var                  = Variant{std::in_place_type_t<uint32_t>{}, 3421},
+                    .var                  = Variant{std::in_place_type_t<ItemU32>{}, 3421},
                     .inner_option_u32     = None,
                     .inner_option_str     = "xyz"s,
                     .inner_option_vec_u16 = None,
@@ -123,7 +124,7 @@ OuterStruct tests1_data[] = {
         .field_option_inner =
             InnerStruct{
                 .inner_u32            = 1234,
-                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .var                  = Variant{std::in_place_type_t<ItemU32>{}, 0},
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = "testing"s,
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
@@ -133,9 +134,9 @@ OuterStruct tests1_data[] = {
             DefWontChangeInnerStruct{
                 .field_bool    = true,
                 .field_u32     = 44,
-                .field_var     = "xyz",
+                .field_var     = ItemStr{"xyz"},
                 .field_i16     = 55,
-                .field_o_var   = Variant{std::in_place_type_t<uint32_t>{}, 88},
+                .field_o_var   = Variant{std::in_place_type_t<ItemU32>{}, 88},
                 .field_str     = "byebye"s,
                 .field_a_i16_3 = {77, 88, 99},
                 .field_f32     = 6.4,
@@ -166,7 +167,7 @@ OuterStruct tests1_data[] = {
         .field_inner =
             InnerStruct{
                 .inner_u32            = 1234,
-                .var                  = ""s,
+                .var                  = ItemStr{""s},
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = None,
                 .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -176,7 +177,7 @@ OuterStruct tests1_data[] = {
             DefWontChangeInnerStruct{
                 .field_bool    = false,
                 .field_u32     = 0,
-                .field_var     = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .field_var     = Variant{std::in_place_type_t<ItemU32>{}, 0},
                 .field_i16     = 0,
                 .field_o_var   = None,
                 .field_str     = ""s,
@@ -193,7 +194,7 @@ OuterStruct tests1_data[] = {
             {
                 InnerStruct{
                     .inner_u32            = 1234,
-                    .var                  = "var"s,
+                    .var                  = ItemStr{"var"s},
                     .inner_option_u32     = Some(0x1234),
                     .inner_option_str     = None,
                     .inner_option_vec_u16 = std::vector<uint16_t>{},
@@ -216,7 +217,7 @@ OuterStruct tests1_data[] = {
         .field_option_inner =
             InnerStruct{
                 .inner_u32            = 1234,
-                .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .var                  = Variant{std::in_place_type_t<ItemU32>{}, 0},
                 .inner_option_u32     = Some(0x1234),
                 .inner_option_str     = "testing"s,
                 .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
@@ -226,7 +227,7 @@ OuterStruct tests1_data[] = {
             DefWontChangeInnerStruct{
                 .field_bool    = false,
                 .field_u32     = 0,
-                .field_var     = Variant{std::in_place_type_t<uint32_t>{}, 0},
+                .field_var     = Variant{std::in_place_type_t<ItemU32>{}, 0},
                 .field_i16     = 0,
                 .field_o_var   = None,
                 .field_str     = ""s,
@@ -244,7 +245,7 @@ OuterStruct tests1_data[] = {
         .field_o_o_str2  = None,
         .field_o_o_inner = std::optional<InnerStruct>{InnerStruct{
             .inner_u32            = 1234,
-            .var                  = Variant{std::in_place_type_t<uint32_t>{}, 0},
+            .var                  = Variant{std::in_place_type_t<ItemU32>{}, 0},
             .inner_option_u32     = Some(0x1234),
             .inner_option_str     = "testing"s,
             .inner_option_vec_u16 = std::vector<uint16_t>{0x1234, 0x5678},
@@ -260,10 +261,7 @@ void check_same(const auto& rust, const auto& cpp)
               psio::bytes{std::vector<char>((const char*)rust.data(),
                                             (const char*)(rust.data() + rust.size()))})
               .c_str());
-   printf("        cpp:  %s\n",
-          psio::convert_to_json(
-              psio::bytes{std::vector<char>(cpp.data(), (const char*)(cpp.data() + cpp.size()))})
-              .c_str());
+   printf("        cpp:  %s\n", psio::convert_to_json(cpp).c_str());
    if (rust.size() == cpp.size() && !memcmp(rust.data(), cpp.data(), rust.size()))
       return;
    throw std::runtime_error("rust and c++ packed differ");
@@ -328,4 +326,35 @@ void round_trip_outer_struct_field(size_t                     index,
    HANDLE(field_o_o_str2);
    HANDLE(field_o_o_inner);
    throw std::runtime_error("unknown field");
+}
+
+// The blob is an OuterStruct
+void round_trip_with_schema(std::size_t                index,
+                            rust::Slice<const uint8_t> schema_packed,
+                            rust::Slice<const uint8_t> blob)
+{
+   std::span schema_data{reinterpret_cast<const char*>(schema_packed.data()), schema_packed.size()};
+   std::span input{reinterpret_cast<const char*>(blob.data()), blob.size()};
+
+   auto                               schema = psio::from_frac<psio::Schema>(schema_data);
+   psio::schema_types::CompiledSchema cschema{schema};
+   psio::schema_types::FracParser     parser{input, cschema, "OuterStruct"};
+
+   auto expected_schema = psio::SchemaBuilder{}.insert<OuterStruct>("OuterStruct").build();
+   if (auto diff = match(schema, expected_schema,
+                         {{*schema.get("OuterStruct"), *expected_schema.get("OuterStruct")}});
+       diff != psio::SchemaDifference::equivalent)
+   {
+      printf("        rust schema: %s\n", psio::convert_to_json(schema).c_str());
+      printf("        cpp schema: %s\n", psio::convert_to_json(expected_schema).c_str());
+      printf("        difference: %x\n", static_cast<unsigned>(diff));
+      throw std::runtime_error("Rust schema is not equivalent to C++ schema");
+   }
+
+   std::string         schema_result;
+   psio::string_stream stream{schema_result};
+   to_json(parser, stream);
+   std::string direct_result = psio::convert_to_json(tests1_data[index]);
+   if (direct_result != schema_result)
+      throw std::runtime_error(schema_result + " != " + direct_result);
 }

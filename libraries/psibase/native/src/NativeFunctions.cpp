@@ -1,6 +1,7 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
+#include <psibase/Socket.hpp>
 
 namespace psibase
 {
@@ -27,27 +28,28 @@ namespace psibase
              std::chrono::steady_clock::now() - start;
       }
 
-      DbId getDbRead(NativeFunctions& self, uint32_t db)
+      DbId getDbRead(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
          check(self.allowDbRead,
                "database access disabled during proof verification or first auth");
          if (db == uint32_t(DbId::service))
             return (DbId)db;
-         if (db == uint32_t(DbId::nativeConstrained))
-            return (DbId)db;
-         if (db == uint32_t(DbId::nativeUnconstrained))
+         if (db == uint32_t(DbId::native))
             return (DbId)db;
          if (db == uint32_t(DbId::subjective))
          {
-            // TODO: RPC service queries currently can read subjective data to monitor node status.
-            //       However, there's a possibility this may make it easier on an active attacker.
-            //       Make this capability a node configuration toggle? Allow node config to whitelist
-            //       services for this?
+            uint64_t prefix = self.code.codeNum.value;
+            std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
+            check(key.remaining() >= sizeof(prefix) && !memcmp(key.pos, &prefix, sizeof(prefix)),
+                  "key prefix must match service for accessing the subjective database");
             if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
                return (DbId)db;
          }
-         if (db == uint32_t(DbId::writeOnly) && self.allowDbReadSubjective)
-            return (DbId)db;
+         if (db == uint32_t(DbId::writeOnly))
+         {
+            if ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective)
+               return (DbId)db;
+         }
          if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
@@ -84,10 +86,6 @@ namespace psibase
 
       Writable getDbWrite(NativeFunctions& self, uint32_t db, psio::input_stream key)
       {
-         check(self.allowDbRead,
-               "database access disabled during proof verification or first auth");
-         check(self.allowDbWrite, "database writes disabled during query");
-
          if (keyHasServicePrefix(db))
          {
             uint64_t prefix = self.code.codeNum.value;
@@ -96,24 +94,28 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         // User-written subjective services writing to subjective storage isn't really
-         // viable, so it requires an additional permission bit. The oddities:
-         //
-         // * It has billing issues since database billing is objective
-         // * Aborting or undoing a transaction doesn't roll back subjective storage;
-         //   writes from speculative execution survive
-         // * Forking doesn't roll back subjective storage
-         // * Subjective execution doesn't happen when nodes get the produced block
-         //
-         // The unusual semantics exist to enable trusted subjective services to do
-         // subjective attack mitigation.
-         //
-         // TODO: reenable after subjective database support is working as intended
-         if (false && db == uint32_t(DbId::subjective) &&
-             (self.code.flags & CodeRow::isSubjective) &&
+         if (db == uint32_t(DbId::subjective) &&
+             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
             return {(DbId)db, false, false};
+
+         check(self.allowDbRead,
+               "database access disabled during proof verification or first auth");
+
+         if (db == uint32_t(DbId::writeOnly))
+         {
+            if (!self.allowDbWriteSubjective)
+            {
+               check(self.allowDbWrite, "database writes disabled during query");
+               check(!(self.code.flags & CodeRow::isSubjective) ||
+                         (self.code.flags & CodeRow::forceReplay),
+                     "subjective services may only write to DbId::subjective");
+            }
+            return {(DbId)db, !(self.code.flags & CodeRow::isSubjective), false};
+         }
+
+         check(self.allowDbWrite, "database writes disabled during query");
 
          // Prevent poison block; subjective services skip execution during replay
          check(!(self.code.flags & CodeRow::isSubjective),
@@ -121,13 +123,7 @@ namespace psibase
 
          if (db == uint32_t(DbId::service))
             return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::writeOnly))
-            return {(DbId)db, true, false};
-         if (db == uint32_t(DbId::nativeConstrained) &&
-             (self.code.flags & CodeRow::allowWriteNative))
-            return {(DbId)db, true, true};
-         if (db == uint32_t(DbId::nativeUnconstrained) &&
-             (self.code.flags & CodeRow::allowWriteNative))
+         if (db == uint32_t(DbId::native) && (self.code.flags & CodeRow::allowWriteNative))
             return {(DbId)db, true, true};
          throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
@@ -154,6 +150,19 @@ namespace psibase
             return (DbId)db;
          throw std::runtime_error("service may not write this db (" + std::to_string(db) +
                                   "), or must use another intrinsic");
+      }
+
+      void verifyStatusRow(psio::input_stream                key,
+                           psio::input_stream                value,
+                           std::optional<psio::input_stream> oldValue)
+      {
+         check(psio::fracpack_validate_strict<StatusRow>({value.pos, value.end}),
+               "StatusRow has invalid format");
+         // TODO: Verify that only nextConsensus has changed
+         auto expectedKey = psio::convert_to_key(statusKey());
+         check(key.remaining() == expectedKey.size() &&
+                   !std::memcmp(key.pos, expectedKey.data(), key.remaining()),
+               "StatusRow has incorrect key");
       }
 
       void verifyCodeRow(TransactionContext&               ctx,
@@ -242,6 +251,23 @@ namespace psibase
                "WasmConfigRow has incorrect key");
       }
 
+      void verifyNotifyTableRow(psio::input_stream key, psio::input_stream value)
+      {
+         // The notifyTable is only processed subjectively
+      }
+
+      void verifyScheduledSnapshotRow(psio::input_stream key, psio::input_stream value)
+      {
+         check(psio::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
+               "ScheduledSnapshotRow has invalid format");
+         auto row = psio::from_frac<ScheduledSnapshotRow>(
+             psio::prevalidated{std::span{value.pos, value.end}});
+         auto expected_key = psio::convert_to_key(row.key());
+         check(key.remaining() == expected_key.size() &&
+                   !memcmp(key.pos, expected_key.data(), key.remaining()),
+               "ScheduledSnapshotRow has incorrect key");
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -251,7 +277,9 @@ namespace psibase
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeConstrained");
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
-         if (table == codeTable)
+         if (table == statusTable)
+            verifyStatusRow(key, value, existing);
+         else if (table == codeTable)
             verifyCodeRow(context, key, value, existing);
          else if (table == codeByHashTable)
             verifyCodeByHashRow(key, value);
@@ -259,6 +287,10 @@ namespace psibase
             verifyConfigRow(key, value);
          else if (table == transactionWasmConfigTable || table == proofWasmConfigTable)
             verifyWasmConfigRow(table, key, value);
+         else if (table == notifyTable)
+            verifyNotifyTableRow(key, value);
+         else if (table == scheduledSnapshotTable)
+            verifyScheduledSnapshotRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }
@@ -343,7 +375,8 @@ namespace psibase
 
    int32_t NativeFunctions::clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time)
    {
-      check(code.flags & CodeRow::isSubjective, "only subjective services may call clockGetTime");
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "only subjective services may call clockGetTime");
       clearResult(*this);
       std::chrono::nanoseconds result;
       if (id == 0)
@@ -473,7 +506,7 @@ namespace psibase
                       delta.valueBytes -= existing->remaining();
                    }
                    // nativeConstrained is both refundable and chargeable
-                   if (db == uint32_t(DbId::nativeConstrained))
+                   if (db == uint32_t(DbId::native))
                    {
                       verifyWriteConstrained(transactionContext, {key.data(), key.size()},
                                              {value.data(), value.size()}, existing);
@@ -535,7 +568,7 @@ namespace psibase
                           delta.records -= 1;
                           delta.keyBytes -= key.size();
                           delta.valueBytes -= existing->remaining();
-                          if (db == uint32_t(DbId::nativeConstrained))
+                          if (db == uint32_t(DbId::native))
                           {
                              verifyRemoveConstrained(transactionContext, {key.data(), key.size()},
                                                      *existing);
@@ -550,9 +583,11 @@ namespace psibase
    {
       return timeDb(  //
           *this,
-          [&] {
+          [&]
+          {
              return setResult(*this,
-                              database.kvGetRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvGetRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 
@@ -580,8 +615,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(
-                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                   matchKeySize));
+                 *this, database.kvGreaterEqualRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                   {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -598,8 +633,8 @@ namespace psibase
                 check(matchKeySize >= sizeof(AccountNumber::value),
                       "matchKeySize is smaller than 8 bytes");
              return setResult(*this,
-                              database.kvLessThanRaw(getDbRead(*this, db), {key.data(), key.size()},
-                                                     matchKeySize));
+                              database.kvLessThanRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                     {key.data(), key.size()}, matchKeySize));
           });
    }
 
@@ -612,12 +647,13 @@ namespace psibase
              if (keyHasServicePrefix(db))
                 check(key.size() >= sizeof(AccountNumber::value), "key is shorter than 8 bytes");
              return setResult(*this,
-                              database.kvMaxRaw(getDbRead(*this, db), {key.data(), key.size()}));
+                              database.kvMaxRaw(getDbRead(*this, db, {key.data(), key.size()}),
+                                                {key.data(), key.size()}));
           });
    }
 
    // TODO: return an extensible struct instead of a vector.
-   //       maybe include intrinsic usage so transact-sys can veto?
+   //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
       auto seq  = transactionContext.kvResourceDeltas.extract_sequence();
@@ -626,4 +662,37 @@ namespace psibase
                                                          std::move(seq));
       return size;
    }
+
+   void NativeFunctions::checkoutSubjective()
+   {
+      database.checkoutSubjective();
+   }
+   bool NativeFunctions::commitSubjective()
+   {
+      return database.commitSubjective(*transactionContext.blockContext.systemContext.sockets,
+                                       transactionContext.ownedSockets);
+   }
+   void NativeFunctions::abortSubjective()
+   {
+      database.abortSubjective();
+   }
+
+   int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
+   {
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "Sockets are only available during subjective execution");
+      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
+   }
+
+   int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
+   {
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "Sockets are only available during subjective execution");
+      check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
+      return database.socketAutoClose(fd, value,
+                                      *transactionContext.blockContext.systemContext.sockets,
+                                      transactionContext.ownedSockets);
+   }
+
 }  // namespace psibase

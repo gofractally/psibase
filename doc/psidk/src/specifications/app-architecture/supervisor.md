@@ -1,248 +1,68 @@
 # Supervisor
 
-The supervisor is the name of the client-side code that is run by a psibase app and acts as the parent context for every plugin. All plugins run within the supervisor, and can interact with each other via message passing through the supervisor. The supervisor also provides core functionality to each psibase app, such as transaction packing, transaction submission, acquiring user authorization, resource management, and more.
+WebAssembly modules, like [plugins](./plugins.md), always run in some host environment. For psibase app plugins executing in the browser, that host is called the supervisor. The supervisor is a core piece of infrastructure served by the psibase network that mediates all interactions between user interfaces and plugins. Furthermore, it is reponsible for fetching and dynamically linking all of a plugin's dependencies before the plugin is executed. 
 
-## Capabilities
+## Host-provided capabilities
 
-Supervisor is responsible for:
+The supervisor gives plugins their capabilities. These capabilities could include, but are not limited to:
 
-* [Client side peering](#client-side-peering) - For exchange of data using WebRTC
-* [Event subscription feeds](#event-subscription-feeds) - Allowing UIs to respond to server-side [events](./events.md)
-* [Communication with plugins](./plugins.md#communication-with-plugins) - For modularizing app functionality
-* Transaction signing and authorization ([Smart authorization](../blockchain/smart-authorization.md))
-* Packing transactions into the [`fracpack`](../data-formats/fracpack.md) binary format
+- [Synchronous calls between plugins](./plugins.md#synchronous-calls) - For modularizing app functionality
+- Event subscription feeds - Allowing UIs to respond to server-side [events](./events.md)
+- Facilitating user authentication for various tasks
+- Facilitating authenticated sharing of private user data between plugins
+- Client side peering - For exchange of data over WebRTC
 
-### Client-side peering
+## Architecture
 
-> ➕ TODO: Document client-side WebRTC-based peering capabilities facilitated by Supervisor.
-
-### Event subscription feeds
-
-Psibase apps may be interested in reacting to the emission of an [events](./events.md) from a service. In psibase networks, it is the supervisor that is responsible for providing an interface that allows a psibase app to subscribe to notifications for certain events.
-
-The supervisor will poll the root domain to watch for events that have been subscribed to by any psibase apps. When an event occurs, it will notify the psibase app using an `"Event"` message. 
-
-> Note: These events are polled at a particular frequency, such as once per second. This notification system is therefore not designed to benefit apps which have hard real time event notification requirements. For such requirements it is recommended to run your own infrastructure provider node.
-
-### Communication with plugins
+The library used by apps to access plugins will instantiate the supervisor in a hidden iframe within the app. This allows the browser to give the supervisor its own namespace that ensures any browser storage requirements are namespaced according to the supervisor domain rather than the app's domain.
 
 ```svgbob
 .-------------------------------------------.
-| 🔒 app1.psibase                           |
+| 🔒 app1.psibase.tld                       |
 |-------------------------------------------|
 |                                           |
-|   .----------------------------------.    |
-|   | </> supervisor.psibase  [hidden] |    |
-|   |----------------------------------|    |
-|  <-->                                |    |
-|   |   .--------------------------.   |    |
-|   |   | </> app1.plugin.psibase  |   |    |
-|   |   |--------------------------|   |    |
-|   |  <-->                        |   |    |
-|   |   |                          |   |    |
-|   |   '--------------------------'   |    |
-|   |   .--------------------------.   |    |
-|   |   | </> app2.plugin.psibase  |   |    |
-|   |   |--------------------------|   |    |
-|   |  <-->                        |   |    |
-|   |   |                          |   |    |
-|   |   '--------------------------'   |    |
-|   '----------------------------------'    |
+|   .-------------------------------------. |
+|   | supervisor.psibase.tld [hidden]     | |
+|  <-->                                   | |
+|   |   .-----------------------------.   | |
+|   |   | app1.psibase.tld/plugin     |   | |
+|   |  <-->                           |   | |
+|   |   |                             |   | |
+|   |   '-----------------------------'   | |
+|   |   .-----------------------------.   | |
+|   |   | app2.psibase.tld/plugin     |   | |
+|   |  <-->                           |   | |
+|   |   |                             |   | |
+|   |   '-----------------------------'   | |
+|   '-------------------------------------' |
 |                                           |
 '-------------------------------------------'
 ```
 
-The supervisor is instantiated in an iframe by a psibase app, and is responsible for instantiating plugins in their own subdomains using hidden iframes.
+### Dependency downloads
 
-For example, if `app.psibase` is requested from a psibase infrastructure provider, then the element stored at the root path in that service is returned to the client. That UI element is the root page of the psibase app, which will then request the supervisor from its domain on the server. After the supervisor loads, the psibase app can call into the supervisor in order to execute functionality defined in plugins.
+When a call is made to a plugin, the supervisor first downloads the plugin and parses it to understand its dependencies. It then downloads the entire plugin dependency tree.
 
-> ⚠️ For security, plugins should only listen for messages from the supervisor. Otherwise, an attacker app could instantiate the victim app within its own iframe and impersonate the supervisor.
+### Import library generation
 
-#### Supervisor initialization
+For each plugin, the supervisor dynamically generates a javascript library that proxies all calls to imported external plugin functionality through the supervisor. This allows the supervisor to maintain a callstack between all plugin calls, and to enforce any constraints that depend on the identity of the caller plugin (such as namespaced browser storage interactions). The supervisor combines this dynamically generated library with some static libraries for satisfying any imports to common functionality such as many of the [WASI](https://github.com/WebAssembly/WASI/blob/main/preview2/README.md) interfaces and other standard plugin imports.
 
-1. An app instantiates the supervisor inside a hidden iframe and gives the supervisor an ID for identifying the window/session (to help distinguish messages if the app is open in multiple browser tabs).
-2. The app also tells the supervisor the address of its own plugin.
+### Transpilation
 
-```mermaid
-sequenceDiagram
-%%{init: { 'sequence': {'noteAlign': 'left'} }}%%
+The supervisor then transpiles the WebAssembly components along with their imported libraries into core `wasm` modules and associated javascript libraries that can be used to interact with each plugin. This is because the execution of WebAssembly components is not yet supported directly in the browser.
 
-box rgb(85,85,85) client-side, app1.psibase
-participant app1
-participant plugin1
-end
-box rgb(85,85,85) client-side, supervisor.psibase
-participant supervisor
-end
+### Bundling
 
-box rgb(85,85,85) server-side
-participant server
-end
+Then the supervisor bundles the transpiled component and its libaries into an ES module. This module is then dynamically imported into browser memory.
 
-app1->>server: fetch supervisor.psibase
-server-->>app1: <return>
-note over app1: generate session ID
-app1->>supervisor: create(sessionID, myplugin: "plugin1.psibase")
-supervisor->>plugin1: create(sessionID)
-plugin1-->>supervisor: <return>
-supervisor-->>app1: <return>
-```
+### Initialization
 
-#### Adding actions
+Finally, the supervisor initializes each imported module with an object that defines various callbacks that can be used by the module to call back out into the host libraries, which is the final step in the preparation of each plugin. After this step, plugin functions are available to be called by apps or other plugins.
 
-A psibase app can both read from and write to its server side state. The process of writing to server-side state is called "submitting a transaction". A transaction is a structured payload that is authorized to execute an action on one or more services on behalf of a user. An action in a service is a callable function that updates the server-side state.
+## Facilitating user interactions
 
-A psibase app must wrap its client-side logic for calling actions into a [plugin](./plugins.md). On the client-side, apps may reach across the domain boundary using the [`Window.PostMessage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) API. This functionality is used to allow communication between the app, the supervisor, and all plugins. Plugins only need to listen to messages from the supervisor. The supervisor itself listens both to messages from its parent window and also to any of the child windows it creates. 
+There are various cases where it is necessary for a plugin to explicitly interact with the user.
 
-A transaction context is started when an app first calls into a plugin, meaning that actions can now be added into a transaction object by plugins sending action requests to the supervisor. When the initial call into the plugin is complete, the transaction context is closed and the transaction object will not accept any more actions. The transaction object is then authorized and submitted to the server.
+When a plugin asks the supervisor to open a UI for user interaction, it provides a path relative to its own domain at which the UI can be retrieved. The supervisor then initiates opening this URL in another browser tab on behalf of the plugin.
 
-```mermaid
-sequenceDiagram
-%%{init: { 'sequence': {'noteAlign': 'left'} }}%%
-
-box rgb(85,85,85) client-side, app1.psibase
-participant app1
-participant plugin1
-end
-box rgb(85,85,85) client-side, supervisor.psibase
-participant supervisor
-end
-
-box rgb(85,85,85) server-side
-participant server
-end
-
-Note over app1,server: Supervisor initialization
-
-app1->>supervisor: call action1@plugin
-activate supervisor
-supervisor->>plugin1: call action1@plugin
-activate plugin1
-plugin1->>supervisor: add action1<br>to transaction
-note over supervisor: transaction {<br>action1<br>}
-supervisor-->>plugin1: <return>
-plugin1-->>supervisor: <return>
-deactivate plugin1
-supervisor->>server: submit transaction
-supervisor-->>app1: <return>
-deactivate supervisor
-
-```
-
-#### Requesting user permission
-
-When a function in one plugin calls a function in another plugin, either function is permitted to add actions into the current transaction object. However, a plugin may not necessarily trust the legitimacy of the call to its plugin if it came from a source other than its own app. Therefore, all plugins have the ability to ask the supervisor to open a pop-up window in order to explicitly confirm that the user is granting permission to the caller app to make this request on their behalf.
-
-When a plugin asks the supervisor to open a popup, it provides a path relative to its own domain at which the UI for a user confirmation dialog can be retrieved. The supervisor then opens this popup in another window on behalf of the plugin.
-
-> User experience note: The first time the supervisor requests user authentication, a user will need to enable popups from the supervisor in their browser. This is an unfortunate side-effect of pop-up blockers, but it will only happen once and the only domain that needs this permission is the supervisor domain.
-
-```mermaid
-%%{init: { 'sequence': {'noteAlign': 'left'} }}%%
-sequenceDiagram
-
-actor alice
-box rgb(85,85,85) client-side, app1.psibase
-participant app
-participant plugin1
-end
-box rgb(85,85,85) client-side, supervisor.psibase
-participant supervisor
-end
-box rgb(85,85,85) client-side, app2.psibase
-participant plugin2
-participant auth_page
-end
-box rgb(85,85,85) server side
-participant server
-end
-
-Note over app,server: Supervisor initialization
-
-app->>supervisor: call action@plugin1
-supervisor->>plugin1: call action
-activate plugin1
-plugin1->>supervisor: add action1<br>to transaction
-activate supervisor
-note over supervisor: transaction {<br>action1<br>}
-supervisor->>plugin1: 
-deactivate supervisor
-
-plugin1->>supervisor: action@plugin2
-activate supervisor
-supervisor->>plugin2: action
-activate plugin2
-
-# Interact with the user
-    note over plugin2: I do not trust<br>plugin1 yet
-    plugin2->>supervisor: get auth(/auth)
-    note over supervisor: opens auth page<br>app2.psibase/auth
-    alice->>auth_page: Grant permission
-    note over auth_page: save permission<br>in localstorage
-    note over plugin2: triggered by local<br>storage write
-
-
-plugin2->>supervisor: add action2<br>to transaction
-note over supervisor: transaction {<br>action1<br>action2<br>}
-supervisor-->>plugin2: 
-deactivate plugin2
-plugin2-->>supervisor: 
-deactivate supervisor
-supervisor-->>plugin1: 
-deactivate plugin1
-supervisor->>server: submits transaction
-
-```
-
-## Message formats
-
-> This section is incomplete. More details are needed.
-
-The supervisor listens for messages posted to its window messages with the following payload:
-
-```json
-{
-    "message": {
-        "session": "number", // A number identifying the session/window on which the supervisor was instantiated
-        "type": "...", // Where the type is one of the supported supervisor message types
-        "payload": "..." // Contents depends on the message type
-    }
-}
-```
-
-Supported supervisor message types:
-* `"Action"` - Used when requesting the supervisor add an action to the pending transaction
-* `"IAC"` - Used when calling a function defined in a plugin of another application
-* `"IACResponse"` - A response to a prior IAC
-* `"Event"` - A notification from the supervisor that an event to which your app subscribed has been emitted
-* `"TransactionReceipt"` - A response with the payload returned by the node to whom a transaction was submitted
-* `"ChangeHistory"` - A notification fired by a psibase app when its history changes, used for synchronizing the URL
-
-Depending on the type of message, the payload is required to contain different parameters and the supervisor will behave differently.
-
-> ➕ TODO: document supervisor message bodies
-
-## Message sequences
-
-### Transaction construction
-
-An app's user interface may call an `"IAC"` message on a supervisor, which lets plugins reqest actions to be added to a transaction. A transaction may be packed with multiple actions, which eases the authentication burden on the infrastructure providers who only need to run the authorization code once for the entire set of actions in the transaction, rather than once for each independent transaction.
-
-The supervisor will open a transaction at the start of a call to a plugin. Plugins may send the `"Action"` message to the supervisor to attempt to add the action into the transaction. Furthermore, plugins may themselves use the `"IAC"` message to call into other plugins. The supervisor will handle packing all the transactions (depth-first) that were requested by each plugin accessed by the entire interaction.
-
-A plugin signals that it is complete by sending the `"IACResponse"` message to the supervisor. Once the initial plugin function sends its `"IACResponse"` message, the transaction (which may now have many actions added to it) is considered closed to new actions.
-
-> 🕓 Timeouts: If the supervisor does not receive an `"IACResponse"` message from a plugin in less than 100ms after it is initially called, then it will consider it failed. Caller plugins will be notified of the failure.
-
-### Transaction authorization
-
-Once the transaction construction is complete and new actions cannot be added, then it must be authorized using [smart authorization](../blockchain/smart-authorization.md) and submitted.
-
-Authorizing a transaction is a multi-step process that requires aggregating one or more claims into the transaction, calculating the transaction hash, and then aggregating a proof for each claim (See [smart authorization](../blockchain/smart-authorization.md) docs for more details). Once the claims and proofs have been added into the transaction object the transaction is ready to be packed into a binary format and sent to an infrastructure provider node.
-
-### Transaction packing
-
-Transactions need to be packed into the [`fracpack`](../data-formats/fracpack.md) format before they are submitted. To do this, first, actions must be packed. To pack an action, supervisor will expect that the service on whom an action is being called handles requests made to `POST /pack_action/x`, wher `x` is the name of the action. The message body will include the action arguments, and the service is responsible for returning the packed `application/octet-stream` back to the supervisor, which can then include the packed actions in its transaction.
-
-Supervisor must then use endpoints that are exposed by psibase infrastructure provider nodes: `POST /common/pack/Transaction` and `POST /common/pack/SignedTransaction`. These endpoints are used to pack the transaction, which can then be sent to the node.
-
+> Note on user experience: Since modern browser do not allow pages to arbitrarily open new pages/tabs outside of handling a direct user interaction, the first time the supervisor requests to open a new window a user will need to explicitly enable popups from the supervisor in their browser. Due to the design of the supervisor running in its own domain, this is a one-time authorization by each user per device.

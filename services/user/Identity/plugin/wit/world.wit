@@ -1,0 +1,56 @@
+package identity:plugin;
+
+interface types {
+    type account = string;
+    type date-time = string;
+
+    record attestation-graph-node {
+        attester: string,
+        attested-to: string,
+        perc-high-confidence: f32,
+        num-unique-attestations: u32,
+    }
+    type attestation-graph = list<attestation-graph-node>;
+
+    /* an identity profile summarizes a member's identity attestations.
+        A Member profile will show % of high-confidence attestations (from unique attesters) with the total number of (unique) attesters, e.g., 83% of 12.
+        Attestations from the same attester will simply replace the most recent attestation from that attester, to maintain the freshness of attestations, and
+        the data that’s summarized in a Member profile.
+        */
+    record identity-attestation {
+        attester: account,
+        attested-to: account,
+        confidence: f32,
+        date: date-time,
+    }
+    record identity-summary {
+        perc-high-confidence: u8,
+        num-unique-attestations: u16,
+    }
+}
+
+interface api {
+    use host:common/types.{error};
+
+    /// Attest to another Account's identity
+    ///  @subject: the username being attested to
+    ///  @score: float (2 decimals of precision), the percentage confidence in subject's identity.
+    ///   The score answers: How confident the attester is that the subject is a real person and that they are the person they claim to be?
+    attest-identity-claim: func(subject: string, confidence: f32) -> result<_, error>;
+}
+
+interface queries {
+    use host:common/types.{error};
+    use types.{attestation-graph, identity-summary, identity-attestation};
+
+    summary: func(subject: string) -> result<option<identity-summary>, error>;
+    // Future implementations (for attestation graphs)
+    // graph: func() -> result<attestation-graph, error>;
+    // get-history: func(subject: string) -> result<list<identity-attestation>, error>;
+}
+
+world imports {
+    import types;
+    import api;
+    import queries;
+}

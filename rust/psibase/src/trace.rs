@@ -1,12 +1,11 @@
 use std::fmt;
 
-use crate::{Action, Hex, Pack, Reflect, Unpack};
+use crate::{Action, Hex, Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct ActionTrace {
     pub action: Action,
@@ -23,43 +22,38 @@ impl fmt::Display for ActionTrace {
     }
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct EventTrace {
     pub name: String,
     pub data: Hex<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct ConsoleTrace {
     pub console: String,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 pub enum InnerTraceEnum {
     ConsoleTrace(ConsoleTrace),
     EventTrace(EventTrace),
     ActionTrace(ActionTrace),
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct InnerTrace {
     pub inner: InnerTraceEnum,
 }
 
-#[derive(Debug, Clone, Pack, Unpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[reflect(psibase_mod = "crate")]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     pub action_traces: Vec<ActionTrace>,
@@ -93,12 +87,39 @@ impl TransactionTrace {
             ))
         }
     }
+    pub fn console(&self) -> TraceConsole {
+        return TraceConsole { trace: self };
+    }
 }
 
 impl fmt::Display for TransactionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         format_transaction_trace(self, 0, f)
     }
+}
+
+pub struct TraceConsole<'a> {
+    trace: &'a TransactionTrace,
+}
+
+impl fmt::Display for TraceConsole<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for atrace in &self.trace.action_traces {
+            write_action_console(atrace, f)?;
+        }
+        Ok(())
+    }
+}
+
+fn write_action_console(atrace: &ActionTrace, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    for inner in &atrace.inner_traces {
+        match &inner.inner {
+            InnerTraceEnum::ConsoleTrace(c) => write!(f, "{}", &c.console)?,
+            InnerTraceEnum::EventTrace(_) => {}
+            InnerTraceEnum::ActionTrace(a) => write_action_console(a, f)?,
+        }
+    }
+    Ok(())
 }
 
 fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -17,12 +17,9 @@ extern std::vector<std::string> data;
 
 TEST_CASE("cache_allocator")
 {
-   temp_directory dir("triedent-test");
-   std::filesystem::create_directories(dir.path);
-   cache_allocator a{dir.path,
+   cache_allocator a{std::filesystem::temp_directory_path(),
                      {.hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 1024},
-                     access_mode::read_write};
-   dir.reset();
+                     open_mode::temporary};
 
    std::vector<std::pair<object_id, std::size_t>> known_ids;
    std::mutex                                     id_mutex;
@@ -65,7 +62,7 @@ TEST_CASE("cache_allocator")
    };
 
    std::vector<std::thread> threads;
-   std::atomic<bool>         done{false};
+   std::atomic<bool>        done{false};
    threads.emplace_back(
        [&]
        {
@@ -81,7 +78,8 @@ TEST_CASE("cache_allocator")
       write_some(session);
    }
    done = true;
-   for( auto& t : threads ) {
+   for (auto& t : threads)
+   {
       t.join();
    }
    threads.clear();
@@ -91,12 +89,9 @@ TEST_CASE("cache_allocator")
 
 TEST_CASE("cache_allocator long")
 {
-   temp_directory dir("triedent-test");
-   std::filesystem::create_directories(dir.path);
-   cache_allocator a{dir.path,
+   cache_allocator a{std::filesystem::temp_directory_path(),
                      {.hot_bytes = 128, .warm_bytes = 128, .cool_bytes = 128, .cold_bytes = 128},
-                     access_mode::read_write};
-   dir.reset();
+                     open_mode::temporary};
 
    std::vector<object_id> ids{data.size()};
    std::mutex             mutex;
@@ -161,9 +156,9 @@ TEST_CASE("cache_allocator long")
       }
       if (copy != data[idx])
       {
-        // not supported on mac, std::osyncstream(std::cout) << copy << " != " << data[idx] << std::endl;
+         // not supported on mac, std::osyncstream(std::cout) << copy << " != " << data[idx] << std::endl;
          std::cout << copy << " != " << data[idx] << std::endl;
-         
+
          failed.store(true);
          done.store(true);
       }
@@ -219,7 +214,8 @@ TEST_CASE("cache_allocator long")
    std::this_thread::sleep_for(100ms);
 #endif
    done.store(true);
-   for( auto& t : threads ) {
+   for (auto& t : threads)
+   {
       t.join();
    }
    threads.clear();

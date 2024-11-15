@@ -1,0 +1,53 @@
+package tokens:plugin;
+
+interface types {
+
+    type quantity = string;
+    type precision = u8;
+    type token-id = string;
+    type token-number = u32;
+    type account-number = string;
+
+    record token-detail {
+        id: token-number,
+        owner: string,
+        precision: u8,
+        symbol-id: string,
+    }
+
+    record balance {
+        balance: string,
+        creditor: string,
+        debitor: string,
+        token-number: token-number,
+    }
+}
+
+interface intf {
+    use host:common/types.{error};
+    use types.{precision, quantity, token-id, account-number};
+    
+    create: func(precision: precision, max-supply: quantity) -> result<_, error>;
+    burn: func(token-id: token-id, amount: quantity, memo: string, account: account-number) -> result<_, error>;
+    mint: func(token-id: token-id, amount: quantity, memo: string) -> result<_, error>;
+}
+
+interface queries {
+    use host:common/types.{error};
+    use types.{token-id, token-detail};
+    token-owner: func(token-id: token-id) -> result<token-detail, error>;
+}
+
+interface transfer {
+    use host:common/types.{error};
+    use types.{token-id, account-number, quantity, balance, token-detail};
+
+    uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
+    credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+}
+
+world imports {
+    import intf;
+    import queries;
+    import transfer;
+}

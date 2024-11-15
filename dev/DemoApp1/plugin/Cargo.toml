@@ -1,0 +1,24 @@
+[package]
+name = "demoapp1"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wit-bindgen-rt = { version = "0.27.0" }
+psibase = { path = "../../../rust/psibase/" }
+service = { path = "../service" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "demoapp1:example"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../services/user/CommonApi/common/packages/wit/host-common.wit" }
+"invite:plugin" = { path = "../../../services/user/Invite/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../services/system/Transact/plugin/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../services/system/AuthSig/plugin/wit/world.wit" }

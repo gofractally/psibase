@@ -8,6 +8,7 @@
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
 use crate::{native_raw, AccountNumber, DbId, ToKey};
+use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
 /// Write message to console
@@ -196,11 +197,7 @@ pub fn put_sequential<Type: Pack, V: Pack>(
     ty: &Type,
     value: &V,
 ) -> u64 {
-    let mut packed = Vec::new();
-    service.pack(&mut packed);
-    ty.pack(&mut packed);
-    value.pack(&mut packed);
-    put_sequential_bytes(db, &packed)
+    put_sequential_bytes(db, &(service, Some(ty), Some(value)).packed())
 }
 
 /// Remove a key-value pair if it exists
@@ -294,4 +291,71 @@ pub fn kv_max_bytes(db: DbId, key: &[u8]) -> Option<Vec<u8>> {
 pub fn kv_max<K: ToKey, V: UnpackOwned>(db_id: DbId, key: &K) -> Option<V> {
     let bytes = kv_max_bytes(db_id, &key.to_key());
     bytes.map(|v| V::unpack(&v[..], &mut 0).unwrap())
+}
+
+pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
+    let size = unsafe { native_raw::getSequential(db_id, id) };
+    get_optional_result_bytes(size)
+}
+
+pub use scopeguard;
+
+pub fn checkout_subjective() {
+    unsafe { native_raw::checkoutSubjective() }
+}
+
+pub fn commit_subjective() -> bool {
+    unsafe { native_raw::commitSubjective() }
+}
+
+pub fn abort_subjective() {
+    unsafe { native_raw::abortSubjective() }
+}
+
+#[macro_export]
+macro_rules! subjective_tx {
+    {$($stmt:tt)*} => {
+        $crate::native::checkout_subjective();
+        #[allow(unreachable_code)]
+        let r = loop {
+            let mut guard = $crate::native::scopeguard::guard((), |_|{
+                $crate::native::abort_subjective();
+            });
+            let result = { $($stmt)* };
+            $crate::native::scopeguard::ScopeGuard::into_inner(guard);
+            if $crate::native::commit_subjective() {
+                break result;
+            }
+        };
+        r
+    }
+}
+
+/// Send a message to a socket
+pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
+    if err == 0 {
+        Ok(())
+    } else {
+        Err(anyhow!("socket_send: {}", err))
+    }
+}
+
+/// Tells the current transaction/query/callback context to take or release
+/// ownership of a socket.
+///
+/// Any sockets that are owned by a context will be closed when it finishes.
+/// - HTTP socket: send a 500 response with an error message in the body
+/// - Other sockets may not be set to auto-close
+///
+/// If this function is called within a subjectiveCheckout, it will only take
+/// effect if the top-level commit succeeds. If another context takes ownership
+/// of the socket, subjectiveCommit may fail.
+pub fn socket_auto_close(fd: i32, value: bool) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketAutoClose(fd, value) };
+    if err == 0 {
+        Ok(())
+    } else {
+        Err(anyhow!("socket_auto_close: {}", err))
+    }
 }

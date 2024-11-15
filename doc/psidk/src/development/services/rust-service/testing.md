@@ -43,7 +43,10 @@ mod service {
     }
 }
 
-#[psibase::test_case(services("example"))]
+/* packages takes a comma-delimited list and references the
+ * package.metadata.psibase.package-name (case-sensitive) in Cargo.toml).
+ * The test chain will be initialized with default packages + services listed here. */
+#[psibase::test_case(packages("example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Verify the actions work as expected.
     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
@@ -68,6 +71,13 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
 }
 ```
 
+Add the following to `Cargo.toml`. This will allow `cargo psibase` to build a psibase package from the crate. See [Building Packages](package.md) for more details.
+
+```toml
+[package.metadata.psibase]
+package-name = "example"
+```
+
 ## Running the Test
 
 ```
@@ -88,10 +98,10 @@ test test_arith ...
 
 Here is the trace:
 action:
-     => transact-sys::
+     => transact::
     raw_retval: 0 bytes
     action:
-        transact-sys => auth-any-sys::checkauthsys
+        transact => auth-any::checkauthsys
         raw_retval: 0 bytes
     action:
         example => example::add
@@ -102,63 +112,6 @@ ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
-
-## Manually Deploying A Service
-
-`#[psibase::test_case(services("example"))]` automatically deployed the
-`example` service to the `example` account on a test chain. We could
-deploy it ourselves and gain some control.
-
-```rust
-// This time we don't have `services("example")` in the attribute arguments.
-#[psibase::test_case]
-fn manual_deploy(chain: psibase::Chain) -> Result<(), psibase::Error> {
-    // Deploy the service
-    chain.deploy_service(
-        psibase::account!("another"), // Account to deploy on
-        include_service!("example"),  // Service to deploy
-    )?;
-
-    // `push` defaulted the `service` and `sender` fields of the action to
-    // `"example"`. We're using a different account now.
-    assert_eq!(
-        Wrapper::push_from_to(
-            &chain,
-            psibase::account!("another"), // sender
-            psibase::account!("another")  // receiver
-        )
-        .add(3, 4)
-        .get()?,
-        7
-    );
-
-    Ok(())
-}
-```
-
-`Chain::deploy_service` creates an account if it doesn't already exist and
-installs a service on that account. Its second argument is a `&[u8]`, which
-contains the service WASM.
-
-The `include_service!` macro returns the service wasm as a `&[u8]`. Its
-argument may be any of the following, assuming they define a service:
-
-- The name of the current package
-- The name of any package the current package depends on
-- The name of any package in the current workspace, if any
-
-The `include_service!` macro only exists within a `psibase::test_case`.
-
-### Under The Hood
-
-The `include_service!` macro uses prints to notify `cargo psibase test`
-that it needs a service (Rust package). `cargo psibase test` builds that
-package and sets an environment variable to let the macro know the final
-location of the built WASM. `include_service!` then expands into
-`include_bytes!` with the WASM's location.
-
-The `services(...)` argument of the `test_case` macro expands to code which
-uses `include_service!`.
 
 ## Next Step
 

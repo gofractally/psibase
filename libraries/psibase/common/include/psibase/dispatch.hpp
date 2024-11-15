@@ -1,28 +1,65 @@
 #pragma once
 #include <psibase/AccountNumber.hpp>
-#include <psibase/Service.hpp>
 #include <psibase/RawNativeFunctions.hpp>
+#include <psibase/Service.hpp>
 #include <psio/fracpack.hpp>
 
 namespace psibase
 {
+
+   template <typename T>
+   std::span<const char> find_view_span(psio::view<T> v)
+   {
+      const char*   start       = psio::get_view_data(v);
+      bool          has_unknown = false;
+      bool          known_end;
+      std::uint32_t pos = 0;
+      if (!psio::is_packable<std::remove_cv_t<T>>::template unpack<false, true>(
+              nullptr, has_unknown, known_end, start, pos, 0xffffffffu))
+      {
+         static_assert(!psio::is_std_optional_v<std::remove_cv_t<T>>,
+                       "Optional members are not stored in contiguous memory");
+         assert(!"View must be valid");
+         __builtin_unreachable();
+      }
+      if (known_end)
+         return {start, pos};
+      else
+         return {};
+   }
+
+   template <typename T>
+   constexpr bool is_view_v = false;
+   template <typename T>
+   constexpr bool is_view_v<psio::view<T>> = true;
+
    template <typename R, typename T, typename MemberPtr, typename... Args>
    void callMethod(T& service, MemberPtr method, Args&&... args)
    {
-      psio::shared_view_ptr<R> p((service.*method)(std::forward<decltype(args)>(args)...));
-      raw::setRetval(p.data(), p.size());
+      if constexpr (is_view_v<R>)
+      {
+         R    v((service.*method)(static_cast<decltype(args)>(args)...));
+         auto s = find_view_span(v);
+         check(s.data() != nullptr, "Cannot handle extensions in returned view");
+         raw::setRetval(s.data(), s.size());
+      }
+      else
+      {
+         psio::shared_view_ptr<R> p((service.*method)(static_cast<decltype(args)>(args)...));
+         raw::setRetval(p.data(), p.size());
+      }
    }
 
    template <typename F, typename T, std::size_t... I>
    decltype(auto) tuple_call(F&& f, T&& t, std::index_sequence<I...>)
    {
-      return f(get<I>(std::forward<T>(t))...);
+      return f(psio::get<I>(t)...);
    }
 
    template <typename F, typename T>
    decltype(auto) tuple_call(F&& f, T&& t)
    {
-      return tuple_call(std::forward<F>(f), std::forward<T>(t),
+      return tuple_call(f, t,
                         std::make_index_sequence<std::tuple_size_v<std::remove_cvref_t<T>>>());
    }
 
@@ -52,16 +89,14 @@ namespace psibase
       };
       auto service{makeService()};
 
-      bool called = psio::reflect<Service>::get_by_name(
+      bool called = psio::get_member_function<Service>(
           act->method().value(),
-          [&](auto meta, auto member)
+          [&](auto member, auto /*names*/)
           {
-             auto member_func  = member(&service);
-             using result_type = decltype(psio::result_of(member_func));
-             using param_tuple =
-                 decltype(psio::tuple_remove_view(psio::args_as_tuple(member_func)));
+             using result_type = decltype(psio::result_of(member));
+             using param_tuple = typename psio::make_param_value_tuple<decltype(member)>::type;
 
-             auto param_data = std::span{act->rawData().data(), act->rawData().size()};
+             auto param_data = std::span<const char>{act->rawData().data(), act->rawData().size()};
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
                             "invalid argument encoding for " + act->method().unpack().str());
 
@@ -72,12 +107,12 @@ namespace psibase
                  {
                     if constexpr (std::is_same_v<void, result_type>)
                     {
-                       (service.*member_func)(std::forward<decltype(args)>(args)...);
+                       (service.*member)(std::forward<decltype(args)>(args)...);
                     }
                     else
                     {
-                       callMethod<result_type, Service, decltype(member_func), decltype(args)...>(
-                           service, member_func, std::forward<decltype(args)>(args)...);
+                       callMethod<result_type, Service, decltype(member), decltype(args)...>(
+                           service, member, std::forward<decltype(args)>(args)...);
                     }
                  },
                  param_view);

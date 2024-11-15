@@ -3,12 +3,13 @@
 #include <psibase/Actor.hpp>
 #include <psibase/nativeTables.hpp>
 
-#include <services/system/AccountSys.hpp>
-#include <services/system/AuthAnySys.hpp>
-#include <services/system/CpuSys.hpp>
-#include <services/system/ProducerSys.hpp>
-#include <services/system/TransactionSys.hpp>
-#include <services/system/VerifyEcSys.hpp>
+#include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
+#include <services/system/CpuLimit.hpp>
+#include <services/system/Producers.hpp>
+#include <services/system/RTransact.hpp>
+#include <services/system/Transact.hpp>
+#include <services/system/VerifySig.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -74,42 +75,47 @@ std::vector<psibase::AccountNumber> makeAccounts(
    return result;
 }
 
-void boot(BlockContext* ctx, const Consensus& producers, bool ec)
+void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
 {
    std::vector<GenesisService> services = {{
-                                               .service = TransactionSys::service,
-                                               .flags   = TransactionSys::serviceFlags,
-                                               .code    = readWholeFile("TransactionSys.wasm"),
+                                               .service = Transact::service,
+                                               .flags   = Transact::serviceFlags,
+                                               .code    = readWholeFile("Transact.wasm"),
                                            },
                                            {
-                                               .service = CpuSys::service,
-                                               .flags   = CpuSys::serviceFlags,
-                                               .code    = readWholeFile("CpuSys.wasm"),
-                                           },
-                                           {
-                                               .service = AccountSys::service,
+                                               .service = RTransact::service,
                                                .flags   = 0,
-                                               .code    = readWholeFile("AccountSys.wasm"),
+                                               .code    = readWholeFile("RTransact.wasm"),
                                            },
                                            {
-                                               .service = ProducerSys::service,
-                                               .flags   = ProducerSys::serviceFlags,
-                                               .code    = readWholeFile("ProducerSys.wasm"),
+                                               .service = CpuLimit::service,
+                                               .flags   = CpuLimit::serviceFlags,
+                                               .code    = readWholeFile("MockCpuLimit.wasm"),
                                            },
                                            {
-                                               .service = AuthAnySys::service,
+                                               .service = Accounts::service,
                                                .flags   = 0,
-                                               .code    = readWholeFile("AuthAnySys.wasm"),
+                                               .code    = readWholeFile("Accounts.wasm"),
+                                           },
+                                           {
+                                               .service = Producers::service,
+                                               .flags   = Producers::serviceFlags,
+                                               .code    = readWholeFile("Producers.wasm"),
+                                           },
+                                           {
+                                               .service = AuthAny::service,
+                                               .flags   = 0,
+                                               .code    = readWholeFile("AuthAny.wasm"),
                                            }};
    if (ec)
    {
       services.push_back({
-          .service = VerifyEcSys::service,
-          .flags   = VerifyEcSys::serviceFlags,
-          .code    = readWholeFile("VerifyEcSys.wasm"),
+          .service = VerifySig::service,
+          .flags   = VerifySig::serviceFlags,
+          .code    = readWholeFile("VerifySig.wasm"),
       });
    }
-   // TransactionSys + ProducerSys + AuthAnySys + AccountSys
+   // Transact + Producers + AuthAny + Accounts
    pushTransaction(ctx,
                    Transaction{                                                         //
                                .actions = {                                             //
@@ -123,18 +129,18 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
        ctx,
        Transaction{
            .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
-           .actions = {Action{.sender  = TransactionSys::service,
-                              .service = TransactionSys::service,
+           .actions = {Action{.sender  = Transact::service,
+                              .service = Transact::service,
                               .method  = MethodNumber{"startBoot"},
                               .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
-                       Action{.sender  = AccountSys::service,
-                              .service = AccountSys::service,
+                       Action{.sender  = Accounts::service,
+                              .service = Accounts::service,
                               .method  = MethodNumber{"init"},
                               .rawData = psio::to_frac(std::tuple())},
-                       transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
+                       transactor<Producers>(Producers::service, Producers::service)
                            .setConsensus(producers),
-                       Action{.sender  = TransactionSys::service,
-                              .service = TransactionSys::service,
+                       Action{.sender  = Transact::service,
+                              .service = Transact::service,
                               .method  = MethodNumber{"finishBoot"},
                               .rawData = psio::to_frac(std::tuple())}}});
 }
@@ -162,21 +168,20 @@ static Tapos getTapos(psibase::BlockContext* ctx)
    return result;
 }
 
-Transaction setProducers(const psibase::Consensus& producers)
+Transaction setProducers(const psibase::ConsensusData& producers)
 {
    return Transaction{
        .tapos   = {},
-       .actions = {transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                       .setConsensus(producers)}};
+       .actions = {
+           transactor<Producers>(Producers::service, Producers::service).setConsensus(producers)}};
 }
 
-void setProducers(psibase::BlockContext* ctx, const psibase::Consensus& producers)
+void setProducers(psibase::BlockContext* ctx, const psibase::ConsensusData& producers)
 {
    pushTransaction(
-       ctx,
-       Transaction{.tapos   = getTapos(ctx),
-                   .actions = {transactor<ProducerSys>(ProducerSys::service, ProducerSys::service)
-                                   .setConsensus(producers)}});
+       ctx, Transaction{.tapos   = getTapos(ctx),
+                        .actions = {transactor<Producers>(Producers::service, Producers::service)
+                                        .setConsensus(producers)}});
 }
 
 SignedTransaction signTransaction(const BlockInfo& prevBlock, const Transaction& trx)
@@ -197,14 +202,16 @@ std::vector<SignedTransaction> signTransactions(const BlockInfo&                
    return result;
 }
 
-BlockMessage makeBlock(const BlockInfo&                   info,
-                       std::string_view                   producer,
-                       TermNum                            view,
-                       std::vector<SignedTransaction>     trxs,
-                       BlockNum                           commitNum,
-                       const std::optional<BlockConfirm>& auxData = {})
+TestBlock makeBlock(const BlockInfo&                   info,
+                    const JointConsensus&              state,
+                    std::string_view                   producer,
+                    TermNum                            view,
+                    std::vector<SignedTransaction>     trxs,
+                    BlockNum                           commitNum,
+                    const std::optional<BlockConfirm>& auxData = {})
 {
-   SignedBlock newBlock;
+   SignedBlock    newBlock;
+   JointConsensus newState{state};
    newBlock.block.header.previous     = info.blockId;
    newBlock.block.header.blockNum     = info.header.blockNum + 1;
    newBlock.block.header.time.seconds = info.header.time.seconds + 1;
@@ -212,16 +219,23 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    newBlock.block.header.term         = view;
    newBlock.block.header.commitNum    = commitNum;
    Merkle m;
+   if (newState.next && newState.next->blockNum <= info.header.commitNum)
+   {
+      newState.current = std::move(newState.next->consensus);
+      newState.next.reset();
+   }
    for (auto& trx : trxs)
    {
       for (auto act : trx.transaction->actions())
       {
-         if (act.service() == ProducerSys::service && act.method() == MethodNumber{"setConsensus"})
+         if (act.service() == Producers::service && act.method() == MethodNumber{"setConsensus"})
          {
             using param_tuple =
-                decltype(psio::tuple_remove_view(psio::args_as_tuple(&ProducerSys::setConsensus)));
+                psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
             auto params                        = psio::view<const param_tuple>(act.rawData());
-            newBlock.block.header.newConsensus = get<0>(params);
+            newBlock.block.header.newConsensus = Consensus{get<0>(params), {}};
+            check(!newState.next, "Joint consensus is already running");
+            newState.next = {*newBlock.block.header.newConsensus, newBlock.block.header.blockNum};
          }
       }
       trx.subjectiveData.emplace();
@@ -229,6 +243,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
       trx.subjectiveData->push_back(psio::to_frac(std::chrono::nanoseconds(100000)));
       m.push(TransactionInfo{trx});
    }
+   newBlock.block.header.consensusState  = sha256(newState);
    newBlock.block.transactions           = std::move(trxs);
    newBlock.block.header.trxMerkleRoot   = m.root();
    newBlock.block.header.eventMerkleRoot = Checksum256{};
@@ -236,37 +251,38 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    {
       newBlock.auxConsensusData = psio::to_frac(*auxData);
    }
-   return BlockMessage{newBlock};
+   return {BlockMessage{newBlock}, newState};
 }
 
-BlockMessage makeBlock(const BlockArg& info, std::string_view producer, TermNum view)
+TestBlock makeBlock(const BlockArg& info, std::string_view producer, TermNum view)
 {
-   return makeBlock(info, producer, view, {}, info.info.header.commitNum);
+   return makeBlock(info.info, info.state, producer, view, {}, info.info.header.commitNum);
 }
 
-BlockMessage makeBlock(const BlockArg&    info,
-                       std::string_view   producer,
-                       TermNum            view,
-                       const Transaction& trx)
+TestBlock makeBlock(const BlockArg&    info,
+                    std::string_view   producer,
+                    TermNum            view,
+                    const Transaction& trx)
 {
-   return makeBlock(info, producer, view, signTransactions(info, {trx}),
+   return makeBlock(info.info, info.state, producer, view, signTransactions(info, {trx}),
                     info.info.header.commitNum);
 }
 
-BlockMessage makeBlock(const BlockArg&     info,
-                       std::string_view    producer,
-                       TermNum             view,
-                       const BlockMessage& irreversible)
+TestBlock makeBlock(const BlockArg&     info,
+                    std::string_view    producer,
+                    TermNum             view,
+                    const BlockMessage& irreversible)
 {
-   return makeBlock(info, producer, view, {}, irreversible.block->block().header().blockNum());
+   return makeBlock(info.info, info.state, producer, view, {},
+                    irreversible.block->block().header().blockNum());
 }
 
-BlockMessage makeBlock(const BlockArg&     info,
-                       std::string_view    producer,
-                       TermNum             view,
-                       const BlockConfirm& irreversible)
+TestBlock makeBlock(const BlockArg&     info,
+                    std::string_view    producer,
+                    TermNum             view,
+                    const BlockConfirm& irreversible)
 {
-   return makeBlock(info, producer, view, {}, irreversible.blockNum, irreversible);
+   return makeBlock(info.info, info.state, producer, view, {}, irreversible.blockNum, irreversible);
 }
 
 std::vector<ProducerConfirm> makeProducerConfirms(const std::vector<std::string_view>& names)
@@ -326,17 +342,14 @@ ViewChangeMessage makeViewChange(std::string_view                        produce
 
 void runFor(boost::asio::io_context& ctx, mock_clock::duration total_time)
 {
-   for (auto end = mock_clock::now() + total_time; mock_clock::now() < end;)
+   ctx.poll();
+   ctx.restart();
+   auto end = mock_clock::now() + total_time;
+   while (mock_clock::advance(end))
    {
       ctx.poll();
       ctx.restart();
-      if (!mock_clock::advance())
-      {
-         return;
-      }
    }
-   ctx.poll();
-   ctx.restart();
 }
 
 void printAccounts(std::ostream& os, const std::vector<AccountNumber>& producers)

@@ -1,28 +1,38 @@
 # Smart authorization
 
-Account authorization can be done in many different ways: simple signature verification, time locks, zero-knowledge password proofs, multi-user authentication, and more. As technology progresses, new cryptographic techniques are discovered to improve the capabilities and efficiency of proving technology. Rather than attempt to add and maintain native support for all major authorization techniques, psibase instead describes a mechanism by which accounts are given full programmatic control over account authorization.
+For an account to call an action defined in a service requires that the posted payload satisfies the authorization of the account.
+
+Account authorization can use various techniques: simple signature verification, multi-signature verification, time locks, zero-knowledge proofs, and more. As technology progresses, new cryptographic techniques are discovered to improve the capabilities and efficiency of proving technology. Rather than attempt to add and maintain native support for all major authorization techniques, psibase instead describes a mechanism by which all accounts are given full programmatic control over how they should be authorized.
 
 ## Goals
 
-* Enable accounts to have complete programmatic control over how their account can be authorized
-* Allow developers to develop, deploy, and use custom cryptographic verification programs without requiring coordinated upgrades to the native node software
+- Enable accounts to have complete programmatic control over how their account can be authorized
+- Allow developers to develop, deploy, and use custom cryptographic verification programs without requiring coordinated upgrades to the native node software
 
-## Design overview
-
-### Definitions
-
-* **Claim** - Something that the submitter of a transaction claims to know (e.g. a public key)
-* **Proof** - Conclusive evidence that the transaction submitter does actually know what she claims (e.g. a cryptographic signature)
-* **Transaction** - A payload that specifies the intent of the sender to execute some code on the network
-* **Auth service** - A service (configurable by each account) that specifies what claims are needed to authorize transactions from that account
-* **Verify service** - A service that knows how to verify proof of a claim
+## Design
 
 ### How it works
+
+#### Overview
+
+Any account may specify how it should be authorized. As the user interacts with psibase apps and publishes transactions to modify their state on the network, code is dynamically loaded on the client-side to ensure that the published transaction contains the necessary information to authorize the account. For example, if an account specifies that it uses a simple cryptographic signature for authorization, the psibase infrastructure on the client-side will automatically pull the corresponding signature-authorization plugin from the server and allow it to modify the transaction by adding signatures before it is published to the network.
+
+This is fully dynamic. Third-party developers can write their own authorization plugins, and accounts are free to use any authorization plugin.
+
+#### Definitions
+
+- **Claim** - Something that the submitter of a transaction claims to know (e.g. a public key)
+- **Proof** - Conclusive evidence that the transaction submitter does actually know what she claims (e.g. a cryptographic signature)
+- **Transaction** - A payload that specifies the intent of the sender to execute some code on the network
+- **Auth service** - A service (configurable by each account) that specifies what claims are needed to authorize transactions from that account
+- **Verify service** - A service that knows how to verify proof of a claim
+
+#### Detailed steps
 
 1. Every psibase account must specify an auth service
 2. The auth service must enforce that transactions submitted by an account make one or more specific claims
 3. A transaction gets submitted with: the claim(s) required by the auth service, a corresponding proof(s), the name of a verify service(s)
-4. The auth service will verify the existence of the transaction claims, and that the correct verify service was specified.
+4. The auth service will verify the existence of the needed claims in the transaction and that the correct verify service was specified.
 5. The claim(s) and proof(s) are sent to the associated verify service(s), which can authorize (or fail) the transaction.
 
 ## Architecture
@@ -52,70 +62,66 @@ classDiagram
    }
 ```
 
-> Note: A `SignedTransaction` should be eventually renamed to something more generic, like `AuthedTransaction`, since "Signed" implies the specific claim/proof technique of using digital signatures.
+> Note: A `SignedTransaction` should be renamed to something more generic, like `AuthedTransaction`, since "Signed" implies the specific claim/proof technique of using digital signatures.
 
-The submitted `SignedTransaction` is sent to the AuthService defined by an account (e.g. [AuthSys](../../default-apps/auth-sys.md)) and the corresponding verification service. These services will fail the transaction if either the claims in the transaction are incorrect, or if the proof does not prove the claim.
+The submitted `SignedTransaction` is sent to the auth service defined by an account (e.g. [AuthSig](../../default-apps/auth-sig.md)) and the corresponding verification service. These services will fail the transaction if either the claims in the transaction are incorrect, or if the proof does not prove the claim.
 
-## Supervisor
+## Client-side transaction construction
 
-When building Psibase apps, the construction of each transaction submitted to the network is done automatically, including any claim and proof aggregation. The following sequence diagram shows how the supervisor aggregates claims and proofs. This entire interaction happens on the client-side.
+When building psibase apps, the construction of each transaction submitted to the network is done automatically, including the aggregation of claims and generation of proofs. The following sequence diagram shows an example of a simple transaction being constructed. This entire interaction happens on the client-side.
 
 ```mermaid
 sequenceDiagram
 
 participant app
-participant auth plugin
+participant transact
 participant supervisor
 participant plugin
+participant auth plugin
 
-app->>supervisor: 1. action@plugin
+app->>supervisor: call a plugin function
 activate supervisor
-supervisor->>auth plugin: 2. GetClaim()
-activate auth plugin
-auth plugin-->>supervisor: <claim>
-deactivate auth plugin
-note over supervisor: Add <claim> to transaction
-
-supervisor->>plugin: 3. Call action
+supervisor->>transact: start tx
+activate transact
+note right of transact: transaction {}
+transact-->>supervisor: return
+deactivate transact
+supervisor->>plugin: function1()
 activate plugin
-plugin->>supervisor: 4. AddClaim(claim)
-activate supervisor
-note over supervisor: Add <claim> to transaction
-supervisor-->>plugin: 
-deactivate supervisor
-plugin-->>supervisor: 
+plugin->>transact: add-action-to-transaction
+activate transact
+note right of transact: transaction { { action1 } }
+transact-->>plugin: return
+deactivate transact
+plugin-->>supervisor: return
 deactivate plugin
-
-supervisor->>supervisor: 5. Generate `hashedTransaction`<br>from the transaction<br>and its claims
-
-supervisor->>auth plugin: 6. getProof(hashedTransaction, claim)
+supervisor->>transact: finish tx
+activate transact
+note right of transact: Look up the user's auth service
+transact->>auth plugin: get-claim
 activate auth plugin
-auth plugin->>supervisor: <proof>
+auth plugin-->>transact: return <claim>
 deactivate auth plugin
-note over supervisor: Add <proof> to transaction
-
-loop For each added claim
-   supervisor->>plugin: 7. getProof(hashedTransaction, claim)
-   activate plugin
-   plugin->>supervisor: <proof>
-   deactivate plugin
-   note over supervisor: Add <proof> to transaction
-end
-
-Note over supervisor: 8. Submit transaction
+note right of transact: transaction { { action1, claim1 } }
+transact->>auth plugin: get proof(transaction)
+activate auth plugin
+auth plugin-->>transact: return <proof>
+deactivate auth plugin
+note right of transact: transaction { { action1, claim1 }, proof1 }
+transact-->>supervisor: return
+deactivate transact
+Note over supervisor: Submit transaction
 deactivate supervisor
+supervisor-->>app: return
 ```
 
-The following is an explanation of each step in the diagram to aid understanding:
+## Auth notifiers
 
-1. Alice calls an action on a plugin.
-2. Supervisor gives the user's configured auth plugin the opportunity to add a claim to the transaction.
-3. Supervisor calls the plugin action
-4. If (and only if) a plugin calls a service action, then it is allowed to add a claim to the transaction.
-5. Supervisor has accumulated all actions and claims for this transaction, so it calculates the hash of the transaction object which can be used for the generation of proofs (such as digital signatures).
-6. The user's configured auth plugin is asked to generate a proof for the claim it added.
-7. Each plugin that added a claim is asked for a proof of the claim.
-8. Supervisor has collected all claims and proofs, therefore the final transaction object is packed and submitted to the network.
+At any time, a plugin can notify the `transact` plugin (which is responsible for transaction construction) that it has one or more claims to be added to the transaction. If this is done, at the time the transaction is being constructed, the `transact` plugin will ask this notifier for claims and proofs in addition to the user's auth service plugin.
+
+## Transaction privacy
+
+The only plugin that can see the full contents of a transaction is the user's auth service plugin. For every other plugin, it only knows what actions it was itself responsible for including in the transaction. This rule includes auth notifiers. While `transact` provides the user's auth service plugin with all actions in a transaction, it will only provide an auth-notifier with a list of actions that were added by the notifier plugin itself.
 
 ## Conclusion
 

@@ -8,18 +8,16 @@ endfunction()
 function(add suffix)
     add_library(services_system${suffix} INTERFACE)
     target_mapped_include_directories(services_system${suffix} INTERFACE
-        AccountSys/include
-        AuthDelegateSys/include
-        AuthEcSys/include
-        AuthAnySys/include
-        AuthSys/include
-        CpuSys/include
-        ProducerSys/include
-        ProxySys/include
-        SetCodeSys/include
-        TransactionSys/include
-        VerifyEcSys/include
-        VerifySys/include
+        Accounts/include
+        AuthDelegate/include
+        AuthAny/include
+        AuthSig/include
+        CpuLimit/include
+        Producers/include
+        HttpServer/include
+        SetCode/include
+        Transact/include
+        VerifySig/include
     )
 endfunction(add)
 
@@ -27,16 +25,14 @@ add("")
 add("-debug")
 
 if(DEFINED IS_WASM)
-    add_subdirectory(AccountSys)
-    add_subdirectory(AuthDelegateSys)
-    add_subdirectory(AuthEcSys)
-    add_subdirectory(AuthAnySys)
-    add_subdirectory(AuthSys)
-    add_subdirectory(CpuSys)
-    add_subdirectory(ProducerSys)
-    add_subdirectory(ProxySys)
-    add_subdirectory(SetCodeSys)
-    add_subdirectory(TransactionSys)
-    add_subdirectory(VerifyEcSys)
-    add_subdirectory(VerifySys)
+    add_subdirectory(Accounts)
+    add_subdirectory(AuthDelegate)
+    add_subdirectory(AuthAny)
+    add_subdirectory(AuthSig)
+    add_subdirectory(CpuLimit)
+    add_subdirectory(Producers)
+    add_subdirectory(HttpServer)
+    add_subdirectory(SetCode)
+    add_subdirectory(Transact)
+    add_subdirectory(VerifySig)
 endif()

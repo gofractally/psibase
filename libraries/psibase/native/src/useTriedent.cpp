@@ -15,9 +15,14 @@ namespace psibase
 {
    static constexpr uint8_t revisionHeadPrefix = 0;
    static constexpr uint8_t revisionByIdPrefix = 1;
-   static constexpr uint8_t blockDataPrefix    = 2;
+   static constexpr uint8_t subjectivePrefix   = 2;
 
    static const char revisionHeadKey[] = {revisionHeadPrefix};
+   static const char subjectiveKey[]   = {subjectivePrefix};
+
+   // TODO: should this be defined in a header or even loaded from the db?
+   // It is not consensus, so it's somewhat safe to change it.
+   static constexpr std::size_t maxSubjectiveTransactionDepth = 8;
 
    static auto revisionById(const Checksum256& blockId)
    {
@@ -27,13 +32,114 @@ namespace psibase
       return result;
    }
 
+   namespace
+   {
+      void prepare(DbChangeSet& changes)
+      {
+         std::ranges::sort(changes.ranges, {}, &DbChangeSet::Range::lower);
+         // merge adjacent and overlapping ranges
+         auto pos = changes.ranges.begin();
+         auto end = changes.ranges.end();
+         if (pos != end)
+         {
+            auto out = pos;
+            ++pos;
+            for (; pos != end; ++pos)
+            {
+               if (out->upper.empty())
+               {
+                  out->write = out->write || std::any_of(pos, end, [](auto& r) { return r.write; });
+                  break;
+               }
+               else if (pos->lower <= out->upper)
+               {
+                  out->write |= pos->write;
+                  if (out->upper < pos->upper || pos->upper.empty())
+                     out->upper = std::move(pos->upper);
+               }
+               else
+               {
+                  ++out;
+                  *out = std::move(*pos);
+               }
+            }
+            ++out;
+            changes.ranges.erase(out, changes.ranges.end());
+         }
+      }
+      std::vector<unsigned char> keyExact(std::span<const char> key)
+      {
+         return {key.begin(), key.end()};
+      }
+      std::vector<unsigned char> keyNext(std::span<const char> key)
+      {
+         std::vector<unsigned char> result;
+         result.reserve(key.size() + 1);
+         result.insert(result.end(), key.begin(), key.end());
+         result.push_back(0);
+         return result;
+      }
+      std::vector<unsigned char> keyNextPrefix(std::span<const char> key)
+      {
+         auto result = keyExact(key);
+         while (!result.empty() && result.back() == 0xffu)
+            result.pop_back();
+         if (!result.empty())
+            ++result.back();
+         return result;
+      }
+      std::span<const char> dbKey(const std::vector<unsigned char>& v)
+      {
+         return {reinterpret_cast<const char*>(v.data()), v.size()};
+      }
+
+      bool isIndependent(DbId db)
+      {
+         return db >= DbId::beginIndependent && db < DbId::endIndependent;
+      }
+      std::uint32_t independentIndex(DbId db)
+      {
+         assert(isIndependent(db));
+         return static_cast<std::uint32_t>(db) - static_cast<std::uint32_t>(DbId::beginIndependent);
+      }
+
+   }  // namespace
+   void DbChangeSet::onRead(std::span<const char> key)
+   {
+      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key)});
+   }
+   void DbChangeSet::onGreaterEqual(std::span<const char> key,
+                                    std::size_t           prefixLen,
+                                    bool                  found,
+                                    std::span<const char> result)
+   {
+      ranges.push_back(
+          {keyExact(key), found ? keyNext(result) : keyNextPrefix(key.subspan(0, prefixLen))});
+   }
+   void DbChangeSet::onLessThan(std::span<const char> key,
+                                std::size_t           prefixLen,
+                                bool                  found,
+                                std::span<const char> result)
+   {
+      ranges.push_back(
+          {found ? keyExact(result) : keyExact(key.subspan(0, prefixLen)), keyExact(key)});
+   }
+   void DbChangeSet::onMax(std::span<const char> key, bool found, std::span<const char> result)
+   {
+      ranges.push_back({found ? keyExact(result) : keyExact(key), keyNextPrefix(key)});
+   }
+   void DbChangeSet::onWrite(std::span<const char> key)
+   {
+      ranges.push_back({.lower = keyExact(key), .upper = keyNext(key), .write = true});
+   }
+
    // TODO: move triedent::root destruction to a gc thread
    struct Revision
    {
-      std::shared_ptr<triedent::root> roots[numDatabases];
+      std::shared_ptr<triedent::root> roots[numChainDatabases];
 
 #ifdef SANITY_CHECK
-      std::map<std::vector<char>, std::vector<char>, blob_less> _sanity[numDatabases];
+      std::map<std::vector<char>, std::vector<char>, blob_less> _sanity[numChainDatabases];
 
       auto& sanity() { return _sanity; }
 
@@ -53,11 +159,11 @@ namespace psibase
       {
          std::shared_ptr<Revision> result = std::make_shared<Revision>();
 
-         for (uint32_t i = 0; i < numDatabases; ++i)
+         for (uint32_t i = 0; i < numChainDatabases; ++i)
             result->roots[i] = roots[i];
 
 #ifdef SANITY_CHECK
-         for (uint32_t i = 0; i < numDatabases; ++i)
+         for (uint32_t i = 0; i < numChainDatabases; ++i)
             result->_sanity[i] = _sanity[i];
 #endif
 
@@ -145,7 +251,7 @@ namespace psibase
       std::vector<std::shared_ptr<triedent::root>> roots;
       if (s.get(topRoot, key, nullptr, &roots))
       {
-         check(roots.size() == numDatabases, "wrong number of roots in database");
+         check(roots.size() == numChainDatabases, "wrong number of roots in database");
          for (size_t i = 0; i < roots.size(); ++i)
             revision->roots[i] = std::move(roots[i]);
       }
@@ -154,7 +260,7 @@ namespace psibase
 
       if constexpr (sanityCheck)
       {
-         for (int db = 0; db < (int)numDatabases; ++db)
+         for (int db = 0; db < (int)numChainDatabases; ++db)
          {
             auto&             r = revision->roots[db];
             auto&             m = revision->sanity()[db];
@@ -174,42 +280,56 @@ namespace psibase
    {
       std::shared_ptr<triedent::database> trie;
 
+      std::mutex                      topMutex;
+      std::shared_ptr<triedent::root> topRoot;
+
       std::mutex                      headMutex;
       std::shared_ptr<const Revision> head;
 
-      SharedDatabaseImpl(const std::filesystem::path& dir,
-                         uint64_t                     hot_bytes,
-                         uint64_t                     warm_bytes,
-                         uint64_t                     cool_bytes,
-                         uint64_t                     cold_bytes)
+      std::mutex          subjectiveMutex;
+      IndependentRevision subjective;
+
+      SharedDatabaseImpl(const std::filesystem::path&     dir,
+                         const triedent::database_config& config,
+                         triedent::open_mode              mode)
       {
          // The largest object is 16 MiB
          // Each file must be at least double this
          constexpr std::uint64_t min_size = 32 * 1024 * 1024;
-         if (hot_bytes < min_size || warm_bytes < min_size || cool_bytes < min_size ||
-             cold_bytes < min_size)
+         if (config.hot_bytes < min_size || config.warm_bytes < min_size ||
+             config.cool_bytes < min_size || config.cold_bytes < min_size)
          {
             throw std::runtime_error("Requested database size is too small");
          }
-         if (!std::filesystem::exists(dir / "db"))
+         trie    = std::make_shared<triedent::database>(dir.c_str(), config, mode);
+         auto s  = trie->start_write_session();
+         topRoot = s->get_top_root();
+         head    = loadRevision(*s, topRoot, revisionHeadKey);
+
+         std::vector<std::shared_ptr<triedent::root>> roots;
+         if (s->get(topRoot, subjectiveKey, nullptr, &roots))
          {
-            // std::cout << "Creating " << dir << "\n";
-            triedent::database::create(  //
-                dir,                     //
-                triedent::database::config{
-                    .hot_bytes  = hot_bytes,
-                    .warm_bytes = warm_bytes,
-                    .cool_bytes = cool_bytes,
-                    .cold_bytes = cold_bytes,
-                });
+            check(roots.size() == numIndependentDatabases, "Wrong number of subjective databases");
+            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+               subjective[i] = roots[i];
          }
-         else
-         {
-            // std::cout << "Open existing " << dir << "\n";
-         }
-         trie   = std::make_shared<triedent::database>(dir.c_str(), triedent::database::read_write);
-         auto s = trie->start_write_session();
-         head   = loadRevision(*s, s->get_top_root(), revisionHeadKey);
+      }
+
+      SharedDatabaseImpl(const SharedDatabaseImpl& other)
+          : trie(other.trie), topRoot(other.topRoot), head(other.head), subjective(other.subjective)
+      {
+      }
+
+      auto getTopRoot()
+      {
+         std::lock_guard lock{topMutex};
+         return topRoot;
+      }
+
+      auto getNativeSubjective()
+      {
+         std::lock_guard l{subjectiveMutex};
+         return subjective[independentIndex(DbId::nativeSubjective)];
       }
 
       auto getHead()
@@ -220,9 +340,11 @@ namespace psibase
 
       void setHead(triedent::write_session& session, std::shared_ptr<const Revision> r)
       {
-         auto topRoot = session.get_top_root();
-         session.upsert(topRoot, revisionHeadKey, r->roots);
-         session.set_top_root(topRoot);
+         {
+            std::lock_guard lock{topMutex};
+            session.upsert(topRoot, revisionHeadKey, r->roots);
+            session.set_top_root(topRoot);
+         }
 
          std::lock_guard<std::mutex> lock(headMutex);
          head = std::move(r);
@@ -232,23 +354,24 @@ namespace psibase
                          const Checksum256&       blockId,
                          const Revision&          r)
       {
-         auto topRoot = session.get_top_root();
+         std::lock_guard lock{topMutex};
          session.upsert(topRoot, revisionById(blockId), r.roots);
          session.set_top_root(topRoot);
       }
    };  // SharedDatabaseImpl
 
-   SharedDatabase::SharedDatabase(const boost::filesystem::path& dir,
-                                  uint64_t                       hot_bytes,
-                                  uint64_t                       warm_bytes,
-                                  uint64_t                       cool_bytes,
-                                  uint64_t                       cold_bytes)
-       : impl{std::make_shared<SharedDatabaseImpl>(dir.c_str(),
-                                                   hot_bytes,
-                                                   warm_bytes,
-                                                   cool_bytes,
-                                                   cold_bytes)}
+   SharedDatabase::SharedDatabase(const std::filesystem::path&     dir,
+                                  const triedent::database_config& config,
+                                  triedent::open_mode              mode)
+       : impl{std::make_shared<SharedDatabaseImpl>(dir, config, mode)}
    {
+   }
+
+   SharedDatabase SharedDatabase::clone() const
+   {
+      SharedDatabase result{*this};
+      result.impl = std::make_shared<SharedDatabaseImpl>(*impl);
+      return result;
    }
 
    ConstRevisionPtr SharedDatabase::getHead()
@@ -273,75 +396,142 @@ namespace psibase
 
    ConstRevisionPtr SharedDatabase::getRevision(Writer& writer, const Checksum256& blockId)
    {
-      return loadRevision(writer, writer.get_top_root(), revisionById(blockId), true);
+      return loadRevision(writer, impl->getTopRoot(), revisionById(blockId), true);
    }
 
    // TODO: move triedent::root destruction to a gc thread
    void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
-      auto              topRoot = writer.get_top_root();
+      // TODO: Reduce critical section
+      auto              nativeSubjective = impl->getNativeSubjective();
+      std::lock_guard   lock{impl->topMutex};
       std::vector<char> key{revisionByIdPrefix};
+      std::vector<char> tmpKey;
+      bool              hasIrreversible = false;
 
-      // Remove everything with a blockNum <= irreversible's, except irreversible.
-      while (writer.get_greater_equal(topRoot, key, &key, nullptr, nullptr))
+      // Remove everything with a blockNum <= irreversible's, except irreversible
+      // and saved snapshots.
+      while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, nullptr))
       {
          if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix ||
              memcmp(key.data() + 1, irreversible.data(), sizeof(BlockNum)) > 0)
             break;
-         if (memcmp(key.data() + 1, irreversible.data(), irreversible.size()))
-            writer.remove(topRoot, key);
+         Checksum256 id;
+         std::memcpy(id.data(), key.data() + 1, id.size());
+         if (id == irreversible)
+         {
+            hasIrreversible = true;
+         }
+         else
+         {
+            tmpKey.clear();
+            psio::vector_stream stream{tmpKey};
+            psio::to_key(snapshotKey(id), stream);
+            if (!writer.get(nativeSubjective, tmpKey))
+               writer.remove(impl->topRoot, key);
+         }
          key.push_back(0);
       }
 
-      // Remove everything with a blockNum > irreversible's which builds on a block
-      // no longer present.
-      std::vector<std::shared_ptr<triedent::root>> roots;
-      std::vector<char>                            statusBytes;
-      auto                                         sk = psio::convert_to_key(statusKey());
-      while (writer.get_greater_equal(topRoot, key, &key, nullptr, &roots))
+      if (hasIrreversible)
       {
-         if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
-            break;
-         check(roots.size() == numDatabases, "wrong number of roots in fork");
-         if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
-            throw std::runtime_error("Status row missing in fork");
-         auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
-         if (!status.head)
-            throw std::runtime_error("Status row is missing head information in fork");
-         if (!writer.get(topRoot, revisionById(status.head->header.previous), nullptr, nullptr))
-            writer.remove(topRoot, key);
-         key.push_back(0);
+         // Remove everything with a blockNum > irreversible's which builds on a block
+         // no longer present.
+         std::vector<std::shared_ptr<triedent::root>> roots;
+         std::vector<char>                            statusBytes;
+         auto                                         sk = psio::convert_to_key(statusKey());
+         while (writer.get_greater_equal(impl->topRoot, key, &key, nullptr, &roots))
+         {
+            if (key.size() != 1 + irreversible.size() || key[0] != revisionByIdPrefix)
+               break;
+            check(roots.size() == numChainDatabases, "wrong number of roots in fork");
+            if (!writer.get(roots[(int)StatusRow::db], sk, &statusBytes, nullptr))
+               throw std::runtime_error("Status row missing in fork");
+            auto status = psio::from_frac<StatusRow>(psio::prevalidated{statusBytes});
+            if (!status.head)
+               throw std::runtime_error("Status row is missing head information in fork");
+            if (!writer.get(impl->topRoot, revisionById(status.head->header.previous), nullptr,
+                            nullptr))
+               writer.remove(impl->topRoot, key);
+            key.push_back(0);
+         }
       }
 
-      writer.set_top_root(topRoot);
+      writer.set_top_root(impl->topRoot);
    }  // removeRevisions
 
-   void SharedDatabase::setBlockData(Writer&               writer,
-                                     const Checksum256&    blockId,
-                                     std::span<const char> key,
-                                     std::span<const char> value)
+   void SharedDatabase::kvPutSubjective(Writer&               writer,
+                                        std::span<const char> key,
+                                        std::span<const char> value)
    {
-      auto              topRoot = writer.get_top_root();
-      std::vector<char> fullKey;
-      fullKey.reserve(1 + blockId.size() + key.size());
-      fullKey.push_back(blockDataPrefix);
-      fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
-      fullKey.insert(fullKey.end(), key.begin(), key.end());
-      writer.upsert(topRoot, fullKey, value);
-      writer.set_top_root(topRoot);
+      std::lock_guard l{impl->subjectiveMutex};
+      writer.upsert(impl->subjective[independentIndex(DbId::nativeSubjective)], key, value);
+      std::lock_guard lock{impl->topMutex};
+      writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+      writer.set_top_root(impl->topRoot);
    }
 
-   std::optional<std::vector<char>> SharedDatabase::getBlockData(Writer&               reader,
-                                                                 const Checksum256&    blockId,
-                                                                 std::span<const char> key)
+   std::optional<std::vector<char>> SharedDatabase::kvGetSubjective(Writer&               reader,
+                                                                    std::span<const char> key)
    {
-      auto              topRoot = reader.get_top_root();
-      std::vector<char> fullKey;
-      fullKey.reserve(1 + blockId.size() + key.size());
-      fullKey.push_back(blockDataPrefix);
-      fullKey.insert(fullKey.end(), blockId.begin(), blockId.end());
-      fullKey.insert(fullKey.end(), key.begin(), key.end());
-      return reader.get(topRoot, fullKey);
+      auto root = impl->getNativeSubjective();
+      return reader.get(root, key);
+   }
+
+   IndependentRevision SharedDatabase::getSubjective()
+   {
+      std::lock_guard l{impl->subjectiveMutex};
+      return impl->subjective;
+   }
+
+   bool SharedDatabase::commitSubjective(Writer&                writer,
+                                         IndependentRevision&   original,
+                                         IndependentRevision    updated,
+                                         IndependentChangeSet&& changes,
+                                         SocketChangeSet&&      socketChanges,
+                                         Sockets&               sockets,
+                                         SocketAutoCloseSet&    closing)
+   {
+      bool hasChange = !socketChanges.empty();
+      for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+      {
+         prepare(changes[i]);
+         hasChange =
+             hasChange || std::ranges::any_of(changes[i].ranges, [](auto& r) { return r.write; });
+      }
+      if (hasChange)
+      {
+         std::lock_guard l{impl->subjectiveMutex};
+         for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+         {
+            for (const auto& r : changes[i].ranges)
+            {
+               if (!writer.is_equal_weak(original[i], impl->subjective[i], dbKey(r.lower),
+                                         dbKey(r.upper)))
+               {
+                  original = impl->subjective;
+                  return false;
+               }
+            }
+         }
+         if (!sockets.applyChanges(socketChanges, &closing))
+         {
+            original = impl->subjective;
+            return false;
+         }
+         for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+         {
+            for (const auto& r : changes[i].ranges)
+            {
+               if (r.write)
+                  writer.splice(impl->subjective[i], updated[i], dbKey(r.lower), dbKey(r.upper));
+            }
+         }
+         std::lock_guard lock{impl->topMutex};
+         writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+         writer.set_top_root(impl->topRoot);
+      }
+      return true;
    }
 
    bool SharedDatabase::isSlow() const
@@ -355,6 +545,24 @@ namespace psibase
       return {result.begin(), result.end()};
    }
 
+   struct SubjectiveRevision
+   {
+      std::array<std::size_t, numIndependentDatabases> changeSetPos;
+      std::size_t                                      socketChangePos;
+      IndependentRevision                              db;
+   };
+
+   std::array<std::size_t, numIndependentDatabases> getChangeSetPos(
+       std::span<const DbChangeSet, numIndependentDatabases> changes)
+   {
+      std::array<std::size_t, numIndependentDatabases> result;
+      for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+      {
+         result[i] = changes[i].ranges.size();
+      }
+      return result;
+   }
+
    struct DatabaseImpl
    {
       SharedDatabase                           shared;
@@ -365,6 +573,33 @@ namespace psibase
       std::shared_ptr<const Revision>          readOnlyRevision;
       std::vector<char>                        keyBuffer;
       std::vector<char>                        valueBuffer;
+
+      IndependentChangeSet            subjectiveChanges;
+      std::vector<SocketChange>       socketChanges;
+      std::vector<SubjectiveRevision> subjectiveRevisions;
+      std::size_t                     subjectiveLimit;
+
+      auto db(auto& revision, DbId db) -> decltype((revision.roots[(int)db]))
+      {
+         if (isIndependent(db))
+         {
+            check(!subjectiveRevisions.empty(),
+                  "subjectiveCheckout is required to access the subjective database");
+            return subjectiveRevisions.back().db[independentIndex(db)];
+         }
+         else
+         {
+            return revision.roots[(int)db];
+         }
+      }
+
+      DbChangeSet* getChangeSet(DbId db)
+      {
+         if (isIndependent(db))
+            return &subjectiveChanges[independentIndex(db)];
+         else
+            return nullptr;
+      }
 
       template <typename F>
       auto read(F f)
@@ -452,6 +687,114 @@ namespace psibase
          else if (!writeRevisions.empty())
             writeRevisions.pop_back();
       }
+
+      void checkoutSubjective()
+      {
+         check(subjectiveRevisions.size() <= maxSubjectiveTransactionDepth,
+               "checkoutSubjective nesting exceeded limit");
+         if (subjectiveRevisions.empty())
+         {
+            subjectiveRevisions.push_back({{}, 0, shared.getSubjective()});
+         }
+         subjectiveRevisions.push_back({getChangeSetPos(subjectiveChanges), socketChanges.size(),
+                                        subjectiveRevisions.back().db});
+      }
+
+      bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
+      {
+         check(subjectiveRevisions.size() > subjectiveLimit,
+               "commitSubjective requires checkoutSubjective");
+         if (subjectiveRevisions.size() > 2)
+         {
+            subjectiveRevisions[subjectiveRevisions.size() - 2].db =
+                std::move(subjectiveRevisions.back().db);
+            subjectiveRevisions.pop_back();
+         }
+         else
+         {
+            assert(subjectiveRevisions.size() == 2);
+            if (writeSession)
+            {
+               if (!shared.commitSubjective(
+                       *writeSession, subjectiveRevisions.front().db, subjectiveRevisions.back().db,
+                       std::move(subjectiveChanges), std::move(socketChanges), sockets, closing))
+               {
+                  subjectiveRevisions[1].db              = subjectiveRevisions[0].db;
+                  subjectiveRevisions[0].changeSetPos    = {};
+                  subjectiveRevisions[0].socketChangePos = 0;
+                  subjectiveRevisions[1].changeSetPos    = {};
+                  subjectiveRevisions[1].socketChangePos = 0;
+                  for (auto& change : subjectiveChanges)
+                     change.ranges.clear();
+                  socketChanges.clear();
+                  return false;
+               }
+            }
+            subjectiveRevisions.clear();
+            for (auto& change : subjectiveChanges)
+               change.ranges.clear();
+            socketChanges.clear();
+         }
+         return true;
+      }
+      void abortSubjective()
+      {
+         check(subjectiveRevisions.size() > subjectiveLimit,
+               "abortSubjective requires checkoutSubjective");
+         if (subjectiveRevisions.size() > 2)
+         {
+            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+               assert(subjectiveRevisions.back().changeSetPos[i] <=
+                      subjectiveChanges[i].ranges.size());
+            assert(subjectiveRevisions.back().socketChangePos <= socketChanges.size());
+            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+               subjectiveChanges[i].ranges.resize(subjectiveRevisions.back().changeSetPos[i]);
+            socketChanges.resize(subjectiveRevisions.back().socketChangePos);
+            subjectiveRevisions.pop_back();
+         }
+         else
+         {
+            assert(subjectiveRevisions.size() == 2);
+            subjectiveRevisions.clear();
+            for (auto& change : subjectiveChanges)
+               change.ranges.clear();
+            socketChanges.clear();
+         }
+      }
+      std::int32_t socketAutoClose(std::int32_t        socket,
+                                   bool                value,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing)
+      {
+         return sockets.autoClose(socket, value, &closing,
+                                  subjectiveRevisions.empty() ? nullptr : &socketChanges);
+      }
+      std::size_t saveSubjective()
+      {
+         auto result     = subjectiveLimit;
+         subjectiveLimit = subjectiveRevisions.size();
+         return result;
+      }
+      void restoreSubjective(std::size_t depth)
+      {
+         check(depth <= subjectiveLimit, "Wrong subjective depth");
+         if (subjectiveLimit == 0)
+         {
+            subjectiveRevisions.clear();
+            for (auto& change : subjectiveChanges)
+               change.ranges.clear();
+            socketChanges.clear();
+         }
+         else if (subjectiveLimit < subjectiveRevisions.size())
+         {
+            for (std::size_t i = 0; i < numIndependentDatabases; ++i)
+               subjectiveChanges[i].ranges.resize(
+                   subjectiveRevisions[subjectiveLimit].changeSetPos[i]);
+            socketChanges.resize(subjectiveRevisions[subjectiveLimit].socketChangePos);
+            subjectiveRevisions.resize(subjectiveLimit);
+         }
+         subjectiveLimit = depth;
+      }
    };  // DatabaseImpl
 
    Database::Database(SharedDatabase shared, ConstRevisionPtr revision)
@@ -508,12 +851,83 @@ namespace psibase
       impl->abort();
    }
 
+   ConstRevisionPtr Database::getPrevAuthServices()
+   {
+      return impl->read(
+          [&](auto& session, auto& revision) -> ConstRevisionPtr
+          {
+             auto        index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
+             auto        native = static_cast<std::uint32_t>(DbId::native);
+             const auto& root   = revision.roots[index];
+             if (!session.is_empty(root, {}, {}))
+             {
+                auto result           = std::make_shared<Revision>();
+                result->roots[native] = root;
+                return result;
+             }
+             else
+             {
+                return nullptr;
+             }
+          });
+   }
+
+   void Database::setPrevAuthServices(ConstRevisionPtr revision)
+   {
+      impl->write(
+          [&](auto& session, auto& writeRevision)
+          {
+             auto index  = static_cast<std::uint32_t>(DbId::prevAuthServices);
+             auto native = static_cast<std::uint32_t>(DbId::native);
+             if (revision)
+             {
+                writeRevision.roots[index] = revision->roots[native];
+             }
+             else
+             {
+                writeRevision.roots[index] = nullptr;
+             }
+          });
+   }
+
+   void Database::checkoutSubjective()
+   {
+      impl->checkoutSubjective();
+   }
+   bool Database::commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
+   {
+      return impl->commitSubjective(sockets, closing);
+   }
+   void Database::abortSubjective()
+   {
+      impl->abortSubjective();
+   }
+   std::int32_t Database::socketAutoClose(std::int32_t        socket,
+                                          bool                value,
+                                          Sockets&            sockets,
+                                          SocketAutoCloseSet& closing)
+   {
+      return impl->socketAutoClose(socket, value, sockets, closing);
+   }
+   std::size_t Database::saveSubjective()
+   {
+      return impl->saveSubjective();
+   }
+   void Database::restoreSubjective(std::size_t depth)
+   {
+      impl->restoreSubjective(depth);
+   }
+
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
    {
       impl->write(
           [&](auto& session, auto& revision)
           {
-             session.upsert(revision.roots[(int)db], key.string_view(), value.string_view());
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onWrite(key.string_view());
+             }
+             session.upsert(impl->db(revision, db), key.string_view(), value.string_view());
              if constexpr (sanityCheck)
              {
                 revision.sanity()[(int)db][key.vector()] = value.vector();
@@ -527,7 +941,11 @@ namespace psibase
       impl->write(
           [&](auto& session, auto& revision)
           {
-             session.remove(revision.roots[(int)db], key.string_view());
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onWrite(key.string_view());
+             }
+             session.remove(impl->db(revision, db), key.string_view());
              if constexpr (sanityCheck)
              {
                 revision.sanity()[(int)db].erase(key.vector());
@@ -541,7 +959,12 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<psio::input_stream>
           {
-             if (!session.get(revision.roots[(int)db], key.string_view(), &impl->valueBuffer,
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onRead(key.string_view());
+             }
+
+             if (!session.get(impl->db(revision, db), key.string_view(), &impl->valueBuffer,
                               nullptr))
              {
                 if constexpr (sanityCheck)
@@ -572,11 +995,16 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_greater_equal(revision.roots[(int)db], key.string_view(),
+             auto found = session.get_greater_equal(impl->db(revision, db), key.string_view(),
                                                     &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
                 found = false;
+
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onGreaterEqual(key.string_view(), matchKeySize, found, impl->keyBuffer);
+             }
 
              if (!found)
              {
@@ -618,11 +1046,16 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             auto found = session.get_less_than(revision.roots[(int)db], key.string_view(),
+             auto found = session.get_less_than(impl->db(revision, db), key.string_view(),
                                                 &impl->keyBuffer, &impl->valueBuffer, nullptr);
              if (found && (impl->keyBuffer.size() < matchKeySize ||
                            memcmp(impl->keyBuffer.data(), key.pos, matchKeySize)))
                 found = false;
+
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onLessThan(key.string_view(), matchKeySize, found, impl->keyBuffer);
+             }
 
              if (!found)
              {
@@ -675,8 +1108,15 @@ namespace psibase
       return impl->read(
           [&](auto& session, auto& revision) -> std::optional<Database::KVResult>
           {
-             if (!session.get_max(revision.roots[(int)db], key.string_view(), &impl->keyBuffer,
-                                  &impl->valueBuffer, nullptr))
+             auto found = session.get_max(impl->db(revision, db), key.string_view(),
+                                          &impl->keyBuffer, &impl->valueBuffer, nullptr);
+
+             if (auto* changes = impl->getChangeSet(db))
+             {
+                changes->onMax(key.string_view(), found, impl->keyBuffer);
+             }
+
+             if (!found)
              {
                 if constexpr (sanityCheck)
                 {

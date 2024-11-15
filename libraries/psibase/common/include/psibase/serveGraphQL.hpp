@@ -10,8 +10,8 @@ namespace psibase
    struct GraphQLQuery
    {
       std::string query;
+      PSIO_REFLECT(GraphQLQuery, query);
    };
-   PSIO_REFLECT(GraphQLQuery, query);
 
    /// Handle `/graphql` request
    ///
@@ -82,8 +82,8 @@ namespace psibase
       bool        hasNextPage     = false;
       std::string startCursor;
       std::string endCursor;
+      PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
    };
-   PSIO_REFLECT(PageInfo, hasPreviousPage, hasNextPage, startCursor, endCursor)
 
    /// GraphQL support for paging
    ///
@@ -349,6 +349,116 @@ namespace psibase
       return result;
    }  // makeConnection
 
+   /// Similar to makeConnection, except that it allows pagination through a virtual table index.
+   ///
+   /// A virtual table index is a dynamically constructed vector of objects.
+   ///
+   /// Allows for a user-provided projection function that transforms elements from type T to Key
+   /// before isolating a range within the container.
+   template <typename Connection, typename T, typename Key>
+   Connection makeVirtualConnection(const std::vector<T>&             elements,
+                                    const std::optional<Key>&         gt,
+                                    const std::optional<Key>&         ge,
+                                    const std::optional<Key>&         lt,
+                                    const std::optional<Key>&         le,
+                                    std::optional<uint32_t>           first,
+                                    std::optional<uint32_t>           last,
+                                    const std::optional<std::string>& before,
+                                    const std::optional<std::string>& after,
+                                    std::function<Key(T)>             projection = {})
+   {
+      auto indexFromString = [&](const std::string& str, size_t& index) -> bool
+      {
+         char*         end;
+         unsigned long result = std::strtoul(str.c_str(), &end, 10);
+         if (end == str.c_str() || *end != '\0' || result == std::numeric_limits<size_t>::max())
+         {
+            return false;
+         }
+         index = static_cast<size_t>(result);
+         return true;
+      };
+
+      auto lower_bound = [&](const Key& key)
+      { return std::ranges::lower_bound(elements, key, {}, projection); };
+
+      auto upper_bound = [&](const Key& key)
+      { return std::ranges::upper_bound(elements, key, {}, projection); };
+
+      auto rangeBegin = elements.begin();
+      auto rangeEnd   = elements.end();
+      if (ge || gt || le || lt)
+      {
+         if (!projection)
+         {
+            psibase::check(false, "makeVirtualConnection: missing projection function");
+         }
+      }
+      if (ge)
+         rangeBegin = std::max(rangeBegin, lower_bound(*ge));
+      if (gt)
+         rangeBegin = std::max(rangeBegin, upper_bound(*gt));
+      if (le)
+         rangeEnd = std::min(rangeEnd, upper_bound(*le));
+      if (lt)
+         rangeEnd = std::min(rangeEnd, lower_bound(*lt));
+      rangeEnd = std::max(rangeBegin, rangeEnd);
+
+      auto it  = rangeBegin;
+      auto end = rangeEnd;
+      if (after)
+      {
+         size_t index = 0;
+         if (indexFromString(*after, index))
+            it = std::clamp(elements.begin() + index + 1, rangeBegin, rangeEnd);
+      }
+      if (before)
+      {
+         size_t index = 0;
+         if (indexFromString(*before, index))
+            end = std::clamp(elements.begin() + index, rangeBegin, rangeEnd);
+      }
+
+      end = std::max(it, end);
+
+      Connection result;
+      auto       add_edge = [&](const auto& it)
+      {
+         size_t index  = std::distance(elements.begin(), it);
+         auto   cursor = std::to_string(index);
+         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
+      };
+
+      if (last && !first)
+      {
+         result.pageInfo.hasNextPage = end != rangeEnd;
+         while (it != end && (*last)-- > 0)
+            add_edge(--end);
+         result.pageInfo.hasPreviousPage = end != rangeBegin;
+         std::reverse(result.edges.begin(), result.edges.end());
+      }
+      else
+      {
+         result.pageInfo.hasPreviousPage = it != rangeBegin;
+         for (; it != end && (!first || (*first)-- > 0); ++it)
+            add_edge(it);
+         result.pageInfo.hasNextPage = it != rangeEnd;
+         if (last && *last < result.edges.size())
+         {
+            result.pageInfo.hasPreviousPage = true;
+            result.edges.erase(result.edges.begin(),
+                               result.edges.begin() + (result.edges.size() - *last));
+         }
+      }
+
+      if (!result.edges.empty())
+      {
+         result.pageInfo.startCursor = result.edges.front().cursor;
+         result.pageInfo.endCursor   = result.edges.back().cursor;
+      }
+      return result;
+   }  // makeConnection
+
    template <typename T, typename K>
    constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
    {
@@ -375,15 +485,15 @@ namespace psibase
       bool          event_supported_service;
       MethodNumber  event_type;
       bool          event_unpack_ok;
+      PSIO_REFLECT(EventDecoderStatus,
+                   event_db,
+                   event_id,
+                   event_found,
+                   event_service,
+                   event_supported_service,
+                   event_type,
+                   event_unpack_ok)
    };
-   PSIO_REFLECT(EventDecoderStatus,
-                event_db,
-                event_id,
-                event_found,
-                event_service,
-                event_supported_service,
-                event_type,
-                event_unpack_ok)
 
    /// GraphQL support for decoding an event
    ///
@@ -458,7 +568,7 @@ namespace psibase
    ///       "event_id": "13",
    ///       "event_type": "credited",
    ///       "tokenId": 1,
-   ///       "sender": "symbol-sys",
+   ///       "sender": "symbol",
    ///       "receiver": "alice",
    ///       "amount": {
    ///         "value": "100000000000"
@@ -673,21 +783,19 @@ namespace psibase
 
       bool ok    = true;
       bool found = false;
-      psio::reflect<Events>::get_by_name(
+      psio::get_member_function_type<Events>(
           header.type->value,
-          [&](auto meta, auto member)
+          [&](auto member, std::span<const char* const> names)
           {
-             using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+             using MT = psio::MemberPtrType<decltype(member)>;
              static_assert(MT::isFunction);
-             using TT                                     = decltype(psio::tuple_remove_view(
-                 std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+             using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
              SequentialRecord<MethodNumber, TT> eventData = {};
              if (psio::from_frac(eventData, *v))
              {
                 found = true;
                 ok = gql_query_decoder_value(decoder, *header.type, *eventData.value, input_stream,
-                                             output_stream, error,
-                                             {meta.param_names.begin(), meta.param_names.end()});
+                                             output_stream, error, names.subspan(1));
              }
           });
 
@@ -709,11 +817,11 @@ namespace psibase
 
    template <typename T>
    concept EventType = requires(T events) {
-                          typename decltype(events)::History;
-                          // Don't require Ui and Merkle for now
-                          //typename decltype(events)::Ui;
-                          //typename decltype(events)::Merkle;
-                       };
+      typename decltype(events)::History;
+      // Don't require Ui and Merkle for now
+      //typename decltype(events)::Ui;
+      //typename decltype(events)::Merkle;
+   };
 
    /// GraphQL support for decoding multiple events
    ///
@@ -776,7 +884,7 @@ namespace psibase
    ///         {
    ///           "event_id": "3",
    ///           "tokenId": 1,
-   ///           "creator": "token-sys",
+   ///           "creator": "tokens",
    ///           "precision": {
    ///             "value": 8
    ///           },
@@ -788,7 +896,7 @@ namespace psibase
    ///           "event_id": "4",
    ///           "prevEvent": 1,
    ///           "tokenId": "3",
-   ///           "setter": "token-sys",
+   ///           "setter": "tokens",
    ///           "flag": "untradeable",
    ///           "enable": true
    ///         }
@@ -1021,21 +1129,19 @@ namespace psibase
          }
 
          bool found = false;
-         psio::reflect<Events>::get_by_name(
+         psio::get_member_function_type<Events>(
              header.type->value,
-             [&](auto meta, auto member)
+             [&](auto member, std::span<const char* const> names)
              {
-                using MT = psio::MemberPtrType<decltype(member(std::declval<Events*>()))>;
+                using MT = psio::MemberPtrType<decltype(member)>;
                 static_assert(MT::isFunction);
-                using TT = decltype(psio::tuple_remove_view(
-                    std::declval<psio::TupleFromTypeList<typename MT::SimplifiedArgTypes>>()));
+                using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
                 // TODO: EventDecoder validates and unpacks this again
                 SequentialRecord<MethodNumber, TT> eventData;
                 if (psio::from_frac(eventData, *v))
                 {
                    get_event_field<0>(  //
-                       *eventData.value, fieldName, {},
-                       {meta.param_names.begin(), meta.param_names.end()},
+                       *eventData.value, fieldName, {}, names.subspan(1),
                        [&](auto _, const auto& field)
                        {
                           if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psio/fracpack.hpp>
+#include <psio/schema.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 // Prevent clang-format from munging the header order
@@ -209,9 +210,24 @@ auto test_base(const T& value)
       CHECK_THAT(psio::from_frac<T>(psio::prevalidated{data}), BitwiseEqual(value));
       CHECK(psio::fracpack_validate_strict<T>(data));
    }
+   // schema
+   using namespace psio::schema_types;
+   Schema         schema = SchemaBuilder().insert<T>("T").build();
+   CompiledSchema cschema(schema);
+   {
+      INFO("schema: " << psio::format_json(schema));
+      FracParser          parser{data, cschema, "T"};
+      std::vector<char>   json;
+      psio::vector_stream out{json};
+      to_json(parser, out);
+      CHECK(std::string_view{json.data(), json.size()} == psio::convert_to_json(value));
+      CHECK(parser.in.pos == parser.in.end_pos);
+      CHECK(!parser.in.has_unknown);
+   }
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
    {
+      INFO("leading bytes: " << i);
       // Making a copy in a separate allocation allows asan to detect out-of-bounds access
       std::unique_ptr<char[]> copy{new char[i]};
       std::memcpy(copy.get(), data.data(), i);
@@ -230,6 +246,7 @@ auto test_base(const T& value)
          CHECK(!psio::is_packable<T>::template unpack<false, true>(nullptr, has_unknown, known_end,
                                                                    copy.get(), pos, i));
       }
+      CHECK(!fracpack_validate({copy.get(), i}, cschema, "T"));
    }
    return data;
 }
@@ -254,6 +271,17 @@ template <typename T>
 T& clio_unwrap_packable(packable_wrapper<T>& wrapper)
 {
    return wrapper.value;
+}
+template <typename T, typename Stream>
+void to_json(const packable_wrapper<T>& wrapper, Stream& stream)
+{
+   to_json(wrapper.value, stream);
+}
+template <typename T>
+constexpr const char* get_type_name(const packable_wrapper<T>*)
+{
+   using psio::get_type_name;
+   return get_type_name((T*)nullptr);
 }
 
 template <typename... T>
@@ -452,6 +480,9 @@ void test(std::initializer_list<T> values)
       test(std::tuple{std::optional<std::vector<T>>{}});
       test(std::tuple{std::optional{std::vector<T>{}}});
       test(std::tuple{std::optional{std::vector<T>(values)}});
+
+      test(std::tuple{std::optional{std::uint32_t{6}}, std::vector<T>(values),
+                      std::optional{std::uint32_t{7}}});
    }
    // variant
    for (const auto& v : values)
@@ -477,6 +508,7 @@ void test(std::initializer_list<T> values)
       test(std::tuple{a});
       test(std::tuple{std::optional<std::array<T, 20>>{}});
       test(std::tuple{std::optional{a}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, a, std::optional{std::uint32_t{7}}});
    }
    // shared_view_ptr
    {
@@ -484,5 +516,16 @@ void test(std::initializer_list<T> values)
       {
          test(psio::shared_view_ptr{v});
       }
+   }
+   // Sandwiched between two heap objects (checks correct tracking of fixed_pos vs heap_pos)
+   for (const auto& v : values)
+   {
+      test(std::tuple{std::optional{std::uint32_t{6}}, v, std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, nonextensible_wrapper{v},
+                      std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, extensible_wrapper{v},
+                      std::optional{std::uint32_t{7}}});
+      test(std::tuple{std::optional{std::uint32_t{6}}, std::optional<T>(v),
+                      std::optional{std::uint32_t{7}}});
    }
 }

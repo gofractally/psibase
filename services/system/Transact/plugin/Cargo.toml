@@ -1,0 +1,31 @@
+[package]
+name = "transact"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.29.0", features = ["bitflags"] }
+psibase = { path = "../../../../rust/psibase" }
+regex = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = "0.4.38"
+sha2 = "0.10.6"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "transact:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/wit/world.wit" }
+"accounts:smart-auth" = { path = "../../Accounts/plugin/smartAuth/import.wit" }
+
+[package.metadata.component.bindings]
+derives = ["psibase::Pack", "psibase::Unpack"]
