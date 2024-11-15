@@ -49,26 +49,6 @@ impl From<DateTime<Utc>> for TimePointSec {
     }
 }
 
-impl Add for TimePointSec {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        Self {
-            seconds: self.seconds + other.seconds,
-        }
-    }
-}
-
-impl Sub for TimePointSec {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        Self {
-            seconds: self.seconds - other.seconds,
-        }
-    }
-}
-
 impl Serialize for TimePointSec {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(
@@ -221,6 +201,5 @@ impl Sub<Seconds> for TimePointUSec {
     }
 }
 
-// TODO: TimePointSec is both a time point and a duration
 // TODO: string conversions
 // TODO: implement trait with the time functions helpers
