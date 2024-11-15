@@ -62,8 +62,8 @@ namespace SystemService
 
    struct ReversibleBlocksRow
    {
-      psibase::BlockNum      blockNum;
-      psibase::TimePointUSec time;
+      psibase::BlockNum  blockNum;
+      psibase::BlockTime time;
    };
    PSIO_REFLECT(ReversibleBlocksRow, blockNum, time)
 

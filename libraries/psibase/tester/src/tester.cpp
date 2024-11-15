@@ -211,7 +211,7 @@ void psibase::TestChain::startBlock(std::string_view time)
    startBlock(TimePointUSec{Seconds{sec} + MicroSeconds{nsec / 1000}});
 }
 
-void psibase::TestChain::startBlock(TimePointUSec tp)
+void psibase::TestChain::startBlock(BlockTime tp)
 {
    // Guarantee that there is a recent block for fillTapos to use.
    if (status && status->current.time + Seconds(1) < tp)

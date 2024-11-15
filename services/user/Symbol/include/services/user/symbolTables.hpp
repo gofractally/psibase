@@ -21,8 +21,8 @@ namespace UserService
       Quantity floorPrice;
       Quantity activePrice;
 
-      uint8_t                createCounter;
-      psibase::TimePointUSec lastPriceUpdateTime;
+      uint8_t            createCounter;
+      psibase::BlockTime lastPriceUpdateTime;
 
       uint64_t eventHead;
    };

@@ -335,7 +335,7 @@ struct test_chain
       db     = {};
    }
 
-   void startBlock(std::optional<psibase::TimePointUSec> time = std::nullopt)
+   void startBlock(std::optional<psibase::BlockTime> time = std::nullopt)
    {
       // TODO: undo control
       finishBlock();
@@ -1242,9 +1242,8 @@ struct callbacks
    void testerStartBlock(uint32_t chain_index, int64_t time_us)
    {
       assert_chain(chain_index)
-          .startBlock(time_us
-                          ? std::optional{psibase::TimePointUSec{psibase::MicroSeconds{time_us}}}
-                          : std::nullopt);
+          .startBlock(time_us ? std::optional{psibase::BlockTime{psibase::MicroSeconds{time_us}}}
+                              : std::nullopt);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }

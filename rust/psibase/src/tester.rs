@@ -8,9 +8,9 @@
 
 use crate::{
     create_boot_transactions, get_result_bytes, kv_get, services, status_key, tester_raw,
-    AccountNumber, Action, Caller, DirectoryRegistry, Error, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, PackageRegistry, Seconds, SignedTransaction, StatusRow, TimePointSec,
-    TimePointUSec, Transaction, TransactionTrace,
+    AccountNumber, Action, BlockTime, Caller, DirectoryRegistry, Error, HttpBody, HttpReply,
+    HttpRequest, InnerTraceEnum, PackageRegistry, Seconds, SignedTransaction, StatusRow,
+    TimePointSec, TimePointUSec, Transaction, TransactionTrace,
 };
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack};
@@ -122,7 +122,7 @@ impl Chain {
     /// then starts a new block 1 second after the most recent.
     ///
     /// TODO: Support sub-second block times
-    pub fn start_block_at(&self, time: TimePointUSec) {
+    pub fn start_block_at(&self, time: BlockTime) {
         let status = &mut *self.status.borrow_mut();
 
         // Guarantee that there is a recent block for fillTapos to use.

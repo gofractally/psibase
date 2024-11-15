@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub type Checksum256 = Hex<[u8; 32]>;
 
 pub type BlockNum = u32;
+pub type BlockTime = TimePointUSec;
 
 /// A synchronous call
 ///
@@ -354,7 +355,7 @@ pub struct BlockHeaderCode {
 pub struct BlockHeader {
     pub previous: Checksum256,
     pub blockNum: BlockNum,
-    pub time: TimePointUSec,
+    pub time: BlockTime,
     pub producer: AccountNumber,
     pub term: TermNum,
     pub commitNum: BlockNum,
