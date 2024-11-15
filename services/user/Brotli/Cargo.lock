@@ -372,6 +372,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli_package"
+version = "0.13.0"
+dependencies = [
+ "plugin",
+ "psi-brotli",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -406,24 +415,6 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "chainmail"
-version = "0.13.0"
-dependencies = [
- "async-graphql",
- "chainmail_package",
- "psibase",
- "serde",
-]
-
-[[package]]
-name = "chainmail_package"
-version = "0.13.0"
-dependencies = [
- "chainmail",
- "plugin",
-]
 
 [[package]]
 name = "chrono"
@@ -1526,13 +1517,9 @@ dependencies = [
 name = "plugin"
 version = "0.13.0"
 dependencies = [
- "chainmail",
- "chainmail_package",
- "chrono",
+ "brotli",
+ "brotli_package",
  "psibase",
- "serde",
- "serde-aux",
- "serde_json",
  "wit-bindgen-rt",
 ]
 
@@ -1582,6 +1569,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "psi-brotli"
+version = "0.13.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "brotli",
+ "brotli_package",
+ "psibase",
+ "serde",
 ]
 
 [[package]]
@@ -1945,9 +1944,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.214"
+version = "1.0.213"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55c3193aca71c12ad7890f1785d2b73e1b9f63a0bbc353c08ef26fe03fc56b5"
+checksum = "3ea7893ff5e2466df8d720bb615088341b295f849602c6956047f8f80f0e9bc1"
 dependencies = [
  "serde_derive",
 ]
@@ -1985,9 +1984,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.214"
+version = "1.0.213"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de523f781f095e28fa605cdce0f8307e451cc0fd14e2eb4cd2e98a355b147766"
+checksum = "7e85ad2009c50b58e87caa8cd6dac16bdf511bbfb7af6c33df902396aa480fa5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2845,9 +2844,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.28.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a37bd9274cb2d4754b915d624447ec0dce9105d174361841c0826efc79ceb9"
+checksum = "744845cde309b8fa32408d6fb67456449278c66ea4dcd96de29797b302721f02"
 dependencies = [
  "bitflags 2.6.0",
 ]

@@ -421,6 +421,11 @@ cargo_psibase_package(
     DEPENDS ${Branding_js_DEP}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Brotli.psi
+    PATH services/user/Brotli
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
@@ -754,7 +759,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
@@ -764,7 +769,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode Supervisor Symbol Tokens Transact Homepage
 )
@@ -793,7 +798,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig Branding Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts AuthAny AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
@@ -804,6 +809,7 @@ install(
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/Branding.psi
+          ${SERVICE_DIR}/Brotli.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi

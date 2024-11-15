@@ -10,22 +10,12 @@ struct AccountTokens;
 
 impl API for AccountTokens {
     fn serialize_token(token: Token) -> String {
-        match token {
-            Token::InviteToken(invite_token) => URL_SAFE.encode(&invite_token.packed()),
-            Token::ConnectionToken(connection_token) => URL_SAFE.encode(&connection_token.packed()),
-        }
+        URL_SAFE.encode(token.packed())
     }
 
     fn deserialize_token(token: String) -> Option<Token> {
         let decoded = URL_SAFE.decode(&token).ok()?;
-
-        if let Ok(invite_token) = <InviteToken>::unpacked(&decoded) {
-            Some(Token::InviteToken(invite_token))
-        } else if let Ok(connection_token) = <ConnectionToken>::unpacked(&decoded) {
-            Some(Token::ConnectionToken(connection_token))
-        } else {
-            None
-        }
+        Token::unpacked(&decoded).ok()
     }
 }
 

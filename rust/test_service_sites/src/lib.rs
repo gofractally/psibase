@@ -400,6 +400,7 @@ mod tests {
             method: "POST".to_string(),
             contentType: "application/json".to_string(),
             body: json_query.to_string().into_bytes().into(),
+            headers: vec![],
         });
 
         let response = response.get()?;
@@ -542,6 +543,7 @@ mod tests {
             method: "GET".to_string(),
             contentType: "".to_string(),
             body: Vec::new().into(),
+            headers: vec![],
         })
     }
 }

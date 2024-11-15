@@ -2,7 +2,7 @@
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
+        serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
         Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
