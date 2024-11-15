@@ -13,6 +13,12 @@ interface admin {
 
     /// Gets the names of all apps to which the user has connected
     get-connected-apps: func(user: string) -> list<string>;
+
+    /// Adds an account into the accounts table so that it can be used on this device.
+    import-account: func(account: string);
+
+    /// Gets a list of all accounts that are known by the accounts app on this device.
+    get-all-accounts: func() -> list<string>;
 }
 
 world impl {

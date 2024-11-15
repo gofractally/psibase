@@ -54,7 +54,10 @@ impl AppsTable {
         Keyvalue::set(&self.prefixed_key(DbKeys::LOGGED_IN), user.as_bytes())
             .expect("Failed to set logged-in user");
 
-        // Add to connected accounts if not already present
+        self.connect(user);
+    }
+
+    pub fn connect(&self, user: &str) {
         let connected_accounts = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS));
         let mut connected_accounts = connected_accounts
             .map(|c| <ConnectedAccounts>::unpacked(&c).unwrap())
