@@ -1,6 +1,7 @@
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/commonErrors.hpp>
+#include <services/user/Events.hpp>
 #include <services/user/Fractal.hpp>
 #include <services/user/Invite.hpp>
 
@@ -31,8 +32,20 @@ void Fractal::init()
    check(not init.has_value(), UserService::Errors::alreadyInit);
    initTable.put(InitializedRecord{});
 
-   // Register with proxy
+   // Register with HttpServer
    to<SystemService::HttpServer>().registerServer(service);
+
+   // Register event indices and schema
+   to<EventIndex>().setSchema(ServiceSchema::make<Fractal>());
+
+   // Event indices:
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "identityAdded"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invCreated"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invReceived"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 1);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 2);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invRejected"_m, 0);
 }
 
 void Fractal::createIdentity()
@@ -53,17 +66,7 @@ void Fractal::newIdentity(AccountNumber name, bool requireNew)
    if (isNew)
    {
       identityTable.put(IdentityRecord{name});
-
-      // Emit event
-      auto eventTable  = Tables().open<ServiceEventTable>();
-      auto eventRecord = eventTable.get(SingletonKey{})
-                             .value_or(ServiceEventRecord{
-                                 .key       = SingletonKey{},
-                                 .eventHead = 0,
-                             });
-
-      eventRecord.eventHead = emit().history().identityAdded(eventRecord.eventHead, name);
-      eventTable.put(eventRecord);
+      emit().history().identityAdded(name);
    }
 }
 
@@ -78,8 +81,6 @@ void Fractal::setDispName(string displayName)
 
    identity->displayName = displayName;
    identityTable.put(*identity);
-
-   // Todo - emit event
 }
 
 void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
@@ -104,14 +105,7 @@ void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
 
    // Save stats? total invites created?
 
-   // Emit events
-   auto identityTable = Tables().open<IdentityTable>();
-   auto acc           = identityTable.get(sender);
-   acc->eventHead     = emit().history().invCreated(acc->eventHead, sender, fractal);
-   identityTable.put(*acc);
-
-   fracRecord->eventHead = emit().history().invCreated(fracRecord->eventHead, sender, fractal);
-   fractalTable.put(*fracRecord);
+   emit().history().invCreated(pubkey, sender, fractal);
 }
 
 void Fractal::claim(PublicKey inviteKey)
@@ -138,15 +132,7 @@ void Fractal::claim(PublicKey inviteKey)
    // Invite has officially been accepted/associated with an account. No need to keep original inv object
    to<InviteNs::Invite>().delInvite(inviteKey);
 
-   // Emit InviteReceived event
-   auto identityTable = Tables().open<IdentityTable>();
-   auto identity      = identityTable.get(record.creator);
-   if (identity)
-   {
-      identity->eventHead =
-          emit().history().invReceived(identity->eventHead, sender, record.fractal);
-      identityTable.put(*identity);
-   }
+   emit().history().invReceived(inviteKey, sender, record.fractal);
 }
 
 void Fractal::accept(PublicKey inviteKey)
@@ -186,20 +172,7 @@ void Fractal::accept(PublicKey inviteKey)
          reject(inv.key);
    }
 
-   // Emit events
-   fracRecord->eventHead = emit().history().invAccepted(fracRecord->eventHead, sender, fractal);
-   fractalTable.put(*fracRecord);
-
-   auto inviter = identityTable.get(invite.creator);
-   if (inviter)
-   {
-      inviter->eventHead = emit().history().invAccepted(inviter->eventHead, sender, fractal);
-      identityTable.put(*inviter);
-   }
-
-   joinerProfile->eventHead =
-       emit().history().invAccepted(joinerProfile->eventHead, sender, fractal);
-   identityTable.put(*joinerProfile);
+   emit().history().invAccepted(inviteKey, invite.creator, fractal, sender);
 }
 
 void Fractal::reject(PublicKey inviteKey)
@@ -215,15 +188,7 @@ void Fractal::reject(PublicKey inviteKey)
 
    inviteTable.remove(*invite);
 
-   // Emit event
-   auto identityTable = Tables().open<IdentityTable>();
-   auto inviter       = identityTable.get(invite->creator);
-   if (inviter)
-   {
-      inviter->eventHead =
-          emit().history().invRejected(inviter->eventHead, sender, invite->fractal);
-      identityTable.put(*inviter);
-   }
+   emit().history().invRejected(inviteKey, sender, invite->fractal);
 }
 
 void Fractal::registerType()
@@ -321,8 +286,6 @@ optional<MembershipRecord> Fractal::getMember(AccountNumber account, AccountNumb
    return Tables().open<MemberTable>().get(MembershipKey{account, fractal});
 }
 
-// TODO - rename queryableservice and delete table management from it. It should just help with events.
-auto fractalService = QueryableService<Fractal::Tables, Fractal::Events>{Fractal::service};
 struct Queries
 {
    auto getIdentity(AccountNumber user) const
@@ -375,30 +338,6 @@ struct Queries
    {  //
       return Fractal::Tables(Fractal::service).open<FractalTypeTable>().get(service);
    }
-
-   auto events() const
-   {  //
-      return fractalService.allEvents();
-   }
-
-   auto serviceEvents(optional<uint32_t> first, const optional<string>& after) const
-   {
-      return fractalService.eventIndex<Fractal::ServiceEvents>(SingletonKey{}, first, after);
-   }
-
-   auto fractalEvents(AccountNumber           fractal,
-                      optional<uint32_t>      first,
-                      const optional<string>& after) const
-   {
-      return fractalService.eventIndex<Fractal::FractalEvents>(fractal, first, after);
-   }
-
-   auto userEvents(AccountNumber           user,
-                   optional<uint32_t>      first,
-                   const optional<string>& after) const
-   {
-      return fractalService.eventIndex<Fractal::UserEvents>(user, first, after);
-   }
 };
 PSIO_REFLECT(Queries,  //
              method(getIdentity, user),
@@ -406,12 +345,7 @@ PSIO_REFLECT(Queries,  //
              method(getMember, user, fractal),
              method(getFractals, user, gt, ge, lt, le, first, last, before, after),
              method(getFractal, fractal),
-             method(getFractalType, service),
-             //
-             method(events),
-             method(serviceEvents, first, after),
-             method(fractalEvents, fractal, first, after),
-             method(userEvents, user, fractal, first, after)
+             method(getFractalType, service)
              //
 );
 
