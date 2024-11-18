@@ -512,7 +512,7 @@ class Node(API):
         if producer is None:
             raise RuntimeError("Producer required for boot")
         self.run_psibase(['boot', '-p', producer] + packages)
-        now = datetime.datetime.now(datetime.UTC)
+        now = datetime.datetime.now(datetime.timezone.utc)
         def isbooted(node):
             try:
                 timestamp = node.get_block_header()['time']

@@ -1,5 +1,5 @@
 import calendar
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 
 def _get_producer_name(prod):
     if isinstance(prod, str):
@@ -19,7 +19,7 @@ def producers_are(expected):
     return result
 
 def new_block():
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     print("waiting for block produced after %s" % now.isoformat())
     def result(node):
         timestamp = node.get_block_header()['time']
