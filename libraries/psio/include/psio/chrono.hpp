@@ -325,14 +325,50 @@ namespace psio
       }
    };
 
-   bool parse_system_time(std::string_view s, std::int64_t& result, std::uint32_t& nsec);
+   bool        parse_system_time(std::string_view s, std::int64_t& result, std::uint32_t& nsec);
+   std::string format_system_time(std::int64_t sec, std::uint64_t subsec, int digits);
+
+   namespace detail
+   {
+      constexpr int ratio_frac_digits(std::intmax_t /*N*/, std::intmax_t D)
+      {
+         for (std::intmax_t result = 0; result <= 18; ++result)
+         {
+            if (D == 1)
+               return result;
+            else if (D % 10 == 0)
+               D /= 10;
+            else if (D % 5 == 0)
+               D /= 5;
+            else if (D % 2 == 0)
+               D /= 2;
+            else
+               break;
+         }
+         return 6;
+      }
+      constexpr std::intmax_t pow10(int n)
+      {
+         std::intmax_t result = 1;
+         for (int i = 0; i < n; ++i)
+            result *= 10;
+         return result;
+      }
+   }  // namespace detail
 
    // ISO 8601 Extended
    template <typename Duration, typename Stream>
    void to_json(const std::chrono::time_point<std::chrono::system_clock, Duration>& obj,
                 Stream&                                                             stream)
    {
-      to_json(std::format("{:%FT%TZ}", obj), stream);
+      auto           sec    = std::chrono::floor<std::chrono::seconds>(obj);
+      auto           subsec = obj - sec;
+      constexpr auto digits =
+          detail::ratio_frac_digits(Duration::period::num, Duration::period::den);
+      using subsec_t = std::chrono::duration<std::int64_t, std::ratio<1, detail::pow10(digits)>>;
+      to_json(format_system_time(sec.time_since_epoch().count(),
+                                 std::chrono::duration_cast<subsec_t>(subsec).count(), digits),
+              stream);
    }
 
    template <typename Duration, typename Stream>
