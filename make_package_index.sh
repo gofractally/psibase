@@ -2,22 +2,20 @@
 
 CMAKE_COMMAND="$1"
 DIR="$2"
-
-pushd "${DIR}" >/dev/null
-packages=$(echo *.psi)
-popd >/dev/null
+shift 2
 
 MYDIR=`mktemp -d`
 pushd "$MYDIR" >/dev/null
 
 first=1
 echo -n '['
-for file in ${packages}; do
+for package in "$@"; do
     if (( $first )); then
         first=0
     else
         echo -n ','
     fi
+    file=${package}.psi
     "${CMAKE_COMMAND}" -E tar xf "${DIR}/${file}" --format=zip meta.json
     HASH=`"${CMAKE_COMMAND}" -E sha256sum "${DIR}/${file}" | head -c 64`
     sed -E '$s/\}[[:space:]]*$/,/' meta.json
