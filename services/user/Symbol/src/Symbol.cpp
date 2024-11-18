@@ -107,6 +107,8 @@ void Symbol::init()
    to<EventIndex>().setSchema(ServiceSchema::make<Symbol>());
 
    // Event indices:
+   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 1);
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 0);
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 1);
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symSold"_m, 2);
@@ -145,6 +147,8 @@ void Symbol::create(SID newSymbol, Quantity maxDebit)
    symType.createCounter++;
    symType.lastPriceUpdateTime = to<Transact>().headBlockTime();
    Tables().open<SymbolLengthTable>().put(symType);
+
+   emit().history().symCreated(newSymbol, sender, cost);
 }
 
 void Symbol::listSymbol(SID symbol, Quantity price)

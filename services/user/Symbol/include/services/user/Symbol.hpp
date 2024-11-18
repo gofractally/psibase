@@ -44,6 +44,7 @@ namespace UserService
          using Account    = psibase::AccountNumber;
          struct History
          {
+            void symCreated(SID symbol, Account owner, Quantity cost) {}
             void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
          };
          struct Ui{};
@@ -69,6 +70,7 @@ namespace UserService
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
+      method(symCreated, symbol, owner, cost),
       method(symSold, symbol, buyer, seller, cost),
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
