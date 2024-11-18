@@ -24,6 +24,8 @@ def new_block():
     def result(node):
         timestamp = node.get_block_header()['time']
         print(timestamp)
+        if timestamp.endswith('Z'):
+            timestamp = timestamp[:-1] + '+00:00'
         return datetime.fromisoformat(timestamp) + timedelta(seconds=1) > now
     return result
 

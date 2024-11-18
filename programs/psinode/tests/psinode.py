@@ -518,6 +518,8 @@ class Node(API):
                 timestamp = node.get_block_header()['time']
             except requests.exceptions.HTTPError as e:
                 return False
+            if timestamp.endswith('Z'):
+                timestamp = timestamp[:-1] + '+00:00'
             if datetime.datetime.fromisoformat(timestamp) <= now:
                 return False
             return node.get_producers() == ([producer],[])
