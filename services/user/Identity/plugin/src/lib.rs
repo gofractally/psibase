@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::accounts::plugin::accounts;
+use bindings::accounts::plugin as Accounts;
 use bindings::exports::identity::plugin::api::Guest as Api;
 use bindings::exports::identity::plugin::queries::Guest as QueriesApi;
 use bindings::exports::identity::plugin::types as IdentityTypes;
@@ -30,7 +30,7 @@ impl Api for IdentityPlugin {
             return Err(InvalidClaim(score).into());
         }
 
-        accounts::get_account(&subject)?;
+        Accounts::api::get_account(&subject)?;
 
         let int_score = (score * 100.0).trunc() as u8;
 

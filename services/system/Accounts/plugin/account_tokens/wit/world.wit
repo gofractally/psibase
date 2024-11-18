@@ -1,0 +1,32 @@
+package accounts:account-tokens;
+
+interface types {
+    use host:common/types.{origination-data};
+
+    record invite-token {
+        app: option<string>,
+        app-domain: string,
+        pk: string,
+    }
+
+    type connection-token = origination-data;
+
+    variant token {
+        invite-token(invite-token),
+        connection-token(connection-token)
+    }
+}
+
+interface api {
+    use types.{token};
+
+    /// Serializes a token into a base64 string.
+    serialize-token: func(token: token) -> string;
+
+    /// Deserializes a token from a base64 string.
+    deserialize-token: func(token: string) -> option<token>;
+}
+
+world imports {
+    import api;
+}

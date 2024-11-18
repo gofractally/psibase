@@ -8,7 +8,7 @@ mod errors;
 mod queries;
 mod serde_structs;
 
-use bindings::accounts::plugin::accounts as AccountPlugin;
+use bindings::accounts::plugin as AccountPlugin;
 use bindings::exports::chainmail::plugin::{
     api::{Error, Guest as Api},
     queries::{Guest as Query, Message},
@@ -97,7 +97,9 @@ impl Query for ChainmailPlugin {
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
         let rcvr = match receiver {
             Some(r) => r,
-            None => AccountPlugin::get_logged_in_user()?.expect("No receiver specified"),
+            None => {
+                AccountPlugin::active_app::get_logged_in_user()?.expect("No receiver specified")
+            }
         };
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it

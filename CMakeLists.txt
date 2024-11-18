@@ -296,6 +296,7 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
     accounts
+    account-tokens
     auth-any
     auth-delegate
     auth-invite
@@ -307,6 +308,7 @@ add_rs_component_workspace(services/:Plugins
     tokens
     transact
 )
+
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -384,6 +386,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SERVER r-accounts
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
+        DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
@@ -786,13 +789,13 @@ function(write_package_index target dir)
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} >${dir}/index.json
+        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
     Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 

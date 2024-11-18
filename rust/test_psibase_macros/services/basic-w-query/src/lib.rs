@@ -1,7 +1,7 @@
 #[psibase::service(name = "basicwquery")]
 #[allow(non_snake_case)]
 mod service {
-    use psibase::{anyhow, serve_graphql, serve_simple_ui, HttpReply, HttpRequest};
+    use psibase::{serve_graphql, serve_simple_ui, HttpReply, HttpRequest};
 
     #[action]
     fn add(a: i32, b: i32) -> i32 {
