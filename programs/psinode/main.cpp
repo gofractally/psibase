@@ -590,6 +590,7 @@ struct transaction_queue
 
 bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
 {
+   bool result = false;
    try
    {
       // TODO: verify no extra data
@@ -615,6 +616,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
                   bc.pushTransaction(std::move(trx), trace, std::nullopt);
             }
          }
+         result = true;
       }
       RETHROW_BAD_ALLOC
       catch (...)
@@ -650,7 +652,7 @@ bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
       RETHROW_BAD_ALLOC
       CATCH_IGNORE
    }
-   return false;
+   return result;
 }  // push_boot
 
 template <typename Timer, typename F>
