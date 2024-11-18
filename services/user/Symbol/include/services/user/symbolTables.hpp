@@ -23,8 +23,6 @@ namespace UserService
 
       uint8_t               createCounter;
       psibase::TimePointSec lastPriceUpdateTime;
-
-      uint64_t eventHead;
    };
    PSIO_REFLECT(SymbolLengthRecord,
                 symbolLength,
@@ -60,8 +58,6 @@ namespace UserService
       NID         ownerNft;
       SaleDetails saleDetails;
 
-      uint64_t eventHead = 0;
-
       static bool isValidKey(SID testSymbol)
       {
          auto str = testSymbol.str();
@@ -70,14 +66,6 @@ namespace UserService
 
       friend std::strong_ordering operator<=>(const SymbolRecord&, const SymbolRecord&) = default;
    };
-   PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails, eventHead);
+   PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
-
-   struct UserSymbolEventsRecord
-   {
-      psibase::AccountNumber account;
-      uint64_t               eventHead = 0;
-   };
-   PSIO_REFLECT(UserSymbolEventsRecord, account, eventHead);
-   using UserEventTable = psibase::Table<UserSymbolEventsRecord, &UserSymbolEventsRecord::account>;
 }  // namespace UserService
