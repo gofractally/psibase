@@ -122,7 +122,9 @@ namespace psio
       {
          if (!parse_uint(h, 2))
             return false;
-         if (parse_char(':') & !parse_uint(min, 2))
+         bool has_sep = parse_char(':');
+         bool has_min = parse_uint(min, 2);
+         if (has_sep && !has_min)
             return false;
          if (h > 14 || min > 59)
             return false;
@@ -132,7 +134,9 @@ namespace psio
       {
          if (!parse_uint(h, 2))
             return false;
-         if (parse_char(':') & !parse_uint(min, 2))
+         bool has_sep = parse_char(':');
+         bool has_min = parse_uint(min, 2);
+         if (has_sep && !has_min)
             return false;
          if (h > 14 || min > 59)
             return false;
