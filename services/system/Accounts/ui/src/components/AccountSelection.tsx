@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
@@ -47,6 +46,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 
 import { useSearchParams } from "react-router-dom";
 import { supervisor } from "@/main";
+import { useDecodeToken } from "@/hooks/useToken";
 
 dayjs.extend(relativeTime);
 
@@ -108,22 +108,13 @@ interface AccountType {
 }
 
 const formSchema = z.object({
-  username: z.string().min(3).max(50),
+  username: z.string().min(1).max(50),
 });
 
 const isAccountAvailable = async (accountName: string): Promise<boolean> => {
   await wait(1000);
   return accountName.length > 5 || Math.random() > 0.5;
 };
-
-const DecodedToken = z.object({
-  inviter: z.string(),
-  app: z.string(),
-  appDomain: z.string().url(),
-  state: z.string(),
-  actor: z.string(),
-  expiry: z.string().datetime(),
-});
 
 export const AccountSelection = () => {
   const form = useForm<z.infer<typeof formSchema>>({
@@ -133,19 +124,34 @@ export const AccountSelection = () => {
     },
   });
 
-  const { mutateAsync } = useMutation<number, Error, string>({
-    mutationFn: async (params) => {
-      console.log(params, "are to create a blockchain account");
-      return 5;
+  const { mutateAsync: importAccount } = useMutation<void, string, string>({
+    mutationFn: async (accountName) => {
+      await supervisor.functionCall({
+        method: "importAccount",
+        params: [accountName],
+        service: "accounts",
+        intf: "admin",
+      });
+    },
+    onSuccess: async () => {
+      fetchAccounts();
     },
   });
 
-  const { isDirty, isValid, isSubmitting } = form.formState;
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(true);
+
+  const { isDirty, isSubmitting } = form.formState;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     console.log("submitting account", values);
-    await wait(2000);
-    void (await mutateAsync(values.username));
+    console.log({ isCreatingAccount });
+
+    if (isCreatingAccount) {
+      void (await createAccount(values.username));
+    } else {
+      void (await importAccount(values.username));
+    }
   };
 
   const username = form.watch("username");
@@ -156,24 +162,21 @@ export const AccountSelection = () => {
     data: accounts,
     isLoading: isFetching,
     error,
+    refetch: fetchAccounts,
   } = useQuery({
     queryKey: ["availableAccounts"],
     queryFn: async (): Promise<AccountType[]> => {
-      console.log("loading...");
-      // await supervisor.onLoaded();
-      console.log("loaded");
       supervisor.preLoadPlugins([{ service: "accounts" }]);
 
-      console.log("getting the connected account");
       const res = z
         .string()
         .array()
         .parse(
           await supervisor.functionCall({
-            method: "getConnectedAccounts",
+            method: "getAllAccounts",
             params: [],
             service: "accounts",
-            intf: "activeApp",
+            intf: "admin",
           })
         );
       console.log(res, "was the accounts return");
@@ -215,8 +218,6 @@ export const AccountSelection = () => {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  const appName = "Dashboard";
-
   const [activeSearch, setActiveSearch] = useState("");
 
   const accountsToRender = activeSearch
@@ -224,42 +225,57 @@ export const AccountSelection = () => {
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
+  const [searchParams] = useSearchParams();
+
+  const token = searchParams.get("token");
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
   );
 
-  const chainName = "fwe";
+  const {
+    data: invite,
+    isLoading: isLoadingInvite,
+    refetch: refetchToken,
+  } = useDecodeToken(token);
 
-  const [searchParams] = useSearchParams();
+  const { mutateAsync: createAccount } = useMutation<void, string, string>({
+    mutationFn: async (account) => {
+      if (!invite) throw new Error(`Must have invite`);
+      void (await supervisor.functionCall({
+        method: "acceptWithNewAccount",
+        params: [account, token],
+        service: "invite",
+        intf: "invitee",
+      }));
 
-  const token = searchParams.get("token");
-  const redirect = searchParams.get("redirect");
+      await wait(2000);
 
-  console.log(token, "is the token");
+      await importAccount(account);
 
-  const { data: invite, isLoading: isLoadingInvite } = useQuery({
-    queryKey: ["invite", token],
-    queryFn: async () => {
-      await supervisor.onLoaded();
-      const tokenRes = DecodedToken.parse(
-        await supervisor.functionCall({
-          service: "invite",
-          intf: "invitee",
-          method: "decodeInvite",
-          params: [token],
-        })
-      );
-      console.log(tokenRes, "is the token res");
+      void (await supervisor.functionCall({
+        method: "loginDirect",
+        params: [
+          {
+            app: invite.app,
+            origin: invite.appDomain,
+          },
+          account,
+        ],
+        service: "accounts",
+        intf: "admin",
+      }));
 
-      return {
-        ...tokenRes,
-        expiry: new Date(tokenRes.expiry),
-      };
+      alert("i should not redirect to the app...");
     },
   });
 
-  const inviter = invite?.inviter;
+  console.log(selectedAccount);
+
+  const chainName = "chain_name";
+
+  const appName = invite ? capitaliseFirstLetter(invite.app) : "Loading";
+
   const isExpired = invite
     ? invite.expiry.valueOf() < new Date().valueOf()
     : false;
@@ -267,35 +283,90 @@ export const AccountSelection = () => {
   const notFound = false;
 
   const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
+    onSuccess: () => {
+      refetchToken();
+      setTimeout(() => {
+        refetchToken();
+      }, 3000);
+    },
     mutationFn: async () => {
-      console.log("hit reject");
-      // TODO: reject the invite
+      if (!invite) {
+        throw new Error(`No invite available`);
+      }
 
-      // TODO:
-      await supervisor.functionCall({
-        service: "invite",
-        intf: "invitee",
-        method: "decodeInvite",
-        params: [token],
-      });
+      if (selectedAccount) {
+        void (await supervisor.functionCall({
+          method: "login",
+          params: [selectedAccount.account],
+          service: "accounts",
+          intf: "activeApp",
+        }));
 
-      await supervisor.functionCall({
-        service: "invite",
-        intf: "invitee",
-        method: "decodeInvite",
-        params: [token],
-      });
+        void (await supervisor.functionCall({
+          method: "reject",
+          params: [token],
+          service: "invite",
+          intf: "invitee",
+        }));
+      } else {
+        void (await supervisor.functionCall({
+          method: "logout",
+          params: [],
+          service: "accounts",
+          intf: "activeApp",
+        }));
+
+        void (await supervisor.functionCall({
+          method: "reject",
+          params: [token],
+          service: "invite",
+          intf: "invitee",
+        }));
+      }
     },
   });
 
-  const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation({
-    mutationFn: async (data: unknown) => {
-      // TODO: accept the invite
+  const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
+    void,
+    string,
+    string
+  >({
+    mutationFn: async (token) => {
+      if (!selectedAccount) {
+        throw new Error(`No account selected`);
+      }
+      if (!invite) {
+        throw new Error(`No invite available`);
+      }
+      void (await supervisor.functionCall({
+        method: "login",
+        params: [selectedAccount.account],
+        service: "accounts",
+        intf: "activeApp",
+      }));
 
-      console.log(data, "is the data");
-      console.log(z.string().parse(data), "user");
-      if (window.location && window.location.href && redirect) {
-        window.location.href = redirect;
+      void (await supervisor.functionCall({
+        method: "accept",
+        params: [token],
+        service: "invite",
+        intf: "invitee",
+      }));
+
+      void (await supervisor.functionCall({
+        method: "loginDirect",
+        params: [
+          {
+            app: invite.app,
+            origin: invite.appDomain,
+          },
+          selectedAccount.account,
+        ],
+        service: "accounts",
+        intf: "admin",
+      }));
+
+      if (window.location && window.location.href) {
+        window.location.href = invite.appDomain;
       }
     },
   });
@@ -324,8 +395,40 @@ export const AccountSelection = () => {
             <TriangleAlert className="w-12 h-12" />
           </div>
           <CardTitle>Invitation not found.</CardTitle>
+          <CardDescription>This invitation does not exist.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (invite?.state == "accepted") {
+    return (
+      <Card className="w-[350px] mx-auto mt-4">
+        <CardHeader>
+          <div className="mx-auto">
+            <TriangleAlert className="w-12 h-12" />
+          </div>
+          <CardTitle>Invitation already accepted.</CardTitle>
           <CardDescription>
-            The invitation token is either invalid or has already been used.
+            This invitation has been accepted by{" "}
+            <span className="text-primary font-semibold">{invite.actor}</span>.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (invite?.state == "rejected") {
+    return (
+      <Card className="w-[350px] mx-auto mt-4">
+        <CardHeader>
+          <div className="mx-auto">
+            <TriangleAlert className="w-12 h-12" />
+          </div>
+          <CardTitle>Invitation rejected.</CardTitle>
+          <CardDescription>
+            This invitation has been rejected
+            {invite?.actor ? ` by ${invite.actor}.` : "."}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -336,7 +439,7 @@ export const AccountSelection = () => {
     invite &&
     `This invitation expired ${dayjs().to(invite.expiry)} (${dayjs(
       invite.expiry
-    ).format("DD/MM/YYYY HH:mm")}).`;
+    ).format("YYYY/MM/DD HH:mm")}).`;
 
   if (isExpired) {
     return (
@@ -349,7 +452,8 @@ export const AccountSelection = () => {
           <CardDescription>{expiryMessage}</CardDescription>
           <CardDescription>
             Please ask the sender{" "}
-            <span className="text-primary">{inviter}</span> for a new one.
+            <span className="text-primary">{invite?.inviter}</span> for a new
+            one.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -358,14 +462,18 @@ export const AccountSelection = () => {
 
   return (
     <>
-      <Dialog>
+      <Dialog open={isModalOpen} onOpenChange={(open) => setIsModalOpen(open)}>
         <div className="mt-6">
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create an account</DialogTitle>
+              <DialogTitle>
+                {isCreatingAccount ? "Create an account" : "Import an account"}
+              </DialogTitle>
               <DialogDescription>
-                Use this invitation to create an on-chain account and use it to
-                connect to the {appName} app.
+                {isCreatingAccount
+                  ? `Use this invitation to create an on-chain account and use it to
+                connect to the ${appName} app.`
+                  : "Import a pre-existing account prior to accepting / denying an invite."}
               </DialogDescription>
               <Form {...form}>
                 <form
@@ -412,18 +520,10 @@ export const AccountSelection = () => {
                       </FormItem>
                     )}
                   />
-                  <Button
-                    type="submit"
-                    disabled={
-                      !(
-                        isValid &&
-                        !isProcessing &&
-                        accountIsAvailable &&
-                        !isSubmitting
-                      )
-                    }
-                  >
-                    {isSubmitting ? "Accepting" : "Accept"} invite
+                  <Button type="submit">
+                    {isCreatingAccount
+                      ? `${isSubmitting ? "Accepting" : "Accept"} invite`
+                      : `Import account`}
                   </Button>
                 </form>
               </Form>
@@ -471,20 +571,23 @@ export const AccountSelection = () => {
                       />
                     ))}
               </div>
-              <DialogTrigger asChild>
-                <button className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed">
-                  Create a new account
-                </button>
-              </DialogTrigger>
+              <button
+                onClick={() => {
+                  setIsCreatingAccount(true);
+                  setIsModalOpen(true);
+                }}
+                className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed"
+              >
+                Create a new account
+              </button>
             </div>
             <div className="my-3">
               <Button
                 onClick={() => {
                   console.log("pressed");
-                  acceptInvite(username);
+                  acceptInvite(z.string().parse(token));
                 }}
                 className="w-full"
-                disabled={!selectedAccount || form.formState.isLoading}
               >
                 {isSubmitting ? "Loading..." : "Accept invite"}
               </Button>
@@ -497,6 +600,18 @@ export const AccountSelection = () => {
                 className="text-muted-foreground"
               >
                 Reject invite
+              </Button>
+            </div>
+            <div className="w-full justify-center flex">
+              <Button
+                onClick={() => {
+                  setIsCreatingAccount(false);
+                  setIsModalOpen(true);
+                }}
+                variant="link"
+                className="text-muted-foreground"
+              >
+                Import an account
               </Button>
             </div>
           </div>
