@@ -120,4 +120,7 @@ TEST_CASE("chrono format")
    CHECK(!psio::parse_system_time("2024-11-18T24:01:00Z", a, b));
    CHECK(!psio::parse_system_time("2024-11-18T24:00:01Z", a, b));
    CHECK(!psio::parse_system_time("2024-11-18T24:00:00.1Z", a, b));
+   // bad offset
+   CHECK(!psio::parse_system_time("2024-11-18T00:00:00+010", a, b));
+   CHECK(!psio::parse_system_time("2024-11-18T00:00:00-010", a, b));
 }

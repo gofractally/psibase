@@ -51,13 +51,16 @@ namespace psio
       auto        parse_uint = [&](uint32_t& result, int digits)
       {
          result = 0;
-         while (digits--)
+         if (end - s < digits)
+            return false;
+         for (int i = 0; i < digits; ++i)
          {
-            if (s != end && *s >= '0' && *s <= '9')
-               result = result * 10 + *s++ - '0';
+            if (s[i] >= '0' && s[i] <= '9')
+               result = result * 10 + s[i] - '0';
             else
                return false;
          }
+         s += digits;
          return true;
       };
       auto parse_char = [&](char ch)
