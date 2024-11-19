@@ -120,8 +120,6 @@ impl Chain {
     ///
     /// Starts a new block at `time`. If `time.seconds` is 0,
     /// then starts a new block 1 second after the most recent.
-    ///
-    /// TODO: Support sub-second block times
     pub fn start_block_at(&self, time: BlockTime) {
         let status = &mut *self.status.borrow_mut();
 
