@@ -423,6 +423,11 @@ cargo_psibase_package(
     PATH services/user/Brotli
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/AppRegistry.psi
+    PATH services/user/Registry
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
@@ -797,7 +802,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    AppRegistry Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -825,6 +830,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
+          ${SERVICE_DIR}/AppRegistry.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Supervisor.psi

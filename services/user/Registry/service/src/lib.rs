@@ -128,7 +128,7 @@ pub mod service {
         pub status: AppStatusU32,
 
         /// The timestamp of when the app was created
-        pub created_at: psibase::TimePointSec,
+        pub created_at: psibase::BlockTime,
 
         /// The redirect URIs for the app
         pub redirect_uris: Vec<String>,
