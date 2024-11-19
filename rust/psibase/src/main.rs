@@ -35,9 +35,10 @@ use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct BasicArgs {
-    // /// Print help
-    // #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
-    // help: Option<Vec<OsString>>,
+    /// Print help
+    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
+    help: Option<Vec<OsString>>,
+
     #[clap(subcommand)]
     command: Option<Command>,
 }

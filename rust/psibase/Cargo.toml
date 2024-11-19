@@ -5,7 +5,7 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
-description = "Library and command-line tool for interacting with psibase blockchains"
+description = "Library and command-line tool for interacting with psibase networks"
 license = "MIT"
 include = ["src/**/*", "boot-image/**/*", "Cargo.toml"]
 
@@ -50,7 +50,7 @@ url = "2.4"
 toml = "0.8.19"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-clap = {version = "4.5", features = ["derive", "env", "string"]}
+clap = { version = "4.5", features = ["derive", "env", "string"] }
 
 hmac = "0.12"
 indicatif = "0.17"
