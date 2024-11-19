@@ -5,8 +5,8 @@ mod graphql;
 mod tables;
 
 use actions::{
-    add_pre_action_call, check_for_pre_action, process_action_args, process_action_callers,
-    process_action_schema, Options, PreAction,
+    add_pre_action_call_if_not_excluded, check_for_pre_action, process_action_args,
+    process_action_callers, process_action_schema, Options, PreAction,
 };
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
@@ -151,24 +151,19 @@ fn process_mod(
             }
         }
 
-        // let mut has_check_init = false;
+        println!("1");
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
+        println!("2");
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
-                if pre_action_info.exists {
-                    // TODO: add only-if-not-excluded
-                    add_pre_action_call(&pre_action_info, f);
-                    // println!(
-                    //     "1 : 1st line of {} is {:#?}",
-                    //     f.sig.ident.to_string(),
-                    //     f.block.stmts[0].clone()
-                    // );
+                if pre_action_info.has_pre_action() {
+                    add_pre_action_call_if_not_excluded(&pre_action_info, f);
                 }
                 process_action_args(
                     options,
