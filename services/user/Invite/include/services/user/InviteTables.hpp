@@ -30,9 +30,9 @@ namespace UserService
       /// An invite object
       struct InviteRecord
       {
-         /// The public key of the invite. This uniquely identifies an invite and 
+         /// The public key of the invite. This uniquely identifies an invite and
          ///   may also used to authenticate the transaction accepting the invite.
-         Spki                   pubkey;
+         Spki pubkey;
 
          /// The creator of the invite object
          psibase::AccountNumber inviter;
@@ -41,17 +41,17 @@ namespace UserService
          psibase::AccountNumber actor;
 
          /// The time in seconds at which this invite expires
-         uint32_t               expiry;
+         psibase::TimePointSec expiry;
 
-         /// A flag that represents whether a new account may still be created by 
+         /// A flag that represents whether a new account may still be created by
          ///   redeeming this invite
-         bool                   newAccountToken = false;
+         bool newAccountToken = false;
 
          /// An integer representing whether the invite is:
          ///  - pending (0)
-         ///  - accepted (1) 
+         ///  - accepted (1)
          ///  - rejected (2)
-         uint8_t                state;
+         uint8_t state;
 
          auto secondary() const { return std::tie(inviter, pubkey); }
       };

@@ -21,8 +21,8 @@ namespace UserService
       Quantity floorPrice;
       Quantity activePrice;
 
-      uint8_t               createCounter;
-      psibase::TimePointSec lastPriceUpdateTime;
+      uint8_t            createCounter;
+      psibase::BlockTime lastPriceUpdateTime;
    };
    PSIO_REFLECT(SymbolLengthRecord,
                 symbolLength,
