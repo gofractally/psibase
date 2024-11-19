@@ -85,8 +85,18 @@ namespace psio
       if (!parse_char('T') || !parse_uint(h, 2) || !parse_char(':') || !parse_uint(min, 2) ||
           !parse_char(':') || !parse_uint(sec, 2))
          return false;
+      if (m < 1 || m > 12)
+         return false;
+      static constexpr uint32_t days_in_month[12] = {31, 29, 31, 30, 31, 30,
+                                                     31, 31, 30, 31, 30, 31};
+      if (d < 1 || d > days_in_month[m - 1])
+         return false;
+      if (m == 2 && d == 29 && (y % 4 != 0 || (y % 100 == 0 && y % 400 != 0)))
+         return false;
       if (h > 24 || min > 59 || sec > 60)
          return false;
+      if (sec == 60)
+         sec = 59;
       result = std::chrono::sys_days(std::chrono::year{static_cast<int>(y)} / m / d)
                        .time_since_epoch()
                        .count() *
@@ -103,6 +113,8 @@ namespace psio
             ++s;
          }
       }
+      if (h == 24 && (min != 0 || sec != 0 || nsec != 0))
+         return false;
       if (parse_char('Z'))
       {
       }
@@ -127,6 +139,10 @@ namespace psio
          if (h == 0 && min == 0)
             return false;
          result += (h * 60 + min) * 60;
+      }
+      else
+      {
+         return false;
       }
       return s == end;
    }
