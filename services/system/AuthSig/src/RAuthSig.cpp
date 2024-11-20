@@ -33,7 +33,7 @@ namespace SystemService
          {
             auto idx =
                 AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
-                    key);
+                    keyFingerprint(key));
 
             auto convert = [](const auto& opt)
             {
@@ -73,7 +73,7 @@ namespace SystemService
          return std::nullopt;
 
       }  // serveSys
-   }     // namespace AuthSig
+   }  // namespace AuthSig
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::AuthSig::RAuthSig)
