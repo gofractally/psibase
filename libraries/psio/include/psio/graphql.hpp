@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <chrono>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/shared_view_ptr.hpp>
@@ -40,6 +41,12 @@ namespace psio
 
    template <std::size_t Size>
    constexpr bool use_json_string_for_gql(std::array<signed char, Size>*)
+   {
+      return true;
+   }
+
+   template <typename Clock, typename Duration>
+   constexpr bool use_json_string_for_gql(std::chrono::time_point<Clock, Duration>*)
    {
       return true;
    }
@@ -579,8 +586,8 @@ namespace psio
                return;
             }
          }  // while (true)
-      }     // skip()
-   };       // gql_stream
+      }  // skip()
+   };  // gql_stream
 
    template <typename E>
    auto gql_parse_arg(std::string& arg, gql_stream& input_stream, const E& error)

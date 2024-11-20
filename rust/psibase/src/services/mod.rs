@@ -2,6 +2,7 @@
 
 pub mod accounts;
 pub mod auth_delegate;
+pub mod auth_invite;
 pub mod auth_sig;
 pub mod chainmail;
 pub mod common_api;
@@ -14,8 +15,10 @@ pub mod invite;
 pub mod nft;
 pub mod packages;
 pub mod producers;
+pub mod psi_brotli;
 pub mod r_events;
 pub mod setcode;
 pub mod sites;
 pub mod tokens;
 pub mod transact;
+pub mod verify_sig;

@@ -75,7 +75,7 @@ std::vector<psibase::AccountNumber> makeAccounts(
    return result;
 }
 
-void boot(BlockContext* ctx, const Consensus& producers, bool ec)
+void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
 {
    std::vector<GenesisService> services = {{
                                                .service = Transact::service,
@@ -128,7 +128,8 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
    pushTransaction(
        ctx,
        Transaction{
-           .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
+           .tapos = {.expiration = std::chrono::time_point_cast<Seconds>(ctx->current.header.time) +
+                                   Seconds(1)},
            .actions = {Action{.sender  = Transact::service,
                               .service = Transact::service,
                               .method  = MethodNumber{"startBoot"},
@@ -148,7 +149,7 @@ void boot(BlockContext* ctx, const Consensus& producers, bool ec)
 static Tapos getTapos(const BlockInfo& info)
 {
    Tapos result;
-   result.expiration.seconds = info.header.time.seconds + 2;
+   result.expiration = std::chrono::time_point_cast<Seconds>(info.header.time) + Seconds(2);
    std::memcpy(&result.refBlockSuffix,
                info.blockId.data() + info.blockId.size() - sizeof(result.refBlockSuffix),
                sizeof(result.refBlockSuffix));
@@ -159,7 +160,7 @@ static Tapos getTapos(const BlockInfo& info)
 static Tapos getTapos(psibase::BlockContext* ctx)
 {
    Tapos result;
-   result.expiration.seconds = ctx->current.header.time.seconds + 1;
+   result.expiration = std::chrono::time_point_cast<Seconds>(ctx->current.header.time) + Seconds(1);
    std::memcpy(&result.refBlockSuffix,
                ctx->current.header.previous.data() + ctx->current.header.previous.size() -
                    sizeof(result.refBlockSuffix),
@@ -168,7 +169,7 @@ static Tapos getTapos(psibase::BlockContext* ctx)
    return result;
 }
 
-Transaction setProducers(const psibase::Consensus& producers)
+Transaction setProducers(const psibase::ConsensusData& producers)
 {
    return Transaction{
        .tapos   = {},
@@ -176,7 +177,7 @@ Transaction setProducers(const psibase::Consensus& producers)
            transactor<Producers>(Producers::service, Producers::service).setConsensus(producers)}};
 }
 
-void setProducers(psibase::BlockContext* ctx, const psibase::Consensus& producers)
+void setProducers(psibase::BlockContext* ctx, const psibase::ConsensusData& producers)
 {
    pushTransaction(
        ctx, Transaction{.tapos   = getTapos(ctx),
@@ -202,21 +203,28 @@ std::vector<SignedTransaction> signTransactions(const BlockInfo&                
    return result;
 }
 
-BlockMessage makeBlock(const BlockInfo&                   info,
-                       std::string_view                   producer,
-                       TermNum                            view,
-                       std::vector<SignedTransaction>     trxs,
-                       BlockNum                           commitNum,
-                       const std::optional<BlockConfirm>& auxData = {})
+TestBlock makeBlock(const BlockInfo&                   info,
+                    const JointConsensus&              state,
+                    std::string_view                   producer,
+                    TermNum                            view,
+                    std::vector<SignedTransaction>     trxs,
+                    BlockNum                           commitNum,
+                    const std::optional<BlockConfirm>& auxData = {})
 {
-   SignedBlock newBlock;
-   newBlock.block.header.previous     = info.blockId;
-   newBlock.block.header.blockNum     = info.header.blockNum + 1;
-   newBlock.block.header.time.seconds = info.header.time.seconds + 1;
-   newBlock.block.header.producer     = AccountNumber{producer};
-   newBlock.block.header.term         = view;
-   newBlock.block.header.commitNum    = commitNum;
+   SignedBlock    newBlock;
+   JointConsensus newState{state};
+   newBlock.block.header.previous  = info.blockId;
+   newBlock.block.header.blockNum  = info.header.blockNum + 1;
+   newBlock.block.header.time      = info.header.time + Seconds(1);
+   newBlock.block.header.producer  = AccountNumber{producer};
+   newBlock.block.header.term      = view;
+   newBlock.block.header.commitNum = commitNum;
    Merkle m;
+   if (newState.next && newState.next->blockNum <= info.header.commitNum)
+   {
+      newState.current = std::move(newState.next->consensus);
+      newState.next.reset();
+   }
    for (auto& trx : trxs)
    {
       for (auto act : trx.transaction->actions())
@@ -226,7 +234,9 @@ BlockMessage makeBlock(const BlockInfo&                   info,
             using param_tuple =
                 psio::make_param_value_tuple<decltype(&Producers::setConsensus)>::type;
             auto params                        = psio::view<const param_tuple>(act.rawData());
-            newBlock.block.header.newConsensus = get<0>(params);
+            newBlock.block.header.newConsensus = Consensus{get<0>(params), {}};
+            check(!newState.next, "Joint consensus is already running");
+            newState.next = {*newBlock.block.header.newConsensus, newBlock.block.header.blockNum};
          }
       }
       trx.subjectiveData.emplace();
@@ -234,6 +244,7 @@ BlockMessage makeBlock(const BlockInfo&                   info,
       trx.subjectiveData->push_back(psio::to_frac(std::chrono::nanoseconds(100000)));
       m.push(TransactionInfo{trx});
    }
+   newBlock.block.header.consensusState  = sha256(newState);
    newBlock.block.transactions           = std::move(trxs);
    newBlock.block.header.trxMerkleRoot   = m.root();
    newBlock.block.header.eventMerkleRoot = Checksum256{};
@@ -241,37 +252,38 @@ BlockMessage makeBlock(const BlockInfo&                   info,
    {
       newBlock.auxConsensusData = psio::to_frac(*auxData);
    }
-   return BlockMessage{newBlock};
+   return {BlockMessage{newBlock}, newState};
 }
 
-BlockMessage makeBlock(const BlockArg& info, std::string_view producer, TermNum view)
+TestBlock makeBlock(const BlockArg& info, std::string_view producer, TermNum view)
 {
-   return makeBlock(info, producer, view, {}, info.info.header.commitNum);
+   return makeBlock(info.info, info.state, producer, view, {}, info.info.header.commitNum);
 }
 
-BlockMessage makeBlock(const BlockArg&    info,
-                       std::string_view   producer,
-                       TermNum            view,
-                       const Transaction& trx)
+TestBlock makeBlock(const BlockArg&    info,
+                    std::string_view   producer,
+                    TermNum            view,
+                    const Transaction& trx)
 {
-   return makeBlock(info, producer, view, signTransactions(info, {trx}),
+   return makeBlock(info.info, info.state, producer, view, signTransactions(info, {trx}),
                     info.info.header.commitNum);
 }
 
-BlockMessage makeBlock(const BlockArg&     info,
-                       std::string_view    producer,
-                       TermNum             view,
-                       const BlockMessage& irreversible)
+TestBlock makeBlock(const BlockArg&     info,
+                    std::string_view    producer,
+                    TermNum             view,
+                    const BlockMessage& irreversible)
 {
-   return makeBlock(info, producer, view, {}, irreversible.block->block().header().blockNum());
+   return makeBlock(info.info, info.state, producer, view, {},
+                    irreversible.block->block().header().blockNum());
 }
 
-BlockMessage makeBlock(const BlockArg&     info,
-                       std::string_view    producer,
-                       TermNum             view,
-                       const BlockConfirm& irreversible)
+TestBlock makeBlock(const BlockArg&     info,
+                    std::string_view    producer,
+                    TermNum             view,
+                    const BlockConfirm& irreversible)
 {
-   return makeBlock(info, producer, view, {}, irreversible.blockNum, irreversible);
+   return makeBlock(info.info, info.state, producer, view, {}, irreversible.blockNum, irreversible);
 }
 
 std::vector<ProducerConfirm> makeProducerConfirms(const std::vector<std::string_view>& names)

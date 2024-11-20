@@ -1,59 +1,74 @@
 #[allow(warnings)]
 mod bindings;
-use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
-use bindings::exports::auth_sig::plugin::smart_auth;
-use bindings::exports::auth_sig::plugin::{
-    actions::Guest as Actions, keyvault::Guest as KeyVault, smart_auth::Guest as SmartAuth,
-};
-use bindings::host::common::types as CommonTypes;
-use bindings::transact::plugin::intf as Transact;
-
 mod errors;
 use errors::ErrorType::*;
+mod helpers;
+use helpers::*;
+mod db;
+use db::*;
+mod types;
+use types::*;
 
-use p256::ecdsa::{SigningKey, VerifyingKey};
-use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use rand_core::OsRng;
+// Other plugins
+use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
+use bindings::auth_sig::plugin::types::{Keypair, Pem};
+use bindings::host::common::{client as Client, types as CommonTypes};
+use bindings::transact::plugin::intf as Transact;
 
-use psibase::fracpack::Pack;
+// Exported interfaces
+use bindings::exports::accounts::smart_auth::smart_auth::Guest as SmartAuth;
+use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::Guest as KeyVault};
+
+// Services
 use psibase::services::auth_sig::action_structs as MyService;
 
-use seahash;
-
-trait TryFromPemStr: Sized {
-    fn try_from_pem_str(p: &Pem) -> Result<Self, CommonTypes::Error>;
-}
-
-impl TryFromPemStr for pem::Pem {
-    fn try_from_pem_str(key_string: &Pem) -> Result<Self, CommonTypes::Error> {
-        Ok(pem::parse(key_string.trim()).map_err(|e| CryptoError.err(&e.to_string()))?)
-    }
-}
-
-fn get_hash(key: &Pem) -> Result<String, CommonTypes::Error> {
-    let pem = pem::Pem::try_from_pem_str(&key)?;
-    let digest = seahash::hash(&pem.contents().to_vec());
-    Ok(format!("{:x}", digest))
-}
+// Third-party crates
+use p256::ecdsa::{signature::hazmat::PrehashSigner, Signature, SigningKey, VerifyingKey};
+use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
+use psibase::fracpack::Pack;
+use rand_core::OsRng;
 
 struct AuthSig;
 
 impl SmartAuth for AuthSig {
-    fn get_claim() -> Result<smart_auth::Claim, CommonTypes::Error> {
-        Err(NotYetImplemented.err("get_claim"))
+    fn get_claims(
+        account_name: String,
+        _actions: Vec<Action>,
+    ) -> Result<Vec<Claim>, CommonTypes::Error> {
+        if !from_transact() {
+            return Err(Unauthorized("get_claims").into());
+        }
+
+        let pubkey = get_pubkey(&account_name)?;
+        if !ManagedKeys::has(&pubkey) {
+            return Err(KeyNotFound("get_claims").into());
+        }
+
+        Ok(vec![Claim {
+            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+            raw_data: AuthSig::to_der(pubkey)?,
+        }])
     }
 
-    fn get_proof(_message: Vec<u8>) -> Result<smart_auth::Proof, CommonTypes::Error> {
-        Err(NotYetImplemented.err("get_proof"))
+    fn get_proofs(
+        account_name: String,
+        transaction_hash: Vec<u8>,
+    ) -> Result<Vec<Proof>, CommonTypes::Error> {
+        if !from_transact() {
+            return Err(Unauthorized("get_proofs").into());
+        }
+
+        let pubkey = get_pubkey(&account_name)?;
+        let private_key = ManagedKeys::get(&pubkey);
+        let signature = AuthSig::sign(transaction_hash, private_key)?;
+        Ok(vec![Proof { signature }])
     }
 }
 
 impl KeyVault for AuthSig {
     fn generate_keypair() -> Result<String, CommonTypes::Error> {
         let keypair = AuthSig::generate_unmanaged_keypair()?;
-        let hash = get_hash(&keypair.public_key)?;
-        Keyvalue::set(&hash, &AuthSig::to_der(keypair.private_key)?)?;
+        ManagedKeys::add(&keypair.public_key, &AuthSig::to_der(keypair.private_key)?);
         Ok(keypair.public_key)
     }
 
@@ -63,11 +78,11 @@ impl KeyVault for AuthSig {
 
         let private_key = signing_key
             .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?
+            .map_err(|e| CryptoError(e.to_string()))?
             .to_string();
         let public_key = verifying_key
             .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+            .map_err(|e| CryptoError(e.to_string()))?;
 
         Ok(Keypair {
             public_key,
@@ -77,25 +92,43 @@ impl KeyVault for AuthSig {
 
     fn pub_from_priv(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
         let pem = pem::Pem::try_from_pem_str(&private_key)?;
-        let signing_key = SigningKey::from_pkcs8_der(&pem.contents())
-            .map_err(|e| CryptoError.err(&e.to_string()))?;
+        let signing_key =
+            SigningKey::from_pkcs8_der(&pem.contents()).map_err(|e| CryptoError(e.to_string()))?;
         let verifying_key = signing_key.verifying_key();
 
         Ok(verifying_key
             .to_public_key_pem(LineEnding::LF)
-            .map_err(|e| CryptoError.err(&e.to_string()))?)
+            .map_err(|e| CryptoError(e.to_string()))?)
     }
 
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
         let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
     }
+
+    fn sign(hashed_message: Vec<u8>, private_key: Vec<u8>) -> Result<Vec<u8>, CommonTypes::Error> {
+        let signing_key =
+            SigningKey::from_pkcs8_der(&private_key).map_err(|e| CryptoError(e.to_string()))?;
+        let signature: Signature = signing_key
+            .sign_prehash(&hashed_message)
+            .map_err(|e| CryptoError(e.to_string()))?;
+        Ok(signature.to_bytes().to_vec())
+    }
 }
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
+        // TODO: check if sender authorizes caller app to set key
+        // Currently only an AuthSig app would be able to set a user's key
+        let auth = Client::get_sender_app().app.map_or(false, |app| {
+            app == psibase::services::auth_sig::SERVICE.to_string()
+        });
+        if !auth {
+            return Err(Unauthorized("set_key").into());
+        }
+
         Transact::add_action_to_transaction(
-            "setKey",
+            MyService::setKey::ACTION_NAME,
             &MyService::setKey {
                 key: AuthSig::to_der(public_key)?.into(),
             }

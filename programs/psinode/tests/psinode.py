@@ -5,6 +5,7 @@ import subprocess
 import os
 import tempfile
 import time
+import datetime
 import calendar
 from collections import namedtuple
 import psibase
@@ -214,7 +215,7 @@ class API:
         Raise TransactionError if the transaction fails
         '''
         packed = self.pack_signed_transaction(trx)
-        with self.post('/native/push_transaction', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
+        with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
             if trace['error'] is not None:
@@ -385,7 +386,7 @@ def _write_config(dir, log_filter, log_format):
             f.write(_default_config % (log_filter, log_format))
 
 class Node(API):
-    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None):
+    def __init__(self, executable='psinode', dir=None, hostname=None, producer=None, p2p=True, listen=[], log_filter=None, log_format=None, database_cache_size=None, start=True):
         '''
         Create a new psinode server
         If dir is not specified, the server will reside in a temporary directory
@@ -409,7 +410,8 @@ class Node(API):
             listen = [listen]
         self.listen = listen
         self.p2p = p2p
-        self.start(database_cache_size=database_cache_size)
+        if start:
+            self.start(database_cache_size=database_cache_size)
     def start(self, database_cache_size=None):
         args = [self.executable, "-l", self.socketpath]
         for interface in self.listen:
@@ -510,25 +512,30 @@ class Node(API):
         if producer is None:
             raise RuntimeError("Producer required for boot")
         self.run_psibase(['boot', '-p', producer] + packages)
-        now = time.time_ns() // 1000000000
+        now = datetime.datetime.now(datetime.timezone.utc)
         def isbooted(node):
             try:
                 timestamp = node.get_block_header()['time']
             except requests.exceptions.HTTPError as e:
                 return False
-            if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) <= now:
+            if timestamp.endswith('Z'):
+                timestamp = timestamp[:-1] + '+00:00'
+            if datetime.datetime.fromisoformat(timestamp) <= now:
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)
     def run_psibase(self, args):
         self._find_psibase()
-        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args)
+        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args).check_returncode()
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):
-        with self.log() as f:
-            for line in f.readlines():
-                print(line, end='')
+        try:
+            with self.log() as f:
+                for line in f.readlines():
+                    print(line, end='')
+        except FileNotFoundError:
+            pass
     def _find_psibase(self):
         if not hasattr(self, 'psibase'):
             dirname = os.path.dirname(self.executable)

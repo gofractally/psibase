@@ -1,8 +1,8 @@
-use crate::services::{accounts, auth_delegate, producers, transact};
+use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    method_raw, new_account_action, set_auth_service_action, validate_dependencies, AccountNumber,
-    Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData, MethodNumber,
-    PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
+    method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
+    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
+    MethodNumber, PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
 use serde_bytes::ByteBuf;
@@ -82,6 +82,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     let has_packages = true;
@@ -95,22 +96,28 @@ pub fn get_initial_actions<R: Read + Seek>(
 
         if install_ui {
             s.reg_server(&mut actions)?;
-            s.store_data(&mut actions)?;
+            s.store_data(&mut actions, compression_level)?;
         }
 
         s.postinstall(&mut actions)?;
     }
 
-    actions.push(set_producers_action(
-        initial_producer,
-        match initial_key {
-            Some(k) => to_claim(k),
-            None => Claim {
-                service: AccountNumber::new(0),
-                rawData: Default::default(),
-            },
-        },
-    ));
+    // Create producer account
+    actions.push(new_account_action(accounts::SERVICE, initial_producer));
+
+    let mut claim = Claim {
+        service: AccountNumber::new(0),
+        rawData: Default::default(),
+    };
+    if let Some(key) = initial_key {
+        // Set transaction signing key for producer
+        actions.push(set_key_action(initial_producer, &key));
+        actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
+        claim = to_claim(&key);
+    }
+
+    // Set the producers
+    actions.push(set_producers_action(initial_producer, claim));
 
     actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
     actions.push(
@@ -173,11 +180,17 @@ pub fn create_boot_transactions<R: Read + Seek>(
     install_ui: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
-    let mut actions =
-        get_initial_actions(initial_key, initial_producer, install_ui, service_packages)?;
+    let mut actions = get_initial_actions(
+        initial_key,
+        initial_producer,
+        install_ui,
+        service_packages,
+        compression_level,
+    )?;
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -231,17 +244,18 @@ pub fn js_create_boot_transactions(
         services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
     }
     let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
+    // Todo: Allow parameterization of compression level from browser
+    let compression_level = 4;
     let (boot_transactions, transactions) = js_err(create_boot_transactions(
         &None,
         prod.into(),
         true,
         expiration,
         &mut services[..],
+        compression_level,
     ))?;
 
     let boot_transactions = boot_transactions.packed();

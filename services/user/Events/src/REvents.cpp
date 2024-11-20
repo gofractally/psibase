@@ -1041,7 +1041,7 @@ void load_tables(sqlite3* db, std::string_view sql)
       if (serviceStr != AccountNumber{serviceStr}.str())
          continue;
       std::string typeStr = match[3].str();
-      if (typeStr != MethodNumber{typeStr}.str())
+      if (MethodNumber{typeStr} == MethodNumber{})
          continue;
       stmt += "CREATE VIRTUAL TABLE IF NOT EXISTS \"";
       stmt += match[1].str();

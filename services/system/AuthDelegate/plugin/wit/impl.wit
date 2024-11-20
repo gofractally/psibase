@@ -1,0 +1,8 @@
+package auth-sig:plugin;
+
+world impl {
+    include host:common/imports;
+
+    import accounts:smart-auth/types;
+    export accounts:smart-auth/smart-auth;
+}

@@ -13,35 +13,48 @@
 
 namespace psibase
 {
+
+   struct CompareMethodNumber
+   {
+      using is_transparent = void;
+      bool operator()(const auto& lhs, const auto& rhs) const
+      {
+         return MethodNumber(lhs) < MethodNumber(rhs);
+      }
+   };
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
       psibase::AccountNumber service;
       psio::Schema           types;
-      using ActionMap = std::map<psibase::MethodNumber, psio::schema_types::FunctionType>;
+      using ActionMap =
+          std::map<std::string, psio::schema_types::FunctionType, CompareMethodNumber>;
       ActionMap actions;
-      using EventMap = std::map<psibase::MethodNumber, psio::schema_types::AnyType>;
+      using EventMap = std::map<std::string, psio::schema_types::AnyType, CompareMethodNumber>;
       EventMap ui;
       EventMap history;
       EventMap merkle;
 
      private:
       template <typename M>
-      static auto makeParams(psio::SchemaBuilder& builder, std::span<const char* const> ref)
-          -> psio::schema_types::Object
+      static auto makeParams(psio::SchemaBuilder&         builder,
+                             std::span<const char* const> ref) -> psio::schema_types::Object
       {
          psio::schema_types::Object type;
          auto                       nameIter = ref.begin();
          auto                       nameEnd  = ref.end();
          auto                       i        = ref.size();
-         forEachType(
-             typename M::SimplifiedArgTypes{},
-             [&](auto* t)
-             {
-                std::string name = nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
-                type.members.push_back(
-                    {std::move(name), builder.insert<std::remove_pointer_t<decltype(t)>>()});
-             });
+         forEachType(typename M::SimplifiedArgTypes{},
+                     [&](auto* t)
+                     {
+                        std::string name =
+                            nameIter == nameEnd ? "c" + std::to_string(i++) : *nameIter++;
+                        type.members.push_back(
+                            {std::move(name),
+                             builder.insert<std::remove_cv_t<
+                                 psio::remove_view_t<std::remove_pointer_t<decltype(t)>>>>()});
+                     });
          return type;
       }
       template <typename T>
@@ -54,7 +67,7 @@ namespace psibase
          }
          else
          {
-            return builder.insert<T>();
+            return builder.insert<std::remove_cv_t<psio::remove_view_t<T>>>();
          }
       }
       template <typename T>
@@ -70,7 +83,7 @@ namespace psibase
                 std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
                 using m                            = psio::MemberPtrType<decltype(member)>;
                 auto [pos, inserted]               = out.try_emplace(
-                    psibase::MethodNumber{names[0]},
+                    names[0],
                     psio::schema_types::FunctionType{makeParams<m>(builder, names.subspan(1)),
                                                      makeResult<typename m::ReturnType>(builder)});
                 if (inserted)
@@ -88,23 +101,23 @@ namespace psibase
                              std::vector<psio::schema_types::AnyType*>& eventTypes)
       {
          std::size_t i = 0;
-         psio::for_each_member_type(
-             (typename psio::reflect<T>::member_functions*)nullptr,
-             [&](auto member)
-             {
-                std::span<const char* const> names = psio::reflect<T>::member_function_names[i];
-                using m                            = psio::MemberPtrType<decltype(member)>;
-                if constexpr (m::isFunction)
-                {
-                   auto [pos, inserted] = out.try_emplace(psibase::MethodNumber{names[0]},
-                                                          makeParams<m>(builder, names.subspan(1)));
-                   if (inserted)
-                   {
-                      eventTypes.push_back(&pos->second);
-                   }
-                }
-                ++i;
-             });
+         psio::for_each_member_type((typename psio::reflect<T>::member_functions*)nullptr,
+                                    [&](auto member)
+                                    {
+                                       std::span<const char* const> names =
+                                           psio::reflect<T>::member_function_names[i];
+                                       using m = psio::MemberPtrType<decltype(member)>;
+                                       if constexpr (m::isFunction)
+                                       {
+                                          auto [pos, inserted] = out.try_emplace(
+                                              names[0], makeParams<m>(builder, names.subspan(1)));
+                                          if (inserted)
+                                          {
+                                             eventTypes.push_back(&pos->second);
+                                          }
+                                       }
+                                       ++i;
+                                    });
       }
 
      public:
@@ -154,7 +167,7 @@ namespace psibase
       }
 
      public:
-      const psio::schema_types::AnyType* getType(psibase::DbId db, psibase::MethodNumber event)
+      const psio::schema_types::AnyType* getType(psibase::DbId db, MethodNumber event)
       {
          if (const auto* dbTypes = getDb(db))
             if (auto pos = dbTypes->find(event); pos != dbTypes->end())
@@ -176,10 +189,5 @@ namespace psibase
       PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
    };
 
-   inline psio::schema_types::CustomTypes psibase_types()
-   {
-      auto result = psio::schema_types::standard_types();
-      result.insert<AccountNumber>("AccountNumber");
-      return result;
-   }
+   psio::schema_types::CustomTypes psibase_types();
 }  // namespace psibase

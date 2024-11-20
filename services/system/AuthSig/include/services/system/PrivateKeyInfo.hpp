@@ -8,6 +8,8 @@ namespace SystemService
 {
    namespace AuthSig
    {
+      struct SubjectPublicKeyInfo;
+
       /// The private key type used by this library.
       /// It is encoded as a PKCS8 PrivateKeyInfo.
       struct PrivateKeyInfo
@@ -23,6 +25,7 @@ namespace SystemService
       // Takes a private key in PEM format encoded as a PKCS8 PrivateKeyInfo
       std::vector<unsigned char> parsePrivateKeyInfo(std::string_view s);
       std::string                to_string(const PrivateKeyInfo&);
+      SubjectPublicKeyInfo       getSubjectPublicKeyInfo(const PrivateKeyInfo& private_key);
 
       std::vector<uint8_t> sign(const PrivateKeyInfo&       private_key,
                                 const psibase::Checksum256& checksum);

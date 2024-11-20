@@ -21,11 +21,14 @@ impl Api for BrandingPlugin {
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
-        upload(&File {
-            path: String::from("/network_logo.svg"),
-            content_type: String::from("image/svg+xml"),
-            content: logo,
-        })
+        upload(
+            &File {
+                path: String::from("/network_logo.svg"),
+                content_type: String::from("image/svg+xml"),
+                content: logo,
+            },
+            11,
+        )
         .expect("Failed to upload logo");
     }
 }
@@ -49,9 +52,8 @@ impl Queries for BrandingPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
         );
 
-        let netname_val = netname_val
-            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))
-            .unwrap();
+        let netname_val =
+            netname_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(netname_val.data.network_name)
     }

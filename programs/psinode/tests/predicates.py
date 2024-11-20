@@ -1,5 +1,5 @@
 import calendar
-import time
+from datetime import datetime, timedelta, timezone
 
 def _get_producer_name(prod):
     if isinstance(prod, str):
@@ -19,12 +19,14 @@ def producers_are(expected):
     return result
 
 def new_block():
-    now = time.time_ns() // 1000000000
-    print("waiting for block produced after %s" % time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)))
+    now = datetime.now(timezone.utc)
+    print("waiting for block produced after %s" % now.isoformat())
     def result(node):
         timestamp = node.get_block_header()['time']
         print(timestamp)
-        return calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) + 1 > now
+        if timestamp.endswith('Z'):
+            timestamp = timestamp[:-1] + '+00:00'
+        return datetime.fromisoformat(timestamp) + timedelta(seconds=1) > now
     return result
 
 def irreversible(num):

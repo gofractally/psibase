@@ -26,9 +26,6 @@ namespace UserService
             struct Ui{};
             struct Merkle{};
          };
-         //using SymbolEvents = psibase::EventIndex<&SymbolRecord::eventHead, "prevEvent">;
-         //using SymbolTypeEvents = psibase::EventIndex<&SymbolLengthRecord::eventHead, "prevEvent">;
-         // clang-format on
       };
 
       // clang-format off

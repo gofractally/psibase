@@ -16,7 +16,7 @@ using namespace psibase;
 static constexpr bool enable_print = false;
 
 // TODO: remove this limit after billing accounts for the storage
-static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
+static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
@@ -93,6 +93,41 @@ namespace SystemService
             break;
          includedTable.remove(obj);
       }
+
+      auto snap    = tables.open<SnapshotInfoTable>();
+      auto snapRow = snap.get(SingletonKey{});
+      if (snapRow)
+      {
+         if (snapRow->snapshotInterval != psibase::Seconds{0} &&
+             stat.current.time - snapRow->lastSnapshot >= snapRow->snapshotInterval)
+         {
+            ScheduledSnapshotRow row{stat.current.blockNum};
+            kvPut(ScheduledSnapshotRow::db, row.key(), row);
+            snapRow->lastSnapshot = stat.current.time;
+            snap.put(*snapRow);
+         }
+      }
+      else
+      {
+         snap.put({stat.head->header.time, psibase::Seconds{0}});
+      }
+   }
+
+   void Transact::setSnapTime(psibase::Seconds seconds)
+   {
+      check(getSender() == getReceiver(), "Wrong sender");
+      Tables tables(Transact::service);
+
+      auto& stat = getStatus();
+
+      auto table = tables.open<SnapshotInfoTable>();
+      auto row   = table.get(SingletonKey{});
+      if (!row)
+         row = {.lastSnapshot     = stat.head ? stat.head->header.time : stat.current.time,
+                .snapshotInterval = seconds};
+      else
+         row->snapshotInterval = seconds;
+      table.put(*row);
    }
 
    static void checkObjectiveCallback(CallbackType type)
@@ -265,7 +300,7 @@ namespace SystemService
                               ServiceMethod{action.service, action.method}, allowedActions,
                               std::vector<Claim>{});
          }  // if (requester != account->authService)
-      }     // if(enforceAuth)
+      }  // if(enforceAuth)
 
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
@@ -297,7 +332,7 @@ namespace SystemService
       return stat.head->header;
    }
 
-   psibase::TimePointSec Transact::headBlockTime() const
+   psibase::BlockTime Transact::headBlockTime() const
    {
       auto& stat = getStatus();
       if (stat.head)
@@ -343,7 +378,7 @@ namespace SystemService
 
       check(!(tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
       check(stat.current.time < tapos.expiration, "transaction has expired");
-      check(tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
+      check(tapos.expiration < stat.current.time + maxTrxLifetime,
             "transaction was submitted too early");
 
       auto tables        = Transact::Tables(Transact::service);

@@ -1,25 +1,9 @@
-use crate::bindings::host::common::types::{Error, PluginId};
+use psibase::plugin_error;
 
-#[derive(PartialEq, Eq, Hash)]
-pub enum ErrorType {
-    QueryResponseParseError,
-}
-
-fn my_plugin_id() -> PluginId {
-    return PluginId {
-        service: "identity".to_string(),
-        plugin: "plugin".to_string(),
-    };
-}
-
-impl ErrorType {
-    pub fn err(self, msg: &str) -> Error {
-        match self {
-            ErrorType::QueryResponseParseError => Error {
-                code: self as u32,
-                producer: my_plugin_id(),
-                message: format!("Query response parsing error: {}", msg),
-            },
-        }
-    }
+plugin_error! {
+    #[derive(Debug)]
+    pub ErrorType
+    QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
+    InvalidMsgId(msg: String) => "No message found with msg_id {msg}",
+    DateTimeConversion(msg: String) => "Invalid DateTime: {msg}"
 }

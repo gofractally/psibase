@@ -10,6 +10,8 @@ namespace psibase
 {
    using BlockNum = uint32_t;
 
+   using BlockTime = TimePointUSec;
+
    /// A synchronous call
    ///
    /// An Action represents a synchronous call between services.
@@ -128,33 +130,6 @@ namespace psibase
 
    using TermNum = uint32_t;
 
-   struct Producer
-   {
-      AccountNumber name;
-      Claim         auth;
-      friend bool   operator==(const Producer&, const Producer&) = default;
-      PSIO_REFLECT(Producer, name, auth);
-   };
-
-   struct CftConsensus
-   {
-      std::vector<Producer> producers;
-      PSIO_REFLECT(CftConsensus, producers);
-   };
-
-   struct BftConsensus
-   {
-      std::vector<Producer> producers;
-      PSIO_REFLECT(BftConsensus, producers);
-   };
-
-   using Consensus = std::variant<CftConsensus, BftConsensus>;
-
-   inline auto get_gql_name(Consensus*)
-   {
-      return "Consensus";
-   }
-
    struct BlockHeaderAuthAccount
    {
       AccountNumber codeNum;
@@ -167,6 +142,43 @@ namespace psibase
       PSIO_REFLECT(BlockHeaderAuthAccount, codeNum, codeHash, vmType, vmVersion);
    };
 
+   struct Producer
+   {
+      AccountNumber name;
+      Claim         auth;
+      friend bool   operator==(const Producer&, const Producer&) = default;
+      PSIO_REFLECT(Producer, name, auth);
+   };
+
+   struct CftConsensus
+   {
+      std::vector<Producer> producers;
+      friend bool           operator==(const CftConsensus&, const CftConsensus&) = default;
+      PSIO_REFLECT(CftConsensus, producers);
+   };
+
+   struct BftConsensus
+   {
+      std::vector<Producer> producers;
+      friend bool           operator==(const BftConsensus&, const BftConsensus&) = default;
+      PSIO_REFLECT(BftConsensus, producers);
+   };
+
+   using ConsensusData = std::variant<CftConsensus, BftConsensus>;
+
+   inline auto get_gql_name(ConsensusData*)
+   {
+      return "ConsensusData";
+   }
+
+   struct Consensus
+   {
+      ConsensusData                       data;
+      std::vector<BlockHeaderAuthAccount> services;
+      friend bool                         operator==(const Consensus&, const Consensus&) = default;
+      PSIO_REFLECT(Consensus, data, services)
+   };
+
    struct BlockHeaderCode
    {
       uint8_t vmType    = 0;
@@ -174,6 +186,21 @@ namespace psibase
 
       std::vector<uint8_t> code = {};
       PSIO_REFLECT(BlockHeaderCode, vmType, vmVersion, code);
+   };
+
+   struct PendingConsensus
+   {
+      Consensus consensus;
+      BlockNum  blockNum;
+      PSIO_REFLECT(PendingConsensus, consensus, blockNum)
+   };
+
+   // This commits to all the state used to verify block signatures.
+   struct JointConsensus
+   {
+      Consensus                       current;
+      std::optional<PendingConsensus> next;
+      PSIO_REFLECT(JointConsensus, current, next)
    };
 
    // TODO: Receipts & Merkles. Receipts need sequence numbers, resource consumption, and events.
@@ -185,10 +212,13 @@ namespace psibase
    {
       Checksum256   previous = {};
       BlockNum      blockNum = 0;  // TODO: pack into previous instead?
-      TimePointSec  time;          // TODO: switch to microseconds
+      BlockTime     time;
       AccountNumber producer;
       TermNum       term;
       BlockNum      commitNum;
+
+      // Holds a sha256 of the current JointConsensus
+      Checksum256 consensusState;
 
       // Holds a merkle root of the transactions in the block.
       // This does not depend on execution, so that it can be
@@ -203,9 +233,6 @@ namespace psibase
       // this block. Joint consensus must not be active already.
       // Joint consensus ends after this block becomes irreversible.
       std::optional<Consensus> newConsensus;
-      // If this is specified, it should should contain the full set of
-      // of services that can be used for verifying block signatures.
-      std::optional<std::vector<BlockHeaderAuthAccount>> authServices;
       // This contains the code for authServices
       // It MUST contain all code that was added in this block
       // It MUST NOT contain code that is not in authServices
@@ -219,10 +246,10 @@ namespace psibase
                    producer,
                    term,
                    commitNum,
+                   consensusState,
                    trxMerkleRoot,
                    eventMerkleRoot,
                    newConsensus,
-                   authServices,
                    authCode)
    };
 

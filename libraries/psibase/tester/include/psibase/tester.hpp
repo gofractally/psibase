@@ -215,7 +215,7 @@ namespace psibase
 
       void startBlock(std::string_view time);
 
-      void startBlock(TimePointSec tp);
+      void startBlock(BlockTime tp);
 
       /**
        * Finish the current pending block.  If no block is pending, creates an empty block.
@@ -401,6 +401,8 @@ namespace psibase
       };
 
       auto from(AccountNumber id) { return UserContext{*this, id, {}}; }
+
+      std::uint32_t nativeHandle() const { return id; }
 
       /// Get a key-value pair, if any
       std::optional<std::vector<char>> kvGetRaw(psibase::DbId db, psio::input_stream key);

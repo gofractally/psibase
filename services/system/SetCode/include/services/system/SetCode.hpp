@@ -32,6 +32,6 @@ namespace SystemService
       void setFlags(psibase::AccountNumber service, uint64_t flags);
    };
    PSIO_REFLECT(SetCode,
-                method(setCode, contact, vmType, vmVersion, code),
+                method(setCode, service, vmType, vmVersion, code),
                 method(setFlags, service, flags))
 }  // namespace SystemService

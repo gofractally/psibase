@@ -9,8 +9,9 @@ function(add suffix)
     target_sources(psibase${suffix} PRIVATE
         common/src/block.cpp
         common/src/crypto.cpp
+        common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
-        common/src/time.cpp
+        common/src/schema.cpp
         common/src/trace.cpp
     )
 
@@ -125,6 +126,7 @@ function(add suffix)
             service/src/time.c
             tester/src/chain_polyfill.cpp
             tester/src/wasi_polyfill/system.cpp
+            tester/src/wasi_polyfill/init_cwd.cpp
         )
         target_compile_options(psitestlib${suffix} PUBLIC -DCOMPILING_TESTS)
         target_link_libraries(psitestlib${suffix} PUBLIC

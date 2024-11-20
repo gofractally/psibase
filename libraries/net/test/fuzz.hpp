@@ -227,11 +227,11 @@ struct NetworkBase
       auto                 block = blocks[idx];
       psibase::BlockInfo   info{block->block()};
       psibase::SignedBlock newBlock;
-      newBlock.block.header.previous     = info.blockId;
-      newBlock.block.header.blockNum     = info.header.blockNum + 1;
-      newBlock.block.header.time.seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                                               psibase::test::mock_clock::now().time_since_epoch())
-                                               .count();
+      newBlock.block.header.previous = info.blockId;
+      newBlock.block.header.blockNum = info.header.blockNum + 1;
+      newBlock.block.header.time =
+          psibase::TimePointSec{std::chrono::duration_cast<psibase::Seconds>(
+              psibase::test::mock_clock::now().time_since_epoch())};
       newBlock.block.header.producer  = producer;
       newBlock.block.header.term      = view;
       newBlock.block.header.commitNum = info.header.commitNum;
@@ -274,6 +274,7 @@ struct NetworkBase
    void recv(const psibase::net::HelloRequest&) {}
    void recv(const psibase::net::HelloResponse&) {}
    void recv(const psibase::net::WasmProducerMessage&) {}
+   void recv(const psibase::net::StateChecksumMessage&) {}
 
    template <typename T>
    static bool has_message(const psibase::net::SignedMessage<T>&              message,
@@ -371,7 +372,7 @@ struct NetworkBase
 
 struct StaticDatabase
 {
-   explicit StaticDatabase(const psibase::Consensus& init);
+   explicit StaticDatabase(const psibase::ConsensusData& init);
    ~StaticDatabase();
    operator psibase::SystemContext*();
 };

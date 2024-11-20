@@ -1,4 +1,5 @@
 #include "services/system/PrivateKeyInfo.hpp"
+#include "services/system/Spki.hpp"
 
 #include <botan/auto_rng.h>
 #include <botan/ber_dec.h>
@@ -35,6 +36,12 @@ namespace SystemService
       {
          return Botan::PEM_Code::encode(reinterpret_cast<const std::uint8_t*>(key.data.data()),
                                         key.data.size(), "PRIVATE KEY");
+      }
+
+      SubjectPublicKeyInfo getSubjectPublicKeyInfo(const PrivateKeyInfo& private_key)
+      {
+         auto key = Botan::PKCS8::load_key({private_key.data.data(), private_key.data.size()});
+         return {key->subject_public_key()};
       }
 
       std::vector<uint8_t> sign(const PrivateKeyInfo&       private_key,

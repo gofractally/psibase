@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = ["service", "query", "plugin"]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://github.com/gofractally/psibase"
+
+[package]
+name = "registry_package"
+edition.workspace = true
+version.workspace = true
+
+[package.metadata.psibase]
+package-name = "AppRegistry"
+description = "Registry for psibase apps"
+services = ["registry"]
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+registry = { path = "service" }
+r-registry = { path = "query" }
+registry-plugin = { path = "plugin" }

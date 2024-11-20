@@ -3,6 +3,7 @@
 - [Introduction](README.md)
 
 - [Specifications](specifications/README.md)
+
   - [Blockchain](specifications/blockchain/README.md)
     - [TaPoS](specifications/blockchain/tapos.md)
     - [Smart authorization](specifications/blockchain/smart-authorization.md)
@@ -14,6 +15,7 @@
       - [CFT](specifications/blockchain/peer-consensus/cft.md)
       - [BFT](specifications/blockchain/peer-consensus/bft.md)
       - [Joint Consensus](specifications/blockchain/peer-consensus/joint-consensus.md)
+    - [Snapshots](specifications/blockchain/snapshots.md)
   - [App architecture](specifications/app-architecture/README.md)
     - [Events](specifications/app-architecture/events.md)
     - [Plugins](specifications/app-architecture/plugins.md)
@@ -29,6 +31,7 @@
     - [App Packages](specifications/data-formats/package.md)
 
 - [Development guides](development/README.md)
+
   - [Services](development/services/README.md)
     - [Action scripts](development/services/action-scripts.md)
     - [Standards](development/services/standards.md)
@@ -66,18 +69,22 @@
       - [JS libraries](development/front-ends/reference/js-libraries.md)
 
 - [Running infrastructure](run-infrastructure/README.md)
+
   - [Installation]()
     - [Native binaries]()
     - [Docker containers]()
   - [Administration](run-infrastructure/administration.md)
   - [Command-line utilities](run-infrastructure/cli/README.md)
     - [psibase](run-infrastructure/cli/psibase.md)
+      - [psibase-create-snapshot](run-infrastructure/cli/psibase-create-snapshot.md)
+      - [psibase-load-snapshot](run-infrastructure/cli/psibase-load-snapshot.md)
     - [psinode](run-infrastructure/cli/psinode.md)
   - [Configuration]()
     - [HTTPS](run-infrastructure/configuration/https.md)
     - [Logging](run-infrastructure/configuration/logging.md)
 
 - [Default apps](default-apps/README.md)
+
   - [accounts](default-apps/accounts.md)
   - [x-admin](default-apps/x-admin.md)
   - [auth-sig](default-apps/auth-sig.md)
