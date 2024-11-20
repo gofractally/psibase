@@ -6,6 +6,8 @@ import predicates
 import unittest
 import os
 
+def node_args(self):
+    return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
 class TestSnapshot(unittest.TestCase):
     @testutil.psinode_test
     def test_snapshot(self, cluster):
@@ -33,12 +35,12 @@ class TestSnapshot(unittest.TestCase):
         # Load two nodes from snapshots
         e = cluster.make_node('e', start=False)
         f = cluster.make_node('f', start=False)
-        a.run_psibase(['create-snapshot', a.dir, os.path.join(a.dir, 'snapshot')])
-        e.run_psibase(['load-snapshot', e.dir, os.path.join(a.dir, 'snapshot')])
+        a.run_psibase(['create-snapshot'] + node_args() + [a.dir, os.path.join(a.dir, 'snapshot')])
+        e.run_psibase(['load-snapshot'] + node_args() + [e.dir, os.path.join(a.dir, 'snapshot')])
         # Make sure that loading from a snapshot leaves a state that is able
         # to create snapshots
-        e.run_psibase(['create-snapshot', e.dir, os.path.join(e.dir, 'snapshot')])
-        f.run_psibase(['load-snapshot', f.dir, os.path.join(e.dir, 'snapshot')])
+        e.run_psibase(['create-snapshot'] + node_args() + [e.dir, os.path.join(e.dir, 'snapshot')])
+        f.run_psibase(['load-snapshot'] + node_args() + [f.dir, os.path.join(e.dir, 'snapshot')])
         e.start()
         f.start()
         e.connect(f)

@@ -82,12 +82,14 @@ def make_package_repository(directory, packages):
     with open(os.path.join(directory, 'index.json'), 'w') as file:
         file.write(json.dumps(index))
 
+def node_args(self):
+    return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
 class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.run_psibase(['install', 'Symbol', 'Tokens', 'TokenUsers'])
+        a.run_psibase(['install'] + node_args() + ['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
@@ -113,12 +115,12 @@ class TestPsibase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo10])
-            a.run_psibase(['install', 'foo', '--package-source', dir])
+            a.run_psibase(['install'] + node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
             make_package_repository(dir, [foo10, foo11])
-            a.run_psibase(['install', 'foo', '--package-source', dir])
+            a.run_psibase(['install'] + node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)

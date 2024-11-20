@@ -9,13 +9,15 @@ from psibase import *
 from threading import Thread
 from requests import ConnectionError
 
+def node_args(self):
+    return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
 # This test is most useful when run with ASAN_OPTIONS=abort_on_error=1
 class TestExceptionExit(unittest.TestCase):
     @testutil.psinode_test
     def test_socket(self, cluster):
         (a,) = cluster.complete('a')
         a.boot(packages=['Minimal', 'Explorer'])
-        a.run_psibase(['install', '--package-source', testutil.test_packages(), 'KeepSocket'])
+        a.run_psibase(['install'] + node_args + ['--package-source', testutil.test_packages(), 'KeepSocket'])
         a.wait(new_block())
 
         def long_query(api):
