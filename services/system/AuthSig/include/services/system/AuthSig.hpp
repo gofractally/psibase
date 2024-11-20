@@ -24,7 +24,7 @@ namespace SystemService
          /// The public key included in the claims for each transaction sent by this account.
          SubjectPublicKeyInfo pubkey;
 
-         auto byPubkey() const { return std::tuple{pubkey, account}; }
+         auto byPubkey() const { return std::tuple{keyFingerprint(pubkey), account}; }
       };
       PSIO_REFLECT(AuthRecord, account, pubkey)
 

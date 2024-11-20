@@ -21,7 +21,7 @@ namespace SystemService
    {
       struct AuthQuery
       {
-         auto accWithKey(SubjectPublicKeyInfo    key,
+         auto accWithKey(string                  pubkeyPem,
                          optional<AccountNumber> gt,
                          optional<AccountNumber> ge,
                          optional<AccountNumber> lt,
@@ -33,7 +33,7 @@ namespace SystemService
          {
             auto idx =
                 AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
-                    key);
+                    keyFingerprint(SubjectPublicKeyInfo{parseSubjectPublicKeyInfo(pubkeyPem)}));
 
             auto convert = [](const auto& opt)
             {
@@ -57,7 +57,7 @@ namespace SystemService
          }
       };
       PSIO_REFLECT(AuthQuery,
-                   method(accWithKey, key, gt, ge, lt, le, first, last, before, after),
+                   method(accWithKey, pubkeyPem, gt, ge, lt, le, first, last, before, after),
                    method(account, name)
                    //
       );
@@ -73,7 +73,7 @@ namespace SystemService
          return std::nullopt;
 
       }  // serveSys
-   }     // namespace AuthSig
+   }  // namespace AuthSig
 }  // namespace SystemService
 
 PSIBASE_DISPATCH(SystemService::AuthSig::RAuthSig)

@@ -36,6 +36,12 @@ interface keyvault {
 
     /// Signs a pre-hashed message with the specified DER-encoded private key
     sign: func(hashed-message: list<u8>, private-key: list<u8>) -> result<list<u8>, error>;
+
+    /// Imports a PEM-encoded private key into the keyvault.
+    /// This does not change the key of any account, it simply allows AuthSig to sign
+    ///   with the specified private key.
+    /// Returns the corresponding public key in PEM format.
+    import-key: func(private-key: pem) -> result<pem, error>;
 }
 
 interface actions {
