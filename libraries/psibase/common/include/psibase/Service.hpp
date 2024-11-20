@@ -12,6 +12,7 @@ namespace psibase
    class Service
    {
      public:
+#ifdef __wasm32__
       /// Emit events
       ///
       /// The following examples use the example definitions in [Defining Events](#defining-events). After you have defined your events, you can use `emit` to emit them. Examples:
@@ -87,6 +88,7 @@ namespace psibase
       {
          return EventReader<DerivedService>(DerivedService::service);
       }
+#endif
    };  // Service
 };  // namespace psibase
 
