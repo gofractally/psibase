@@ -16,13 +16,13 @@ export function useUser() {
     const [availableAccounts, setAvailableAccounts] = useAtom(accountsAtom);
     const [user, setUser] = useAtom(userAtom);
 
-    const getAvailableAccounts = async () => {
+    const getConnectedAccounts = async () => {
         const supervisor = await getSupervisor();
         try {
             const res = (await supervisor.functionCall({
                 service: "accounts",
-                intf: "accounts",
-                method: "getAvailableAccounts",
+                intf: "activeApp",
+                method: "getConnectedAccounts",
                 params: [],
             })) as string[];
             setAvailableAccounts(res);
@@ -36,8 +36,8 @@ export function useUser() {
         try {
             await supervisor.functionCall({
                 service: "accounts",
-                intf: "accounts",
-                method: "loginTemp",
+                intf: "activeApp",
+                method: "login",
                 params: [accountName],
             });
             setUser(accountName);
@@ -48,7 +48,7 @@ export function useUser() {
     };
 
     useEffect(() => {
-        getAvailableAccounts();
+        getConnectedAccounts();
     }, []);
 
     return {

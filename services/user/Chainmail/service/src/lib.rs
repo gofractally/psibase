@@ -16,7 +16,7 @@ mod service {
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        anyhow, check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
+        check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
         HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ mod service {
             AccountsSvc::call().exists(receiver),
             &format!("receiver account {} doesn't exist", receiver),
         );
-        let datetime = TransactSvc::call().currentBlock().time;
+        let datetime = TransactSvc::call().currentBlock().time.seconds();
         Wrapper::emit()
             .history()
             .sent(get_sender(), receiver, subject, body, datetime);
@@ -85,7 +85,7 @@ mod service {
         sender: AccountNumber,
         subject: String,
         body: String,
-        datetime: u32,
+        datetime: i64,
     ) {
         check(
             get_sender() == receiver,
@@ -108,7 +108,7 @@ mod service {
     /// Unsave a message
     /// `unsave` releases the state storage for a previously saved message
     #[action]
-    fn unsave(msg_id: u64, sender: AccountNumber, subject: String, body: String, datetime: u32) {
+    fn unsave(msg_id: u64, sender: AccountNumber, subject: String, body: String, datetime: i64) {
         let saved_messages_table = SavedMessageTable::new();
 
         saved_messages_table.remove(&SavedMessage {

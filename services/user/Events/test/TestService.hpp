@@ -11,6 +11,7 @@ struct TestService : psibase::Service<TestService>
    void sendOptional8(std::optional<std::uint8_t> opt);
    void sendString(const std::string& s);
    void sendAccount(psibase::AccountNumber account);
+   void sendTime(psibase::TimePointSec t);
    struct Events
    {
       struct Ui
@@ -23,6 +24,7 @@ struct TestService : psibase::Service<TestService>
          void optb(std::optional<std::uint8_t> opt);
          void str(std::string s);
          void account(psibase::AccountNumber a);
+         void time(psibase::TimePointSec t);
       };
       struct Merkle
       {
@@ -34,7 +36,8 @@ PSIO_REFLECT(TestService,
              method(sendOptional, opt),
              method(sendOptional8, opt),
              method(sendString, s),
-             method(sendAccount, a))
+             method(sendAccount, a),
+             method(sendTime, t))
 
 PSIBASE_REFLECT_EVENTS(TestService);
 PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
@@ -42,6 +45,7 @@ PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
                                method(opt, opt),
                                method(optb, opt),
                                method(str, s),
-                               method(account, a));
+                               method(account, a),
+                               method(time, t));
 PSIBASE_REFLECT_UI_EVENTS(TestService);
 PSIBASE_REFLECT_MERKLE_EVENTS(TestService);

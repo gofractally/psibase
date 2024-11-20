@@ -25,12 +25,12 @@ class MethodNumber(Custom(RawMethodNumber, "MethodNumber"), str):
     def pack(value, stream):
         RawMethodNumber.pack(RawMethodNumber(name.method_to_number(value)), stream)
 
-class TimePointSec(u32):
+class TimePointSec(i64):
     @staticmethod
     def pack(value, stream):
         if isinstance(value, str):
             value = calendar.timegm(time.strptime(value, "%Y-%m-%dT%H:%M:%SZ"))
-        u32.pack(value, stream)
+        i64.pack(value, stream)
 
 class RawAction(Object):
     sender: AccountNumber

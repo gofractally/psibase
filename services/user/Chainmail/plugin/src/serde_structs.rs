@@ -40,7 +40,7 @@ pub struct TempMessageForDeserEvents {
     pub subject: String,
     pub body: String,
     #[serde(deserialize_with = "deserialize_timepoint")]
-    pub datetime: u32,
+    pub datetime: i64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -53,7 +53,7 @@ pub struct TempMessageForDeserGql {
     pub subject: String,
     pub body: String,
     #[serde(deserialize_with = "deserialize_timepoint")]
-    pub datetime: u32,
+    pub datetime: i64,
 }
 #[derive(Debug, Deserialize)]
 pub struct TempMessageForDeserGqlResponseNodes {
@@ -69,7 +69,7 @@ pub struct TempMessageForDeserGqlResponse {
     pub data: TempMessageForDeserGqlResponseData,
 }
 
-fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<u32, D::Error>
+fn deserialize_timepoint<'d, D>(deserializer: D) -> Result<i64, D::Error>
 where
     D: de::Deserializer<'d>,
 {
@@ -84,7 +84,7 @@ impl Into<Message> for TempMessageForDeserEvents {
             sender: self.sender,
             subject: self.subject,
             body: self.body,
-            datetime: DateTime::from_timestamp(self.datetime as i64, 0)
+            datetime: DateTime::from_timestamp(self.datetime, 0)
                 .unwrap()
                 .to_string(),
             is_saved_msg: false,
@@ -100,7 +100,7 @@ impl Into<Message> for TempMessageForDeserGql {
             sender: self.sender,
             subject: self.subject,
             body: self.body,
-            datetime: DateTime::from_timestamp(self.datetime as i64, 0)
+            datetime: DateTime::from_timestamp(self.datetime, 0)
                 .unwrap()
                 .to_string(),
             is_saved_msg: false,

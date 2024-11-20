@@ -1,5 +1,5 @@
 export const intf = {
-    getActiveAppDomain() {
-        return host.getActiveAppDomain();
+    getActiveApp() {
+        return host.getActiveApp();
     },
 };

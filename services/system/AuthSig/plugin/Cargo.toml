@@ -1,7 +1,7 @@
 [package]
 name = "auth-sig"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
@@ -12,13 +12,6 @@ pem = "3"
 seahash = "4.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -33,7 +26,7 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
-"accounts:plugin" = { path = "../../Accounts/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 "accounts:smart-auth" = { path = "../../Accounts/plugin/smartAuth/export.wit" }
 "transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }

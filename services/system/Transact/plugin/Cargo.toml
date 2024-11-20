@@ -1,7 +1,7 @@
 [package]
 name = "transact"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.29.0", features = ["bitflags"] }
@@ -15,13 +15,6 @@ sha2 = "0.10.6"
 [lib]
 crate-type = ["cdylib"]
 
-[profile.release]
-codegen-units = 1
-opt-level = "s"
-debug = false
-strip = true
-lto = true
-
 [package.metadata.component]
 package = "transact:plugin"
 
@@ -31,7 +24,7 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "../../Accounts/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 "accounts:smart-auth" = { path = "../../Accounts/plugin/smartAuth/import.wit" }
 
 [package.metadata.component.bindings]

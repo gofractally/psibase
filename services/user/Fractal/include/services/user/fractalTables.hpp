@@ -8,15 +8,6 @@ namespace UserService
    {
       using PublicKey = SystemService::AuthSig::SubjectPublicKeyInfo;
 
-      struct ServiceEventRecord
-      {
-         psibase::SingletonKey key;
-         uint64_t              eventHead;
-      };
-      PSIO_REFLECT(ServiceEventRecord, key, eventHead);
-
-      using ServiceEventTable = psibase::Table<ServiceEventRecord, &ServiceEventRecord::key>;
-
       // Implemented by fractal types in order to be compatible with this parent service
       struct FractalInterface
       {
@@ -38,13 +29,11 @@ namespace UserService
          psibase::AccountNumber account;
          psibase::AccountNumber type;
          psibase::AccountNumber founder;
-         psibase::TimePointSec  creationTime;
+         psibase::TimePointUSec creationTime;
 
          std::string displayName;
          std::string description;
          std::string languageCode;
-
-         uint64_t eventHead;
 
          auto byType() const { return std::tie(type, account); }
       };
@@ -55,8 +44,7 @@ namespace UserService
                    creationTime,
                    displayName,
                    description,
-                   languageCode,
-                   eventHead);
+                   languageCode);
       using FractalTable =
           psibase::Table<FractalRecord, &FractalRecord::account, &FractalRecord::byType>;
 
@@ -104,10 +92,9 @@ namespace UserService
 
          std::string displayName;
 
-         uint64_t eventHead;
          // Todo - metadata / profile
       };
-      PSIO_REFLECT(IdentityRecord, name, displayName, eventHead);
+      PSIO_REFLECT(IdentityRecord, name, displayName);
       using IdentityTable = psibase::Table<IdentityRecord, &IdentityRecord::name>;
 
    }  // namespace FractalNs
