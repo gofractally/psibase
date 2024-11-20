@@ -49,13 +49,15 @@ impl From<DateTime<Utc>> for TimePointSec {
     }
 }
 
+impl From<TimePointSec> for DateTime<Utc> {
+    fn from(time: TimePointSec) -> Self {
+        Self::from_timestamp(time.seconds, 0).expect("Timestamp out of range")
+    }
+}
+
 impl Serialize for TimePointSec {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(
-            &DateTime::<Utc>::from_timestamp(self.seconds, 0)
-                .unwrap()
-                .to_rfc3339(),
-        )
+        serializer.serialize_str(&DateTime::<Utc>::from(*self).to_rfc3339())
     }
 }
 
@@ -118,13 +120,15 @@ impl From<DateTime<Utc>> for TimePointUSec {
     }
 }
 
+impl From<TimePointUSec> for DateTime<Utc> {
+    fn from(time: TimePointUSec) -> Self {
+        Self::from_timestamp_micros(time.microseconds).expect("Timestamp out of range")
+    }
+}
+
 impl Serialize for TimePointUSec {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(
-            &DateTime::<Utc>::from_timestamp_micros(self.microseconds)
-                .unwrap()
-                .to_rfc3339(),
-        )
+        serializer.serialize_str(&DateTime::<Utc>::from(*self).to_rfc3339())
     }
 }
 
