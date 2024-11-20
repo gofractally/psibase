@@ -156,12 +156,8 @@ namespace psio
                                  S&                                          stream,
                                  std::set<std::pair<std::type_index, bool>>& defined_types)
    {
-      if constexpr (MemPtr::isConstFunction)
-      {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (MemPtr::numArgs == 0 &&
+                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
          fill_gql_schema_fn_types((MemberPtrType<decltype(gql_callable_fn(
                                        (typename MemPtr::ReturnType*)nullptr))>*)nullptr,
@@ -182,12 +178,8 @@ namespace psio
                            std::span<const char* const> argNames,
                            S&                           stream)
    {
-      if constexpr (MemPtr::isConstFunction)
-      {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (MemPtr::numArgs == 0 &&
+                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
          return fill_gql_schema_fn(
              (MemberPtrType<decltype(gql_callable_fn(                                         //
