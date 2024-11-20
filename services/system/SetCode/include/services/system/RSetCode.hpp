@@ -5,7 +5,7 @@
 
 namespace SystemService
 {
-   struct RSetCode : psibase::Service<RSetCode>
+   struct RSetCode : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber("r-setcode");
 
