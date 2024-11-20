@@ -12,11 +12,8 @@ namespace UserService
    class Symbol : public psibase::Service<Symbol>
    {
      public:
-      using Tables = psibase::ServiceTables<SymbolTable,
-                                            SymbolLengthTable,
-                                            PriceAdjustmentSingleton,
-                                            InitTable,
-                                            UserEventTable>;
+      using Tables = psibase::
+          ServiceTables<SymbolTable, SymbolLengthTable, PriceAdjustmentSingleton, InitTable>;
 
       static constexpr auto service        = psibase::AccountNumber("symbol");
       static constexpr auto sysTokenSymbol = SID{"psi"};
@@ -47,18 +44,12 @@ namespace UserService
          using Account    = psibase::AccountNumber;
          struct History
          {
-            void symCreated(uint64_t prevEvent, SID symbol, Account owner, Quantity cost) {}
-            void symListed(uint64_t prevEvent, SID symbol, Account seller, Quantity cost) {}
-            void symSold(uint64_t prevEvent, SID symbol, Account buyer, Account seller, Quantity cost) {}
-            void symUnlisted(uint64_t prevEvent, SID symbol, Account owner) {}
-
-            void newCreatePrice(uint64_t prevEvent, uint8_t symbolLength, psibase::BlockNum blockNum, Quantity newPrice) {}
+            void symCreated(SID symbol, Account owner, Quantity cost) {}
+            void symSold(SID symbol, Account buyer, Account seller, Quantity cost) {}
          };
          struct Ui{};
          struct Merkle{};
       };
-      using SymbolEvents = psibase::EventIndex<&SymbolRecord::eventHead, "prevEvent">;
-      using SymbolTypeEvents = psibase::EventIndex<&SymbolLengthRecord::eventHead, "prevEvent">;
       // clang-format on
    };
 
@@ -79,11 +70,8 @@ namespace UserService
    );
    PSIBASE_REFLECT_EVENTS(Symbol);
    PSIBASE_REFLECT_HISTORY_EVENTS(Symbol,
-      method(symCreated, prevEvent, symbol, owner, cost),
-      method(symListed, prevEvent, symbol, seller, cost),
-      method(symSold, prevEvent, symbol, buyer, seller, cost),
-      method(symUnlisted, prevEvent, symbol, owner),
-      method(newCreatePrice, prevEvent, symbolLength, blockNum, newPrice)
+      method(symCreated, symbol, owner, cost),
+      method(symSold, symbol, buyer, seller, cost),
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
    PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);

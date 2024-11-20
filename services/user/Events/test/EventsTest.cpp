@@ -99,6 +99,12 @@ struct Acct
    REFLECT_EVENT(Acct, a)
 };
 
+struct Time
+{
+   TimePointSec t;
+   REFLECT_EVENT(Time, t)
+};
+
 TEST_CASE("events")
 {
    DefaultTestChain chain;
@@ -228,4 +234,9 @@ TEST_CASE("events")
            chain,
            R"""(SELECT * FROM "history.test-service.account" WHERE a >= 't1201' COLLATE BINARY ORDER BY ROWID)""") ==
        std::vector<Acct>{{AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}});
+
+   // time
+   expect(testService.to<TestService>().sendTime(TimePointSec{}).trace());
+   CHECK(query<Time>(chain, R"""(SELECT * FROM "history.test-service.time")""") ==
+         std::vector<Time>{{TimePointSec{}}});
 }

@@ -27,7 +27,10 @@ class TestExceptionExit(unittest.TestCase):
 
         t = Thread(target=long_query, args=(a.new_api(),))
         t.start()
-        a.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+        try:
+            a.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+        except ConnectionError:
+            pass
         t.join()
 
         code = a.child.wait(timeout=10)

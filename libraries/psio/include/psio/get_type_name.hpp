@@ -214,6 +214,21 @@ namespace psio
       return "duration";
    }
 
+   template <typename Rep>
+   constexpr const char* get_type_name(
+       const std::chrono::time_point<std::chrono::system_clock, std::chrono::duration<Rep>>*)
+   {
+      return "TimePointSec";
+   }
+
+   template <typename Rep>
+   constexpr const char* get_type_name(
+       const std::chrono::time_point<std::chrono::system_clock,
+                                     std::chrono::duration<Rep, std::micro>>*)
+   {
+      return "TimePointUSec";
+   }
+
    template <typename T>
    constexpr const char* get_type_name()
    {

@@ -11,7 +11,7 @@ function(add suffix)
         common/src/crypto.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
-        common/src/time.cpp
+        common/src/schema.cpp
         common/src/trace.cpp
     )
 

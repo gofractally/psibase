@@ -508,15 +508,14 @@ namespace psibase::net
          // - The last block interval boundary before the current time
          // - The head block time + the block interval
          //
-         auto head_time   = typename Timer::time_point{std::chrono::seconds(head->time.seconds)};
+         auto head_time = typename Timer::time_point{
+             std::chrono::duration_cast<std::chrono::seconds>(head->time.time_since_epoch())};
          auto block_start = std::max(head_time + _block_interval,
                                      floor2(Timer::clock_type::now(), _block_interval));
          _block_timer.expires_at(block_start + _block_interval);
          auto commit_index = chain().commit_index();
-         chain().start_block(
-             TimePointSec{static_cast<uint32_t>(
-                 duration_cast<std::chrono::seconds>(block_start.time_since_epoch()).count())},
-             self, current_term, commit_index);
+         chain().start_block(TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())},
+                             self, current_term, commit_index);
          _block_timer.async_wait(
              [this, saved_leader_cancel = _leader_cancel](const std::error_code& ec)
              {

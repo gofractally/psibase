@@ -24,15 +24,10 @@ use serde_structs::TempMessageForDeserGqlResponse;
 
 struct ChainmailPlugin;
 
-fn get_u32_unix_time_from_iso8601_str(dt_str: String) -> Result<u32, Error> {
-    let dt_i64 = DateTime::parse_from_str(dt_str.as_str(), "%+")
+fn get_unix_time_from_iso8601_str(dt_str: String) -> Result<i64, Error> {
+    Ok(DateTime::parse_from_str(dt_str.as_str(), "%+")
         .map_err(|e| ErrorType::DateTimeConversion(e.to_string()))?
-        .timestamp();
-    if dt_i64 >= 0 && dt_i64 < u32::MAX as i64 {
-        return Ok(dt_i64 as u32);
-    } else {
-        return Err(ErrorType::DateTimeConversion(dt_str).into());
-    };
+        .timestamp())
 }
 
 impl Api for ChainmailPlugin {
@@ -68,7 +63,7 @@ impl Api for ChainmailPlugin {
                 receiver: AccountNumber::from(msg.receiver.as_str()),
                 msg_id: msg.msg_id,
                 sender: AccountNumber::from(msg.sender.as_str()),
-                datetime: get_u32_unix_time_from_iso8601_str(msg.datetime)?,
+                datetime: get_unix_time_from_iso8601_str(msg.datetime)?,
             }
             .packed(),
         )?;
