@@ -21,7 +21,7 @@ namespace SystemService
    {
       struct AuthQuery
       {
-         auto accWithKey(SubjectPublicKeyInfo    key,
+         auto accWithKey(string                  pubkeyPem,
                          optional<AccountNumber> gt,
                          optional<AccountNumber> ge,
                          optional<AccountNumber> lt,
@@ -33,7 +33,7 @@ namespace SystemService
          {
             auto idx =
                 AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
-                    keyFingerprint(key));
+                    keyFingerprint(SubjectPublicKeyInfo{parseSubjectPublicKeyInfo(pubkeyPem)}));
 
             auto convert = [](const auto& opt)
             {
