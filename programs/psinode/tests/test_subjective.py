@@ -52,7 +52,6 @@ class TestSubjective(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
 
-        # a.run_psibase(['install'] + node_args() + ['--package-source', testutil.test_packages(), 'PSubjective'])
         a.install(args=['--package-source', testutil.test_packages(), 'PSubjective'])
         a.wait(new_block())
 
@@ -106,7 +105,6 @@ class TestSubjective(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
 
-        # a.run_psibase(['install'] + self.node_args() + ['--package-source', testutil.test_packages(), 'PSubjective', 'Counter'])
         a.install(args=['--package-source', testutil.test_packages(), 'PSubjective', 'Counter'])
         a.wait(new_block())
 

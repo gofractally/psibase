@@ -15,7 +15,6 @@ class TestExceptionExit(unittest.TestCase):
     def test_socket(self, cluster):
         (a,) = cluster.complete('a')
         a.boot(packages=['Minimal', 'Explorer'])
-        # a.run_psibase(['install'] + node_args + ['--package-source', testutil.test_packages(), 'KeepSocket'])
         a.install(args=['--package-source', testutil.test_packages(), 'KeepSocket'])
         a.wait(new_block())
 

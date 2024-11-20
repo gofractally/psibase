@@ -38,7 +38,6 @@ class TestQuery(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
         a.install(args=['--package-source', testutil.test_packages(), 'AsyncQuery'])
-        # a.run_psibase(['install'] + node_args() + ['--package-source', testutil.test_packages(), 'AsyncQuery'])
         a.wait(new_block())
 
         # Basic normal usage
