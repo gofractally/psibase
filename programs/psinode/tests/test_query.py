@@ -32,15 +32,13 @@ def post_parallel(api, *targets):
         return lambda a: do_post(a, t, d)
     return parallel(api, *(fn(t, d) for (t,d) in targets))
 
-def node_args(self):
-    return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
 class TestQuery(unittest.TestCase):
     @testutil.psinode_test
     def test_(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-
-        a.run_psibase(['install'] + node_args() + ['--package-source', testutil.test_packages(), 'AsyncQuery'])
+        a.install(args=['--package-source', testutil.test_packages(), 'AsyncQuery'])
+        # a.run_psibase(['install'] + node_args() + ['--package-source', testutil.test_packages(), 'AsyncQuery'])
         a.wait(new_block())
 
         # Basic normal usage
