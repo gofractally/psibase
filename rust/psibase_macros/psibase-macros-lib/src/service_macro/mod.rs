@@ -151,13 +151,13 @@ fn process_mod(
             }
         }
 
-        println!("1");
+        // println!("1");
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
-        println!("2");
+        // println!("2");
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};

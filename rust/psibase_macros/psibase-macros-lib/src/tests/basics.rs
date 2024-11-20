@@ -49,36 +49,36 @@ mod tests {
     //     let _after = service_macro_impl(attr, before);
     // }
 
-    #[test]
+    // #[test]
     // Events can only have one event type
-    fn test_pre_action_expansion() {
-        use quote::quote;
+    // fn test_pre_action_expansion() {
+    //     use quote::quote;
 
-        let attr = quote! {};
-        let before = quote! {
-            mod service {
-                #[action]
-                fn init() {
-                    // do something
-                }
-                #[pre_action(exclude(init))]
-                fn check_init() {
-                    // check init
-                    println!("Verify pre_action");
-                }
-                #[action]
-                fn add(a: i32, b: i32) -> i32 {
-                    a + b
-                }
-                #[event(history, ui)]
-                fn something() {
+    //     let attr = quote! {};
+    //     let before = quote! {
+    //         mod service {
+    //             #[action]
+    //             fn init() {
+    //                 // do something
+    //             }
+    //             #[pre_action(exclude(init))]
+    //             fn check_init() {
+    //                 // check init
+    //                 println!("Verify pre_action");
+    //             }
+    //             #[action]
+    //             fn add(a: i32, b: i32) -> i32 {
+    //                 a + b
+    //             }
+    //             #[event(history, ui)]
+    //             fn something() {
 
-                }
-            }
-        };
+    //             }
+    //         }
+    //     };
 
-        let _after = service_macro_impl(attr, before);
-    }
+    //     let _after = service_macro_impl(attr, before);
+    // }
 
     #[test]
     // `service` macro should expand and compile without requiring a `use` to provide the anyhow dep

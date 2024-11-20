@@ -200,9 +200,7 @@ pub struct PreAction {
 
 impl PreAction {
     pub fn has_pre_action(&self) -> bool {
-        let pre_action_exists = self.fn_name.is_some();
-        // println!("pre_action_exists: {}", pre_action_exists);
-        pre_action_exists
+        self.fn_name.is_some()
     }
 }
 
@@ -216,12 +214,7 @@ impl Default for PreAction {
 }
 
 fn is_pre_action_attr(attr: &Attribute) -> bool {
-    if let AttrStyle::Outer = attr.style {
-        if attr.meta.path().is_ident("pre_action") {
-            return true;
-        }
-    }
-    false
+    AttrStyle::Outer == attr.style && attr.meta.path().is_ident("pre_action")
 }
 
 #[derive(Debug, FromMeta)]
@@ -230,7 +223,6 @@ struct PreActionOptions {
 }
 
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
-    // println!("check_for_pre_action().top");
     for (_item_index, item) in items.iter_mut().enumerate() {
         if let Item::Fn(f) = item {
             let num_pre_action_fns = f
@@ -240,22 +232,24 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                 .filter(|attr| is_pre_action_attr(attr))
                 .collect::<Vec<Attribute>>()
                 .len();
-            // println!("num_pre_action_fns: {}", num_pre_action_fns);
             if num_pre_action_fns > 1 {
                 abort!(
                     item,
-                    "No more than 1 pre_action fn permitted. {} found.",
-                    num_pre_action_fns
+                    format!(
+                        "No more than 1 pre_action fn permitted. {} found.",
+                        num_pre_action_fns
+                    )
                 );
             }
             let pos = f.attrs.iter().position(is_pre_action_attr);
             if pos.is_none() {
-                return;
+                continue;
             }
-            println!("pos: {:?}", pos);
-            let pre_action_attr = f.attrs.get(pos.unwrap()).unwrap();
-            println!("pre_action_attr: {:?}", pre_action_attr);
+            let pre_action_attr = f.attrs.get(pos.unwrap()).unwrap().clone();
+
             pre_action_info.fn_name = Some(f.sig.ident.clone());
+
+            //TODO: decode attrs and get `exclude` arg
             let attr_args_ts = match pre_action_attr.meta.clone() {
                 Meta::List(args) => args.tokens,
                 Meta::Path(args) => abort!(
@@ -279,6 +273,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                         format!("Invalid pre_action arguments: {}", err.to_string())
                     );
                 });
+
             pre_action_info.exclude = options.exclude;
 
             if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
@@ -289,7 +284,6 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
 }
 
 pub fn add_pre_action_call_if_not_excluded(pre_action_info: &PreAction, f: &mut ItemFn) {
-    // println!("add_pre_action_call_if_not_excluded().top");
     if pre_action_info
         .exclude
         .to_strings()
@@ -297,6 +291,12 @@ pub fn add_pre_action_call_if_not_excluded(pre_action_info: &PreAction, f: &mut 
     {
         return;
     }
+    // let fn_name = pre_action_info.fn_name.clone();
+    // let new_line_ts = quote! {
+    //     #fn_name();
+    // };
+    // let new_line = syn::parse2(new_line_ts).unwrap();
+    // f.block.stmts.insert(0, new_line);
     let fn_name = pre_action_info.fn_name.clone().unwrap();
     let pre_action_line: Stmt = parse_quote! {
         self::#fn_name();
