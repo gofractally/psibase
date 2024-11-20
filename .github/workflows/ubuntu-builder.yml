@@ -11,8 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2004:7581315f13f1edaff283a2e6ef0cad74aebbd45d"
-            ubuntu-version: "2004"
           - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:7581315f13f1edaff283a2e6ef0cad74aebbd45d"
             ubuntu-version: "2204"
           - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:7581315f13f1edaff283a2e6ef0cad74aebbd45d"
