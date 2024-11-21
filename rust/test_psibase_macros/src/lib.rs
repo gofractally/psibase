@@ -49,7 +49,6 @@ mod tests {
     // Chain is inited with default service + whatever is listed in attribute ^^^ (comma-delimited list (case-sensitive))
     // Verifies pre_action() calls get inserted as designed
     fn test_pre_action_inserted(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        // TODO: check that pre_action() is *not* inserted into excluded fns
         use addcheckinit::Wrapper;
         use psibase::AccountNumber;
 
