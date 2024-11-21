@@ -7,7 +7,7 @@ namespace SystemService
 {
 
    /// All compiled code is uploaded to the chain through this service
-   struct SetCode : psibase::Service<SetCode>
+   struct SetCode : psibase::Service
    {
       /// "setcode"
       static constexpr auto service = psibase::AccountNumber("setcode");

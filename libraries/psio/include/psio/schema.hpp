@@ -959,6 +959,21 @@ namespace psio
          return false;
       }
 
+      template <typename Rep>
+      constexpr bool psio_custom_schema(
+          std::chrono::time_point<std::chrono::system_clock, std::chrono::duration<Rep>>*)
+      {
+         return true;
+      }
+
+      template <typename Rep>
+      constexpr bool psio_custom_schema(
+          std::chrono::time_point<std::chrono::system_clock,
+                                  std::chrono::duration<Rep, std::micro>>*)
+      {
+         return true;
+      }
+
       template <typename T>
       constexpr bool is_shared_view_ptr_v = false;
       template <typename T>
@@ -968,6 +983,11 @@ namespace psio
       constexpr bool is_duration_v = false;
       template <typename Rep, typename Period>
       constexpr bool is_duration_v<std::chrono::duration<Rep, Period>> = true;
+
+      template <typename T>
+      constexpr bool is_time_point_v = false;
+      template <typename Clock, typename Duration>
+      constexpr bool is_time_point_v<std::chrono::time_point<Clock, Duration>> = true;
 
       template <typename S, typename... T>
       std::vector<Member> insert_variant_alternatives(S& schema, std::variant<T...>*)
@@ -1075,6 +1095,10 @@ namespace psio
                else if constexpr (is_duration_v<T>)
                {
                   schema.insert(name, insert<typename T::rep>());
+               }
+               else if constexpr (is_time_point_v<T>)
+               {
+                  schema.insert(name, insert<typename T::duration>());
                }
                else if constexpr (std::numeric_limits<T>::is_iec559)
                {

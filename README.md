@@ -38,7 +38,7 @@ Documentation is hosted on the [docs app](https://docs.psibase.io/) of our demo 
 
 ## Build from source 🛠️
 
-We only officially support developing natively on Ubuntu 20.04 and Ubuntu 22.04, although any Linux distribution may work. If you use a distribution other than Ubuntu 20.04 or 22.04, ensure the versions of the dependencies you install are at least as high as they are in Ubuntu.
+We only officially support developing natively on Ubuntu 22.04 and Ubuntu 24.04, although any Linux distribution may work. If you use a distribution other than Ubuntu 22.04 or 24.04, ensure the versions of the dependencies you install are at least as high as they are in Ubuntu.
 
 Some of our developers have very strong success with Ubuntu on WSL2, and also with Docker.
 
@@ -54,7 +54,7 @@ The following is a list of dependencies you are required to install:
 | binaryen                   | 113             | A compiler and toolchain infrastructure library for WebAssembly                                                                                                  |
 | boost                      | 1.78            | A collection of C++ libraries                                                                                                                                    |
 | clang + llvm               | 16              | The LLVM compiler and toolchain for C/C++ and the libraries to interface with it                                                                                 |
-| cmake                      | 3.16.3          | A build system generator that creates makefiles used for compilation                                                                                             |
+| cmake                      | 3.22.1          | A build system generator that creates makefiles used for compilation                                                                                             |
 | g++                        | 11              | A GNU compiler for C++                                                                                                                                           |
 | libssl-dev                 | 1.1.1           | Development package for OpenSSL, enabling various cryptography and secure network communication                                                                  |
 | libtool                    | 2.4.6           | Script that simplifies the process of creating and using shared libraries                                                                                        |
@@ -62,7 +62,7 @@ The following is a list of dependencies you are required to install:
 | node                       | 16.17.0         | A JavaScript runtime                                                                                                                                             |
 | pkg-config                 | 0.29.1          | A helper tool used during compilation to provide correct compiler flags, and to locate and manage library dependencies                                           |
 | Rust toolchain             | 1.78            | Develop programs in Rust. Use `cargo` to install `cargo-component`, `mdbook`, `mdbook-linkcheck`, `mdbook-mermaid`, `mdbook-pagetoc`, `sccache`, and `wasm-pack` |
-| Wasi SDK                   | 20.0            | A development toolchain for building WebAssembly programs that target the WebAssembly System Interface (WASI)                                                    |
+| Wasi SDK                   | 24.0            | A development toolchain for building WebAssembly programs that target the WebAssembly System Interface (WASI)                                                    |
 | zstd                       | 1.4.4           | Command-line utility that implements the Zstandard file compression algorithm                                                                                    |
 
 Other notes:
@@ -70,7 +70,7 @@ Other notes:
 * Set the `WASI_SDK_PREFIX` environment variable before building to the root of your llvm installation (e.g. `/usr/lib/llvm-16`). Alternatively, set this variable during the build using the CMake flag `-DWASI_SDK_PREFIX=....`.
 * Add the following targets to rust: `wasm32-wasi`, `wasm32-unknown-unknown`
 
-> 🔍 You can reference either the [Ubuntu 20.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2004-builder.Dockerfile) or the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) for an example on how an environment could be set up.
+> 🔍 You can reference either the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) or the [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile) for an example on how an environment could be set up.
 
 ### Build
 
@@ -103,7 +103,7 @@ The following are some of the common/useful build flags you can use to configure
 > 🔍 We currently do not provide an ARM binary or docker image. If your device uses an ARM chip, you should build psinode (or its [docker image](https://github.com/gofractally/image-builders)) yourself. 
 
 To run psinode, you can either build from source as described above, or you can install prebuilt binaries through one of the following two methods:
-1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 20.04 and Ubuntu 22.04.
+1. Installing a binary release, the latest of which can be found on our [Releases](https://github.com/gofractally/psibase/releases) page. We provide binary packages for both Ubuntu 22.04 and Ubuntu 24.04.
 2. Installing our psinode [Docker Image](https://github.com/orgs/gofractally/packages/container/package/psinode).
 
 To execute psinode from the docker image, you can use the following docker command (make sure to specify the `VERSION` you want to run):

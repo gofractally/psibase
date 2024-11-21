@@ -51,7 +51,7 @@ TEST_CASE("bft crash", "[bft]")
    CHECK(final_state->blockId() == nodes[2].chain().get_head_state()->blockId());
    CHECK(final_state->blockId() == nodes[3].chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum == final_state->info.header.blockNum - 2);
@@ -93,7 +93,7 @@ TEST_CASE("bft quorum", "[bft]")
          CHECK(node->chain().get_head_state()->blockId() == Checksum256{});
    }
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
@@ -126,7 +126,7 @@ TEST_CASE("bft partition", "[bft]")
    for (const auto& node : nodes.nodes)
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
@@ -158,13 +158,12 @@ TEST_CASE("bft latency", "[bft]")
    {
       auto final_state = node->chain().get_head_state();
       // Verify that the final block looks sane
-      mock_clock::time_point final_time{
-          std::chrono::seconds{final_state->info.header.time.seconds}};
+      mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
       CHECK(final_time <= mock_clock::now());
       CHECK(final_time >= mock_clock::now() - 2s - latency);
       auto irreversible = node->chain().get_block_by_num(final_state->info.header.commitNum);
       mock_clock::time_point irreversible_time{
-          std::chrono::seconds{irreversible->block().header().time().seconds()}};
+          irreversible->block().header().time().unpack().time_since_epoch()};
       CHECK(final_time - irreversible_time >= 3 * latency);
       CHECK(final_time - irreversible_time <= 3 * latency + 2s);
    }
@@ -532,7 +531,7 @@ TEST_CASE("new consensus quick recovery")
    for (const auto& node : nodes.nodes)
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
 
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);

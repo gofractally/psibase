@@ -313,9 +313,7 @@ fn store_sys(
 
 fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
-    let expiration = TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_10secs);
     Transaction {
         tapos: Tapos {
             expiration,
@@ -692,9 +690,7 @@ async fn boot(
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let mut package_registry = JointRegistry::new();
     let package_names = if services.is_empty() {
         vec!["DevDefault".to_string()]

@@ -76,7 +76,7 @@ namespace SystemService
    /// See [psibase CLI docs](../run-infrastructure/cli/psibase.md) for details on how to upload files and directories.
    ///
    /// After files are uploaded, the site is available at `http://$ACCOUNT.$DOMAIN`
-   class Sites : psibase::Service<Sites>
+   class Sites : psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("sites");

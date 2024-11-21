@@ -28,7 +28,7 @@ namespace
       return (static_cast<Source>(r) == v);
    }
 
-   constexpr uint32_t secondsInDay{24 * 60 * 60};
+   constexpr auto secondsInDay = std::chrono::days(1);
 
 }  // namespace
 
@@ -259,7 +259,7 @@ void Symbol::updatePrices()
    for (auto symbolType : symLengthIndex)
    {
       bool priceChanged = false;
-      if (lastBlockTime.seconds - symbolType.lastPriceUpdateTime.seconds > secondsInDay)
+      if (lastBlockTime - symbolType.lastPriceUpdateTime > secondsInDay)
       {  // Decrease price if needed
          if (symbolType.createCounter < symbolType.targetCreatedPerDay)
          {

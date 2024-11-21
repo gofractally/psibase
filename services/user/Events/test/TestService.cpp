@@ -27,4 +27,9 @@ void TestService::sendAccount(psibase::AccountNumber a)
    emit().history().account(a);
 }
 
+void TestService::sendTime(psibase::TimePointSec t)
+{
+   emit().history().time(t);
+}
+
 PSIBASE_DISPATCH(TestService)

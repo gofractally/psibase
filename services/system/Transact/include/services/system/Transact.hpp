@@ -194,9 +194,9 @@ namespace SystemService
 
    struct SnapshotInfo
    {
-      psibase::TimePointSec lastSnapshot;
-      std::uint32_t         snapshotInterval;
-      auto                  key() const { return psibase::SingletonKey(); }
+      psibase::BlockTime lastSnapshot;
+      psibase::Seconds   snapshotInterval;
+      auto               key() const { return psibase::SingletonKey(); }
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, &SnapshotInfo::key>;
@@ -210,7 +210,7 @@ namespace SystemService
    /// Other services use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
-   struct Transact : psibase::Service<Transact>
+   struct Transact : psibase::Service
    {
       /// "transact"
       static constexpr auto service = psibase::AccountNumber("transact");
@@ -250,7 +250,7 @@ namespace SystemService
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
       /// setting because snapshots are signed by the block producers.
-      void setSnapTime(std::uint32_t seconds);
+      void setSnapTime(psibase::Seconds seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
@@ -309,7 +309,7 @@ namespace SystemService
       ///
       /// This is *not* the currently executing block time.
       /// TODO: remove
-      psibase::TimePointSec headBlockTime() const;
+      psibase::BlockTime headBlockTime() const;
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),

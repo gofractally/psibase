@@ -10,6 +10,8 @@ namespace psibase
 {
    using BlockNum = uint32_t;
 
+   using BlockTime = TimePointUSec;
+
    /// A synchronous call
    ///
    /// An Action represents a synchronous call between services.
@@ -210,7 +212,7 @@ namespace psibase
    {
       Checksum256   previous = {};
       BlockNum      blockNum = 0;  // TODO: pack into previous instead?
-      TimePointSec  time;          // TODO: switch to microseconds
+      BlockTime     time;
       AccountNumber producer;
       TermNum       term;
       BlockNum      commitNum;

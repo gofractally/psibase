@@ -62,8 +62,8 @@ namespace SystemService
 
    struct ReversibleBlocksRow
    {
-      psibase::BlockNum     blockNum;
-      psibase::TimePointSec time;
+      psibase::BlockNum  blockNum;
+      psibase::BlockTime time;
    };
    PSIO_REFLECT(ReversibleBlocksRow, blockNum, time)
 
@@ -79,14 +79,14 @@ namespace SystemService
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
-   class RTransact : psibase::Service<RTransact>
+   class RTransact : psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber{"r-transact"};
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
-                                                   TransactionDataTable,
-                                                   AvailableSequenceTable,
-                                                   TraceClientTable>;
+                                                                TransactionDataTable,
+                                                                AvailableSequenceTable,
+                                                                TraceClientTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
@@ -94,8 +94,8 @@ namespace SystemService
       // Callbacks used to track successful/expired transactions
       void onTrx(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
       void onBlock();
-      auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> socket)
-          -> std::optional<psibase::HttpReply>;
+      auto serveSys(const psibase::HttpRequest& request,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
    };
    PSIO_REFLECT(RTransact,
                 method(next),

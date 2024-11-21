@@ -40,7 +40,7 @@
     <div class="mb-6 flex items-center gap-2">
         <ExplorerIcon />
         <h1 class="text-6xl text-gray-600">Block explorer</h1>
-        <div class="flex-grow" />
+        <div class="flex-grow"></div>
     </div>
     <Button
         on:click={() => history.back()}

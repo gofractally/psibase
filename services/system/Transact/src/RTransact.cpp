@@ -71,7 +71,7 @@ void RTransact::onBlock()
    auto commitNum  = stat->current.commitNum;
    auto reversible = WriteOnly{}.open<ReversibleBlocksTable>();
    reversible.put({.blockNum = stat->current.blockNum, .time = stat->current.time});
-   TimePointSec irreversibleTime = {};
+   BlockTime irreversibleTime = {};
    for (auto r : reversible.getIndex<0>())
    {
       if (r.blockNum > commitNum)
@@ -136,12 +136,9 @@ namespace
          available.put({sequence + 1});
          pending.put({.id         = id,
                       .expiration = trx.transaction->tapos().expiration(),
-                      .ctime      = {static_cast<std::uint32_t>(
-                          std::chrono::time_point_cast<std::chrono::seconds>(
-                              std::chrono::system_clock::now())
-                              .time_since_epoch()
-                              .count())},
-                      .sequence   = sequence});
+                      .ctime      = std::chrono::time_point_cast<psibase::Seconds>(
+                          std::chrono::system_clock::now()),
+                      .sequence = sequence});
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
       }
       return true;

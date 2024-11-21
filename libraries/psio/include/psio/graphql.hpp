@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <chrono>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/shared_view_ptr.hpp>
@@ -40,6 +41,12 @@ namespace psio
 
    template <std::size_t Size>
    constexpr bool use_json_string_for_gql(std::array<signed char, Size>*)
+   {
+      return true;
+   }
+
+   template <typename Clock, typename Duration>
+   constexpr bool use_json_string_for_gql(std::chrono::time_point<Clock, Duration>*)
    {
       return true;
    }
@@ -149,12 +156,8 @@ namespace psio
                                  S&                                          stream,
                                  std::set<std::pair<std::type_index, bool>>& defined_types)
    {
-      if constexpr (MemPtr::isConstFunction)
-      {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (MemPtr::numArgs == 0 &&
+                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
          fill_gql_schema_fn_types((MemberPtrType<decltype(gql_callable_fn(
                                        (typename MemPtr::ReturnType*)nullptr))>*)nullptr,
@@ -175,12 +178,8 @@ namespace psio
                            std::span<const char* const> argNames,
                            S&                           stream)
    {
-      if constexpr (MemPtr::isConstFunction)
-      {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (MemPtr::numArgs == 0 &&
+                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
          return fill_gql_schema_fn(
              (MemberPtrType<decltype(gql_callable_fn(                                         //
@@ -579,8 +578,8 @@ namespace psio
                return;
             }
          }  // while (true)
-      }     // skip()
-   };       // gql_stream
+      }  // skip()
+   };  // gql_stream
 
    template <typename E>
    auto gql_parse_arg(std::string& arg, gql_stream& input_stream, const E& error)
