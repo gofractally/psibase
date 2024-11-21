@@ -104,13 +104,7 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
-                    // println!(
-                    //     "adding action fn: {} w {} lines",
-                    //     f.sig.ident.to_string(),
-                    //     f.block.stmts.len()
-                    // )
                 } else {
-                    // println!("Pushing this item into non_actions:\n{:#?}", f.sig.ident);
                     non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
@@ -151,13 +145,11 @@ fn process_mod(
             }
         }
 
-        // println!("1");
         let mut action_structs = proc_macro2::TokenStream::new();
         let mut action_schema_init = quote! {};
         let mut action_callers = proc_macro2::TokenStream::new();
         let mut dispatch_body = proc_macro2::TokenStream::new();
         let mut with_action_struct = proc_macro2::TokenStream::new();
-        // println!("2");
         for fn_index in action_fns.iter() {
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
@@ -194,11 +186,6 @@ fn process_mod(
                     // If this is an action, remove the action attribute
                     f.attrs.remove(i);
                 }
-                // println!(
-                //     "2 : 1st line of {} is {:#?}",
-                //     f.sig.ident.to_string(),
-                //     f.block.stmts[0].clone()
-                // );
             }
         }
         add_unknown_action_check_to_dispatch_body(psibase_mod, &mut dispatch_body);
@@ -765,19 +752,6 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
-    // let Some(_, ItemMod { _, _, _, _, i, c, _}) = impl_mod.content;
-    // println!("final impl_mod.content {:#?}", impl_mod.content);
-    // if let Some((_, items)) = &mut impl_mod.content {
-    //     for (_, item) in items.iter_mut().enumerate() {
-    //         if let Item::Fn(f) = item {
-    //             println!(
-    //                 "{}.stmts[0]: {:#?}",
-    //                 f.sig.ident.to_string(),
-    //                 f.block.stmts[0]
-    //             );
-    //         }
-    //     }
-    // }
     quote! {
         #silence
         #impl_mod
