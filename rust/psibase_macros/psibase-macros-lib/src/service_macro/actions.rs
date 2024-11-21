@@ -223,40 +223,46 @@ struct PreActionOptions {
 }
 
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
+    let mut num_pre_action_fns = 0;
     for (_item_index, item) in items.iter_mut().enumerate() {
         if let Item::Fn(f) = item {
-            let num_pre_action_fns = f
+            let pre_action_attrs = f
                 .attrs
                 .clone()
                 .into_iter()
                 .filter(|attr| is_pre_action_attr(attr))
-                .collect::<Vec<Attribute>>()
-                .len();
+                .collect::<Vec<Attribute>>();
+            let num_pa_attrs_on_fn = pre_action_attrs.len();
+            if num_pa_attrs_on_fn == 0 {
+                continue;
+            }
+            if num_pa_attrs_on_fn > 1 {
+                abort!(item, "More than one pre_action attribute found.");
+            }
+            num_pre_action_fns += 1;
             if num_pre_action_fns > 1 {
                 abort!(
                     item,
                     format!(
                         "No more than 1 pre_action fn permitted. {} found.",
-                        num_pre_action_fns
+                        num_pa_attrs_on_fn
                     )
                 );
             }
-            let pos = f.attrs.iter().position(is_pre_action_attr);
-            if pos.is_none() {
-                continue;
-            }
-            let pre_action_attr = f.attrs.get(pos.unwrap()).unwrap().clone();
+            let pre_action_attr = pre_action_attrs.get(0).unwrap().clone();
 
             pre_action_info.fn_name = Some(f.sig.ident.clone());
 
-            //TODO: decode attrs and get `exclude` arg
             let attr_args_ts = match pre_action_attr.meta.clone() {
                 Meta::List(args) => args.tokens,
                 Meta::Path(args) => abort!(
                     args,
                     "Invalid pre_action attributes: expected list; got path."
                 ),
-                Meta::NameValue(args) => args.value.to_token_stream(),
+                Meta::NameValue(args) => abort!(
+                    args,
+                    "Invalid pre_action attributes: expected list; got key-value pair."
+                ),
             };
             let attr_args =
                 NestedMeta::parse_meta_list(attr_args_ts.clone()).unwrap_or_else(|err| {
@@ -291,12 +297,6 @@ pub fn add_pre_action_call_if_not_excluded(pre_action_info: &PreAction, f: &mut 
     {
         return;
     }
-    // let fn_name = pre_action_info.fn_name.clone();
-    // let new_line_ts = quote! {
-    //     #fn_name();
-    // };
-    // let new_line = syn::parse2(new_line_ts).unwrap();
-    // f.block.stmts.insert(0, new_line);
     let fn_name = pre_action_info.fn_name.clone().unwrap();
     let pre_action_line: Stmt = parse_quote! {
         self::#fn_name();

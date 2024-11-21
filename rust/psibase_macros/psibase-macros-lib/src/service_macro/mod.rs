@@ -495,13 +495,12 @@ fn process_mod(
                     #psibase_mod::ActionPacker { sender, service }.into()
                 }
 
-                // TODO: thids doc and the next seem switched, no?
-                #[doc = #emit_from_doc]
+                #[doc = #emit_doc]
                 pub fn emit() -> EmitEvent {
                     EmitEvent { sender: Self::#constant }
                 }
 
-                #[doc = #emit_doc]
+                #[doc = #emit_from_doc]
                 pub fn emit_from(sender: #psibase_mod::AccountNumber) -> EmitEvent {
                     EmitEvent { sender }
                 }
