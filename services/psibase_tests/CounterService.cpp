@@ -19,7 +19,7 @@ PSIO_REFLECT(CounterRow, key, value)
 
 using CounterTable = psibase::Table<CounterRow, &CounterRow::key>;
 
-struct CounterService : psibase::Service<CounterService>
+struct CounterService : psibase::Service
 {
    using Tables                              = psibase::ServiceTables<CounterTable>;
    static constexpr auto             service = psibase::AccountNumber{"counter"};

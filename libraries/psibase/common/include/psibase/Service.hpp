@@ -9,12 +9,10 @@ namespace psibase
 {
    /// Services may optionally inherit from this to gain the [emit] and [events] convenience methods
    ///
-   /// Template arguments:
-   /// - `DerivedService`: the most-derived service class that inherits from `Service`
-   template <typename DerivedService>
    class Service
    {
      public:
+#ifdef __wasm32__
       /// Emit events
       ///
       /// The following examples use the example definitions in [Defining Events](#defining-events). After you have defined your events, you can use `emit` to emit them. Examples:
@@ -43,7 +41,11 @@ namespace psibase
       /// auto eventBNumber = emitter.ui().updateDisplay();
       /// auto eventCNumber = emitter.merkle().credit(from, to, amount);
       /// ```
-      EventEmitter<DerivedService> emit() const { return EventEmitter<DerivedService>(); }
+      template <typename DerivedService>
+      EventEmitter<DerivedService> emit(this const DerivedService&)
+      {
+         return EventEmitter<DerivedService>();
+      }
 
       /// Read events
       ///
@@ -81,12 +83,14 @@ namespace psibase
       /// auto eventBArguments = reader.ui().updateDisplay(eventBNumber).unpack();
       /// auto eventCArguments = reader.merkle().credit(eventCNumber).unpack();
       /// ```
-      EventReader<DerivedService> events() const
+      template <typename DerivedService>
+      EventReader<DerivedService> events(this const DerivedService&)
       {
          return EventReader<DerivedService>(DerivedService::service);
       }
+#endif
    };  // Service
-};     // namespace psibase
+};  // namespace psibase
 
 #define PSIBASE_REFLECT_EVENTS(SERVICE)       \
    using SERVICE##_Events = SERVICE ::Events; \
