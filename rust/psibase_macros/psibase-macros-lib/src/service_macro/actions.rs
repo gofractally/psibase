@@ -224,7 +224,7 @@ struct PreActionOptions {
 
 pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
     let mut num_pre_action_fns = 0;
-    for (_item_index, item) in items.iter_mut().enumerate() {
+    for item in items.iter_mut() {
         if let Item::Fn(f) = item {
             let pre_action_attrs = f
                 .attrs
@@ -241,13 +241,7 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
             }
             num_pre_action_fns += 1;
             if num_pre_action_fns > 1 {
-                abort!(
-                    item,
-                    format!(
-                        "No more than 1 pre_action fn permitted. {} found.",
-                        num_pa_attrs_on_fn
-                    )
-                );
+                abort!(item, "No more than 1 pre_action fn permitted.");
             }
             let pre_action_attr = pre_action_attrs.get(0).unwrap().clone();
 
