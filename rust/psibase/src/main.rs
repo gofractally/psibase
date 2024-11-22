@@ -1423,9 +1423,9 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = parse_args()?;
-    // if let Some(help) = &args.help {
-    //     return print_help(help);
-    // }
+    if let Some(help) = &args.help {
+        return print_help(help);
+    }
     let Some(command) = &args.command else {
         return print_help(&[]);
     };

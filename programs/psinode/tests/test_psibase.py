@@ -87,7 +87,7 @@ class TestPsibase(unittest.TestCase):
     def test_install(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.install(args=['Symbol', 'Tokens', 'TokenUsers'])
+        a.install(packages=['Symbol', 'Tokens', 'TokenUsers'])
         a.wait(new_block())
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
@@ -113,8 +113,7 @@ class TestPsibase(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as dir:
             make_package_repository(dir, [foo10])
-            # a.run_psibase(['install'] + self.node_args() + ['foo', '--package-source', dir])
-            a.install(args=['foo', '--package-source', dir])
+            a.run_psibase(['install'] + self.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')

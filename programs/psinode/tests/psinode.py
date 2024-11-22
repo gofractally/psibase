@@ -525,9 +525,9 @@ class Node(API):
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)
-    def install(self, args=[]):
+    def install(self, packages=[], sources=[]):
         '''installs a package'''
-        self.run_psibase(['install'] + self.node_args() + args)
+        self.run_psibase(['install'] + self.node_args() + ['--package-source', sources] + packages)
     def run_psibase(self, args):
         self._find_psibase()
         subprocess.run([self.psibase] + args).check_returncode()
