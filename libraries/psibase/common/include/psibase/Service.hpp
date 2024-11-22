@@ -7,6 +7,35 @@
 
 namespace psibase
 {
+
+   template <typename Service>
+   struct RecursionGuard
+   {
+      static bool running;
+      RecursionGuard()
+      {
+         check(!running, "Cannot reenter service");
+         running = true;
+      }
+      ~RecursionGuard() { running = false; }
+   };
+
+   template <typename Service>
+   bool RecursionGuard<Service>::running = false;
+
+   template <typename Service>
+   struct RecursiveActor : Actor<Service>
+   {
+      bool prevRunning;
+      RecursiveActor(AccountNumber sender, AccountNumber receiver)
+          : Actor<Service>{sender, receiver}
+      {
+         prevRunning                      = RecursionGuard<Service>::running;
+         RecursionGuard<Service>::running = false;
+      }
+      ~RecursiveActor() { RecursionGuard<Service>::running = prevRunning; }
+   };
+
    /// Services may optionally inherit from this to gain the [emit] and [events] convenience methods
    ///
    class Service
@@ -87,6 +116,25 @@ namespace psibase
       EventReader<DerivedService> events(this const DerivedService&)
       {
          return EventReader<DerivedService>(DerivedService::service);
+      }
+
+      /// Allow synchronous calls to re-enter the service
+      ///
+      /// The service is responsible for ensuring correctness:
+      /// - All tables should be in a consistent state when a recursive call is made.
+      /// - Local variables that shadow table rows may not be valid after a recursive call returns.
+      ///
+      /// This only allows a single level of recursion. If an action that is called
+      /// recursively itself needs to make a recursive call, it must also enable recursion.
+      ///
+      /// ```
+      /// recurse().foo();
+      /// ```
+      template <typename DerivedService>
+      RecursiveActor<DerivedService> recurse(this const DerivedService&)
+      {
+         auto receiver = getReceiver();
+         return {receiver, receiver};
       }
 #endif
    };  // Service
