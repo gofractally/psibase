@@ -1,8 +1,10 @@
 use darling::{ast::NestedMeta, util::PathList, FromMeta};
+use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_quote, AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat, ReturnType, Stmt,
+    parse_quote, spanned::Spanned, AttrStyle, Attribute, FnArg, Ident, Item, ItemFn, Meta, Pat,
+    ReturnType, Stmt,
 };
 
 #[derive(Debug, FromMeta)]
@@ -222,8 +224,12 @@ struct PreActionOptions {
     exclude: PathList,
 }
 
-pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Item>) {
+pub fn check_for_pre_action(
+    pre_action_info: &mut PreAction,
+    items: &mut Vec<Item>,
+) -> Result<(), TokenStream> {
     let mut num_pre_action_fns = 0;
+    let mut sp: Option<Attribute> = None;
     for item in items.iter_mut() {
         if let Item::Fn(f) = item {
             let pre_action_attrs = f
@@ -237,50 +243,56 @@ pub fn check_for_pre_action(pre_action_info: &mut PreAction, items: &mut Vec<Ite
                 continue;
             }
             if num_pa_attrs_on_fn > 1 {
-                abort!(item, "More than one pre_action attribute found.");
+                return Err(
+                    syn::Error::new(f.span(), "More than one pre_action attribute found.")
+                        .to_compile_error(),
+                );
             }
             num_pre_action_fns += 1;
-            if num_pre_action_fns > 1 {
-                abort!(item, "No more than 1 pre_action fn permitted.");
-            }
+
             let pre_action_attr = pre_action_attrs.get(0).unwrap().clone();
+            sp = Some(pre_action_attr.clone());
 
             pre_action_info.fn_name = Some(f.sig.ident.clone());
 
-            let attr_args_ts = match pre_action_attr.meta.clone() {
-                Meta::List(args) => args.tokens,
-                Meta::Path(args) => abort!(
-                    args,
-                    "Invalid pre_action attributes: expected list; got path."
-                ),
+            pre_action_info.exclude = match pre_action_attr.meta.clone() {
+                Meta::List(args) => {
+                    let attr_args = NestedMeta::parse_meta_list(args.tokens.clone())
+                        .unwrap_or_else(|err| {
+                            abort!(
+                                args.tokens,
+                                format!("Invalid pre_action arguments: {}", err.to_string())
+                            )
+                        });
+
+                    let options: PreActionOptions = PreActionOptions::from_list(&attr_args.clone())
+                        .unwrap_or_else(|err| {
+                            abort!(
+                                args.tokens,
+                                format!("Invalid pre_action arguments: {}", err.to_string())
+                            );
+                        });
+
+                    options.exclude
+                }
+                Meta::Path(_) => PathList::new::<syn::Path>(vec![]),
                 Meta::NameValue(args) => abort!(
                     args,
                     "Invalid pre_action attributes: expected list; got key-value pair."
                 ),
             };
-            let attr_args =
-                NestedMeta::parse_meta_list(attr_args_ts.clone()).unwrap_or_else(|err| {
-                    abort!(
-                        attr_args_ts,
-                        format!("Invalid pre_action arguments: {}", err.to_string())
-                    )
-                });
-
-            let options: PreActionOptions = PreActionOptions::from_list(&attr_args.clone())
-                .unwrap_or_else(|err| {
-                    abort!(
-                        attr_args_ts,
-                        format!("Invalid pre_action arguments: {}", err.to_string())
-                    );
-                });
-
-            pre_action_info.exclude = options.exclude;
 
             if let Some(pre_action_pos) = f.attrs.iter().position(is_pre_action_attr) {
                 f.attrs.remove(pre_action_pos);
             }
         }
     }
+    if num_pre_action_fns > 1 {
+        return Err(
+            syn::Error::new(sp.span(), "Only 1 pre_action fn permitted.").to_compile_error(),
+        );
+    }
+    Ok(())
 }
 
 pub fn add_pre_action_call_if_not_excluded(pre_action_info: &PreAction, f: &mut ItemFn) {

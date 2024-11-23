@@ -92,7 +92,10 @@ fn process_mod(
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
-        check_for_pre_action(&mut pre_action_info, items);
+        let pa_ret = check_for_pre_action(&mut pre_action_info, items);
+        if pa_ret.is_err() {
+            return pa_ret.err().unwrap();
+        }
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
                 if s.attrs.iter().any(is_table_attr) {
