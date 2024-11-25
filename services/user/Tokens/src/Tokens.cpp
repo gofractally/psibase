@@ -67,11 +67,10 @@ void Tokens::init()
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
-   auto tokService = to<Tokens>();
    auto nftService = to<Nft>();
 
    // Configure manual debit for self on Token and NFT
-   tokService.setUserConf(userConfig::manualDebit, true);
+   recurse().setUserConf(userConfig::manualDebit, true);
    nftService.setUserConf(userConfig::manualDebit, true);
 
    // Configure manual debit for Nft on Token
@@ -87,11 +86,11 @@ void Tokens::init()
    }
 
    // Create system token
-   auto tid = tokService.create(Precision{4}, Quantity{1'000'000'000e4});
+   auto tid = recurse().create(Precision{4}, Quantity{1'000'000'000e4});
    check(tid == TID{1}, wrongSysTokenId);
 
    // Make system token default untradeable
-   tokService.setTokenConf(tid, tokenConfig::untradeable, true);
+   recurse().setTokenConf(tid, tokenConfig::untradeable, true);
 
    // Pass system token ownership to symbol service
    auto tNft = getToken(tid).ownerNft;

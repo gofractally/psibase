@@ -43,7 +43,7 @@ void Nft::init()
    initTable.put(InitializedRecord{});
 
    // Configure manual debit for self on Token and NFT
-   to<Nft>().setUserConf(userConfig::manualDebit, true);
+   recurse().to<Nft>().setUserConf(userConfig::manualDebit, true);
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Nft::service);
