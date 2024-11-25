@@ -156,9 +156,13 @@ namespace psio
                                  S&                                          stream,
                                  std::set<std::pair<std::type_index, bool>>& defined_types)
    {
-      if constexpr (MemPtr::numArgs == 0 &&
-                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
+         if constexpr (MemPtr::numArgs != 0)
+         {
+            forEachType(typename MemPtr::ArgTypes{},
+                        [&](auto* p) { fill_gql_schema(p, stream, defined_types, true); });
+         }
          fill_gql_schema_fn_types((MemberPtrType<decltype(gql_callable_fn(
                                        (typename MemPtr::ReturnType*)nullptr))>*)nullptr,
                                   stream, defined_types);
@@ -172,21 +176,51 @@ namespace psio
       }
    }
 
+   template <typename R, typename A1, typename A2>
+   struct GqlDeduceMergeArgs;
+
+   template <typename R, typename... A1, typename... A2>
+   struct GqlDeduceMergeArgs<R, std::tuple<A1...>, std::tuple<A2...>>
+   {
+      auto operator()(const A1&... a1, const A2&... a2) const -> R;
+   };
+
    template <typename MemPtr, typename S>
    void fill_gql_schema_fn(MemPtr*,
                            const char*                  name,
                            std::span<const char* const> argNames,
                            S&                           stream)
    {
-      if constexpr (MemPtr::numArgs == 0 &&
-                    gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
+      if constexpr (gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
-         return fill_gql_schema_fn(
-             (MemberPtrType<decltype(gql_callable_fn(                                         //
-                  (typename MemPtr::ReturnType*)nullptr))>*)nullptr,                          //
-             name,                                                                            //
-             *gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),  //
-             stream);
+         if constexpr (MemPtr::numArgs == 0)
+         {
+            return fill_gql_schema_fn(
+                (MemberPtrType<decltype(gql_callable_fn(                                         //
+                     (typename MemPtr::ReturnType*)nullptr))>*)nullptr,                          //
+                name,                                                                            //
+                *gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),  //
+                stream);
+         }
+         else
+         {
+            using F2          = decltype(gql_callable_fn((typename MemPtr::ReturnType*)nullptr));
+            using args_tuple  = TupleFromTypeList<typename MemPtr::SimplifiedArgTypes>;
+            using args2_tuple = TupleFromTypeList<typename MemberPtrType<F2>::SimplifiedArgTypes>;
+            const char* merged_names[MemPtr::numArgs + std::tuple_size_v<args2_tuple>];
+            auto        arg_names2 = *gql_callable_args((typename MemPtr::ReturnType*)nullptr);
+            check(argNames.size() + arg_names2.size() == std::ranges::size(merged_names),
+                  "Wrong number of argument names: " + std::to_string(argNames.size()) + " + " +
+                      std::to_string(arg_names2.size()) +
+                      " != " + std::to_string(std::ranges::size(merged_names)));
+            auto pos = merged_names;
+            pos      = std::ranges::copy(argNames, pos).out;
+            std::ranges::copy(arg_names2, pos);
+            using MergeFn =
+                GqlDeduceMergeArgs<typename MemberPtrType<F2>::ReturnType, args_tuple, args2_tuple>;
+            return fill_gql_schema_fn((MemberPtrType<decltype(&MergeFn::operator())>*)nullptr, name,
+                                      merged_names, stream);
+         }
       }
       else
       {
@@ -944,6 +978,21 @@ namespace psio
       return gql_query(value.unpack(), input_stream, output_stream, error, allow_unknown_members);
    }
 
+   template <typename T, typename F1, typename F2, typename A1, typename A2>
+   struct GqlMergeArgs;
+
+   template <typename T, typename F1, typename F2, typename... A1, typename... A2>
+   struct GqlMergeArgs<T, F1, F2, std::tuple<A1...>, std::tuple<A2...>>
+   {
+      decltype(auto) operator()(const A1&... a1, const A2&... a2) const
+      {
+         return f2(std::invoke(f1, t, a1...), a2...);
+      }
+      T  t;
+      F1 f1;
+      F2 f2;
+   };
+
    template <typename T, typename MPtr, typename OS, typename E>
    bool gql_query_fn(const T&                     value,
                      std::span<const char* const> argNames,
@@ -956,11 +1005,31 @@ namespace psio
       using args_tuple = TupleFromTypeList<typename MemberPtrType<MPtr>::SimplifiedArgTypes>;
       static constexpr int num_args = std::tuple_size_v<args_tuple>;
       using ReturnType              = std::remove_cvref_t<typename MemberPtrType<MPtr>::ReturnType>;
-      if constexpr (num_args == 0 && gql_callable_args((ReturnType*)nullptr))
+      if constexpr (gql_callable_args((ReturnType*)nullptr))
       {
-         return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
-                             gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
-                             error, allow_unknown_members);
+         if constexpr (num_args == 0)
+         {
+            return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
+                                gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
+                                error, allow_unknown_members);
+         }
+         else
+         {
+            auto fn2 = gql_callable_fn((ReturnType*)nullptr);
+            using args2_tuple =
+                TupleFromTypeList<typename MemberPtrType<decltype(fn2)>::SimplifiedArgTypes>;
+            const char* merged_names[num_args + std::tuple_size_v<args2_tuple>];
+            auto        arg_names2 = *gql_callable_args((ReturnType*)nullptr);
+            check(argNames.size() + arg_names2.size() == std::ranges::size(merged_names),
+                  "Wrong number of argument names");
+            auto pos = merged_names;
+            pos      = std::ranges::copy(argNames, pos).out;
+            std::ranges::copy(arg_names2, pos);
+            using MergeFn = GqlMergeArgs<const T&, MPtr, decltype(fn2), args_tuple, args2_tuple>;
+            MergeFn mergedFn{value, mptr, fn2};
+            return gql_query_fn(mergedFn, merged_names, &MergeFn::operator(), input_stream,
+                                output_stream, error, allow_unknown_members);
+         }
       }
       else
       {

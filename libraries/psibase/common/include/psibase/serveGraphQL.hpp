@@ -270,7 +270,7 @@ namespace psibase
    /// - `MyTypeEdge` and `MyTypeConnection` are automatically generated from `MyType`.
    /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
    /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
-   template <typename Connection, typename T, typename Key>
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
    Connection makeConnection(const TableIndex<T, Key>&         index,
                              const std::optional<Key>&         gt,
                              const std::optional<Key>&         ge,
@@ -279,7 +279,8 @@ namespace psibase
                              std::optional<uint32_t>           first,
                              std::optional<uint32_t>           last,
                              const std::optional<std::string>& before,
-                             const std::optional<std::string>& after)
+                             const std::optional<std::string>& after,
+                             Proj&&                            proj = {})
    {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
@@ -316,7 +317,7 @@ namespace psibase
       auto       add_edge = [&](const auto& it)
       {
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{proj(*it), std::move(cursor)});
       };
 
       if (last && !first)
@@ -459,6 +460,45 @@ namespace psibase
       return result;
    }  // makeConnection
 
+   template <typename Index, typename F>
+   struct TransformedConnection
+   {
+      Index index;
+      F     f;
+   };
+
+   namespace detail
+   {
+      template <typename Connection, typename T, typename Key>
+      Connection makeConnectionFn(const TableIndex<T, Key>&         index,
+                                  const std::optional<Key>&         gt,
+                                  const std::optional<Key>&         ge,
+                                  const std::optional<Key>&         lt,
+                                  const std::optional<Key>&         le,
+                                  std::optional<uint32_t>           first,
+                                  std::optional<uint32_t>           last,
+                                  const std::optional<std::string>& before,
+                                  const std::optional<std::string>& after)
+      {
+         return makeConnection<Connection>(index, gt, ge, lt, le, first, last, before, after);
+      }
+
+      template <typename Connection, typename Index, typename F, typename Key>
+      Connection makeTransformedConnection(const TransformedConnection<Index, F>& index,
+                                           const std::optional<Key>&              gt,
+                                           const std::optional<Key>&              ge,
+                                           const std::optional<Key>&              lt,
+                                           const std::optional<Key>&              le,
+                                           std::optional<uint32_t>                first,
+                                           std::optional<uint32_t>                last,
+                                           const std::optional<std::string>&      before,
+                                           const std::optional<std::string>&      after)
+      {
+         return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
+                                           index.f);
+      }
+   }  // namespace detail
+
    template <typename T, typename K>
    constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
    {
@@ -470,7 +510,23 @@ namespace psibase
    {
       using Connection = psibase::Connection<  //
           T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
-      return makeConnection<Connection, T, K>;
+      return &detail::makeConnectionFn<Connection, T, K>;
+   }  // gql_callable_fn
+
+   template <typename Index, typename F>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+       TransformedConnection<Index, F>*)
+   {
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+   }
+
+   template <typename T, typename Key, typename F>
+   constexpr auto gql_callable_fn(const TransformedConnection<TableIndex<T, Key>, F>*)
+   {
+      using R          = decltype(std::declval<F>()(std::declval<T>()));
+      using Connection = psibase::Connection<  //
+          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+      return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
    // These fields are in snake_case and have the event_ prefix
