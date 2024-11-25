@@ -1,9 +1,6 @@
-import type { MilkdownPlugin, Ctx } from "@milkdown/ctx";
-
 import { atom, useSetAtom } from "jotai";
 import {
     defaultValueCtx,
-    editorViewCtx,
     editorViewOptionsCtx,
     Editor as MilkdownEditor,
     rootCtx,
@@ -12,24 +9,15 @@ import {
 // import { $view } from "@milkdown/utils";
 import { nord } from "@milkdown/theme-nord";
 import { Milkdown, useEditor } from "@milkdown/react";
-import { commonmark, linkSchema } from "@milkdown/preset-commonmark";
+import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { listItemBlockComponent } from "@milkdown/components/list-item-block";
-import {
-    configureLinkTooltip,
-    linkTooltipAPI,
-    linkTooltipPlugin,
-    linkTooltipState,
-} from "@milkdown/components/link-tooltip";
-import { TooltipProvider, tooltipFactory } from "@milkdown/plugin-tooltip";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 // import { math, mathBlockSchema } from "@milkdown/plugin-math";
 // import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
 // import { useNodeViewFactory } from "@prosemirror-adapter/react";
 import { Node, Schema } from "@milkdown/prose/model";
-import type { EditorView } from "@milkdown/prose/view";
-import type { EditorState } from "@milkdown/prose/state";
 
 import {
     selectionCtx,
@@ -38,11 +26,15 @@ import {
 
 // import { MathBlock, MermaidDiagram } from "./editor";
 // import { MathBlock } from "./editor";
+import {
+    insertLinkTooltip,
+    linkTooltipConfig,
+    linkTooltipPlugin,
+} from "./editor/link-widget";
 
 import "@milkdown/theme-nord/style.css";
 // import "katex/dist/katex.min.css";
 import "../styles/editor.css";
-import "../styles/link-tooltip.css";
 
 export const editorSelectionAtom = atom<{
     doc: Node;
@@ -89,61 +81,14 @@ export const MarkdownEditor = ({
     //     ].flat();
     // }, [nodeViewFactory]);
 
-    const insertLinkTooltip = tooltipFactory("CREATE_LINK");
-
-    function tooltipPluginView(ctx: Ctx) {
-        return (_view: EditorView) => {
-            const content = document.createElement("div");
-            const provider = new TooltipProvider({
-                content,
-                shouldShow: (view: EditorView) => {
-                    const { selection, doc } = view.state;
-                    const has = doc.rangeHasMark(
-                        selection.from,
-                        selection.to,
-                        linkSchema.type(ctx),
-                    );
-                    if (has || selection.empty) return false;
-
-                    return true;
-                },
-            });
-
-            content.onmousedown = (e: MouseEvent) => {
-                e.preventDefault();
-                const view = ctx.get(editorViewCtx);
-                const { selection } = view.state;
-                ctx.get(linkTooltipAPI.key).addLink(
-                    selection.from,
-                    selection.to,
-                );
-                provider.hide();
-            };
-
-            return {
-                update: (updatedView: EditorView, prevState: EditorState) => {
-                    if (ctx.get(linkTooltipState.key).mode === "edit") return;
-                    provider.update(updatedView, prevState);
-                },
-                destroy: () => {
-                    provider.destroy();
-                    content.remove();
-                },
-            };
-        };
-    }
-
     useEditor((root) =>
         MilkdownEditor.make()
             .config(nord)
             .config((ctx) => {
                 ctx.set(rootCtx, root);
                 ctx.set(defaultValueCtx, initialValue);
-                ctx.set(insertLinkTooltip.key, {
-                    view: tooltipPluginView(ctx),
-                });
-                configureLinkTooltip(ctx);
             })
+            .config(linkTooltipConfig)
             .config((ctx) => {
                 if (readOnly) return;
                 const listener = ctx.get(listenerCtx);
