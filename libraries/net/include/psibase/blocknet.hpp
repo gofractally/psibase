@@ -3,6 +3,7 @@
 #include <psibase/ForkDb.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/net_base.hpp>
+#include <psio/finally.hpp>
 #include <psio/reflect.hpp>
 
 #include <algorithm>
@@ -387,24 +388,19 @@ namespace psibase::net
          {
             if (active_producers[1]->size() != 1 || !active_producers[1]->isProducer(self))
                return false;
+            if (active_producers[0]->size() == 0)
+               return true;
          }
-         return active_producers[0]->size() == 0 ||
-                (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self));
+         return (active_producers[0]->size() == 1 && active_producers[0]->isProducer(self));
       }
       bool is_producer() const
       {
-         // If there are no producers set on chain, then any
-         // producer can produce a block
-         return (active_producers[0]->size() == 0 && self != AccountNumber() &&
-                 !active_producers[1]) ||
-                active_producers[0]->isProducer(self) ||
+         return active_producers[0]->isProducer(self) ||
                 (active_producers[1] && active_producers[1]->isProducer(self));
       }
       bool is_producer(AccountNumber account) const
       {
-         return (active_producers[0]->size() == 0 && account != AccountNumber() &&
-                 !active_producers[1]) ||
-                active_producers[0]->isProducer(account) ||
+         return active_producers[0]->isProducer(account) ||
                 (active_producers[1] && active_producers[1]->isProducer(account));
       }
       producer_id producer_name() const { return self; }
@@ -576,6 +572,73 @@ namespace psibase::net
             PSIBASE_LOG(consensus().logger, info) << log_message;
             chain().abort_block();
          }
+      }
+
+      bool push_boot(std::vector<SignedTransaction>&& transactions, TransactionTrace& trace)
+      {
+         bool result = false;
+         if (chain().getBlockContext())
+         {
+            trace.error = "chain is already booted";
+            return result;
+         }
+         try
+         {
+            auto block_start  = floor2(Timer::clock_type::now(), _block_interval);
+            auto commit_index = chain().commit_index();
+            chain().start_block(
+                TimePointSec{duration_cast<Seconds>(block_start.time_since_epoch())}, self,
+                current_term, commit_index);
+            auto  cleanup = psio::finally{[&]
+                                         {
+                                            if (!result)
+                                            {
+                                               chain().abort_block();
+                                            }
+                                         }};
+            auto& bc      = *chain().getBlockContext();
+            if (!bc.needGenesisAction)
+            {
+               trace.error = "chain is already booted";
+            }
+            else
+            {
+               for (auto& trx : transactions)
+               {
+                  if (!trx.proofs.empty())
+                     // Proofs execute as of the state at the beginning of a block.
+                     // That state is empty, so there are no proof services installed.
+                     trace.error = "Transactions in boot block may not have proofs";
+                  else
+                     bc.pushTransaction(std::move(trx), trace, std::nullopt);
+               }
+               if (auto* b = chain().finish_block([this](const BlockHeaderState* state)
+                                                  { return consensus().makeBlockData(state); }))
+               {
+                  result = true;
+                  consensus().set_producers({b->producers, b->nextProducers});
+                  consensus().on_accept_block(b);
+                  consensus().on_fork_switch(&b->info.header);
+                  consensus().set_producers({b->nextProducers, nullptr});
+                  network().on_producer_change();
+                  // do_gc needs to run after on_fork_switch, because
+                  // on_fork_switch is responsible for cleaning up any
+                  // pointers that will become dangling.
+                  do_gc();
+               }
+            }
+         }
+         catch (std::bad_alloc&)
+         {
+            throw;
+         }
+         catch (...)
+         {
+            // Don't give a false positive
+            if (!trace.error)
+               throw;
+         }
+         return result;
       }
 
       // This async loop is active when running as the leader and
@@ -815,14 +878,6 @@ namespace psibase::net
             throw std::runtime_error("Consensus algorithm not available");
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
-
-         if (_state != producer_state::leader)
-         {
-            _state = producer_state::leader;
-            PSIBASE_LOG(logger, info)
-                << "Starting block production for term " << current_term << " as " << self.str();
-            start_leader();
-         }
       }
       void cancel() {}
       void validate_message() {}

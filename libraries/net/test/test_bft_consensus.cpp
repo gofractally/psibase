@@ -149,7 +149,7 @@ TEST_CASE("bft latency", "[bft]")
    auto                    producers = makeAccounts({"a", "b", "c", "d"});
    nodes.add(producers);
    nodes.partition(NetworkPartition::all(), latency);
-   boot<BftConsensus>(nodes.getBlockContext(), producers);
+   boot<BftConsensus>(nodes[0], producers);
 
    runFor(ctx, 5min);
 
@@ -188,7 +188,7 @@ TEST_CASE("commit before prepare", "[bft]")
    auto                    producers = makeAccounts({"a", "b", "c", "d"});
    nodes.add(makeAccounts({"a", "e"}));
    nodes.partition(NetworkPartition::all());
-   boot<BftConsensus>(nodes.getBlockContext(), producers);
+   boot<BftConsensus>(nodes[0], producers);
    runFor(ctx, 1s);
 
    auto send = [&](auto&& message)

@@ -315,25 +315,33 @@ psibase::Transaction setProducers(const psibase::ConsensusData& producers);
 std::vector<psibase::AccountNumber> makeAccounts(
     const std::vector<std::string_view>& producer_names);
 
-void boot(psibase::BlockContext*        ctx,
-          const psibase::ConsensusData& producers,
-          bool                          enableEcdsa = false);
+auto makeBoot(const psibase::ConsensusData& producers,
+              bool enableEcdsa = false) -> std::vector<psibase::SignedTransaction>;
 
-template <typename C>
-void boot(psibase::BlockContext* ctx, const std::vector<psibase::AccountNumber>& producers)
+template <typename Node>
+void boot(Node& node, const psibase::ConsensusData& producers, bool enableEcdsa = false)
+{
+   psibase::TransactionTrace trace;
+   node.push_boot(makeBoot(producers, enableEcdsa), trace);
+   if (trace.error)
+      throw std::runtime_error(std::move(*trace.error));
+}
+
+template <typename C, typename Node>
+void boot(Node& node, const std::vector<psibase::AccountNumber>& producers)
 {
    C consensus;
    for (auto account : producers)
    {
       consensus.producers.push_back({account});
    }
-   boot(ctx, consensus);
+   boot(node, consensus);
 }
 
-template <typename C>
-void boot(psibase::BlockContext* ctx, const std::vector<std::string_view>& names)
+template <typename C, typename Node>
+void boot(Node& node, const std::vector<std::string_view>& names)
 {
-   boot<C>(ctx, makeAccounts(names));
+   boot<C>(node, makeAccounts(names));
 }
 
 template <typename C, typename N>
@@ -342,7 +350,7 @@ void setup(NodeSet<N>& nodes, const std::vector<psibase::AccountNumber>& produce
    for (auto prod : producers)
       nodes.add(prod);
    nodes.connect_all();
-   boot<C>(nodes[0].chain().getBlockContext(), producers);
+   boot<C>(nodes[0], producers);
 }
 
 template <typename C, typename N>
@@ -432,7 +440,7 @@ struct SingleNode
    {
       nodes.add(makeAccounts({"a", "main"}));
       nodes.partition(NetworkPartition::all());
-      boot<psibase::BftConsensus>(nodes.getBlockContext(), producers);
+      boot<psibase::BftConsensus>(nodes[0], producers);
       runFor(ctx, std::chrono::seconds(1));
    }
    SingleNode(const std::vector<std::string_view>& producers) : SingleNode(makeAccounts(producers))

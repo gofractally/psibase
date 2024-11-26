@@ -200,7 +200,11 @@ namespace
                                    true);
          blockContext.start(TimePointSec{}, genesisProducer, 0, 0);
          blockContext.callStartBlock();
-         boot(&blockContext, *init);
+         for (auto&& trx : makeBoot(*init))
+         {
+            TransactionTrace trace;
+            blockContext.pushTransaction(std::move(trx), trace, std::nullopt);
+         }
          auto [revision, id] = blockContext.writeRevision(prover, claim);
          systemContext->sharedDatabase.setHead(*writer, revision);
          initialHead  = revision;
