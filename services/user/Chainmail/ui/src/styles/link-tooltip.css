@@ -4,6 +4,8 @@ milkdown-link-preview {
         display: none;
     }
 
+    @apply dark:text-background;
+
     & > .link-preview {
         @apply absolute -right-40 -top-12 z-20 rounded-md border bg-white;
         height: 42px;
@@ -58,7 +60,7 @@ milkdown-link-preview {
             }
             @apply rounded-md px-1;
             &:hover {
-                @apply bg-accent;
+                @apply bg-accent dark:text-foreground;
             }
         }
     }
@@ -69,6 +71,9 @@ milkdown-link-edit {
     &[data-show="false"] {
         display: none;
     }
+
+    @apply dark:text-background;
+
     & > .link-edit {
         @apply absolute -right-40 -top-12 z-20 flex justify-center gap-2 rounded-md border bg-white px-3 py-2;
         height: 42px;
@@ -84,7 +89,7 @@ milkdown-link-edit {
             @apply flex w-max cursor-pointer items-center rounded-md px-1.5;
             font-size: 12px;
             &:hover {
-                @apply bg-accent;
+                @apply bg-accent dark:text-foreground;
             }
             &.hidden {
                 visibility: hidden;

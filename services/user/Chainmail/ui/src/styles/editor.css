@@ -10,6 +10,10 @@
     @apply mx-auto h-full max-w-none dark:text-foreground;
 }
 
+.prose a {
+    @apply dark:text-foreground;
+}
+
 /* list-item-block */
 .prose :where(li):not(:where([class~="not-prose"] *)) {
     margin-top: 0.5em;
