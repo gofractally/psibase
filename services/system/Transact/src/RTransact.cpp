@@ -313,7 +313,10 @@ namespace
       AcceptParser parser;
       for (const auto& header : headers)
       {
-         parseHeader(header.value, parser);
+         if (header.name == "accept")
+         {
+            parseHeader(header.value, parser);
+         }
       }
       return parser.isJson();
    }
