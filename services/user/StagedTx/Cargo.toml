@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = ["service", "query-service"]
+
+[workspace.package]
+version = "0.13.0"
+rust-version = "1.64"
+edition = "2021"
+repository = "https://github.com/gofractally/psibase"
+homepage = "https://psibase.io"
+publish = false
+
+[package]
+name = "staged-tx-pkg"
+description = "Library for proposing and executing staged transactions"
+version.workspace = true
+edition.workspace = true
+
+[package.metadata.psibase]
+package-name = "StagedTx"
+services = ["staged-tx"]
+
+[package.metadata.psibase.dependencies]
+Supervisor = "0.13.0"
+Sites = "0.13.0"
+HttpServer = "0.13.0"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+staged-tx = { path = "service", version = "0.13.0" }
+r-staged-tx = { path = "query-service", version = "0.13.0" }
