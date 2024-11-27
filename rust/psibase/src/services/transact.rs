@@ -152,6 +152,30 @@ pub mod auth_interface {
     fn canAuthUserSys(user: crate::AccountNumber) {
         unimplemented!()
     }
+
+    /// Handle notification related to the acceptance of a staged transaction
+    ///
+    /// An auth service is notified when the sender of the staged transaction
+    /// is an account that uses the auth service.
+    ///
+    /// * `txid`: The transaction ID of the staged transaction
+    /// * `actor`: The account that accepts the specified staged transaction
+    #[action]
+    fn stagedAccept(txid: crate::Checksum256, actor: crate::AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Handle notification related to the rejection of a staged transaction
+    ///
+    /// An auth service is notified when the sender of the staged transaction
+    /// is an account that uses the auth service.
+    ///
+    /// * `txid`: The transaction ID of the staged transaction
+    /// * `actor`: The account that rejects the specified staged transaction
+    #[action]
+    fn stagedReject(txid: crate::Checksum256, actor: crate::AccountNumber) {
+        unimplemented!()
+    }
 }
 
 /// All transactions enter the chain through this service

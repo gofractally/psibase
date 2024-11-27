@@ -139,10 +139,32 @@ namespace SystemService
       /// * `user`:  The user being checked
       // TODO: Return error message instead?
       void canAuthUserSys(psibase::AccountNumber user);
+
+      /// Handle notification related to the acceptance of a staged transaction
+      ///
+      /// An auth service is notified when the sender of the staged transaction
+      /// is an account that uses the auth service.
+      ///
+      /// * `txid`: The transaction ID of the staged transaction
+      /// * `actor`: The account that accepts the specified staged transaction
+      void stagedAccept(psibase::Checksum256 txid, psibase::AccountNumber actor);
+
+      /// Handle notification related to the rejection of a staged transaction
+      ///
+      /// An auth service is notified when the sender of the staged transaction
+      /// is an account that uses the auth service.
+      ///
+      /// * `txid`: The transaction ID of the staged transaction
+      /// * `actor`: The account that rejects the specified staged transaction
+      void stagedReject(psibase::Checksum256 txid, psibase::AccountNumber actor);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-                method(canAuthUserSys, user))
+                method(canAuthUserSys, user),
+                method(stagedAccept, txid, actor),
+                method(stagedReject, txid, actor)
+                //
+   )
 
    struct TransactStatus
    {
