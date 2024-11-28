@@ -430,7 +430,7 @@ cargo_psibase_package(
 
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/StagedTx.psi
-    PATH services/user/StagedTx
+    PATH services/system/StagedTx
 )
 
 psibase_package(

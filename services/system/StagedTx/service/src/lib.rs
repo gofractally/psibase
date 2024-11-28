@@ -13,15 +13,14 @@ pub fn get_auth_service(sender: AccountNumber) -> Option<AccountNumber> {
 }
 
 /// A service for staged transaction proposal and execution
-#[psibase::service]
+#[psibase::service(recursive = true)]
 pub mod service {
     use crate::get_auth_service;
     use crate::sha256;
     use async_graphql::SimpleObject;
     use psibase::fracpack::Pack;
-    use psibase::services::transact::auth_interface::auth_action_structs::*;
+    use psibase::services::transact::auth_interface::auth_action_structs;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::Checksum256;
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
@@ -38,19 +37,31 @@ pub mod service {
             }
         }
 
-        pub fn accept(&self, txid: Checksum256, actor: psibase::AccountNumber) {
+        pub fn accept(&self, id: u32, actor: psibase::AccountNumber) {
+            psibase::write_console("staged-tx->accept");
             self.service_caller.call_returns_nothing(
-                MethodNumber::from(stagedAccept::ACTION_NAME),
-                stagedAccept { txid, actor }.packed(),
+                MethodNumber::from(auth_action_structs::stagedAccept::ACTION_NAME),
+                auth_action_structs::stagedAccept {
+                    staged_tx_id: id,
+                    actor,
+                },
             )
         }
 
-        pub fn reject(&self, txid: Checksum256, actor: psibase::AccountNumber) {
+        pub fn reject(&self, id: u32, actor: psibase::AccountNumber) {
             self.service_caller.call_returns_nothing(
-                MethodNumber::from(stagedReject::ACTION_NAME),
-                stagedReject { txid, actor }.packed(),
+                MethodNumber::from(auth_action_structs::stagedReject::ACTION_NAME),
+                auth_action_structs::stagedReject {
+                    staged_tx_id: id,
+                    actor,
+                },
             )
         }
+    }
+
+    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    pub struct ActionList {
+        actions: Vec<Action>,
     }
 
     #[table(name = "StagedTxTable", index = 0)]
@@ -60,7 +71,7 @@ pub mod service {
         pub txid: [u8; 32],
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
-        pub tx: Transaction,
+        pub action_list: ActionList,
     }
     impl StagedTx {
         #[primary_key]
@@ -71,41 +82,39 @@ pub mod service {
         #[secondary_key(1)]
         fn by_act_sender(&self) -> (AccountNumber, u32) {
             check(
-                self.tx.actions.len() > 0,
+                self.action_list.actions.len() > 0,
                 "Staged transaction contains no actions",
             );
-            (self.tx.actions[0].sender, self.id)
+            (self.action_list.actions[0].sender, self.id)
         }
 
         #[secondary_key(2)]
         fn by_staging_policy(&self) -> (AccountNumber, u32) {
             check(
-                self.tx.actions.len() > 0,
+                self.action_list.actions.len() > 0,
                 "Staged transaction contains no actions",
             );
-            let sender = self.tx.actions[0].sender;
+            let sender = self.action_list.actions[0].sender;
             let auth_service =
                 get_auth_service(sender).expect("Action sender account in staged tx is invalid");
             (auth_service, self.id)
         }
 
-        fn new(tx: Transaction) -> Self {
+        fn new(actions: Vec<Action>) -> Self {
             check(
-                tx.claims.is_empty(),
-                "Staged transaction must not contain any claims",
-            );
-            check(
-                tx.actions.len() > 0,
+                actions.len() > 0,
                 "Staged transaction must contain at least one action",
             );
 
-            let sender = tx.actions[0].sender;
+            let sender = actions[0].sender;
             check(
                 Accounts::call().getAccount(sender).is_some(),
                 "Sender account in staged tx is invalid",
             );
 
-            let packed = tx.packed();
+            let monotonic_id = LastUsed::get_next_id();
+            let current_block = Transact::call().currentBlock();
+            let packed = (monotonic_id, current_block.blockNum, &actions).packed();
             let txid = sha256(&packed);
 
             StagedTxTable::new()
@@ -121,16 +130,16 @@ pub mod service {
                 });
 
             StagedTx {
-                id: LastUsed::get_next_id(),
+                id: monotonic_id,
                 txid,
-                propose_date: Transact::call().currentBlock().time,
+                propose_date: current_block.time,
                 proposer: get_sender(),
-                tx,
+                action_list: ActionList { actions },
             }
         }
 
         fn first_sender(&self) -> AccountNumber {
-            self.tx.actions[0].sender
+            self.action_list.actions[0].sender
         }
 
         fn staged_tx_policy(&self) -> StagedTxPolicy {
@@ -176,7 +185,6 @@ pub mod service {
         pub account: AccountNumber,
         pub accepted: bool,
     }
-
     impl Response {
         #[primary_key]
         fn by_id(&self) -> (u32, AccountNumber) {
@@ -211,15 +219,19 @@ pub mod service {
     ///
     /// * `tx` - The staged transaction
     #[action]
-    fn propose(tx: Transaction) {
-        let new_tx = StagedTx::new(tx);
+    fn propose(actions: Vec<Action>) {
+        let new_tx = StagedTx::new(actions);
+
+        psibase::write_console("1");
 
         StagedTxTable::new().put(&new_tx).unwrap();
+        psibase::write_console("2");
 
         new_tx.emit(StagedTxEvent::PROPOSED);
-
+        psibase::write_console("3");
         // A proposal is also an implicit accept
-        accept(new_tx.id);
+        accept(new_tx.id, new_tx.txid);
+        psibase::write_console("4");
     }
 
     /// Indicates that the caller accepts the staged transaction
@@ -228,50 +240,71 @@ pub mod service {
     /// of the staged transaction, this could result in the execution of the transaction.
     ///
     /// * `id`: The ID of the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn accept(id: u32) {
+    fn accept(id: u32, txid: [u8; 32]) {
+        psibase::write_console("5");
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
+        psibase::write_console("6");
         check(staged_tx.is_some(), "Unknown staged tx");
         let staged_tx = staged_tx.unwrap();
+        psibase::write_console("7");
+        check(
+            staged_tx.txid == txid,
+            "specified txid must match staged tx txid",
+        );
+        psibase::write_console("8");
 
         Response::upsert(id, true);
+        psibase::write_console("9");
 
         staged_tx
             .staged_tx_policy()
-            .accept(staged_tx.txid.into(), get_sender());
+            .accept(staged_tx.id, get_sender());
+        psibase::write_console("10");
 
         staged_tx.emit(StagedTxEvent::ACCEPTED);
+        psibase::write_console("11");
     }
 
     /// Indicates that the caller rejects the staged transaction
     ///
     /// * `id`: The ID of the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn reject(id: u32) {
+    fn reject(id: u32, txid: [u8; 32]) {
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
         check(staged_tx.is_some(), "Unknown staged tx");
         let staged_tx = staged_tx.unwrap();
+        check(
+            staged_tx.txid == txid,
+            "specified txid must match staged tx txid",
+        );
 
         Response::upsert(id, false);
 
         staged_tx
             .staged_tx_policy()
-            .reject(staged_tx.txid.into(), get_sender());
+            .reject(staged_tx.id, get_sender());
 
         staged_tx.emit(StagedTxEvent::REJECTED);
     }
 
-    /// Deletes a staged transaction
+    /// Removes (deletes) a staged transaction
     ///
-    /// A staged transaction can only be deleted by the proposer or the auth service of
+    /// A staged transaction can only be removed by the proposer or the auth service of
     /// the staged tx sender.
     ///
     /// * `id`: The ID of the staged transaction
     #[action]
-    fn delete(id: u32) {
+    fn remove(id: u32, txid: [u8; 32]) {
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
         check(staged_tx.is_some(), "Unknown staged tx");
         let staged_tx = staged_tx.unwrap();
+        check(
+            staged_tx.txid == txid,
+            "specified txid must match staged tx txid",
+        );
         check(
             get_sender() == staged_tx.proposer
                 || get_sender() == get_auth_service(staged_tx.first_sender()).unwrap(),
@@ -294,16 +327,19 @@ pub mod service {
         staged_tx.emit(StagedTxEvent::DELETED);
     }
 
-    /// Notifies the staged-tx service that a staged transaction has been executed
-    /// by the staged transaction first sender's auth service. This allows the staged-tx
-    /// service to delete the old staged-tx record, and emit relevant events.
+    /// Notifies the staged-tx service that a staged transaction should be executed.
+    /// Called by the staged transaction first sender's auth service.
     ///
     /// * `id`: The ID of the staged transaction
     #[action]
-    fn executed(id: u32) {
+    fn execute(id: u32, txid: [u8; 32]) {
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
         check(staged_tx.is_some(), "Unknown staged tx");
         let staged_tx = staged_tx.unwrap();
+        check(
+            staged_tx.txid == txid,
+            "specified txid must match staged tx txid",
+        );
         check(
             get_sender() == get_auth_service(staged_tx.first_sender()).unwrap(),
             "Only the staged tx first sender's auth service can execute the staged tx",
@@ -311,12 +347,19 @@ pub mod service {
 
         staged_tx.emit(StagedTxEvent::EXECUTED);
 
-        delete(id);
+        delete(id, txid);
+
+        psibase::write_console("staged-tx->execute");
     }
 
+    /// Gets a staged transaction by id. Used inline by auth services.
+    ///
+    /// * `id`: The ID of the staged transaction
     #[action]
-    fn print() {
-        psibase::write_console("debug print from staged tx service");
+    fn get_staged_tx(id: u32) -> StagedTx {
+        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
+        check(staged_tx.is_some(), "Unknown staged tx");
+        staged_tx.unwrap()
     }
 
     #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject, Clone)]

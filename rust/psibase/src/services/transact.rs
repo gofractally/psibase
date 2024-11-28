@@ -158,10 +158,11 @@ pub mod auth_interface {
     /// An auth service is notified when the sender of the staged transaction
     /// is an account that uses the auth service.
     ///
-    /// * `txid`: The transaction ID of the staged transaction
+    /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
+    ///                   staged-tx record.
     /// * `actor`: The account that accepts the specified staged transaction
     #[action]
-    fn stagedAccept(txid: crate::Checksum256, actor: crate::AccountNumber) {
+    fn stagedAccept(staged_tx_id: u32, actor: crate::AccountNumber) {
         unimplemented!()
     }
 
@@ -170,10 +171,11 @@ pub mod auth_interface {
     /// An auth service is notified when the sender of the staged transaction
     /// is an account that uses the auth service.
     ///
-    /// * `txid`: The transaction ID of the staged transaction
+    /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
+    ///                   staged-tx record.
     /// * `actor`: The account that rejects the specified staged transaction
     #[action]
-    fn stagedReject(txid: crate::Checksum256, actor: crate::AccountNumber) {
+    fn stagedReject(staged_tx_id: u32, actor: crate::AccountNumber) {
         unimplemented!()
     }
 }

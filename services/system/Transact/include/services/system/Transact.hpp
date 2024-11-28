@@ -145,18 +145,20 @@ namespace SystemService
       /// An auth service is notified when the sender of the staged transaction
       /// is an account that uses the auth service.
       ///
-      /// * `txid`: The transaction ID of the staged transaction
+      /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
+      ///                   staged-tx record.
       /// * `actor`: The account that accepts the specified staged transaction
-      void stagedAccept(psibase::Checksum256 txid, psibase::AccountNumber actor);
+      void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
 
       /// Handle notification related to the rejection of a staged transaction
       ///
       /// An auth service is notified when the sender of the staged transaction
       /// is an account that uses the auth service.
       ///
-      /// * `txid`: The transaction ID of the staged transaction
+      /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
+      ///                   staged-tx record.
       /// * `actor`: The account that rejects the specified staged transaction
-      void stagedReject(psibase::Checksum256 txid, psibase::AccountNumber actor);
+      void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

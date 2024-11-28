@@ -63,16 +63,12 @@ mod tests {
         chain.new_account(bob).unwrap();
 
         Wrapper::push_from(&chain, alice)
-            .propose(Transaction {
-                tapos: get_tapos(&chain),
-                actions: vec![Action {
-                    sender: bob,
-                    service: Nft::SERVICE,
-                    method: MethodNumber::from("mint"),
-                    rawData: Hex(vec![]),
-                }],
-                claims: vec![],
-            })
+            .propose(vec![Action {
+                sender: bob,
+                service: Nft::SERVICE,
+                method: MethodNumber::from("mint"),
+                rawData: Hex(vec![]),
+            }])
             .get()?;
 
         Ok(())

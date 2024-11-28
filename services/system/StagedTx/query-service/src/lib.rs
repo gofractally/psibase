@@ -1,6 +1,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
+    use async_graphql::connection::Connection;
     use psibase::*;
     use staged_tx::service::*;
 
@@ -11,6 +12,13 @@ mod service {
         /// Gets a staged transaction by its ID
         async fn get_staged_tx(&self, id: u32) -> Option<StagedTx> {
             StagedTxTable::new().get_index_pk().get(&id)
+        }
+
+        /// Gets all staged transactions
+        async fn get_all_staged(&self) -> async_graphql::Result<Connection<RawKey, StagedTx>> {
+            TableQuery::new(StagedTxTable::new().get_index_pk())
+                .query()
+                .await
         }
     }
 
