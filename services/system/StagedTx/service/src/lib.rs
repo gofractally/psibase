@@ -38,7 +38,6 @@ pub mod service {
         }
 
         pub fn accept(&self, id: u32, actor: psibase::AccountNumber) {
-            psibase::write_console("staged-tx->accept");
             self.service_caller.call_returns_nothing(
                 MethodNumber::from(auth_action_structs::stagedAccept::ACTION_NAME),
                 auth_action_structs::stagedAccept {
@@ -222,16 +221,11 @@ pub mod service {
     fn propose(actions: Vec<Action>) {
         let new_tx = StagedTx::new(actions);
 
-        psibase::write_console("1");
-
         StagedTxTable::new().put(&new_tx).unwrap();
-        psibase::write_console("2");
 
         new_tx.emit(StagedTxEvent::PROPOSED);
-        psibase::write_console("3");
         // A proposal is also an implicit accept
         accept(new_tx.id, new_tx.txid);
-        psibase::write_console("4");
     }
 
     /// Indicates that the caller accepts the staged transaction
@@ -243,28 +237,21 @@ pub mod service {
     /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn accept(id: u32, txid: [u8; 32]) {
-        psibase::write_console("5");
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        psibase::write_console("6");
         check(staged_tx.is_some(), "Unknown staged tx");
         let staged_tx = staged_tx.unwrap();
-        psibase::write_console("7");
         check(
             staged_tx.txid == txid,
             "specified txid must match staged tx txid",
         );
-        psibase::write_console("8");
 
         Response::upsert(id, true);
-        psibase::write_console("9");
 
         staged_tx
             .staged_tx_policy()
             .accept(staged_tx.id, get_sender());
-        psibase::write_console("10");
 
         staged_tx.emit(StagedTxEvent::ACCEPTED);
-        psibase::write_console("11");
     }
 
     /// Indicates that the caller rejects the staged transaction
@@ -306,9 +293,8 @@ pub mod service {
             "specified txid must match staged tx txid",
         );
         check(
-            get_sender() == staged_tx.proposer
-                || get_sender() == get_auth_service(staged_tx.first_sender()).unwrap(),
-            "Only the proposer or the staged tx first sender's auth service can delete the staged tx",
+            get_sender() == staged_tx.proposer || get_sender() == staged_tx.first_sender(),
+            "Only the proposer or the staged tx first sender can remove the staged tx",
         );
 
         // Delete all responses for this staged tx
@@ -341,15 +327,17 @@ pub mod service {
             "specified txid must match staged tx txid",
         );
         check(
-            get_sender() == get_auth_service(staged_tx.first_sender()).unwrap(),
-            "Only the staged tx first sender's auth service can execute the staged tx",
+            staged_tx.first_sender() == get_sender(),
+            "Only the first sender of the staged tx can execute it",
         );
+
+        staged_tx.action_list.actions.iter().for_each(|action| {
+            let _ = Transact::call().runAs(action.clone(), Vec::new());
+        });
 
         staged_tx.emit(StagedTxEvent::EXECUTED);
 
-        delete(id, txid);
-
-        psibase::write_console("staged-tx->execute");
+        remove(id, txid);
     }
 
     /// Gets a staged transaction by id. Used inline by auth services.

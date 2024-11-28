@@ -16,6 +16,7 @@ function(add suffix)
         Producers/include
         HttpServer/include
         SetCode/include
+        StagedTx/service/cpp/include
         Transact/include
         VerifySig/include
     )
