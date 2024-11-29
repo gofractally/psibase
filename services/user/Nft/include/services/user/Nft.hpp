@@ -9,7 +9,7 @@
 
 namespace UserService
 {
-   class Nft : public psibase::Service<Nft>
+   class Nft : public psibase::Service
    {
      public:
       using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;

@@ -76,6 +76,8 @@ namespace psibase
       internal::sender   = sender;
       internal::receiver = receiver;
 
+      RecursionGuard<Service> g;
+
       auto makeService = [&]()
       {
          if constexpr (std::is_constructible<Service, psio::shared_view_ptr<psibase::Action>>{})

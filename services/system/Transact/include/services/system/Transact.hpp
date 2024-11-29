@@ -210,7 +210,7 @@ namespace SystemService
    /// Other services use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
-   struct Transact : psibase::Service<Transact>
+   struct Transact : psibase::Service
    {
       /// "transact"
       static constexpr auto service = psibase::AccountNumber("transact");

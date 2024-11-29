@@ -18,6 +18,10 @@ psibase-create-snapshot - Write a snapshot to a file
 
   Include the block log in the snapshot. This will make the block log available for queries.
 
+- `-z`, `--gzip`
+
+  Compress the snapshot with gzip.
+
 - `-h`, `--help`
 
   Prints a help message

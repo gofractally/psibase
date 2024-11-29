@@ -93,12 +93,12 @@ void Symbol::init()
    priceAdjustmentSingleton.put(PriceAdjustmentRecord{0, increasePct, decreasePct});
 
    // Create system token symbol
-   to<Symbol>().create(sysTokenSymbol, initialPrice);
+   recurse().to<Symbol>().create(sysTokenSymbol, initialPrice);
 
    // Offer system token symbol
    auto symbolOwnerNft = getSymbol(sysTokenSymbol);
    to<Nft>().credit(symbolOwnerNft.ownerNft, Tokens::service, "System token symbol ownership nft");
-   to<Tokens>().mapSymbol(Tokens::sysToken, sysTokenSymbol);
+   recurse().to<Tokens>().mapSymbol(Tokens::sysToken, sysTokenSymbol);
 
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
