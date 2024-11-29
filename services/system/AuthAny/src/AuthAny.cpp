@@ -32,26 +32,8 @@ namespace SystemService
    void AuthAny::stagedAccept(uint32_t stagedTxId, AccountNumber actor)
    {
       check(getSender() == "staged-tx"_a, "can only be called by staged-tx");
-      StagedTx staged_tx = to<StagedTxService>().get_staged_tx(stagedTxId);
-      check(!staged_tx.action_list.actions.empty(), "Unsupported staged transaction");
 
-      auto makeServiceMethod = [](const Action& action)
-      { return ServiceMethod{action.service, action.method}; };
-
-      auto allowedActions = staged_tx.action_list.actions |
-                            std::views::transform(makeServiceMethod) |
-                            std::ranges::to<std::vector>();
-
-      auto staged_tx_sender = staged_tx.action_list.actions.front().sender;
-
-      Action execute{.sender  = staged_tx_sender,
-                     .service = "staged-tx"_a,
-                     .method  = "execute"_m,
-                     .rawData = psio::convert_to_frac(std::make_tuple(stagedTxId, staged_tx.txid))};
-
-      // TODO:
-      // auto [execute, allowedActions] = to<StagedTxService>().get_executor(stagedTxId);
-
+      auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(stagedTxId);
       to<Transact>().runAs(std::move(execute), allowedActions);
    }
 

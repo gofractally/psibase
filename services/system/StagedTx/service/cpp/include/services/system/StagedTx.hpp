@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
+#include <services/system/Transact.hpp>
 
 namespace SystemService
 {
@@ -39,6 +40,7 @@ namespace SystemService
       void     remove(uint32_t id, psibase::Checksum256 txid);
       void     execute(uint32_t id, psibase::Checksum256 txid);
       StagedTx get_staged_tx(uint32_t id);
+      std::tuple<psibase::Action, std::vector<ServiceMethod>> get_exec_info(uint32_t id);
    };
 
    // clang-format off
@@ -49,6 +51,7 @@ namespace SystemService
       method(remove, id, txid),
       method(execute, id, txid),
       method(get_staged_tx, id),
+      method(get_exec_info, id)
    );
    // clang-format on
 

@@ -19,7 +19,7 @@ pub mod service {
     use crate::sha256;
     use async_graphql::SimpleObject;
     use psibase::fracpack::Pack;
-    use psibase::services::transact::auth_interface::auth_action_structs;
+    use psibase::services::transact::{auth_interface::auth_action_structs, ServiceMethod};
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
     use psibase::*;
     use serde::{Deserialize, Serialize};
@@ -350,12 +350,40 @@ pub mod service {
         staged_tx.unwrap()
     }
 
+    /// Gets info needed for staged tx execution
+    #[action]
+    fn get_exec_info(id: u32) -> (Action, Vec<ServiceMethod>) {
+        let staged_tx = get_staged_tx(id);
+
+        let make_service_method = |action: &Action| ServiceMethod {
+            service: action.service,
+            method: action.method,
+        };
+
+        let allowed_actions: Vec<ServiceMethod> = staged_tx
+            .action_list
+            .actions
+            .iter()
+            .map(make_service_method)
+            .collect();
+
+        let staged_tx_sender = staged_tx.action_list.actions[0].sender;
+
+        let execute = Action {
+            sender: staged_tx_sender,
+            service: Wrapper::SERVICE,
+            method: MethodNumber::from(action_structs::execute::ACTION_NAME),
+            rawData: (id, staged_tx.txid).packed().into(),
+        };
+
+        (execute, allowed_actions)
+    }
+
     #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject, Clone)]
     struct StagedTxEvent {
         ty: u8,
     }
 
-    #[allow(dead_code)] // Todo - remove
     impl StagedTxEvent {
         const PROPOSED: u8 = 0;
         const ACCEPTED: u8 = 1;
