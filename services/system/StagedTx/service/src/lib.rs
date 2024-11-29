@@ -20,7 +20,9 @@ pub mod service {
     use async_graphql::SimpleObject;
     use psibase::fracpack::Pack;
     use psibase::services::transact::{auth_interface::auth_action_structs, ServiceMethod};
-    use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
+    use psibase::services::{
+        accounts::Wrapper as Accounts, events::Wrapper as Events, transact::Wrapper as Transact,
+    };
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
@@ -63,7 +65,15 @@ pub mod service {
         actions: Vec<Action>,
     }
 
-    #[table(name = "StagedTxTable", index = 0)]
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
+    struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "StagedTxTable", index = 1)]
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTx {
         pub id: u32,
@@ -147,18 +157,16 @@ pub mod service {
 
         fn emit(&self, event_type: u8) {
             Wrapper::emit().history().updated(
-                StagedTxSummary {
-                    id: self.id,
-                    sender: self.first_sender(),
-                },
+                self.txid,
                 self.first_sender(),
+                get_sender(),
                 Transact::call().currentBlock().time,
                 event_type.into(),
             );
         }
     }
 
-    #[table(name = "LastUsedTable", index = 1)]
+    #[table(name = "LastUsedTable", index = 2)]
     #[derive(Default, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct LastUsed {
         pub id: u32,
@@ -177,7 +185,7 @@ pub mod service {
         }
     }
 
-    #[table(name = "ResponseTable", index = 2)]
+    #[table(name = "ResponseTable", index = 3)]
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct Response {
         pub id: u32,
@@ -214,6 +222,28 @@ pub mod service {
         }
     }
 
+    /// Initialize the staged-tx service
+    #[action]
+    fn init() {
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+
+        let updated = MethodNumber::from("updated");
+        Events::call().setSchema(create_schema::<Wrapper>());
+        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
+        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific txid sender
+        Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 2); // Index events related to specific proposer/accepter/rejecter
+    }
+
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        let table: InitTable = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_some(),
+            "service not initialized",
+        );
+    }
+
     /// Proposes a new staged transaction. The staged transaction must not contain any claims.
     ///
     /// * `tx` - The staged transaction
@@ -224,6 +254,7 @@ pub mod service {
         StagedTxTable::new().put(&new_tx).unwrap();
 
         new_tx.emit(StagedTxEvent::PROPOSED);
+
         // A proposal is also an implicit accept
         accept(new_tx.id, new_tx.txid);
     }
@@ -399,15 +430,10 @@ pub mod service {
         }
     }
 
-    #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject, Clone)]
-    struct StagedTxSummary {
-        id: u32,               // The ID in the StagedTxTable
-        sender: AccountNumber, // The sender of the staged transaction
-    }
-
     #[event(history)]
     pub fn updated(
-        tx_summary: StagedTxSummary,
+        txid: [u8; 32],            // The txid of the staged transaction
+        sender: AccountNumber,     // The sender of the staged transaction
         actor: AccountNumber,      // The sender of the action causing the event
         datetime: TimePointUSec,   // The time of the event emission
         event_type: StagedTxEvent, // The type of event

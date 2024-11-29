@@ -57,6 +57,8 @@ mod tests {
 
     #[psibase::test_case(packages("StagedTx", "Nft", "AuthSig"))]
     fn test_propose(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+
         let alice = AccountNumber::from("alice");
         chain.new_account(alice).unwrap();
 
