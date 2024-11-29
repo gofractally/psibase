@@ -58,6 +58,7 @@
       - [Minimal UI](development/services/rust-service/minimal-ui.md)
       - [Tables](development/services/rust-service/tables.md)
       - [GraphQL](development/services/rust-service/graphql.md)
+      - [Initializing Services](development/services/rust-service/pre-action.md)
       - [Reference]()
         - [Web Services](development/services/rust-service/reference/web-services.md)
   - [Plugins]()
