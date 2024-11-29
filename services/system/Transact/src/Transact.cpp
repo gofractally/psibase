@@ -259,6 +259,18 @@ namespace SystemService
       auto statusIdx      = statusTable.getIndex<0>();
       auto transactStatus = statusIdx.get(std::tuple{});
 
+      if constexpr (enable_print)
+      {
+         psibase::writeConsole(getSender().str() + "@transact->runAs(" + action.sender.str() + "@" +
+                               action.service.str() + "->" + action.method.str() + ")\n");
+         if (!allowedActions.empty())
+         {
+            psibase::writeConsole("Allowed actions: \n");
+            for (auto& a : allowedActions)
+               psibase::writeConsole(" - " + a.service.str() + "->" + a.method.str() + "\n");
+         }
+      }
+
       if (transactStatus && transactStatus->enforceAuth)
       {
          auto accountsTables = Accounts::Tables(Accounts::service);
@@ -293,6 +305,26 @@ namespace SystemService
                }
                if (!flags)
                   flags = AuthInterface::runAsOtherReq;
+            }
+
+            if constexpr (enable_print)
+            {
+               std::string flags_str = "";
+               auto        type      = flags & AuthInterface::requestMask;
+               if (type == AuthInterface::runAsRequesterReq)
+                  flags_str += " - runAsRequesterReq\n";
+               else if (type == AuthInterface::runAsMatchedReq)
+                  flags_str += " - runAsMatchedReq\n";
+               else if (type == AuthInterface::runAsMatchedExpandedReq)
+                  flags_str += " - runAsMatchedExpandedReq\n";
+               else if (type == AuthInterface::runAsOtherReq)
+                  flags_str += " - runAsOtherReq\n";
+
+               if (!flags_str.empty())
+               {
+                  psibase::writeConsole("Checking auth service " + account->authService.str() +
+                                        " with flags: \n" + flags_str + "\n");
+               }
             }
 
             Actor<AuthInterface> auth(Transact::service, account->authService);
