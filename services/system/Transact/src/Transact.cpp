@@ -337,6 +337,7 @@ namespace SystemService
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
+      auto _      = recurse();
       auto result = call(action);
 
       for (auto& a : allowedActions)

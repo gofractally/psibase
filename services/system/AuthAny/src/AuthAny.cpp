@@ -34,7 +34,7 @@ namespace SystemService
       check(getSender() == "staged-tx"_a, "can only be called by staged-tx");
 
       auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(stagedTxId);
-      to<Transact>().runAs(std::move(execute), allowedActions);
+      recurse().to<Transact>().runAs(std::move(execute), allowedActions);
    }
 
    void AuthAny::stagedReject(uint32_t stagedTxId, AccountNumber actor)
