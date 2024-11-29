@@ -27,6 +27,8 @@ namespace SystemService
       if (!account)
          abortMessage("unknown owner \"" + sender.str() + "\"");
 
+      auto r = recurse();
+
       Actor<AuthInterface> auth(AuthDelegate::service, account->authService);
       auth.checkAuthSys(flags, requester, row->owner, std::move(action), std::move(allowedActions),
                         std::move(claims));

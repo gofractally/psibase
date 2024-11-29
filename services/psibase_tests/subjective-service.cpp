@@ -91,7 +91,7 @@ void SubjectiveService::nested(std::string key, std::string value1, std::string 
 void SubjectiveService::nestFail1a(bool commit)
 {
    psibase::checkoutSubjective();
-   to<SubjectiveService>().nestFail1b(commit);
+   recurse().to<SubjectiveService>().nestFail1b(commit);
 }
 
 void SubjectiveService::nestFail1b(bool commit)
@@ -104,7 +104,7 @@ void SubjectiveService::nestFail1b(bool commit)
 
 void SubjectiveService::nestFail2a(bool commit)
 {
-   to<SubjectiveService>().nestFail2b();
+   recurse().to<SubjectiveService>().nestFail2b();
    if (commit)
       psibase::commitSubjective();
    else
@@ -119,7 +119,7 @@ void SubjectiveService::nestFail2b()
 void SubjectiveService::nestFail3a(bool commit1, bool commit2)
 {
    psibase::checkoutSubjective();
-   to<SubjectiveService>().nestFail3b(commit2);
+   recurse().to<SubjectiveService>().nestFail3b(commit2);
    if (commit1)
       psibase::commitSubjective();
    else
