@@ -4,7 +4,10 @@ mod events;
 mod graphql;
 mod tables;
 
-use actions::{process_action_args, process_action_callers, process_action_schema, Options};
+use actions::{
+    add_pre_action_call_if_not_excluded, check_for_pre_action, process_action_args,
+    process_action_callers, process_action_schema, Options, PreAction,
+};
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
 use dispatch::{add_unknown_action_check_to_dispatch_body, process_dispatch_body};
@@ -82,11 +85,17 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
+        let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
+        let pa_ret = check_for_pre_action(&mut pre_action_info, items);
+        if pa_ret.is_err() {
+            return pa_ret.err().unwrap();
+        }
         for (item_index, item) in items.iter_mut().enumerate() {
             if let Item::Struct(s) = item {
                 if s.attrs.iter().any(is_table_attr) {
@@ -98,6 +107,8 @@ fn process_mod(
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
                     action_fns.push(item_index);
+                } else {
+                    non_action_fns.push(item_index);
                 }
                 for attr in &f.attrs {
                     if let Some(kind) = parse_event_attr(attr) {
@@ -146,6 +157,9 @@ fn process_mod(
             if let Item::Fn(f) = &mut items[*fn_index] {
                 let mut invoke_args = quote! {};
                 let mut invoke_struct_args = quote! {};
+                if pre_action_info.has_pre_action() {
+                    add_pre_action_call_if_not_excluded(&pre_action_info, f);
+                }
                 process_action_args(
                     options,
                     false,
@@ -172,6 +186,7 @@ fn process_mod(
                     }
                 };
                 if let Some(i) = f.attrs.iter().position(is_action_attr) {
+                    // If this is an action, remove the action attribute
                     f.attrs.remove(i);
                 }
             }
@@ -470,12 +485,12 @@ fn process_mod(
                     #psibase_mod::ActionPacker { sender, service }.into()
                 }
 
-                #[doc = #emit_from_doc]
+                #[doc = #emit_doc]
                 pub fn emit() -> EmitEvent {
                     EmitEvent { sender: Self::#constant }
                 }
 
-                #[doc = #emit_doc]
+                #[doc = #emit_from_doc]
                 pub fn emit_from(sender: #psibase_mod::AccountNumber) -> EmitEvent {
                     EmitEvent { sender }
                 }
