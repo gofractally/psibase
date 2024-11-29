@@ -20,4 +20,3 @@ pem = { version = "3.0.4" }
 
 [dev-dependencies]
 staged-tx-pkg = { path = "..", version = "0.13.0" }
-p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }

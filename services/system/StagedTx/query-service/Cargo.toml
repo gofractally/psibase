@@ -8,10 +8,6 @@ homepage.workspace = true
 edition = "2021"
 publish = false
 
-# [package.metadata.psibase]
-# plugin = "tpack-plugin"
-# data = [{ src = "../ui", dst = "/" }]
-
 [dependencies]
 psibase = { path = "../../../../rust/psibase/", version = "0.13.0" }
 serde = "1.0"

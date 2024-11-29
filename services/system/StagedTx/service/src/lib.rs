@@ -13,6 +13,18 @@ pub fn get_auth_service(sender: AccountNumber) -> Option<AccountNumber> {
 }
 
 /// A service for staged transaction proposal and execution
+///
+/// A staged transaction allows an account (the proposer) to propose a set of
+/// actions to be executed by another account (the executor). The set of actions
+/// proposed is known as the staged transaction. The staged transaction is not
+/// executed unless and until the executor's auth service authorizes the execution.
+///
+/// The rules for authorization may vary depending on the staged-tx policy enforced
+/// by the executor's auth service.
+///
+/// This can be used, for example, to propose a transaction on behalf of an account
+/// that is only authorized by the combined authorization of multiple other accounts
+/// (a.k.a. a "multi-sig" or multi-signature transaction), among many other uses.
 #[psibase::service(recursive = true)]
 pub mod service {
     use crate::get_auth_service;
@@ -126,18 +138,6 @@ pub mod service {
             let packed = (monotonic_id, current_block.blockNum, &actions).packed();
             let txid = sha256(&packed);
 
-            StagedTxTable::new()
-                .get_index_by_act_sender()
-                .range((sender, 0)..=(sender, u32::MAX))
-                .for_each(|existing| {
-                    if existing.txid == txid {
-                        check(
-                            false,
-                            &format!("Staged transaction already exists at index {}", existing.id),
-                        );
-                    }
-                });
-
             StagedTx {
                 id: monotonic_id,
                 txid,
@@ -145,6 +145,18 @@ pub mod service {
                 proposer: get_sender(),
                 action_list: ActionList { actions },
             }
+        }
+
+        fn get(id: u32, txid: [u8; 32]) -> Self {
+            let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
+            check(staged_tx.is_some(), "Unknown staged tx");
+            let staged_tx = staged_tx.unwrap();
+            check(
+                staged_tx.txid == txid,
+                "specified txid must match staged tx txid",
+            );
+
+            staged_tx
         }
 
         fn first_sender(&self) -> AccountNumber {
@@ -244,9 +256,9 @@ pub mod service {
         );
     }
 
-    /// Proposes a new staged transaction. The staged transaction must not contain any claims.
+    /// Proposes a new staged transaction containing the specified actions.
     ///
-    /// * `tx` - The staged transaction
+    /// * `actions` - The actions to be staged
     #[action]
     fn propose(actions: Vec<Action>) {
         let new_tx = StagedTx::new(actions);
@@ -259,22 +271,16 @@ pub mod service {
         accept(new_tx.id, new_tx.txid);
     }
 
-    /// Indicates that the caller accepts the staged transaction
+    /// Indicates that the caller accepts the specified staged transaction
     ///
     /// Depending on the staging rules enforced by the auth service of the sender
     /// of the staged transaction, this could result in the execution of the transaction.
     ///
-    /// * `id`: The ID of the staged transaction
+    /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn accept(id: u32, txid: [u8; 32]) {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        check(staged_tx.is_some(), "Unknown staged tx");
-        let staged_tx = staged_tx.unwrap();
-        check(
-            staged_tx.txid == txid,
-            "specified txid must match staged tx txid",
-        );
+        let staged_tx = StagedTx::get(id, txid);
 
         Response::upsert(id, true);
 
@@ -287,17 +293,11 @@ pub mod service {
 
     /// Indicates that the caller rejects the staged transaction
     ///
-    /// * `id`: The ID of the staged transaction
+    /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn reject(id: u32, txid: [u8; 32]) {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        check(staged_tx.is_some(), "Unknown staged tx");
-        let staged_tx = staged_tx.unwrap();
-        check(
-            staged_tx.txid == txid,
-            "specified txid must match staged tx txid",
-        );
+        let staged_tx = StagedTx::get(id, txid);
 
         Response::upsert(id, false);
 
@@ -313,16 +313,12 @@ pub mod service {
     /// A staged transaction can only be removed by the proposer or the auth service of
     /// the staged tx sender.
     ///
-    /// * `id`: The ID of the staged transaction
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn remove(id: u32, txid: [u8; 32]) {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        check(staged_tx.is_some(), "Unknown staged tx");
-        let staged_tx = staged_tx.unwrap();
-        check(
-            staged_tx.txid == txid,
-            "specified txid must match staged tx txid",
-        );
+        let staged_tx = StagedTx::get(id, txid);
+
         check(
             get_sender() == staged_tx.proposer || get_sender() == staged_tx.first_sender(),
             "Only the proposer or the staged tx first sender can remove the staged tx",
@@ -345,18 +341,15 @@ pub mod service {
     }
 
     /// Notifies the staged-tx service that a staged transaction should be executed.
-    /// Called by the staged transaction first sender's auth service.
+    /// Typically this call is facilitated by the staged transaction's first sender's auth
+    /// service on behalf of the staged transaction's first sender.
     ///
-    /// * `id`: The ID of the staged transaction
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn execute(id: u32, txid: [u8; 32]) {
-        let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-        check(staged_tx.is_some(), "Unknown staged tx");
-        let staged_tx = staged_tx.unwrap();
-        check(
-            staged_tx.txid == txid,
-            "specified txid must match staged tx txid",
-        );
+        let staged_tx = StagedTx::get(id, txid);
+
         check(
             staged_tx.first_sender() == get_sender(),
             "Only the first sender of the staged tx can execute it",
@@ -371,9 +364,9 @@ pub mod service {
         remove(id, txid);
     }
 
-    /// Gets a staged transaction by id. Used inline by auth services.
+    /// Gets a staged transaction by id. Typically used inline by auth services.
     ///
-    /// * `id`: The ID of the staged transaction
+    /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
         let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
@@ -381,7 +374,9 @@ pub mod service {
         staged_tx.unwrap()
     }
 
-    /// Gets info needed for staged tx execution
+    /// Gets info needed for staged tx execution. Typically used inline by auth services.
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
     #[action]
     fn get_exec_info(id: u32) -> (Action, Vec<ServiceMethod>) {
         let staged_tx = get_staged_tx(id);
