@@ -5,7 +5,7 @@
 
 namespace SystemService
 {
-   struct RProducers : public psibase::Service<RProducers>
+   struct RProducers : public psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber("r-producers");
 

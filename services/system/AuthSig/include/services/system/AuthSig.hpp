@@ -24,7 +24,7 @@ namespace SystemService
          /// The public key included in the claims for each transaction sent by this account.
          SubjectPublicKeyInfo pubkey;
 
-         auto byPubkey() const { return std::tuple{pubkey, account}; }
+         auto byPubkey() const { return std::tuple{keyFingerprint(pubkey), account}; }
       };
       PSIO_REFLECT(AuthRecord, account, pubkey)
 
@@ -35,7 +35,7 @@ namespace SystemService
       /// transaction sent by this account.
       ///
       /// This service supports K1 or R1 keys (Secp256K1 or Secp256R1) keys.
-      class AuthSig : public psibase::Service<AuthSig>
+      class AuthSig : public psibase::Service
       {
         public:
          static constexpr auto service = psibase::AccountNumber("auth-sig");

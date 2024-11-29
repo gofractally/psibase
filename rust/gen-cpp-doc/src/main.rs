@@ -806,7 +806,7 @@ fn parse<'tu>(
     let clang_include_dir = get_clang_include_dir(&wasi_sdk_prefix);
     parser.arguments(&[
         "-fcolor-diagnostics",
-        "-std=c++2a",
+        "-std=c++23",
         "-c",
         "--target=wasm32-wasi",
         "-fno-exceptions",

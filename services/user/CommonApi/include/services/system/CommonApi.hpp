@@ -9,7 +9,7 @@ namespace SystemService
    ///
    /// See [HTTP requests](../development/front-ends/reference/http-requests.md) and
    /// [JS libraries](../development/front-ends/reference/js-libraries.md)
-   struct CommonApi : psibase::Service<CommonApi>
+   struct CommonApi : psibase::Service
    {
       /// "common-api"
       static constexpr auto service = psibase::AccountNumber("common-api");

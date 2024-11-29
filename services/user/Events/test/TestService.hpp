@@ -2,7 +2,7 @@
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Service.hpp>
 
-struct TestService : psibase::Service<TestService>
+struct TestService : psibase::Service
 {
    static constexpr auto service = psibase::AccountNumber{"test-service"};
    //

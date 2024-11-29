@@ -63,7 +63,7 @@ namespace UserService
    using InstalledPackageTable = psibase::Table<InstalledPackage, &InstalledPackage::byName>;
    using PackageManifestTable  = psibase::Table<PackageManifest, &PackageManifest::byName>;
 
-   struct Packages : psibase::Service<Packages>
+   struct Packages : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"packages"};
       using Tables = psibase::ServiceTables<InstalledPackageTable, PackageManifestTable>;

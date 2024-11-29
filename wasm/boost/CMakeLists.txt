@@ -38,6 +38,12 @@ endif()
 add_library(boost INTERFACE)
 target_mapped_include_directories(boost INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
+add_library(BoostIostreams
+    ${BOOST_EXTRACTED}/libs/iostreams/src/gzip.cpp
+    ${BOOST_EXTRACTED}/libs/iostreams/src/zlib.cpp)
+target_include_directories(BoostIostreams PRIVATE ${DEP_PREFIX}/include)
+target_link_libraries(BoostIostreams PUBLIC boost wasm-base exception-stub -lz)
+
 include(GNUInstallDirs)
 install(DIRECTORY ${BOOST_BOOST} TYPE INCLUDE COMPONENT libpsibase)
 install(FILES ${BOOST_EXTRACTED}/LICENSE_1_0.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.boost COMPONENT libpsibase)

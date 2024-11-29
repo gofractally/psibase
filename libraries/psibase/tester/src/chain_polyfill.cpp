@@ -21,7 +21,7 @@ uint32_t psibase::raw::getKey(const char* dest, uint32_t destSize)
 
 void psibase::raw::abortMessage(const char* message, uint32_t len)
 {
-   return psibase::tester::raw::abortMessage(message, len);
+   psibase::tester::raw::abortMessage(message, len);
 }
 
 void psibase::raw::writeConsole(const char* message, uint32_t len)

@@ -79,7 +79,7 @@ namespace SystemService
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
-   class RTransact : psibase::Service<RTransact>
+   class RTransact : psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber{"r-transact"};

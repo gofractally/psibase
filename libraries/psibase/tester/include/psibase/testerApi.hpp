@@ -47,6 +47,7 @@ namespace psibase::tester::raw
    TESTER_NATIVE(shutdownChain) void shutdownChain(uint32_t chain);
    TESTER_NATIVE(startBlock) void startBlock(std::uint32_t chain_index, std::int64_t time_us);
 
+   [[noreturn]]
    TESTER_NATIVE(abortMessage) void abortMessage(const char* message, std::uint32_t len);
 
    TESTER_NATIVE(getResult)

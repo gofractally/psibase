@@ -1,3 +1,5 @@
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -230,9 +232,10 @@ int main(int argc, const char* const* argv)
    std::string_view              snapshot_file;
    bool                          help   = false;
    bool                          blocks = false;
-   auto                          opts =
-       std::tuple(Option{&blocks, 'b', "blocks"}, Option{&key_files, 's', "sign"},
-                  Option{&help, 'h', "help"}, PositionalOptions{&database_file, &snapshot_file});
+   bool                          gzip   = false;
+   auto opts = std::tuple(Option{&blocks, 'b', "blocks"}, Option{&gzip, 'z', "gzip"},
+                          Option{&key_files, 's', "sign"}, Option{&help, 'h', "help"},
+                          PositionalOptions{&database_file, &snapshot_file});
    if (!parse(argc, argv, opts))
    {
       std::cerr << usage_brief << std::endl;
@@ -312,11 +315,25 @@ int main(int argc, const char* const* argv)
       std::cerr << "No chain" << std::endl;
       return 1;
    }
-   std::ofstream out(snapshot_file.data(), std::ios_base::trunc | std::ios_base::binary);
-   if (!out)
+   std::ofstream                                                file;
+   boost::iostreams::filtering_stream<boost::iostreams::output> out;
+   if (gzip)
    {
-      std::cerr << "Failed to open " << snapshot_file << std::endl;
-      return 1;
+      out.push(boost::iostreams::gzip_compressor{});
+   }
+   if (snapshot_file == std::string_view{"-"})
+   {
+      out.push(std::cout);
+   }
+   else
+   {
+      file.open(snapshot_file.data(), std::ios_base::trunc | std::ios_base::binary);
+      if (!file)
+      {
+         std::cerr << "Failed to open " << snapshot_file << std::endl;
+         return 1;
+      }
+      out.push(file);
    }
    write_header({}, out);
    footer.hash.emplace();

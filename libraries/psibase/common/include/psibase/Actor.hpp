@@ -341,9 +341,9 @@ namespace psibase
       auto from(AccountNumber other) const { return Actor(other, Base::receiver); }
 
       template <typename Other>
-      auto to(uint64_t otherReceiver) const
+      auto to(AccountNumber otherReceiver = Other::service) const
       {
-         return Actor<Other>(Base::sender, AccountNumber(otherReceiver));
+         return Actor<Other>(Base::psio_get_proxy().sender, AccountNumber(otherReceiver));
       }
 
       auto* operator->() const { return this; }
@@ -449,7 +449,7 @@ namespace psibase
       ///
       /// This returns a new `Actor` object instead of modifying this.
       template <typename Other>
-      Actor<Other> to(uint64_t otherReceiver) const;
+      Actor<Other> to(AccountNumber otherReceiver = Other::service) const;
 
       /// Return this
       Actor<T>* operator->() const;
