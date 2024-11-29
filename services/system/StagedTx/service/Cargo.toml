@@ -9,6 +9,9 @@ publish = false
 
 [package.metadata.psibase]
 server = "r-staged-tx"
+postinstall = [
+    { sender = "staged-tx", service = "staged-tx", method = "init", rawData = "0000" },
+]
 
 [dependencies]
 async-graphql = { version = "7.0.10" }
