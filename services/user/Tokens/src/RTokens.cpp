@@ -140,7 +140,6 @@ struct TokenQuery
                                    [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& balance)
                                    {
                                       auto tokenOpt = tokenTypeIdx.get(balance.key.tokenId);
-                                      check(tokenOpt.has_value(), "Invalid token type");
                                       return TokenBalance{tokenOpt->symbolId, balance.key.tokenId,
                                                           tokenOpt->precision, balance.balance};
                                    }};
@@ -156,7 +155,6 @@ struct TokenQuery
           creditIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& credit)
           {
              auto tokenOpt = tokenTypeIdx.get(credit.key.tokenId);
-             check(tokenOpt.has_value(), "Invalid token type");
              return Credit{tokenOpt->symbolId, credit.key.tokenId, tokenOpt->precision,
                            credit.balance, credit.key.debitor};
           }};
@@ -187,9 +185,10 @@ struct TokenQuery
       std::vector<TokenRecord> tokens;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      auto nftIdx       = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>();
       for (auto token : tokenTypeIdx)
       {
-         auto nft = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>().get(token.ownerNft);
+         auto nft = nftIdx.get(token.ownerNft);
          if (nft.has_value() && nft->owner == user)
          {
             tokens.push_back(token);
