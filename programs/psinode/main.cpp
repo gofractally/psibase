@@ -2380,17 +2380,35 @@ void run(const std::string&              db_path,
                   if (service.root.string().find("services/x-admin") != std::string::npos &&
                       service.host.ends_with('.'))
                   {
-                     xAdminSubdomain = service.host;
-                     if (!host.empty())
-                     {
-                        xAdminSubdomain += host;
-                     }
+                     xAdminSubdomain = service.host + host;
                      break;
                   }
                }
 
-               std::string message = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
+               if (!xAdminSubdomain.empty())
+               {
+                  std::string protocol;
+                  std::string port;
+                  for (const auto& listen : http_config->listen)
+                  {
+                     if (std::holds_alternative<psibase::http::tcp_listen_spec<true>>(listen))
+                     {
+                        const auto& spec = std::get<psibase::http::tcp_listen_spec<true>>(listen);
+                        protocol         = "https://";
+                        port             = std::to_string(spec.endpoint.port());
+                        break;
+                     }
+                     else if (std::holds_alternative<psibase::http::tcp_listen_spec<false>>(listen))
+                     {
+                        const auto& spec = std::get<psibase::http::tcp_listen_spec<false>>(listen);
+                        protocol         = "http://";
+                        port             = std::to_string(spec.endpoint.port());
+                     }
+                  }
+                  xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
+               }
 
+               std::string message = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
                if (!xAdminSubdomain.empty())
                {
                   message += " or visit '" + xAdminSubdomain +
