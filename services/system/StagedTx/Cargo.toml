@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "query-service"]
 
 [workspace.package]
-version = "0.13.0"
+version = "0.14.0"
 rust-version = "1.64"
 edition = "2021"
 repository = "https://github.com/gofractally/psibase"
@@ -21,9 +21,9 @@ package-name = "StagedTx"
 services = ["staged-tx"]
 
 [package.metadata.psibase.dependencies]
-Supervisor = "0.13.0"
-Sites = "0.13.0"
-HttpServer = "0.13.0"
+Supervisor = "0.14.0"
+Sites = "0.14.0"
+HttpServer = "0.14.0"
 
 [profile.release]
 codegen-units = 1
@@ -36,5 +36,5 @@ lto = true
 crate-type = ["rlib"]
 
 [dependencies]
-staged-tx = { path = "service", version = "0.13.0" }
-r-staged-tx = { path = "query-service", version = "0.13.0" }
+staged-tx = { path = "service", version = "0.14.0" }
+r-staged-tx = { path = "query-service", version = "0.14.0" }

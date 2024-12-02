@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.13.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
 serde = "1.0"
-staged-tx = { path = "../service", version = "0.13.0" }
+staged-tx = { path = "../service", version = "0.14.0" }
 async-graphql = { version = "7.0.10" }
