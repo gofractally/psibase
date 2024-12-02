@@ -729,7 +729,7 @@ async fn boot(
         progress.inc(1)
     }
     if !args.suppress_ok {
-        println!("Ok");
+        println!("Ok. Successfully booted {}", args.api);
     }
     Ok(())
 }
