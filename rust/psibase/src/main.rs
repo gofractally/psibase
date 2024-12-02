@@ -66,10 +66,6 @@ struct NodeArgs {
 #[derive(Args, Debug)]
 #[clap(long_about = None)]
 struct TxArgs {
-    /// Sign with this key (repeatable)
-    #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<AnyPrivateKey>,
-
     /// Suppress "Ok" message
     #[clap(long)]
     suppress_ok: bool,
@@ -82,6 +78,15 @@ struct TxArgs {
     /// Controls whether the transaction's console output is shown
     #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
     console: bool,
+}
+
+/// transaction-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+struct SigArgs {
+    /// Sign with this key (repeatable)
+    #[clap(short = 's', long, value_name = "KEY")]
+    sign: Vec<AnyPrivateKey>,
 }
 
 #[derive(Args, Debug)]
@@ -119,6 +124,9 @@ struct CreateArgs {
     node_args: NodeArgs,
 
     #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
     tx_args: TxArgs,
 
     /// Account to create
@@ -147,6 +155,9 @@ struct ModifyArgs {
     node_args: NodeArgs,
 
     #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
     tx_args: TxArgs,
 
     /// Account to modify
@@ -168,6 +179,9 @@ struct ModifyArgs {
 struct DeployArgs {
     #[command(flatten)]
     node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
 
     #[command(flatten)]
     tx_args: TxArgs,
@@ -205,6 +219,9 @@ struct UploadArgs {
     node_args: NodeArgs,
 
     #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
     tx_args: TxArgs,
 
     /// Source filename to upload
@@ -235,6 +252,9 @@ struct UploadArgs {
 struct InstallArgs {
     #[command(flatten)]
     node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
 
     #[command(flatten)]
     tx_args: TxArgs,
@@ -316,6 +336,9 @@ struct InfoArgs {
 
 #[derive(Args, Debug)]
 struct CreateTokenArgs {
+    #[command(flatten)]
+    sig_args: SigArgs,
+
     #[command(flatten)]
     tx_args: TxArgs,
 
@@ -442,7 +465,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client,
-        sign_transaction(trx, &args.tx_args.sign)?.packed(),
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         None,
@@ -487,7 +510,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client,
-        sign_transaction(trx, &args.tx_args.sign)?.packed(),
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         None,
@@ -544,7 +567,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client,
-        sign_transaction(trx, &args.tx_args.sign)?.packed(),
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         None,
@@ -599,7 +622,7 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     push_transaction(
         &args.node_args.api,
         client,
-        sign_transaction(trx, &args.tx_args.sign)?.packed(),
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         None,
@@ -875,7 +898,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
             args,
             &client,
             selected_files,
-            sign_transaction(trx, &args.tx_args.sign)?,
+            sign_transaction(trx, &args.sig_args.sign)?,
             progress.clone(),
             n as u64,
         ));
@@ -1004,7 +1027,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         }
         Ok(sign_transaction(
             with_tapos(&tapos, actions),
-            &args.tx_args.sign,
+            &args.sig_args.sign,
         )?)
     };
 
