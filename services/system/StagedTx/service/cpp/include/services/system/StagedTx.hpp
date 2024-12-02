@@ -49,6 +49,7 @@ namespace SystemService
       void init();
 
       /// Proposes a new staged transaction containing the specified actions.
+      /// All actions must have the same sender.
       ///
       /// * `actions` - The actions to be staged
       void propose(const std::vector<psibase::Action>& actions);

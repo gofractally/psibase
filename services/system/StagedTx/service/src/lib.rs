@@ -264,6 +264,7 @@ pub mod service {
     }
 
     /// Proposes a new staged transaction containing the specified actions.
+    /// All actions must have the same sender.
     ///
     /// * `actions` - The actions to be staged
     #[action]
@@ -291,11 +292,11 @@ pub mod service {
 
         Response::upsert(id, true);
 
+        staged_tx.emit(StagedTxEvent::ACCEPTED);
+
         staged_tx
             .staged_tx_policy()
             .accept(staged_tx.id, get_sender());
-
-        staged_tx.emit(StagedTxEvent::ACCEPTED);
     }
 
     /// Indicates that the caller rejects the staged transaction
@@ -325,13 +326,19 @@ pub mod service {
     #[action]
     fn remove(id: u32, txid: [u8; 32]) {
         let staged_tx = StagedTx::get(id, txid);
+        remove_impl(&staged_tx);
+        staged_tx.emit(StagedTxEvent::DELETED);
+    }
 
+    // Needed to separate the event emission from the removal logic
+    fn remove_impl(staged_tx: &StagedTx) {
         check(
             get_sender() == staged_tx.proposer || get_sender() == staged_tx.first_sender(),
             "Only the proposer or the staged tx first sender can remove the staged tx",
         );
 
         // Delete all responses for this staged tx
+        let id = staged_tx.id;
         let responses = ResponseTable::new();
         let deletable = responses
             .get_index_pk()
@@ -343,8 +350,6 @@ pub mod service {
 
         // Delete the staged tx itself
         StagedTxTable::new().erase(&id);
-
-        staged_tx.emit(StagedTxEvent::DELETED);
     }
 
     /// Notifies the staged-tx service that a staged transaction should be executed.
@@ -362,13 +367,14 @@ pub mod service {
             "Only the first sender of the staged tx can execute it",
         );
 
+        remove_impl(&staged_tx);
+
         staged_tx.action_list.actions.iter().for_each(|action| {
             let _ = Transact::call().runAs(action.clone(), Vec::new());
         });
 
         staged_tx.emit(StagedTxEvent::EXECUTED);
-
-        remove(id, txid);
+        staged_tx.emit(StagedTxEvent::DELETED);
     }
 
     /// Gets a staged transaction by id. Typically used inline by auth services.
