@@ -118,7 +118,6 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
             make_package_repository(dir, [foo10, foo11])
-            a.install(args=['foo', '--package-source', dir])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
