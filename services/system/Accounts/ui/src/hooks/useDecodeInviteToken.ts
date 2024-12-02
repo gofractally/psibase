@@ -11,14 +11,13 @@ const DecodedToken = z.object({
   expiry: z.string().datetime(),
 });
 
-export const useDecodeToken = (
+export const useDecodeInviteToken = (
   token: string | undefined | null,
-  ping = false
+  enabled: boolean
 ) =>
   useQuery({
     queryKey: ["invite", token],
-    refetchInterval: ping ? 2000 : false,
-    enabled: !!token,
+    enabled,
     queryFn: async () => {
       await supervisor.onLoaded();
       const tokenRes = DecodedToken.parse(

@@ -46,15 +46,11 @@ import relativeTime from "dayjs/plugin/relativeTime";
 
 import { useSearchParams } from "react-router-dom";
 import { supervisor } from "@/main";
-import { useDecodeToken } from "@/hooks/useToken";
+import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
+import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
+import { useDecodeToken } from "@/hooks/useDecodeToken";
 
 dayjs.extend(relativeTime);
-
-enum Status {
-  Loading,
-  Unavailable,
-  Available,
-}
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -111,9 +107,33 @@ const formSchema = z.object({
   username: z.string().min(1).max(50),
 });
 
-const isAccountAvailable = async (accountName: string): Promise<boolean> => {
-  await wait(1000);
-  return accountName.length > 5 || Math.random() > 0.5;
+const AccountNameStatus = z.enum(["Available", "Taken", "Invalid", "Loading"]);
+const GetAccountReturn = z
+  .object({
+    accountNum: z.string(),
+    authService: z.string(),
+    resourceBalance: z.boolean().or(z.bigint()),
+  })
+  .optional();
+
+const isAccountAvailable = async (
+  accountName: string
+): Promise<z.infer<typeof AccountNameStatus>> => {
+  try {
+    const res = GetAccountReturn.parse(
+      await supervisor.functionCall({
+        method: "getAccount",
+        params: [accountName],
+        service: "accounts",
+        intf: "api",
+      })
+    );
+
+    return AccountNameStatus.parse(res ? "Taken" : "Available");
+  } catch (e) {
+    console.error(e);
+    return AccountNameStatus.parse("Invalid");
+  }
 };
 
 export const AccountSelection = () => {
@@ -135,22 +155,24 @@ export const AccountSelection = () => {
     },
     onSuccess: async () => {
       fetchAccounts();
+      setTimeout(() => {
+        fetchAccounts();
+      }, 2000);
     },
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   const [isCreatingAccount, setIsCreatingAccount] = useState(true);
 
   const { isDirty, isSubmitting } = form.formState;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log("submitting account", values);
-    console.log({ isCreatingAccount });
-
     if (isCreatingAccount) {
       void (await createAccount(values.username));
     } else {
       void (await importAccount(values.username));
+      setIsModalOpen(false);
     }
   };
 
@@ -179,7 +201,6 @@ export const AccountSelection = () => {
             intf: "admin",
           })
         );
-      console.log(res, "was the accounts return");
 
       return z
         .string()
@@ -189,21 +210,22 @@ export const AccountSelection = () => {
     },
   });
 
+  const isNoAccounts = accounts ? accounts.length == 0 : false;
+
   console.log({ error }, "was the error");
 
-  const { data: accountIsAvailable, isLoading: debounceIsLoading } = useQuery({
+  const { data: status, isLoading: debounceIsLoading } = useQuery<
+    z.infer<typeof AccountNameStatus>
+  >({
     queryKey: ["userAccount", debouncedAccount],
     queryFn: async () => isAccountAvailable(debouncedAccount!),
     enabled: !!debouncedAccount,
+    initialData: "Loading",
   });
 
   const isProcessing = debounceIsLoading || username !== debouncedAccount;
 
-  const status = isProcessing
-    ? Status.Loading
-    : accountIsAvailable
-    ? Status.Available
-    : Status.Unavailable;
+  const accountStatus = isProcessing ? "Loading" : status;
 
   const isAccountsLoading = isFetching && !accounts;
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
@@ -233,11 +255,23 @@ export const AccountSelection = () => {
     (account) => account.id == selectedAccountId
   );
 
+  const { data: decodedToken, isLoading: isLoadingToken } =
+    useDecodeToken(token);
+  const isInvite = decodedToken?.tag === "invite-token";
+
   const {
     data: invite,
     isLoading: isLoadingInvite,
     refetch: refetchToken,
-  } = useDecodeToken(token);
+  } = useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
+
+  const { data: connectionToken, isLoading: isLoadingConnectionToken } =
+    useDecodeConnectionToken(token, decodedToken?.tag == "connection-token");
+
+  const isInitialLoading =
+    isLoadingInvite || isLoadingConnectionToken || isLoadingToken;
+
+  console.log({ decodedToken, inviteToken: invite, connectionToken });
 
   const { mutateAsync: createAccount } = useMutation<void, string, string>({
     mutationFn: async (account) => {
@@ -265,22 +299,22 @@ export const AccountSelection = () => {
         service: "accounts",
         intf: "admin",
       }));
-
-      alert("i should not redirect to the app...");
     },
   });
 
   console.log(selectedAccount);
 
-  const chainName = "chain_name";
-
-  const appName = invite ? capitaliseFirstLetter(invite.app) : "Loading";
+  const appName = isInvite
+    ? invite
+      ? capitaliseFirstLetter(invite.app)
+      : ""
+    : connectionToken
+    ? capitaliseFirstLetter(connectionToken.app)
+    : "";
 
   const isExpired = invite
     ? invite.expiry.valueOf() < new Date().valueOf()
     : false;
-
-  const notFound = false;
 
   const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
     onSuccess: () => {
@@ -294,6 +328,12 @@ export const AccountSelection = () => {
         throw new Error(`No invite available`);
       }
 
+      const rejectParams = {
+        method: "reject",
+        params: [token],
+        service: "invite",
+        intf: "invitee",
+      };
       if (selectedAccount) {
         void (await supervisor.functionCall({
           method: "login",
@@ -302,12 +342,7 @@ export const AccountSelection = () => {
           intf: "activeApp",
         }));
 
-        void (await supervisor.functionCall({
-          method: "reject",
-          params: [token],
-          service: "invite",
-          intf: "invitee",
-        }));
+        void (await supervisor.functionCall(rejectParams));
       } else {
         void (await supervisor.functionCall({
           method: "logout",
@@ -316,12 +351,33 @@ export const AccountSelection = () => {
           intf: "activeApp",
         }));
 
-        void (await supervisor.functionCall({
-          method: "reject",
-          params: [token],
-          service: "invite",
-          intf: "invitee",
-        }));
+        void (await supervisor.functionCall(rejectParams));
+      }
+    },
+  });
+
+  const { mutateAsync: login, isPending: isLoggingIn } = useMutation({
+    mutationFn: async () => {
+      if (!selectedAccount) throw new Error(`Expected selected account`);
+      if (!connectionToken) throw new Error(`Expected connection token`);
+
+      void (await supervisor.functionCall({
+        method: "loginDirect",
+        params: [
+          {
+            app: connectionToken.app,
+            origin: connectionToken.origin,
+          },
+          selectedAccount.account,
+        ],
+        service: "accounts",
+        intf: "admin",
+      }));
+
+      if (window.location && window.location.href) {
+        window.location.href = connectionToken.origin;
+      } else {
+        throw new Error(`Expected window location to redirect to`);
       }
     },
   });
@@ -371,8 +427,7 @@ export const AccountSelection = () => {
     },
   });
 
-  const isTxInProgress = isRejecting || isAccepting;
-  console.log({ chainName, isTxInProgress, wtf: false });
+  const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
 
   if (isLoadingInvite) {
     return (
@@ -382,20 +437,6 @@ export const AccountSelection = () => {
             <LoaderCircle className="w-12 h-12 animate-spin" />
           </div>
           <CardTitle className="text-center">Loading...</CardTitle>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  if (notFound) {
-    return (
-      <Card className="w-[350px] mx-auto mt-4">
-        <CardHeader>
-          <div className="mx-auto">
-            <TriangleAlert className="w-12 h-12" />
-          </div>
-          <CardTitle>Invitation not found.</CardTitle>
-          <CardDescription>This invitation does not exist.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -487,17 +528,23 @@ export const AccountSelection = () => {
                       <FormItem>
                         <div className="w-full flex justify-between ">
                           <FormLabel>Username</FormLabel>
-                          {isDirty && (
+                          {isDirty && isCreatingAccount && (
                             <FormLabel className="text-muted-foreground">
-                              {status === Status.Available ? (
+                              {accountStatus === "Available" ? (
                                 <div className="flex gap-1">
                                   <div className="text-sm">Available</div>
                                   <Check size={15} className="my-auto" />{" "}
                                 </div>
-                              ) : status === Status.Unavailable ? (
+                              ) : accountStatus === "Taken" ? (
                                 <div className="flex gap-1">
                                   {" "}
                                   <div className="text-sm">Taken</div>
+                                  <UserX size={15} className=" my-auto" />{" "}
+                                </div>
+                              ) : accountStatus === "Invalid" ? (
+                                <div className="flex gap-1">
+                                  {" "}
+                                  <div className="text-sm">Invalid</div>
                                   <UserX size={15} className=" my-auto" />{" "}
                                 </div>
                               ) : (
@@ -512,6 +559,33 @@ export const AccountSelection = () => {
                               )}
                             </FormLabel>
                           )}
+                          {isDirty && !isCreatingAccount && (
+                            <FormLabel className="text-muted-foreground">
+                              {accountStatus === "Available" ? (
+                                <div className="flex gap-1">
+                                  <div className="text-sm">
+                                    Account does not exist
+                                  </div>
+                                  <UserX size={15} className=" my-auto" />{" "}
+                                </div>
+                              ) : accountStatus === "Invalid" ? (
+                                <div className="flex gap-1">
+                                  {" "}
+                                  <div className="text-sm">Invalid</div>
+                                  <UserX size={15} className=" my-auto" />{" "}
+                                </div>
+                              ) : accountStatus === "Loading" ? (
+                                <div className="flex gap-1">
+                                  {" "}
+                                  <div className="text-sm">Loading</div>
+                                  <LoaderCircle
+                                    size={15}
+                                    className="animate animate-spin my-auto"
+                                  />{" "}
+                                </div>
+                              ) : undefined}
+                            </FormLabel>
+                          )}
                         </div>
                         <FormControl>
                           <Input {...field} />
@@ -520,7 +594,7 @@ export const AccountSelection = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
                     {isCreatingAccount
                       ? `${isSubmitting ? "Accepting" : "Accept"} invite`
                       : `Import account`}
@@ -529,24 +603,33 @@ export const AccountSelection = () => {
               </Form>
             </DialogHeader>
           </DialogContent>
-
           <div className="max-w-lg mx-auto">
             <div className="text-center text-muted-foreground py-2">
               <span>
-                Select an account to accept invite to{" "}
-                <span className="text-primary">{appName}</span>
+                {isInitialLoading
+                  ? "Loading..."
+                  : isNoAccounts
+                  ? `No accounts available.`
+                  : isInvite
+                  ? `Select an account to accept invite to `
+                  : `Select an account to login to `}
+                {!isNoAccounts && (
+                  <span className="text-primary">{appName}</span>
+                )}
               </span>
             </div>
-            <div className="relative ml-auto flex-1 md:grow-0 mb-3">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={activeSearch}
-                type="search"
-                onChange={(e) => setActiveSearch(e.target.value)}
-                placeholder="Search..."
-                className="w-full rounded-lg bg-background pl-8 "
-              />
-            </div>
+            {!isNoAccounts && (
+              <div className="relative ml-auto flex-1 md:grow-0 mb-3">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={activeSearch}
+                  type="search"
+                  onChange={(e) => setActiveSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full rounded-lg bg-background pl-8 "
+                />
+              </div>
+            )}
 
             <div className="flex flex-col gap-3 ">
               <div className="flex flex-col gap-3 max-h-[600px] overflow-auto">
@@ -571,36 +654,49 @@ export const AccountSelection = () => {
                       />
                     ))}
               </div>
-              <button
-                onClick={() => {
-                  setIsCreatingAccount(true);
-                  setIsModalOpen(true);
-                }}
-                className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed"
-              >
-                Create a new account
-              </button>
+              {isInvite && (
+                <button
+                  onClick={() => {
+                    setIsCreatingAccount(true);
+                    setIsModalOpen(true);
+                  }}
+                  className="flex p-4 shrink-0 items-center justify-center rounded-md border border-neutral-600 text-muted-foreground hover:text-primary hover:underline border-dashed"
+                >
+                  Create a new account
+                </button>
+              )}
             </div>
-            <div className="my-3">
-              <Button
-                onClick={() => {
-                  console.log("pressed");
-                  acceptInvite(z.string().parse(token));
-                }}
-                className="w-full"
-              >
-                {isSubmitting ? "Loading..." : "Accept invite"}
-              </Button>
-            </div>
-            {/* <Separator className="my-8 " /> */}
+            {!isNoAccounts && (
+              <div className="my-3">
+                <Button
+                  disabled={!selectedAccount || isTxInProgress}
+                  onClick={() => {
+                    if (isInvite) {
+                      acceptInvite(z.string().parse(token));
+                    } else {
+                      login();
+                    }
+                  }}
+                  className="w-full"
+                >
+                  {isSubmitting
+                    ? "Loading..."
+                    : isInvite
+                    ? "Accept invite"
+                    : "Login"}
+                </Button>
+              </div>
+            )}
             <div className="w-full justify-center flex">
-              <Button
-                onClick={() => rejectInvite()}
-                variant="link"
-                className="text-muted-foreground"
-              >
-                Reject invite
-              </Button>
+              {isInvite && (
+                <Button
+                  onClick={() => rejectInvite()}
+                  variant="link"
+                  className="text-muted-foreground"
+                >
+                  Reject invite
+                </Button>
+              )}
             </div>
             <div className="w-full justify-center flex">
               <Button
@@ -608,8 +704,8 @@ export const AccountSelection = () => {
                   setIsCreatingAccount(false);
                   setIsModalOpen(true);
                 }}
-                variant="link"
-                className="text-muted-foreground"
+                variant={isNoAccounts ? "default" : "link"}
+                className={cn({ "text-muted-foreground": !isNoAccounts })}
               >
                 Import an account
               </Button>

@@ -1,4 +1,5 @@
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { siblingUrl } from "@psibase/common-lib";
 
 function HoverBorderGradientDemo() {
   return (
@@ -17,9 +18,9 @@ function HoverBorderGradientDemo() {
 export const Nav = () => {
   return (
     <div className="mt-4 flex w-full justify-between">
-      <div>
+      <a href={siblingUrl()}>
         <HoverBorderGradientDemo />
-      </div>
+      </a>
       <div></div>
     </div>
   );

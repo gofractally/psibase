@@ -24,6 +24,7 @@ import {
     UserPlus,
     Copy,
     RefreshCcw,
+    LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
@@ -41,7 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { siblingUrl, Supervisor } from "@psibase/common-lib";
@@ -52,8 +53,20 @@ import { supervisor } from "@/main";
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const createConnectionToken = async (): Promise<string> => {
+    const token = z.string().parse(
+        await supervisor.functionCall({
+            method: "createConnectionToken",
+            params: [],
+            service: "accounts",
+            intf: "activeApp",
+        })
+    );
+
+    return token;
+};
+
 const fetchInvite = async (): Promise<string> => {
-    console.log("fetching invite..");
     await wait(2000);
 
     try {
@@ -72,6 +85,7 @@ const fetchInvite = async (): Promise<string> => {
             siblingUrl(undefined, "accounts", null, false),
             {
                 token,
+                invite: "1",
             }
         );
 
@@ -92,17 +106,86 @@ export const SettingsDropdown = () => {
         isPending,
         mutate: generateInvite,
     } = useMutation({
-        mutationFn: () => {
-            return fetchInvite();
+        mutationFn: fetchInvite,
+    });
+
+    const [activeUser, setActiveUser] = useState<string>("");
+
+    const { mutateAsync: onLogin } = useMutation({
+        mutationFn: createConnectionToken,
+        onSuccess: (token) => {
+            const url = modifyUrlParams(
+                siblingUrl(undefined, "accounts", null, false),
+                {
+                    token,
+                }
+            );
+
+            console.log(url, "is the url I want to use");
+
+            window.location.href = url;
         },
     });
 
-    const [accounts, setAccounts] = useState<string[]>([]);
+    const { isSuccess: isLoaded } = useQuery({
+        queryKey: ["loaded"],
+        queryFn: async () => {
+            await supervisor.onLoaded();
+            supervisor.preLoadPlugins([{ service: "accounts" }]);
+        },
+    });
+
+    const { data: loggedInUser, refetch: refetchLoggedInUser } = useQuery({
+        queryKey: ["loggedInUser"],
+        enabled: isLoaded,
+        queryFn: async () => {
+            return z
+                .string()
+                .optional()
+                .parse(
+                    await supervisor.functionCall({
+                        method: "getLoggedInUser",
+                        params: [],
+                        service: "accounts",
+                        intf: "activeApp",
+                    })
+                );
+        },
+    });
+
+    const isLoggedIn = !!loggedInUser;
+
+    const { data: currentAccounts, refetch: refetchCurrentAccounts } = useQuery(
+        {
+            queryKey: ["currentAccounts"],
+            enabled: isLoaded,
+            initialData: [],
+            queryFn: async () => {
+                return z
+                    .string()
+                    .array()
+                    .parse(
+                        await supervisor.functionCall({
+                            method: "getConnectedAccounts",
+                            params: [],
+                            service: "accounts",
+                            intf: "activeApp",
+                        })
+                    );
+            },
+        }
+    );
+
+    const selectAccount = async (accountName: string) => {
+        void (await supervisor.functionCall({
+            method: "login",
+            params: [z.string().parse(accountName)],
+            service: "accounts",
+            intf: "activeApp",
+        }));
+    };
 
     const init = async () => {
-        await supervisor.onLoaded();
-        supervisor.preLoadPlugins([{ service: "accounts" }]);
-        console.log("starting...");
         const res = z
             .string()
             .array()
@@ -115,7 +198,6 @@ export const SettingsDropdown = () => {
                 })
             );
         console.log(res, "was the accounts return");
-        setAccounts(res);
 
         try {
             void (await supervisor.functionCall({
@@ -137,8 +219,6 @@ export const SettingsDropdown = () => {
 
         console.log({ res3 });
     };
-
-    console.log({ accounts }, "are available accounts");
 
     useEffect(() => {
         init();
@@ -217,15 +297,52 @@ export const SettingsDropdown = () => {
                 <DropdownMenuContent className="w-56">
                     <DropdownMenuLabel>Settings</DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={() => {
+                            onLogin();
+                        }}
+                    >
+                        <LogIn className="mr-2 h-4 w-4" />
+                        <span>{loggedInUser || "Select account"}</span>
+                    </DropdownMenuItem>
                     <DropdownMenuGroup>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                <span>{currentAccounts}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    {currentAccounts.map((account) => (
+                                        <DropdownMenuItem key={account}>
+                                            <Mail className="mr-2 h-4 w-4" />
+                                            <span>{account}</span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            onLogin();
+                                        }}
+                                    >
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        <span>More...</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
                         <DialogTrigger asChild>
                             <DropdownMenuItem
+                                disabled={!activeUser}
                                 onClick={() => {
                                     generateInvite();
                                 }}
                             >
                                 <User className="mr-2 h-4 w-4" />
-                                <span>Create invite</span>
+                                <span>
+                                    Create invite
+                                    {!isLoggedIn && " (Requires login)"}
+                                </span>
                             </DropdownMenuItem>
                         </DialogTrigger>
                         <DropdownMenuItem disabled>
