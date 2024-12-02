@@ -2,7 +2,10 @@
 
 use crate::{Hex, Pack, ToKey, ToSchema, Unpack};
 use anyhow::anyhow;
+use percent_encoding::percent_decode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::borrow::Cow;
+use std::collections::HashMap;
 
 /// An HTTP header
 ///
@@ -52,6 +55,22 @@ pub struct HttpRequest {
 
     /// Request body, e.g. POST data
     pub body: Hex<Vec<u8>>,
+}
+
+impl HttpRequest {
+    pub fn path<'a>(&'a self) -> Cow<'a, str> {
+        let encoded = self
+            .target
+            .split_once('?')
+            .map_or(self.target.as_str(), |s| s.0);
+        return percent_decode(encoded.as_bytes()).decode_utf8_lossy();
+    }
+    pub fn query(&self) -> HashMap<String, String> {
+        let encoded = self.target.split_once('?').map_or("", |s| s.1);
+        return form_urlencoded::parse(encoded.as_bytes())
+            .into_owned()
+            .collect();
+    }
 }
 
 pub struct HttpBody {
