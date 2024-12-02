@@ -270,7 +270,7 @@ namespace SystemService
       if (request.method == "GET" || request.method == "HEAD")
       {
          Tables tables{};
-         auto   target = normalizeTarget(request.target);
+         auto   target = request.path();
 
          std::optional<SitesContentRow> content;
          auto                           isSpa = useSpa(account);
