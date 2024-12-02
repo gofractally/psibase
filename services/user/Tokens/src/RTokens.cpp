@@ -140,6 +140,7 @@ struct TokenQuery
                                    [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& balance)
                                    {
                                       auto tokenOpt = tokenTypeIdx.get(balance.key.tokenId);
+                                      check(tokenOpt.has_value(), "Invalid token type");
                                       return TokenBalance{tokenOpt->symbolId, balance.key.tokenId,
                                                           tokenOpt->precision, balance.balance};
                                    }};
@@ -155,6 +156,7 @@ struct TokenQuery
           creditIdx, [tokenTypeIdx = std::move(tokenTypeIdx)](auto&& credit)
           {
              auto tokenOpt = tokenTypeIdx.get(credit.key.tokenId);
+             check(tokenOpt.has_value(), "Invalid token type");
              return Credit{tokenOpt->symbolId, credit.key.tokenId, tokenOpt->precision,
                            credit.balance, credit.key.debitor};
           }};
