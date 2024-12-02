@@ -527,7 +527,7 @@ class Node(API):
         self.wait(isbooted)
     def install(self, packages=[], sources=[]):
         '''installs a package'''
-        self.run_psibase(['install'] + self.node_args() + ['--package-source', sources] + packages)
+        self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args):
         self._find_psibase()
         subprocess.run([self.psibase] + args).check_returncode()
