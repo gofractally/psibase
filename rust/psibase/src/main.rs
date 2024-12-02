@@ -729,7 +729,7 @@ async fn boot(
         progress.inc(1)
     }
     if !args.suppress_ok {
-        println!("Ok. Successfully booted {}", args.api);
+        println!("Ok, booted {}", args.api);
     }
     Ok(())
 }
@@ -1166,7 +1166,7 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
-            .contains("Need genesis block; use 'psibase boot' to boot chain")
+            .contains("Node is not yet booted. To boot, use the 'psibase boot' CLI")
         {
             return Ok(PackageList::new());
         }

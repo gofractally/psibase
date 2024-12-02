@@ -688,7 +688,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          if (bc.needGenesisAction)
-            trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+            trace.error = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
          else
          {
             check(trx.proofs.size() == trx.transaction->claims().size(),
@@ -2391,18 +2391,18 @@ void run(const std::string&              db_path,
                   std::string port;
                   for (const auto& listen : http_config->listen)
                   {
-                     if (std::holds_alternative<psibase::http::tcp_listen_spec<true>>(listen))
+                     if (const auto* spec =
+                             std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
                      {
-                        const auto& spec = std::get<psibase::http::tcp_listen_spec<true>>(listen);
-                        protocol         = "https://";
-                        port             = std::to_string(spec.endpoint.port());
+                        protocol = "https://";
+                        port     = std::to_string(spec->endpoint.port());
                         break;
                      }
-                     else if (std::holds_alternative<psibase::http::tcp_listen_spec<false>>(listen))
+                     else if (const auto* spec =
+                                  std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
                      {
-                        const auto& spec = std::get<psibase::http::tcp_listen_spec<false>>(listen);
-                        protocol         = "http://";
-                        port             = std::to_string(spec.endpoint.port());
+                        protocol = "http://";
+                        port     = std::to_string(spec->endpoint.port());
                      }
                   }
                   xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
@@ -2411,8 +2411,7 @@ void run(const std::string&              db_path,
                std::string message = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
                if (!xAdminSubdomain.empty())
                {
-                  message += " or visit '" + xAdminSubdomain +
-                             "' app in browser for a graphical boot interface";
+                  message += " or visit '" + xAdminSubdomain + "' for node setup";
                }
 
                PSIBASE_LOG(node.chain().getLogger(), notice) << message;
