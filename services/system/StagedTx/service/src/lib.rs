@@ -133,6 +133,13 @@ pub mod service {
                 "Sender account in staged tx is invalid",
             );
 
+            for action in &actions {
+                check(
+                    action.sender == sender,
+                    "All actions in staged tx must have the same sender",
+                );
+            }
+
             let monotonic_id = LastUsed::get_next_id();
             let current_block = Transact::call().currentBlock();
             let packed = (monotonic_id, current_block.blockNum, &actions).packed();
