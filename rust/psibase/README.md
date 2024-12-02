@@ -1,4 +1,4 @@
-`psibase` is a library and command-line tool for interacting with psibase networks. Used by sys admins and non-Rust devs.
+`psibase` is a library and command-line tool for interacting with psibase networks.
 
-See `psibase --help` for details.
+See `psibase --help` for CLI usage details.
 See [rust docs](docs.rs/psibase) for library usage details.
