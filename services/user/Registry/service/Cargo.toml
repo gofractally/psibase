@@ -13,8 +13,8 @@ server = "r-registry"
 plugin = "registry-plugin"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.13.0"
-Sites = "0.13.0"
+HttpServer = "0.14.0"
+Sites = "0.14.0"
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase" }
