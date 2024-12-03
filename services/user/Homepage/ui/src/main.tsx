@@ -9,7 +9,7 @@ import "./index.css";
 import router from "./router";
 import { Supervisor, siblingUrl } from "@psibase/common-lib";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 const supervisorSrc = siblingUrl(undefined, "supervisor", undefined, false);
 

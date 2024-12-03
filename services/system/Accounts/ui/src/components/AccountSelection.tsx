@@ -172,8 +172,8 @@ export const AccountSelection = () => {
       void (await createAccount(values.username));
     } else {
       void (await importAccount(values.username));
-      setIsModalOpen(false);
     }
+    setIsModalOpen(false);
   };
 
   const username = form.watch("username");
@@ -190,17 +190,12 @@ export const AccountSelection = () => {
     queryFn: async (): Promise<AccountType[]> => {
       supervisor.preLoadPlugins([{ service: "accounts" }]);
 
-      const res = z
-        .string()
-        .array()
-        .parse(
-          await supervisor.functionCall({
-            method: "getAllAccounts",
-            params: [],
-            service: "accounts",
-            intf: "admin",
-          })
-        );
+      const res = await supervisor.functionCall({
+        method: "getAllAccounts",
+        params: [],
+        service: "accounts",
+        intf: "admin",
+      });
 
       return z
         .string()
@@ -273,34 +268,43 @@ export const AccountSelection = () => {
 
   console.log({ decodedToken, inviteToken: invite, connectionToken });
 
-  const { mutateAsync: createAccount } = useMutation<void, string, string>({
-    mutationFn: async (account) => {
-      if (!invite) throw new Error(`Must have invite`);
-      void (await supervisor.functionCall({
-        method: "acceptWithNewAccount",
-        params: [account, token],
-        service: "invite",
-        intf: "invitee",
-      }));
+  const { mutateAsync: createAccount, isSuccess: isInviteClaimed } =
+    useMutation<void, string, string>({
+      mutationFn: async (account) => {
+        if (!invite) throw new Error(`Must have invite`);
 
-      await wait(2000);
+        void (await supervisor.functionCall({
+          method: "logout",
+          params: [],
+          service: "accounts",
+          intf: "activeApp",
+        }));
 
-      await importAccount(account);
+        void (await supervisor.functionCall({
+          method: "acceptWithNewAccount",
+          params: [account, token],
+          service: "invite",
+          intf: "invitee",
+        }));
 
-      void (await supervisor.functionCall({
-        method: "loginDirect",
-        params: [
-          {
-            app: invite.app,
-            origin: invite.appDomain,
-          },
-          account,
-        ],
-        service: "accounts",
-        intf: "admin",
-      }));
-    },
-  });
+        await wait(2000);
+
+        await importAccount(account);
+
+        void (await supervisor.functionCall({
+          method: "loginDirect",
+          params: [
+            {
+              app: invite.app,
+              origin: invite.appDomain,
+            },
+            account,
+          ],
+          service: "accounts",
+          intf: "admin",
+        }));
+      },
+    });
 
   console.log(selectedAccount);
 
@@ -442,7 +446,7 @@ export const AccountSelection = () => {
     );
   }
 
-  if (invite?.state == "accepted") {
+  if (invite?.state == "accepted" && !isInviteClaimed) {
     return (
       <Card className="w-[350px] mx-auto mt-4">
         <CardHeader>
@@ -654,7 +658,7 @@ export const AccountSelection = () => {
                       />
                     ))}
               </div>
-              {isInvite && (
+              {isInvite && !isInviteClaimed && (
                 <button
                   onClick={() => {
                     setIsCreatingAccount(true);

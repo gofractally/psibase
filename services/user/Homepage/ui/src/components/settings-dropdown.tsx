@@ -13,12 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
     Settings,
-    CreditCard,
     Github,
     LifeBuoy,
     LogOut,
-    Mail,
-    MessageSquare,
     PlusCircle,
     User,
     UserPlus,
@@ -28,7 +25,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "./mode-toggle";
-import { useEffect, useState } from "react";
 
 import {
     Dialog,
@@ -42,192 +38,46 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { siblingUrl, Supervisor } from "@psibase/common-lib";
-import { useNavigate } from "react-router-dom";
-import { modifyUrlParams } from "@/lib/modifyUrlParams";
-import { z } from "zod";
-import { supervisor } from "@/main";
 
-const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const createConnectionToken = async (): Promise<string> => {
-    const token = z.string().parse(
-        await supervisor.functionCall({
-            method: "createConnectionToken",
-            params: [],
-            service: "accounts",
-            intf: "activeApp",
-        })
-    );
-
-    return token;
-};
-
-const fetchInvite = async (): Promise<string> => {
-    await wait(2000);
-
-    try {
-        const token = z.string().parse(
-            await supervisor.functionCall({
-                service: "invite",
-                intf: "inviter",
-                method: "generateInvite",
-                params: ["/thisismycallback?params=derp"],
-            })
-        );
-
-        console.log(token, "is invite res");
-
-        const res = modifyUrlParams(
-            siblingUrl(undefined, "accounts", null, false),
-            {
-                token,
-                invite: "1",
-            }
-        );
-
-        console.log({ res });
-
-        return res as string;
-    } catch (e) {
-        console.error(e);
-        throw new Error("got no string");
-    }
-};
+import { useSupervisor } from "@/lib/hooks/useSupervisor";
+import { useLoggedInUser } from "@/lib/hooks/useLoggedInUser";
+import { useCurrentAccounts } from "@/lib/hooks/useCurrentAccounts";
+import { useLogout } from "@/lib/hooks/useLogout";
+import { useSelectAccount } from "@/lib/hooks/useSelectAccount";
+import { useGenerateInvite } from "@/lib/hooks/useGenerateInvite";
+import { useCreateConnectionToken } from "@/lib/hooks/useCreateConnectionToken";
 
 export const SettingsDropdown = () => {
-    const navigate = useNavigate();
-
     const {
         data: inviteLink,
         isPending,
         mutate: generateInvite,
-    } = useMutation({
-        mutationFn: fetchInvite,
-    });
+    } = useGenerateInvite();
 
-    const [activeUser, setActiveUser] = useState<string>("");
+    const { mutateAsync: onLogin } = useCreateConnectionToken();
 
-    const { mutateAsync: onLogin } = useMutation({
-        mutationFn: createConnectionToken,
-        onSuccess: (token) => {
-            const url = modifyUrlParams(
-                siblingUrl(undefined, "accounts", null, false),
-                {
-                    token,
-                }
-            );
-
-            console.log(url, "is the url I want to use");
-
-            window.location.href = url;
-        },
-    });
-
-    const { isSuccess: isLoaded } = useQuery({
-        queryKey: ["loaded"],
-        queryFn: async () => {
-            await supervisor.onLoaded();
-            supervisor.preLoadPlugins([{ service: "accounts" }]);
-        },
-    });
-
-    const { data: loggedInUser, refetch: refetchLoggedInUser } = useQuery({
-        queryKey: ["loggedInUser"],
-        enabled: isLoaded,
-        queryFn: async () => {
-            return z
-                .string()
-                .optional()
-                .parse(
-                    await supervisor.functionCall({
-                        method: "getLoggedInUser",
-                        params: [],
-                        service: "accounts",
-                        intf: "activeApp",
-                    })
-                );
-        },
-    });
-
+    const { isSuccess: isSupervisorLoaded } = useSupervisor();
+    const { data: loggedInUser } = useLoggedInUser(isSupervisorLoaded);
+    console.log({ loggedInUser });
     const isLoggedIn = !!loggedInUser;
 
-    const { data: currentAccounts, refetch: refetchCurrentAccounts } = useQuery(
-        {
-            queryKey: ["currentAccounts"],
-            enabled: isLoaded,
-            initialData: [],
-            queryFn: async () => {
-                return z
-                    .string()
-                    .array()
-                    .parse(
-                        await supervisor.functionCall({
-                            method: "getConnectedAccounts",
-                            params: [],
-                            service: "accounts",
-                            intf: "activeApp",
-                        })
-                    );
-            },
-        }
-    );
+    const { data: currentAccounts, isPending: isLoadingAccounts } =
+        useCurrentAccounts(isSupervisorLoaded);
 
-    const selectAccount = async (accountName: string) => {
-        void (await supervisor.functionCall({
-            method: "login",
-            params: [z.string().parse(accountName)],
-            service: "accounts",
-            intf: "activeApp",
-        }));
-    };
+    const isNoOptions = !isLoggedIn && currentAccounts.length == 0;
 
-    const init = async () => {
-        const res = z
-            .string()
-            .array()
-            .parse(
-                await supervisor.functionCall({
-                    method: "getConnectedAccounts",
-                    params: [],
-                    service: "accounts",
-                    intf: "activeApp",
-                })
-            );
-        console.log(res, "was the accounts return");
-
-        try {
-            void (await supervisor.functionCall({
-                method: "login",
-                params: ["aa"],
-                service: "accounts",
-                intf: "activeApp",
-            }));
-        } catch (e) {
-            console.error("there was an error hitting login", e);
-        }
-
-        const res3 = await supervisor.functionCall({
-            method: "getLoggedInUser",
-            params: [],
-            service: "accounts",
-            intf: "activeApp",
-        });
-
-        console.log({ res3 });
-    };
-
-    useEffect(() => {
-        init();
-    }, []);
+    const { mutateAsync: onLogout } = useLogout();
+    const { mutateAsync: selectAccount } = useSelectAccount();
 
     const onCopyClick = async () => {
-        navigate("invite");
+        if (!inviteLink) {
+            toast("No invite link.");
+            return;
+        }
         if ("clipboard" in navigator) {
-            await navigator.clipboard.writeText("test");
+            await navigator.clipboard.writeText(inviteLink);
             toast("Copied to clipboard.");
         } else {
             toast("Copying failed, not in secure context?");
@@ -296,87 +146,7 @@ export const SettingsDropdown = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                     <DropdownMenuLabel>Settings</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                        onClick={() => {
-                            onLogin();
-                        }}
-                    >
-                        <LogIn className="mr-2 h-4 w-4" />
-                        <span>{loggedInUser || "Select account"}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuGroup>
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                                <UserPlus className="mr-2 h-4 w-4" />
-                                <span>{currentAccounts}</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
-                                    {currentAccounts.map((account) => (
-                                        <DropdownMenuItem key={account}>
-                                            <Mail className="mr-2 h-4 w-4" />
-                                            <span>{account}</span>
-                                        </DropdownMenuItem>
-                                    ))}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onClick={() => {
-                                            onLogin();
-                                        }}
-                                    >
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        <span>More...</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                            </DropdownMenuPortal>
-                        </DropdownMenuSub>
-                        <DialogTrigger asChild>
-                            <DropdownMenuItem
-                                disabled={!activeUser}
-                                onClick={() => {
-                                    generateInvite();
-                                }}
-                            >
-                                <User className="mr-2 h-4 w-4" />
-                                <span>
-                                    Create invite
-                                    {!isLoggedIn && " (Requires login)"}
-                                </span>
-                            </DropdownMenuItem>
-                        </DialogTrigger>
-                        <DropdownMenuItem disabled>
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            <span>Billing</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                    {false && (
-                        <DropdownMenuGroup>
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                    <UserPlus className="mr-2 h-4 w-4" />
-                                    <span>Invite users</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                    <DropdownMenuSubContent>
-                                        <DropdownMenuItem>
-                                            <Mail className="mr-2 h-4 w-4" />
-                                            <span>Email</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem>
-                                            <MessageSquare className="mr-2 h-4 w-4" />
-                                            <span>Message</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem>
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            <span>More...</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                            </DropdownMenuSub>
-                        </DropdownMenuGroup>
-                    )}
+
                     <DropdownMenuSeparator />
                     <a
                         href="https://github.com/gofractally/psibase"
@@ -399,7 +169,80 @@ export const SettingsDropdown = () => {
                         </DropdownMenuItem>
                     </a>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem disabled>
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem
+                            disabled={!loggedInUser}
+                            onClick={() => {
+                                generateInvite();
+                            }}
+                        >
+                            <User className="mr-2 h-4 w-4" />
+                            <span>
+                                Create invite
+                                {!isLoggedIn && " (Requires login)"}
+                            </span>
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                    <DropdownMenuSeparator />
+                    {isNoOptions && (
+                        <DropdownMenuItem
+                            onClick={() => {
+                                onLogin();
+                            }}
+                        >
+                            <LogIn className="mr-2 h-4 w-4" />
+                            <span>
+                                {isLoadingAccounts ? "Loading..." : "Login"}
+                            </span>
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuGroup>
+                        {!isNoOptions && (
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    <span>
+                                        {loggedInUser || "Select an account"}
+                                    </span>
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                        {currentAccounts
+                                            .filter(
+                                                (account) =>
+                                                    account !== loggedInUser
+                                            )
+                                            .map((account) => (
+                                                <DropdownMenuItem
+                                                    key={account}
+                                                    onClick={() => {
+                                                        selectAccount(account);
+                                                    }}
+                                                >
+                                                    <User className="mr-2 h-4 w-4" />
+                                                    <span>{account}</span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                onLogin();
+                                            }}
+                                        >
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            <span>More...</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                        )}
+                    </DropdownMenuGroup>
+                    <DropdownMenuItem
+                        disabled={!isLoggedIn}
+                        onClick={() => {
+                            onLogout();
+                        }}
+                    >
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
                     </DropdownMenuItem>
