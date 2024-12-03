@@ -64,14 +64,11 @@ export const Invite = () => {
         data: invite,
         isError,
         isLoading,
-        error,
     } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
         queryFn: async () => fetchInvite(z.string().parse(token)),
     });
-
-    console.log({ isError, error });
 
     if (!token) {
         return (
