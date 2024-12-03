@@ -356,7 +356,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.13.0")
+set(PSIBASE_VERSION "0.14.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -426,6 +426,11 @@ cargo_psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/AppRegistry.psi
     PATH services/user/Registry
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/StagedTx.psi
+    PATH services/system/StagedTx
 )
 
 psibase_package(
@@ -763,7 +768,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
 
 psibase_package(
@@ -773,7 +778,7 @@ psibase_package(
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
 
 
@@ -802,7 +807,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    AppRegistry Sites SetCode Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    AppRegistry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -833,6 +838,7 @@ install(
           ${SERVICE_DIR}/AppRegistry.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi

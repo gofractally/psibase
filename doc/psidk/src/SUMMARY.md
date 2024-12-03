@@ -101,6 +101,7 @@
   - [http-server](default-apps/http-server.md)
   - [sites](default-apps/sites.md)
   - [setcode](default-apps/setcode.md)
+  - [staged-tx](default-apps/staged-tx.md)
   - [symbol]()
   - [tokens]()
   - [transact](default-apps/transact.md)
