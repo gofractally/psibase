@@ -134,7 +134,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
             && export CXX=\"${CMAKE_CXX_COMPILER_LAUNCHER} ${CMAKE_CXX_COMPILER}\"  \
             && export AR=${CMAKE_AR}                                                \
             && export RANLIB=${CMAKE_RANLIB}                                        \
-            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi\"    \
+            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1\"  \
             && ./configure --prefix=${DEP_PREFIX} --static                          \
             && make -j                                                              \
             && make -j install                                                      \
@@ -153,7 +153,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
             && cd ${GMP_EXTRACTED}                                                          \
             && ./configure                                                                  \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
-                CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL --target=wasm32-wasi\"               \
+                CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL --target=wasm32-wasip1\"               \
                 LDFLAGS=-lwasi-emulated-signal                                              \
                 --prefix=${DEP_PREFIX}                                                      \
                 --host none                                                                 \
@@ -167,7 +167,7 @@ endif()
 if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
     download(${DEP_URL}/${OPENSSL_ARCHIVE} ${DEP_PREFIX}/${OPENSSL_ARCHIVE} ${OPENSSL_SHA256})
     message("building openssl")
-    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY -Wno-error=implicit-function-declaration")
+    set(OPENSSL_BUILD_FLAGS "--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1 -D_WASI_EMULATED_SIGNAL -D_WASI_EMULATED_PROCESS_CLOCKS -DNO_SYSLOG -DOPENSSL_NO_SECURE_MEMORY -Wno-error=implicit-function-declaration")
     execute_process(
         WORKING_DIRECTORY ${DEP_PREFIX}
         COMMAND bash -c "\
@@ -200,7 +200,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libsecp256k1.a)
             && export CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"           \
             && export AR=${CMAKE_AR}                                                    \
             && export RANLIB=${CMAKE_RANLIB}                                            \
-            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasi -DUSE_FORCE_WIDEMUL_INT64\"   \
+            && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1 -DUSE_FORCE_WIDEMUL_INT64\"   \
             && ./configure --prefix=${DEP_PREFIX} --host=wasm32                         \
             && make -j                                                                  \
             && make -j install                                                          \

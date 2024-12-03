@@ -68,7 +68,7 @@ The following is a list of dependencies you are required to install:
 Other notes:
 * Add the paths to `node`, `npm`, `yarn`, `cargo`, and `wasm-opt` into your PATH environment variable.
 * Set the `WASI_SDK_PREFIX` environment variable before building to the root of your llvm installation (e.g. `/usr/lib/llvm-16`). Alternatively, set this variable during the build using the CMake flag `-DWASI_SDK_PREFIX=....`.
-* Add the following targets to rust: `wasm32-wasi`, `wasm32-unknown-unknown`
+* Add the following targets to rust: `wasm32-wasip1`, `wasm32-unknown-unknown`
 
 > 🔍 You can reference either the [Ubuntu 22.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2204-builder.Dockerfile) or the [Ubuntu 24.04 dockerfile](https://github.com/gofractally/image-builders/blob/main/docker/ubuntu-2404-builder.Dockerfile) for an example on how an environment could be set up.
 
