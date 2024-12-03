@@ -14,7 +14,6 @@ export const useLoggedInUser = (enabled: boolean) =>
                 service: "accounts",
                 intf: "activeApp",
             });
-            console.log(res, "is fresh from get logged in user");
             if (res) {
                 return z.string().parse(res);
             } else {

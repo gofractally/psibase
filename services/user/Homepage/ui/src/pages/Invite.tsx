@@ -40,13 +40,6 @@ const inviteObject = z.object({
 const fetchInvite = async (token: string) => {
     await supervisor.onLoaded();
 
-    await supervisor.functionCall({
-        service: "accounts",
-        intf: "accounts",
-        method: "loginTemp",
-        params: ["alice"],
-    });
-
     const tokenRes = await supervisor.functionCall({
         service: "invite",
         intf: "invitee",
@@ -55,8 +48,6 @@ const fetchInvite = async (token: string) => {
     });
 
     const parsedToken = inviteObject.parse(tokenRes);
-
-    console.log(parsedToken, "is token res");
 
     return {
         chainName: "psibase",

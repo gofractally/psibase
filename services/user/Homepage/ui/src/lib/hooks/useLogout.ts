@@ -15,11 +15,6 @@ export const useLogout = () =>
             queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
             setTimeout(() => {
                 queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-                queryClient
-                    .fetchQuery({ queryKey: ["loggedInUser"] })
-                    .then((x) =>
-                        console.log(x, "came back get logged in user")
-                    );
             }, 2500);
         },
     });

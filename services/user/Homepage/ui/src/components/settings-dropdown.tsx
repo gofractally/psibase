@@ -60,7 +60,6 @@ export const SettingsDropdown = () => {
 
     const { isSuccess: isSupervisorLoaded } = useSupervisor();
     const { data: loggedInUser } = useLoggedInUser(isSupervisorLoaded);
-    console.log({ loggedInUser });
     const isLoggedIn = !!loggedInUser;
 
     const { data: currentAccounts, isPending: isLoadingAccounts } =

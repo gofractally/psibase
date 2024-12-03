@@ -36,7 +36,6 @@ export const useDecodeToken = (token: string | undefined | null) => {
         })
       );
 
-      console.log(res, "was the res on the token");
       return res;
     },
   });
