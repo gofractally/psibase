@@ -197,8 +197,11 @@ namespace psio::schema_types
             std::int64_t value;
             if (itype->isSigned && (raw & (static_cast<std::uint64_t>(1) << (itype->bits - 1))))
             {
-               value = static_cast<std::int64_t>(
-                   raw | ~((static_cast<std::uint64_t>(1) << itype->bits) - 1));
+               if (itype->bits == 64)
+                  value = static_cast<std::int64_t>(raw);
+               else
+                  value = static_cast<std::int64_t>(
+                      raw | ~((static_cast<std::uint64_t>(1) << itype->bits) - 1));
             }
             else
             {
