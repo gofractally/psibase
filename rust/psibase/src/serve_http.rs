@@ -217,12 +217,14 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
 
 /// Serve GraphiQL UI
 ///
-/// This function serves the GraphiQL UI for `GET /graphiql.html`.
+/// This function serves the GraphiQL UI for `GET /graphiql.html` and `GET /graphiql`.
 /// Use with [serve_graphql].
 ///
 /// This wraps [graphiql_source].
 pub fn serve_graphiql(request: &HttpRequest) -> Option<HttpReply> {
-    if request.method == "GET" && request.target == "/graphiql.html" {
+    if request.method == "GET"
+        && (request.target == "/graphiql.html" || request.target == "/graphiql")
+    {
         Some(HttpReply {
             status: 200,
             contentType: "text/html".into(),

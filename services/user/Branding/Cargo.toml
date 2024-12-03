@@ -3,7 +3,7 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.13.0"
+version = "0.14.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
@@ -26,8 +26,8 @@ description = "Allow operators to rebrand their network easily"
 services = ["branding"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.13.0"
-Sites = "0.13.0"
+HttpServer = "0.14.0"
+Sites = "0.14.0"
 
 [lib]
 crate-type = ["rlib"]

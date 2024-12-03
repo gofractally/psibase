@@ -1,6 +1,6 @@
 # Default apps
 
-Psibase comes with default applications that bootstrap the initial functionality of the network. Ultimately, all of this functionality is customizeable by modifying the app code. 
+Psibase comes with default applications that bootstrap the initial functionality of the network. Ultimately, all of this functionality is customizeable by modifying the app code.
 
 ## System apps
 
@@ -14,6 +14,7 @@ System apps are the applications responsible for the core functionality of the n
 - [producers]()
 - [http-server](http-server.md)
 - [setcode](setcode.md)
+- [staged-tx](staged-tx.md)
 - [transact](transact.md)
 - [verify-sig]()
 
