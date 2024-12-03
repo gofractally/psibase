@@ -191,7 +191,7 @@ namespace psio::schema_types
                std::uint8_t digit;
                if (!in.unpack<true, true>(&digit))
                   return false;
-               raw += digit << (i * 8);
+               raw += static_cast<std::uint64_t>(digit) << (i * 8);
             }
             // Sign-extend if needed
             std::int64_t value;
