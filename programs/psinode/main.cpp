@@ -688,7 +688,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          if (bc.needGenesisAction)
-            trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+            trace.error = "Node is not connected to any psibase network.";
          else
          {
             check(trx.proofs.size() == trx.transaction->claims().size(),
@@ -2097,9 +2097,9 @@ void run(const std::string&              db_path,
                    }
                    else
                    {
-                      check(
-                          false,
-                          "should not get here, because service should have been checked already");
+                      check(false,
+                            "should not get here, because service should have been checked "
+                            "already");
                    }
                    std::vector<Claim> claim;
                    result->get(claim);
@@ -2374,8 +2374,47 @@ void run(const std::string&              db_path,
          {
             if (!showedBootMsg)
             {
-               PSIBASE_LOG(node.chain().getLogger(), notice)
-                   << "Need genesis block; use 'psibase boot' to boot chain";
+               std::string xAdminSubdomain;
+               for (const auto& service : services)
+               {
+                  if (service.root.string().find("services/x-admin") != std::string::npos &&
+                      service.host.ends_with('.'))
+                  {
+                     xAdminSubdomain = service.host + host;
+                     break;
+                  }
+               }
+
+               if (!xAdminSubdomain.empty())
+               {
+                  std::string protocol;
+                  std::string port;
+                  for (const auto& listen : http_config->listen)
+                  {
+                     if (const auto* spec =
+                             std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
+                     {
+                        protocol = "https://";
+                        port     = std::to_string(spec->endpoint.port());
+                        break;
+                     }
+                     else if (const auto* spec =
+                                  std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
+                     {
+                        protocol = "http://";
+                        port     = std::to_string(spec->endpoint.port());
+                     }
+                  }
+                  xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
+               }
+
+               std::string message = "Node is not connected to any psibase network.";
+               if (!xAdminSubdomain.empty())
+               {
+                  message += " Visit '" + xAdminSubdomain + "' for node setup.";
+               }
+
+               PSIBASE_LOG(node.chain().getLogger(), notice) << message;
                showedBootMsg = true;
             }
             //continue;
@@ -2448,8 +2487,8 @@ int main(int argc, char* argv[])
        "Controls client access to the admin API");
    opt("database-cache-size",
        po::value(&db_cache_size)->default_value({std::size_t(1) << 33}, "8 GiB"),
-       "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: this "
-       "will not modify an existing database. This option is subject to change.");
+       "The amount of RAM reserved for the database cache. Must be at least 64 MiB. Warning: "
+       "this will not modify an existing database. This option is subject to change.");
 #ifdef PSIBASE_ENABLE_SSL
    opt("tls-trustfile", po::value(&root_ca)->default_value({}, "")->value_name("path"),
        "A list of trusted Certification Authorities in PEM format");

@@ -823,8 +823,9 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         .await?;
         progress.inc(1)
     }
+
     if !args.tx_args.suppress_ok {
-        println!("Ok");
+        println!("Successfully booted {}", args.node_args.api);
     }
     Ok(())
 }
@@ -1257,7 +1258,7 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
-            .contains("Need genesis block; use 'psibase boot' to boot chain")
+            .contains("Node is not connected to any psibase network.")
         {
             return Ok(PackageList::new());
         }
