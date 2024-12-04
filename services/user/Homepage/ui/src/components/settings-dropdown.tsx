@@ -54,6 +54,7 @@ export const SettingsDropdown = () => {
         data: inviteLink,
         isPending,
         mutate: generateInvite,
+        error: generateInviteError,
     } = useGenerateInvite();
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
@@ -132,6 +133,11 @@ export const SettingsDropdown = () => {
                             Close
                         </Button>
                     </DialogClose>
+                    {generateInviteError && (
+                        <div className="text-destructive">
+                            {generateInviteError.message}
+                        </div>
+                    )}
                 </DialogFooter>
             </DialogContent>
 

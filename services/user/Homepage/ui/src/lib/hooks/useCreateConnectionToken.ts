@@ -3,9 +3,10 @@ import { modifyUrlParams } from "@/lib/modifyUrlParams";
 import { z } from "zod";
 import { supervisor } from "@/main";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export const useCreateConnectionToken = () =>
-    useMutation({
+    useMutation<string, Error>({
         mutationFn: async () =>
             z.string().parse(
                 await supervisor.functionCall({
@@ -22,5 +23,8 @@ export const useCreateConnectionToken = () =>
                     token,
                 }
             );
+        },
+        onError: (error) => {
+            toast.error(error.message);
         },
     });
