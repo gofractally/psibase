@@ -5,7 +5,7 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition = "2021"
-description = "Library and command-line tool for interacting with psibase blockchains"
+description = "Library and command-line tool for interacting with psibase networks"
 license = "MIT"
 include = ["src/**/*", "boot-image/**/*", "Cargo.toml"]
 

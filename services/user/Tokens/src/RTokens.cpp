@@ -187,9 +187,10 @@ struct TokenQuery
       std::vector<TokenRecord> tokens;
 
       auto tokenTypeIdx = tokenService.open<TokenTable>().getIndex<0>();
+      auto nftIdx       = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>();
       for (auto token : tokenTypeIdx)
       {
-         auto nft = Nft::Tables{Nft::service}.open<NftTable>().getIndex<0>().get(token.ownerNft);
+         auto nft = nftIdx.get(token.ownerNft);
          if (nft.has_value() && nft->owner == user)
          {
             tokens.push_back(token);

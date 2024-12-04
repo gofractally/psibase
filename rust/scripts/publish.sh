@@ -8,15 +8,15 @@
 ###### 
 #   ~ Dependencies ~
 #
-#                               ,---> fracpack -->--,                         ,--> psibase-macros-lib
-#   cargo-psibase --> psibase --|                   |                         |--> psibase-macros-derive
-#                               |--->---------------'--> psibase-macros -->--,
-#                               |                                             |
+#                               ,---> fracpack -->--,
+#   cargo-psibase --> psibase --|                   |                         ,--> psibase-macros-derive --> psibase-macros-lib
+#                               |--->---------------'--> psibase-macros -->--|
+#                               |                                            |
 #                               '--->-----------------------------------------'--> psibase-names
 ######
 
 # Dependencies above imply the following publish order:
-dirs=(psibase_names psibase_macros/psibase-macros-derive psibase_macros/psibase-macros-lib psibase_macros fracpack psibase cargo-psibase)
+dirs=(psibase_names psibase_macros/psibase-macros-lib psibase_macros/psibase-macros-derive psibase_macros fracpack psibase cargo-psibase)
 
 cd "$(dirname "$0")/../"
 

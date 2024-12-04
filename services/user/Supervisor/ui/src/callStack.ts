@@ -1,7 +1,7 @@
 import { toString } from "@psibase/common-lib";
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib/messaging";
 
-import { OriginationData } from "./utils";
+import { assertTruthy, OriginationData } from "./utils";
 
 export interface Call {
     caller: OriginationData;
@@ -14,15 +14,27 @@ export class CallStack {
     private storage: Array<Call> = [];
 
     push(sender: OriginationData, args: QualifiedFunctionCallArgs): void {
-        console.log(
-            `Callstack: ${" ".repeat(4 * this.storage.length)}+${toString(args)}`,
-        );
-
         this.storage.push({
             caller: sender,
             args: args,
             startTime: Date.now(),
         });
+
+        const bottomFrame = this.peekBottom(0);
+        assertTruthy(bottomFrame, "rootCall method is undefined");
+        const rootCall = bottomFrame.args.method;
+        const initiator = bottomFrame.caller.app;
+        if (
+            rootCall === "startTx" ||
+            rootCall === "finishTx" ||
+            initiator === "supervisor" ||
+            this.storage.length > 1
+        )
+            return;
+
+        console.log(
+            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}+${toString(args)}`,
+        );
     }
 
     pop(): Call | undefined {
@@ -31,11 +43,22 @@ export class CallStack {
             return undefined;
         }
 
-        const popped = this.peek(0)!;
-        const resolutionTime = Date.now() - popped.startTime!;
-        console.log(
-            `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(popped.args)} [${resolutionTime} ms]`,
-        );
+        const bottomFrame = this.peekBottom(0);
+        assertTruthy(bottomFrame, "rootCall method is undefined");
+        const rootCall = bottomFrame.args.method;
+        const initiator = bottomFrame.caller.app;
+        if (
+            rootCall !== "startTx" &&
+            rootCall !== "finishTx" &&
+            this.storage.length === 1 &&
+            initiator !== "supervisor"
+        ) {
+            const popped = this.peek(0)!;
+            const resolutionTime = Date.now() - popped.startTime!;
+            console.log(
+                `Callstack: ${" ".repeat(4 * (this.storage.length - 1))}-${toString(popped.args)} [${resolutionTime} ms]`,
+            );
+        }
 
         return this.storage.pop();
     }
