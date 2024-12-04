@@ -37,7 +37,7 @@ class TestQuery(unittest.TestCase):
     def test_(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.install(sources=testutil.test_packages(), packages=['AsyncQuery'])
+        a.install(sources=[testutil.test_packages()], packages=['AsyncQuery'])
         a.wait(new_block())
 
         # Basic normal usage
