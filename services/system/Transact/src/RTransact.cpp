@@ -189,7 +189,7 @@ namespace
       if (low == std::string::npos)
          return {};
       else
-         return s.substr(low, high + 1);
+         return s.substr(low, high - low + 1);
    }
 
    template <typename F>
@@ -253,7 +253,7 @@ namespace
          int  specificness = -1;
          bool json         = false;
          bool bin          = false;
-         for (auto&& part : value | std::views::split(','))
+         for (auto&& part : value | std::views::split(';'))
          {
             auto param = trim(std::string_view(part.begin(), part.end()));
             if (first)
