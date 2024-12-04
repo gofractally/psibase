@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::branding::plugin::api::Guest as Api;
-use bindings::exports::branding::plugin::queries::Guest as Queries;
+use bindings::exports::{{project-name}}::plugin::api::Guest as Api;
+use bindings::exports::{{project-name}}::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::sites::plugin::sites::{upload, File};
@@ -13,11 +13,11 @@ use psibase::fracpack::Pack;
 mod errors;
 use errors::ErrorType;
 
-struct BrandingPlugin;
+struct {{project-name}}.to_title_case()Plugin;
 
-impl Api for BrandingPlugin {
+impl Api for {{project-name}}.to_title_case()Plugin {
     fn set_network_name(name: String) {
-        let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
+        let packed_network_name_args = {{project-name}}::action_structs::setNetworkName { name }.packed();
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
@@ -41,7 +41,7 @@ struct NetworkNameResponse {
     data: NetworkNameData,
 }
 
-impl Queries for BrandingPlugin {
+impl Queries for {{project-name}}.to_title_case()Plugin {
     fn get_network_name() -> Result<String, Error> {
         let graphql_str = "query { networkName }";
 
@@ -57,4 +57,4 @@ impl Queries for BrandingPlugin {
     }
 }
 
-bindings::export!(BrandingPlugin with_types_in bindings);
+bindings::export!({{project-name}}.to_title_case()Plugin with_types_in bindings);
