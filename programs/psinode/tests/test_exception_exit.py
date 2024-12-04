@@ -15,7 +15,7 @@ class TestExceptionExit(unittest.TestCase):
     def test_socket(self, cluster):
         (a,) = cluster.complete('a')
         a.boot(packages=['Minimal', 'Explorer'])
-        a.install(packages=['KeepSock'], sources=[testutil.test_packages()])
+        a.install(packages=['KeepSock'], sources=testutil.test_packages())
         a.wait(new_block())
 
         def long_query(api):

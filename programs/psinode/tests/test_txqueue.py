@@ -12,7 +12,7 @@ class TestTransactionQueue(unittest.TestCase):
     def test_submit(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'TokenUsers'])
-        a.install(args=['--package-source', testutil.test_packages(), 'SubjectiveCounter'])
+        a.install(sources=testutil.test_packages(), packages=['SubjectiveCounter'])
         a.wait(new_block())
 
         tokens = Tokens(a)
