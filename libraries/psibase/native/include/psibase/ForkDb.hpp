@@ -1449,7 +1449,7 @@ namespace psibase
          try
          {
             if (bc->needGenesisAction)
-               trace.error = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
+               trace.error = "Node is not connected to any psibase network.";
             else
             {
                check(trx.proofs.size() == trx.transaction->claims().size(),

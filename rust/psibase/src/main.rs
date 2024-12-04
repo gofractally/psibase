@@ -1258,7 +1258,7 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
-            .contains("Node is not yet booted. To boot, use the 'psibase boot' CLI")
+            .contains("Node is not connected to any psibase network.")
         {
             return Ok(PackageList::new());
         }

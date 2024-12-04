@@ -1358,8 +1358,7 @@ struct callbacks
 
       psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
-      psibase::check(!bc.needGenesisAction,
-                     "Node is not yet booted. To boot, use the 'psibase boot' CLI");
+      psibase::check(!bc.needGenesisAction, "Node is not connected to any psibase network.");
       psibase::SignedTransaction  trx;
       psibase::TransactionContext tc{bc, trx, trace, true, false, true};
 

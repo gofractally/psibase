@@ -688,7 +688,7 @@ bool pushTransaction(psibase::SharedState&                  sharedState,
       try
       {
          if (bc.needGenesisAction)
-            trace.error = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
+            trace.error = "Node is not connected to any psibase network.";
          else
          {
             check(trx.proofs.size() == trx.transaction->claims().size(),
@@ -2408,10 +2408,10 @@ void run(const std::string&              db_path,
                   xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
                }
 
-               std::string message = "Node is not yet booted. To boot, use the 'psibase boot' CLI";
+               std::string message = "Node is not connected to any psibase network.";
                if (!xAdminSubdomain.empty())
                {
-                  message += " or visit '" + xAdminSubdomain + "' for node setup";
+                  message += " Visit '" + xAdminSubdomain + "' for node setup.";
                }
 
                PSIBASE_LOG(node.chain().getLogger(), notice) << message;

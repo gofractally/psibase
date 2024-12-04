@@ -696,7 +696,7 @@ namespace psibase::http
             bc.start();
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
-                                 "Node is not yet booted. To boot, use the 'psibase boot' CLI"));
+                                 "Node is not connected to any psibase network."));
 
             SignedTransaction  trx;
             TransactionTrace   trace;
