@@ -41,7 +41,7 @@ function(target_mapped_include_directories target type)
 endfunction()
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.72 REQUIRED COMPONENTS program_options)
+find_package(Boost 1.72 CONFIG REQUIRED COMPONENTS program_options)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
 target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})

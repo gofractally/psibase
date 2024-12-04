@@ -18,7 +18,7 @@ endif()
 if(IS_NATIVE)
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_LIBS   ON)
-    find_package(Boost 1.67 REQUIRED COMPONENTS date_time filesystem chrono iostreams)
+    find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS date_time filesystem chrono iostreams)
 
     option(ENABLE_INSTALL "enable this library to be installed" OFF)
     option(ENABLE_TOOLS "enable building of tools" OFF)
