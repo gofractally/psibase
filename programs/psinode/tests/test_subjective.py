@@ -52,7 +52,7 @@ class TestSubjective(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
 
-        a.run_psibase(['install', '--package-source', testutil.test_packages(), 'PSubjective'])
+        a.install(sources=[testutil.test_packages()], packages=['PSubjective'])
         a.wait(new_block())
 
         def parallel_query(fn):
@@ -105,7 +105,7 @@ class TestSubjective(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
 
-        a.run_psibase(['install', '--package-source', testutil.test_packages(), 'PSubjective', 'Counter'])
+        a.install(sources=[testutil.test_packages()], packages=['PSubjective', 'Counter'])
         a.wait(new_block())
 
         launcher = ThreadErrorHandler()
