@@ -1,0 +1,18 @@
+[package]
+name = "{{project-name}}"
+edition = "2021"
+
+[package.metadata.psibase]
+package-name = "{{project-name}}"
+server = "{{project-name}}"
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.14.0"
+
+[dependencies]
+psibase = { path = "../../../psibase" }
+psibase_macros = { path = "../../../psibase_macros" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+
+[dev-dependencies]

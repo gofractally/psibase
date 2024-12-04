@@ -1,0 +1,11 @@
+[placeholders]
+project_name = { prompt = "Enter project name", default = "my_project", type = "string" }
+language = { prompt = "Which language (Rust, C++)?", choices = [
+    "rust",
+    "cpp",
+], default = "rust", type = "string" }
+use_git = { prompt = "Initialize Git repository?", default = true, type = "bool" }
+
+[template]
+cargo_generate_version = ">=0.9.0"
+ignore = ["file", "or folder", "to be ignored"]
