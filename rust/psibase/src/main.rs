@@ -825,7 +825,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     }
 
     if !args.tx_args.suppress_ok {
-        println!("Ok, booted {}", args.api);
+        println!("Successfully booted {}", args.node_args.api);
     }
     Ok(())
 }
