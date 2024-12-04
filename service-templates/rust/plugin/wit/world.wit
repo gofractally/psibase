@@ -1,4 +1,4 @@
-package branding:plugin;
+package {{project-name}}:plugin;
 
 interface api {
     set-network-name: func(name: string);

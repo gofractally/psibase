@@ -17,7 +17,7 @@ wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "{{crate-name}}:psibase-plugin"
+package = "{{crate_name}}:psibase-plugin"
 
 [package.metadata.component.dependencies]
 
@@ -28,4 +28,4 @@ package = "{{crate-name}}:psibase-plugin"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
-{{crate-name}}_package = { path = ".." }
+{{crate_name}}_package = { path = ".." }

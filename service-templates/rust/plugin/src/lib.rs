@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::{{crate-name}}::plugin::api::Guest as Api;
-use bindings::exports::{{crate-name}}::plugin::queries::Guest as Queries;
+use bindings::exports::{{crate_name}}::plugin::api::Guest as Api;
+use bindings::exports::{{crate_name}}::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::sites::plugin::sites::{upload, File};
@@ -13,11 +13,11 @@ use psibase::fracpack::Pack;
 mod errors;
 use errors::ErrorType;
 
-struct {{ {{project-name}} | to_title_case}}Plugin;
+struct {{project-name | to_title_case}}Plugin;
 
 impl Api for {{project-name | to_title_case}}Plugin {
     fn set_network_name(name: String) {
-        let packed_network_name_args = {{crate-name}}::action_structs::setNetworkName { name }.packed();
+        let packed_network_name_args = {{crate_name}}::action_structs::setNetworkName { name }.packed();
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
@@ -57,4 +57,4 @@ impl Queries for {{project-name | to_title_case}}Plugin {
     }
 }
 
-bindings::export!({{crate-name}}Plugin with_types_in bindings);
+bindings::export!({{crate_name}}Plugin with_types_in bindings);
