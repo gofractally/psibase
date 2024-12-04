@@ -87,11 +87,7 @@ const Account = ({
           </Avatar>
         )}
         <div className={cn("text-lg flex flex-col justify-center")}>
-          {!name ? (
-            <Skeleton className="h-4 w-[100px]" />
-          ) : (
-            capitaliseFirstLetter(name)
-          )}
+          {!name ? <Skeleton className="h-4 w-[100px]" /> : name}
         </div>
       </div>
     </button>
@@ -254,6 +250,13 @@ export const AccountSelection = () => {
     useDecodeToken(token);
   const isInvite = decodedToken?.tag === "invite-token";
 
+  const onAccountSelection = (accountId: string) => {
+    setSelectedAccountId(accountId);
+    if (!isInvite) {
+      login();
+    }
+  };
+
   const {
     data: invite,
     isLoading: isLoadingInvite,
@@ -384,6 +387,9 @@ export const AccountSelection = () => {
         throw new Error(`Expected window location to redirect to`);
       }
     },
+    onError: (error) => {
+      console.log(error, "was the error", typeof error, "is the type we have");
+    },
   });
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
@@ -473,7 +479,9 @@ export const AccountSelection = () => {
           <CardTitle>Invitation rejected.</CardTitle>
           <CardDescription>
             This invitation has been rejected
-            {invite?.actor ? ` by ${invite.actor}.` : "."}
+            {invite?.actor && invite.actor !== "invite-sys"
+              ? ` by ${invite.actor}.`
+              : "."}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -650,7 +658,7 @@ export const AccountSelection = () => {
                   : accountsToRender.map((account) => (
                       <Account
                         onSelected={() => {
-                          setSelectedAccountId(account.id);
+                          onAccountSelection(account.id);
                         }}
                         isSelected={selectedAccountId == account.id}
                         key={account.id}
