@@ -27,7 +27,7 @@ pub trait TryParseGqlResponse: Sized {
 pub struct InviteRecordSubset {
     pub inviter: psibase::AccountNumber,
     pub actor: psibase::AccountNumber,
-    pub expiry: u32,
+    pub expiry: String,
     pub state: u8,
 }
 
