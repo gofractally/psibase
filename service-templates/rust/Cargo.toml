@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.1.0"
+rust-version = "1.64"
+edition = "2021"
+
+[package]
+name = "{{project-name}}_package"
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "{{project-name}}"
+services = ["{{project-name}}"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+branding = { path = "service" }
+plugin = { path = "plugin" }
