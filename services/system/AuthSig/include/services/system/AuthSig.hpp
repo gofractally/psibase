@@ -70,13 +70,27 @@ namespace SystemService
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
 
+         /// Handle notification related to the acceptance of a staged transaction
+         ///
+         /// Auth-sig will execute the staged transaction if the sender of the call to `accept`
+         /// is the same as the sender of the staged transaction.
+         void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+
+         /// Handle notification related to the rejection of a staged transaction
+         ///
+         /// Auth-sig will reject the staged transaction if the sender of the call to `reject` is
+         /// the same as the sender of the staged transaction.
+         void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+
         private:
          Tables db{psibase::getReceiver()};
       };
       PSIO_REFLECT(AuthSig,  //
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
-                   method(setKey, key)
+                   method(setKey, key),
+                   method(stagedAccept, staged_tx_id, actor),
+                   method(stagedReject, staged_tx_id, actor)
                    //
       )
    }  // namespace AuthSig
