@@ -48,7 +48,13 @@ export function useUser() {
     };
 
     useEffect(() => {
-        getConnectedAccounts();
+        const logIn = async () => {
+            await logInAs("alice");
+            await logInAs("bob");
+            getConnectedAccounts();
+        };
+        if (availableAccounts.length) return;
+        logIn();
     }, []);
 
     return {
