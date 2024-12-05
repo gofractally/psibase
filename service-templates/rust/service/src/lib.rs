@@ -2,7 +2,7 @@
 mod service {
     use async_graphql::{Object, SimpleObject};
     use psibase::{
-        anyhow, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
+        check, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
         Table, ToSchema,
     };
     use serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ mod service {
         );
     }
 
-    #[table(name = "ExampleThingTable")]
+    #[table(name = "ExampleThingTable", index = 1)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ExampleThing {
         pub thing: String,

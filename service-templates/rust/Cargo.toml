@@ -8,7 +8,7 @@ rust-version = "1.64"
 edition = "2021"
 
 [package]
-name = "{{project-name}}_package"
+name = "{{project-name | snake_case}}_package"
 
 [profile.release]
 codegen-units = 1
@@ -25,5 +25,5 @@ services = ["{{project-name}}"]
 crate-type = ["rlib"]
 
 [dependencies]
-branding = { path = "service" }
+{{project-name}} = { path = "service" }
 plugin = { path = "plugin" }

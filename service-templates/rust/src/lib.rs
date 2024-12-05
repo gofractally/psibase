@@ -1,2 +1,2 @@
-pub use branding;
-pub use branding-plugin;
+pub use {{project-name}};
+pub use {{project-name}}-plugin;
