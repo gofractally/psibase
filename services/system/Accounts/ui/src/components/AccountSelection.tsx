@@ -132,7 +132,16 @@ const isAccountAvailable = async (
   }
 };
 
+const LoginParams = z.object({
+  app: z.string(),
+  origin: z.string(),
+  accountName: z.string(),
+});
+
 export const AccountSelection = () => {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -166,8 +175,17 @@ export const AccountSelection = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (isCreatingAccount) {
       void (await createAccount(values.username));
+      void (await acceptInvite({
+        accountName: values.username,
+        token: z.string().parse(token),
+      }));
     } else {
       void (await importAccount(values.username));
+      void (await login({
+        accountName: values.username,
+        app: connectionToken!.app,
+        origin: connectionToken!.origin,
+      }));
     }
     setIsModalOpen(false);
   };
@@ -179,7 +197,6 @@ export const AccountSelection = () => {
   const {
     data: accounts,
     isLoading: isFetching,
-    error,
     refetch: fetchAccounts,
   } = useQuery({
     queryKey: ["availableAccounts"],
@@ -202,8 +219,6 @@ export const AccountSelection = () => {
   });
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
-
-  console.log({ error }, "was the error");
 
   const { data: status, isLoading: debounceIsLoading } = useQuery<
     z.infer<typeof AccountNameStatus>
@@ -238,9 +253,6 @@ export const AccountSelection = () => {
         account.account.toLowerCase().includes(activeSearch.toLowerCase())
       )
     : accounts || [];
-  const [searchParams] = useSearchParams();
-
-  const token = searchParams.get("token");
 
   const selectedAccount = (accountsToRender || []).find(
     (account) => account.id == selectedAccountId
@@ -253,12 +265,19 @@ export const AccountSelection = () => {
   const onAccountSelection = (accountId: string) => {
     setSelectedAccountId(accountId);
     if (!isInvite) {
-      login();
+      if (!connectionToken) {
+        throw new Error(`Expected connection token`);
+      }
+      login({
+        accountName: accountId,
+        app: connectionToken.app,
+        origin: connectionToken.origin,
+      });
     }
   };
 
   const {
-    data: invite,
+    data: inviteToken,
     isLoading: isLoadingInvite,
     refetch: refetchToken,
   } = useDecodeInviteToken(token, decodedToken?.tag == "invite-token");
@@ -269,12 +288,12 @@ export const AccountSelection = () => {
   const isInitialLoading =
     isLoadingInvite || isLoadingConnectionToken || isLoadingToken;
 
-  console.log({ decodedToken, inviteToken: invite, connectionToken });
+  console.log({ decodedToken, inviteToken, connectionToken });
 
   const { mutateAsync: createAccount, isSuccess: isInviteClaimed } =
     useMutation<void, string, string>({
       mutationFn: async (account) => {
-        if (!invite) throw new Error(`Must have invite`);
+        if (!inviteToken) throw new Error(`Must have invite`);
 
         void (await supervisor.functionCall({
           method: "logout",
@@ -298,8 +317,8 @@ export const AccountSelection = () => {
           method: "loginDirect",
           params: [
             {
-              app: invite.app,
-              origin: invite.appDomain,
+              app: inviteToken.app,
+              origin: inviteToken.appDomain,
             },
             account,
           ],
@@ -312,15 +331,15 @@ export const AccountSelection = () => {
   console.log(selectedAccount);
 
   const appName = isInvite
-    ? invite
-      ? capitaliseFirstLetter(invite.app)
+    ? inviteToken
+      ? capitaliseFirstLetter(inviteToken.app)
       : ""
     : connectionToken
     ? capitaliseFirstLetter(connectionToken.app)
     : "";
 
-  const isExpired = invite
-    ? invite.expiry.valueOf() < new Date().valueOf()
+  const isExpired = inviteToken
+    ? inviteToken.expiry.valueOf() < new Date().valueOf()
     : false;
 
   const { mutateAsync: rejectInvite, isPending: isRejecting } = useMutation({
@@ -331,7 +350,7 @@ export const AccountSelection = () => {
       }, 3000);
     },
     mutationFn: async () => {
-      if (!invite) {
+      if (!inviteToken) {
         throw new Error(`No invite available`);
       }
 
@@ -363,26 +382,29 @@ export const AccountSelection = () => {
     },
   });
 
-  const { mutateAsync: login, isPending: isLoggingIn } = useMutation({
-    mutationFn: async () => {
-      if (!selectedAccount) throw new Error(`Expected selected account`);
-      if (!connectionToken) throw new Error(`Expected connection token`);
+  const { mutateAsync: login, isPending: isLoggingIn } = useMutation<
+    void,
+    Error,
+    z.infer<typeof LoginParams>
+  >({
+    mutationFn: async (params) => {
+      const { accountName, app, origin } = LoginParams.parse(params);
 
       void (await supervisor.functionCall({
         method: "loginDirect",
         params: [
           {
-            app: connectionToken.app,
-            origin: connectionToken.origin,
+            app,
+            origin,
           },
-          selectedAccount.account,
+          accountName,
         ],
         service: "accounts",
         intf: "admin",
       }));
 
       if (window.location && window.location.href) {
-        window.location.href = connectionToken.origin;
+        window.location.href = origin;
       } else {
         throw new Error(`Expected window location to redirect to`);
       }
@@ -395,18 +417,13 @@ export const AccountSelection = () => {
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
     void,
     string,
-    string
+    { token: string; accountName: string }
   >({
-    mutationFn: async (token) => {
-      if (!selectedAccount) {
-        throw new Error(`No account selected`);
-      }
-      if (!invite) {
-        throw new Error(`No invite available`);
-      }
+    mutationFn: async ({ accountName, token }) => {
+      console.log("trying to use this with ", { accountName, token });
       void (await supervisor.functionCall({
         method: "login",
-        params: [selectedAccount.account],
+        params: [accountName],
         service: "accounts",
         intf: "activeApp",
       }));
@@ -418,21 +435,25 @@ export const AccountSelection = () => {
         intf: "invitee",
       }));
 
+      const origin = z
+        .string()
+        .parse(inviteToken ? inviteToken.appDomain : connectionToken?.origin);
+
       void (await supervisor.functionCall({
         method: "loginDirect",
         params: [
           {
-            app: invite.app,
-            origin: invite.appDomain,
+            app: inviteToken ? inviteToken.app : connectionToken?.app,
+            origin,
           },
-          selectedAccount.account,
+          accountName,
         ],
         service: "accounts",
         intf: "admin",
       }));
 
       if (window.location && window.location.href) {
-        window.location.href = invite.appDomain;
+        window.location.href = origin;
       }
     },
   });
@@ -452,7 +473,7 @@ export const AccountSelection = () => {
     );
   }
 
-  if (invite?.state == "accepted" && !isInviteClaimed) {
+  if (inviteToken?.state == "accepted" && !isInviteClaimed) {
     return (
       <Card className="w-[350px] mx-auto mt-4">
         <CardHeader>
@@ -462,14 +483,17 @@ export const AccountSelection = () => {
           <CardTitle>Invitation already accepted.</CardTitle>
           <CardDescription>
             This invitation has been accepted by{" "}
-            <span className="text-primary font-semibold">{invite.actor}</span>.
+            <span className="text-primary font-semibold">
+              {inviteToken.actor}
+            </span>
+            .
           </CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
-  if (invite?.state == "rejected") {
+  if (inviteToken?.state == "rejected") {
     return (
       <Card className="w-[350px] mx-auto mt-4">
         <CardHeader>
@@ -479,8 +503,8 @@ export const AccountSelection = () => {
           <CardTitle>Invitation rejected.</CardTitle>
           <CardDescription>
             This invitation has been rejected
-            {invite?.actor && invite.actor !== "invite-sys"
-              ? ` by ${invite.actor}.`
+            {inviteToken?.actor && inviteToken.actor !== "invite-sys"
+              ? ` by ${inviteToken.actor}.`
               : "."}
           </CardDescription>
         </CardHeader>
@@ -489,9 +513,9 @@ export const AccountSelection = () => {
   }
 
   const expiryMessage =
-    invite &&
-    `This invitation expired ${dayjs().to(invite.expiry)} (${dayjs(
-      invite.expiry
+    inviteToken &&
+    `This invitation expired ${dayjs().to(inviteToken.expiry)} (${dayjs(
+      inviteToken.expiry
     ).format("YYYY/MM/DD HH:mm")}).`;
 
   if (isExpired) {
@@ -505,8 +529,8 @@ export const AccountSelection = () => {
           <CardDescription>{expiryMessage}</CardDescription>
           <CardDescription>
             Please ask the sender{" "}
-            <span className="text-primary">{invite?.inviter}</span> for a new
-            one.
+            <span className="text-primary">{inviteToken?.inviter}</span> for a
+            new one.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -684,9 +708,16 @@ export const AccountSelection = () => {
                   disabled={!selectedAccount || isTxInProgress}
                   onClick={() => {
                     if (isInvite) {
-                      acceptInvite(z.string().parse(token));
+                      acceptInvite({
+                        token: z.string().parse(token),
+                        accountName: z.string().parse(selectedAccount?.account),
+                      });
                     } else {
-                      login();
+                      login({
+                        app: connectionToken!.app,
+                        origin: connectionToken!.origin,
+                        accountName: selectedAccount!.account,
+                      });
                     }
                   }}
                   className="w-full"
