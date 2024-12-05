@@ -86,6 +86,17 @@ namespace SystemService
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
+   struct BlockTraceRecord
+   {
+      psibase::BlockNum         blockNum;
+      psibase::Checksum256      id;
+      psibase::TransactionTrace trace;
+
+      auto primaryKey() const { return std::tuple(blockNum, id); }
+   };
+   PSIO_REFLECT(BlockTraceRecord, blockNum, id, trace)
+   using BlockTraceTable = psibase::Table<BlockTraceRecord, &BlockTraceRecord::primaryKey>;
+
    class RTransact : psibase::Service
    {
      public:
@@ -93,7 +104,8 @@ namespace SystemService
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
-                                                                TraceClientTable>;
+                                                                TraceClientTable,
+                                                                BlockTraceTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P
@@ -103,6 +115,9 @@ namespace SystemService
       void onBlock();
       auto serveSys(const psibase::HttpRequest& request,
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
+
+     private:
+      void sendReply(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
