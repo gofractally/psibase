@@ -15,11 +15,12 @@ namespace SystemService
    {
       uint32_t               id;
       psibase::Checksum256   txid;
+      uint32_t               propose_block;
       psibase::TimePointUSec propose_date;
       psibase::AccountNumber proposer;
       ActionList             action_list;
    };
-   PSIO_REFLECT(StagedTx, id, txid, propose_date, proposer, action_list)
+   PSIO_REFLECT(StagedTx, id, txid, propose_block, propose_date, proposer, action_list)
 
    struct Response
    {
@@ -49,10 +50,12 @@ namespace SystemService
       void init();
 
       /// Proposes a new staged transaction containing the specified actions.
+      /// Returns the ID of the database record containing the staged transaction.
+      ///
       /// All actions must have the same sender.
       ///
       /// * `actions` - The actions to be staged
-      void propose(const std::vector<psibase::Action>& actions);
+      uint32_t propose(const std::vector<psibase::Action>& actions);
 
       /// Indicates that the caller accepts the specified staged transaction
       ///
@@ -71,8 +74,8 @@ namespace SystemService
 
       /// Removes (deletes) a staged transaction
       ///
-      /// A staged transaction can only be removed by the proposer or the auth service of
-      /// the staged tx sender.
+      /// A staged transaction can only be removed by the proposer, the staged tx
+      /// first sender, or the first sender's auth service.
       ///
       /// * `id`: The ID of the database record containing the staged transaction
       /// * `txid`: The unique txid of the staged transaction
