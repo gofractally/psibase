@@ -40,7 +40,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    __builtin_unreachable();
 }
 
-void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
+void RTransact::onTrx(const Checksum256& id, psibase::TransactionTrace&& trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
 
@@ -53,7 +53,7 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    }
 }
 
-void RTransact::sendReply(const Checksum256& id, const TransactionTrace& trace)
+void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
 {
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
@@ -122,17 +122,25 @@ void RTransact::onBlock()
    }
 
    // Send replies to all transactions in the block that are now irreversible
+   std::vector<std::tuple<Checksum256, TransactionTrace>> traces;
    PSIBASE_SUBJECTIVE_TX
    {
-      auto blockTracesIdx = Subjective{}.open<BlockTraceTable>().getIndex<0>();
+      auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
+      auto blockTracesIdx  = blockTraceTable.getIndex<0>();
       for (auto i : irreversible)
       {
          auto index = blockTracesIdx.subindex(i);
          for (auto trace : index)
          {
-            sendReply(trace.id, trace.trace);
+            traces.emplace_back(trace.id, std::move(trace.trace));
+            blockTraceTable.remove(trace);
          }
       }
+   }
+
+   for (auto&& [id, trace] : traces)
+   {
+      sendReply(id, std::move(trace));
    }
 
    // Remove expired transactions and find associated requests
