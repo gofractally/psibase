@@ -588,73 +588,6 @@ struct transaction_queue
 #define CATCH_IGNORE \
    catch (...) {}
 
-bool push_boot(BlockContext& bc, transaction_queue::entry& entry)
-{
-   bool result = false;
-   try
-   {
-      // TODO: verify no extra data
-      // TODO: view
-      auto transactions = psio::from_frac<std::vector<SignedTransaction>>(entry.packed_signed_trx);
-      TransactionTrace trace;
-
-      try
-      {
-         if (!bc.needGenesisAction)
-         {
-            trace.error = "chain is already booted";
-         }
-         else
-         {
-            for (auto& trx : transactions)
-            {
-               if (!trx.proofs.empty())
-                  // Proofs execute as of the state at the beginning of a block.
-                  // That state is empty, so there are no proof services installed.
-                  trace.error = "Transactions in boot block may not have proofs";
-               else
-                  bc.pushTransaction(std::move(trx), trace, std::nullopt);
-            }
-         }
-         result = true;
-      }
-      RETHROW_BAD_ALLOC
-      catch (...)
-      {
-         // Don't give a false positive
-         if (!trace.error)
-            throw;
-      }
-
-      try
-      {
-         entry.boot_callback(std::move(trace));
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   RETHROW_BAD_ALLOC
-   catch (std::exception& e)
-   {
-      try
-      {
-         entry.boot_callback(e.what());
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   catch (...)
-   {
-      try
-      {
-         entry.boot_callback("unknown error");
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   return result;
-}  // push_boot
-
 template <typename Timer, typename F>
 void loop(Timer& timer, F&& f)
 {
@@ -1724,18 +1657,28 @@ void run(const std::string&              db_path,
       http_config->admin_authz = admin_authz;
 
       // TODO: speculative execution on non-producers
-      http_config->push_boot_async = [queue, &transactionStats, &transactionStatsMutex](
-                                         std::vector<char>               packed_signed_transactions,
-                                         http::push_transaction_callback callback)
+      http_config->push_boot_async =
+          [&chainContext, &node](std::vector<char>               packed_signed_transactions,
+                                 http::push_transaction_callback callback)
       {
-         {
-            std::lock_guard l{transactionStatsMutex};
-            ++transactionStats.total;
-            ++transactionStats.unprocessed;
-         }
-         std::scoped_lock lock{queue->mutex};
-         queue->entries.push_back(
-             {true, std::move(packed_signed_transactions), std::move(callback), {}});
+         boost::asio::post(chainContext,
+                           [&node, callback = std::move(callback),
+                            transactions = psio::from_frac<std::vector<SignedTransaction>>(
+                                packed_signed_transactions)] mutable
+                           {
+                              TransactionTrace trace;
+                              try
+                              {
+                                 node.push_boot(std::move(transactions), trace);
+                              }
+                              RETHROW_BAD_ALLOC
+                              catch (std::exception& e)
+                              {
+                                 callback(e.what());
+                                 return;
+                              }
+                              callback(std::move(trace));
+                           });
       };
 
       http_config->push_transaction_async =
@@ -2324,37 +2267,15 @@ void run(const std::string&              db_path,
       else if (auto bc = node.chain().getBlockContext())
       {
          std::vector<transaction_queue::entry> entries;
-         if (bc->needGenesisAction)
-         {
-            // Only process up to the genesis transaction
-            std::scoped_lock lock{queue->mutex};
-            auto             pos = std::ranges::find_if(queue->entries,
-                                                        [](const auto& entry) { return entry.is_boot; });
-            if (pos != queue->entries.end())
-               ++pos;
-            std::ranges::move(queue->entries.begin(), pos, std::back_inserter(entries));
-            queue->entries.erase(queue->entries.begin(), pos);
-         }
-         else if (bc->current.header.previous != Checksum256{})
          {
             std::scoped_lock lock{queue->mutex};
             std::swap(entries, queue->entries);
          }
-         else
-         {
-            // The genesis transaction has already been executed, but we're still
-            // building the genesis block. Wait for the next block before pushing
-            // any transactions.
-         }
          auto revisionAtBlockStart = node.chain().getHeadRevision();
          for (auto& entry : entries)
          {
-            bool res;
-            if (entry.is_boot)
-               res = push_boot(*bc, entry);
-            else
-               res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                                     std::chrono::microseconds(leeway_us));
+            bool res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
+                                       std::chrono::microseconds(leeway_us));
             {
                std::lock_guard lock{transactionStatsMutex};
                --transactionStats.unprocessed;

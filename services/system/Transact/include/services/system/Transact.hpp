@@ -286,8 +286,10 @@ namespace SystemService
       ///
       /// Subjective callbacks are run by native and must have no sender.
       ///
-      /// TODO: Generalize implementation. Currently the only supported
-      /// combinations are objective+transaction and subjective+block.
+      /// Callbacks are unique. `addCallback` will have no effect if an
+      /// identical callback is already registered.
+      ///
+      /// The order in which callbacks are executed is unspecified.
       void addCallback(CallbackType type, bool objective, psibase::Action act);
       /// Removes an existing callback
       void removeCallback(CallbackType type, bool objective, psibase::Action act);

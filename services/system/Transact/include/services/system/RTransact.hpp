@@ -70,12 +70,19 @@ namespace SystemService
    using ReversibleBlocksTable =
        psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
 
+   struct TraceClientInfo
+   {
+      std::int32_t socket;
+      bool         json = true;
+      PSIO_REFLECT(TraceClientInfo, socket, json)
+   };
+
    struct TraceClientRow
    {
-      psibase::Checksum256      id;
-      std::vector<std::int32_t> sockets;
+      psibase::Checksum256         id;
+      std::vector<TraceClientInfo> clients;
    };
-   PSIO_REFLECT(TraceClientRow, id, sockets)
+   PSIO_REFLECT(TraceClientRow, id, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 

@@ -1,8 +1,11 @@
-use crate::{AccountNumber, Action, ActionGroup, ActionSink, SignedTransaction, TransactionTrace};
+use crate::{
+    services::transact, AccountNumber, Action, ActionGroup, ActionSink, SignedTransaction,
+    TransactionTrace,
+};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
-use fracpack::Pack;
+use fracpack::{Pack, UnpackOwned};
 use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -15,6 +18,8 @@ custom_error! { Error
     NoDomain = "Virtual hosting requires a URL with a domain name",
     GraphQLError{message: String} = "{message}",
     GraphQLWrongResponse = "Missing field `data` in graphql response",
+    MissingContentType = "HTTP response has no Content-Type",
+    WrongContentType{ty:String} = "HTTP response has unexpected Content-Type: {ty}",
 }
 
 async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
@@ -34,6 +39,34 @@ pub async fn as_json<T: DeserializeOwned>(
     builder: reqwest::RequestBuilder,
 ) -> Result<T, anyhow::Error> {
     Ok(serde_json::de::from_str(&as_text(builder).await?)?)
+}
+
+async fn as_json_or_fracpack<T: UnpackOwned + DeserializeOwned>(
+    builder: reqwest::RequestBuilder,
+) -> Result<T, anyhow::Error> {
+    let mut response = builder.send().await?;
+    if response.status().is_client_error() {
+        response = response.error_for_status()?;
+    }
+    if response.status().is_server_error() {
+        return Err(anyhow::Error::new(Error::Message {
+            message: response.text().await?,
+        }));
+    }
+    match response.headers().get("Content-Type") {
+        Some(ty) => {
+            if ty == "application/json" {
+                Ok(serde_json::de::from_str(&response.text().await?)?)
+            } else if ty == "application/octet-stream" {
+                Ok(T::unpacked(response.bytes().await?.as_ref())?)
+            } else {
+                Err(Error::WrongContentType {
+                    ty: ty.to_str()?.to_string(),
+                })?
+            }
+        }
+        None => Err(Error::MissingContentType)?,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, SimpleObject, InputObject)]
@@ -130,9 +163,11 @@ async fn push_transaction_impl(
     console: bool,
     progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    let trace: TransactionTrace = as_json(
+    let trace: TransactionTrace = as_json_or_fracpack(
         client
-            .post(base_url.join("native/push_transaction")?)
+            .post(transact::SERVICE.url(base_url)?.join("/push_transaction")?)
+            .header("Content-Type", "application/octet-stream")
+            .header("Accept", "application/octet-stream")
             .body(packed),
     )
     .await?;

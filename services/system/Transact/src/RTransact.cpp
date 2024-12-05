@@ -45,19 +45,43 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
+   bool                          json;
+   bool                          bin;
    PSIBASE_SUBJECTIVE_TX
    {
-      row = clients.get(id);
+      json = false;
+      bin  = false;
+      row  = clients.get(id);
       if (row)
+      {
          clients.remove(*row);
+         for (auto client : row->clients)
+         {
+            if (client.json)
+               json = true;
+            else
+               bin = true;
+            to<HttpServer>().claimReply(client.socket);
+         }
+      }
    }
-   if (row)
+   if (json)
    {
       HttpReply           reply{.contentType = "application/json"};
       psio::vector_stream stream{reply.body};
       to_json(trace, stream);
-      for (std::int32_t sock : row->sockets)
-         to<HttpServer>().sendReply(sock, reply);
+      for (auto client : row->clients)
+         if (client.json)
+            to<HttpServer>().sendReply(client.socket, reply);
+   }
+   if (bin)
+   {
+      HttpReply           reply{.contentType = "application/octet-stream"};
+      psio::vector_stream stream{reply.body};
+      to_frac(trace, stream);
+      for (auto client : row->clients)
+         if (!client.json)
+            to<HttpServer>().sendReply(client.socket, reply);
    }
 }
 
@@ -104,14 +128,21 @@ void RTransact::onBlock()
    // Send responses to everyone waiting for a transaction that expired
    if (!ids.empty())
    {
-      TransactionTrace    trace{.error = "Transaction expired"};
-      HttpReply           reply{.contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
-      to_json(trace, stream);
+      TransactionTrace trace{.error = "Transaction expired"};
+      HttpReply        json{.contentType = "application/json"};
+      {
+         psio::vector_stream stream{json.body};
+         to_json(trace, stream);
+      }
+      HttpReply bin{.contentType = "application/octet-stream"};
+      {
+         psio::vector_stream stream{bin.body};
+         to_frac(trace, stream);
+      }
       for (auto row : ids)
       {
-         for (auto sock : row.sockets)
-            to<HttpServer>().sendReply(sock, reply);
+         for (auto client : row.clients)
+            to<HttpServer>().sendReply(client.socket, client.json ? json : bin);
       }
    }
 }
@@ -148,6 +179,148 @@ namespace
       to<HttpServer>().sendProds(
           transactor<RTransact>(HttpServer::service, RTransact::service).recv(trx));
    }
+
+   constexpr auto ws = " \t";  // (SP / HTAB)
+
+   std::string_view trim(std::string_view s)
+   {
+      auto low  = s.find_first_not_of(ws);
+      auto high = s.find_last_not_of(ws);
+      if (low == std::string::npos)
+         return {};
+      else
+         return s.substr(low, high - low + 1);
+   }
+
+   template <typename F>
+   void parseHeader(std::string_view value, F&& f)
+   {
+      for (auto&& part : value | std::views::split(','))
+      {
+         f(trim(std::string_view(part.begin(), part.end())));
+      }
+   }
+
+   std::optional<int> parseQ(std::string_view param)
+   {
+      if (param.starts_with("q="))
+      {
+         int q;
+         param.remove_prefix(2);
+         if (param.starts_with('0'))
+            q = 0;
+         else if (param.starts_with('1'))
+            q = 1000;
+         else
+            return {};
+         if (param.size() > 1)
+         {
+            if (param[1] != '.')
+               return {};
+            param.remove_prefix(2);
+            if (param.size() > 3)
+               return {};
+            for (std::size_t i = 0; i < 3; ++i)
+            {
+               int digit = 0;
+               if (i < param.size())
+               {
+                  auto ch = param[i];
+                  if (ch < '0' || ch > '9')
+                     return {};
+                  digit = ch - '0';
+               }
+               q = q * 10 + digit;
+            }
+            if (q > 1000)
+               return {};
+         }
+         return q;
+      }
+      return {};
+   }
+
+   struct AcceptParser
+   {
+      int  bestJson = -1;
+      int  bestBin  = -1;
+      int  jsonQ    = 0;
+      int  binQ     = 0;
+      void operator()(std::string_view value)
+      {
+         bool first        = true;
+         int  q            = 1000;
+         int  specificness = -1;
+         bool json         = false;
+         bool bin          = false;
+         for (auto&& part : value | std::views::split(';'))
+         {
+            auto param = trim(std::string_view(part.begin(), part.end()));
+            if (first)
+            {
+               first = false;
+               if (param == "application/json")
+               {
+                  json         = true;
+                  specificness = 2;
+               }
+               else if (param == "application/octet-stream")
+               {
+                  bin          = true;
+                  specificness = 2;
+               }
+               else if (param == "application/*")
+               {
+                  json         = true;
+                  bin          = true;
+                  specificness = 1;
+               }
+               else if (param == "*/*")
+               {
+                  json         = true;
+                  bin          = true;
+                  specificness = 0;
+               }
+               else
+               {
+                  return;
+               }
+            }
+            else
+            {
+               if (auto newQ = parseQ(param))
+               {
+                  q = *newQ;
+               }
+            }
+         }
+         if (json && specificness > bestJson)
+         {
+            bestJson = specificness;
+            jsonQ    = q;
+         }
+         if (bin && specificness > bestBin)
+         {
+            bestBin = specificness;
+            binQ    = q;
+         }
+      }
+      bool isJson() { return jsonQ >= binQ; }
+   };
+
+   bool acceptJson(const auto& headers)
+   {
+      AcceptParser parser;
+      for (const auto& header : headers)
+      {
+         if (header.name == "accept")
+         {
+            parseHeader(header.value, parser);
+         }
+      }
+      return parser.isJson();
+   }
+
 }  // namespace
 
 void RTransact::recv(const SignedTransaction& trx)
@@ -167,13 +340,14 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
    {
       if (request.contentType != "application/octet-stream")
          abortMessage("Expected fracpack encoded signed transaction (application/octet-stream)");
-      auto trx = psio::from_frac<SignedTransaction>(request.body);
-      auto id  = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      auto trx  = psio::from_frac<SignedTransaction>(request.body);
+      auto id   = psibase::sha256(trx.transaction.data(), trx.transaction.size());
+      bool json = acceptJson(request.headers);
       PSIBASE_SUBJECTIVE_TX
       {
          auto clients = Subjective{}.open<TraceClientTable>();
          auto row     = clients.get(id).value_or(TraceClientRow{.id = id});
-         row.sockets.push_back(*socket);
+         row.clients.push_back({*socket, json});
          clients.put(row);
          to<HttpServer>().deferReply(*socket);
       }

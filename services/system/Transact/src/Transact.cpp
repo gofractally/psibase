@@ -176,8 +176,11 @@ namespace SystemService
          {
             value = Callbacks{.type = type};
          }
-         value->actions.push_back(std::move(act));
-         table.put(*value);
+         if (!std::ranges::contains(value->actions, act))
+         {
+            value->actions.push_back(std::move(act));
+            table.put(*value);
+         }
       }
       else
       {
@@ -189,8 +192,11 @@ namespace SystemService
          {
             value = NotifyRow{.type = ntype};
          }
-         value->actions.push_back(std::move(act));
-         kvPut(NotifyRow::db, key, *value);
+         if (!std::ranges::contains(value->actions, act))
+         {
+            value->actions.push_back(std::move(act));
+            kvPut(NotifyRow::db, key, *value);
+         }
       }
    }
 
