@@ -86,23 +86,6 @@ size_t getNrNfts(DefaultTestChain& chain, AccountNumber user)
    return response_root.data.userNfts.edges.size();
 }
 
-// Checksum256 calc_txid(DefaultTestChain& chain, uint32_t id, std::vector<Action> actions)
-// {
-//    // auto query =
-//    //     GraphQLBody{"query GetStagedTx { getStagedTx(id: " + std::to_string(id) + ") { id, proposeBlock, txid } }"};
-
-//    auto query = GraphQLBody{
-//        "query GetAllStaged { getAllStaged { edges { node { id, txid, proposeBlock, "
-//        "proposer } } } }"};
-
-//    auto res  = chain.post(StagedTxService::service, "/graphql", query);
-//    auto body = std::string(res.body.begin(), res.body.end());
-//    psibase::writeConsole(body);
-//    psibase::writeConsole("\n");
-
-//    return {};
-// }
-
 // Tx can be staged on behalf of an account using auth-sig
 // Tx is executed once the staged tx sender accepts it
 // Tx is deleted without execution once tx sender rejects it
