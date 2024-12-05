@@ -201,8 +201,6 @@ export const AccountSelection = () => {
   } = useQuery({
     queryKey: ["availableAccounts"],
     queryFn: async (): Promise<AccountType[]> => {
-      supervisor.preLoadPlugins([{ service: "accounts" }]);
-
       const res = await supervisor.functionCall({
         method: "getAllAccounts",
         params: [],
@@ -288,8 +286,6 @@ export const AccountSelection = () => {
   const isInitialLoading =
     isLoadingInvite || isLoadingConnectionToken || isLoadingToken;
 
-  console.log({ decodedToken, inviteToken, connectionToken });
-
   const { mutateAsync: createAccount, isSuccess: isInviteClaimed } =
     useMutation<void, string, string>({
       mutationFn: async (account) => {
@@ -327,8 +323,6 @@ export const AccountSelection = () => {
         }));
       },
     });
-
-  console.log(selectedAccount);
 
   const appName = isInvite
     ? inviteToken
@@ -409,9 +403,6 @@ export const AccountSelection = () => {
         throw new Error(`Expected window location to redirect to`);
       }
     },
-    onError: (error) => {
-      console.log(error, "was the error", typeof error, "is the type we have");
-    },
   });
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
@@ -420,7 +411,6 @@ export const AccountSelection = () => {
     { token: string; accountName: string }
   >({
     mutationFn: async ({ accountName, token }) => {
-      console.log("trying to use this with ", { accountName, token });
       void (await supervisor.functionCall({
         method: "login",
         params: [accountName],
@@ -641,20 +631,17 @@ export const AccountSelection = () => {
           </DialogContent>
           <div className="max-w-lg mx-auto">
             <div className="text-center text-muted-foreground py-2">
-              <span>
+              <div>
                 {isInitialLoading
                   ? "Loading..."
-                  : isNoAccounts
-                  ? `No accounts available.`
                   : isInvite
                   ? `Select an account to accept invite to `
                   : `Select an account to login to `}
-                {!isNoAccounts && (
-                  <span className="text-primary">{appName}</span>
-                )}
-              </span>
+              </div>
             </div>
-            {!isNoAccounts && (
+            {isNoAccounts ? (
+              <div className="text-primary">No accounts available</div>
+            ) : (
               <div className="relative ml-auto flex-1 md:grow-0 mb-3">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -741,18 +728,20 @@ export const AccountSelection = () => {
                 </Button>
               )}
             </div>
-            <div className="w-full justify-center flex">
-              <Button
-                onClick={() => {
-                  setIsCreatingAccount(false);
-                  setIsModalOpen(true);
-                }}
-                variant={isNoAccounts ? "default" : "link"}
-                className={cn({ "text-muted-foreground": !isNoAccounts })}
-              >
-                Import an account
-              </Button>
-            </div>
+            {!isInvite && (
+              <div className="w-full justify-center flex">
+                <Button
+                  onClick={() => {
+                    setIsCreatingAccount(false);
+                    setIsModalOpen(true);
+                  }}
+                  variant={isNoAccounts ? "default" : "link"}
+                  className={cn({ "text-muted-foreground": !isNoAccounts })}
+                >
+                  Import an account
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Dialog>
