@@ -243,6 +243,7 @@ ExternalProject_Add(
 
 # UIs built with yarn
 set(JS_DIRS
+    services/system/Accounts/ui:Accounts_js
     services/user/Homepage/ui:Homepage_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
@@ -385,11 +386,13 @@ psibase_package(
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SERVER r-accounts
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
         DATA ${Plugins_OUTPUT_FILE_account_tokens} /account-tokens.wasm
         INIT
     SERVICE r-accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
+    DEPENDS ${Accounts_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/index.html
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
