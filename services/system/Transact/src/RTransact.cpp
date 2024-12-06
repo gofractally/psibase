@@ -53,7 +53,7 @@ void RTransact::onTrx(const Checksum256& id, psibase::TransactionTrace&& trace)
    }
 }
 
-void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
+void RTransact::sendReply(const Checksum256& id, const TransactionTrace& trace)
 {
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
@@ -81,7 +81,7 @@ void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
    {
       HttpReply           reply{.contentType = "application/json"};
       psio::vector_stream stream{reply.body};
-      to_json(std::move(trace), stream);
+      to_json(trace, stream);
       for (auto client : row->clients)
          if (client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -90,7 +90,7 @@ void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
    {
       HttpReply           reply{.contentType = "application/octet-stream"};
       psio::vector_stream stream{reply.body};
-      to_frac(std::move(trace), stream);
+      to_frac(trace, stream);
       for (auto client : row->clients)
          if (!client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -122,24 +122,33 @@ void RTransact::onBlock()
    }
 
    // Send replies to all transactions in the block that are now irreversible
-   std::vector<std::tuple<Checksum256, TransactionTrace>> traces;
-   PSIBASE_SUBJECTIVE_TX
+   std::vector<std::tuple<uint32_t, Checksum256>> keys;
+   for (auto i : irreversible)
    {
-      auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
-      auto blockTracesIdx  = blockTraceTable.getIndex<0>();
-      for (auto i : irreversible)
+      PSIBASE_SUBJECTIVE_TX
       {
+         auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
+         auto blockTracesIdx  = blockTraceTable.getIndex<0>();
          for (auto trace : blockTracesIdx.subindex(i))
          {
-            traces.emplace_back(trace.id, std::move(trace.trace));
-            blockTraceTable.remove(trace);
+            keys.emplace_back(trace.blockNum, trace.id);
          }
       }
    }
 
-   for (auto&& [id, trace] : traces)
+   for (auto key : keys)
    {
-      sendReply(id, std::move(trace));
+      std::optional<BlockTraceRecord> record = std::nullopt;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
+         record               = blockTraceTable.get(key);
+         blockTraceTable.erase(key);
+      }
+      if (record)
+      {
+         sendReply(record->id, record->trace);
+      }
    }
 
    // Remove expired transactions and find associated requests

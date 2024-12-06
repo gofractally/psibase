@@ -117,7 +117,7 @@ namespace SystemService
                     std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
      private:
-      void sendReply(const psibase::Checksum256& id, psibase::TransactionTrace&& trace);
+      void sendReply(const psibase::Checksum256& id, const psibase::TransactionTrace& trace);
    };
    PSIO_REFLECT(RTransact,
                 method(next),
