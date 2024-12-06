@@ -49,6 +49,8 @@ import { supervisor } from "@/main";
 import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
 import { useDecodeToken } from "@/hooks/useDecodeToken";
+import { useGetAllAccounts } from "@/hooks/useGetAllAccounts";
+import { useLoginDirect } from "@/hooks/useLoginDirect";
 
 dayjs.extend(relativeTime);
 
@@ -94,11 +96,6 @@ const Account = ({
   );
 };
 
-interface AccountType {
-  account: string;
-  id: string;
-}
-
 const formSchema = z.object({
   username: z.string().min(1).max(50),
 });
@@ -131,12 +128,6 @@ const isAccountAvailable = async (
     return AccountNameStatus.parse("Invalid");
   }
 };
-
-const LoginParams = z.object({
-  app: z.string(),
-  origin: z.string(),
-  accountName: z.string(),
-});
 
 export const AccountSelection = () => {
   const [searchParams] = useSearchParams();
@@ -198,23 +189,7 @@ export const AccountSelection = () => {
     data: accounts,
     isLoading: isFetching,
     refetch: fetchAccounts,
-  } = useQuery({
-    queryKey: ["availableAccounts"],
-    queryFn: async (): Promise<AccountType[]> => {
-      const res = await supervisor.functionCall({
-        method: "getAllAccounts",
-        params: [],
-        service: "accounts",
-        intf: "admin",
-      });
-
-      return z
-        .string()
-        .array()
-        .parse(res)
-        .map((x) => ({ account: x, id: x }));
-    },
-  });
+  } = useGetAllAccounts();
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
@@ -259,6 +234,9 @@ export const AccountSelection = () => {
   const { data: decodedToken, isLoading: isLoadingToken } =
     useDecodeToken(token);
   const isInvite = decodedToken?.tag === "invite-token";
+
+  const disableModalSubmit: boolean =
+    accountStatus !== (isInvite ? "Available" : "Taken");
 
   const onAccountSelection = (accountId: string) => {
     setSelectedAccountId(accountId);
@@ -376,34 +354,7 @@ export const AccountSelection = () => {
     },
   });
 
-  const { mutateAsync: login, isPending: isLoggingIn } = useMutation<
-    void,
-    Error,
-    z.infer<typeof LoginParams>
-  >({
-    mutationFn: async (params) => {
-      const { accountName, app, origin } = LoginParams.parse(params);
-
-      void (await supervisor.functionCall({
-        method: "loginDirect",
-        params: [
-          {
-            app,
-            origin,
-          },
-          accountName,
-        ],
-        service: "accounts",
-        intf: "admin",
-      }));
-
-      if (window.location && window.location.href) {
-        window.location.href = origin;
-      } else {
-        throw new Error(`Expected window location to redirect to`);
-      }
-    },
-  });
+  const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
 
   const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
     void,
@@ -620,7 +571,7 @@ export const AccountSelection = () => {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button type="submit" disabled={disableModalSubmit}>
                     {isCreatingAccount
                       ? `${isSubmitting ? "Accepting" : "Accept"} invite`
                       : `Import account`}
