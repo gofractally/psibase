@@ -49,7 +49,7 @@ void RTransact::onTrx(const Checksum256& id, psibase::TransactionTrace&& trace)
    auto blockTraces = Subjective{}.open<BlockTraceTable>();
    PSIBASE_SUBJECTIVE_TX
    {
-      blockTraces.put({.blockNum = currentBlock, .id = id, .trace = trace});
+      blockTraces.put({.blockNum = currentBlock, .id = id, .trace = std::move(trace)});
    }
 }
 
@@ -81,7 +81,7 @@ void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
    {
       HttpReply           reply{.contentType = "application/json"};
       psio::vector_stream stream{reply.body};
-      to_json(trace, stream);
+      to_json(std::move(trace), stream);
       for (auto client : row->clients)
          if (client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -90,7 +90,7 @@ void RTransact::sendReply(const Checksum256& id, TransactionTrace&& trace)
    {
       HttpReply           reply{.contentType = "application/octet-stream"};
       psio::vector_stream stream{reply.body};
-      to_frac(trace, stream);
+      to_frac(std::move(trace), stream);
       for (auto client : row->clients)
          if (!client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -129,8 +129,7 @@ void RTransact::onBlock()
       auto blockTracesIdx  = blockTraceTable.getIndex<0>();
       for (auto i : irreversible)
       {
-         auto index = blockTracesIdx.subindex(i);
-         for (auto trace : index)
+         for (auto trace : blockTracesIdx.subindex(i))
          {
             traces.emplace_back(trace.id, std::move(trace.trace));
             blockTraceTable.remove(trace);
