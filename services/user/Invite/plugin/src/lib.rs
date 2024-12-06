@@ -112,7 +112,7 @@ impl Invitee for InvitePlugin {
 
         let expiry = DateTime::parse_from_rfc3339(&invite.expiry)
             .map_err(|_| DatetimeError("decode_invite"))?
-            .to_string();
+            .to_rfc3339_opts(SecondsFormat::Millis, true);
         let state = match invite.state {
             0 => InviteState::Pending,
             1 => InviteState::Accepted,
@@ -122,6 +122,7 @@ impl Invitee for InvitePlugin {
             }
         };
 
+        println!("Successfully decoded");
         Ok(Invite {
             inviter: invite.inviter.to_string(),
             app: invite_token.app,
