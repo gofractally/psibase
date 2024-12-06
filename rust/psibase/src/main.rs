@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use clap::{Args as _, FromArgMatches, Parser, Subcommand};
+use clap::{Args, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
@@ -31,10 +31,21 @@ use std::path::{Path, PathBuf};
 mod cli;
 use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
-/// Interact with a running psinode
+/// Basic commands
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-struct Args {
+struct BasicArgs {
+    /// Print help
+    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
+    help: Option<Vec<OsString>>,
+
+    #[clap(subcommand)]
+    command: Option<Command>,
+}
+/// Interact with a running psinode
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+struct NodeArgs {
     /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
     #[clap(
         short = 'a',
@@ -49,11 +60,12 @@ struct Args {
     /// HTTP proxy
     #[clap(long, value_name = "URL")]
     proxy: Option<Url>,
+}
 
-    /// Sign with this key (repeatable)
-    #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<AnyPrivateKey>,
-
+/// transaction-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+struct TxArgs {
     /// Suppress "Ok" message
     #[clap(long)]
     suppress_ok: bool,
@@ -66,211 +78,310 @@ struct Args {
     /// Controls whether the transaction's console output is shown
     #[clap(long, action=clap::ArgAction::Set, num_args=0..=1, require_equals=true, default_value="true", default_missing_value="true")]
     console: bool,
+}
 
-    /// Print help
-    #[clap(short = 'h', long, num_args=0.., value_name="COMMAND")]
-    help: Option<Vec<OsString>>,
+/// transaction-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+struct SigArgs {
+    /// Sign with this key (repeatable)
+    #[clap(short = 's', long, value_name = "KEY")]
+    sign: Vec<AnyPrivateKey>,
+}
 
-    #[clap(subcommand)]
-    command: Option<Command>,
+#[derive(Args, Debug)]
+
+struct BootArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Set all accounts to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// Sets the name of the block producer
+    #[clap(short = 'p', long, value_name = "PRODUCER")]
+    producer: ExactAccountNumber,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+
+    services: Vec<OsString>,
+
+    /// Configure compression level for boot package file uploads
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
+struct CreateArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Account to create
+    account: ExactAccountNumber,
+
+    /// Set the account to authenticate using this key. Also works
+    /// if the account already exists.
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// The account won't be secured; anyone can authorize as this
+    /// account without signing. This option does nothing if the
+    /// account already exists. Caution: this option should not
+    /// be used on production or public chains.
+    #[clap(short = 'i', long)]
+    insecure: bool,
+
+    /// Sender to use when creating the account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
+struct ModifyArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Account to modify
+    account: ExactAccountNumber,
+
+    /// Set the account to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// Make the account insecure, even if it has been previously
+    /// secured. Anyone will be able to authorize as this account
+    /// without signing. Caution: this option should not be used
+    /// on production or public chains.
+    #[clap(short = 'i', long)]
+    insecure: bool,
+}
+
+#[derive(Args, Debug)]
+struct DeployArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Account to deploy service on
+    account: ExactAccountNumber,
+
+    /// Filename containing the service
+    filename: String,
+
+    /// Create the account if it doesn't exist. Also set the account to
+    /// authenticate using this key, even if the account already existed.
+    #[clap(short = 'c', long, value_name = "KEY")]
+    create_account: Option<AnyPublicKey>,
+
+    /// Create the account if it doesn't exist. The account won't be secured;
+    /// anyone can authorize as this account without signing. Caution: this option
+    /// should not be used on production or public chains.
+    #[clap(short = 'i', long)]
+    create_insecure_account: bool,
+
+    /// Register the service with HttpServer. This allows the service to host a
+    /// website, serve RPC requests, and serve GraphQL requests.
+    #[clap(short = 'p', long)]
+    register_proxy: bool,
+
+    /// Sender to use when creating the account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
+struct UploadArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Source filename to upload
+    source: String,
+
+    /// Destination path within service
+    dest: Option<String>,
+
+    /// MIME content type of file
+    #[clap(short = 't', long, value_name = "MIME-TYPE")]
+    content_type: Option<String>,
+
+    /// Upload a directory recursively
+    #[clap(short = 'r', long)]
+    recursive: bool,
+
+    /// Sender to use (required). Files are uploaded to this account's subdomain.
+    #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+    sender: ExactAccountNumber,
+
+    /// Configure compression level
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
+struct InstallArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Packages to install
+    #[clap(required = true)]
+    packages: Vec<OsString>,
+
+    /// Set all accounts to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+
+    /// Sender to use for installing. The packages and all accounts
+    /// that they create will be owned by this account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
+
+    /// Install the package even if it is already installed
+    #[clap(long)]
+    reinstall: bool,
+
+    /// Configure compression level to use for uploaded files
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
+struct ListArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    /// List all apps
+    #[clap(long)]
+    all: bool,
+    /// List apps that are available in the repository, but not currently installed
+    #[clap(long)]
+    available: bool,
+    /// List installed apps
+    #[clap(long)]
+    installed: bool,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct SearchArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    /// Regular expressions to search for in package names and descriptions
+    #[clap(required = true)]
+    patterns: Vec<String>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct InfoArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    /// Packages to show
+    #[clap(required = true)]
+    packages: Vec<OsString>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct CreateTokenArgs {
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// The lifetime of the new token
+    #[clap(short = 'e', long, default_value = "3600", value_name = "SECONDS")]
+    expires_after: i64,
+
+    /// The access mode: "r" or "rw"
+    #[clap(short = 'm', long, default_value = "rw")]
+    mode: String,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Boot a development chain
-    Boot {
-        /// Set all accounts to authenticate using this key
-        #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<AnyPublicKey>,
-
-        /// Sets the name of the block producer
-        #[clap(short = 'p', long, value_name = "PRODUCER")]
-        producer: ExactAccountNumber,
-
-        /// A URL or path to a package repository (repeatable)
-        #[clap(long, value_name = "URL")]
-        package_source: Vec<String>,
-
-        services: Vec<OsString>,
-
-        /// Configure compression level for boot package file uploads
-        /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
-        compression_level: u32,
-    },
+    Boot(BootArgs),
 
     /// Create or modify an account
-    Create {
-        /// Account to create
-        account: ExactAccountNumber,
-
-        /// Set the account to authenticate using this key. Also works
-        /// if the account already exists.
-        #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<AnyPublicKey>,
-
-        /// The account won't be secured; anyone can authorize as this
-        /// account without signing. This option does nothing if the
-        /// account already exists. Caution: this option should not
-        /// be used on production or public chains.
-        #[clap(short = 'i', long)]
-        insecure: bool,
-
-        /// Sender to use when creating the account.
-        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
-        sender: ExactAccountNumber,
-    },
+    Create(CreateArgs),
 
     /// Modify an account
-    Modify {
-        /// Account to modify
-        account: ExactAccountNumber,
-
-        /// Set the account to authenticate using this key
-        #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<AnyPublicKey>,
-
-        /// Make the account insecure, even if it has been previously
-        /// secured. Anyone will be able to authorize as this account
-        /// without signing. Caution: this option should not be used
-        /// on production or public chains.
-        #[clap(short = 'i', long)]
-        insecure: bool,
-    },
+    Modify(ModifyArgs),
 
     /// Deploy a service
-    Deploy {
-        /// Account to deploy service on
-        account: ExactAccountNumber,
-
-        /// Filename containing the service
-        filename: String,
-
-        /// Create the account if it doesn't exist. Also set the account to
-        /// authenticate using this key, even if the account already existed.
-        #[clap(short = 'c', long, value_name = "KEY")]
-        create_account: Option<AnyPublicKey>,
-
-        /// Create the account if it doesn't exist. The account won't be secured;
-        /// anyone can authorize as this account without signing. Caution: this option
-        /// should not be used on production or public chains.
-        #[clap(short = 'i', long)]
-        create_insecure_account: bool,
-
-        /// Register the service with HttpServer. This allows the service to host a
-        /// website, serve RPC requests, and serve GraphQL requests.
-        #[clap(short = 'p', long)]
-        register_proxy: bool,
-
-        /// Sender to use when creating the account.
-        #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
-        sender: ExactAccountNumber,
-    },
+    Deploy(DeployArgs),
 
     /// Upload a file to a service
-    Upload {
-        /// Source filename to upload
-        source: String,
-
-        /// Destination path within service
-        dest: Option<String>,
-
-        /// Sender to use (required). Files are uploaded to this account's subdomain.
-        #[clap(short = 'S', long, value_name = "SENDER", required = true)]
-        sender: ExactAccountNumber,
-
-        /// MIME content type of file
-        #[clap(short = 't', long, value_name = "MIME-TYPE")]
-        content_type: Option<String>,
-
-        /// Upload a directory recursively
-        #[clap(short = 'r', long)]
-        recursive: bool,
-
-        /// Configure compression level
-        /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
-        compression_level: u32,
-    },
+    Upload(UploadArgs),
 
     /// Install apps to the chain
-    Install {
-        /// Packages to install
-        #[clap(required = true)]
-        packages: Vec<OsString>,
-
-        /// Set all accounts to authenticate using this key
-        #[clap(short = 'k', long, value_name = "KEY")]
-        key: Option<AnyPublicKey>,
-
-        /// A URL or path to a package repository (repeatable)
-        #[clap(long, value_name = "URL")]
-        package_source: Vec<String>,
-
-        /// Sender to use for installing. The packages and all accounts
-        /// that they create will be owned by this account.
-        #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
-        sender: ExactAccountNumber,
-
-        /// Install the package even if it is already installed
-        #[clap(long)]
-        reinstall: bool,
-
-        /// Configure compression level to use for uploaded files
-        /// (1=fastest, 11=most compression)
-        #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
-        compression_level: u32,
-    },
+    Install(InstallArgs),
 
     /// Prints a list of apps
-    List {
-        /// List all apps
-        #[clap(long)]
-        all: bool,
-        /// List apps that are available in the repository, but not currently installed
-        #[clap(long)]
-        available: bool,
-        /// List installed apps
-        #[clap(long)]
-        installed: bool,
-
-        /// A URL or path to a package repository (repeatable)
-        #[clap(long, value_name = "URL")]
-        package_source: Vec<String>,
-    },
+    List(ListArgs),
 
     /// Find packages
-    Search {
-        /// Regular expressions to search for in package names and descriptions
-        #[clap(required = true)]
-        patterns: Vec<String>,
-
-        /// A URL or path to a package repository (repeatable)
-        #[clap(long, value_name = "URL")]
-        package_source: Vec<String>,
-    },
+    Search(SearchArgs),
 
     /// Shows package contents
-    Info {
-        /// Packages to show
-        #[clap(required = true)]
-        packages: Vec<OsString>,
-
-        /// A URL or path to a package repository (repeatable)
-        #[clap(long, value_name = "URL")]
-        package_source: Vec<String>,
-    },
+    Info(InfoArgs),
 
     /// Create a bearer token that can be used to access a node
-    CreateToken {
-        /// The lifetime of the new token
-        #[clap(short = 'e', long, default_value = "3600", value_name = "SECONDS")]
-        expires_after: i64,
-
-        /// The access mode: "r" or "rw"
-        #[clap(short = 'm', long, default_value = "rw")]
-        mode: String,
-    },
+    CreateToken(CreateTokenArgs),
 
     /// Setup the psibase local config file
     #[command(subcommand)]
@@ -313,9 +424,7 @@ fn store_sys(
 
 fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
-    let expiration = TimePointSec {
-        seconds: now_plus_10secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_10secs);
     Transaction {
         tapos: Tapos {
             expiration,
@@ -328,116 +437,107 @@ fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
     }
 }
 
-async fn create(
-    args: &Args,
-    client: reqwest::Client,
-    sender: AccountNumber,
-    account: AccountNumber,
-    key: &Option<AnyPublicKey>,
-    insecure: bool,
-) -> Result<(), anyhow::Error> {
+async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if key.is_some() && insecure {
+    if args.key.is_some() && args.insecure {
         return Err(anyhow!("--key and --insecure cannot be used together"));
     }
-    if key.is_none() && !insecure {
+    if args.key.is_none() && !args.insecure {
         return Err(anyhow!("either --key or --insecure must be used"));
     }
 
-    actions.push(new_account_action(sender, account));
+    actions.push(new_account_action(args.sender.into(), args.account.into()));
 
-    if let Some(key) = key {
-        actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, key.auth_service()));
+    if let Some(key) = &args.key {
+        actions.push(set_key_action(args.account.into(), &key));
+        actions.push(set_auth_service_action(
+            args.account.into(),
+            key.auth_service(),
+        ));
     }
 
     let trx = with_tapos(
-        &get_tapos_for_head(&args.api, client.clone()).await?,
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
     );
     push_transaction(
-        &args.api,
+        &args.node_args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-        args.console,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
         None,
     )
     .await?;
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         println!("Ok");
     }
     Ok(())
 }
 
-async fn modify(
-    args: &Args,
-    client: reqwest::Client,
-    account: AccountNumber,
-    key: &Option<AnyPublicKey>,
-    insecure: bool,
-) -> Result<(), anyhow::Error> {
+async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if key.is_some() && insecure {
+    if args.key.is_some() && args.insecure {
         return Err(anyhow!("--key and --insecure cannot be used together"));
     }
-    if key.is_none() && !insecure {
+    if args.key.is_none() && !args.insecure {
         return Err(anyhow!("either --key or --insecure must be used"));
     }
 
-    if let Some(key) = key {
-        actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, key.auth_service()));
+    if let Some(key) = &args.key {
+        actions.push(set_key_action(args.account.into(), &key));
+        actions.push(set_auth_service_action(
+            args.account.into(),
+            key.auth_service(),
+        ));
     }
 
-    if insecure {
-        actions.push(set_auth_service_action(account, account!("auth-any")));
+    if args.insecure {
+        actions.push(set_auth_service_action(
+            args.account.into(),
+            account!("auth-any"),
+        ));
     }
 
     let trx = with_tapos(
-        &get_tapos_for_head(&args.api, client.clone()).await?,
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
     );
     push_transaction(
-        &args.api,
+        &args.node_args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-        args.console,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
         None,
     )
     .await?;
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         println!("Ok");
     }
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn deploy(
-    args: &Args,
-    client: reqwest::Client,
-    sender: AccountNumber,
-    account: AccountNumber,
-    filename: &str,
-    create_account: &Option<AnyPublicKey>,
-    create_insecure_account: bool,
-    register_proxy: bool,
-) -> Result<(), anyhow::Error> {
-    let wasm = std::fs::read(filename).with_context(|| format!("Can not read {}", filename))?;
+async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let wasm = std::fs::read(args.filename.clone())
+        .with_context(|| format!("Can not read {}", args.filename))?;
 
     let mut actions: Vec<Action> = Vec::new();
 
-    if create_account.is_some() && create_insecure_account {
+    if args.create_account.is_some() && args.create_insecure_account {
         return Err(anyhow!(
             "--create-account and --create-insecure-account cannot be used together"
         ));
     }
 
-    if create_account.is_some() || create_insecure_account {
-        actions.push(new_account_action(sender, account));
+    if args.create_account.is_some() || args.create_insecure_account {
+        actions.push(new_account_action(args.sender.into(), args.account.into()));
     }
 
     // This happens before the set_code as a safety measure.
@@ -446,88 +546,89 @@ async fn deploy(
     // lock out the user. Putting this before the set_code causes
     // the set_code to require the private key, failing the transaction
     // if the user doesn't have it.
-    if let Some(key) = create_account {
-        actions.push(set_key_action(account, key));
-        actions.push(set_auth_service_action(account, key.auth_service()));
+    if let Some(key) = args.create_account.clone() {
+        actions.push(set_key_action(args.account.into(), &key));
+        actions.push(set_auth_service_action(
+            args.account.into(),
+            key.auth_service(),
+        ));
     }
 
-    actions.push(set_code_action(account, wasm));
+    actions.push(set_code_action(args.account.into(), wasm));
 
-    if register_proxy {
-        actions.push(reg_server(account, account));
+    if args.register_proxy {
+        actions.push(reg_server(args.account.into(), args.account.into()));
     }
 
     let trx = with_tapos(
-        &get_tapos_for_head(&args.api, client.clone()).await?,
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
     );
     push_transaction(
-        &args.api,
+        &args.node_args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-        args.console,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
         None,
     )
     .await?;
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         println!("Ok");
     }
     Ok(())
 }
 
-async fn upload(
-    args: &Args,
-    client: reqwest::Client,
-    sender: ExactAccountNumber,
-    dest: &Option<String>,
-    content_type: &Option<String>,
-    source: &str,
-    compression_level: u32,
-) -> Result<(), anyhow::Error> {
-    let deduced_content_type = match content_type {
+async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let deduced_content_type = match &args.content_type {
         Some(t) => t.clone(),
         None => {
-            let guess = mime_guess::from_path(source);
+            let guess = mime_guess::from_path(&args.source);
             let Some(t) = guess.first() else {
-                return Err(anyhow!(format!("Unknown mime type: {}", source)));
+                return Err(anyhow!(format!("Unknown mime type: {}", args.source)));
             };
             t.essence_str().to_string()
         }
     };
 
-    let normalized_dest = if let Some(d) = dest {
+    let normalized_dest = if let Some(d) = &args.dest {
         if d.starts_with('/') {
             d.to_string()
         } else {
-            "/".to_string() + d
+            "/".to_string() + d.as_str()
         }
     } else {
-        "/".to_string() + Path::new(source).file_name().unwrap().to_str().unwrap()
+        "/".to_string()
+            + Path::new(&args.source)
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
     };
 
     let actions = vec![store_sys(
-        sender.into(),
+        args.sender.into(),
         &normalized_dest,
         &deduced_content_type,
-        &std::fs::read(source).with_context(|| format!("Can not read {}", source))?,
-        compression_level,
+        &std::fs::read(&args.source).with_context(|| format!("Can not read {}", args.source))?,
+        args.compression_level,
     )];
     let trx = with_tapos(
-        &get_tapos_for_head(&args.api, client.clone()).await?,
+        &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
     );
 
     push_transaction(
-        &args.api,
+        &args.node_args.api,
         client,
-        sign_transaction(trx, &args.sign)?.packed(),
-        args.trace,
-        args.console,
+        sign_transaction(trx, &args.sig_args.sign)?.packed(),
+        args.tx_args.trace,
+        args.tx_args.console,
         None,
     )
     .await?;
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         println!("Ok");
     }
     Ok(())
@@ -587,7 +688,7 @@ fn fill_tree(
 }
 
 async fn monitor_trx(
-    args: &Args,
+    args: &UploadArgs,
     client: &reqwest::Client,
     files: Vec<String>,
     trx: SignedTransaction,
@@ -595,11 +696,11 @@ async fn monitor_trx(
     n: u64,
 ) -> Result<(), anyhow::Error> {
     let result = push_transaction(
-        &args.api,
+        &args.node_args.api,
         client.clone(),
         trx.packed(),
-        args.trace,
-        args.console,
+        args.tx_args.trace,
+        args.tx_args.console,
         Some(&progress),
     )
     .await;
@@ -682,37 +783,27 @@ async fn get_package_registry(
     Ok(result)
 }
 
-async fn boot(
-    args: &Args,
-    client: reqwest::Client,
-    key: &Option<AnyPublicKey>,
-    producer: ExactAccountNumber,
-    package_source: &Vec<String>,
-    services: &Vec<OsString>,
-    compression_level: u32,
-) -> Result<(), anyhow::Error> {
+async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let mut package_registry = JointRegistry::new();
-    let package_names = if services.is_empty() {
+    let package_names = if args.services.is_empty() {
         vec!["DevDefault".to_string()]
     } else {
-        let (files, packages) = FileSetRegistry::from_files(services)?;
+        let (files, packages) = FileSetRegistry::from_files(&args.services)?;
         package_registry.push(files)?;
         packages
     };
-    add_package_registry(package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
-
     let (boot_transactions, transactions) = create_boot_transactions(
-        key,
-        producer.into(),
+        &args.key,
+        args.producer.into(),
         true,
         expiration,
         &mut packages,
-        compression_level,
+        args.compression_level,
     )?;
 
     let progress = ProgressBar::new((transactions.len() + 1) as u64)
@@ -722,34 +813,40 @@ async fn boot(
     progress.inc(1);
     for transaction in transactions {
         push_transaction(
-            &args.api,
+            &args.node_args.api,
             client.clone(),
             transaction.packed(),
-            args.trace,
-            args.console,
+            args.tx_args.trace,
+            args.tx_args.console,
             Some(&progress),
         )
         .await?;
         progress.inc(1)
     }
-    if !args.suppress_ok {
-        println!("Ok");
+
+    if !args.tx_args.suppress_ok {
+        println!("Successfully booted {}", args.node_args.api);
     }
     Ok(())
 }
 
 async fn push_boot(
-    args: &Args,
+    args: &BootArgs,
     client: &reqwest::Client,
     packed: Vec<u8>,
     progress: &ProgressBar,
 ) -> Result<(), anyhow::Error> {
-    let trace: TransactionTrace =
-        as_json(client.post(args.api.join("native/push_boot")?).body(packed)).await?;
-    if args.console {
+    let trace: TransactionTrace = as_json(
+        client
+            .post(args.node_args.api.join("native/push_boot")?)
+            .body(packed),
+    )
+    .await?;
+    if args.tx_args.console {
         progress.suspend(|| print!("{}", trace.console()));
     }
-    args.trace
+    args.tx_args
+        .trace
         .error_for_trace(trace, Some(progress))
         .context("Failed to boot")
 }
@@ -768,27 +865,21 @@ fn normalize_upload_path(path: &Option<String>) -> String {
     result
 }
 
-async fn upload_tree(
-    args: &Args,
-    client: reqwest::Client,
-    sender: ExactAccountNumber,
-    dest: &Option<String>,
-    source: &str,
-    compression_level: u32,
-) -> Result<(), anyhow::Error> {
-    let normalized_dest = normalize_upload_path(dest);
+async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let normalized_dest = normalize_upload_path(&args.dest);
 
     let mut actions = Vec::new();
     fill_tree(
-        sender.into(),
+        args.sender.into(),
         &mut actions,
         &normalized_dest,
-        source,
+        &args.source,
         true,
-        compression_level,
+        args.compression_level,
     )?;
 
-    let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
     let mut running = Vec::new();
     let progress = ProgressBar::new(actions.len() as u64).with_style(ProgressStyle::with_template(
         "{wide_bar} {pos}/{len} files",
@@ -808,7 +899,7 @@ async fn upload_tree(
             args,
             &client,
             selected_files,
-            sign_transaction(trx, &args.sign)?,
+            sign_transaction(trx, &args.sig_args.sign)?,
             progress.clone(),
             n as u64,
         ));
@@ -825,7 +916,7 @@ async fn upload_tree(
         return Err(anyhow!("{}/{} failed transactions", num_failed, num_trx));
     }
 
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         println!("Ok");
     }
     Ok(())
@@ -910,40 +1001,35 @@ async fn apply_packages<
     Ok(())
 }
 
-async fn install(
-    args: &Args,
-    mut client: reqwest::Client,
-    packages: &[OsString],
-    sender: AccountNumber,
-    key: &Option<AnyPublicKey>,
-    sources: &Vec<String>,
-    reinstall: bool,
-    compression_level: u32,
-) -> Result<(), anyhow::Error> {
-    let installed = PackageList::installed(&args.api, &mut client).await?;
+async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
     let mut package_registry = JointRegistry::new();
-    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(sources, client.clone(), &mut package_registry).await?;
+    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let to_install = installed
-        .resolve_changes(&package_registry, &packages, reinstall)
+        .resolve_changes(&package_registry, &packages, args.reinstall)
         .await?;
 
-    let tapos = get_tapos_for_head(&args.api, client.clone()).await?;
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
 
     let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-        if actions.first().unwrap().sender != sender {
+        if actions.first().unwrap().sender != args.sender.into() {
             actions.insert(
                 0,
                 Action {
-                    sender,
+                    sender: args.sender.into(),
                     service: account!("nop"),
                     method: method!("nop"),
                     rawData: Default::default(),
                 },
             );
         }
-        Ok(sign_transaction(with_tapos(&tapos, actions), &args.sign)?)
+        Ok(sign_transaction(
+            with_tapos(&tapos, actions),
+            &args.sig_args.sign,
+        )?)
     };
 
     let action_limit: usize = 64 * 1024;
@@ -953,20 +1039,26 @@ async fn install(
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
-        &args.api,
+        &args.node_args.api,
         &mut client,
         &package_registry,
         to_install,
         &mut new_accounts,
         &mut trx_builder,
-        sender,
-        key,
-        compression_level,
+        args.sender.into(),
+        &args.key,
+        args.compression_level,
     )
     .await?;
 
-    new_accounts = get_accounts_to_create(&args.api, &mut client, &new_accounts, sender).await?;
-    create_accounts(new_accounts, &mut account_builder, sender)?;
+    new_accounts = get_accounts_to_create(
+        &args.node_args.api,
+        &mut client,
+        &new_accounts,
+        args.sender.into(),
+    )
+    .await?;
+    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
 
     let account_transactions = account_builder.finish()?;
     let transactions = trx_builder.finish()?;
@@ -976,11 +1068,11 @@ async fn install(
             ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
         );
         push_transactions(
-            &args.api,
+            &args.node_args.api,
             client.clone(),
             account_transactions,
-            args.trace,
-            args.console,
+            args.tx_args.trace,
+            args.tx_args.console,
             &progress,
         )
         .await?;
@@ -992,16 +1084,16 @@ async fn install(
     );
 
     push_transactions(
-        &args.api,
+        &args.node_args.api,
         client.clone(),
         transactions,
-        args.trace,
-        args.console,
+        args.tx_args.trace,
+        args.tx_args.console,
         &progress,
     )
     .await?;
 
-    if !args.suppress_ok {
+    if !args.tx_args.suppress_ok {
         progress.finish_with_message("Ok");
     } else {
         progress.finish_and_clear();
@@ -1010,29 +1102,29 @@ async fn install(
     Ok(())
 }
 
-async fn list(
-    args: &Args,
-    mut client: reqwest::Client,
-    all: bool,
-    available: bool,
-    installed: bool,
-    sources: &Vec<String>,
-) -> Result<(), anyhow::Error> {
-    if all || (installed && available) || (!all & !installed && !available) {
-        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
-        let package_registry = get_package_registry(sources, client.clone()).await?;
+async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    if args.all
+        || (args.installed && args.available)
+        || (!args.all & !args.installed && !args.available)
+    {
+        let installed =
+            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
         }
-    } else if installed {
-        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
+    } else if args.installed {
+        let installed =
+            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
         for name in installed.into_vec() {
             println!("{}", name);
         }
-    } else if available {
-        let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
-        let package_registry = get_package_registry(sources, client.clone()).await?;
+    } else if args.available {
+        let installed =
+            handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -1041,18 +1133,14 @@ async fn list(
     Ok(())
 }
 
-async fn search(
-    _args: &Args,
-    client: reqwest::Client,
-    patterns: &Vec<String>,
-    sources: &Vec<String>,
-) -> Result<(), anyhow::Error> {
+async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut compiled = vec![];
-    for pattern in patterns {
+    for pattern in &args.patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = get_package_registry(sources, client.clone()).await?;
+    let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1170,7 +1258,7 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
-            .contains("Need genesis block; use 'psibase boot' to boot chain")
+            .contains("Node is not connected to any psibase network.")
         {
             return Ok(PackageList::new());
         }
@@ -1178,24 +1266,35 @@ fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageLi
     list
 }
 
-async fn package_info(
-    args: &Args,
-    mut client: reqwest::Client,
-    packages: &Vec<OsString>,
-    sources: &Vec<String>,
-) -> Result<(), anyhow::Error> {
-    let installed = handle_unbooted(PackageList::installed(&args.api, &mut client).await)?;
+async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed =
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
     let mut package_registry = JointRegistry::new();
-    let (files, packages) = FileSetRegistry::from_files(packages)?;
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(sources, client.clone(), &mut package_registry).await?;
+    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
     for package in &packages {
         if let Some((meta, origin)) = installed.get_by_name(package)? {
-            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+            show_package(
+                &package_registry,
+                &args.node_args.api,
+                &mut client,
+                meta,
+                origin,
+            )
+            .await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
-            show_package(&package_registry, &args.api, &mut client, meta, origin).await?;
+            show_package(
+                &package_registry,
+                &args.node_args.api,
+                &mut client,
+                meta,
+                origin,
+            )
+            .await?;
         } else {
             eprintln!("Package {} not found", package);
         }
@@ -1264,7 +1363,7 @@ fn handle_external(args: &Vec<OsString>) -> Result<(), anyhow::Error> {
     let wasm_file = command_path.join(filename);
     if !wasm_file.is_file() {
         let command = clap::Command::new("psibase");
-        let mut command = Args::augment_args(command)
+        let mut command = BasicArgs::augment_args(command)
             .disable_help_subcommand(true)
             .disable_help_flag(true);
         command.build();
@@ -1293,7 +1392,7 @@ fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
 
 fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
     let command = clap::Command::new("psibase");
-    let mut command = Args::augment_args(command);
+    let mut command = BasicArgs::augment_args(command);
     if !subcommand.is_empty() {
         command.build();
         let mut iter = subcommand.iter();
@@ -1319,18 +1418,20 @@ fn print_help(subcommand: &[OsString]) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn parse_args() -> Result<Args, anyhow::Error> {
+fn parse_args() -> Result<BasicArgs, anyhow::Error> {
     let command = clap::Command::new("psibase");
-    let mut command = Args::augment_args(command);
+    let mut command = BasicArgs::augment_args(command);
     command.build();
     command = command
         .disable_help_subcommand(true)
         .disable_help_flag(true);
-    Ok(Args::from_arg_matches(&command.get_matches())?)
+    Ok(BasicArgs::from_arg_matches(&command.get_matches())?)
 }
 
-async fn build_client(args: &Args) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
-    let (builder, result) = apply_proxy(reqwest::Client::builder(), &args.proxy).await?;
+async fn build_client(
+    proxy: &Option<Url>,
+) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
+    let (builder, result) = apply_proxy(reqwest::Client::builder(), proxy).await?;
     Ok((builder.gzip(true).build()?, result))
 }
 
@@ -1346,7 +1447,6 @@ pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = parse_args()?;
-    let (client, _proxy) = build_client(&args).await?;
     if let Some(help) = &args.help {
         return print_help(help);
     }
@@ -1354,129 +1454,27 @@ async fn main() -> Result<(), anyhow::Error> {
         return print_help(&[]);
     };
     match command {
-        Command::Boot {
-            key,
-            producer,
-            package_source,
-            services,
-            compression_level,
-        } => {
-            boot(
-                &args,
-                client,
-                key,
-                *producer,
-                package_source,
-                services,
-                *compression_level,
-            )
-            .await?
-        }
-        Command::Create {
-            account,
-            key,
-            insecure,
-            sender,
-        } => {
-            create(
-                &args,
-                client,
-                (*sender).into(),
-                (*account).into(),
-                key,
-                *insecure,
-            )
-            .await?
-        }
-        Command::Modify {
-            account,
-            key,
-            insecure,
-        } => modify(&args, client, (*account).into(), key, *insecure).await?,
-        Command::Deploy {
-            account,
-            filename,
-            create_account,
-            create_insecure_account,
-            register_proxy,
-            sender,
-        } => {
-            deploy(
-                &args,
-                client,
-                (*sender).into(),
-                (*account).into(),
-                filename,
-                create_account,
-                *create_insecure_account,
-                *register_proxy,
-            )
-            .await?
-        }
-        Command::Upload {
-            source,
-            dest,
-            content_type,
-            recursive,
-            sender,
-            compression_level,
-        } => {
-            if *recursive {
-                if content_type.is_some() {
+        Command::Boot(args) => boot(&args).await?,
+        Command::Create(args) => create(&args).await?,
+        Command::Modify(args) => modify(&args).await?,
+        Command::Deploy(args) => deploy(&args).await?,
+        Command::Upload(args) => {
+            if args.recursive {
+                if args.content_type.is_some() {
                     return Err(anyhow!("--recursive is incompatible with --content-type"));
                 }
-                upload_tree(&args, client, *sender, dest, source, *compression_level).await?
+                upload_tree(&args).await?
             } else {
-                upload(
-                    &args,
-                    client,
-                    *sender,
-                    dest,
-                    content_type,
-                    source,
-                    *compression_level,
-                )
-                .await?
+                upload(&args).await?
             }
         }
-        Command::Install {
-            packages,
-            key,
-            package_source,
-            sender,
-            reinstall,
-            compression_level,
-        } => {
-            install(
-                &args,
-                client,
-                packages,
-                (*sender).into(),
-                key,
-                package_source,
-                *reinstall,
-                *compression_level,
-            )
-            .await?
+        Command::Install(args) => install(&args).await?,
+        Command::List(args) => list(&args).await?,
+        Command::Search(args) => search(&args).await?,
+        Command::Info(args) => package_info(&args).await?,
+        Command::CreateToken(args) => {
+            create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
-        Command::List {
-            all,
-            available,
-            installed,
-            package_source,
-        } => list(&args, client, *all, *available, *installed, package_source).await?,
-        Command::Search {
-            patterns,
-            package_source,
-        } => search(&args, client, patterns, package_source).await?,
-        Command::Info {
-            packages,
-            package_source,
-        } => package_info(&args, client, packages, package_source).await?,
-        Command::CreateToken {
-            expires_after,
-            mode,
-        } => create_token(Duration::seconds(*expires_after), mode)?,
         Command::Config(config) => handle_cli_config_cmd(config)?,
         Command::Help { command } => print_help(command)?,
         Command::External(argv) => handle_external(argv)?,

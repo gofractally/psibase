@@ -31,8 +31,8 @@ impl FromExpirationTime for Tapos {
             .duration_since(UNIX_EPOCH)
             .expect("Failed to get time")
             .as_secs();
-        assert!(expiration <= u32::MAX as u64, "expiration out of range");
-        let expiration_timepoint = TimePointSec::from(expiration as u32);
+        assert!(expiration <= i64::MAX as u64, "expiration out of range");
+        let expiration_timepoint = TimePointSec::from(expiration as i64);
 
         let tapos_str =
             Host::server::get_json("/common/tapos/head").expect("[finish_tx] Failed to get TaPoS");

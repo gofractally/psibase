@@ -73,6 +73,25 @@ fn genesis_transaction<R: Read + Seek>(
     })
 }
 
+/// genesis_block_actions
+///
+/// This returns all actions that need to be packed into the boot block.
+fn genesis_block_actions<R: Read + Seek>(
+    _initial_key: &Option<AnyPublicKey>,
+    _initial_producer: AccountNumber,
+    service_packages: &mut [PackagedService<R>],
+) -> Result<Vec<Action>, anyhow::Error> {
+    let mut actions = Vec::new();
+
+    for s in &mut service_packages[..] {
+        if s.get_accounts().contains(&transact::SERVICE) {
+            s.reg_server(&mut actions)?;
+            s.postinstall(&mut actions)?;
+        }
+    }
+    Ok(actions)
+}
+
 /// Get initial actions
 ///
 /// This returns all actions that need to be packed into the transactions pushed after the
@@ -207,6 +226,16 @@ pub fn create_boot_transactions<R: Read + Seek>(
         });
     }
 
+    boot_transactions.push(SignedTransaction {
+        transaction: without_tapos(
+            genesis_block_actions(initial_key, initial_producer, service_packages)?,
+            expiration,
+        )
+        .packed()
+        .into(),
+        proofs: vec![],
+    });
+
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
         transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
@@ -244,9 +273,7 @@ pub fn js_create_boot_transactions(
         services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
     }
     let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
     // Todo: Allow parameterization of compression level from browser

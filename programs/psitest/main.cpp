@@ -266,8 +266,7 @@ struct test_chain
    {
       if (blockContext)
       {
-         return std::chrono::system_clock::time_point{
-             std::chrono::seconds{blockContext->current.header.time.seconds}};
+         return blockContext->current.header.time;
       }
       else
       {
@@ -336,8 +335,7 @@ struct test_chain
       db     = {};
    }
 
-   // TODO: Support sub-second block times
-   void startBlock(std::optional<psibase::TimePointSec> time = std::nullopt)
+   void startBlock(std::optional<psibase::BlockTime> time = std::nullopt)
    {
       // TODO: undo control
       finishBlock();
@@ -1241,12 +1239,11 @@ struct callbacks
       c.db = {};
    }
 
-   // TODO: Support sub-second block times
-   void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
+   void testerStartBlock(uint32_t chain_index, int64_t time_us)
    {
       assert_chain(chain_index)
-          .startBlock(time_seconds ? std::optional{psibase::TimePointSec{time_seconds}}
-                                   : std::nullopt);
+          .startBlock(time_us ? std::optional{psibase::BlockTime{psibase::MicroSeconds{time_us}}}
+                              : std::nullopt);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
@@ -1361,7 +1358,7 @@ struct callbacks
 
       psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
-      psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
+      psibase::check(!bc.needGenesisAction, "Node is not connected to any psibase network.");
       psibase::SignedTransaction  trx;
       psibase::TransactionContext tc{bc, trx, trace, true, false, true};
 

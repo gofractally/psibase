@@ -48,7 +48,7 @@ TEST_CASE("cft crash", "[cft]")
    CHECK(final_state->blockId() == nodes[1].chain().get_head_state()->blockId());
    CHECK(final_state->blockId() == nodes[2].chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum == final_state->info.header.blockNum - 2);
@@ -90,7 +90,7 @@ TEST_CASE("cft quorum", "[cft]")
          CHECK(node->chain().get_head_state()->blockId() == Checksum256{});
    }
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
@@ -126,7 +126,7 @@ TEST_CASE("cft partition", "[cft]")
    for (const auto& node : nodes.nodes)
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);

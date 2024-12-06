@@ -60,9 +60,7 @@ impl Consumer for RegistryPlugin {
             .map(|owner| owner.to_string())
             .collect();
 
-        let created_at = DateTime::from_timestamp(metadata.created_at.seconds as i64, 0)
-            .expect("Failed to parse the timestamp from the created_at metadata field")
-            .to_string();
+        let created_at = DateTime::from(metadata.created_at).to_string();
 
         let status = metadata.status.into();
 

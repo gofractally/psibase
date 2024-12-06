@@ -5,19 +5,6 @@ use crate::helpers::validate_user;
 use psibase::services::r_events::Wrapper as REventsSvc;
 use psibase::{Hex, HttpReply, HttpRequest};
 
-fn parse_query(query: &str) -> HashMap<String, String> {
-    let mut params: HashMap<String, String> = HashMap::new();
-
-    let itr = query.split("&");
-    for p in itr {
-        let kv = p
-            .split_once("=")
-            .expect(&format!("Invalid http query str: {}", query));
-        params.insert(kv.0.to_string(), kv.1.trim_start_matches('=').to_string());
-    }
-    params
-}
-
 fn build_query_by_id(params: HashMap<String, String>) -> Option<String> {
     if params.get("id").is_none() {
         return None;
@@ -103,18 +90,11 @@ fn build_query_by_rcvr_sndr(params: HashMap<String, String>) -> Option<String> {
 
 pub fn serve_rest_api(request: &HttpRequest) -> Option<HttpReply> {
     if request.method == "GET" {
-        if !request.target.starts_with("/api/messages") {
+        if request.path() != "/api/messages" {
             return None;
         }
 
-        let query_start = request.target.find('?');
-        if query_start.is_none() {
-            return None;
-        }
-        let query_start = query_start.unwrap();
-
-        let query = request.target.split_at(query_start + 1).1;
-        let params = parse_query(query);
+        let params = request.query();
 
         let sql_query_str = if params.get("id").is_some() {
             build_query_by_id(params)

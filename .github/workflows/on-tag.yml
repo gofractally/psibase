@@ -52,7 +52,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            psidk-ubuntu-2004/psidk-ubuntu-2004.tar.gz
             psidk-ubuntu-2204/psidk-ubuntu-2204.tar.gz
             psidk-ubuntu-2404/psidk-ubuntu-2404.tar.gz
             psidk-book/psidk-book.tar.gz

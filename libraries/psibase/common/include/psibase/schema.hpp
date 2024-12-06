@@ -189,10 +189,5 @@ namespace psibase
       PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
    };
 
-   inline psio::schema_types::CustomTypes psibase_types()
-   {
-      auto result = psio::schema_types::standard_types();
-      result.insert<AccountNumber>("AccountNumber");
-      return result;
-   }
+   psio::schema_types::CustomTypes psibase_types();
 }  // namespace psibase

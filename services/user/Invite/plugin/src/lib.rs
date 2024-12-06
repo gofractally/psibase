@@ -110,9 +110,9 @@ impl Invitee for InvitePlugin {
         );
         let invite = InviteRecordSubset::from_gql(Server::post_graphql_get_json(&query)?)?;
 
-        let expiry = DateTime::from_timestamp(invite.expiry as i64, 0)
-            .ok_or(DatetimeError("decode_invite"))?
-            .to_rfc3339_opts(SecondsFormat::Millis, true);
+        let expiry = DateTime::parse_from_rfc3339(&invite.expiry)
+            .map_err(|_| DatetimeError("decode_invite"))?
+            .to_string();
         let state = match invite.state {
             0 => InviteState::Pending,
             1 => InviteState::Accepted,

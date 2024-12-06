@@ -53,13 +53,16 @@ interface api {
     /// leak any private information, and only notifies the caller whether there is a user logged in.
     is-logged-in: func() -> bool;
 
-    /// Gets the account details for the specified account name (if it exists)
-    /// Returns None if the account does not exist.
+    /// Gets the account details for the specified account name.
+    /// Possible responses:
+    /// - Some(Account) - The account name is valid and exists with specified details
+    /// - None - The account name is valid but has not been created
+    /// - [Error] InvalidAccountName - The account name is not a valid psibase account name
     get-account: func(name: string) -> result<option<account>, error>;
 
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted to the homepage app.
-    set-auth-service: func(service-name: string) -> result<_, error>;
+    set-auth-service: func(service-name: string) -> result<_, error>; 
 }
 
 world imports {

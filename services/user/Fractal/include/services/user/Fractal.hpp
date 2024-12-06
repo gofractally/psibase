@@ -9,7 +9,7 @@ namespace UserService
 {
    namespace FractalNs
    {
-      class Fractal : public psibase::Service<Fractal>
+      class Fractal : public psibase::Service
       {
         public:
          using Tables = psibase::ServiceTables<InitTable,
@@ -17,8 +17,7 @@ namespace UserService
                                                FractalTypeTable,
                                                MemberTable,
                                                InviteTable,
-                                               IdentityTable,
-                                               ServiceEventTable>;
+                                               IdentityTable>;
 
          static constexpr auto service = psibase::AccountNumber("fractal");
 
@@ -66,21 +65,18 @@ namespace UserService
          struct Events
          {
             struct History{
-               void identityAdded(uint64_t prevEvent, psibase::AccountNumber name);
-               void invCreated(uint64_t prevEvent, psibase::AccountNumber creator, psibase::AccountNumber fractal);
-               void invReceived(uint64_t prevEvent, psibase::AccountNumber receiver, psibase::AccountNumber fractal);
-               void invAccepted(uint64_t prevEvent, psibase::AccountNumber accepter, psibase::AccountNumber fractal);
-               void invRejected(uint64_t prevEvent, psibase::AccountNumber rejecter, psibase::AccountNumber fractal);
+               void identityAdded(psibase::AccountNumber name);
+               void invCreated(PublicKey invite_id, psibase::AccountNumber creator, psibase::AccountNumber fractal);
+               void invReceived(PublicKey invite_id, psibase::AccountNumber receiver, psibase::AccountNumber fractal);
+               void invAccepted(PublicKey invite_id, psibase::AccountNumber creator, psibase::AccountNumber fractal, psibase::AccountNumber accepter);
+               void invRejected(PublicKey invite_id, psibase::AccountNumber rejecter, psibase::AccountNumber fractal);
 
                // Not used yet
-               void joinedFrac(uint64_t prevEvent, psibase::AccountNumber fractal);
+               void joinedFrac(psibase::AccountNumber fractal);
             };
             struct Ui{};
             struct Merkle{};
          };
-         using ServiceEvents = psibase::EventIndex<&ServiceEventRecord::eventHead, "prevEvent">;
-         using FractalEvents = psibase::EventIndex<&FractalRecord::eventHead, "prevEvent">;
-         using UserEvents = psibase::EventIndex<&IdentityRecord::eventHead, "prevEvent">;
          // clang-format on
 
          // Interface for other services
@@ -118,12 +114,12 @@ namespace UserService
       );
       PSIBASE_REFLECT_EVENTS(Fractal);
       PSIBASE_REFLECT_HISTORY_EVENTS(Fractal,
-         method(identityAdded, prevEvent, name),
-         method(invCreated, prevEvent, creator, fractal),
-         method(invReceived, prevEvent, receiver, fractal),
-         method(invAccepted, prevEvent, accepter, fractal),
-         method(invRejected, prevEvent, rejecter, fractal),
-         method(joinedFrac, prevEvent, fractal)
+         method(identityAdded, name),
+         method(invCreated, creator, fractal),
+         method(invReceived, receiver, fractal),
+         method(invAccepted, creator, fractal, accepter),
+         method(invRejected, rejecter, fractal),
+         method(joinedFrac, fractal)
       );
       PSIBASE_REFLECT_UI_EVENTS(Fractal);
       PSIBASE_REFLECT_MERKLE_EVENTS(Fractal);

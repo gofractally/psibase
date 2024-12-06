@@ -1,6 +1,3 @@
-import type { MilkdownPlugin } from "@milkdown/ctx";
-
-import { useMemo } from "react";
 import { atom, useSetAtom } from "jotai";
 import {
     defaultValueCtx,
@@ -9,21 +6,17 @@ import {
     rootCtx,
     schemaCtx,
 } from "@milkdown/core";
-import { $view } from "@milkdown/utils";
+// import { $view } from "@milkdown/utils";
 import { nord } from "@milkdown/theme-nord";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { listItemBlockComponent } from "@milkdown/components/list-item-block";
-import {
-    configureLinkTooltip,
-    linkTooltipPlugin,
-} from "@milkdown/components/link-tooltip";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
 // import { math, mathBlockSchema } from "@milkdown/plugin-math";
 // import { diagram, diagramSchema } from "@milkdown/plugin-diagram";
-import { useNodeViewFactory } from "@prosemirror-adapter/react";
+// import { useNodeViewFactory } from "@prosemirror-adapter/react";
 import { Node, Schema } from "@milkdown/prose/model";
 
 import {
@@ -33,6 +26,11 @@ import {
 
 // import { MathBlock, MermaidDiagram } from "./editor";
 // import { MathBlock } from "./editor";
+import {
+    insertLinkTooltip,
+    linkTooltipConfig,
+    linkTooltipPlugin,
+} from "./editor/link-widget";
 
 import "@milkdown/theme-nord/style.css";
 // import "katex/dist/katex.min.css";
@@ -56,7 +54,7 @@ export const MarkdownEditor = ({
     updateMarkdown,
     readOnly = false,
 }: EditorProps) => {
-    const nodeViewFactory = useNodeViewFactory();
+    // const nodeViewFactory = useNodeViewFactory();
     const setSelection = useSetAtom(editorSelectionAtom);
 
     // const mathPlugins: MilkdownPlugin[] = useMemo(() => {
@@ -89,8 +87,8 @@ export const MarkdownEditor = ({
             .config((ctx) => {
                 ctx.set(rootCtx, root);
                 ctx.set(defaultValueCtx, initialValue);
-                configureLinkTooltip(ctx);
             })
+            .config(linkTooltipConfig)
             .config((ctx) => {
                 if (readOnly) return;
                 const listener = ctx.get(listenerCtx);
@@ -120,7 +118,8 @@ export const MarkdownEditor = ({
             .use(listItemBlockComponent)
             // .use(mathPlugins)
             // .use(diagramPlugins)
-            .use(linkTooltipPlugin),
+            .use(linkTooltipPlugin)
+            .use(insertLinkTooltip),
     );
 
     return <Milkdown />;

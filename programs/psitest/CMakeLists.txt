@@ -1,4 +1,4 @@
-find_package(Boost 1.75 REQUIRED COMPONENTS filesystem)
+find_package(Boost 1.75 CONFIG REQUIRED COMPONENTS filesystem)
 
 add_executable(psitest main.cpp)
 

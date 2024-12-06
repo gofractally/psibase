@@ -4,7 +4,7 @@ set(IS_NATIVE YES)
 set(ROOT_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 set(ROOT_BINARY_DIR ${CMAKE_BINARY_DIR})
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
@@ -41,7 +41,7 @@ function(target_mapped_include_directories target type)
 endfunction()
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.72 REQUIRED COMPONENTS program_options)
+find_package(Boost 1.72 CONFIG REQUIRED COMPONENTS program_options)
 add_library(boost INTERFACE)
 target_include_directories(boost INTERFACE ${Boost_INCLUDE_DIR})
 target_link_libraries(boost INTERFACE ${Boost_LIBRARIES})

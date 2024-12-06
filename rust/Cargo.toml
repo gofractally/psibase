@@ -13,8 +13,6 @@ members = [
     "test_package/plugin",
     "test_package/query",
     "test_package/service",
-    "test_service_elections",
-    "test_service_sites",
     "test_fracpack",
     "test_subjective",
     "test_psibase_macros",
@@ -32,7 +30,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.13.0"
+version = "0.14.0"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"

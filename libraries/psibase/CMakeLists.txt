@@ -11,7 +11,8 @@ function(add suffix)
         common/src/crypto.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
-        common/src/time.cpp
+        common/src/Rpc.cpp
+        common/src/schema.cpp
         common/src/trace.cpp
     )
 
@@ -176,7 +177,7 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
+        find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
         target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log debug_eos_vm -ldl)
         target_include_directories(psibase${suffix} PUBLIC

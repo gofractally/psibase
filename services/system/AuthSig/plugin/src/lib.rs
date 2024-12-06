@@ -114,6 +114,12 @@ impl KeyVault for AuthSig {
             .map_err(|e| CryptoError(e.to_string()))?;
         Ok(signature.to_bytes().to_vec())
     }
+
+    fn import_key(private_key: Pem) -> Result<Pem, CommonTypes::Error> {
+        let public_key = AuthSig::pub_from_priv(private_key.clone())?;
+        ManagedKeys::add(&public_key, &AuthSig::to_der(private_key)?);
+        Ok(public_key)
+    }
 }
 
 impl Actions for AuthSig {

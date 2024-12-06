@@ -75,37 +75,38 @@ std::vector<psibase::AccountNumber> makeAccounts(
    return result;
 }
 
-void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
+auto makeBoot(const ConsensusData& producers, bool ec) -> std::vector<SignedTransaction>
 {
-   std::vector<GenesisService> services = {{
-                                               .service = Transact::service,
-                                               .flags   = Transact::serviceFlags,
-                                               .code    = readWholeFile("Transact.wasm"),
+   std::vector<SignedTransaction> result;
+   std::vector<GenesisService>    services = {{
+                                                  .service = Transact::service,
+                                                  .flags   = Transact::serviceFlags,
+                                                  .code    = readWholeFile("Transact.wasm"),
                                            },
-                                           {
-                                               .service = RTransact::service,
-                                               .flags   = 0,
-                                               .code    = readWholeFile("RTransact.wasm"),
+                                              {
+                                                  .service = RTransact::service,
+                                                  .flags   = 0,
+                                                  .code    = readWholeFile("RTransact.wasm"),
                                            },
-                                           {
-                                               .service = CpuLimit::service,
-                                               .flags   = CpuLimit::serviceFlags,
-                                               .code    = readWholeFile("MockCpuLimit.wasm"),
+                                              {
+                                                  .service = CpuLimit::service,
+                                                  .flags   = CpuLimit::serviceFlags,
+                                                  .code    = readWholeFile("MockCpuLimit.wasm"),
                                            },
-                                           {
-                                               .service = Accounts::service,
-                                               .flags   = 0,
-                                               .code    = readWholeFile("Accounts.wasm"),
+                                              {
+                                                  .service = Accounts::service,
+                                                  .flags   = 0,
+                                                  .code    = readWholeFile("Accounts.wasm"),
                                            },
-                                           {
-                                               .service = Producers::service,
-                                               .flags   = Producers::serviceFlags,
-                                               .code    = readWholeFile("Producers.wasm"),
+                                              {
+                                                  .service = Producers::service,
+                                                  .flags   = Producers::serviceFlags,
+                                                  .code    = readWholeFile("Producers.wasm"),
                                            },
-                                           {
-                                               .service = AuthAny::service,
-                                               .flags   = 0,
-                                               .code    = readWholeFile("AuthAny.wasm"),
+                                              {
+                                                  .service = AuthAny::service,
+                                                  .flags   = 0,
+                                                  .code    = readWholeFile("AuthAny.wasm"),
                                            }};
    if (ec)
    {
@@ -116,39 +117,38 @@ void boot(BlockContext* ctx, const ConsensusData& producers, bool ec)
       });
    }
    // Transact + Producers + AuthAny + Accounts
-   pushTransaction(ctx,
-                   Transaction{                                                         //
-                               .actions = {                                             //
-                                           Action{.sender  = AccountNumber{"psibase"},  // ignored
-                                                  .service = AccountNumber{"psibase"},  // ignored
-                                                  .method  = MethodNumber{"boot"},
-                                                  .rawData = psio::convert_to_frac(
-                                                      GenesisActionData{.services = services})}}});
+   result.push_back({Transaction{
+       //
+       .actions = {
+           //
+           Action{.sender  = AccountNumber{"psibase"},  // ignored
+                  .service = AccountNumber{"psibase"},  // ignored
+                  .method  = MethodNumber{"boot"},
+                  .rawData = psio::convert_to_frac(GenesisActionData{.services = services})}}}});
 
-   pushTransaction(
-       ctx,
-       Transaction{
-           .tapos   = {.expiration = {ctx->current.header.time.seconds + 1}},
-           .actions = {Action{.sender  = Transact::service,
-                              .service = Transact::service,
-                              .method  = MethodNumber{"startBoot"},
-                              .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
-                       Action{.sender  = Accounts::service,
-                              .service = Accounts::service,
-                              .method  = MethodNumber{"init"},
-                              .rawData = psio::to_frac(std::tuple())},
-                       transactor<Producers>(Producers::service, Producers::service)
-                           .setConsensus(producers),
-                       Action{.sender  = Transact::service,
-                              .service = Transact::service,
-                              .method  = MethodNumber{"finishBoot"},
-                              .rawData = psio::to_frac(std::tuple())}}});
+   result.push_back({Transaction{
+       .tapos   = {.expiration = TimePointSec{Seconds(2)}},
+       .actions = {
+           Action{.sender  = Transact::service,
+                  .service = Transact::service,
+                  .method  = MethodNumber{"startBoot"},
+                  .rawData = psio::to_frac(std::tuple(std::vector<Checksum256>()))},
+           Action{.sender  = Accounts::service,
+                  .service = Accounts::service,
+                  .method  = MethodNumber{"init"},
+                  .rawData = psio::to_frac(std::tuple())},
+           transactor<Producers>(Producers::service, Producers::service).setConsensus(producers),
+           Action{.sender  = Transact::service,
+                  .service = Transact::service,
+                  .method  = MethodNumber{"finishBoot"},
+                  .rawData = psio::to_frac(std::tuple())}}}});
+   return result;
 }
 
 static Tapos getTapos(const BlockInfo& info)
 {
    Tapos result;
-   result.expiration.seconds = info.header.time.seconds + 2;
+   result.expiration = std::chrono::time_point_cast<Seconds>(info.header.time) + Seconds(2);
    std::memcpy(&result.refBlockSuffix,
                info.blockId.data() + info.blockId.size() - sizeof(result.refBlockSuffix),
                sizeof(result.refBlockSuffix));
@@ -159,7 +159,7 @@ static Tapos getTapos(const BlockInfo& info)
 static Tapos getTapos(psibase::BlockContext* ctx)
 {
    Tapos result;
-   result.expiration.seconds = ctx->current.header.time.seconds + 1;
+   result.expiration = std::chrono::time_point_cast<Seconds>(ctx->current.header.time) + Seconds(1);
    std::memcpy(&result.refBlockSuffix,
                ctx->current.header.previous.data() + ctx->current.header.previous.size() -
                    sizeof(result.refBlockSuffix),
@@ -212,12 +212,12 @@ TestBlock makeBlock(const BlockInfo&                   info,
 {
    SignedBlock    newBlock;
    JointConsensus newState{state};
-   newBlock.block.header.previous     = info.blockId;
-   newBlock.block.header.blockNum     = info.header.blockNum + 1;
-   newBlock.block.header.time.seconds = info.header.time.seconds + 1;
-   newBlock.block.header.producer     = AccountNumber{producer};
-   newBlock.block.header.term         = view;
-   newBlock.block.header.commitNum    = commitNum;
+   newBlock.block.header.previous  = info.blockId;
+   newBlock.block.header.blockNum  = info.header.blockNum + 1;
+   newBlock.block.header.time      = info.header.time + Seconds(1);
+   newBlock.block.header.producer  = AccountNumber{producer};
+   newBlock.block.header.term      = view;
+   newBlock.block.header.commitNum = commitNum;
    Merkle m;
    if (newState.next && newState.next->blockNum <= info.header.commitNum)
    {

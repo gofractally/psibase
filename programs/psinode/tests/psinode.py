@@ -5,6 +5,7 @@ import subprocess
 import os
 import tempfile
 import time
+import datetime
 import calendar
 from collections import namedtuple
 import psibase
@@ -411,6 +412,8 @@ class Node(API):
         self.p2p = p2p
         if start:
             self.start(database_cache_size=database_cache_size)
+    def node_args(self):
+        return ['-a', self.url, '--proxy', 'unix:' + self.socketpath]
     def start(self, database_cache_size=None):
         args = [self.executable, "-l", self.socketpath]
         for interface in self.listen:
@@ -503,27 +506,31 @@ class Node(API):
             return False
         else:
             return self.disconnect(other.socketpath) or other.disconnect(self.socketpath)
-
     def boot(self, producer=None, packages=[]):
         '''boots the chain. If a producer is not specified, uses the name of this node'''
         if producer is None:
             producer = self.producer
         if producer is None:
             raise RuntimeError("Producer required for boot")
-        self.run_psibase(['boot', '-p', producer] + packages)
-        now = time.time_ns() // 1000000000
+        self.run_psibase(['boot'] + self.node_args() + ['-p', producer] + packages)
+        now = datetime.datetime.now(datetime.timezone.utc)
         def isbooted(node):
             try:
                 timestamp = node.get_block_header()['time']
             except requests.exceptions.HTTPError as e:
                 return False
-            if calendar.timegm(time.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.000Z")) <= now:
+            if timestamp.endswith('Z'):
+                timestamp = timestamp[:-1] + '+00:00'
+            if datetime.datetime.fromisoformat(timestamp) <= now:
                 return False
             return node.get_producers() == ([producer],[])
         self.wait(isbooted)
+    def install(self, packages=[], sources=[]):
+        '''installs a package'''
+        self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args):
         self._find_psibase()
-        subprocess.run([self.psibase, '-a', self.url, '--proxy', 'unix:' + self.socketpath] + args).check_returncode()
+        subprocess.run([self.psibase] + args).check_returncode()
     def log(self):
         return open(self.logpath, 'r')
     def print_log(self):

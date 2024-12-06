@@ -72,7 +72,7 @@ namespace SystemService
    /// Only the Accounts service itself and the `inviteService` may create new accounts.
    /// Other services may also use this service to check if an account exists.
    // TODO: account deletion, with an index to prevent reusing IDs
-   class Accounts : public psibase::Service<Accounts>
+   class Accounts : public psibase::Service
    {
      public:
       /// "accounts"
@@ -101,6 +101,9 @@ namespace SystemService
       /// Used to update the auth service used by an account
       void setAuthServ(psibase::AccountNumber authService);
 
+      /// Returns data about an account from the accounts table
+      std::optional<Account> getAccount(psibase::AccountNumber name);
+
       /// Return value indicates whether the account `name` exists
       bool exists(psibase::AccountNumber name);
 
@@ -113,6 +116,7 @@ namespace SystemService
                 method(init),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthServ, authService),
+                method(getAccount, name),
                 method(exists, name),
                 method(billCpu, name, amount)
                 //

@@ -64,58 +64,23 @@ namespace UserService
        method(installed),
        method(newAccounts, accounts, owner))
 
-   void parse_query_string_impl(std::string_view                  query,
-                                std::span<const std::string_view> keys,
-                                std::span<std::string_view>       values)
+   struct ManifestQuery
    {
-      while (true)
-      {
-         auto end   = query.find('&');
-         auto split = query.find('=');
-         fflush(stdout);
-         if (split >= end)
-            psibase::abortMessage("Missing '=' in query");
-
-         auto key   = query.substr(0, split);
-         auto value = query.substr(split + 1, end - split - 1);
-         if (auto pos = std::ranges::find(keys, key); pos != keys.end())
-         {
-            values[pos - keys.begin()] = value;
-         }
-
-         if (end == std::string_view::npos)
-         {
-            break;
-         }
-         else
-         {
-            query.remove_prefix(end + 1);
-         }
-      }
-   }
-
-   template <typename... T>
-   std::array<std::string_view, sizeof...(T)> parse_query_string(std::string_view query,
-                                                                 const T&... t)
-   {
-      std::array<std::string_view, sizeof...(T)> keys{t...};
-      std::array<std::string_view, sizeof...(T)> values;
-      parse_query_string_impl(query, keys, values);
-      return values;
-   }
+      std::string owner;
+      std::string package;
+      PSIO_REFLECT(ManifestQuery, owner, package)
+   };
 
    std::optional<psibase::HttpReply> servePackageManifest(psibase::HttpRequest& request)
    {
-      constexpr std::string_view prefix = "/manifest?";
-      std::string_view           target = request.target;
-      if (request.method == "GET" && target.starts_with(prefix))
+      auto path = request.path();
+      if (request.method == "GET" && path == "/manifest")
       {
-         auto [owner, package] =
-             parse_query_string(target.substr(prefix.size()), "owner", "package");
+         auto query = request.query<ManifestQuery>();
          auto manifestIndex =
              Packages::Tables(Packages::service).open<PackageManifestTable>().getIndex<0>();
          if (auto result =
-                 manifestIndex.get(std::tuple(std::string(package), psibase::AccountNumber(owner))))
+                 manifestIndex.get(std::tuple(query.package, psibase::AccountNumber(query.owner))))
          {
             return psibase::HttpReply{
                 .contentType = "application/json",

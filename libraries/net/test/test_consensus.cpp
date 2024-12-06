@@ -158,7 +158,7 @@ TEST_CASE("joint consensus", "[combined]")
    NodeSet<node_type>      nodes(ctx);
    add_producers(nodes, start);
    nodes.connect_all();
-   boot(nodes.getBlockContext(), start);
+   boot(nodes[0], start);
    runFor(ctx, 15s);
 
    add_producers(nodes, change);
@@ -170,7 +170,7 @@ TEST_CASE("joint consensus", "[combined]")
    for (const auto& node : nodes.nodes)
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
@@ -191,7 +191,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    NodeSet<node_type>      nodes(ctx);
    add_producers(nodes, start);
    nodes.connect_all();
-   boot(nodes.getBlockContext(), start);
+   boot(nodes[0], start);
    runFor(ctx, 15s);
 
    timer_type    timer(ctx);
@@ -213,7 +213,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    for (const auto& node : nodes.nodes)
       CHECK(final_state->blockId() == node->chain().get_head_state()->blockId());
    // Verify that the final block looks sane
-   mock_clock::time_point final_time{std::chrono::seconds{final_state->info.header.time.seconds}};
+   mock_clock::time_point final_time{final_state->info.header.time.time_since_epoch()};
    CHECK(final_time <= mock_clock::now());
    CHECK(final_time >= mock_clock::now() - 2s);
    CHECK(final_state->info.header.commitNum >= final_state->info.header.blockNum - 2);
@@ -227,12 +227,14 @@ TEST_CASE("joint consensus crash", "[combined]")
 
 TEST_CASE("fork at commit consensus change", "[combined]")
 {
+   TEST_START(logger);
+
    boost::asio::io_context ctx;
    NodeSet<node_type>      nodes(ctx);
    auto                    producers = makeAccounts({"a", "b", "c", "d"});
    nodes.add(makeAccounts({"a", "h"}));
    nodes.partition(NetworkPartition::all());
-   boot<BftConsensus>(nodes.getBlockContext(), producers);
+   boot<BftConsensus>(nodes[0], producers);
    runFor(ctx, 1s);
 
    auto send = [&](auto&& message)

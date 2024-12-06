@@ -37,10 +37,10 @@ namespace psibase
 
       void checkActive() { check(active, "block is not active"); }
 
-      StatusRow   start(std::optional<TimePointSec> time     = {},
-                        AccountNumber               producer = {},
-                        TermNum                     term     = {},
-                        BlockNum                    irr      = {});
+      StatusRow   start(std::optional<BlockTime> time     = {},
+                        AccountNumber            producer = {},
+                        TermNum                  term     = {},
+                        BlockNum                 irr      = {});
       void        start(Block&& src);
       void        callStartBlock();
       void        callOnBlock();
@@ -90,6 +90,6 @@ namespace psibase
           bool                                     enableUndo,
           bool                                     commit);
 
-      psibase::TimePointSec getHeadBlockTime();
+      psibase::BlockTime getHeadBlockTime();
    };  // BlockContext
 }  // namespace psibase

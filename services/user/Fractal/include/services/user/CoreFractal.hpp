@@ -7,7 +7,7 @@ namespace UserService
 {
    namespace FractalNs
    {
-      class CoreFractal : public psibase::Service<CoreFractal>
+      class CoreFractal : public psibase::Service
       {
         public:
          using Tables                  = psibase::ServiceTables<InitTable>;
@@ -26,9 +26,6 @@ namespace UserService
             struct Ui{};
             struct Merkle{};
          };
-         //using SymbolEvents = psibase::EventIndex<&SymbolRecord::eventHead, "prevEvent">;
-         //using SymbolTypeEvents = psibase::EventIndex<&SymbolLengthRecord::eventHead, "prevEvent">;
-         // clang-format on
       };
 
       // clang-format off

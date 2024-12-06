@@ -15,7 +15,7 @@ class TestExceptionExit(unittest.TestCase):
     def test_socket(self, cluster):
         (a,) = cluster.complete('a')
         a.boot(packages=['Minimal', 'Explorer'])
-        a.run_psibase(['install', '--package-source', testutil.test_packages(), 'KeepSocket'])
+        a.install(packages=['KeepSocket'], sources=[testutil.test_packages()])
         a.wait(new_block())
 
         def long_query(api):
@@ -26,7 +26,10 @@ class TestExceptionExit(unittest.TestCase):
 
         t = Thread(target=long_query, args=(a.new_api(),))
         t.start()
-        a.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+        try:
+            a.push_action('transact', 'setcode', 'setcode', {"service":"transact","vmType":0, "vmVersion":0, "code": "DEADBEEF"})
+        except ConnectionError:
+            pass
         t.join()
 
         code = a.child.wait(timeout=10)

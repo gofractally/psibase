@@ -109,12 +109,17 @@ namespace SystemService
       accountTable.put(*account);
    }
 
-   bool Accounts::exists(AccountNumber name)
+   std::optional<Account> Accounts::getAccount(AccountNumber name)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
-      return accountIndex.get(name) != std::nullopt;
+      return accountIndex.get(name);
+   }
+
+   bool Accounts::exists(AccountNumber name)
+   {
+      return getAccount(name) != std::nullopt;
    }
 
    void Accounts::billCpu(AccountNumber name, std::chrono::nanoseconds amount)

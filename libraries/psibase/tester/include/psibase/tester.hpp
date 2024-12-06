@@ -141,6 +141,13 @@ namespace psibase
       { t.body() } -> std::convertible_to<std::vector<char>>;
    };
 
+   struct GraphQLBody
+   {
+      std::string       contentType() const { return "application/graphql"; }
+      std::vector<char> body() const { return {text.begin(), text.end()}; }
+      std::string_view  text;
+   };
+
    /**
     * Manages a chain.
     * The test chain uses simulated time.
@@ -215,7 +222,7 @@ namespace psibase
 
       void startBlock(std::string_view time);
 
-      void startBlock(TimePointSec tp);
+      void startBlock(BlockTime tp);
 
       /**
        * Finish the current pending block.  If no block is pending, creates an empty block.

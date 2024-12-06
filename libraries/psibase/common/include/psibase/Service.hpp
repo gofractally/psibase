@@ -7,14 +7,41 @@
 
 namespace psibase
 {
+
+   template <typename Service>
+   struct RecursionGuard
+   {
+      static bool running;
+      RecursionGuard()
+      {
+         check(!running, "Cannot reenter service");
+         running = true;
+      }
+      ~RecursionGuard() { running = false; }
+   };
+
+   template <typename Service>
+   bool RecursionGuard<Service>::running = false;
+
+   template <typename Service>
+   struct RecursiveActor : Actor<Service>
+   {
+      bool prevRunning;
+      RecursiveActor(AccountNumber sender, AccountNumber receiver)
+          : Actor<Service>{sender, receiver}
+      {
+         prevRunning                      = RecursionGuard<Service>::running;
+         RecursionGuard<Service>::running = false;
+      }
+      ~RecursiveActor() { RecursionGuard<Service>::running = prevRunning; }
+   };
+
    /// Services may optionally inherit from this to gain the [emit] and [events] convenience methods
    ///
-   /// Template arguments:
-   /// - `DerivedService`: the most-derived service class that inherits from `Service`
-   template <typename DerivedService>
    class Service
    {
      public:
+#ifdef __wasm32__
       /// Emit events
       ///
       /// The following examples use the example definitions in [Defining Events](#defining-events). After you have defined your events, you can use `emit` to emit them. Examples:
@@ -43,7 +70,11 @@ namespace psibase
       /// auto eventBNumber = emitter.ui().updateDisplay();
       /// auto eventCNumber = emitter.merkle().credit(from, to, amount);
       /// ```
-      EventEmitter<DerivedService> emit() const { return EventEmitter<DerivedService>(); }
+      template <typename DerivedService>
+      EventEmitter<DerivedService> emit(this const DerivedService&)
+      {
+         return EventEmitter<DerivedService>();
+      }
 
       /// Read events
       ///
@@ -81,12 +112,33 @@ namespace psibase
       /// auto eventBArguments = reader.ui().updateDisplay(eventBNumber).unpack();
       /// auto eventCArguments = reader.merkle().credit(eventCNumber).unpack();
       /// ```
-      EventReader<DerivedService> events() const
+      template <typename DerivedService>
+      EventReader<DerivedService> events(this const DerivedService&)
       {
          return EventReader<DerivedService>(DerivedService::service);
       }
+
+      /// Allow synchronous calls to re-enter the service
+      ///
+      /// The service is responsible for ensuring correctness:
+      /// - All tables should be in a consistent state when a recursive call is made.
+      /// - Local variables that shadow table rows may not be valid after a recursive call returns.
+      ///
+      /// This only allows a single level of recursion. If an action that is called
+      /// recursively itself needs to make a recursive call, it must also enable recursion.
+      ///
+      /// ```
+      /// recurse().foo();
+      /// ```
+      template <typename DerivedService>
+      RecursiveActor<DerivedService> recurse(this const DerivedService&)
+      {
+         auto receiver = getReceiver();
+         return {receiver, receiver};
+      }
+#endif
    };  // Service
-};     // namespace psibase
+};  // namespace psibase
 
 #define PSIBASE_REFLECT_EVENTS(SERVICE)       \
    using SERVICE##_Events = SERVICE ::Events; \

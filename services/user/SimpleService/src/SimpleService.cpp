@@ -2,7 +2,7 @@
 
 namespace company
 {
-   class MinService : public psibase::Service<MinService>
+   class MinService : public psibase::Service
    {
      public:
       static constexpr psibase::account_id_type id = psibase::name_to_number("simpleserv");  //_a;

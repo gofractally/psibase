@@ -1,4 +1,6 @@
 #include <psio/schema.hpp>
+
+#include <psio/chrono.hpp>
 #include <set>
 
 namespace psio::schema_types
@@ -152,12 +154,87 @@ namespace psio::schema_types
       }
    };
 
+   template <int Digits>
+   struct TimePointImpl
+   {
+      // Unwrap a single element struct
+      static const CompiledType* unwrap(const CompiledType* type)
+      {
+         if (type->kind == CompiledType::struct_ && type->children.size() == 1 &&
+             !type->children[0].is_optional)
+            return type->children[0].type;
+         else
+            return type;
+      }
+      static bool match(const CompiledType* type)
+      {
+         type = unwrap(type);
+         // Accept integers up to 64 bits
+         if (type->kind == CompiledType::scalar)
+         {
+            if (auto* itype = std::get_if<Int>(&type->original_type->value))
+            {
+               return itype->bits <= 64;
+            }
+         }
+         return false;
+      }
+      static bool frac2json(const CompiledType* type, FracStream& in, StreamBase& out)
+      {
+         type = unwrap(type);
+         if (auto* itype = std::get_if<Int>(&type->original_type->value))
+         {
+            // read up to 8 bytes
+            std::uint64_t raw = 0;
+            for (int i = 0; i < (itype->bits + 7) / 8; ++i)
+            {
+               std::uint8_t digit;
+               if (!in.unpack<true, true>(&digit))
+                  return false;
+               raw += static_cast<std::uint64_t>(digit) << (i * 8);
+            }
+            // Sign-extend if needed
+            std::int64_t value;
+            if (itype->isSigned && (raw & (static_cast<std::uint64_t>(1) << (itype->bits - 1))))
+            {
+               if (itype->bits == 64)
+                  value = static_cast<std::int64_t>(raw);
+               else
+                  value = static_cast<std::int64_t>(
+                      raw | ~((static_cast<std::uint64_t>(1) << itype->bits) - 1));
+            }
+            else
+            {
+               if (raw & (static_cast<std::uint64_t>(1) << 63))
+                  check(false, "Time point out of range");
+               value = raw;
+            }
+            // split seconds from subseconds
+            std::int64_t divisor = 1;
+            for (int i = 0; i < Digits; ++i)
+               divisor *= 10;
+            std::int64_t subsec = value % divisor;
+            std::int64_t sec    = value / divisor;
+            if (subsec < 0)
+            {
+               --sec;
+               subsec += divisor;
+            }
+            to_json(format_system_time(sec, subsec, Digits), out);
+            return true;
+         }
+         return false;
+      }
+   };
+
    CustomTypes standard_types()
    {
       CustomTypes result;
       result.insert<bool>("bool");
       result.insert("string", BlobImpl<StringImpl>());
       result.insert("hex", BlobImpl<OctetStringImpl>());
+      result.insert("TimePointSec", TimePointImpl<0>());
+      result.insert("TimePointUSec", TimePointImpl<6>());
       return result;
    }
 
@@ -1487,8 +1564,7 @@ namespace psio::schema_types
       }
       bool match(const Struct& lhs, const Struct& rhs)
       {
-         return std::ranges::equal(lhs.members, rhs.members,
-                                   [this](const auto& l, const auto& r)
+         return std::ranges::equal(lhs.members, rhs.members, [this](const auto& l, const auto& r)
                                    { return match(l.type, r.type); });
       }
       bool match(const Array& lhs, const Array& rhs)

@@ -16,7 +16,7 @@ using namespace psibase;
 static constexpr bool enable_print = false;
 
 // TODO: remove this limit after billing accounts for the storage
-static constexpr uint32_t maxTrxLifetime = 60 * 60;  // 1 hour
+static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
@@ -98,8 +98,8 @@ namespace SystemService
       auto snapRow = snap.get(SingletonKey{});
       if (snapRow)
       {
-         if (snapRow->snapshotInterval &&
-             stat.current.time.seconds - snapRow->lastSnapshot.seconds >= snapRow->snapshotInterval)
+         if (snapRow->snapshotInterval != psibase::Seconds{0} &&
+             stat.current.time - snapRow->lastSnapshot >= snapRow->snapshotInterval)
          {
             ScheduledSnapshotRow row{stat.current.blockNum};
             kvPut(ScheduledSnapshotRow::db, row.key(), row);
@@ -109,11 +109,11 @@ namespace SystemService
       }
       else
       {
-         snap.put({stat.head->header.time, 0});
+         snap.put({stat.head->header.time, psibase::Seconds{0}});
       }
    }
 
-   void Transact::setSnapTime(std::uint32_t seconds)
+   void Transact::setSnapTime(psibase::Seconds seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
       Tables tables(Transact::service);
@@ -176,8 +176,11 @@ namespace SystemService
          {
             value = Callbacks{.type = type};
          }
-         value->actions.push_back(std::move(act));
-         table.put(*value);
+         if (!std::ranges::contains(value->actions, act))
+         {
+            value->actions.push_back(std::move(act));
+            table.put(*value);
+         }
       }
       else
       {
@@ -189,8 +192,11 @@ namespace SystemService
          {
             value = NotifyRow{.type = ntype};
          }
-         value->actions.push_back(std::move(act));
-         kvPut(NotifyRow::db, key, *value);
+         if (!std::ranges::contains(value->actions, act))
+         {
+            value->actions.push_back(std::move(act));
+            kvPut(NotifyRow::db, key, *value);
+         }
       }
    }
 
@@ -259,6 +265,18 @@ namespace SystemService
       auto statusIdx      = statusTable.getIndex<0>();
       auto transactStatus = statusIdx.get(std::tuple{});
 
+      if constexpr (enable_print)
+      {
+         psibase::writeConsole(getSender().str() + "@transact->runAs(" + action.sender.str() + "@" +
+                               action.service.str() + "->" + action.method.str() + ")\n");
+         if (!allowedActions.empty())
+         {
+            psibase::writeConsole("Allowed actions: \n");
+            for (auto& a : allowedActions)
+               psibase::writeConsole(" - " + a.service.str() + "->" + a.method.str() + "\n");
+         }
+      }
+
       if (transactStatus && transactStatus->enforceAuth)
       {
          auto accountsTables = Accounts::Tables(Accounts::service);
@@ -295,6 +313,26 @@ namespace SystemService
                   flags = AuthInterface::runAsOtherReq;
             }
 
+            if constexpr (enable_print)
+            {
+               std::string flags_str = "";
+               auto        type      = flags & AuthInterface::requestMask;
+               if (type == AuthInterface::runAsRequesterReq)
+                  flags_str += " - runAsRequesterReq\n";
+               else if (type == AuthInterface::runAsMatchedReq)
+                  flags_str += " - runAsMatchedReq\n";
+               else if (type == AuthInterface::runAsMatchedExpandedReq)
+                  flags_str += " - runAsMatchedExpandedReq\n";
+               else if (type == AuthInterface::runAsOtherReq)
+                  flags_str += " - runAsOtherReq\n";
+
+               if (!flags_str.empty())
+               {
+                  psibase::writeConsole("Checking auth service " + account->authService.str() +
+                                        " with flags: \n" + flags_str + "\n");
+               }
+            }
+
             Actor<AuthInterface> auth(Transact::service, account->authService);
             auth.checkAuthSys(flags, requester, action.sender,
                               ServiceMethod{action.service, action.method}, allowedActions,
@@ -305,6 +343,7 @@ namespace SystemService
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
+      auto _      = recurse();
       auto result = call(action);
 
       for (auto& a : allowedActions)
@@ -332,7 +371,7 @@ namespace SystemService
       return stat.head->header;
    }
 
-   psibase::TimePointSec Transact::headBlockTime() const
+   psibase::BlockTime Transact::headBlockTime() const
    {
       auto& stat = getStatus();
       if (stat.head)
@@ -378,7 +417,7 @@ namespace SystemService
 
       check(!(tapos.flags & ~Tapos::valid_flags), "unsupported flags on transaction");
       check(stat.current.time < tapos.expiration, "transaction has expired");
-      check(tapos.expiration.seconds < stat.current.time.seconds + maxTrxLifetime,
+      check(tapos.expiration < stat.current.time + maxTrxLifetime,
             "transaction was submitted too early");
 
       auto tables        = Transact::Tables(Transact::service);

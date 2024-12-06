@@ -65,12 +65,10 @@ extern "C" {
 
     /// Start a new block
     ///
-    /// Starts a new block at time `time_seconds` (unix time). If
+    /// Starts a new block at time `time_us` (unix time). If
     /// time_seconds is 0, then starts a new block 1 second after
     /// the most recent.
-    ///
-    /// TODO: Support sub-second block times
-    pub fn startBlock(chain_handle: u32, time_seconds: u32);
+    pub fn startBlock(chain_handle: u32, time_us: i64);
 
     /// Runs an HttpRequest and returns a socket
     pub fn httpRequest(
