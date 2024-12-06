@@ -41,10 +41,6 @@ namespace SystemService
       check(row.has_value(), "sender does not have an owning account");
    }
 
-   /// Handle notification related to the acceptance of a staged transaction
-   ///
-   /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
-   /// is the owner account of the sender of the staged transaction.
    void AuthDelegate::stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor)
    {
       check(getSender() == StagedTxService::service, "can only be called by staged-tx");
@@ -62,10 +58,6 @@ namespace SystemService
       }
    }
 
-   /// Handle notification related to the rejection of a staged transaction
-   ///
-   /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
-   /// is the owner account of the sender of the staged transaction.
    void AuthDelegate::stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor)
    {
       check(getSender() == StagedTxService::service, "can only be called by staged-tx");
