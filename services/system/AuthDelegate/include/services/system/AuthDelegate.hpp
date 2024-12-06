@@ -52,6 +52,18 @@ namespace SystemService
       /// This action allows any user who has already set an owning account with `AuthDelegate::setOwner`.
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Handle notification related to the acceptance of a staged transaction
+      ///
+      /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
+      /// is the owner account of the sender of the staged transaction.
+      void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+
+      /// Handle notification related to the rejection of a staged transaction
+      ///
+      /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
+      /// is the owner account of the sender of the staged transaction.
+      void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+
       /// Set the owner of the sender account
       ///
       /// Whenever a sender using this auth service submits a transaction, authorization
@@ -64,6 +76,8 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
+                method(stagedAccept, staged_tx_id, actor),
+                method(stagedReject, staged_tx_id, actor),
                 method(setOwner, owner)
                 //
    )
