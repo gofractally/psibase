@@ -90,6 +90,7 @@ pub mod service {
     pub struct StagedTx {
         pub id: u32,
         pub txid: [u8; 32],
+        pub propose_block: u32,
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
         pub action_list: ActionList,
@@ -148,6 +149,7 @@ pub mod service {
             StagedTx {
                 id: monotonic_id,
                 txid,
+                propose_block: current_block.blockNum,
                 propose_date: current_block.time,
                 proposer: get_sender(),
                 action_list: ActionList { actions },
@@ -264,11 +266,13 @@ pub mod service {
     }
 
     /// Proposes a new staged transaction containing the specified actions.
+    /// Returns the ID of the database record containing the staged transaction.
+    ///
     /// All actions must have the same sender.
     ///
     /// * `actions` - The actions to be staged
     #[action]
-    fn propose(actions: Vec<Action>) {
+    fn propose(actions: Vec<Action>) -> u32 {
         let new_tx = StagedTx::new(actions);
 
         StagedTxTable::new().put(&new_tx).unwrap();
@@ -277,6 +281,8 @@ pub mod service {
 
         // A proposal is also an implicit accept
         accept(new_tx.id, new_tx.txid);
+
+        new_tx.id
     }
 
     /// Indicates that the caller accepts the specified staged transaction
@@ -309,17 +315,17 @@ pub mod service {
 
         Response::upsert(id, false);
 
+        staged_tx.emit(StagedTxEvent::REJECTED);
+
         staged_tx
             .staged_tx_policy()
             .reject(staged_tx.id, get_sender());
-
-        staged_tx.emit(StagedTxEvent::REJECTED);
     }
 
     /// Removes (deletes) a staged transaction
     ///
-    /// A staged transaction can only be removed by the proposer or the auth service of
-    /// the staged tx sender.
+    /// A staged transaction can only be removed by the proposer, the staged tx
+    /// first sender, or the first sender's auth service.
     ///
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
@@ -332,8 +338,12 @@ pub mod service {
 
     // Needed to separate the event emission from the removal logic
     fn remove_impl(staged_tx: &StagedTx) {
+        let sender = get_sender();
+        let first_sender = staged_tx.first_sender();
         check(
-            get_sender() == staged_tx.proposer || get_sender() == staged_tx.first_sender(),
+            sender == staged_tx.proposer
+                || sender == first_sender
+                || sender == get_auth_service(first_sender).unwrap(),
             "Only the proposer or the staged tx first sender can remove the staged tx",
         );
 

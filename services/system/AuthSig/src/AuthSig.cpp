@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <services/system/Spki.hpp>
+#include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
 
 #include <concepts>
@@ -80,6 +81,34 @@ namespace SystemService
       {
          auto authTable = db.open<AuthTable>();
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
+      }
+
+      void AuthSig::stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor)
+      {
+         check(getSender() == StagedTxService::service, "can only be called by staged-tx");
+
+         auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
+         auto actions   = staged_tx.action_list.actions;
+
+         check(actions.size() > 0, "staged tx has no actions");
+         if (actor == actions[0].sender)
+         {
+            auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(staged_tx_id);
+            recurse().to<Transact>().runAs(std::move(execute), allowedActions);
+         }
+      }
+
+      void AuthSig::stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor)
+      {
+         check(getSender() == StagedTxService::service, "can only be called by staged-tx");
+
+         auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
+         auto actions   = staged_tx.action_list.actions;
+         check(actions.size() > 0, "staged tx has no actions");
+         if (actor == actions[0].sender)
+         {
+            to<StagedTxService>().remove(staged_tx.id, staged_tx.txid);
+         }
       }
    }  // namespace AuthSig
 }  // namespace SystemService
