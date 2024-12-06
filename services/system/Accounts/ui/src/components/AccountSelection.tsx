@@ -51,6 +51,7 @@ import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
 import { useDecodeToken } from "@/hooks/useDecodeToken";
 import { useGetAllAccounts } from "@/hooks/useGetAllAccounts";
 import { useLoginDirect } from "@/hooks/useLoginDirect";
+import { useAcceptInvite } from "@/hooks/useAcceptInvite";
 
 dayjs.extend(relativeTime);
 
@@ -167,6 +168,8 @@ export const AccountSelection = () => {
     if (isCreatingAccount) {
       void (await createAccount(values.username));
       void (await acceptInvite({
+        origin: inviteToken ? inviteToken.appDomain : connectionToken!.origin,
+        app: inviteToken ? inviteToken.app : connectionToken!.app,
         accountName: values.username,
         token: z.string().parse(token),
       }));
@@ -356,48 +359,8 @@ export const AccountSelection = () => {
 
   const { mutateAsync: login, isPending: isLoggingIn } = useLoginDirect();
 
-  const { mutateAsync: acceptInvite, isPending: isAccepting } = useMutation<
-    void,
-    string,
-    { token: string; accountName: string }
-  >({
-    mutationFn: async ({ accountName, token }) => {
-      void (await supervisor.functionCall({
-        method: "login",
-        params: [accountName],
-        service: "accounts",
-        intf: "activeApp",
-      }));
-
-      void (await supervisor.functionCall({
-        method: "accept",
-        params: [token],
-        service: "invite",
-        intf: "invitee",
-      }));
-
-      const origin = z
-        .string()
-        .parse(inviteToken ? inviteToken.appDomain : connectionToken?.origin);
-
-      void (await supervisor.functionCall({
-        method: "loginDirect",
-        params: [
-          {
-            app: inviteToken ? inviteToken.app : connectionToken?.app,
-            origin,
-          },
-          accountName,
-        ],
-        service: "accounts",
-        intf: "admin",
-      }));
-
-      if (window.location && window.location.href) {
-        window.location.href = origin;
-      }
-    },
-  });
+  const { mutateAsync: acceptInvite, isPending: isAccepting } =
+    useAcceptInvite();
 
   const isTxInProgress = isRejecting || isAccepting || isLoggingIn;
 
@@ -646,14 +609,24 @@ export const AccountSelection = () => {
                   disabled={!selectedAccount || isTxInProgress}
                   onClick={() => {
                     if (isInvite) {
+                      if (!inviteToken) {
+                        throw new Error(`Expected invite token loaded`);
+                      }
                       acceptInvite({
                         token: z.string().parse(token),
                         accountName: z.string().parse(selectedAccount?.account),
+                        app: inviteToken.app,
+                        origin: inviteToken.appDomain,
                       });
                     } else {
+                      if (!connectionToken) {
+                        throw new Error(
+                          `Expected connection token for a login`
+                        );
+                      }
                       login({
-                        app: connectionToken!.app,
-                        origin: connectionToken!.origin,
+                        app: connectionToken.app,
+                        origin: connectionToken.origin,
                         accountName: selectedAccount!.account,
                       });
                     }

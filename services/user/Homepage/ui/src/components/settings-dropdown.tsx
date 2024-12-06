@@ -212,6 +212,9 @@ export const SettingsDropdown = () => {
                                 </DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
                                     <DropdownMenuSubContent>
+                                        <DropdownMenuLabel>
+                                            Switch accounts
+                                        </DropdownMenuLabel>
                                         {currentAccounts
                                             .filter(
                                                 (account) =>
