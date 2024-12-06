@@ -60,7 +60,7 @@ namespace SystemService
 
       /// Handle notification related to the rejection of a staged transaction
       ///
-      /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
+      /// Auth-delegate will reject the staged transaction if the sender of the call to `reject`
       /// is the owner account of the sender of the staged transaction.
       void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
 
