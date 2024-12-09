@@ -40,9 +40,10 @@ export const App = () => {
         try {
             await supervisor.functionCall({
                 service: "accounts",
-                intf: "accounts",
-                method: "loginTemp",
-                params: [thisServiceName],
+                intf: "activeAccount",
+                method: "login",
+                /* TODO: WORKAROUND: logs in as boot account (assuming "myproducer" as boot account). Update this with token actual login. */
+                params: ["myproducer"],
             });
 
             if (exampleThing) {

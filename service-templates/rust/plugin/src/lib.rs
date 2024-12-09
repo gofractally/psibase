@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::{{crate_name}}::plugin::api::Guest as Api;
-use bindings::exports::{{crate_name}}::plugin::queries::Guest as Queries;
+use bindings::exports::{{project-name | snake_case}}::plugin::api::Guest as Api;
+use bindings::exports::{{project-name | snake_case}}::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -16,7 +16,7 @@ struct {{project-name | upper_camel_case}}Plugin;
 
 impl Api for {{project-name | upper_camel_case}}Plugin {
     fn set_example_thing(thing: String) {
-        let packed_example_thing_args = {{crate_name}}::action_structs::setExampleThing { thing }.packed();
+        let packed_example_thing_args = {{project-name | snake_case}}::action_structs::setExampleThing { thing }.packed();
         add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
     }
 }

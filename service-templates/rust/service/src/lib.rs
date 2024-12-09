@@ -21,7 +21,7 @@ mod service {
         table.put(&InitRow {}).unwrap();
     }
 
-    #[pre_action(exclude(init, init2, check_inited))]
+    #[pre_action(exclude(init))]
     fn check_init() {
         let table = InitTable::new();
         check(

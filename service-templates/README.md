@@ -2,6 +2,8 @@ This directory contains service (with plugins and UIs) templates that can be ins
 
 ## Usage
 
+(only for Rust projects so far)
+
 Instanstiate a Rust service:
 `cargo generate --git fractally/psibase/templates` rust
 
