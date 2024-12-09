@@ -71,21 +71,6 @@ namespace
 
 }  // namespace
 
-size_t getNrNfts(DefaultTestChain& chain, AccountNumber user)
-{
-   auto query = GraphQLBody{
-       "query UserNfts { userNfts( user: \"alice\" ) { edges { node { id issuer owner } } } }"};
-
-   auto res = chain.post(Nft::service, "/graphql", query);
-
-   auto body          = std::string(res.body.begin(), res.body.end());
-   auto response_root = psio::convert_from_json<QueryRoot>(body);
-
-   //psibase::writeConsole(psio::format_json(response_root));
-
-   return response_root.data.userNfts.edges.size();
-}
-
 // Tx can be staged on behalf of an account using auth-sig
 // Tx is executed once the staged tx sender accepts it
 // Tx is deleted without execution once tx sender rejects it
@@ -108,21 +93,35 @@ SCENARIO("AuthSig")
       };
       auto proposed   = std::vector<Action>{mintAction};
 
+      auto aliceNfts = [&]()
+      {
+         auto query = GraphQLBody{
+             "query UserNfts { userNfts( user: \"alice\" ) { edges { node { id issuer owner } } } "
+             "}"};
+
+         auto res = t.post(Nft::service, "/graphql", query);
+
+         auto body          = std::string(res.body.begin(), res.body.end());
+         auto response_root = psio::convert_from_json<QueryRoot>(body);
+
+         return response_root.data.userNfts.edges.size();
+      };
+
       THEN("Alice has not minted any NFTs")
       {
-         CHECK(getNrNfts(t, alice.id) == 0);
+         CHECK(aliceNfts() == 0);
       }
       THEN("Alice can self-stage a tx, which auto-executes")
       {
          auto propose = alice.to<StagedTxService>().propose(proposed);
          REQUIRE(propose.succeeded());
-         REQUIRE(getNrNfts(t, alice.id) == 1);
+         REQUIRE(aliceNfts() == 1);
       }
       THEN("Bob can stage a tx for alice, which does not auto-execute")
       {
          auto propose = bob.to<StagedTxService>().propose(proposed);
          REQUIRE(propose.succeeded());
-         REQUIRE(getNrNfts(t, alice.id) == 0);
+         REQUIRE(aliceNfts() == 0);
       }
       WHEN("Bob stages a tx for alice")
       {
@@ -133,13 +132,13 @@ SCENARIO("AuthSig")
          {
             auto accept = alice.to<StagedTxService>().accept(id, txid);
             REQUIRE(accept.succeeded());
-            REQUIRE(getNrNfts(t, alice.id) == 1);
+            REQUIRE(aliceNfts() == 1);
          }
          THEN("Alice can reject it, deleting it")
          {
             auto reject = alice.to<StagedTxService>().reject(id, txid);
             REQUIRE(reject.succeeded());
-            REQUIRE(getNrNfts(t, alice.id) == 0);
+            REQUIRE(aliceNfts() == 0);
             REQUIRE(alice.to<StagedTxService>().get_staged_tx(id).failed("Unknown staged tx"));
          }
       }
