@@ -326,7 +326,7 @@ async fn build(
         .arg("rustc")
         .args(extra_args)
         .arg("--release")
-        .arg("--target=wasm32-wasi")
+        .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
         .arg("--message-format=json-diagnostic-rendered-ansi")
@@ -365,7 +365,7 @@ async fn build_plugin(
         .arg("build")
         .args(extra_args)
         .arg("--release")
-        .arg("--target=wasm32-wasi")
+        .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
         .arg("--message-format=json-render-diagnostics")
@@ -390,7 +390,7 @@ async fn build_plugin(
 
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
     if let Some(platform) = &dep.target {
-        if platform.matches("wasm32-wasi", &[]) {
+        if platform.matches("wasm32-wasip1", &[]) {
             true
         } else {
             false
@@ -523,7 +523,7 @@ async fn test(
         || metadata.metadata.target_directory.as_std_path(),
         |p| p.as_path(),
     );
-    let out_dir = target_dir.join("wasm32-wasi/release/packages");
+    let out_dir = target_dir.join("wasm32-wasip1/release/packages");
     let index_file =
         out_dir.join(metadata.packages.get(root).unwrap().name.clone() + "-index.json");
     serde_json::to_writer(File::create(&index_file)?, &index)?;

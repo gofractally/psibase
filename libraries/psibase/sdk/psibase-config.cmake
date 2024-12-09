@@ -113,7 +113,7 @@ function(add_libs suffix)
         -lSpki${suffix}
         -lPrivateKeyInfo${suffix}
         ${LIBCLANG_RT_BUILTINS}
-        ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
+        ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasip1/crt1.o
     )
     target_link_options(Psibase::test${suffix} INTERFACE
         -Wl,--entry,_start
