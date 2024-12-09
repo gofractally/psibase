@@ -24,7 +24,7 @@ impl Api for {{project-name | upper_camel_case}}Plugin {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ExampleThingData {
-    thing: String,
+    exampleThing: String,
 }
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -34,17 +34,16 @@ struct ExampleThingResponse {
 
 impl Queries for {{project-name | upper_camel_case}}Plugin {
     fn get_example_thing() -> Result<String, Error> {
-        let graphql_str = "query { thing }";
+        let graphql_str = "query { exampleThing }";
 
         let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str).unwrap(),
+            &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
         let examplething_val = examplething_val
-            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))
-            .unwrap();
+            .map_err(|err| ErrorType::QueryResponseParseError.err(err.to_string().as_str()))?;
 
-        Ok(examplething_val.data.thing)
+        Ok(examplething_val.data.exampleThing)
     }
 }
 

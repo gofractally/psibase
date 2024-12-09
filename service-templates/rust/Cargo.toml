@@ -8,7 +8,8 @@ rust-version = "1.64"
 edition = "2021"
 
 [package]
-name = "{{project-name | snake_case}}_package"
+# Crate name
+name = "{{project-name}}-pkg"
 
 [profile.release]
 codegen-units = 1
@@ -18,8 +19,13 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "{{project-name}}"
+# PsiPackage name: referenced from tests
+# TODO: distinguish psi-package-name and package-name so the difference is demonstrated
+package-name = "{{project-name | upper_camel_case}}"
 services = ["{{project-name}}"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.14.0"
 
 [lib]
 crate-type = ["rlib"]

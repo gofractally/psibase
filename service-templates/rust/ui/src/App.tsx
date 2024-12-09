@@ -13,6 +13,7 @@ export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
     const [exampleThing, setExampleThing] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
+    const thisServiceName = "{{project-name}}"
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -25,7 +26,7 @@ export const App = () => {
 
     const getExampleThing = async () => {
         const queriedExampleThing = (await supervisor.functionCall({
-            service: "{{project-name}}",
+            service: thisServiceName,
             intf: "queries",
             method: "getExampleThing",
             params: [],
@@ -41,12 +42,12 @@ export const App = () => {
                 service: "accounts",
                 intf: "accounts",
                 method: "loginTemp",
-                params: ["{{project-name}}"],
+                params: [thisServiceName],
             });
 
             if (exampleThing) {
                 await supervisor.functionCall({
-                    service: "{{project-name}}",
+                    service: thisServiceName,
                     intf: "api",
                     method: "setExampleThing",
                     params: [exampleThing],

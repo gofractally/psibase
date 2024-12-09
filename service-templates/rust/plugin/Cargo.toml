@@ -26,4 +26,4 @@ package = "{{project-name}}:psibase-plugin"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
-{{crate_name}}_package = { path = ".." }
+{{project-name}}-pkg = { path = ".." }
