@@ -12,16 +12,17 @@ import {
 import { Input } from "../ui/input";
 
 const BlockProducerSchema = z.object({
-    name: z.string().min(2),
+    name: z.string().min(1),
 });
 
 interface Props {
     form: UseFormReturn<z.infer<typeof BlockProducerSchema>>;
+    next: () => Promise<void>;
 }
 
-export const BlockProducerForm = ({ form }: Props) => (
+export const BlockProducerForm = ({ form, next }: Props) => (
     <Form {...form}>
-        <form className="space-y-6">
+        <form className="space-y-6" onSubmit={form.handleSubmit(next)}>
             <FormField
                 control={form.control}
                 name="name"
