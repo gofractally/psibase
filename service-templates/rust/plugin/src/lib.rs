@@ -24,7 +24,7 @@ impl Api for {{project-name | upper_camel_case}}Plugin {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ExampleThingData {
-    exampleThing: String,
+    example_thing: String,
 }
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
