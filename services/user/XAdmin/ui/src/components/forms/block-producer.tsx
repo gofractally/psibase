@@ -12,7 +12,7 @@ import {
 import { Input } from "../ui/input";
 
 const BlockProducerSchema = z.object({
-    name: z.string().min(2),
+    name: z.string().min(1),
 });
 
 interface Props {
