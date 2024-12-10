@@ -51,8 +51,8 @@ struct AppMetadataResponse {
 
 impl TryParseGqlResponse for AppMetadataResponseData {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        let response_root: ResponseRoot<AppMetadataResponse> = serde_json::from_str(&response)
-            .map_err(|e| ErrorType::QueryDeserializeError(e.to_string()))?;
+        let response_root: ResponseRoot<AppMetadataResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryDeserializeError(e.to_string()))?;
         match response_root.data.app_metadata {
             Some(app_metadata) => Ok(app_metadata),
             None => Err(NotFound("App metadata not found".to_string()).into()),
