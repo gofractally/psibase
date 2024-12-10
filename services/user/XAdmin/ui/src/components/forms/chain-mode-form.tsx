@@ -15,9 +15,10 @@ type ChainTypeShape = z.infer<typeof chainTypeSchema>;
 
 interface Props {
     form: UseFormReturn<ChainTypeShape>;
+    next: () => Promise<void>;
 }
 
-export const ChainTypeForm = ({ form }: Props) => (
+export const ChainTypeForm = ({ form, next }: Props) => (
     <Form {...form}>
         <form className="space-y-6">
             <FormField
@@ -30,6 +31,7 @@ export const ChainTypeForm = ({ form }: Props) => (
                                 onClick={(event) => {
                                     event.preventDefault();
                                     field.onChange("dev");
+                                    next();
                                 }}
                                 variant={
                                     field.value === "dev"
@@ -54,6 +56,7 @@ export const ChainTypeForm = ({ form }: Props) => (
                                 onClick={(event) => {
                                     event.preventDefault();
                                     field.onChange("prod");
+                                    next();
                                 }}
                                 variant={
                                     field.value === "prod"
