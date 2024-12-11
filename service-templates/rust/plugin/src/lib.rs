@@ -41,7 +41,7 @@ impl Queries for {{project-name | upper_camel_case}}Plugin {
         );
 
         let examplething_val = examplething_val
-            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string().as_str()))?;
+            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
     }
