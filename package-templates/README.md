@@ -12,7 +12,7 @@ This directory contains service (with plugins and UIs) templates that can be ins
 
 Instanstiate a Rust service from Git:
 
-`cargo generate --git fractally/psibase` package-templates/rust
+`cargo generate --git gofractally/psibase` package-templates/rust
 
 Instanstiate a Rust service from local path in `services` directory.
 
