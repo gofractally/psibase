@@ -1,4 +1,4 @@
-import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+import { HoverBorderGradient } from "@shadcn/hover-border-gradient";
 import { SettingsDropdown } from "@/components/settings-dropdown";
 import { siblingUrl } from "@psibase/common-lib";
 
