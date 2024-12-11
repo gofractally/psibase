@@ -104,7 +104,7 @@ pub fn get_package_dir(args: &Args, metadata: &MetadataIndex) -> PathBuf {
         || metadata.metadata.target_directory.as_std_path(),
         |p| p.as_path(),
     );
-    target_dir.join("wasm32-wasi/release/packages")
+    target_dir.join("wasm32-wasip1/release/packages")
 }
 
 fn should_build_package(

@@ -27,7 +27,7 @@ set(CMAKE_BUILD_TYPE_INIT Release)
 set(CMAKE_SYSTEM_NAME WASI)
 set(CMAKE_SYSTEM_VERSION 1)
 set(CMAKE_SYSTEM_PROCESSOR wasm32)
-set(triple wasm32-wasi)
+set(triple wasm32-wasip1)
 set(CMAKE_EXECUTABLE_SUFFIX_C .wasm)
 set(CMAKE_EXECUTABLE_SUFFIX_CXX .wasm)
 
