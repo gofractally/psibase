@@ -70,17 +70,29 @@ namespace SystemService
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
 
-         /// Handle notification related to the acceptance of a staged transaction
+         /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+         /// transaction from a specified sender.
          ///
-         /// Auth-sig will execute the staged transaction if the sender of the call to `accept`
-         /// is the same as the sender of the staged transaction.
-         void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+         /// * `sender`: The sender account for the transaction potentially being authorized.
+         /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+         ///
+         /// Returns:
+         /// * `true`: If the sender is among the authorizers
+         /// * `false`: If the sender is not among the authorizers
+         bool isAuthSys(psibase::AccountNumber              sender,
+                        std::vector<psibase::AccountNumber> authorizers);
 
-         /// Handle notification related to the rejection of a staged transaction
+         /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+         /// transaction from a specified sender.
          ///
-         /// Auth-sig will reject the staged transaction if the sender of the call to `reject` is
-         /// the same as the sender of the staged transaction.
-         void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+         /// * `sender`: The sender account for the transaction potentially being rejected.
+         /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+         ///
+         /// Returns:
+         /// * `true`: If the sender is among the rejecters
+         /// * `false`: If the sender is not among the rejecters
+         bool isRejectSys(psibase::AccountNumber              sender,
+                          std::vector<psibase::AccountNumber> rejecters);
 
         private:
          Tables db{psibase::getReceiver()};
@@ -89,8 +101,8 @@ namespace SystemService
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
                    method(setKey, key),
-                   method(stagedAccept, staged_tx_id, actor),
-                   method(stagedReject, staged_tx_id, actor)
+                   method(isAuthSys, sender, authorizers),
+                   method(isRejectSys, sender, rejecters)
                    //
       )
    }  // namespace AuthSig
