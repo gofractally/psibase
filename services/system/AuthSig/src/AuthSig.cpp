@@ -87,20 +87,12 @@ namespace SystemService
       bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
                               std::vector<psibase::AccountNumber> authorizers)
       {
-         auto accDetails = to<Accounts>().getAccount(sender);
-         check(accDetails.has_value() && accDetails->authService == AuthSig::service,
-               "sender " + sender.str() + " does not use this auth service");
-
          return std::find(authorizers.begin(), authorizers.end(), sender) != authorizers.end();
       }
 
       bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> rejecters)
       {
-         auto accDetails = to<Accounts>().getAccount(sender);
-         check(accDetails.has_value() && accDetails->authService == AuthSig::service,
-               "sender " + sender.str() + " does not use this auth service");
-
          return std::find(rejecters.begin(), rejecters.end(), sender) != rejecters.end();
       }
    }  // namespace AuthSig
