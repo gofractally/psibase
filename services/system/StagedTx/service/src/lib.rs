@@ -319,7 +319,7 @@ pub mod service {
         emit_update(staged_tx.txid, StagedTxEvent::REJECTED);
 
         let rejected =
-            staged_tx.action_list.actions.iter().all(|action| {
+            staged_tx.action_list.actions.iter().any(|action| {
                 StagedTxPolicy::new(action.sender).does_reject(staged_tx.rejecters())
             });
 
