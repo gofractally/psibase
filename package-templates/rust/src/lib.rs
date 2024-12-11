@@ -1,2 +1,1 @@
-pub use {{project-name}};
-pub use {{project-name}}-plugin;
+pub use {{project-name | snake_case}};

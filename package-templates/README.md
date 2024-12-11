@@ -14,9 +14,9 @@ Instanstiate a Rust service from Git:
 
 `cargo generate --git gofractally/psibase` package-templates/rust
 
-Instanstiate a Rust service from local path in `services` directory.
+Instantiate a Rust package from local path in `services` directory.
 
-`cargo generate -p ../../service-templates/rust`
+`cargo generate -p ../../package-templates/rust`
 
 ## Building a package
 
