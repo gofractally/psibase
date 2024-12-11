@@ -3,7 +3,7 @@ name = "plugin"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-publish = false
+publish.workspace = true
 
 [dependencies]
 {{project-name}} = { path = "../service/" }
@@ -26,4 +26,4 @@ package = "{{project-name}}:psibase-plugin"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
-{{project-name}}-pkg = { path = ".." }
+{{project-name}}-pkg = { path = "..", version = "0.14.0" }

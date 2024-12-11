@@ -3,13 +3,18 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.14.0"
 rust-version = "1.64"
 edition = "2021"
+publish = false
 
 [package]
 # Crate name
 name = "{{project-name}}-pkg"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
 
 [profile.release]
 codegen-units = 1
