@@ -6,7 +6,6 @@ use registry::service::TagRecord;
 use crate::bindings::host::common::{server as Server, types as CommonTypes};
 use crate::bindings::registry::plugin::types::AccountId;
 
-use crate::errors::ErrorType;
 use crate::errors::ErrorType::*;
 
 #[derive(Deserialize, Debug)]
