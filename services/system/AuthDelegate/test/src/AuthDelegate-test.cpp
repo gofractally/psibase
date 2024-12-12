@@ -13,6 +13,26 @@ using namespace psibase;
 
 namespace
 {
+   auto pubFromPem = [](std::string param) {  //
+      return AuthSig::SubjectPublicKeyInfo{AuthSig::parseSubjectPublicKeyInfo(param)};
+   };
+
+   auto privFromPem = [](std::string param) {  //
+      return AuthSig::PrivateKeyInfo{AuthSig::parsePrivateKeyInfo(param)};
+   };
+
+   auto pub = pubFromPem(
+       "-----BEGIN PUBLIC KEY-----\n"
+       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWdALpn+cGuD1klsSRXTdapYlG5mu\n"
+       "WgoALofZYufL838GRUo43UuoGzxu/mW5T6r9Ix4/qc4gH2B+Zc6VYw/pKQ==\n"
+       "-----END PUBLIC KEY-----\n");
+   auto priv = privFromPem(
+       "-----BEGIN PRIVATE KEY-----\n"
+       "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg9h35bFuOZyB8i+GT\n"
+       "HEfwKktshavRCyzHq3X55sdfgs6hRANCAARZ0Aumf5wa4PWSWxJFdN1qliUbma5a\n"
+       "CgAuh9li58vzfwZFSjjdS6gbPG7+ZblPqv0jHj+pziAfYH5lzpVjD+kp\n"
+       "-----END PRIVATE KEY-----\n");
+
    struct Node
    {
       uint32_t      id;
@@ -59,8 +79,13 @@ SCENARIO("AuthDelegate")
       auto alice   = t.from(t.addAccount("alice"_a));
       auto bob     = t.from(t.addAccount("bob"_a));
       auto charlie = t.from(t.addAccount("charlie"_a));
+      auto dana    = t.from(t.addAccount("dana"_a));
+
       REQUIRE(alice.to<AuthDelegate>().setOwner("bob"_a).succeeded());
       REQUIRE(alice.to<Accounts>().setAuthServ(AuthDelegate::service).succeeded());
+
+      t.setAuth<AuthSig::AuthSig>(dana.id, pub);
+      auto keys = KeyList{{pub, priv}};
 
       auto mintAction = Action{.sender  = alice.id,
                                .service = Nft::service,
@@ -94,29 +119,67 @@ SCENARIO("AuthDelegate")
          REQUIRE(propose.succeeded());
          REQUIRE(aliceNfts() == 1);
       }
-      THEN("Charlie can stage a tx for alice, which does not auto-execute")
+      WHEN("Bob uses auth-sig")
       {
-         auto propose = charlie.to<StagedTxService>().propose(proposed);
-         REQUIRE(propose.succeeded());
-         REQUIRE(aliceNfts() == 0);
-      }
-      WHEN("Charlie stages a tx for alice")
-      {
-         auto id   = charlie.to<StagedTxService>().propose(proposed).returnVal();
-         auto txid = charlie.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
+         t.setAuth<AuthSig::AuthSig>(bob.id, pub);
 
-         THEN("Bob can accept it, executing it")
+         THEN("Charlie can stage a tx for alice, which does not auto-execute")
          {
-            auto accept = bob.to<StagedTxService>().accept(id, txid);
-            REQUIRE(accept.succeeded());
-            REQUIRE(aliceNfts() == 1);
-         }
-         THEN("Bob can reject it, deleting it")
-         {
-            auto reject = bob.to<StagedTxService>().reject(id, txid);
-            REQUIRE(reject.succeeded());
+            auto propose = charlie.to<StagedTxService>().propose(proposed);
+            REQUIRE(propose.succeeded());
             REQUIRE(aliceNfts() == 0);
-            REQUIRE(bob.to<StagedTxService>().get_staged_tx(id).failed("Unknown staged tx"));
+         }
+         WHEN("Charlie stages a tx for alice")
+         {
+            auto id   = charlie.to<StagedTxService>().propose(proposed).returnVal();
+            auto txid = charlie.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
+
+            THEN("Bob can accept it, executing it")
+            {
+               auto accept = bob.with(keys).to<StagedTxService>().accept(id, txid);
+               REQUIRE(accept.succeeded());
+               REQUIRE(aliceNfts() == 1);
+            }
+            THEN("Bob can reject it, deleting it")
+            {
+               auto reject = bob.with(keys).to<StagedTxService>().reject(id, txid);
+               REQUIRE(reject.succeeded());
+               REQUIRE(aliceNfts() == 0);
+               REQUIRE(bob.with(keys).to<StagedTxService>().get_staged_tx(id).failed(
+                   "Unknown staged tx"));
+            }
+         }
+      }
+      AND_WHEN("Bob delegates account to dana")
+      {
+         REQUIRE(bob.to<AuthDelegate>().setOwner("dana"_a).succeeded());
+         REQUIRE(bob.to<Accounts>().setAuthServ(AuthDelegate::service).succeeded());
+
+         THEN("Charlie can stage a tx for alice, which does not auto-execute")
+         {
+            auto propose = charlie.to<StagedTxService>().propose(proposed);
+            REQUIRE(propose.succeeded());
+            REQUIRE(aliceNfts() == 0);
+         }
+         WHEN("Charlie stages a tx for alice")
+         {
+            auto id   = charlie.to<StagedTxService>().propose(proposed).returnVal();
+            auto txid = charlie.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
+
+            THEN("Dana can accept it, executing it")
+            {
+               auto accept = dana.with(keys).to<StagedTxService>().accept(id, txid);
+               REQUIRE(accept.succeeded());
+               REQUIRE(aliceNfts() == 1);
+            }
+            THEN("Dana can reject it, deleting it")
+            {
+               auto reject = dana.with(keys).to<StagedTxService>().reject(id, txid);
+               REQUIRE(reject.succeeded());
+               REQUIRE(aliceNfts() == 0);
+               REQUIRE(dana.with(keys).to<StagedTxService>().get_staged_tx(id).failed(
+                   "Unknown staged tx"));
+            }
          }
       }
    }

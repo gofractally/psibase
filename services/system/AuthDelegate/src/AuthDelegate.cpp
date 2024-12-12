@@ -21,14 +21,11 @@ namespace SystemService
       if (requester == row->owner)
          flags = (flags & ~AuthInterface::requestMask) | AuthInterface::runAsRequesterReq;
 
-      auto accountsTables = Accounts::Tables(Accounts::service);
-      auto accountTable   = accountsTables.open<AccountTable>();
-      auto accountIndex   = accountTable.getIndex<0>();
-      auto account        = accountIndex.get(row->owner);
+      auto account = to<Accounts>().getAccount(row->owner);
       if (!account)
          abortMessage("unknown owner \"" + sender.str() + "\"");
 
-      auto r = recurse();
+      auto _ = recurse();
 
       Actor<AuthInterface> auth(AuthDelegate::service, account->authService);
       auth.checkAuthSys(flags, requester, row->owner, std::move(action), std::move(allowedActions),
@@ -41,37 +38,32 @@ namespace SystemService
       check(row.has_value(), "sender does not have an owning account");
    }
 
-   void AuthDelegate::stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor)
+   bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
+                                std::vector<psibase::AccountNumber> authorizers)
    {
-      check(getSender() == StagedTxService::service, "can only be called by staged-tx");
+      auto owner = db.open<AuthDelegateTable>().getIndex<0>().get(sender)->owner;
 
-      auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
-      auto actions   = staged_tx.action_list.actions;
-      check(actions.size() > 0, "staged tx has no actions");
+      if (std::ranges::contains(authorizers, owner))
+         return true;
 
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(actions[0].sender);
-      check(row.has_value(), "staged sender does not have an owning account");
-      if (row->owner == actor)
-      {
-         auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(staged_tx_id);
-         recurse().to<Transact>().runAs(std::move(execute), allowedActions);
-      }
+      auto ownerAuth = to<Accounts>().getAccount(owner)->authService;
+
+      auto _ = recurse();
+      return Actor<AuthInterface>{service, ownerAuth}.isAuthSys(owner, std::move(authorizers));
    }
 
-   void AuthDelegate::stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor)
+   bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
+                                  std::vector<psibase::AccountNumber> rejecters)
    {
-      check(getSender() == StagedTxService::service, "can only be called by staged-tx");
+      auto owner = db.open<AuthDelegateTable>().getIndex<0>().get(sender)->owner;
 
-      auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
-      auto actions   = staged_tx.action_list.actions;
-      check(actions.size() > 0, "staged tx has no actions");
+      if (std::ranges::contains(rejecters, owner))
+         return true;
 
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(actions[0].sender);
-      check(row.has_value(), "staged sender does not have an owning account");
-      if (row->owner == actor)
-      {
-         to<StagedTxService>().remove(staged_tx.id, staged_tx.txid);
-      }
+      auto ownerAuth = to<Accounts>().getAccount(owner)->authService;
+
+      auto _ = recurse();
+      return Actor<AuthInterface>{service, ownerAuth}.isRejectSys(owner, std::move(rejecters));
    }
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)

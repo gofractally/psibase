@@ -52,17 +52,31 @@ namespace SystemService
       /// This action allows any user who has already set an owning account with `AuthDelegate::setOwner`.
       void canAuthUserSys(psibase::AccountNumber user);
 
-      /// Handle notification related to the acceptance of a staged transaction
+      /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+      /// transaction from a specified sender.
       ///
-      /// Auth-delegate will execute the staged transaction if the sender of the call to `accept`
-      /// is the owner account of the sender of the staged transaction.
-      void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      /// * `sender`: The sender account for the transaction potentially being authorized.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the sender's owner is among the authorizers, or if the sender's owner's auth
+      /// service would authorize the transaction
+      /// * `false`: If not returning true
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
 
-      /// Handle notification related to the rejection of a staged transaction
+      /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+      /// transaction from a specified sender.
       ///
-      /// Auth-delegate will reject the staged transaction if the sender of the call to `reject`
-      /// is the owner account of the sender of the staged transaction.
-      void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      /// * `sender`: The sender account for the transaction potentially being rejected.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the sender's owner is among the rejecters, or if the sender's owner's auth
+      /// service would reject the transaction
+      /// * `false`: If not returning true
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
 
       /// Set the owner of the sender account
       ///
@@ -76,8 +90,8 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(stagedAccept, staged_tx_id, actor),
-                method(stagedReject, staged_tx_id, actor),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters),
                 method(setOwner, owner)
                 //
    )
