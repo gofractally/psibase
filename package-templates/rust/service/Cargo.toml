@@ -1,0 +1,25 @@
+[package]
+name = "{{project-name}}"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "{{project-name}}"
+# TODO: this should probably be interpolated... from where?
+plugin = "plugin"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [
+    { sender = "{{project-name}}", service = "{{project-name}}", method = "init", rawData = "0000" },
+]
+
+[dependencies]
+psibase = { version = "0.14.0", path = "../../../../rust/psibase" }
+psibase_macros = { version = "0.14.0", path = "../../../../rust/psibase_macros" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0.120"
+
+[dev-dependencies]
+{{project-name}}-pkg = { path = "..", version = "0.14.0" }
