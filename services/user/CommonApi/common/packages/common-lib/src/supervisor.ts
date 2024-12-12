@@ -60,7 +60,7 @@ export class Supervisor {
         );
     }
 
-    private onLoadPromise?: (value?: unknown) => void;
+    private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
 
     constructor(public options?: Options) {
         this.supervisorSrc =
@@ -108,9 +108,7 @@ export class Supervisor {
 
     onSupervisorInitialized() {
         this.isSupervisorInitialized = true;
-        if (this.onLoadPromise) {
-            this.onLoadPromise();
-        }
+        this.onLoadPromiseResolvers.forEach((resolver) => resolver());
     }
 
     onFunctionCallResponse(response: FunctionCallResponse) {
@@ -171,7 +169,8 @@ export class Supervisor {
         return iframe;
     }
 
-    functionCall(args: FunctionCallArgs) {
+    async functionCall(args: FunctionCallArgs) {
+        await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
         const fqArgs: QualifiedFunctionCallArgs = {
@@ -204,7 +203,7 @@ export class Supervisor {
     async onLoaded() {
         if (this.isSupervisorInitialized) return;
         return new Promise((resolve) => {
-            this.onLoadPromise = resolve;
+            this.onLoadPromiseResolvers.push(resolve);
         });
     }
 
