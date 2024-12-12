@@ -1,10 +1,7 @@
 #[psibase::service(name = "{{project-name}}")]
-mod service {
-    use async_graphql::{Object, SimpleObject};
-    use psibase::{
-        check, serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
-        Table, ToSchema,
-    };
+pub mod service {
+    use async_graphql::SimpleObject;
+    use psibase::*;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -19,6 +16,19 @@ mod service {
     fn init() {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
+
+        // Configures this service within the event service
+        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
+
+        // Initial service configuration
+        let thing_table = ExampleThingTable::new();
+        if thing_table.get_index_pk().get(&SingletonKey {}).is_none() {
+            thing_table
+                .put(&ExampleThing {
+                    thing: String::from("default thing"),
+                })
+                .unwrap();
+        }
     }
 
     #[pre_action(exclude(init))]
@@ -31,52 +41,48 @@ mod service {
     }
 
     #[table(name = "ExampleThingTable", index = 1)]
-    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct ExampleThing {
         pub thing: String,
     }
 
     impl ExampleThing {
         #[primary_key]
-        fn by_key(&self) -> SingletonKey {
+        fn pk(&self) -> SingletonKey {
             SingletonKey {}
-        }
-    }
-
-    impl Default for ExampleThing {
-        fn default() -> Self {
-            ExampleThing {
-                thing: String::from("default thing"),
-            }
         }
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn setExampleThing(thing: String) {
-        ExampleThingTable::new()
-            .put(&ExampleThing { thing: thing.clone() })
+        let table = ExampleThingTable::new();
+        let old_thing = table
+            .get_index_pk()
+            .get(&SingletonKey {})
+            .unwrap_or_default()
+            .thing;
+
+        table
+            .put(&ExampleThing {
+                thing: thing.clone(),
+            })
             .unwrap();
 
-        Wrapper::emit().history().exampleThingChanged(thing);
-    }
-
-    #[event(history)]
-    pub fn exampleThingChanged(thing: String) {}
-
-    struct Query;
-
-    #[Object]
-    impl Query {
-        async fn example_thing(&self) -> String {
-            let curr_val = ExampleThingTable::new().get_index_pk().get(&SingletonKey {});
-            curr_val.unwrap_or_default().thing
-        }
+        Wrapper::emit().history().updated(old_thing, thing);
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_graphql(&request, Query))
+    fn getExampleThing() -> String {
+        let table = ExampleThingTable::new();
+        table
+            .get_index_pk()
+            .get(&SingletonKey {})
+            .unwrap_or_default()
+            .thing
     }
+
+    #[event(history)]
+    pub fn updated(old_thing: String, new_thing: String) {}
 }
