@@ -86,13 +86,14 @@ namespace SystemService
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
+   using BlockTraceKey_t = std::tuple<psibase::BlockNum, psibase::Checksum256>;
    struct BlockTraceRecord
    {
       psibase::BlockNum         blockNum;
       psibase::Checksum256      id;
       psibase::TransactionTrace trace;
 
-      auto primaryKey() const { return std::tuple(blockNum, id); }
+      BlockTraceKey_t primaryKey() const { return std::tuple(blockNum, id); }
    };
    PSIO_REFLECT(BlockTraceRecord, blockNum, id, trace)
    using BlockTraceTable = psibase::Table<BlockTraceRecord, &BlockTraceRecord::primaryKey>;

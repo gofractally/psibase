@@ -121,21 +121,20 @@ void RTransact::onBlock()
       }
    }
 
+   std::vector<BlockTraceKey_t> keys;
    // Send replies to all transactions in the block that are now irreversible
-   std::vector<std::tuple<uint32_t, Checksum256>> keys;
+   auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
    for (auto i : irreversible)
    {
       PSIBASE_SUBJECTIVE_TX
       {
-         auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
-         auto blockTracesIdx  = blockTraceTable.getIndex<0>();
+         auto blockTracesIdx = blockTraceTable.getIndex<0>();
          for (auto trace : blockTracesIdx.subindex(i))
          {
-            keys.emplace_back(trace.blockNum, trace.id);
+            keys.push_back(trace.primaryKey());
          }
       }
    }
-
    for (auto key : keys)
    {
       std::optional<BlockTraceRecord> record = std::nullopt;
