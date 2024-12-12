@@ -31,6 +31,10 @@ interface keyvault {
     /// private key.
     pub-from-priv: func(private-key: pem) -> result<pem, error>;
 
+    /// Returns the private key corresponding to the specified 
+    /// public key.
+    priv-from-pub: func(public-key: pem) -> result<pem, error>;
+
     /// Returns the DER encoded key
     to-der: func(key: pem) -> result<list<u8>, error>;
 

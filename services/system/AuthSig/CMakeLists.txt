@@ -20,4 +20,6 @@ function(add suffix)
 
 endfunction(add)
 
+add_subdirectory(test)
+
 conditional_add()

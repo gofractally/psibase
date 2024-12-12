@@ -119,6 +119,10 @@ struct InstallCommand {
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL")]
     compression_level: Option<u32>,
+
+    /// Reinstall the package
+    #[clap(short = 'r', long)]
+    reinstall: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -586,12 +590,12 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["--suppress-ok".into()];
+    let mut args = vec!["deploy".into()];
     if let Some(api) = &opts.api {
         args.push("--api".into());
         args.push(api.to_string());
     }
-    args.push("deploy".into());
+    args.push("--suppress-ok".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
@@ -641,13 +645,17 @@ async fn install(
 
     let mut command = std::process::Command::new("psibase");
 
-    command.arg("--suppress-ok");
+    command.arg("install");
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
-    command.arg("install");
+    command.arg("--suppress-ok");
     if let Some(sender) = &opts.sender {
         command.args(["--sender", &sender.to_string()]);
+    }
+
+    if opts.reinstall {
+        command.args(["--reinstall"]);
     }
 
     if let Some(compression_level) = opts.compression_level {

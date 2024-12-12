@@ -175,7 +175,7 @@ std::vector<std::string> DefaultTestChain::defaultPackages()
 {
    return {"Accounts", "AuthAny", "AuthDelegate", "AuthSig", "CommonApi", "CpuLimit",  "Events",
            "Explorer", "Fractal", "Invite",       "Nft",     "Packages",  "Producers", "HttpServer",
-           "Sites",    "SetCode", "Symbol",       "Tokens",  "Transact"};
+           "Sites",    "SetCode", "StagedTx",     "Symbol",  "Tokens",    "Transact"};
 }
 
 DefaultTestChain::DefaultTestChain() : TestChain(defaultChainInstance(), true)

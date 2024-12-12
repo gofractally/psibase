@@ -20,26 +20,29 @@ namespace SystemService
                               std::vector<Claim>         claims)
    {
       if (enable_print)
-         std::printf("auth_check\n");
+         std::printf("checkAuthSys\n");
    }
 
    void AuthAny::canAuthUserSys(AccountNumber user)
    {
       if (enable_print)
-         std::printf("user_check\n");
+         std::printf("canAuthUserSys\n");
    }
 
-   void AuthAny::stagedAccept(uint32_t stagedTxId, AccountNumber actor)
+   bool AuthAny::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
-      check(getSender() == StagedTxService::service, "can only be called by staged-tx");
+      if (enable_print)
+         std::printf("isAuthSys\n");
 
-      auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(stagedTxId);
-      recurse().to<Transact>().runAs(std::move(execute), allowedActions);
+      return true;
    }
 
-   void AuthAny::stagedReject(uint32_t stagedTxId, AccountNumber actor)
+   bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
    {
-      check(false, "not supported");
+      if (enable_print)
+         std::printf("isRejectSys\n");
+
+      return false;
    }
 }  // namespace SystemService
 

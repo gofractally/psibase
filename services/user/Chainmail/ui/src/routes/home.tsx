@@ -37,13 +37,9 @@ export function Home() {
                 <div className="flex items-center justify-between px-4">
                     <h1 className="text-xl font-bold">Inbox</h1>
                     <div className="flex items-center gap-2">
-                        <Dialog>
-                            <ComposeDialog
-                                trigger={
-                                    <ComposeDialogTriggerIconWithTooltip />
-                                }
-                            />
-                        </Dialog>
+                        <ComposeDialog
+                            trigger={<ComposeDialogTriggerIconWithTooltip />}
+                        />
                         <ModeToggle />
                     </div>
                 </div>

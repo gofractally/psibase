@@ -153,29 +153,31 @@ pub mod auth_interface {
         unimplemented!()
     }
 
-    /// Handle notification related to the acceptance of a staged transaction
+    /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+    /// transaction from a specified sender.
     ///
-    /// An auth service is notified when the sender of the staged transaction
-    /// is an account that uses the auth service.
+    /// * `sender`: The sender account for the transaction potentially being authorized.
+    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
     ///
-    /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
-    ///                   staged-tx record.
-    /// * `actor`: The account that accepts the specified staged transaction
+    /// Returns:
+    /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
+    /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
     #[action]
-    fn stagedAccept(staged_tx_id: u32, actor: crate::AccountNumber) {
+    fn isAuthSys(sender: crate::AccountNumber, authorizers: Vec<crate::AccountNumber>) -> bool {
         unimplemented!()
     }
 
-    /// Handle notification related to the rejection of a staged transaction
+    /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+    /// transaction from a specified sender.
     ///
-    /// An auth service is notified when the sender of the staged transaction
-    /// is an account that uses the auth service.
+    /// * `sender`: The sender account for the transaction potentially being rejected.
+    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
     ///
-    /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
-    ///                   staged-tx record.
-    /// * `actor`: The account that rejects the specified staged transaction
+    /// Returns:
+    /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
+    /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
     #[action]
-    fn stagedReject(staged_tx_id: u32, actor: crate::AccountNumber) {
+    fn isRejectSys(sender: crate::AccountNumber, rejecters: Vec<crate::AccountNumber>) -> bool {
         unimplemented!()
     }
 }

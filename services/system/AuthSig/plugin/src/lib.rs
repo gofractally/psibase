@@ -12,7 +12,7 @@ use types::*;
 // Other plugins
 use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
-use bindings::host::common::{client as Client, types as CommonTypes};
+use bindings::host::common::types as CommonTypes;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -101,6 +101,20 @@ impl KeyVault for AuthSig {
             .map_err(|e| CryptoError(e.to_string()))?)
     }
 
+    fn priv_from_pub(public_key: Pem) -> Result<Pem, CommonTypes::Error> {
+        if !from_auth_sig_ui() {
+            return Err(Unauthorized("priv_from_pub").into());
+        }
+
+        let private_key = ManagedKeys::get(&public_key);
+
+        Ok(SigningKey::from_pkcs8_der(&private_key)
+            .map_err(|e| CryptoError(e.to_string()))?
+            .to_pkcs8_pem(LineEnding::LF)
+            .map_err(|e| CryptoError(e.to_string()))?
+            .to_string())
+    }
+
     fn to_der(key: Pem) -> Result<Vec<u8>, CommonTypes::Error> {
         let pem = pem::Pem::try_from_pem_str(&key)?;
         Ok(pem.contents().to_vec())
@@ -126,10 +140,7 @@ impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
         // TODO: check if sender authorizes caller app to set key
         // Currently only an AuthSig app would be able to set a user's key
-        let auth = Client::get_sender_app().app.map_or(false, |app| {
-            app == psibase::services::auth_sig::SERVICE.to_string()
-        });
-        if !auth {
+        if !from_auth_sig_ui() {
             return Err(Unauthorized("set_key").into());
         }
 
