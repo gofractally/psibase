@@ -13,6 +13,12 @@ To build the app,
 
 That's it! A package will be generated at `./target/wasm32-wasi/release/packages/{{project-name | upper_camel_case}}.psi`
 
+## Test
+
+To run the tests,
+
+1. Run `cargo-psibase test` in the app's `service` directory.
+
 ## Run
 
 To run the app,

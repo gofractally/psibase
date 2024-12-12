@@ -86,3 +86,6 @@ pub mod service {
     #[event(history)]
     pub fn updated(old_thing: String, new_thing: String) {}
 }
+
+#[cfg(test)]
+mod tests;
