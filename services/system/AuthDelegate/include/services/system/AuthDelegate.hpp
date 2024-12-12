@@ -85,7 +85,8 @@ namespace SystemService
       void setOwner(psibase::AccountNumber owner);
 
      private:
-      Tables db{psibase::getReceiver()};
+      Tables                 db{psibase::getReceiver()};
+      psibase::AccountNumber getOwner(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

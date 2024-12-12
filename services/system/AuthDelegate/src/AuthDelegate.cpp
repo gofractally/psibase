@@ -34,16 +34,14 @@ namespace SystemService
 
    void AuthDelegate::canAuthUserSys(psibase::AccountNumber user)
    {
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(user);
-      check(row.has_value(), "sender does not have an owning account");
+      // Asserts if no owner is set for the user
+      getOwner(user);
    }
 
    bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> authorizers)
    {
-      auto record = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
-      check(record.has_value(), "sender does not have an owning account");
-      auto owner = record->owner;
+      auto owner = getOwner(sender);
 
       if (std::ranges::contains(authorizers, owner))
          return true;
@@ -57,9 +55,7 @@ namespace SystemService
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
                                   std::vector<psibase::AccountNumber> rejecters)
    {
-      auto record = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
-      check(record.has_value(), "sender does not have an owning account");
-      auto owner = record->owner;
+      auto owner = getOwner(sender);
 
       if (std::ranges::contains(rejecters, owner))
          return true;
@@ -74,6 +70,13 @@ namespace SystemService
    {
       auto authTable = db.open<AuthDelegateTable>();
       authTable.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
+   }
+
+   psibase::AccountNumber AuthDelegate::getOwner(psibase::AccountNumber account)
+   {
+      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(account);
+      check(row.has_value(), "account does not have an owning account");
+      return row->owner;
    }
 
 }  // namespace SystemService
