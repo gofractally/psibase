@@ -21,7 +21,7 @@ export const useCreateConnectionToken = () =>
         },
         onSuccess: (token) => {
             window.location.href = modifyUrlParams(
-                siblingUrl(undefined, "accounts", null, false),
+                siblingUrl(undefined, "accounts", null, true),
                 {
                     token,
                 },

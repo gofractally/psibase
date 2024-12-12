@@ -5,6 +5,7 @@ import {
     useLoggedInUser,
     useLogout,
     useSelectAccount,
+    useUser,
 } from "@hooks";
 import { cn } from "@lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
@@ -41,8 +42,11 @@ const user = {
 };
 
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
-    const { setSelectedMessageId } = useIncomingMessages();
-    // const { availableAccounts, user, setUser } = useUser();
+    // const { setSelectedMessageId } = useIncomingMessages();
+    // const { availableAccounts, user: userz, setUser } = useUser();
+
+    // console.log("******* availableAccounts:", availableAccounts);
+    // console.log("******* user:", userz);
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
