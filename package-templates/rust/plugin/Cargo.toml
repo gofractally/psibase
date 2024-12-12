@@ -6,11 +6,12 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-{{project-name}} = { path = "../service/" }
-psibase = { path = "../../../../rust/psibase/" }
+{{project-name}} = { path = "../service/", version = "{{version}}" }
+psibase = { path = "../../../../rust/psibase/", version = "{{version}}" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
+
 [lib]
 crate-type = ["cdylib"]
 
@@ -26,4 +27,4 @@ package = "{{project-name}}:psibase-plugin"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
-{{project-name}}-pkg = { path = "..", version = "0.14.0" }
+{{project-name}}-pkg = { path = "..", version = "{{version}}" }
