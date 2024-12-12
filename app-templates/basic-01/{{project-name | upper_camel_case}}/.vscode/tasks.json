@@ -1,18 +1,31 @@
 {
   "version": "2.0.0",
   "tasks": [
-    // Keeping the below example to show how to run service unit tests:
     {
-      "label": "Test AuthSig",
+      "label": "Build UI",
       "type": "shell",
-      "command": "cd ~/psibase/build && psitest AuthSig-test.wasm -s -r compact",
+      "command": "cd ui && yarn && yarn build",
       "group": {
-        "kind": "test",
+        "kind": "build",
+        "isDefault": true
+      },
+      "options": {
+        "statusbar": {
+          "label": "$(tools) Build UI"
+        }
+      }
+    },
+    {
+      "label": "Build package",
+      "type": "shell",
+      "command": "cargo-psibase package",
+      "group": {
+        "kind": "build",
         "isDefault": false
       },
       "options": {
         "statusbar": {
-          "label": "$(beaker) Test AuthSig"
+          "label": "$(tools) Build package"
         }
       }
     }
