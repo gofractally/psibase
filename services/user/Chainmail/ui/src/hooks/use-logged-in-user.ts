@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@lib/supervisor";
 
-export const useLoggedInUser = (enabled: boolean) =>
+export const useLoggedInUser = (enabled = true) =>
     useQuery({
         queryKey: ["loggedInUser"],
         enabled,

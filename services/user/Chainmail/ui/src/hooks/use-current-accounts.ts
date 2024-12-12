@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@lib/supervisor";
 
-export const useCurrentAccounts = (enabled: boolean) =>
+export const useCurrentAccounts = (enabled = true) =>
     useQuery({
         queryKey: ["currentAccounts"],
         enabled,
