@@ -1,5 +1,5 @@
 [template]
-sub_templates = ["rust"]
+sub_templates = ["basic-01"]
 
 [placeholders]
 description = { prompt = "Enter a description of the package", default = "An example application", type = "string" }
