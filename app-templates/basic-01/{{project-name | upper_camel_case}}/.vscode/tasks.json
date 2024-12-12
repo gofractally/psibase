@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // Keeping the below example to show how to run service unit tests:
+    {
+      "label": "Test AuthSig",
+      "type": "shell",
+      "command": "cd ~/psibase/build && psitest AuthSig-test.wasm -s -r compact",
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "options": {
+        "statusbar": {
+          "label": "$(beaker) Test AuthSig"
+        }
+      }
+    }
+  ]
+}
