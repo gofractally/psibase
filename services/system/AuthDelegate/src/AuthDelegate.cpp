@@ -41,7 +41,9 @@ namespace SystemService
    bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> authorizers)
    {
-      auto owner = db.open<AuthDelegateTable>().getIndex<0>().get(sender)->owner;
+      auto record = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
+      check(record.has_value(), "sender does not have an owning account");
+      auto owner = record->owner;
 
       if (std::ranges::contains(authorizers, owner))
          return true;
@@ -55,7 +57,9 @@ namespace SystemService
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
                                   std::vector<psibase::AccountNumber> rejecters)
    {
-      auto owner = db.open<AuthDelegateTable>().getIndex<0>().get(sender)->owner;
+      auto record = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
+      check(record.has_value(), "sender does not have an owning account");
+      auto owner = record->owner;
 
       if (std::ranges::contains(rejecters, owner))
          return true;
