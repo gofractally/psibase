@@ -140,31 +140,35 @@ namespace SystemService
       // TODO: Return error message instead?
       void canAuthUserSys(psibase::AccountNumber user);
 
-      /// Handle notification related to the acceptance of a staged transaction
+      /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+      /// transaction from a specified sender.
       ///
-      /// An auth service is notified when the sender of the staged transaction
-      /// is an account that uses the auth service.
+      /// * `sender`: The sender account for the transaction potentially being authorized.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
       ///
-      /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
-      ///                   staged-tx record.
-      /// * `actor`: The account that accepts the specified staged transaction
-      void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      /// Returns:
+      /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
+      /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
 
-      /// Handle notification related to the rejection of a staged transaction
+      /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+      /// transaction from a specified sender.
       ///
-      /// An auth service is notified when the sender of the staged transaction
-      /// is an account that uses the auth service.
+      /// * `sender`: The sender account for the transaction potentially being rejected.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
       ///
-      /// * `staged_tx_id`: The ID of the staged transaction, used to identify the
-      ///                   staged-tx record.
-      /// * `actor`: The account that rejects the specified staged transaction
-      void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      /// Returns:
+      /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
+      /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(stagedAccept, txid, actor),
-                method(stagedReject, txid, actor)
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters)
                 //
    )
 

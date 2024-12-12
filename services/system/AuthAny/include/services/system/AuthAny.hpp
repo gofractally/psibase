@@ -17,15 +17,17 @@ namespace SystemService
 
       void canAuthUserSys(psibase::AccountNumber user);
 
-      void stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
 
-      void stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor);
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(AuthAny,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(stagedAccept, staged_tx_id, actor),
-                method(stagedReject, staged_tx_id, actor)
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters)
                 //
    )
 }  // namespace SystemService
