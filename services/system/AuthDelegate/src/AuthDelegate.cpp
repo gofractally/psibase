@@ -15,21 +15,14 @@ namespace SystemService
                                    std::vector<ServiceMethod> allowedActions,
                                    std::vector<Claim>         claims)
    {
-      auto row = db.open<AuthDelegateTable>().getIndex<0>().get(sender);
-      check(row.has_value(), "sender does not have an owning account");
+      auto owner = getOwner(sender);
 
-      if (requester == row->owner)
+      if (requester == owner)
          flags = (flags & ~AuthInterface::requestMask) | AuthInterface::runAsRequesterReq;
 
-      auto account = to<Accounts>().getAccount(row->owner);
-      if (!account)
-         abortMessage("unknown owner \"" + sender.str() + "\"");
-
       auto _ = recurse();
-
-      Actor<AuthInterface> auth(AuthDelegate::service, account->authService);
-      auth.checkAuthSys(flags, requester, row->owner, std::move(action), std::move(allowedActions),
-                        std::move(claims));
+      authServiceOf(owner).checkAuthSys(flags, requester, owner, std::move(action),
+                                        std::move(allowedActions), std::move(claims));
    }
 
    void AuthDelegate::canAuthUserSys(psibase::AccountNumber user)
@@ -46,10 +39,8 @@ namespace SystemService
       if (std::ranges::contains(authorizers, owner))
          return true;
 
-      auto ownerAuth = to<Accounts>().getAccount(owner)->authService;
-
       auto _ = recurse();
-      return Actor<AuthInterface>{service, ownerAuth}.isAuthSys(owner, std::move(authorizers));
+      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers));
    }
 
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
@@ -60,10 +51,8 @@ namespace SystemService
       if (std::ranges::contains(rejecters, owner))
          return true;
 
-      auto ownerAuth = to<Accounts>().getAccount(owner)->authService;
-
       auto _ = recurse();
-      return Actor<AuthInterface>{service, ownerAuth}.isRejectSys(owner, std::move(rejecters));
+      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters));
    }
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
@@ -77,6 +66,17 @@ namespace SystemService
       auto row = db.open<AuthDelegateTable>().getIndex<0>().get(account);
       check(row.has_value(), "account does not have an owning account");
       return row->owner;
+   }
+
+   Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)
+   {
+      auto accountRow = to<Accounts>().getAccount(account);
+      if (!accountRow)
+      {
+         abortMessage("unknown account \"" + account.str() + "\"");
+      }
+
+      return Actor<AuthInterface>{service, accountRow->authService};
    }
 
 }  // namespace SystemService
