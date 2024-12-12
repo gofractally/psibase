@@ -42,7 +42,7 @@ namespace SystemService
       if (enable_print)
          std::printf("isRejectSys\n");
 
-      return true;
+      return false;
    }
 }  // namespace SystemService
 

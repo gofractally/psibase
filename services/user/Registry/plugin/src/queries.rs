@@ -5,6 +5,7 @@ use registry::service::TagRecord;
 
 use crate::bindings::host::common::{server as Server, types as CommonTypes};
 use crate::bindings::registry::plugin::types::AccountId;
+
 use crate::errors::ErrorType::*;
 
 #[derive(Deserialize, Debug)]
@@ -20,8 +21,7 @@ fn query_graphql<T, F>(query: &str, response_parser: F) -> Result<T, CommonTypes
 where
     F: FnOnce(String) -> Result<T, CommonTypes::Error>,
 {
-    let json_str =
-        Server::post_graphql_get_json(query).map_err(|e| QueryError.err(&e.to_string()))?;
+    let json_str = Server::post_graphql_get_json(query).map_err(|e| QueryError(e.to_string()))?;
     response_parser(json_str)
 }
 
@@ -50,19 +50,19 @@ struct AppMetadataResponse {
 
 impl TryParseGqlResponse for AppMetadataResponseData {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        let response_root: ResponseRoot<AppMetadataResponse> = serde_json::from_str(&response)
-            .map_err(|e| QueryDeserializeError.err(&e.to_string()))?;
+        let response_root: ResponseRoot<AppMetadataResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryDeserializeError(e.to_string()))?;
         match response_root.data.app_metadata {
             Some(app_metadata) => Ok(app_metadata),
-            None => Err(NotFound.err("App metadata not found")),
+            None => Err(NotFound("App metadata not found".to_string()).into()),
         }
     }
 }
 
 impl TryParseGqlResponse for TagsResponseData {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
-        let response_root: ResponseRoot<TagsResponse> = serde_json::from_str(&response)
-            .map_err(|e| QueryDeserializeError.err(&e.to_string()))?;
+        let response_root: ResponseRoot<TagsResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryDeserializeError(e.to_string()))?;
         Ok(response_root.data.all_related_tags)
     }
 }
