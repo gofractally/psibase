@@ -2228,9 +2228,50 @@ void run(const std::string&              db_path,
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
 
-   bool showedBootMsg = false;
-
    node.autoconnect(translate_endpoints(peers), autoconnect.value, connect_one);
+
+   if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
+   {
+      std::string xAdminSubdomain;
+      for (const auto& service : services)
+      {
+         if (service.root.string().find("services/x-admin") != std::string::npos &&
+             service.host.ends_with('.'))
+         {
+            xAdminSubdomain = service.host + host;
+            break;
+         }
+      }
+
+      if (!xAdminSubdomain.empty())
+      {
+         std::string protocol;
+         std::string port;
+         for (const auto& listen : http_config->listen)
+         {
+            if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
+            {
+               protocol = "https://";
+               port     = std::to_string(spec->endpoint.port());
+               break;
+            }
+            else if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
+            {
+               protocol = "http://";
+               port     = std::to_string(spec->endpoint.port());
+            }
+         }
+         xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
+      }
+
+      std::string message = "Node is not connected to any psibase network.";
+      if (!xAdminSubdomain.empty())
+      {
+         message += " Visit '" + xAdminSubdomain + "' for node setup.";
+      }
+
+      PSIBASE_LOG(node.chain().getLogger(), notice) << message;
+   }
 
    // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
    auto process_transactions = [&](const std::error_code& ec)
@@ -2288,57 +2329,6 @@ void run(const std::string&              db_path,
                   ++transactionStats.failed;
                }
             }
-         }
-
-         // TODO: this should go in the leader's production loop
-         if (bc->needGenesisAction)
-         {
-            if (!showedBootMsg)
-            {
-               std::string xAdminSubdomain;
-               for (const auto& service : services)
-               {
-                  if (service.root.string().find("services/x-admin") != std::string::npos &&
-                      service.host.ends_with('.'))
-                  {
-                     xAdminSubdomain = service.host + host;
-                     break;
-                  }
-               }
-
-               if (!xAdminSubdomain.empty())
-               {
-                  std::string protocol;
-                  std::string port;
-                  for (const auto& listen : http_config->listen)
-                  {
-                     if (const auto* spec =
-                             std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
-                     {
-                        protocol = "https://";
-                        port     = std::to_string(spec->endpoint.port());
-                        break;
-                     }
-                     else if (const auto* spec =
-                                  std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
-                     {
-                        protocol = "http://";
-                        port     = std::to_string(spec->endpoint.port());
-                     }
-                  }
-                  xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
-               }
-
-               std::string message = "Node is not connected to any psibase network.";
-               if (!xAdminSubdomain.empty())
-               {
-                  message += " Visit '" + xAdminSubdomain + "' for node setup.";
-               }
-
-               PSIBASE_LOG(node.chain().getLogger(), notice) << message;
-               showedBootMsg = true;
-            }
-            //continue;
          }
       }
       else

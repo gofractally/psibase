@@ -1,6 +1,7 @@
 #include <services/system/AuthSig.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
@@ -83,32 +84,16 @@ namespace SystemService
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
       }
 
-      void AuthSig::stagedAccept(uint32_t staged_tx_id, psibase::AccountNumber actor)
+      bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
+                              std::vector<psibase::AccountNumber> authorizers)
       {
-         check(getSender() == StagedTxService::service, "can only be called by staged-tx");
-
-         auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
-         auto actions   = staged_tx.action_list.actions;
-
-         check(actions.size() > 0, "staged tx has no actions");
-         if (actor == actions[0].sender)
-         {
-            auto [execute, allowedActions] = to<StagedTxService>().get_exec_info(staged_tx_id);
-            recurse().to<Transact>().runAs(std::move(execute), allowedActions);
-         }
+         return std::ranges::contains(authorizers, sender);
       }
 
-      void AuthSig::stagedReject(uint32_t staged_tx_id, psibase::AccountNumber actor)
+      bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
+                                std::vector<psibase::AccountNumber> rejecters)
       {
-         check(getSender() == StagedTxService::service, "can only be called by staged-tx");
-
-         auto staged_tx = to<StagedTxService>().get_staged_tx(staged_tx_id);
-         auto actions   = staged_tx.action_list.actions;
-         check(actions.size() > 0, "staged tx has no actions");
-         if (actor == actions[0].sender)
-         {
-            to<StagedTxService>().remove(staged_tx.id, staged_tx.txid);
-         }
+         return std::ranges::contains(rejecters, sender);
       }
    }  // namespace AuthSig
 }  // namespace SystemService
