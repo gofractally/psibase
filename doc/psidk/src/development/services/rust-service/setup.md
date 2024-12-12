@@ -11,7 +11,7 @@ To get started with Rust service development, install the following:
 
 ```
 rustup update
-rustup target add wasm32-wasi
+rustup target add wasm32-wasip1
 cargo install cargo-psibase
 ```
 

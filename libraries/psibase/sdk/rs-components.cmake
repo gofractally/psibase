@@ -54,7 +54,7 @@ function(add_rs_component_workspace TARGET_TUPLE)
     endforeach()
 
     set(TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/plugin_workspaces/${TARGET_NAME})
-    set(TARGET_ARCH wasm32-wasi)
+    set(TARGET_ARCH wasm32-wasip1)
 
     set(COPY_COMMANDS "")
     foreach(FILENAME ${OUTPUT_FILES})
