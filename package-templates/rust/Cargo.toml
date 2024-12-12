@@ -9,8 +9,8 @@ edition = "2021"
 publish = false
 
 [package]
-# Crate name
-name = "{{project-name}}-pkg"
+name = "{{project-name}}-pkg"   # Crate name
+description = "{{description}}"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true

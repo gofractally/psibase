@@ -1,0 +1,5 @@
+[template]
+sub_templates = ["rust"]
+
+[placeholders]
+description = { prompt = "Enter a description of the package.", default = "An example application", type = "string" }
