@@ -40,7 +40,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    __builtin_unreachable();
 }
 
-void RTransact::onTrx(const Checksum256& id, psibase::TransactionTrace&& trace)
+void RTransact::onTrx(const Checksum256& id, TransactionTrace&& trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
 
@@ -122,16 +122,19 @@ void RTransact::onBlock()
    }
 
    std::vector<BlockTraceKey_t> keys;
-   // Send replies to all transactions in the block that are now irreversible
+   // Send replies to all successful transactions in the block that are now irreversible
    auto blockTraceTable = Subjective{}.open<BlockTraceTable>();
    for (auto i : irreversible)
    {
       PSIBASE_SUBJECTIVE_TX
       {
          auto blockTracesIdx = blockTraceTable.getIndex<0>();
-         for (auto trace : blockTracesIdx.subindex(i))
+         for (const BlockTraceRecord& trace : blockTracesIdx.subindex(i))
          {
-            keys.push_back(trace.primaryKey());
+            if (!trace.trace.error.has_value())
+            {
+               keys.push_back(trace.primaryKey());
+            }
          }
       }
    }
