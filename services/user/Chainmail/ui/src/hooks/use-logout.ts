@@ -1,6 +1,6 @@
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
-import { getSupervisor } from "@lib/supervisor";
+import { supervisor } from "src/main";
 
 export const useLogout = () => {
     const queryClient = useQueryClient();
@@ -8,7 +8,6 @@ export const useLogout = () => {
     return useMutation({
         mutationKey: ["logout"],
         mutationFn: async () => {
-            const supervisor = await getSupervisor();
             return supervisor.functionCall({
                 method: "logout",
                 params: [],

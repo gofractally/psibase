@@ -10,8 +10,6 @@ import { toast } from "sonner";
 
 import { type PluginId } from "@psibase/common-lib";
 
-import { getSupervisor } from "@lib/supervisor";
-
 import { Button } from "@shadcn/button";
 import {
     Dialog,
@@ -37,6 +35,8 @@ import {
     FormMessage,
 } from "@shadcn/form";
 import { Input } from "@shadcn/input";
+
+import { supervisor } from "src/main";
 
 interface SupervisorError {
     code: number;
@@ -122,7 +122,6 @@ export const ComposeDialog = ({
         }
 
         try {
-            const supervisor = await getSupervisor();
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
                 service: "chainmail",

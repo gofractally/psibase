@@ -4,13 +4,13 @@ import { toast } from "sonner";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { getSupervisor } from "@lib/supervisor";
 import { modifyUrlParams } from "@lib/utils";
+
+import { supervisor } from "src/main";
 
 export const useCreateConnectionToken = () =>
     useMutation<string, Error>({
         mutationFn: async () => {
-            const supervisor = await getSupervisor();
             const token = await supervisor.functionCall({
                 method: "createConnectionToken",
                 params: [],

@@ -3,7 +3,8 @@ import { atom, useAtom } from "jotai";
 import { useLoggedInUser } from "./use-logged-in-user";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalStorage } from "./use-local-storage";
-import { getSupervisor } from "@lib/supervisor";
+
+import { supervisor } from "src/main";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -50,8 +51,6 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
 };
 
 const getIncomingMessages = async (account?: string | null) => {
-    const supervisor = await getSupervisor();
-    // const res = await fetch(`/messages?receiver=${account}`);
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
@@ -83,7 +82,6 @@ export function useIncomingMessages() {
 }
 
 const getArchivedMessages = async (account?: string | null) => {
-    const supervisor = await getSupervisor();
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
@@ -115,7 +113,6 @@ export function useArchivedMessages() {
 }
 
 const getSavedMessages = async (account?: string | null) => {
-    const supervisor = await getSupervisor();
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
@@ -148,7 +145,6 @@ export function useSavedMessages() {
 }
 
 const getSentMessages = async (account?: string | null) => {
-    const supervisor = await getSupervisor();
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",

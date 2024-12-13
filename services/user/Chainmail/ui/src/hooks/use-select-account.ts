@@ -2,7 +2,7 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { getSupervisor } from "@lib/supervisor";
+import { supervisor } from "src/main";
 
 export const useSelectAccount = () => {
     const queryClient = useQueryClient();
@@ -10,7 +10,6 @@ export const useSelectAccount = () => {
     return useMutation<void, Error, string>({
         mutationKey: ["selectAccount"],
         mutationFn: async (accountName: string) => {
-            const supervisor = await getSupervisor();
             void (await supervisor.functionCall({
                 method: "login",
                 params: [z.string().parse(accountName)],

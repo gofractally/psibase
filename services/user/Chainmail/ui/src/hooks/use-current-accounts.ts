@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@lib/supervisor";
+import { supervisor } from "src/main";
 
 export const useCurrentAccounts = (enabled = true) =>
     useQuery({
@@ -9,7 +9,6 @@ export const useCurrentAccounts = (enabled = true) =>
         enabled,
         initialData: [],
         queryFn: async () => {
-            const supervisor = await getSupervisor();
             const connectedAccounts = await supervisor.functionCall({
                 method: "getConnectedAccounts",
                 params: [],

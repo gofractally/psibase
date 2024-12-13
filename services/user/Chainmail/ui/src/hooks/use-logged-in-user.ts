@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@lib/supervisor";
+import { supervisor } from "src/main";
 
 export const useLoggedInUser = (enabled = true) =>
     useQuery({
@@ -9,7 +9,6 @@ export const useLoggedInUser = (enabled = true) =>
         enabled,
         initialData: null,
         queryFn: async () => {
-            const supervisor = await getSupervisor();
             const res = await supervisor.functionCall({
                 method: "getLoggedInUser",
                 params: [],
