@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { AlarmClockMinus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import debounce from "debounce";
-import { Button } from "./ui/button";
+import { Button } from "./components/ui/button";
 
 import {
   Card,
@@ -44,7 +44,7 @@ import { TriangleAlert } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supervisor } from "@/main";
 import { useDecodeInviteToken } from "@/hooks/useDecodeInviteToken";
 import { useDecodeConnectionToken } from "@/hooks/useDecodeConnectionToken";
@@ -52,6 +52,7 @@ import { useDecodeToken } from "@/hooks/useDecodeToken";
 import { useGetAllAccounts } from "@/hooks/useGetAllAccounts";
 import { useLoginDirect } from "@/hooks/useLoginDirect";
 import { useAcceptInvite } from "@/hooks/useAcceptInvite";
+import { useAccountStatus } from "@/hooks/useAccountStatus";
 
 dayjs.extend(relativeTime);
 
@@ -101,38 +102,24 @@ const formSchema = z.object({
   username: z.string().min(1).max(50),
 });
 
-const AccountNameStatus = z.enum(["Available", "Taken", "Invalid", "Loading"]);
-const GetAccountReturn = z
-  .object({
-    accountNum: z.string(),
-    authService: z.string(),
-    resourceBalance: z.boolean().or(z.bigint()),
-  })
-  .optional();
-
-const isAccountAvailable = async (
-  accountName: string
-): Promise<z.infer<typeof AccountNameStatus>> => {
-  try {
-    const res = GetAccountReturn.parse(
-      await supervisor.functionCall({
-        method: "getAccount",
-        params: [accountName],
-        service: "accounts",
-        intf: "api",
-      })
-    );
-
-    return AccountNameStatus.parse(res ? "Taken" : "Available");
-  } catch (e) {
-    console.error(e);
-    return AccountNameStatus.parse("Invalid");
-  }
-};
-
 export const AccountSelection = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
+
+  const key = searchParams.get("key");
+  console.log({ key });
+
+  const navigate = useNavigate();
+  // HACK
+
+  // auto nav if the key param is present,
+  if (key) {
+    navigate(`/key?key=${key}`);
+  }
+
+  // END HACK
+
+  console.log(key, "is the damn key");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -196,14 +183,8 @@ export const AccountSelection = () => {
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
-  const { data: status, isLoading: debounceIsLoading } = useQuery<
-    z.infer<typeof AccountNameStatus>
-  >({
-    queryKey: ["userAccount", debouncedAccount],
-    queryFn: async () => isAccountAvailable(debouncedAccount!),
-    enabled: !!debouncedAccount,
-    initialData: "Loading",
-  });
+  const { data: status, isLoading: debounceIsLoading } =
+    useAccountStatus(debouncedAccount);
 
   const isProcessing = debounceIsLoading || username !== debouncedAccount;
 
@@ -550,7 +531,7 @@ export const AccountSelection = () => {
                   ? "Loading..."
                   : isInvite
                   ? `Select an account to accept invite to `
-                  : `Select an account to login to `}
+                  : `Select an account to login to  `}
               </div>
             </div>
             {isNoAccounts ? (

@@ -171,7 +171,8 @@ export class Supervisor {
         return iframe;
     }
 
-    functionCall(args: FunctionCallArgs) {
+    async functionCall(args: FunctionCallArgs) {
+        await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
         const fqArgs: QualifiedFunctionCallArgs = {
