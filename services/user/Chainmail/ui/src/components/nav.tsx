@@ -17,6 +17,7 @@ interface NavProps {
         icon: LucideIcon;
         variant: "default" | "ghost";
         href: string;
+        disabled?: boolean;
     }[];
 }
 
@@ -42,6 +43,8 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                         "h-9 w-9",
                                         link.variant === "default" &&
                                             "dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white",
+                                        link.disabled &&
+                                            "pointer-events-none opacity-50",
                                     )}
                                 >
                                     <link.icon className="h-4 w-4" />
@@ -77,6 +80,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                                     "dark:bg-muted dark:text-white dark:hover:bg-muted dark:hover:text-white",
                                 "justify-start",
                             )}
+                            disabled={link.disabled}
                         >
                             <link.icon className="mr-2 h-4 w-4" />
                             {link.title}
