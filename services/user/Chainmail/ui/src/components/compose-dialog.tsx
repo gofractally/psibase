@@ -27,7 +27,7 @@ import { Separator } from "@shadcn/separator";
 
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
-import { type Message, useDraftMessages, useUser } from "@hooks";
+import { type Message, useDraftMessages, useLoggedInUser } from "@hooks";
 
 import {
     Form,
@@ -58,7 +58,7 @@ export const ComposeDialog = ({
 }) => {
     const [open, setOpen] = useState(false);
     const isSent = useRef(false);
-    const { user } = useUser();
+    const { data: user } = useLoggedInUser();
     const { drafts, setDrafts, getDrafts, deleteDraftById } =
         useDraftMessages();
 

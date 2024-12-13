@@ -1,14 +1,12 @@
 import {
     useCreateConnectionToken,
     useCurrentAccounts,
-    useIncomingMessages,
     useLoggedInUser,
     useLogout,
     useSelectAccount,
-    useUser,
 } from "@hooks";
 import { cn } from "@lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@shadcn/avatar";
+import { Avatar, AvatarFallback } from "@shadcn/avatar";
 import { Button } from "@shadcn/button";
 import {
     DropdownMenu,
@@ -36,18 +34,7 @@ interface AccountSwitcherProps {
     isCollapsed: boolean;
 }
 
-const user = {
-    avatar: undefined,
-    name: "alice",
-};
-
 export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
-    // const { setSelectedMessageId } = useIncomingMessages();
-    // const { availableAccounts, user: userz, setUser } = useUser();
-
-    // console.log("******* availableAccounts:", availableAccounts);
-    // console.log("******* user:", userz);
-
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const { data: loggedInUser } = useLoggedInUser();
@@ -61,6 +48,10 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
     const { mutateAsync: onLogout } = useLogout();
     const { mutateAsync: selectAccount } = useSelectAccount();
 
+    const otherConnectedAccounts = currentAccounts.filter(
+        (account) => account !== loggedInUser,
+    );
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -70,20 +61,15 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
                     className={cn("w-full", !isCollapsed && "pl-1 pr-2")}
                 >
                     <Avatar className="h-8 w-8 rounded-lg">
-                        <AvatarImage src={user.avatar} alt={user.name} />
                         <AvatarFallback className="rounded-lg">
-                            {loggedInUser ? (
-                                user.name[0]
-                            ) : (
-                                <LogIn className="h-4 w-4" />
-                            )}
+                            {loggedInUser?.[0] ?? <LogIn className="h-4 w-4" />}
                         </AvatarFallback>
                     </Avatar>
                     {isCollapsed ? null : (
                         <>
                             <div className="ml-2 grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-semibold">
-                                    {loggedInUser ? user.name : "Get started"}
+                                    {loggedInUser ?? "Get started"}
                                 </span>
                             </div>
                             <ChevronsUpDown className="ml-auto size-4" />
@@ -103,17 +89,13 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage
-                                        src={user.avatar}
-                                        alt={user.name}
-                                    />
                                     <AvatarFallback className="rounded-lg">
-                                        {user.name[0]}
+                                        {loggedInUser[0]}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
-                                        {user.name}
+                                        {loggedInUser}
                                     </span>
                                 </div>
                             </div>
@@ -129,41 +111,47 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
                     >
                         <LogIn className="mr-2 h-4 w-4" />
                         <span>
-                            {isLoadingAccounts ? "Loading..." : "Login"}
+                            {isLoadingAccounts ? "Loading..." : "Log in"}
                         </span>
                     </DropdownMenuItem>
                 )}
-                <DropdownMenuGroup>
-                    {!isNoOptions ? (
+                {!isNoOptions && !otherConnectedAccounts.length ? (
+                    <DropdownMenuItem
+                        onClick={() => {
+                            onLogin();
+                        }}
+                    >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        <span>Switch account</span>
+                    </DropdownMenuItem>
+                ) : null}
+                {!isNoOptions && otherConnectedAccounts.length ? (
+                    <DropdownMenuGroup>
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
                                 <UserPlus className="mr-2 h-4 w-4" />
                                 <span>
-                                    {loggedInUser || "Select an account"}
+                                    {loggedInUser
+                                        ? "Switch account"
+                                        : "Select an account"}
                                 </span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
                                 <DropdownMenuSubContent>
-                                    <DropdownMenuLabel>
-                                        Switch accounts
-                                    </DropdownMenuLabel>
-                                    {currentAccounts
-                                        .filter(
-                                            (account) =>
-                                                account !== loggedInUser,
-                                        )
-                                        .map((account) => (
-                                            <DropdownMenuItem
-                                                key={account}
-                                                onClick={() => {
-                                                    selectAccount(account);
-                                                }}
-                                            >
-                                                <User className="mr-2 h-4 w-4" />
-                                                <span>{account}</span>
-                                            </DropdownMenuItem>
-                                        ))}
-                                    <DropdownMenuSeparator />
+                                    {otherConnectedAccounts.map((account) => (
+                                        <DropdownMenuItem
+                                            key={account}
+                                            onClick={() => {
+                                                selectAccount(account);
+                                            }}
+                                        >
+                                            <User className="mr-2 h-4 w-4" />
+                                            <span>{account}</span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                    {otherConnectedAccounts.length ? (
+                                        <DropdownMenuSeparator />
+                                    ) : null}
                                     <DropdownMenuItem
                                         onClick={() => {
                                             onLogin();
@@ -175,8 +163,8 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>
-                    ) : null}
-                </DropdownMenuGroup>
+                    </DropdownMenuGroup>
+                ) : null}
                 <DropdownMenuItem
                     disabled={!isLoggedIn}
                     onClick={() => {
@@ -189,38 +177,4 @@ export function AccountSwitcher({ isCollapsed }: AccountSwitcherProps) {
             </DropdownMenuContent>
         </DropdownMenu>
     );
-
-    // return (
-    //     <Select
-    //         defaultValue={user}
-    //         onValueChange={(value) => {
-    //             setSelectedMessageId("");
-    //             setUser(value);
-    //         }}
-    //     >
-    //         <SelectTrigger
-    //             className={cn(
-    //                 "flex items-center gap-2 [&>span]:line-clamp-1 [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-1 [&>span]:truncate [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
-    //                 isCollapsed &&
-    //                     "flex h-9 w-9 shrink-0 items-center justify-center p-0 [&>span]:w-auto [&>svg]:hidden",
-    //             )}
-    //             aria-label="Select account"
-    //         >
-    //             <SelectValue placeholder="Select an account">
-    //                 <span className={cn("ml-2", isCollapsed && "hidden")}>
-    //                     {user}
-    //                 </span>
-    //             </SelectValue>
-    //         </SelectTrigger>
-    //         <SelectContent>
-    //             {availableAccounts.map((account) => (
-    //                 <SelectItem key={account} value={account}>
-    //                     <div className="flex items-center gap-3 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-foreground">
-    //                         {account}
-    //                     </div>
-    //                 </SelectItem>
-    //             ))}
-    //         </SelectContent>
-    //     </Select>
-    // );
 }

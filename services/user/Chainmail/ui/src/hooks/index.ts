@@ -5,4 +5,3 @@ export * from "./use-logged-in-user";
 export * from "./use-logout";
 export * from "./use-mail";
 export * from "./use-select-account";
-export * from "./use-user";
