@@ -43,10 +43,45 @@ namespace SystemService
                         std::vector<ServiceMethod>  allowedActions,
                         std::vector<psibase::Claim> claims);
       void canAuthUserSys(psibase::AccountNumber user);
+
+      /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being authorized.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the total authorizations from `authorizers` or their auth services meets sender's threshold
+      /// * `false`: If not returning true, or on recursive checks for the same sender
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
+
+      /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being rejected.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the total authorizations from `rejecters` or their auth services meets sender's threshold
+      /// * `false`: If not returning true, or on recursive checks for the same sender
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
+
+     private:
+      using IndirectCheckFunc =
+          bool (psibase::Actor<AuthInterface>::*)(psibase::AccountNumber,
+                                                  const std::vector<psibase::AccountNumber>&);
+      bool checkOverlapping(std::vector<psibase::AccountNumber>&& producers,
+                            std::vector<psibase::AccountNumber>&& authorizers,
+                            std::size_t                           threshold,
+                            IndirectCheckFunc                     indirectCheck);
    };
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
                 method(setProducers, producers),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-                method(canAuthUserSys, user))
+                method(canAuthUserSys, user),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters))
 }  // namespace SystemService
