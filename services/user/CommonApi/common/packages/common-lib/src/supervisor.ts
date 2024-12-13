@@ -60,7 +60,7 @@ export class Supervisor {
         );
     }
 
-    private onLoadPromise?: (value?: unknown) => void;
+    private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
 
     constructor(public options?: Options) {
         this.supervisorSrc =
@@ -69,13 +69,13 @@ export class Supervisor {
         setupSupervisorIFrame(this.supervisorSrc);
     }
 
-    listenToRawMessages() {
+    private listenToRawMessages() {
         window.addEventListener("message", (event) =>
             this.handleRawEvent(event),
         );
     }
 
-    handleRawEvent(messageEvent: MessageEvent) {
+    private handleRawEvent(messageEvent: MessageEvent) {
         if (
             messageEvent.origin !== myOrigin &&
             messageEvent.origin !== this.supervisorSrc
@@ -106,14 +106,12 @@ export class Supervisor {
         }
     }
 
-    onSupervisorInitialized() {
+    private onSupervisorInitialized() {
         this.isSupervisorInitialized = true;
-        if (this.onLoadPromise) {
-            this.onLoadPromise();
-        }
+        this.onLoadPromiseResolvers.forEach((resolver) => resolver());
     }
 
-    onFunctionCallResponse(response: FunctionCallResponse) {
+    private onFunctionCallResponse(response: FunctionCallResponse) {
         const pendingRequest = this.pendingRequests.find(
             (req) => req.id === response.id,
         );
@@ -171,7 +169,8 @@ export class Supervisor {
         return iframe;
     }
 
-    functionCall(args: FunctionCallArgs) {
+    public async functionCall(args: FunctionCallArgs) {
+        await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
         const fqArgs: QualifiedFunctionCallArgs = {
@@ -201,14 +200,15 @@ export class Supervisor {
         });
     }
 
-    async onLoaded() {
+    public async onLoaded() {
         if (this.isSupervisorInitialized) return;
         return new Promise((resolve) => {
-            this.onLoadPromise = resolve;
+            this.onLoadPromiseResolvers.push(resolve);
         });
     }
 
-    preLoadPlugins(plugins: PluginId[]) {
+    public async preLoadPlugins(plugins: PluginId[]) {
+        await this.onLoaded();
         // Fully qualify any plugins with default values
         const fqPlugins: QualifiedPluginId[] = plugins.map((plugin) => ({
             ...plugin,
