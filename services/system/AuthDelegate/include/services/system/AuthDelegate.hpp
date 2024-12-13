@@ -61,7 +61,7 @@ namespace SystemService
       /// Returns:
       /// * `true`: If the sender's owner is among the authorizers, or if the sender's owner's auth
       /// service would authorize the transaction
-      /// * `false`: If not returning true
+      /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isAuthSys(psibase::AccountNumber              sender,
                      std::vector<psibase::AccountNumber> authorizers);
 
@@ -74,7 +74,7 @@ namespace SystemService
       /// Returns:
       /// * `true`: If the sender's owner is among the rejecters, or if the sender's owner's auth
       /// service would reject the transaction
-      /// * `false`: If not returning true
+      /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isRejectSys(psibase::AccountNumber              sender,
                        std::vector<psibase::AccountNumber> rejecters);
 

@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthStack.hpp>
 #include <services/system/StagedTx.hpp>
 
 using namespace psibase;
@@ -34,6 +35,11 @@ namespace SystemService
    bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
                                 std::vector<psibase::AccountNumber> authorizers)
    {
+      // Base case to prevent infinite recursion
+      if (AuthStack::instance().inStack(sender))
+         return false;
+      AuthStackGuard guard(sender);
+
       auto owner = getOwner(sender);
 
       if (std::ranges::contains(authorizers, owner))
@@ -46,6 +52,11 @@ namespace SystemService
    bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
                                   std::vector<psibase::AccountNumber> rejecters)
    {
+      // Base case to prevent infinite recursion
+      if (AuthStack::instance().inStack(sender))
+         return false;
+      AuthStackGuard guard(sender);
+
       auto owner = getOwner(sender);
 
       if (std::ranges::contains(rejecters, owner))
@@ -70,13 +81,7 @@ namespace SystemService
 
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)
    {
-      auto accountRow = to<Accounts>().getAccount(account);
-      if (!accountRow)
-      {
-         abortMessage("unknown account \"" + account.str() + "\"");
-      }
-
-      return Actor<AuthInterface>{service, accountRow->authService};
+      return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
    }
 
 }  // namespace SystemService
