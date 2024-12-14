@@ -1,8 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "src/main";
 
 export const useLogout = () => {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -16,6 +18,7 @@ export const useLogout = () => {
             });
         },
         onSuccess: () => {
+            navigate("/");
             queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
             setTimeout(() => {
                 queryClient.refetchQueries({ queryKey: ["loggedInUser"] });

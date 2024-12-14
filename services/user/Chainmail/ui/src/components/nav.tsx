@@ -1,13 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
 
-import { cn } from "../lib/utils";
-import { buttonVariants } from "../shad/components/ui/button";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "../shad/components/ui/tooltip";
-import { useNavigate } from "react-router-dom";
+import { buttonVariants } from "@shadcn/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@shadcn/tooltip";
+import { cn } from "@lib/utils";
 
 interface NavProps {
     isCollapsed: boolean;
