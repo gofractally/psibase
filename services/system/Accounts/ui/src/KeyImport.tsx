@@ -2,6 +2,8 @@ import { useSearchParams } from "react-router-dom";
 import { siblingUrl } from "@psibase/common-lib";
 import { useUnmanagedKeyPair } from "./hooks/useUnmanagedKeypair";
 import { base64ToPem, pemToBase64 } from "./lib/key";
+import { modifyUrlParams } from "./lib/modifyUrlParams";
+import { usePrivateToPublicKey } from "./hooks/usePrivateToPublicKey";
 
 //
 // keyvault
@@ -9,6 +11,10 @@ import { base64ToPem, pemToBase64 } from "./lib/key";
 
 // pub-from-priv
 // priv-from-pub
+
+// create an account with a key...?
+// then export the thing...?
+// then allow import / lookup of the thing
 
 function KeyImport() {
   const [searchParams] = useSearchParams();
@@ -23,19 +29,28 @@ function KeyImport() {
 
   const encodedKey = data ? pemToBase64(data?.privateKey) : "";
 
-  const rebuiltKey = base64ToPem(encodedKey);
+  const url = modifyUrlParams(siblingUrl(null, "accounts"), {
+    key: encodedKey,
+  });
+
+  const extractedPrivateKey = key && base64ToPem(key);
+
+  const { data: publicKey } = usePrivateToPublicKey(extractedPrivateKey || "");
+
+  // with the public key, work out what accounts are available for import
+  // import them
 
   return (
     <div>
-      <div className="mt-4">1. Random private key {data?.privateKey}</div>
+      <div className="mt-4">1. Key to import {url}</div>
       <div className="mt-4">
         2. Encoded
         {data && <div>{pemToBase64(data?.privateKey)}</div>}
       </div>
-      <div className="mt-4">{rebuiltKey}</div>
-      <div>
-        {rebuiltKey == data?.privateKey ? "Matches!" : "does not match"}
+      <div className="mt-4">
+        2. Extracted from the URL {extractedPrivateKey}{" "}
       </div>
+      <div className="mt-4">3. {publicKey}</div>
     </div>
   );
 }

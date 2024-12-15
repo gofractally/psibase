@@ -25,7 +25,7 @@ export const base64ToPem = (
   const pemKey =
     `-----BEGIN ${keyType}-----\n` +
     keyContent.match(/.{1,64}/g)?.join("\n") +
-    `\n-----END ${keyType}-----`;
+    `\n-----END ${keyType}-----\n`;
 
   return pemKey;
 };
