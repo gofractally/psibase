@@ -1,19 +1,21 @@
 import { siblingUrl } from "./rpc";
+import { buildFunctionCallRequest } from "./messaging/FunctionCallRequest";
 import {
-    QualifiedFunctionCallArgs,
-    toString,
-} from "./messaging/FunctionCallRequest";
-import { PluginId, QualifiedPluginId } from "./messaging/PluginId";
+    PluginId,
+    pluginString,
+    QualifiedPluginId,
+} from "./messaging/PluginId";
 import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
 import {
     isSupervisorInitialized,
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
-    FunctionCallRequest,
     isPluginError,
     isGenericError,
+    buildGetJsonRequest,
 } from "./messaging";
+import { assertTruthy } from "./utils";
 
 const SupervisorIFrameId = "iframe-supervisor" as const;
 
@@ -49,15 +51,17 @@ export class Supervisor {
 
     private pendingRequests: {
         id: string;
-        call: FunctionCallArgs;
+        details: string;
         resolve: (result: unknown) => void;
         reject: (result: unknown) => void;
     }[] = [];
 
     private removePendingRequestById(id: string) {
+        const request = this.pendingRequests.find((req) => req.id === id);
         this.pendingRequests = this.pendingRequests.filter(
             (req) => req.id !== id,
         );
+        return request;
     }
 
     private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
@@ -119,38 +123,24 @@ export class Supervisor {
             throw Error(`Received unexpected response from supervisor.`);
         }
 
-        const expected = pendingRequest.call;
-        const received = response.call;
-        const unexpected =
-            expected.method !== received.method ||
-            expected.service !== received.service;
-
         const { result } = response;
 
-        this.removePendingRequestById(response.id);
+        const resolved = this.removePendingRequestById(response.id);
+        assertTruthy(resolved, "Resolved pending request");
 
         if (isPluginError(result)) {
             const { service, plugin } = result.pluginId;
 
-            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(`Call to ${resolved.details} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
             pendingRequest.reject(result);
             return;
         }
 
         if (isGenericError(result)) {
-            console.error(`Call to ${toString(response.call)} failed`);
+            console.error(`Call to ${resolved.details} failed`);
             console.error(result.message);
             pendingRequest.reject(result);
-            return;
-        }
-
-        if (unexpected) {
-            // Could be infra error rather than plugin error, printing to console to increase probability
-            // that it gets reported.
-            const msg = `Expected reply to ${toString(expected)} but received reply to ${toString(received)}`;
-            console.warn(msg);
-            pendingRequest.reject(msg);
             return;
         }
 
@@ -169,35 +159,33 @@ export class Supervisor {
         return iframe;
     }
 
-    public async functionCall(args: FunctionCallArgs) {
+    private async sendRequest(description: string, request: any): Promise<any> {
         await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
-        const fqArgs: QualifiedFunctionCallArgs = {
-            ...args,
-            plugin: args.plugin || "plugin",
-        };
-
         return new Promise((resolve, reject) => {
-            const requestId: string =
-                window.crypto.randomUUID?.() ?? Math.random().toString(); // if insecure context and randomUUID is unavailable, use Math.random
             this.pendingRequests.push({
-                id: requestId,
-                call: args,
+                id: request.id,
+                details: description,
                 resolve,
                 reject,
             });
-            const message: FunctionCallRequest = {
-                type: "FUNCTION_CALL_REQUEST",
-                id: requestId,
-                args: fqArgs,
-            };
             if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage(message, this.supervisorSrc);
+                iframe.contentWindow.postMessage(request, this.supervisorSrc);
             } else {
                 reject("Failed to get supervisor iframe");
             }
         });
+    }
+
+    public functionCall(args: FunctionCallArgs) {
+        const request = buildFunctionCallRequest(args);
+        return this.sendRequest(args.toString(), request);
+    }
+
+    public getJson(plugin: QualifiedPluginId) {
+        const request = buildGetJsonRequest(plugin);
+        return this.sendRequest(`Get JSON: ${pluginString(plugin)}`, request);
     }
 
     public async onLoaded() {

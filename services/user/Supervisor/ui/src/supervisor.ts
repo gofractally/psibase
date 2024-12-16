@@ -2,19 +2,13 @@ import {
     QualifiedPluginId,
     QualifiedFunctionCallArgs,
     siblingUrl,
-    FunctionCallArgs,
     buildFunctionCallResponse,
     PluginError,
+    assertTruthy,
 } from "@psibase/common-lib";
 
 import { AppInterface } from "./appInterace";
-import {
-    OriginationData,
-    assert,
-    assertTruthy,
-    parser,
-    serviceFromOrigin,
-} from "./utils";
+import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 import { CallContext } from "./callContext";
 import { isRecoverableError } from "./plugin/errors";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
@@ -94,10 +88,10 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
     }
 
-    private replyToParent(id: string, call: FunctionCallArgs, result: any) {
+    private replyToParent(id: string, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
-            buildFunctionCallResponse(id, call, result),
+            buildFunctionCallResponse(id, result),
             this.parentOrigination.origin,
         );
     }
@@ -258,6 +252,22 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
+    // This is an entrypoint that returns the JSON interface for a plugin.
+    async getJson(
+        callerOrigin: string,
+        id: string,
+        plugin: QualifiedPluginId,
+    ) {
+        try {
+            this.setParentOrigination(callerOrigin);
+            await this.preload([plugin]);
+            const json = this.plugins.getPlugin(plugin).plugin.getJson();
+            this.replyToParent(id, json);
+        } catch (e) {
+            this.replyToParent(id, e);
+        }
+    }
+
     // This is an entrypoint for apps to preload plugins.
     // Intended to be used on pageload to prepare the plugins that an app requires,
     //   which accelerates the responsiveness of the plugins for subsequent calls.
@@ -320,7 +330,7 @@ export class Supervisor implements AppInterface {
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
-            this.replyToParent(id, args, result);
+            this.replyToParent(id, result);
 
             this.context = undefined;
         } catch (e) {
@@ -330,11 +340,10 @@ export class Supervisor implements AppInterface {
                 //   converted to a PluginError to be handled by the client.
                 this.replyToParent(
                     id,
-                    args,
                     new PluginError(e.payload.producer, e.payload.message),
                 );
             } else {
-                this.replyToParent(id, args, e);
+                this.replyToParent(id, e);
             }
 
             this.context = undefined;
