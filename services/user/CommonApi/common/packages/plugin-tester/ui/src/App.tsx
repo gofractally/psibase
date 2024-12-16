@@ -1,14 +1,15 @@
 import "./App.css";
 import { Supervisor } from "@psibase/common-lib";
-import { SchemaUI } from "./SchemaUI";
+import { PluginLoader } from "./PluginLoader";
+import { LoginBar } from "./LoginBar";
 
 const supervisor = new Supervisor();
 
 function App() {
   return (
     <>
-      <h1>Plugin tester</h1>
-      <SchemaUI supervisor={supervisor} />
+      <LoginBar supervisor={supervisor} />
+      <PluginLoader supervisor={supervisor} />
     </>
   );
 }
