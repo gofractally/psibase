@@ -27,16 +27,17 @@ export function ExecutionTabs({
       selectedFunction.params.map((p) => [p.name, ""])
     );
     setParamValues(JSON.stringify(initialParams, null, 2));
+  }, [selectedFunction]);
+
+  useEffect(() => {
     setResponseText("No response yet");
     setExecutionTab("Execution");
   }, [selectedFunction]);
 
   const parseParams = (): unknown[] => {
     try {
-      const parsedParams = paramValues ? JSON.parse(paramValues) : {};
-      return Array.isArray(parsedParams)
-        ? parsedParams
-        : Object.values(parsedParams);
+      const parsed = JSON.parse(paramValues);
+      return Array.isArray(parsed) ? parsed : Object.values(parsed);
     } catch {
       return [];
     }
