@@ -5,7 +5,7 @@ import { LoginBar } from "./LoginBar";
 
 const supervisor = new Supervisor();
 
-function App() {
+export default function App() {
   return (
     <>
       <LoginBar supervisor={supervisor} />
@@ -13,5 +13,3 @@ function App() {
     </>
   );
 }
-
-export default App;

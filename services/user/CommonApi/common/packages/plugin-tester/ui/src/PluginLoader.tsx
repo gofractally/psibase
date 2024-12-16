@@ -32,7 +32,10 @@ interface Schema {
   interfaces: SchemaInterface[];
 }
 
-// Simple camelCase converter
+interface ExportedMethodsByInterface {
+  [interfaceName: string]: SchemaFunction[];
+}
+
 function camelCase(str: string): string {
   return str
     .split(/[-_ ]+/)
@@ -44,9 +47,31 @@ function camelCase(str: string): string {
     .join("");
 }
 
-interface ExportedMethodsByInterface {
-  [interfaceName: string]: SchemaFunction[];
-}
+const commonButtonStyle = {
+  padding: "0.5rem 1rem",
+  backgroundColor: "#000",
+  color: "#ddd",
+  border: "none",
+  cursor: "pointer",
+  borderRadius: "5px",
+};
+
+const commonTextAreaStyle = {
+  width: "100%",
+  height: "150px",
+  backgroundColor: "#1f1f1f",
+  color: "#ddd",
+  border: "1px solid #555",
+  fontFamily: "monospace",
+};
+
+const tabStyle = (isSelected: boolean) => ({
+  cursor: "pointer",
+  padding: "0.5rem 1rem",
+  backgroundColor: isSelected ? "#444" : "transparent",
+  borderTopLeftRadius: "5px",
+  borderTopRightRadius: "5px",
+});
 
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [service, setService] = useState("invite");
@@ -64,8 +89,30 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
     "Execution"
   );
 
+  const reset = () => {
+    setSelectedFunction(null);
+    resetSelected();
+  };
+
+  const resetSelected = () => {
+    setParamValues("");
+    setResponseText("No response yet");
+    setExecutionTab("Execution");
+  };
+
   const handleRetrieve = async () => {
     setSchemaText(await supervisor.getJson({ service, plugin }));
+  };
+
+  const parseParams = (): unknown[] => {
+    try {
+      const parsedParams = paramValues ? JSON.parse(paramValues) : {};
+      return Array.isArray(parsedParams)
+        ? parsedParams
+        : Object.values(parsedParams);
+    } catch {
+      return [];
+    }
   };
 
   useEffect(() => {
@@ -73,26 +120,26 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
       try {
         const parsed = JSON.parse(schemaText) as Schema;
         setSchema(parsed);
-        setSelectedInterfaceName(null);
-        setSelectedFunction(null);
-        setResponseText("No response yet");
+        reset();
       } catch {
         alert("Invalid plugin JSON");
       }
     }
-  }, [schemaText]);
+  }, [schemaText, reset]);
 
   const getExportedInterfaceIds = (): number[] => {
     if (!schema) return [];
     const rootWorld = schema.worlds.find((w) => w.name === "root");
-    if (!rootWorld || !rootWorld.exports) return [];
-    return Object.values(rootWorld.exports).map((exp) => exp.interface.id);
+    return rootWorld?.exports
+      ? Object.values(rootWorld.exports).map((exp) => exp.interface.id)
+      : [];
   };
 
   const getExportedMethodsByInterface = (): ExportedMethodsByInterface => {
     if (!schema) return {};
     const exportedInterfaceIds = getExportedInterfaceIds();
     const result: ExportedMethodsByInterface = {};
+
     exportedInterfaceIds.forEach((id) => {
       const intf = schema.interfaces[id];
       if (intf?.functions && intf.name) {
@@ -108,7 +155,6 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const exportedMethods = getExportedMethodsByInterface();
 
   useEffect(() => {
-    // Select the first interface if not selected
     if (!selectedInterfaceName && Object.keys(exportedMethods).length > 0) {
       setSelectedInterfaceName(Object.keys(exportedMethods)[0]);
     }
@@ -116,29 +162,22 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
 
   const handleSelectFunction = (fn: SchemaFunction) => {
     setSelectedFunction(fn);
-    const initialParams: Record<string, unknown> = {};
-    fn.params.forEach((p) => {
-      initialParams[p.name] = "";
-    });
+    const initialParams = Object.fromEntries(
+      fn.params.map((p) => [p.name, ""])
+    );
     setParamValues(JSON.stringify(initialParams, null, 2));
-    setResponseText("No response yet");
-    setExecutionTab("Execution");
+    resetSelected();
   };
 
   const handleExecute = async () => {
     if (!selectedFunction || !selectedInterfaceName) return;
     try {
-      const parsedParams = paramValues ? JSON.parse(paramValues) : {};
-      const paramArray = Array.isArray(parsedParams)
-        ? parsedParams
-        : Object.values(parsedParams);
-
       const response = await supervisor.functionCall({
         service,
         plugin,
         intf: camelCase(selectedInterfaceName),
         method: camelCase(selectedFunction.name),
-        params: paramArray,
+        params: parseParams(),
       });
       setResponseText(JSON.stringify(response, null, 2));
     } catch (e) {
@@ -147,26 +186,15 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
     }
   };
 
-  // Generate the code snippet for the Embed tab
-  const generateEmbedCode = () => {
+  const generateEmbedCode = (): string => {
     if (!selectedFunction || !selectedInterfaceName) return "";
-    let paramArray: any[] = [];
-    try {
-      const parsedParams = paramValues ? JSON.parse(paramValues) : {};
-      paramArray = Array.isArray(parsedParams)
-        ? parsedParams
-        : Object.values(parsedParams);
-    } catch {
-      // If parse fails, just show empty array
-      paramArray = [];
-    }
 
     return `const response = await supervisor.functionCall({
   service: "${service}", 
   plugin: "${plugin}", 
   intf: "${camelCase(selectedInterfaceName)}", 
   method: "${camelCase(selectedFunction.name)}", 
-  params: ${JSON.stringify(paramArray, null, 2)}
+  params: ${JSON.stringify(parseParams(), null, 2)}
 });`;
   };
 
@@ -193,24 +221,13 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
           value={plugin}
           onChange={(e) => setPlugin(e.target.value)}
         />
-        <button
-          onClick={handleRetrieve}
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#000",
-            color: "#ddd",
-            border: "none",
-            cursor: "pointer",
-            borderRadius: "5px",
-          }}
-        >
+        <button onClick={handleRetrieve} style={commonButtonStyle}>
           Load
         </button>
       </div>
 
       {schema && (
         <div>
-          {/* Tabs for Interfaces */}
           <div
             style={{
               display: "flex",
@@ -223,26 +240,15 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
                 key={intfName}
                 onClick={() => {
                   setSelectedInterfaceName(intfName);
-                  setSelectedFunction(null);
-                  setParamValues("");
-                  setResponseText("No response yet");
-                  setExecutionTab("Execution");
+                  reset();
                 }}
-                style={{
-                  cursor: "pointer",
-                  padding: "0.5rem 1rem",
-                  backgroundColor:
-                    selectedInterfaceName === intfName ? "#444" : "transparent",
-                  borderTopLeftRadius: "5px",
-                  borderTopRightRadius: "5px",
-                }}
+                style={tabStyle(selectedInterfaceName === intfName)}
               >
                 {intfName.charAt(0).toUpperCase() + intfName.slice(1)}
               </div>
             ))}
           </div>
 
-          {/* Functions for selected interface */}
           {selectedInterfaceName && (
             <div>
               <div
@@ -257,13 +263,9 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
                   <button
                     key={i}
                     style={{
+                      ...commonButtonStyle,
                       backgroundColor:
                         selectedFunction?.name === fn.name ? "#666" : "#444",
-                      color: "#ddd",
-                      border: "none",
-                      padding: "0.5rem 1rem",
-                      cursor: "pointer",
-                      borderRadius: "5px",
                     }}
                     onClick={() => handleSelectFunction(fn)}
                   >
@@ -274,27 +276,17 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
 
               {selectedFunction && (
                 <>
-                  {/* Only show parameters textarea if there are parameters */}
                   {selectedFunction.params.length > 0 && (
                     <>
                       <h3 style={{ marginBottom: "0.5rem" }}>Parameters</h3>
                       <textarea
-                        style={{
-                          width: "100%",
-                          height: "150px",
-                          backgroundColor: "#1f1f1f",
-                          color: "#ddd",
-                          border: "1px solid #555",
-                          marginBottom: "1rem",
-                          fontFamily: "monospace",
-                        }}
+                        style={{ ...commonTextAreaStyle, marginBottom: "1rem" }}
                         value={paramValues}
                         onChange={(e) => setParamValues(e.target.value)}
                       />
                     </>
                   )}
 
-                  {/* Tabs for Execution and Embed */}
                   <div
                     style={{
                       display: "flex",
@@ -302,69 +294,37 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
                       borderBottom: "1px solid #555",
                     }}
                   >
-                    <div
-                      onClick={() => setExecutionTab("Execution")}
-                      style={{
-                        cursor: "pointer",
-                        padding: "0.5rem 1rem",
-                        backgroundColor:
-                          executionTab === "Execution" ? "#444" : "transparent",
-                        borderTopLeftRadius: "5px",
-                        borderTopRightRadius: "5px",
-                      }}
-                    >
-                      Execution
-                    </div>
-                    <div
-                      onClick={() => setExecutionTab("Embed")}
-                      style={{
-                        cursor: "pointer",
-                        padding: "0.5rem 1rem",
-                        backgroundColor:
-                          executionTab === "Embed" ? "#444" : "transparent",
-                        borderTopLeftRadius: "5px",
-                        borderTopRightRadius: "5px",
-                      }}
-                    >
-                      Embed
-                    </div>
+                    {["Execution", "Embed"].map((tab) => (
+                      <div
+                        key={tab}
+                        onClick={() =>
+                          setExecutionTab(tab as "Execution" | "Embed")
+                        }
+                        style={tabStyle(executionTab === tab)}
+                      >
+                        {tab}
+                      </div>
+                    ))}
                   </div>
 
-                  {executionTab === "Execution" && (
+                  {executionTab === "Execution" ? (
                     <>
-                      {/* Left align the Execute button and make it darker like the Load */}
                       <div style={{ marginBottom: "1rem", textAlign: "left" }}>
                         <button
                           onClick={handleExecute}
-                          style={{
-                            padding: "0.5rem 1rem",
-                            border: "none",
-                            backgroundColor: "#000",
-                            color: "#ddd",
-                            cursor: "pointer",
-                            borderRadius: "5px",
-                          }}
+                          style={commonButtonStyle}
                         >
                           Execute
                         </button>
                       </div>
                       <h3 style={{ marginBottom: "0.5rem" }}>Response</h3>
                       <textarea
-                        style={{
-                          width: "100%",
-                          height: "150px",
-                          backgroundColor: "#1f1f1f",
-                          color: "#ddd",
-                          border: "1px solid #555",
-                          fontFamily: "monospace",
-                        }}
+                        style={commonTextAreaStyle}
                         readOnly
                         value={responseText}
                       />
                     </>
-                  )}
-
-                  {executionTab === "Embed" && (
+                  ) : (
                     <div
                       style={{
                         marginTop: "1rem",
@@ -378,14 +338,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
                         use:
                       </p>
                       <textarea
-                        style={{
-                          width: "100%",
-                          height: "200px",
-                          backgroundColor: "#1f1f1f",
-                          color: "#ddd",
-                          border: "1px solid #555",
-                          fontFamily: "monospace",
-                        }}
+                        style={{ ...commonTextAreaStyle, height: "200px" }}
                         readOnly
                         value={generateEmbedCode()}
                       />

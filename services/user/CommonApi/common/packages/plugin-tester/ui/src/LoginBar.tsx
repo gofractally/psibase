@@ -1,25 +1,35 @@
 import { useEffect, useState } from "react";
 import { Supervisor, siblingUrl } from "@psibase/common-lib";
 
+const buttonStyle = {
+  backgroundColor: "#000",
+  color: "#ddd",
+  border: "none",
+  cursor: "pointer",
+  borderRadius: "5px",
+  padding: "0.5rem 1rem",
+};
+
 export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const user = await supervisor.functionCall({
-          service: "accounts",
-          plugin: "plugin",
-          intf: "activeApp",
-          method: "getLoggedInUser",
-          params: [],
-        });
-        setCurrentUser(user || null);
-      } catch (e) {
-        console.error("Error fetching current user:", e);
-        alert("Error fetching current user: " + e);
-      }
+  const fetchUser = async () => {
+    try {
+      const user = await supervisor.functionCall({
+        service: "accounts",
+        plugin: "plugin",
+        intf: "activeApp",
+        method: "getLoggedInUser",
+        params: [],
+      });
+      setCurrentUser(user || null);
+    } catch (e) {
+      console.error("Error fetching current user:", e);
+      alert("Error fetching current user: " + e);
     }
+  };
+
+  useEffect(() => {
     fetchUser();
   }, [supervisor]);
 
@@ -43,13 +53,11 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
           params: [],
         });
 
-        const loginUrl = siblingUrl(
+        window.location.href = siblingUrl(
           null,
           "accounts",
           `/?token=${encodeURIComponent(token)}`
         );
-
-        window.location.href = loginUrl;
       }
     } catch (e) {
       console.error("Error logging out or in: ", e);
@@ -59,17 +67,7 @@ export function LoginBar({ supervisor }: { supervisor: Supervisor }) {
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", textAlign: "right" }}>
-      <button
-        onClick={handleClick}
-        style={{
-          backgroundColor: "#000",
-          color: "#ddd",
-          border: "none",
-          cursor: "pointer",
-          borderRadius: "5px",
-          padding: "0.5rem 1rem",
-        }}
-      >
+      <button onClick={handleClick} style={buttonStyle}>
         {currentUser ? currentUser : "Connect account"}
       </button>
     </div>
