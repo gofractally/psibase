@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "{{version}}"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+
+[package]
+name = "{{project-name}}-pkg"   # Crate name
+description = "{{description}}"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "{{project-name | upper_camel_case}}"
+services = ["{{project-name}}"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "{{version}}"
+Sites = "{{version}}"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+{{project-name}} = { path = "service", version = "{{version}}" }
+r-{{project-name}} = { path = "query-service", version = "{{version}}" }
+plugin = { path = "plugin", version = "{{version}}" }
