@@ -1,6 +1,7 @@
 import { HoverBorderGradient } from "@shadcn/hover-border-gradient";
-import { SettingsDropdown } from "@/components/settings-dropdown";
 import { siblingUrl } from "@psibase/common-lib";
+import { ModeToggle } from "./mode-toggle";
+import { AccountSwitcher } from "./account-switcher";
 
 function HoverBorderGradientDemo() {
     return (
@@ -28,8 +29,9 @@ export const Nav = ({ title }: { title?: string }) => {
                     {title}
                 </div>
             )}
-            <div>
-                <SettingsDropdown />
+            <div className="flex items-center gap-2">
+                <AccountSwitcher />
+                <ModeToggle />
             </div>
         </div>
     );
