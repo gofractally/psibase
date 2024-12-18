@@ -34,6 +34,12 @@
             "@lib/*": [
                 "src/lib/*"
             ],
+            "@hooks": [
+                "src/hooks"
+            ],
+            "@hooks/*": [
+                "src/hooks/*"
+            ],
             "@/*": [
                 "./src/*"
             ]

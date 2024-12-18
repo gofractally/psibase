@@ -7,6 +7,10 @@ import { Input } from "@shadcn/input";
 import { siblingUrl, Supervisor } from "@psibase/common-lib";
 import { Nav } from "@components/nav";
 
+import {
+    useCreateConnectionToken,
+} from "@hooks";
+
 const supervisor = new Supervisor();
 
 export const App = () => {
@@ -14,6 +18,8 @@ export const App = () => {
     const [exampleThing, setExampleThing] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
     const thisServiceName = "{{project-name}}"
+
+    const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -94,6 +100,14 @@ export const App = () => {
                         className="absolute right-0"
                         disabled={!changesMade}
                         onClick={updateAssets}
+                    >
+                        Save
+                    </Button>
+                </div>
+                <div className="relative col-span-6 mt-6 font-medium">
+                    <Button
+                        className="absolute right-0"
+                        onClick={() => onLogin()}
                     >
                         Save
                     </Button>
