@@ -12,6 +12,10 @@ homepage = "https://psibase.io"
 
 [package]
 name = "branding_package"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
 
 [profile.release]
 codegen-units = 1
