@@ -5,6 +5,13 @@ function(add_system_service suffix name)
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
+function(add_system_service_full_malloc suffix name)
+    add_executable(${name}${suffix} ${ARGN})
+    target_mapped_include_directories(${name}${suffix} PUBLIC include)
+    target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} psibase-service${suffix})
+    set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+endfunction()
+
 function(add_system_test_impl suffix name)
     set(TARGET ${name}-test${suffix})
     add_executable(${TARGET} ${ARGN})
