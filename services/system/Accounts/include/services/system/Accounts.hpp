@@ -104,6 +104,11 @@ namespace SystemService
       /// Returns data about an account from the accounts table
       std::optional<Account> getAccount(psibase::AccountNumber name);
 
+      /// Returns the auth service of the specified account
+      ///
+      /// Aborts if the account does not exist
+      psibase::AccountNumber getAuthOf(psibase::AccountNumber account);
+
       /// Return value indicates whether the account `name` exists
       bool exists(psibase::AccountNumber name);
 
@@ -117,6 +122,7 @@ namespace SystemService
                 method(newAccount, name, authService, requireNew),
                 method(setAuthServ, authService),
                 method(getAccount, name),
+                method(getAuthOf, account),
                 method(exists, name),
                 method(billCpu, name, amount)
                 //

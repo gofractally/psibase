@@ -117,6 +117,13 @@ namespace SystemService
       return accountIndex.get(name);
    }
 
+   psibase::AccountNumber Accounts::getAuthOf(psibase::AccountNumber account)
+   {
+      auto accountRow = getAccount(account);
+      check(accountRow.has_value(), "account does not exist");
+      return accountRow->authService;
+   }
+
    bool Accounts::exists(AccountNumber name)
    {
       return getAccount(name) != std::nullopt;
