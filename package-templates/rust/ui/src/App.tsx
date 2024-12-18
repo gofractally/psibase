@@ -1,19 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@shadcn/button";
 import { Label } from "@shadcn/label";
 import { Input } from "@shadcn/input";
 
-import { siblingUrl, Supervisor } from "@psibase/common-lib";
+import { siblingUrl } from "@psibase/common-lib";
 import { Nav } from "@components/nav";
 
-const supervisor = new Supervisor();
+import {
+    useCreateConnectionToken,
+} from "@hooks";
+
+import { supervisor } from "./main";
 
 export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
     const [exampleThing, setExampleThing] = useState<string>("");
     const [uploadStatus, setUploadStatus] = useState<string>("");
     const thisServiceName = "{{project-name}}"
+
+    const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const init = async () => {
         await supervisor.onLoaded();
@@ -88,10 +94,9 @@ export const App = () => {
                         value={exampleThing}
                     />
                 </div>
-                <div className="relative col-span-6 mt-6 font-medium">
+                <div className="col-span-6 mt-6 font-medium">
                     <Button
                         type="submit"
-                        className="absolute right-0"
                         disabled={!changesMade}
                         onClick={updateAssets}
                     >
