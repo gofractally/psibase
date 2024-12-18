@@ -1,8 +1,12 @@
-import { siblingUrl, QualifiedPluginId } from "@psibase/common-lib";
+import {
+    siblingUrl,
+    QualifiedPluginId,
+    assertTruthy,
+} from "@psibase/common-lib";
 
 import { HostInterface } from "../hostInterface";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
-import { assertTruthy, parser, wasmFromUrl } from "../utils";
+import { parser, wasmFromUrl } from "../utils";
 import { DownloadFailed } from "../errors";
 import { loadPlugin } from "../component-loading/loader";
 import { ComponentAPI } from "../witExtraction";
@@ -115,5 +119,11 @@ export class Plugin {
                 : this.pluginModule[intf][method];
 
         return func(...params);
+    }
+
+    // Gets the JSON interface for a plugin
+    getJson(): string {
+        assertTruthy(this.componentAPI, "Component API undefined");
+        return this.componentAPI.debug;
     }
 }

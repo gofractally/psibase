@@ -1,6 +1,7 @@
 export const I_FRAME_INITIALIZED = "I_FRAME_INITIALIZED" as const;
 export const FUNCTION_CALL_REQUEST = "FUNCTION_CALL_REQUEST" as const;
 export const FUNCTION_CALL_RESPONSE = "FUNCTION_CALL_RESPONSE" as const;
+export const GET_JSON_REQUEST = "GET_JSON_REQUEST" as const;
 
 export {
     type FunctionCallResponse,
@@ -14,6 +15,7 @@ export {
     type FunctionCallArgs,
     type QualifiedFunctionCallArgs,
     isQualifiedFunctionCallArgs,
+    buildFunctionCallRequest,
     toString,
     getCallArgs,
 } from "./FunctionCallRequest";
@@ -28,11 +30,18 @@ export {
     type QualifiedPluginId,
     isEqual,
     pluginId,
+    pluginString,
 } from "./PluginId";
 
 export {
     isSupervisorInitialized,
     buildMessageSupervisorInitialized,
 } from "./SupervisorInitialized";
+
+export {
+    type GetJsonRequest,
+    isGetJsonRequest,
+    buildGetJsonRequest,
+} from "./GetJsonRequest";
 
 export { PluginError, isPluginError, isGenericError } from "./Errors";
