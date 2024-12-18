@@ -2,7 +2,6 @@
 #include <psibase/dispatch.hpp>
 #include <ranges>
 #include <services/system/Accounts.hpp>
-#include <services/system/AuthStack.hpp>
 #include <services/system/Producers.hpp>
 
 using namespace psibase;
@@ -18,6 +17,17 @@ namespace
              || std::ranges::binary_search(claims_sorted, expected, compare_claim);
    }
 
+   struct AuthSetGuard
+   {
+      std::vector<AccountNumber>& set;
+      AccountNumber               sender;
+      AuthSetGuard(std::vector<AccountNumber>& set, const AccountNumber& sender)
+          : set(set), sender(sender)
+      {
+         this->set.push_back(sender);
+      }
+      ~AuthSetGuard() { set.pop_back(); }
+   };
 }  // namespace
 
 namespace SystemService
@@ -136,8 +146,8 @@ namespace SystemService
    };
 
    void Producers::checkAuthSys(uint32_t                    flags,
-                                psibase::AccountNumber      requester,
-                                psibase::AccountNumber      sender,
+                                AccountNumber               requester,
+                                AccountNumber               sender,
                                 ServiceMethod               action,
                                 std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
@@ -176,16 +186,17 @@ namespace SystemService
       }
    }
 
-   void Producers::canAuthUserSys(psibase::AccountNumber user)
+   void Producers::canAuthUserSys(AccountNumber user)
    {
       check(user == producerAccountStrong || user == producerAccountWeak,
             "Can only authorize predefined accounts");
    }
 
-   bool Producers::checkOverlapping(std::vector<AccountNumber>&& producers,
-                                    std::vector<AccountNumber>&& authorizers,
-                                    std::size_t                  threshold,
-                                    IndirectCheckFunc            indirectCheck)
+   bool Producers::checkOverlapping(std::vector<AccountNumber> producers,
+                                    std::vector<AccountNumber> authorizers,
+                                    std::size_t                threshold,
+                                    IndirectCheckFunc          indirectCheck,
+                                    std::vector<AccountNumber> authSet)
    {
       // We only check for indirect auth if there are insufficient direct auths.
       auto nonOverlapping = std::ranges::partition(
@@ -202,19 +213,25 @@ namespace SystemService
       {
          auto toAuth = Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
 
-         if ((toAuth.*indirectCheck)(account, authorizers) && ++numOverlapping >= threshold)
+         if ((toAuth.*indirectCheck)(account, authorizers, std::make_optional(authSet))
+             && ++numOverlapping >= threshold)
          {
             return true;
          }
       }
    }
 
-   bool Producers::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
+   bool Producers::isAuthSys(AccountNumber                             sender,
+                             std::vector<AccountNumber>                authorizers,
+                             std::optional<std::vector<AccountNumber>> authSet_opt)
    {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
       // Base case to prevent infinite recursion
-      if (AuthStack::instance().inStack(sender))
+      if (std::ranges::contains(authSet, sender))
          return false;
-      AuthStackGuard guard(sender);
+
+      AuthSetGuard guard(authSet, sender);
 
       auto consensus = ConsensusDataUtility{};
       auto producers = consensus.getProducers()                    //
@@ -224,16 +241,20 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
-                              &Actor<AuthInterface>::isAuthSys);
+                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
    }
 
-   bool Producers::isRejectSys(psibase::AccountNumber              sender,
-                               std::vector<psibase::AccountNumber> rejecters)
+   bool Producers::isRejectSys(AccountNumber                             sender,
+                               std::vector<AccountNumber>                rejecters,
+                               std::optional<std::vector<AccountNumber>> authSet_opt)
    {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
       // Base case to prevent infinite recursion
-      if (AuthStack::instance().inStack(sender))
+      if (std::ranges::contains(authSet, sender))
          return false;
-      AuthStackGuard guard(sender);
+
+      AuthSetGuard guard(authSet, sender);
 
       auto consensus = ConsensusDataUtility{};
       auto producers = consensus.getProducers()                    //
@@ -246,7 +267,7 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
-                              &Actor<AuthInterface>::isRejectSys);
+                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
    }
 
 }  // namespace SystemService

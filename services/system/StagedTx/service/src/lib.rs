@@ -58,6 +58,7 @@ pub mod service {
                 auth_action_structs::isAuthSys {
                     sender: self.user,
                     authorizers: accepters,
+                    authSet: None,
                 },
             )
         }
@@ -68,6 +69,7 @@ pub mod service {
                 auth_action_structs::isRejectSys {
                     sender: self.user,
                     rejecters,
+                    authSet: None,
                 },
             )
         }
