@@ -179,7 +179,10 @@ export const AccountSelection = () => {
     data: accounts,
     isLoading: isFetching,
     refetch: fetchAccounts,
+    error,
   } = useGetAllAccounts();
+
+  console.log({ error, isFetching, accounts }, "jail");
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
