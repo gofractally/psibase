@@ -50,12 +50,12 @@ impl TryParseGqlResponse for InviteRecordSubset {
 impl InviteToken {
     pub fn from_encoded(token: &str) -> Result<Self, CommonTypes::Error> {
         let invite_params =
-            deserialize_token(token).ok_or(DecodeInviteError("accept_with_new_account"))?;
+            deserialize_token(token).ok_or(DecodeInviteError("maybe incorrect token?"))?;
 
         let invite_token = match invite_params {
             Token::InviteToken(params) => params,
             _ => {
-                return Err(DecodeInviteError("accept_with_new_account").into());
+                return Err(DecodeInviteError("maybe incorrect token?").into());
             }
         };
 

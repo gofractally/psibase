@@ -52,6 +52,32 @@ namespace SystemService
       /// This action allows any user who has already set an owning account with `AuthDelegate::setOwner`.
       void canAuthUserSys(psibase::AccountNumber user);
 
+      /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being authorized.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the sender's owner is among the authorizers, or if the sender's owner's auth
+      /// service would authorize the transaction
+      /// * `false`: If not returning true
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
+
+      /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being rejected.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+      ///
+      /// Returns:
+      /// * `true`: If the sender's owner is among the rejecters, or if the sender's owner's auth
+      /// service would reject the transaction
+      /// * `false`: If not returning true
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
+
       /// Set the owner of the sender account
       ///
       /// Whenever a sender using this auth service submits a transaction, authorization
@@ -59,11 +85,15 @@ namespace SystemService
       void setOwner(psibase::AccountNumber owner);
 
      private:
-      Tables db{psibase::getReceiver()};
+      Tables                        db{psibase::getReceiver()};
+      psibase::AccountNumber        getOwner(psibase::AccountNumber account);
+      psibase::Actor<AuthInterface> authServiceOf(psibase::AccountNumber account);
    };
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters),
                 method(setOwner, owner)
                 //
    )
