@@ -48,6 +48,10 @@ class TestSnapshot(unittest.TestCase):
         c.connect(f)
         b.set_producers([e, f, 'missing'], algorithm='cft')
         b.wait(predicates.producers_are(['e', 'f', 'missing']))
+        # Make sure that nodes can sync with a node that loaded a snapshot
+        g = cluster.make_node('g')
+        g.connect(e)
+        g.wait(predicates.new_block());
 
 if __name__ == '__main__':
     testutil.main()
