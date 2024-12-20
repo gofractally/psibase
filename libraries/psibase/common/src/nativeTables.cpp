@@ -128,4 +128,13 @@ namespace psibase
    {
       return scheduledSnapshotKey(blockNum);
    }
+
+   auto logTruncateKey() -> LogTruncateKeyType
+   {
+      return std::tuple{logTruncateTable, nativeTablePrimaryIndex};
+   }
+   auto LogTruncateRow::key() const -> LogTruncateKeyType
+   {
+      return logTruncateKey();
+   }
 }  // namespace psibase

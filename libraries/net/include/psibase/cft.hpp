@@ -176,14 +176,13 @@ namespace psibase::net
          if (active_producers[0] != prods.first || active_producers[1] != prods.second)
          {
             PSIBASE_LOG(logger, info) << "Active producers: " << *prods.first
-                                      << print_function{
-                                             [&](std::ostream& os)
-                                             {
-                                                if (prods.second)
-                                                {
-                                                   os << ", " << *prods.second;
-                                                }
-                                             }};
+                                      << print_function{[&](std::ostream& os)
+                                                        {
+                                                           if (prods.second)
+                                                           {
+                                                              os << ", " << *prods.second;
+                                                           }
+                                                        }};
          }
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
@@ -531,6 +530,29 @@ namespace psibase::net
       {
          // TODO:
          return true;
+      }
+      BlockNum light_verify(const LightHeaderState&                   state,
+                            const BlockInfo&                          info,
+                            const psio::shared_view_ptr<SignedBlock>& block)
+      {
+         if (state.producers->algorithm == ConsensusAlgorithm::cft)
+         {
+            if (state.producers->size() != 0)
+            {
+               auto claim = state.producers->getClaim(info.header.producer);
+               auto sig   = block->signature();
+               if (!claim)
+                  abortMessage(info.header.producer.str() + " is not a producer at block " +
+                               loggers::to_string(info.blockId));
+               chain().verify(state.producers->authState->revision, BlockSignatureInfo(info),
+                              *claim, sig);
+            }
+            return info.header.commitNum;
+         }
+         else
+         {
+            return Base::light_verify(state, info, block);
+         }
       }
    };
 

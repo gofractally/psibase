@@ -276,6 +276,10 @@ struct NetworkBase
    void recv(const psibase::net::WasmProducerMessage&) {}
    void recv(const psibase::net::StateChecksumMessage&) {}
 
+   void recv(const psibase::net::SnapshotPartMessage&) {}
+   void recv(const psibase::net::SnapshotVerifyMessage&) {}
+   void recv(const psibase::net::BlockHeaderMessage&) {}
+
    template <typename T>
    static bool has_message(const psibase::net::SignedMessage<T>&              message,
                            const std::vector<psibase::net::SignedMessage<T>>& vec)

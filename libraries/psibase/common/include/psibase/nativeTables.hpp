@@ -20,6 +20,7 @@ namespace psibase
    static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
    static constexpr NativeTableNum snapshotTable              = 11;  // subjective
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
+   static constexpr NativeTableNum logTruncateTable           = 13;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -253,6 +254,18 @@ namespace psibase
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> ScheduledSnapshotKeyType;
       PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
+   };
+
+   // If this row is present it indicates the height the block log starts at.
+   using LogTruncateKeyType = KeyPrefixType;
+   auto logTruncateKey() -> LogTruncateKeyType;
+   struct LogTruncateRow
+   {
+      BlockNum start;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> LogTruncateKeyType;
+      PSIO_REFLECT(LogTruncateRow, start)
    };
 
 }  // namespace psibase

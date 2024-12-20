@@ -1532,6 +1532,40 @@ namespace psibase::net
             }
          }
       }
+      BlockNum light_verify(const LightHeaderState&                   state,
+                            const BlockInfo&                          info,
+                            const psio::shared_view_ptr<SignedBlock>& block)
+      {
+         if (state.producers->algorithm == ConsensusAlgorithm::bft)
+         {
+            if (!block->auxConsensusData())
+               throw std::runtime_error("Consensus data missing for producer change");
+            auto commits = psio::from_frac<BlockConfirm>(*block->auxConsensusData());
+
+            const ExtendedBlockId* committed = nullptr;
+            for (auto& xid : state.pendingBlocks)
+            {
+               if (xid.num() == commits.blockNum)
+               {
+                  committed = &xid;
+               }
+            }
+            if (!committed)
+               throw std::runtime_error("Missing committed block");
+
+            verifyMsig<CommitMessage>(state.producers->authState->revision, committed->id(),
+                                      commits.commits, *state.producers);
+            check(!!state.nextProducers, "nextProducers required during joing consensus");
+            check(!!commits.nextCommits, "nextCommits required during joint consensus");
+            verifyMsig<CommitMessage>(state.nextProducers->authState->revision, committed->id(),
+                                      *commits.nextCommits, *state.nextProducers);
+            return commits.blockNum;
+         }
+         else
+         {
+            return Base::light_verify(state, info, block);
+         }
+      }
    };
 
 }  // namespace psibase::net

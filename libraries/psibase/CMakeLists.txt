@@ -188,6 +188,7 @@ function(add suffix)
             native/src/ConfigFile.cpp
             native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
+            native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/NativeFunctions.cpp
             native/src/OpenSSLProver.cpp

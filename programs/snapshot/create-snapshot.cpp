@@ -105,6 +105,7 @@ void write_consensus_change_blocks(std::uint32_t             chain,
    {
       if (num <= last || num >= end)
          return;
+      std::cout << "copying block header: " << num << std::endl;
       blockKey.clear();
       psio::vector_stream kstream{blockKey};
       psio::to_key(num, kstream);
@@ -139,17 +140,23 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       raw::getKey(key.data(), key.size());
       key.push_back('\0');
       auto result = psio::from_frac<psibase::ConsensusChangeRow>(value);
-      if (result.end >= end)
+      if (result.start >= end)
          return {};
       return result;
    };
    while (auto item = read_next())
    {
       copy_block(item->start);
-      copy_block(item->commit);
-      commit_required.push_back(lastId);
-      copy_block(item->end);
-      signatures_required.push_back(item->end);
+      if (item->commit < end)
+      {
+         copy_block(item->commit);
+      }
+      if (item->end < end)
+      {
+         copy_block(item->end);
+         commit_required.push_back(lastId);
+         signatures_required.push_back(item->end);
+      }
    }
 }
 
