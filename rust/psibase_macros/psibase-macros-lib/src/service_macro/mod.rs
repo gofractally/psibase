@@ -4,9 +4,10 @@ mod events;
 mod graphql;
 mod tables;
 
+pub use actions::Options;
 use actions::{
     add_pre_action_call_if_not_excluded, check_for_pre_action, process_action_args,
-    process_action_callers, process_action_schema, Options, PreAction,
+    process_action_callers, process_action_schema, PreAction,
 };
 use darling::ast::NestedMeta;
 use darling::{Error, FromMeta};
