@@ -1039,7 +1039,7 @@ namespace psibase::net
          {
             PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
             connection.state = ConnectionStateReceiveFastForward{
-                .state{new LightHeaderState(chain().light_validate())}};
+                std::unique_ptr<LightHeaderState>(new LightHeaderState(chain().light_validate()))};
          }
          if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
          {
@@ -1052,8 +1052,8 @@ namespace psibase::net
          auto& connection = get_connection(origin);
          if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
          {
-            connection.state = ConnectionStateReceiveSnapshot{.loader{
-                new SnapshotLoader(chain().start_snapshot(std::move(*state->state), msg.blockId))}};
+            connection.state = ConnectionStateReceiveSnapshot{std::unique_ptr<SnapshotLoader>(
+                new SnapshotLoader(chain().start_snapshot(std::move(*state->state), msg.blockId)))};
          }
          if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
          {
