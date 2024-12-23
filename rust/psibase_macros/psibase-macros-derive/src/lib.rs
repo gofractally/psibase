@@ -8,7 +8,7 @@ use number_macro::{account_macro_impl, method_macro_impl};
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use psibase_macros_lib::service_macro::service_macro_impl;
-use psibase_macros_lib::table_macro::table_macro_impl;
+use psibase_macros_lib::state_macro::state_macro_impl;
 use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
@@ -306,8 +306,8 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_error]
 #[proc_macro_attribute]
-pub fn table(attr: TokenStream, item: TokenStream) -> TokenStream {
-    table_macro_impl(
+pub fn state(attr: TokenStream, item: TokenStream) -> TokenStream {
+    state_macro_impl(
         proc_macro2::TokenStream::from(attr),
         proc_macro2::TokenStream::from(item),
     )
