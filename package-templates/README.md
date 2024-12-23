@@ -17,7 +17,7 @@ This directory contains app templates that can be used with cargo-generate to qu
 ## Instantiating the template
 
 From the root of the workspace, run:
-`cargo generate -p ./app-templates/ --destination ./services/user/ --init -v`
+`cargo generate -p ./package-templates/ --destination ./services/user/ --init -v`
 
 This will run a CLI wizard to set up the new app in the `./services/user/` directory.
 
