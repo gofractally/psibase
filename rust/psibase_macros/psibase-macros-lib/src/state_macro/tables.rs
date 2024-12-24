@@ -79,19 +79,18 @@ pub fn process_service_tables(
     let mut table_options: Option<TableOptions> = None;
     let mut table_vis = None;
     let mut preset_table_record: Option<String> = None;
-    let mut debugging_info_to_output: Vec<String> = Vec::new();
+    let mut debug_msgs: Vec<String> = Vec::new();
 
-    debugging_info_to_output.push(String::from("process_service_tables().top"));
+    debug_msgs.push(String::from("process_service_tables().top"));
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
-                process_table_attrs(s, &mut table_options);
+                process_table_attrs(s, &mut table_options, &mut debug_msgs);
                 preset_table_record = table_options
                     .as_ref()
                     .and_then(|opts| opts.record.to_owned());
                 if preset_table_record.is_none() {
-                    debugging_info_to_output.push(String::from("processing table fields..."));
-                    process_table_fields(s, &mut pk_data, &mut debugging_info_to_output);
+                    process_table_fields(s, &mut pk_data, &mut debug_msgs);
                 } else {
                     let fields_named: syn::FieldsNamed =
                         parse_quote! {{ db_id: #psibase_mod::DbId, prefix: Vec<u8> }};
@@ -99,12 +98,9 @@ pub fn process_service_tables(
                 }
                 table_vis = Some(s.vis.clone());
             }
-            Item::Impl(i) => process_table_impls(
-                i,
-                &mut pk_data,
-                &mut secondary_keys,
-                &mut debugging_info_to_output,
-            ),
+            Item::Impl(i) => {
+                process_table_impls(i, &mut pk_data, &mut secondary_keys, &mut debug_msgs)
+            }
             item => abort!(item, "Unknown table item to be processed"),
         }
     }
@@ -233,18 +229,36 @@ pub fn process_service_tables(
     };
     items.push(parse_quote! {#table_struct_impl});
 
-    for (idx, itm) in debugging_info_to_output.iter().enumerate() {
-        let idnt = Ident::new(&format!("t{}", idx), Span::call_site());
-        items.push(parse_quote! {
-            #[doc = #itm]
-            struct #idnt {}
-        });
-    }
+    // for (idx, itm) in debug_msgs.iter().enumerate() {
+    //     let idnt = Ident::new(&format!("t{}", idx), Span::call_site());
+    //     items.push(parse_quote! {
+    //         #[doc = #itm]
+    //         struct #idnt {}
+    //     });
+    // }
+    let doc_attrs = debug_msgs.into_iter().map(|msg| {
+        quote! {
+            #[doc = #msg]
+        }
+    });
+
+    // Combine the struct and its documentation attributes into a single token stream
+    let output = parse_quote! {
+        #(#doc_attrs)*
+        struct macro_debug_msgs {}
+    };
+
+    items.push(output);
 
     table_options.index
 }
 
-fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option<TableOptions>) {
+fn process_table_attrs(
+    table_struct: &mut ItemStruct,
+    table_options: &mut Option<TableOptions>,
+    debug_msgs: &mut Vec<String>,
+) {
+    debug_msgs.push(String::from("process_table_attrs().top"));
     // Parse table name and remove #[table]
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
@@ -276,15 +290,16 @@ fn process_table_attrs(table_struct: &mut ItemStruct, table_options: &mut Option
 fn process_table_fields(
     table_record_struct: &mut ItemStruct,
     pk_data: &mut Option<PkIdentData>,
-    debugging_items_to_output: &mut Vec<String>,
+    debug_msgs: &mut Vec<String>,
 ) {
+    debug_msgs.push(String::from("process_table_fields().top"));
     for field in table_record_struct.fields.iter_mut() {
         let mut removable_attr_idxs = Vec::new();
 
         for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
-            debugging_items_to_output.push(String::from(format!(
+            debug_msgs.push(String::from(format!(
                 "processing attr: {:?}...",
-                field_attr
+                field_attr.meta
             )));
             if field_attr.style == AttrStyle::Outer {
                 if field_attr.meta.path().is_ident("primary_key") {
@@ -292,6 +307,12 @@ fn process_table_fields(
                     removable_attr_idxs.push(field_attr_idx);
                 }
             }
+            // if field_attr.style == AttrStyle::Outer {
+            //     if field_attr.meta.path().is_ident("secondary_key") {
+            //         // process_table_pk_field(pk_data, field);
+            //         removable_attr_idxs.push(field_attr_idx);
+            //     }
+            // }
         }
 
         for i in removable_attr_idxs {
@@ -304,17 +325,16 @@ fn process_table_impls(
     table_impl: &mut ItemImpl,
     pk_data: &mut Option<PkIdentData>,
     secondary_keys: &mut Vec<SkIdentData>,
-    debugging_items_to_output: &mut Vec<String>,
+    debug_msgs: &mut Vec<String>,
 ) {
-    debugging_items_to_output.push(String::from("process_table_impls().top"));
+    debug_msgs.push(String::from("process_table_impls().top"));
     for impl_item in table_impl.items.iter_mut() {
         if let ImplItem::Fn(method) = impl_item {
             let mut removable_attr_idxs = Vec::new();
 
             for (attr_idx, attr) in method.attrs.iter().enumerate() {
                 if attr.style == AttrStyle::Outer {
-                    debugging_items_to_output
-                        .push(String::from(format!("processing outer attr: {:?}", attr)));
+                    debug_msgs.push(String::from(format!("processing outer attr: {:?}", attr)));
                     if attr.meta.path().is_ident("primary_key") {
                         let pk_method = &method.sig.ident;
                         check_unique_pk(pk_data, pk_method);

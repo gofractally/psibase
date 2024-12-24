@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
 use std::{collections::HashMap, str::FromStr};
-use syn::{parse_quote, Ident, Item, ItemMod, Type};
+use syn::{Ident, Item, ItemMod, Type};
 use tables::{is_table_attr, process_service_tables};
 
 pub fn state_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {

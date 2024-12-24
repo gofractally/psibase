@@ -5,6 +5,7 @@ pub mod tables {
     use psibase::AccountNumber;
     use psibase::Fracpack;
     use psibase::TimePointSec;
+    use psibase::ToKey;
     use psibase::ToSchema;
     use serde::{Deserialize, Serialize};
 
@@ -20,4 +21,10 @@ pub mod tables {
         pub body: String,
         pub datetime: TimePointSec,
     }
+    // impl SavedMessage {
+    //     #[secondary_key(1)]
+    //     fn by_receiver(&self) -> AccountNumber {
+    //         self.receiver
+    //     }
+    // }
 }
