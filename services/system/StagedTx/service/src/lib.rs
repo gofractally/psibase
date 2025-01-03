@@ -226,8 +226,8 @@ pub mod service {
         }
 
         #[secondary_key(1)]
-        fn by_responder(&self) -> AccountNumber {
-            self.account
+        fn by_responder(&self) -> (AccountNumber, u32) {
+            (self.account, self.id)
         }
 
         fn upsert(id: u32, accepted: bool) {
