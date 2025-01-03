@@ -57,6 +57,8 @@ namespace psibase
          if (auto at = std::get_if<ActionTrace>(&inner.inner))
             if (isUserAction(at->action))
                top_traces.push_back(at);
+      if (top_traces.size() & 1)
+         std::cout << prettyTrace(trimRawData(t)).c_str();
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];

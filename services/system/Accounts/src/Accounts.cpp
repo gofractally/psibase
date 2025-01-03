@@ -101,7 +101,7 @@ namespace SystemService
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       auto   account      = accountIndex.get((getSender()));
-      check(account.has_value(), "account does not exist");
+      check(account.has_value(), "account " + getSender().str() + " does not exist");
 
       to<AuthInterface>(authService).canAuthUserSys(getSender());
 
@@ -120,7 +120,7 @@ namespace SystemService
    psibase::AccountNumber Accounts::getAuthOf(psibase::AccountNumber account)
    {
       auto accountRow = getAccount(account);
-      check(accountRow.has_value(), "account does not exist");
+      check(accountRow.has_value(), "account " + account.str() + " does not exist");
       return accountRow->authService;
    }
 
@@ -136,7 +136,7 @@ namespace SystemService
       auto accountTable = tables.open<AccountTable>();
       auto accountIndex = accountTable.getIndex<0>();
       auto row          = accountIndex.get(name);
-      check(!!row, "account does not exist");
+      check(!!row, "account " + name.str() + " does not exist");
       if (row->resourceBalance)
       {
          row->resourceBalance->billCpu(amount);

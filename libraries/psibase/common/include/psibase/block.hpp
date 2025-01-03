@@ -147,9 +147,6 @@ namespace psibase
       AccountNumber name;
       Claim         auth;
 
-      static AccountNumber getName(const Producer& p) { return p.name; }
-      static Claim         getAuthClaim(const Producer& p) { return p.auth; }
-
       friend bool operator==(const Producer&, const Producer&) = default;
       PSIO_REFLECT(Producer, name, auth);
    };
