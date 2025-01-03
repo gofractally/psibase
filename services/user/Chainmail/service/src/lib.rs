@@ -135,37 +135,38 @@ mod service {
     #[event(history)]
     pub fn archive(msg_id: String) {}
 
-    // use async_graphql::connection::Connection;
-    // struct Query;
+    use async_graphql::connection::Connection;
+    struct Query;
 
-    // #[async_graphql::Object]
-    // impl Query {
-    //     async fn get_saved_msgs(
-    //         &self,
-    //         receiver: AccountNumber,
-    //         first: Option<i32>,
-    //         last: Option<i32>,
-    //         before: Option<String>,
-    //         after: Option<String>,
-    //     ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
-    //         TableQuery::subindex::<AccountNumber>(
-    //             SavedMessageTable::new().get_index_by_receiver(),
-    //             &receiver,
-    //         )
-    //         .first(first)
-    //         .last(last)
-    //         .before(before)
-    //         .after(after)
-    //         .query()
-    //         .await
-    //     }
-    // }
+    #[async_graphql::Object]
+    impl Query {
+        async fn get_saved_msgs(
+            &self,
+            receiver: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
+            let saved_msgs_table = SavedMessageTable::new();
+            TableQuery::subindex::<AccountNumber>(
+                saved_msgs_table.get_index_by_receiver(),
+                &receiver,
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+    }
 
     /// Serve REST and GraphQL calls
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None //.or_else(|| serve_graphql(&request, Query))
+        None.or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_rest_api(&request))
     }
 }

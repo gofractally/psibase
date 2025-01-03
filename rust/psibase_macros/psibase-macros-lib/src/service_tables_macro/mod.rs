@@ -7,7 +7,7 @@ use std::{collections::HashMap, str::FromStr};
 use syn::{Ident, Item, ItemMod, Type};
 use tables::{is_table_attr, process_service_tables};
 
-pub fn state_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn service_tables_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let options_psibase_mod = String::from("psibase");
 
     let psibase_mod = proc_macro2::TokenStream::from_str(&options_psibase_mod).unwrap();

@@ -135,9 +135,10 @@ pub fn process_service_tables(
 
         let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
 
+        // TODO: why did I need to add the pub on the fn below; it was not originally needed
         sks_fns = quote! {
             #sks_fns
-            fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
+            pub fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
                 use #psibase_mod::Table;
                 self.get_index(#sk_idx)
             }
