@@ -1,6 +1,7 @@
 ---
 BasedOnStyle: Chromium
 BreakBeforeBraces: Allman
+BreakBeforeBinaryOperators: NonAssignment
 ColumnLimit: '100'
 IndentWidth: '3'
 NamespaceIndentation: All

@@ -365,8 +365,8 @@ struct test_chain
                 },
                 status->consensus.next->consensus.data);
          }
-         if (!status->consensus.next ||
-             status->current.commitNum < status->consensus.next->blockNum)
+         if (!status->consensus.next
+             || status->current.commitNum < status->consensus.next->blockNum)
          {
             std::visit(
                 [&](const auto& c)
@@ -380,7 +380,12 @@ struct test_chain
          }
       }
 
-      blockContext->start(time, producer);
+      // These are not the correct values if we want the chain to actually
+      // sync correctly, but it's sufficient for the tester to test services.
+      auto term      = status->current.term;
+      auto commitNum = status->current.blockNum;
+
+      blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();
    }
 
@@ -628,8 +633,8 @@ struct HttpSocket : psibase::AutoCloseSocket
          case psibase::HttpStatus::notFound:
             break;
          default:
-            psibase::check(false, "HTTP response code not allowed: " +
-                                      std::to_string(static_cast<std::uint16_t>(status)));
+            psibase::check(false, "HTTP response code not allowed: "
+                                      + std::to_string(static_cast<std::uint16_t>(status)));
       }
       sendImpl(std::vector(data.begin(), data.end()));
    }
@@ -828,8 +833,8 @@ struct callbacks
 
    file* get_file(int32_t file_index)
    {
-      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size() ||
-          !state.files[file_index].f)
+      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size()
+          || !state.files[file_index].f)
          return nullptr;
       return &state.files[file_index];
    }
@@ -1397,8 +1402,8 @@ struct callbacks
                 socket->queryTimes.databaseTime =
                     std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
                 socket->queryTimes.wasmExecTime =
-                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
-                                                                          tc.databaseTime);
+                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime()
+                                                                          - tc.databaseTime);
                 socket->queryTimes.startTime = startTime;
              });
          psibase::Action action{
