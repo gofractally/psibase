@@ -5,7 +5,7 @@ import { siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
 import { pemToBase64 } from "./lib/key";
 import { Button } from "./components/ui/button";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useAccountLookup } from "./hooks/useAccountLookup";
 import { useLocalStorage } from "usehooks-ts";
 
@@ -32,35 +32,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { z } from "zod";
-
-const useAccountSelector = (
-  accounts: string[],
-  onOtherSelected: () => void
-) => {
-  const hasSetAccounts = useRef(false);
-
-  const [selectedAccount, setTheAccount] = useState<string>();
-
-  const setSelectedAccount = (account: string) => {
-    if (account == "other") {
-      onOtherSelected();
-    } else {
-      setTheAccount(account);
-    }
-  };
-
-  useEffect(() => {
-    if (!hasSetAccounts.current && accounts.length > 0) {
-      hasSetAccounts.current = true;
-      setTheAccount(accounts[0]);
-    }
-  }, [hasSetAccounts, accounts]);
-
-  return {
-    selectedAccount,
-    setSelectedAccount,
-  };
-};
+import { useAccountSelector } from "./hooks/useAccountSelector";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const ModalState = z.enum(["Off", "Warn", "Show"]);
 
@@ -103,8 +76,6 @@ export const AccountSelection = () => {
 
   const [warnUser, setWarnUser] = useLocalStorage("warnUser", true);
 
-  console.log({ showWarning: modalState, setShowWarning: setModalState });
-
   const onCopyClick = async () => {
     if (!url) {
       toast("No URL available.");
@@ -118,34 +89,35 @@ export const AccountSelection = () => {
     }
   };
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <div className="flex flex-col gap-4 mt-4 p-2 ">
       <p>Copy your account to another device or browser session.</p>
       <div className="flex gap-2">
-        <Select
-          onValueChange={(account) => {
-            setSelectedAccount(account);
-          }}
-          value={selectedAccount}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={selectedAccount} />
-          </SelectTrigger>
-          <SelectContent>
-            {availableAccounts.map((account) => (
-              <SelectItem key={account} value={account}>
-                {account}
-              </SelectItem>
-            ))}
-            <SelectItem value={"other"}>Other...</SelectItem>
-          </SelectContent>
-        </Select>
+        {isLoading ? (
+          <Skeleton className="w-full h-[40px] my-auto rounded-sm" />
+        ) : (
+          <Select
+            onValueChange={(account) => {
+              setSelectedAccount(account);
+            }}
+            value={selectedAccount}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={selectedAccount} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableAccounts.map((account) => (
+                <SelectItem key={account} value={account}>
+                  {account}
+                </SelectItem>
+              ))}
+              <SelectItem value={"other"}>Other...</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Button
           className="pr-3 w-20"
+          disabled={isLoading}
           onClick={() => {
             onReveal();
           }}
@@ -207,7 +179,7 @@ export const AccountSelection = () => {
                 share with others.
               </div>
               <div className="flex justify-center">
-                <QRCode size={500} value={url} viewBox={`0 0 256 256`} />
+                <QRCode size={300} value={url} viewBox={`0 0 256 256`} />
               </div>
               <div className="flex justify-center w-full">
                 <div className="flex items-center w-full space-x-2">

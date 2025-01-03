@@ -67,15 +67,11 @@ function KeyImport() {
     }
   }, [availableAccounts]);
 
-  const { data, isPending, mutate } = useImportKey();
-
-  console.log({ data });
+  const { isPending, mutate } = useImportKey();
 
   const isNoAccountSelected = selectedAccounts.length == 0;
   const disableImportButton =
     isNoAccountSelected || isPending || !extractedPrivateKey;
-
-    
 
   return (
     <div>
