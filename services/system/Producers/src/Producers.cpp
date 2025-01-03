@@ -17,18 +17,6 @@ namespace
              || std::ranges::binary_search(claims_sorted, expected, compare_claim);
    }
 
-   struct AuthSetGuard
-   {
-      std::vector<AccountNumber>& set;
-      AccountNumber               sender;
-      AuthSetGuard(std::vector<AccountNumber>& set, const AccountNumber& sender)
-          : set(set), sender(sender)
-      {
-         this->set.push_back(sender);
-      }
-      ~AuthSetGuard() { set.pop_back(); }
-   };
-
    std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
    {
       if (account == SystemService::Producers::producerAccountWeak)
@@ -238,7 +226,7 @@ namespace SystemService
       if (std::ranges::contains(authSet, sender))
          return false;
 
-      AuthSetGuard guard(authSet, sender);
+      authSet.push_back(sender);
 
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
@@ -261,15 +249,16 @@ namespace SystemService
       if (std::ranges::contains(authSet, sender))
          return false;
 
-      AuthSetGuard guard(authSet, sender);
+      authSet.push_back(sender);
 
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
-      auto threshold = antiThreshold(sender);
 
       if (producers.empty())
          return false;
+
+      auto threshold = antiThreshold(sender);
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(rejecters), threshold,

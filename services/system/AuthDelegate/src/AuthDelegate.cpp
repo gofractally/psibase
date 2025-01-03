@@ -6,20 +6,6 @@
 
 using namespace psibase;
 
-namespace
-{
-   struct AuthSetGuard
-   {
-      std::vector<AccountNumber>& set;
-      AccountNumber               sender;
-      AuthSetGuard(std::vector<AccountNumber>& set, const AccountNumber& sender)
-          : set(set), sender(sender)
-      {
-         this->set.push_back(sender);
-      }
-   };
-}  // namespace
-
 namespace SystemService
 {
    void AuthDelegate::checkAuthSys(std::uint32_t              flags,
@@ -55,7 +41,7 @@ namespace SystemService
       if (std::ranges::contains(authSet, sender))
          return false;
 
-      AuthSetGuard guard(authSet, sender);
+      authSet.push_back(sender);
 
       auto owner = getOwner(sender);
 
@@ -77,7 +63,7 @@ namespace SystemService
       if (std::ranges::contains(authSet, sender))
          return false;
 
-      AuthSetGuard guard(authSet, sender);
+      authSet.push_back(sender);
 
       auto owner = getOwner(sender);
 
