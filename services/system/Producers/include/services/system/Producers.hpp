@@ -35,6 +35,11 @@ namespace SystemService
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
 
+      std::vector<psibase::AccountNumber> getProducers();
+
+      uint32_t getThreshold(psibase::AccountNumber account);
+      uint32_t antiThreshold(psibase::AccountNumber account);
+
       // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.
       void checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
@@ -88,8 +93,14 @@ namespace SystemService
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
                 method(setProducers, producers),
+                method(getProducers),
+                method(getThreshold, account),
+                method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
                 method(isAuthSys, sender, authorizers, authSet),
-                method(isRejectSys, sender, rejecters, authSet))
+                method(isRejectSys, sender, rejecters, authSet)
+                //
+   )
+
 }  // namespace SystemService

@@ -28,6 +28,40 @@ namespace
       }
       ~AuthSetGuard() { set.pop_back(); }
    };
+
+   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
+   {
+      if (account == SystemService::Producers::producerAccountWeak)
+         return 1;
+      else
+         return cft.producers.size() / 2 + 1;
+   }
+
+   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
+   {
+      if (account == SystemService::Producers::producerAccountWeak)
+         return (bft.producers.size() + 2) / 3;
+      else
+         return bft.producers.size() * 2 / 3 + 1;
+   }
+
+   std::size_t getNrProds()
+   {
+      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
+      check(status.has_value(), "status row invalid");
+      return std::visit([&](const auto& c) { return c.producers.size(); },
+                        status->consensus.current.data);
+   }
+
+   std::vector<Producer> getProducers()
+   {
+      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
+      check(status.has_value(), "status row invalid");
+      std::vector<Producer> producers;
+      std::visit([&](const auto& c) { producers = c.producers; }, status->consensus.current.data);
+      return std::move(producers);
+   }
+
 }  // namespace
 
 namespace SystemService
@@ -94,56 +128,28 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
+   std::vector<psibase::AccountNumber> Producers::getProducers()
    {
-      if (account == Producers::producerAccountWeak)
-         return 1;
-      else
-         return cft.producers.size() / 2 + 1;
+      return ::getProducers()                          //
+             | std::views::transform(&Producer::name)  //
+             | std::ranges::to<std::vector>();
    }
 
-   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
+   uint32_t Producers::getThreshold(AccountNumber account)
    {
-      if (account == Producers::producerAccountWeak)
-         return (bft.producers.size() + 2) / 3;
-      else
-         return bft.producers.size() * 2 / 3 + 1;
+      check(account == producerAccountWeak || account == producerAccountStrong, "Invalid account");
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      check(!!status, "Missing status row");
+      auto threshold = std::visit([&](const auto& c) { return ::getThreshold(c, account); },
+                                  status->consensus.current.data);
+
+      return threshold;
    }
 
-   struct ConsensusDataUtility
+   uint32_t Producers::antiThreshold(AccountNumber account)
    {
-      ConsensusData data;
-
-      ConsensusDataUtility()
-      {
-         auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
-         check(status.has_value(), "status row invalid");
-         data = status->consensus.current.data;
-      }
-
-      std::size_t getThreshold(AccountNumber sender) const
-      {
-         return std::visit([&](const auto& c) { return SystemService::getThreshold(c, sender); },
-                           data);
-      }
-
-      std::size_t getAntiThreshold(AccountNumber sender) const
-      {
-         return getNrProds() - getThreshold(sender) + 1;
-      }
-
-      std::size_t getNrProds() const
-      {
-         return std::visit([&](const auto& c) { return c.producers.size(); }, data);
-      }
-
-      std::vector<Producer> getProducers() const
-      {
-         std::vector<Producer> producers;
-         std::visit([&](const auto& c) { producers = c.producers; }, data);
-         return producers;
-      }
-   };
+      return ::getNrProds() - getThreshold(account) + 1;
+   }
 
    void Producers::checkAuthSys(uint32_t                    flags,
                                 AccountNumber               requester,
@@ -168,9 +174,8 @@ namespace SystemService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      auto consensus      = ConsensusDataUtility{};
-      auto expectedClaims = consensus.getProducers()                         //
-                            | std::views::transform(Producer::getAuthClaim)  //
+      auto expectedClaims = ::getProducers()                          //
+                            | std::views::transform(&Producer::auth)  //
                             | std::ranges::to<std::vector>();
 
       std::ranges::sort(claims, compare_claim);
@@ -178,7 +183,7 @@ namespace SystemService
          return satisfiesClaim(expected, claims);
       });
 
-      auto threshold = expectedClaims.empty() ? 0 : consensus.getThreshold(sender);
+      auto threshold = expectedClaims.empty() ? 0 : getThreshold(sender);
       if (matching < threshold)
       {
          abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold)
@@ -219,6 +224,8 @@ namespace SystemService
             return true;
          }
       }
+
+      return false;
    }
 
    bool Producers::isAuthSys(AccountNumber                             sender,
@@ -233,11 +240,11 @@ namespace SystemService
 
       AuthSetGuard guard(authSet, sender);
 
-      auto consensus = ConsensusDataUtility{};
-      auto producers = consensus.getProducers()                    //
-                       | std::views::transform(Producer::getName)  //
+      auto producers = ::getProducers()                          //
+                       | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
-      auto threshold = producers.empty() ? 0 : consensus.getThreshold(sender);
+
+      auto threshold = producers.empty() ? 0 : getThreshold(sender);
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
@@ -256,11 +263,10 @@ namespace SystemService
 
       AuthSetGuard guard(authSet, sender);
 
-      auto consensus = ConsensusDataUtility{};
-      auto producers = consensus.getProducers()                    //
-                       | std::views::transform(Producer::getName)  //
+      auto producers = ::getProducers()                          //
+                       | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
-      auto threshold = consensus.getAntiThreshold(sender);
+      auto threshold = antiThreshold(sender);
 
       if (producers.empty())
          return false;
