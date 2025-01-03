@@ -107,19 +107,13 @@ export const AccountSelection = () => {
   const token = searchParams.get("token");
 
   const key = searchParams.get("key");
-  console.log({ key });
 
   const navigate = useNavigate();
-  // HACK
 
-  // auto nav if the key param is present,
+  // Auto nav if the key param is present,
   if (key) {
     navigate(`/key?key=${key}`);
   }
-
-  // END HACK
-
-  console.log(key, "is the damn key");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -179,10 +173,7 @@ export const AccountSelection = () => {
     data: accounts,
     isLoading: isFetching,
     refetch: fetchAccounts,
-    error,
   } = useGetAllAccounts();
-
-  console.log({ error, isFetching, accounts }, "jail");
 
   const isNoAccounts = accounts ? accounts.length == 0 : false;
 
