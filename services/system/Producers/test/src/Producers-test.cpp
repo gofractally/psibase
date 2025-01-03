@@ -155,11 +155,11 @@ SCENARIO("Producers")
 
          auto query = GraphQLBody{query_sv};
 
-         psibase::writeConsole("Querying: " + std::string(query_sv) + "\n");
+         //psibase::writeConsole("Querying: " + std::string(query_sv) + "\n");
          auto res = t.post(Nft::service, "/graphql", query);
 
          auto body = std::string(res.body.begin(), res.body.end());
-         psibase::writeConsole(body + "\n");
+         //psibase::writeConsole(body + "\n");
          auto response_root = psio::convert_from_json<QueryRoot>(body);
 
          return response_root.data.userNfts.edges.size();
