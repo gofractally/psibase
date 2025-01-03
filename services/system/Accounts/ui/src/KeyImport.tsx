@@ -1,56 +1,129 @@
 import { useSearchParams } from "react-router-dom";
-import { siblingUrl } from "@psibase/common-lib";
-import { useUnmanagedKeyPair } from "./hooks/useUnmanagedKeypair";
-import { base64ToPem, pemToBase64 } from "./lib/key";
-import { modifyUrlParams } from "./lib/modifyUrlParams";
+import { base64ToPem } from "./lib/key";
 import { usePrivateToPublicKey } from "./hooks/usePrivateToPublicKey";
+import { useAccountsLookup } from "./hooks/useAccountsLookup";
+import { useEffect, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "./lib/utils";
+import { Button } from "./components/ui/button";
+import { useMutation } from "@tanstack/react-query";
+import { supervisor } from "./main";
+import { z } from "zod";
 
-//
-// keyvault
-// generate-keypair
+const ImportKeyParams = z.object({
+  accounts: z.string().array(),
+  privateKey: z.string(),
+});
 
-// pub-from-priv
-// priv-from-pub
+const useImportKey = () =>
+  useMutation<null, Error, z.infer<typeof ImportKeyParams>>({
+    mutationKey: ["importKey"],
+    mutationFn: async (data) => {
+      const { accounts, privateKey } = ImportKeyParams.parse(data);
+      void (await supervisor.functionCall({
+        method: "importKey",
+        params: [privateKey],
+        service: "auth-sig",
+        intf: "keyvault",
+      }));
 
-// create an account with a key...?
-// then export the thing...?
-// then allow import / lookup of the thing
+      for (const account of accounts) {
+        void (await supervisor.functionCall({
+          method: "importAccount",
+          params: [account],
+          service: "accounts",
+          intf: "admin",
+        }));
+      }
+      return null;
+    },
+  });
+
+let awaitingAccounts = true;
 
 function KeyImport() {
   const [searchParams] = useSearchParams();
 
   const key = searchParams.get("key");
 
-  console.log(key, "is the key", siblingUrl());
-
-  // 1. build a demo keypair, does not need to be managed...
-
-  const { data } = useUnmanagedKeyPair();
-
-  const encodedKey = data ? pemToBase64(data?.privateKey) : "";
-
-  const url = modifyUrlParams(siblingUrl(null, "accounts"), {
-    key: encodedKey,
-  });
-
   const extractedPrivateKey = key && base64ToPem(key);
 
   const { data: publicKey } = usePrivateToPublicKey(extractedPrivateKey || "");
+  const { data: availableAccounts } = useAccountsLookup(publicKey);
 
-  // with the public key, work out what accounts are available for import
-  // import them
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+
+  const handleCheck = (account: string, checked: boolean) => {
+    setSelectedAccounts((accounts) => [
+      ...accounts.filter((x) => x !== account),
+      ...(checked ? [account] : []),
+    ]);
+  };
+
+  useEffect(() => {
+    if (awaitingAccounts && availableAccounts.length > 0) {
+      awaitingAccounts = false;
+      setSelectedAccounts(availableAccounts);
+    }
+  }, [availableAccounts]);
+
+  const { data, isPending, mutate } = useImportKey();
+
+  console.log({ data });
+
+  const isNoAccountSelected = selectedAccounts.length == 0;
+  const disableImportButton =
+    isNoAccountSelected || isPending || !extractedPrivateKey;
+
+    
 
   return (
     <div>
-      <div className="mt-4">1. Key to import {url}</div>
-      <div className="mt-4">
-        2. Encoded
-        {data && <div>{pemToBase64(data?.privateKey)}</div>}
+      <h1 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
+        Import an account
+      </h1>{" "}
+      <p className="leading-7 text-bg-muted-foreground [&:not(:first-child)]:mt-6">
+        Select an account to import to your wallet.
+      </p>
+      <div className="flex  py-4 flex-col gap-3">
+        {availableAccounts.map((account) => {
+          const isSelected = selectedAccounts.includes(account);
+          return (
+            <button
+              onClick={() => handleCheck(account, !isSelected)}
+              key={account}
+              className={cn("p-4 w-full flex rounded-sm justify-between", {
+                "bg-muted": isSelected,
+                "bg-muted/25": !isSelected,
+              })}
+            >
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={(e: boolean) => handleCheck(account, e)}
+              />
+              {account}
+            </button>
+          );
+        })}
       </div>
-      <div className="mt-4">
-        2. Extracted from the URL {extractedPrivateKey}{" "}
+      <div className="flex justify-between text-muted-foreground text-sm">
+        <Button
+          onClick={() => {
+            mutate({
+              privateKey: extractedPrivateKey!,
+              accounts: selectedAccounts,
+            });
+          }}
+          disabled={disableImportButton}
+        >
+          {isPending ? "Importing" : "Import"}
+        </Button>
+        <div>
+          {selectedAccounts.length == 0
+            ? "Select at least 1 account."
+            : `Importing ${selectedAccounts.length} account(s).`}
+        </div>
       </div>
-      <div className="mt-4">3. {publicKey}</div>
     </div>
   );
 }
