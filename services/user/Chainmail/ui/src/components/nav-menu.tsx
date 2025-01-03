@@ -5,15 +5,16 @@ import { cn } from "@lib/utils";
 
 import { AccountSwitcher } from "./account-switcher";
 import { Nav } from "./nav";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useIncomingMessages } from "@hooks";
+import { useLocation } from "react-router-dom";
+import { useIncomingMessages, useLoggedInUser } from "@hooks";
 
 interface Props {
     isCollapsed?: boolean;
 }
 
 export const NavMenu = ({ isCollapsed = false }: Props) => {
-    const navigate = useNavigate();
+    const { data: loggedInUser } = useLoggedInUser();
+    const isLoggedIn = !!loggedInUser;
 
     const { pathname } = useLocation();
     const at = pathname;
@@ -41,30 +42,35 @@ export const NavMenu = ({ isCollapsed = false }: Props) => {
                         icon: Inbox,
                         variant: at === "/" ? "default" : "ghost",
                         href: "/",
+                        disabled: !isLoggedIn,
                     },
                     {
                         title: "Drafts",
                         icon: PencilLine,
                         variant: at === "/drafts" ? "default" : "ghost",
                         href: "/drafts",
+                        disabled: !isLoggedIn,
                     },
                     {
                         title: "Saved",
                         icon: Pin,
                         variant: at === "/saved" ? "default" : "ghost",
                         href: "/saved",
+                        disabled: !isLoggedIn,
                     },
                     {
                         title: "Sent",
                         icon: Send,
                         variant: at === "/sent" ? "default" : "ghost",
                         href: "/sent",
+                        disabled: !isLoggedIn,
                     },
                     {
                         title: "Archived",
                         icon: Archive,
                         variant: at === "/archived" ? "default" : "ghost",
                         href: "/archived",
+                        disabled: !isLoggedIn,
                     },
                 ]}
             />

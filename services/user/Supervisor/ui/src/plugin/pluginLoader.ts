@@ -1,6 +1,5 @@
-import { isEqual, QualifiedPluginId } from "@psibase/common-lib";
+import { assertTruthy, isEqual, QualifiedPluginId } from "@psibase/common-lib";
 import { Plugins } from "./plugins";
-import { assertTruthy } from "../utils";
 
 class PluginIdSet {
     private items: Set<string> = new Set<string>();

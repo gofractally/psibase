@@ -24,8 +24,9 @@ import {
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
-import { getSupervisor } from "@lib/supervisor";
 import { wait } from "@lib/utils";
+
+import { supervisor } from "src/main";
 
 export function MailDisplay({
     message,
@@ -97,7 +98,6 @@ const ActionBar = ({
 
     const onArchive = async (itemId: string) => {
         let id = parseInt(itemId);
-        const supervisor = await getSupervisor();
         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
         await supervisor.functionCall({
             service: "chainmail",
@@ -119,7 +119,6 @@ const ActionBar = ({
 
     const onSave = async (itemId: string) => {
         let id = parseInt(itemId);
-        const supervisor = await getSupervisor();
         await supervisor.functionCall({
             service: "chainmail",
             intf: "api",

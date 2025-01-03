@@ -10,8 +10,7 @@ import { Separator } from "@shadcn/separator";
 import { MailDisplay } from "@components/mail-display";
 import { MailList } from "@components/mail-list";
 
-import { useIncomingMessages } from "@hooks/use-mail";
-import { Dialog } from "@shadcn/dialog";
+import { useIncomingMessages, useLoggedInUser } from "@hooks";
 import {
     ComposeDialog,
     ComposeDialogTriggerIconWithTooltip,
@@ -20,6 +19,9 @@ import {
 } from "@components";
 
 export function Home() {
+    const { data: loggedInUser } = useLoggedInUser();
+    const isLoggedIn = !!loggedInUser;
+
     const { query, selectedMessage, setSelectedMessageId } =
         useIncomingMessages();
 
@@ -37,9 +39,13 @@ export function Home() {
                 <div className="flex items-center justify-between px-4">
                     <h1 className="text-xl font-bold">Inbox</h1>
                     <div className="flex items-center gap-2">
-                        <ComposeDialog
-                            trigger={<ComposeDialogTriggerIconWithTooltip />}
-                        />
+                        {isLoggedIn ? (
+                            <ComposeDialog
+                                trigger={
+                                    <ComposeDialogTriggerIconWithTooltip />
+                                }
+                            />
+                        ) : null}
                         <ModeToggle />
                     </div>
                 </div>
