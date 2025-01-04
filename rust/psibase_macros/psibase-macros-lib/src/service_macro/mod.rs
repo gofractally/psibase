@@ -2,7 +2,6 @@ mod actions;
 mod dispatch;
 mod events;
 mod graphql;
-mod tables;
 
 pub use actions::Options;
 use actions::{
@@ -20,8 +19,7 @@ use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
 use std::{collections::HashMap, str::FromStr};
-use syn::{parse_quote, AttrStyle, Attribute, Ident, Item, ItemMod, ReturnType, Type};
-use tables::{is_table_attr, process_service_tables};
+use syn::{parse_quote, AttrStyle, Attribute, Item, ItemMod, ReturnType};
 
 pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_args = match NestedMeta::parse_meta_list(attr) {
@@ -89,7 +87,6 @@ fn process_mod(
     let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
-        let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut action_fns: Vec<usize> = Vec::new();
         let mut non_action_fns: Vec<usize> = Vec::new();
         let mut event_fns: HashMap<EventType, Vec<usize>> = HashMap::new();
@@ -98,12 +95,6 @@ fn process_mod(
             return pa_ret.err().unwrap();
         }
         for (item_index, item) in items.iter_mut().enumerate() {
-            if let Item::Struct(s) = item {
-                if s.attrs.iter().any(is_table_attr) {
-                    table_structs.insert(s.ident.clone(), vec![item_index]);
-                }
-            }
-
             if let Item::Fn(f) = item {
                 if f.attrs.iter().any(is_action_attr) {
                     f.attrs.push(parse_quote! {#[allow(dead_code)]});
@@ -116,36 +107,6 @@ fn process_mod(
                         event_fns.entry(kind).or_insert(Vec::new()).push(item_index);
                     }
                 }
-            }
-        }
-
-        // A second loop is needed in case the code has `impl` for a relevant table above the struct definition
-        for (item_index, item) in items.iter().enumerate() {
-            if let Item::Impl(i) = item {
-                if let Type::Path(type_path) = &*i.self_ty {
-                    if let Some(tpps) = type_path.path.segments.first() {
-                        table_structs.entry(tpps.ident.clone()).and_modify(|refs| {
-                            refs.push(item_index);
-                        });
-                    }
-                }
-            }
-        }
-
-        let mut processed_tables = Vec::new();
-        for (tb_name, items_idxs) in table_structs.iter() {
-            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs);
-            processed_tables.push((tb_name, table_idx));
-        }
-
-        // Validates table indexes
-        processed_tables.sort_by_key(|t| t.1);
-        for (expected_idx, (table_struct, tb_index)) in processed_tables.iter().enumerate() {
-            if *tb_index as usize != expected_idx {
-                abort!(
-                    table_struct,
-                    format!("Missing expected table index {}; tables may not have gaps and may not be removed or reordered.", expected_idx)
-                );
             }
         }
 

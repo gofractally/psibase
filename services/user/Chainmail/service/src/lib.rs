@@ -10,26 +10,18 @@ mod tables;
 mod service {
     use crate::event_query_helpers::serve_rest_api;
     // use crate::tables::{InitRow, InitTable};
-    use crate::tables::saved_messages::tables::{SavedMessage, SavedMessageTable};
+    use crate::tables::saved_messages::tables::{
+        InitRow, InitTable, SavedMessage, SavedMessageTable,
+    };
 
     use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::services::events::Wrapper as EventsSvc;
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack, HttpReply,
-        HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
+        check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, HttpReply,
+        HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec,
     };
-    use serde::{Deserialize, Serialize};
-
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    pub struct InitRow {}
-
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
 
     #[action]
     fn init() {

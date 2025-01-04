@@ -73,24 +73,24 @@ pub fn process_service_tables(
     table_record_struct_name: &Ident,
     items: &mut Vec<Item>,
     table_idxs: &Vec<usize>,
+    debug_msgs: &mut Vec<String>,
 ) -> u16 {
     let mut pk_data: Option<PkIdentData> = None;
     let mut secondary_keys = Vec::new();
     let mut table_options: Option<TableOptions> = None;
     let mut table_vis = None;
     let mut preset_table_record: Option<String> = None;
-    let mut debug_msgs: Vec<String> = Vec::new();
 
     debug_msgs.push(String::from("process_service_tables().top"));
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
-                process_table_attrs(s, &mut table_options, &mut debug_msgs);
+                process_table_attrs(s, &mut table_options, debug_msgs);
                 preset_table_record = table_options
                     .as_ref()
                     .and_then(|opts| opts.record.to_owned());
                 if preset_table_record.is_none() {
-                    process_table_fields(s, &mut pk_data, &mut debug_msgs);
+                    process_table_fields(s, &mut pk_data, debug_msgs);
                 } else {
                     let fields_named: syn::FieldsNamed =
                         parse_quote! {{ db_id: #psibase_mod::DbId, prefix: Vec<u8> }};
@@ -98,9 +98,7 @@ pub fn process_service_tables(
                 }
                 table_vis = Some(s.vis.clone());
             }
-            Item::Impl(i) => {
-                process_table_impls(i, &mut pk_data, &mut secondary_keys, &mut debug_msgs)
-            }
+            Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys, debug_msgs),
             item => abort!(item, "Unknown table item to be processed"),
         }
     }
@@ -237,19 +235,6 @@ pub fn process_service_tables(
     //         struct #idnt {}
     //     });
     // }
-    let doc_attrs = debug_msgs.into_iter().map(|msg| {
-        quote! {
-            #[doc = #msg]
-        }
-    });
-
-    // Combine the struct and its documentation attributes into a single token stream
-    let output = parse_quote! {
-        #(#doc_attrs)*
-        struct macro_debug_msgs {}
-    };
-
-    items.push(output);
 
     table_options.index
 }
