@@ -31,6 +31,8 @@ namespace SystemService
                          optional<string>        before,
                          optional<string>        after) const
          {
+            std::erase(pubkeyPem, '\n');
+
             auto idx =
                 AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
                     keyFingerprint(SubjectPublicKeyInfo{parseSubjectPublicKeyInfo(pubkeyPem)}));
