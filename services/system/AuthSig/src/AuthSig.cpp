@@ -1,12 +1,12 @@
 #include <services/system/AuthSig.hpp>
 
+#include <concepts>
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
-
-#include <concepts>
 
 using namespace psibase;
 
@@ -94,6 +94,28 @@ namespace SystemService
                                 std::vector<psibase::AccountNumber> rejecters)
       {
          return std::ranges::contains(rejecters, sender);
+      }
+
+      void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
+      {
+         to<Accounts>().newAccount(name, AuthAny::service, true);
+
+         Action setKey{
+             .sender  = name,
+             .service = AuthSig::AuthSig::service,
+             .method  = "setKey"_m,
+             .rawData = psio::convert_to_frac(std::make_tuple(key))  //
+         };
+
+         Action setAuth{
+             .sender  = name,
+             .service = Accounts::service,
+             .method  = "setAuthServ"_m,
+             .rawData = psio::convert_to_frac(std::make_tuple(AuthSig::AuthSig::service))  //
+         };
+
+         to<Transact>().runAs(std::move(setKey), std::vector<ServiceMethod>{});
+         to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
       }
    }  // namespace AuthSig
 }  // namespace SystemService

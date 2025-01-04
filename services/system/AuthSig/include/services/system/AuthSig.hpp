@@ -94,6 +94,9 @@ namespace SystemService
          bool isRejectSys(psibase::AccountNumber              sender,
                           std::vector<psibase::AccountNumber> rejecters);
 
+         /// Create a new account using this auth service configured with the specified public key.
+         void newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key);
+
         private:
          Tables db{psibase::getReceiver()};
       };
@@ -102,7 +105,8 @@ namespace SystemService
                    method(canAuthUserSys, user),
                    method(setKey, key),
                    method(isAuthSys, sender, authorizers),
-                   method(isRejectSys, sender, rejecters)
+                   method(isRejectSys, sender, rejecters),
+                   method(newAccount, name, key)
                    //
       )
    }  // namespace AuthSig
