@@ -114,6 +114,7 @@ namespace SystemService
              .rawData = psio::convert_to_frac(std::make_tuple(AuthSig::AuthSig::service))  //
          };
 
+         auto _ = recurse();
          to<Transact>().runAs(std::move(setKey), std::vector<ServiceMethod>{});
          to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
       }
