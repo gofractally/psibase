@@ -1,6 +1,4 @@
-// Target Syntax:
 #[psibase::service_tables]
-// remove this pub?
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::AccountNumber;

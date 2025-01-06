@@ -9,10 +9,7 @@ mod tables;
 #[psibase::service]
 mod service {
     use crate::event_query_helpers::serve_rest_api;
-    // use crate::tables::{InitRow, InitTable};
-    use crate::tables::saved_messages::tables::{
-        InitRow, InitTable, SavedMessage, SavedMessageTable,
-    };
+    use crate::tables::tables::{InitRow, InitTable, SavedMessage, SavedMessageTable};
 
     use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::services::events::Wrapper as EventsSvc;

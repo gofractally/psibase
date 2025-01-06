@@ -81,7 +81,6 @@ pub fn process_service_tables(
     let mut table_vis = None;
     let mut preset_table_record: Option<String> = None;
 
-    debug_msgs.push(String::from("process_service_tables().top"));
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
@@ -133,7 +132,6 @@ pub fn process_service_tables(
 
         let sk_fn_name = Ident::new(&format!("get_index_{}", sk_ident), Span::call_site());
 
-        // TODO: why did I need to add the pub on the fn below; it was not originally needed
         sks_fns = quote! {
             #sks_fns
             pub fn #sk_fn_name(&self) -> #psibase_mod::TableIndex<#sk_ty, #table_record_struct_name> {
@@ -228,6 +226,7 @@ pub fn process_service_tables(
     };
     items.push(parse_quote! {#table_struct_impl});
 
+    // TODO: remove? Can i add the call_site() part to what i've got for more context in the error messages?
     // for (idx, itm) in debug_msgs.iter().enumerate() {
     //     let idnt = Ident::new(&format!("t{}", idx), Span::call_site());
     //     items.push(parse_quote! {
@@ -244,7 +243,6 @@ fn process_table_attrs(
     table_options: &mut Option<TableOptions>,
     debug_msgs: &mut Vec<String>,
 ) {
-    debug_msgs.push(String::from("process_table_attrs().top"));
     // Parse table name and remove #[table]
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
@@ -278,7 +276,6 @@ fn process_table_fields(
     pk_data: &mut Option<PkIdentData>,
     debug_msgs: &mut Vec<String>,
 ) {
-    debug_msgs.push(String::from("process_table_fields().top"));
     for field in table_record_struct.fields.iter_mut() {
         let mut removable_attr_idxs = Vec::new();
 
@@ -293,12 +290,6 @@ fn process_table_fields(
                     removable_attr_idxs.push(field_attr_idx);
                 }
             }
-            // if field_attr.style == AttrStyle::Outer {
-            //     if field_attr.meta.path().is_ident("secondary_key") {
-            //         // process_table_pk_field(pk_data, field);
-            //         removable_attr_idxs.push(field_attr_idx);
-            //     }
-            // }
         }
 
         for i in removable_attr_idxs {
@@ -313,7 +304,6 @@ fn process_table_impls(
     secondary_keys: &mut Vec<SkIdentData>,
     debug_msgs: &mut Vec<String>,
 ) {
-    debug_msgs.push(String::from("process_table_impls().top"));
     for impl_item in table_impl.items.iter_mut() {
         if let ImplItem::Fn(method) = impl_item {
             let mut removable_attr_idxs = Vec::new();
