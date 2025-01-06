@@ -451,7 +451,6 @@ psibase_package(
     SERVICE verify-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
-    DEPENDS ${AuthSig_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSig/ui/dist/index.html
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
