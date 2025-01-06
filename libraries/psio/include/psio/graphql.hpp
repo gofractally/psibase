@@ -358,9 +358,10 @@ namespace psio
                              bool                                        is_input,
                              bool                                        is_query_root)
    {
-      (fill_gql_schema((T*)nullptr, stream, defined_types, is_input, false), ...);
       if (defined_types.insert({typeid(std::variant<T...>), is_input}).second)
       {
+         (fill_gql_schema((T*)nullptr, stream, defined_types, is_input, false), ...);
+
          write_str("union ", stream);
          write_str(generate_gql_partial_name((std::variant<T...>*)nullptr, is_input), stream);
          write_str(" =", stream);
