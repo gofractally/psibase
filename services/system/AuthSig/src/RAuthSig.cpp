@@ -31,7 +31,11 @@ namespace SystemService
                          optional<string>        before,
                          optional<string>        after) const
          {
-            std::erase(pubkeyPem, '\n');
+            std::size_t pos;
+            while ((pos = pubkeyPem.find("\\n")) != std::string::npos)
+            {
+               pubkeyPem.replace(pos, 2, "\n");
+            }
 
             auto idx =
                 AuthSig::Tables{AuthSig::service}.open<AuthSig::AuthTable>().getIndex<1>().subindex(
