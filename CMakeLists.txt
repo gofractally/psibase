@@ -244,6 +244,7 @@ ExternalProject_Add(
 # UIs built with yarn
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
+    services/system/AuthSig/ui:AuthSig_js
     services/user/Homepage/ui:Homepage_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
@@ -451,6 +452,7 @@ psibase_package(
     SERVICE verify-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
+    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
