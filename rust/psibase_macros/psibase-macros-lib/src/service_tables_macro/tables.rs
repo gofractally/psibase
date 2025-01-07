@@ -1,6 +1,6 @@
 use darling::FromMeta;
 use proc_macro2::Span;
-use proc_macro_error::abort;
+use proc_macro_error::{abort, emit_error};
 use quote::quote;
 use syn::{
     parse_quote, AttrStyle, Attribute, Field, Ident, ImplItem, Item, ItemImpl, ItemStruct,
@@ -98,7 +98,7 @@ pub fn process_service_tables(
                 table_vis = Some(s.vis.clone());
             }
             Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys, debug_msgs),
-            item => abort!(item, "Unknown table item to be processed"),
+            item => emit_error!(item, "Unknown table item to be processed"),
         }
     }
 
@@ -125,7 +125,7 @@ pub fn process_service_tables(
 
         let expected_idx = idx + 1;
         if sk_idx as usize != expected_idx {
-            abort!(sk_ident, format!("Missing expected secondary index {}; indexes may not have gaps and may not be removed or reordered", expected_idx));
+            emit_error!(sk_ident, format!("Missing expected secondary index {}; indexes may not have gaps and may not be removed or reordered", expected_idx));
         }
 
         sks = quote! { #sks #psibase_mod::RawKey::new(self.#sk_ident().to_key()), };
