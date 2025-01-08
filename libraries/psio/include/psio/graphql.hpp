@@ -854,6 +854,14 @@ namespace psio
             }
             else
             {
+               // From the spec: "If non-printable ASCII characters are needed in a string value,
+               //   a standard quoted string with appropriate escape sequences must be used instead of a block string."
+               unsigned char ch = *input.pos;
+               if (ch < 32 && ch != '\n' && ch != '\r' && ch != '\t')
+               {
+                  current_type = error;
+                  return;
+               }
                raw_storage += *input.pos++;
             }
          }
