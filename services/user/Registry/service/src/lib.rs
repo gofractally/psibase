@@ -237,20 +237,19 @@ mod tables {
 #[psibase::service(name = "registry")]
 #[allow(non_snake_case)]
 pub mod service {
-    use std::collections::HashSet;
-
     use async_graphql::*;
-
     use psibase::services::transact;
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use services::events::Wrapper as EventsSvc;
+    use std::collections::HashSet;
 
     use crate::consts::MAX_APP_TAGS;
-    use crate::tables::{
-        AppMetadata, AppMetadataTable, AppTag, AppTagsTable, InitRow, InitTable, TagRecord,
-        TagsTable,
-    };
+    pub use crate::tables::*;
+    // use crate::tables::{
+    //     AppMetadata, AppMetadataTable, AppTag, AppTagsTable, InitRow, InitTable, TagRecord,
+    //     TagsTable,
+    // };
     use crate::utils::increment_last_char;
 
     pub type AppStatusU32 = u32;
@@ -572,14 +571,15 @@ pub mod service {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord, MAX_APP_NAME_LENGTH};
-    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointSec};
+    use crate::consts::MAX_APP_NAME_LENGTH;
+    use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord};
+    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointSec, TimePointUSec};
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
             account_id: AccountNumber::new(0),
             status: AppStatus::Draft as AppStatusU32,
-            created_at: TimePointSec::from(0),
+            created_at: TimePointUSec::from(0),
             redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             owners: vec![account!("alice"), account!("bob")],
             name: "Super Cooking App".to_string(),

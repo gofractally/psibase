@@ -11,76 +11,27 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 pub fn get_auth_service(sender: AccountNumber) -> Option<AccountNumber> {
     Accounts::call().getAccount(sender).map(|a| a.authService)
 }
-/// A service for staged transaction proposal and execution
-///
-/// A staged transaction allows an account (the proposer) to propose a set of
-/// actions to be executed by another account (the executor). The set of actions
-/// proposed is known as the staged transaction. The staged transaction is not
-/// executed unless and until the executor's auth service authorizes the execution.
-///
-/// The rules for authorization may vary depending on the staged-tx policy enforced
-/// by the executor's auth service.
-///
-/// This can be used, for example, to propose a transaction on behalf of an account
-/// that is only authorized by the combined authorization of multiple other accounts
-/// (a.k.a. a "multi-sig" or multi-signature transaction), among many other uses.
-#[psibase::service(recursive = true)]
-pub mod service {
-    use crate::get_auth_service;
+
+#[psibase::service_tables]
+mod tables {
     use crate::sha256;
     use async_graphql::SimpleObject;
     use psibase::fracpack::Pack;
-    use psibase::services::transact::auth_interface::auth_action_structs;
-    use psibase::services::{
-        accounts::Wrapper as Accounts, events::Wrapper as Events, transact::Wrapper as Transact,
+    use psibase::services::accounts::Wrapper as Accounts;
+    use psibase::services::transact::Wrapper as Transact;
+    use psibase::{
+        check, get_sender, AccountNumber, Action, Fracpack, Table, TimePointUSec, ToKey, ToSchema,
     };
-    use psibase::*;
     use serde::{Deserialize, Serialize};
-
-    struct StagedTxPolicy {
-        user: AccountNumber,
-        service_caller: ServiceCaller,
-    }
-    impl StagedTxPolicy {
-        pub fn new(user: AccountNumber) -> Self {
-            StagedTxPolicy {
-                user,
-                service_caller: ServiceCaller {
-                    sender: Wrapper::SERVICE,
-                    service: get_auth_service(user).unwrap(),
-                },
-            }
-        }
-
-        pub fn does_auth(&self, accepters: Vec<AccountNumber>) -> bool {
-            self.service_caller.call(
-                MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
-                auth_action_structs::isAuthSys {
-                    sender: self.user,
-                    authorizers: accepters,
-                },
-            )
-        }
-
-        pub fn does_reject(&self, rejecters: Vec<AccountNumber>) -> bool {
-            self.service_caller.call(
-                MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),
-                auth_action_structs::isRejectSys {
-                    sender: self.user,
-                    rejecters,
-                },
-            )
-        }
-    }
 
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct ActionList {
-        actions: Vec<Action>,
+        pub actions: Vec<Action>,
     }
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    struct InitRow {}
+    pub struct InitRow {}
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
@@ -102,7 +53,7 @@ pub mod service {
             self.id
         }
 
-        fn new(actions: Vec<Action>) -> Self {
+        pub fn new(actions: Vec<Action>) -> Self {
             check(
                 actions.len() > 0,
                 "Staged transaction must contain at least one action",
@@ -131,7 +82,7 @@ pub mod service {
             }
         }
 
-        fn get(id: u32, txid: [u8; 32]) -> Self {
+        pub fn get(id: u32, txid: [u8; 32]) -> Self {
             let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
             check(staged_tx.is_some(), "Unknown staged tx");
             let staged_tx = staged_tx.unwrap();
@@ -143,15 +94,15 @@ pub mod service {
             staged_tx
         }
 
-        fn accept(&self) {
+        pub fn accept(&self) {
             Response::upsert(self.id, true);
         }
 
-        fn reject(&self) {
+        pub fn reject(&self) {
             Response::upsert(self.id, false);
         }
 
-        fn delete(&self) {
+        pub fn delete(&self) {
             // Delete all responses for this staged tx
             let id = self.id;
             let responses = ResponseTable::new();
@@ -164,7 +115,7 @@ pub mod service {
             StagedTxTable::new().erase(&id);
         }
 
-        fn accepters(&self) -> Vec<AccountNumber> {
+        pub fn accepters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
                 .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
@@ -173,7 +124,7 @@ pub mod service {
                 .collect()
         }
 
-        fn rejecters(&self) -> Vec<AccountNumber> {
+        pub fn rejecters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
                 .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
@@ -236,6 +187,67 @@ pub mod service {
                 });
 
             table.put(&response).unwrap();
+        }
+    }
+}
+/// A service for staged transaction proposal and execution
+///
+/// A staged transaction allows an account (the proposer) to propose a set of
+/// actions to be executed by another account (the executor). The set of actions
+/// proposed is known as the staged transaction. The staged transaction is not
+/// executed unless and until the executor's auth service authorizes the execution.
+///
+/// The rules for authorization may vary depending on the staged-tx policy enforced
+/// by the executor's auth service.
+///
+/// This can be used, for example, to propose a transaction on behalf of an account
+/// that is only authorized by the combined authorization of multiple other accounts
+/// (a.k.a. a "multi-sig" or multi-signature transaction), among many other uses.
+#[psibase::service(recursive = true)]
+pub mod service {
+    use crate::get_auth_service;
+    pub use crate::tables::{InitRow, InitTable, StagedTx, StagedTxTable};
+    use async_graphql::SimpleObject;
+    use fracpack::Pack;
+    use psibase::services::transact::auth_interface::auth_action_structs;
+    use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
+    use psibase::Table;
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+
+    struct StagedTxPolicy {
+        user: AccountNumber,
+        service_caller: ServiceCaller,
+    }
+    impl StagedTxPolicy {
+        pub fn new(user: AccountNumber) -> Self {
+            StagedTxPolicy {
+                user,
+                service_caller: ServiceCaller {
+                    sender: Wrapper::SERVICE,
+                    service: get_auth_service(user).unwrap(),
+                },
+            }
+        }
+
+        pub fn does_auth(&self, accepters: Vec<AccountNumber>) -> bool {
+            self.service_caller.call(
+                MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
+                auth_action_structs::isAuthSys {
+                    sender: self.user,
+                    authorizers: accepters,
+                },
+            )
+        }
+
+        pub fn does_reject(&self, rejecters: Vec<AccountNumber>) -> bool {
+            self.service_caller.call(
+                MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),
+                auth_action_structs::isRejectSys {
+                    sender: self.user,
+                    rejecters,
+                },
+            )
         }
     }
 
