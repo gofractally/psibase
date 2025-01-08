@@ -113,24 +113,25 @@ SCENARIO("AuthSig")
              .rawData = psio::to_frac(std::tuple(nftId, receiver, psibase::Memo{"Memo"}))};
       };
 
-      auto getNfts = [](DefaultTestChain& t, AccountNumber acc) -> std::vector<Node>
+      auto getNfts = [](DefaultTestChain& t, AccountNumber acc) -> std::vector<uint32_t>
       {
-         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() + "\" ) { edges { node { id issuer owner } } } "
-             "}";
+         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+                                 "\" ) { edges { node { id issuer owner } } } "
+                                 "}";
          std::string_view query_sv = query_str;
 
          auto query = GraphQLBody{query_sv};
 
-         psibase::writeConsole("Querying: " + std::string(query_sv) + "\n");
+         std::cout << "Querying: " << std::string(query_sv) << "\n";
          auto res = t.post(Nft::service, "/graphql", query);
 
          auto body = std::string(res.body.begin(), res.body.end());
-         psibase::writeConsole(body + "\n");
+         std::cout << "Response: " << body << "\n";
          auto response_root = psio::convert_from_json<QueryRoot>(body);
 
-         return response_root.data.userNfts.edges
-                | std::views::transform([](auto edge) { return edge.node; })
-                | std::ranges::to<std::vector>();
+         return response_root.data.userNfts.edges |
+                std::views::transform([](auto edge) { return edge.node.id; }) |
+                std::ranges::to<std::vector>();
       };
 
       THEN("Alice has not minted any NFTs")
@@ -183,8 +184,8 @@ SCENARIO("AuthSig")
 
          auto aliceNftId = aliceMint.returnVal();
          auto bobNftId   = bobMint.returnVal();
-         REQUIRE(aliceNfts[0].id == aliceNftId);
-         REQUIRE(bobNfts[0].id == bobNftId);
+         REQUIRE(aliceNfts[0] == aliceNftId);
+         REQUIRE(bobNfts[0] == bobNftId);
 
          AND_WHEN("Alice proposes a swap")
          {
@@ -197,7 +198,7 @@ SCENARIO("AuthSig")
 
             THEN("The swap does not immediately execute")
             {
-               REQUIRE(getNfts(t, alice.id)[0].id == aliceNftId);
+               REQUIRE(getNfts(t, alice.id) == std::vector{aliceNftId});
             }
 
             THEN("Bob can accept the swap")
@@ -208,8 +209,8 @@ SCENARIO("AuthSig")
 
                AND_THEN("The atomic swap is complete")
                {
-                  REQUIRE(getNfts(t, alice.id)[0].id == bobNftId);
-                  REQUIRE(getNfts(t, bob.id)[0].id == aliceNftId);
+                  REQUIRE(getNfts(t, alice.id) == std::vector{bobNftId});
+                  REQUIRE(getNfts(t, bob.id) == std::vector{aliceNftId});
                }
             }
          }
