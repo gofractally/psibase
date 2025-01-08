@@ -558,6 +558,7 @@ namespace psibase
 
       JointConsensus state;
       Checksum256    stateHash;
+      bool           consensusChangeReady = false;
 
       Database database;
 
@@ -572,6 +573,7 @@ namespace psibase
          // might be ahead of the point that the peer starts sending.
          if (info.header.blockNum <= prevBlockNum)
             return;
+         maybeAdvance();
          if (info.header.newConsensus)
          {
             check(!nextProducers, "Already in joint consensus");
@@ -588,13 +590,9 @@ namespace psibase
          }
          if (state.next && info.header.commitNum >= state.next->blockNum)
          {
-            auto start    = state.next->blockNum;
-            auto commit   = consensus.light_verify(*this, info, block);
-            state.current = std::move(state.next->consensus);
-            state.next.reset();
-            stateHash = sha256(state);
-            pendingBlocks.clear();
-            producers = std::move(nextProducers);
+            auto start           = state.next->blockNum;
+            auto commit          = consensus.light_verify(*this, info, block);
+            consensusChangeReady = true;
             ConsensusChangeRow changeRow{start, commit, info.header.blockNum};
             systemContext->sharedDatabase.kvPutSubjective(
                 *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
@@ -607,6 +605,19 @@ namespace psibase
          {
             database.kvPutRaw(DbId::blockProof, blockNumKey,
                               std::span<const char>(block->signature()));
+         }
+      }
+
+      void maybeAdvance()
+      {
+         if (consensusChangeReady)
+         {
+            state.current = std::move(state.next->consensus);
+            state.next.reset();
+            stateHash = sha256(state);
+            pendingBlocks.clear();
+            producers            = std::move(nextProducers);
+            consensusChangeReady = false;
          }
       }
    };
@@ -1236,8 +1247,19 @@ namespace psibase
       {
          state.push(systemContext, writer, block, consensus);
       }
-      std::optional<BlockNum> get_next_light_header_num(BlockNum prev)
+      std::optional<BlockNum> get_next_light_header_num(BlockNum           prev,
+                                                        const Checksum256& snapshotId)
       {
+         // If the snapshot is in joint consensus, send all the headers after
+         // the new producers were set.
+         {
+            auto revision = systemContext->sharedDatabase.getRevision(*writer, snapshotId);
+            auto status   = getStatus(revision);
+            if (status.consensus.next && status.consensus.next->blockNum <= prev)
+            {
+               return prev + 1;
+            }
+         }
          Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
          auto     session = database.startRead();
          database.checkoutSubjective();
@@ -1263,6 +1285,10 @@ namespace psibase
       }
       SnapshotLoader start_snapshot(LightHeaderState&& state, const Checksum256& blockId)
       {
+         if (getBlockNum(blockId) > state.prevBlockNum)
+         {
+            state.maybeAdvance();
+         }
          return SnapshotLoader(std::move(state), blockId);
       }
       void add_to_snapshot(SnapshotLoader&                  loader,

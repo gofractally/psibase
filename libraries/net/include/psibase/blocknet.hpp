@@ -464,8 +464,8 @@ namespace psibase::net
          auto& state      = std::get<ConnectionStateSendFastForward>(connection.state);
          auto  snapshotId = chain().get_last_snapshot_id();
          PSIBASE_LOG(logger, debug) << "Last snapshot: " << loggers::to_string(snapshotId);
-         if (auto headerNum = chain().get_next_light_header_num(state.blockNum);
-             headerNum && *headerNum < getBlockNum(snapshotId))
+         if (auto headerNum = chain().get_next_light_header_num(state.blockNum, snapshotId);
+             headerNum && *headerNum <= getBlockNum(snapshotId))
          {
             // Lookup block and discard transactions
             PSIBASE_LOG(logger, debug) << "sending header: " << *headerNum;
