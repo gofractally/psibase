@@ -245,6 +245,7 @@ ExternalProject_Add(
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
     services/user/Homepage/ui:Homepage_js
+    services/user/Workshop/ui:Workshop_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
@@ -731,6 +732,17 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Workshop.psi
+    NAME Workshop
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Add apps to registry"
+    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
+    SERVICE workshop
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
+    DEPENDS ${Workshop_js_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractal.psi
     NAME Fractal
     VERSION ${PSIBASE_VERSION}
@@ -773,7 +785,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
 psibase_package(
@@ -812,7 +824,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    AppRegistry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    AppRegistry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -841,6 +853,7 @@ install(
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/AppRegistry.psi
+          ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/StagedTx.psi

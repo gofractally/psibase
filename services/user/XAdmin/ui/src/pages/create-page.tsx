@@ -127,6 +127,7 @@ export const CreatePage = () => {
             });
         }
     );
+    console.log({ packages, rows });
 
     useEffect(() => {
         if (currentStep == 3) {
