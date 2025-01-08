@@ -13,8 +13,8 @@ namespace
 
    bool satisfiesClaim(const Claim& expected, const std::vector<Claim>& claims_sorted)
    {
-      return expected == Claim{}
-             || std::ranges::binary_search(claims_sorted, expected, compare_claim);
+      return expected == Claim{} ||
+             std::ranges::binary_search(claims_sorted, expected, compare_claim);
    }
 
    std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
@@ -45,9 +45,45 @@ namespace
    {
       auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
       check(status.has_value(), "status row invalid");
-      std::vector<Producer> producers;
-      std::visit([&](const auto& c) { producers = c.producers; }, status->consensus.current.data);
-      return std::move(producers);
+      return std::visit([](const auto& c) -> std::vector<Producer>
+                        { return std::move(c.producers); }, status->consensus.current.data);
+   }
+
+   using IndirectCheckFunc =
+       bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
+                                                     std::vector<AccountNumber>,
+                                                     std::optional<std::vector<AccountNumber>>);
+
+   bool checkOverlapping(std::vector<AccountNumber> producers,
+                         std::vector<AccountNumber> authorizers,
+                         std::size_t                threshold,
+                         IndirectCheckFunc          indirectCheck,
+                         std::vector<AccountNumber> authSet)
+   {
+      // We only check for indirect auth if there are insufficient direct auths.
+      auto nonOverlapping = std::ranges::partition(
+          producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
+      auto numOverlapping = std::ranges::distance(producers.begin(), nonOverlapping.begin());
+      if (numOverlapping >= threshold)
+      {
+         return true;
+      }
+
+      // Now check for indirect authorization
+      for (const auto& account :
+           std::ranges::subrange(nonOverlapping.begin(), nonOverlapping.end()))
+      {
+         auto toAuth = Actor<SystemService::AuthInterface>{
+             SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
+
+         if ((toAuth.*indirectCheck)(account, authorizers, std::optional(std::move(authSet))) &&
+             ++numOverlapping >= threshold)
+         {
+            return true;
+         }
+      }
+
+      return false;
    }
 
 }  // namespace
@@ -174,8 +210,8 @@ namespace SystemService
       auto threshold = expectedClaims.empty() ? 0 : getThreshold(sender);
       if (matching < threshold)
       {
-         abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold)
-                      + " producers required to authorize");
+         abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +
+                      " producers required to authorize");
       }
    }
 
@@ -183,37 +219,6 @@ namespace SystemService
    {
       check(user == producerAccountStrong || user == producerAccountWeak,
             "Can only authorize predefined accounts");
-   }
-
-   bool Producers::checkOverlapping(std::vector<AccountNumber> producers,
-                                    std::vector<AccountNumber> authorizers,
-                                    std::size_t                threshold,
-                                    IndirectCheckFunc          indirectCheck,
-                                    std::vector<AccountNumber> authSet)
-   {
-      // We only check for indirect auth if there are insufficient direct auths.
-      auto nonOverlapping = std::ranges::partition(
-          producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
-      auto numOverlapping = std::ranges::distance(producers.begin(), nonOverlapping.begin());
-      if (numOverlapping >= threshold)
-      {
-         return true;
-      }
-
-      // Now check for indirect authorization
-      for (const auto& account :
-           std::ranges::subrange(nonOverlapping.begin(), nonOverlapping.end()))
-      {
-         auto toAuth = Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
-
-         if ((toAuth.*indirectCheck)(account, authorizers, std::make_optional(authSet))
-             && ++numOverlapping >= threshold)
-         {
-            return true;
-         }
-      }
-
-      return false;
    }
 
    bool Producers::isAuthSys(AccountNumber                             sender,

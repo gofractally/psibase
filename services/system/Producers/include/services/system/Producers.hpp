@@ -78,17 +78,6 @@ namespace SystemService
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                rejecters,
                        std::optional<std::vector<psibase::AccountNumber>> authSet);
-
-     private:
-      using IndirectCheckFunc = bool (psibase::Actor<AuthInterface>::*)(
-          psibase::AccountNumber,
-          std::vector<psibase::AccountNumber>,
-          std::optional<std::vector<psibase::AccountNumber>>);
-      bool checkOverlapping(std::vector<psibase::AccountNumber> producers,
-                            std::vector<psibase::AccountNumber> authorizers,
-                            std::size_t                         threshold,
-                            IndirectCheckFunc                   indirectCheck,
-                            std::vector<psibase::AccountNumber> authSet);
    };
    PSIO_REFLECT(Producers,
                 method(setConsensus, consensus),
