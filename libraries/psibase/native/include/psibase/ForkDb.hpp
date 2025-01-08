@@ -1690,15 +1690,30 @@ namespace psibase
             psio::from_frac(row, *bytes);
          }
          // Check whether there are existing signatures for the same state
-         auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
-         if (pos != row.other.end())
+         if (row.state)
          {
-            row.state = std::move(*pos);
-            row.other.erase(pos);
+            if (row.state->state != checksum)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+               PSIBASE_LOG(logger, error)
+                   << "The recorded state checksum (" << psio::convert_to_json(row.state->state)
+                   << ") does not match the newly computed checksum ("
+                   << psio::convert_to_json(checksum) << ")";
+               row.state = {.state = checksum};
+            }
          }
          else
          {
-            row.state = {.state = checksum};
+            auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+            if (pos != row.other.end())
+            {
+               row.state = std::move(*pos);
+               row.other.erase(pos);
+            }
+            else
+            {
+               row.state = {.state = checksum};
+            }
          }
          // Add my signature
          if (auto claim = producers.getClaim(me))
