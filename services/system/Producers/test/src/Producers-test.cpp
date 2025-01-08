@@ -56,6 +56,18 @@ namespace
                            "cGky3DiVxoHkPFfGo81ZkIDBk3NOMSFiw5hZiscqwtY464TFBKdc8evq\n"
                            "-----END PRIVATE KEY-----\n")};
 
+   auto gary_keys =
+       KeyPair{pubFromPem("-----BEGIN PUBLIC KEY-----"
+                          "\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEb/vyUN9kprmmbKW7PQBsvzhKU5/o"
+                          "\n8KAzO0SdPjGJ9o+NpCPgqgARIGBciczQjA2rIglzNA4RmHmukKl7L8yXlA=="
+                          "\n-----END PUBLIC KEY-----\n"),
+
+               privFromPem("-----BEGIN PRIVATE KEY-----"
+                           "\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgtOdty5dQ9bOx9DSP"
+                           "\nHJFR1vOkzfz35Js+RqIsL/aUKcGhRANCAARv+/JQ32SmuaZspbs9AGy/OEpTn+jw"
+                           "\noDM7RJ0+MYn2j42kI+CqABEgYFyJzNCMDasiCXM0DhGYea6QqXsvzJeU"
+                           "\n-----END PRIVATE KEY-----\n")};
+
    Producer createProducer(AccountNumber name)
    {
       return Producer{.name = name, .auth = Claim{}};
@@ -116,12 +128,14 @@ SCENARIO("Producers")
       auto prod_elena = createProducer(elena.id);
       auto frank      = t.from(t.addAccount("frank"_a));
       auto prod_frank = createProducer(frank.id);
+      auto gary       = t.from(t.addAccount("gary"_a));
+      auto prod_gary  = createProducer(gary.id);
 
       // Other accounts
       auto producers = t.from("producers"_a);
       auto weak      = "prods-weak"_a;
       auto strong    = "prods-strong"_a;
-      auto gary      = t.from(t.addAccount("gary"_a));
+      auto rando     = t.from(t.addAccount("rando"_a));
 
       // Alice requires prods-strong
       REQUIRE(alice.to<AuthDelegate>().setOwner(strong).succeeded());
@@ -135,6 +149,7 @@ SCENARIO("Producers")
       t.setAuth<AuthSig::AuthSig>(dana.id, dana_keys.first);
       t.setAuth<AuthSig::AuthSig>(elena.id, elena_keys.first);
       t.setAuth<AuthSig::AuthSig>(frank.id, frank_keys.first);
+      t.setAuth<AuthSig::AuthSig>(gary.id, gary_keys.first);
 
       auto mintAction = [](AccountNumber acc)
       {
@@ -149,8 +164,9 @@ SCENARIO("Producers")
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc)
       {
-         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() + "\" ) { edges { node { id issuer owner } } } "
-             "}";
+         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+                                 "\" ) { edges { node { id issuer owner } } } "
+                                 "}";
          std::string_view query_sv = query_str;
 
          auto query = GraphQLBody{query_sv};
@@ -198,19 +214,19 @@ SCENARIO("Producers")
 
          THEN("Anyone can stage a tx for alice/bob")
          {
-            auto proposeBob = gary.to<StagedTxService>().propose(proposed(bob.id));
+            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id));
             REQUIRE(proposeBob.succeeded());
             REQUIRE(getNfts(t, bob.id) == 0);
             auto proposeBobId = proposeBob.returnVal();
 
-            auto proposeAlice = gary.to<StagedTxService>().propose(proposed(alice.id));
+            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id));
             REQUIRE(proposeAlice.succeeded());
             REQUIRE(getNfts(t, alice.id) == 0);
             auto proposeAliceId = proposeAlice.returnVal();
 
             AND_WHEN("One producer accepts bob's transaction")
             {
-               auto txid = gary.to<StagedTxService>().get_staged_tx(proposeBobId).returnVal().txid;
+               auto txid = rando.to<StagedTxService>().get_staged_tx(proposeBobId).returnVal().txid;
                auto accept =
                    dana.with({dana_keys}).to<StagedTxService>().accept(proposeBobId, txid);
                REQUIRE(accept.succeeded());
@@ -218,7 +234,7 @@ SCENARIO("Producers")
                THEN("Bob (dependent on prods-weak) threshold was reached, so has minted an NFT")
                {
                   CHECK(getNfts(t, bob.id) == 1);
-                  REQUIRE(gary.to<StagedTxService>()
+                  REQUIRE(rando.to<StagedTxService>()
                               .get_staged_tx(proposeBobId)
                               .failed("Unknown staged tx"));
                }
@@ -227,7 +243,7 @@ SCENARIO("Producers")
             AND_WHEN("One producer accepts alice's transaction")
             {
                auto txid =
-                   gary.to<StagedTxService>().get_staged_tx(proposeAliceId).returnVal().txid;
+                   rando.to<StagedTxService>().get_staged_tx(proposeAliceId).returnVal().txid;
                auto accept =
                    dana.with({dana_keys}).to<StagedTxService>().accept(proposeAliceId, txid);
                REQUIRE(accept.succeeded());
@@ -246,7 +262,7 @@ SCENARIO("Producers")
                   REQUIRE(accept2.succeeded());
                   REQUIRE(getNfts(t, alice.id) == 1);
 
-                  REQUIRE(gary.to<StagedTxService>()
+                  REQUIRE(rando.to<StagedTxService>()
                               .get_staged_tx(proposeAliceId)
                               .failed("Unknown staged tx"));
                }
@@ -256,13 +272,16 @@ SCENARIO("Producers")
 
       WHEN("BFT is used instead of CFT")
       {
-         auto setConsensus = producers.to<Producers>().setConsensus(
-             ConsensusData{BftConsensus{.producers = {prod_dana, prod_elena, prod_frank}}});
+         auto setConsensus = producers.to<Producers>().setConsensus(ConsensusData{
+             BftConsensus{.producers = {prod_dana, prod_elena, prod_frank, prod_gary}}});
          REQUIRE(setConsensus.succeeded());
 
          t.startBlock();
          t.startBlock();
          t.startBlock();
+
+         REQUIRE(rando.to<Producers>().getThreshold(weak).returnVal() == 2);
+         REQUIRE(rando.to<Producers>().getThreshold(strong).returnVal() == 3);
 
          THEN("Alice/bob has not minted any NFTs")
          {
@@ -272,27 +291,32 @@ SCENARIO("Producers")
 
          THEN("Anyone can stage a tx for alice/bob")
          {
-            auto proposeBob = gary.to<StagedTxService>().propose(proposed(bob.id));
+            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id));
             REQUIRE(proposeBob.succeeded());
             REQUIRE(getNfts(t, bob.id) == 0);
             auto proposeBobId = proposeBob.returnVal();
 
-            auto proposeAlice = gary.to<StagedTxService>().propose(proposed(alice.id));
+            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id));
             REQUIRE(proposeAlice.succeeded());
             REQUIRE(getNfts(t, alice.id) == 0);
             auto proposeAliceId = proposeAlice.returnVal();
 
-            AND_WHEN("One producer accepts bob's transaction")
+            AND_WHEN("Two producers accept bob's transaction")
             {
-               auto txid = gary.to<StagedTxService>().get_staged_tx(proposeBobId).returnVal().txid;
+               auto txid = rando.to<StagedTxService>().get_staged_tx(proposeBobId).returnVal().txid;
                auto accept =
                    dana.with({dana_keys}).to<StagedTxService>().accept(proposeBobId, txid);
                REQUIRE(accept.succeeded());
+               CHECK(getNfts(t, bob.id) == 0);
+
+               auto accept2 =
+                   elena.with({elena_keys}).to<StagedTxService>().accept(proposeBobId, txid);
+               REQUIRE(accept2.succeeded());
 
                THEN("Bob (dependent on prods-weak) threshold was reached, so has minted an NFT")
                {
                   CHECK(getNfts(t, bob.id) == 1);
-                  REQUIRE(gary.to<StagedTxService>()
+                  REQUIRE(rando.to<StagedTxService>()
                               .get_staged_tx(proposeBobId)
                               .failed("Unknown staged tx"));
                }
@@ -301,7 +325,7 @@ SCENARIO("Producers")
             AND_WHEN("Two producers accepts alice's transaction")
             {
                auto txid =
-                   gary.to<StagedTxService>().get_staged_tx(proposeAliceId).returnVal().txid;
+                   rando.to<StagedTxService>().get_staged_tx(proposeAliceId).returnVal().txid;
                auto accept =
                    dana.with({dana_keys}).to<StagedTxService>().accept(proposeAliceId, txid);
                REQUIRE(accept.succeeded());
@@ -326,7 +350,7 @@ SCENARIO("Producers")
                       "NFT")
                   {
                      CHECK(getNfts(t, alice.id) == 1);
-                     REQUIRE(gary.to<StagedTxService>()
+                     REQUIRE(rando.to<StagedTxService>()
                                  .get_staged_tx(proposeAliceId)
                                  .failed("Unknown staged tx"));
                   }
