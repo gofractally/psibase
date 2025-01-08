@@ -246,10 +246,6 @@ pub mod service {
 
     use crate::consts::MAX_APP_TAGS;
     pub use crate::tables::*;
-    // use crate::tables::{
-    //     AppMetadata, AppMetadataTable, AppTag, AppTagsTable, InitRow, InitTable, TagRecord,
-    //     TagsTable,
-    // };
     use crate::utils::increment_last_char;
 
     pub type AppStatusU32 = u32;
@@ -272,7 +268,6 @@ pub mod service {
     }
 
     /// Holds metadata for a registered app
-
     #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
     pub struct AppMetadataWithTags {
         pub metadata: AppMetadata,

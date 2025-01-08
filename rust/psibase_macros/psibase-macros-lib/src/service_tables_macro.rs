@@ -36,7 +36,7 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
             }
         }
 
-        // A second loop is needed in case the code has `impl` for a relevant table above the struct definition
+        // do second table loop in case the code has `impl` for a relevant table above the struct definition
         for (item_index, item) in items.iter().enumerate() {
             if let Item::Impl(i) = item {
                 if let Type::Path(type_path) = &*i.self_ty {
@@ -49,7 +49,7 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
             }
         }
 
-        // Transform table attributes into expanded code.
+        // Transform table attributes into expanded code
         let mut processed_tables = Vec::new();
         for (tb_name, items_idxs) in table_structs.iter() {
             let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs);
@@ -58,7 +58,7 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
             }
         }
 
-        // Validates table indexes
+        // Validate table indexes
         processed_tables.sort_by_key(|t| t.1);
         for (expected_idx, (table_struct, tb_index)) in processed_tables.iter().enumerate() {
             if *tb_index as usize != expected_idx {
@@ -68,11 +68,6 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
                 );
             }
         }
-
-        // items.push(parse_quote! {
-        //     #[doc = "mikey2"]
-        //     struct test_string1 {}
-        // });
     } else {
         emit_error!(
             impl_mod,

@@ -275,11 +275,11 @@ fn process_table_fields(
         let mut removable_attr_idxs = Vec::new();
 
         for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
-            if field_attr.style == AttrStyle::Outer {
-                if field_attr.meta.path().is_ident("primary_key") {
-                    process_table_pk_field(pk_data, field)?;
-                    removable_attr_idxs.push(field_attr_idx);
-                }
+            if field_attr.style == AttrStyle::Outer
+                && field_attr.meta.path().is_ident("primary_key")
+            {
+                process_table_pk_field(pk_data, field)?;
+                removable_attr_idxs.push(field_attr_idx);
             }
         }
 
