@@ -6,12 +6,18 @@ members = ["service", "plugin"]
 version = "0.14.0"
 rust-version = "1.64"
 edition = "2021"
-publish = false
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+publish = false
 
 [package]
 name = "branding_package"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
 
 [profile.release]
 codegen-units = 1
