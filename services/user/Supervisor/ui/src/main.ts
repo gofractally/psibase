@@ -3,6 +3,7 @@ import {
     isFunctionCallRequest,
     buildMessageSupervisorInitialized,
     isPreLoadPluginsRequest,
+    isGetJsonRequest,
 } from "@psibase/common-lib/messaging";
 
 import { Supervisor } from "./supervisor";
@@ -39,6 +40,9 @@ addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
     supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),
+);
+addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
+    supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),
 );
 registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
 window.parent.postMessage(buildMessageSupervisorInitialized(), "*");

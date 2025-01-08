@@ -250,6 +250,7 @@ set(JS_DIRS
     services/user/Tokens/ui:Tokens_js
     services/user/Branding/ui:Branding_js
     services/user/Chainmail/ui:Chainmail_js
+    services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -309,7 +310,6 @@ add_rs_component_workspace(services/:Plugins
     tokens
     transact
 )
-
 
 set(WASM_PSIBASE_BYPRODUCTS
     ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
@@ -480,8 +480,10 @@ psibase_package(
         DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
     DEPENDS ${CommonApiCommonLib_js_DEP}
     DEPENDS ${ComponentParser_DEP}
+    DEPENDS ${PluginTester_js_DEP}
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )

@@ -17,3 +17,7 @@ export function isEqual(
 export function pluginId(service: string, plugin: string): QualifiedPluginId {
     return { service, plugin };
 }
+
+export function pluginString(id: QualifiedPluginId): string {
+    return `${id.service}/${id.plugin}`;
+}

@@ -1,7 +1,7 @@
-import { toString } from "@psibase/common-lib";
+import { assertTruthy, toString } from "@psibase/common-lib";
 import { QualifiedFunctionCallArgs } from "@psibase/common-lib/messaging";
 
-import { assertTruthy, OriginationData } from "./utils";
+import { OriginationData } from "./utils";
 
 export interface Call {
     caller: OriginationData;
