@@ -50,7 +50,7 @@ namespace SystemService
 
       auto _ = recurse();
       return authServiceOf(owner).isAuthSys(owner, std::move(authorizers),
-                                            std::make_optional(authSet));
+                                            std::optional(std::move(authSet)));
    }
 
    bool AuthDelegate::isRejectSys(psibase::AccountNumber                             sender,
