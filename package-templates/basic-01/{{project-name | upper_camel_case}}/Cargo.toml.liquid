@@ -3,14 +3,14 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.14.0"
+version = "{{version}}"
 rust-version = "1.64"
 edition = "2021"
 publish = false
 
 [package]
-# Crate name
-name = "{{project-name}}-pkg"
+name = "{{project-name}}-pkg"   # Crate name
+description = "{{description}}"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -24,17 +24,17 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-# PsiPackage name: referenced from tests
-# TODO: distinguish psi-package-name and package-name so the difference is demonstrated
 package-name = "{{project-name | upper_camel_case}}"
 services = ["{{project-name}}"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.14.0"
+HttpServer = "{{version}}"
+Sites = "{{version}}"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-{{project-name}} = { path = "service" }
-plugin = { path = "plugin" }
+{{project-name}} = { path = "service", version = "{{version}}" }
+r-{{project-name}} = { path = "query-service", version = "{{version}}" }
+plugin = { path = "plugin", version = "{{version}}" }
