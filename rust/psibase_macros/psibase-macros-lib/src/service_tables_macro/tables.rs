@@ -1,6 +1,6 @@
 use darling::FromMeta;
 use proc_macro2::Span;
-use proc_macro_error::{abort, emit_error};
+use proc_macro_error::emit_error;
 use quote::quote;
 use syn::{
     parse_quote, AttrStyle, Attribute, Field, Ident, ImplItem, Item, ItemImpl, ItemStruct,
@@ -73,8 +73,7 @@ pub fn process_service_tables(
     table_record_struct_name: &Ident,
     items: &mut Vec<Item>,
     table_idxs: &Vec<usize>,
-    debug_msgs: &mut Vec<String>,
-) -> u16 {
+) -> Result<u16, ()> {
     let mut pk_data: Option<PkIdentData> = None;
     let mut secondary_keys = Vec::new();
     let mut table_options: Option<TableOptions> = None;
@@ -84,34 +83,40 @@ pub fn process_service_tables(
     for idx in table_idxs {
         match &mut items[*idx] {
             Item::Struct(s) => {
-                process_table_attrs(s, &mut table_options, debug_msgs);
+                process_table_attrs(s, &mut table_options)?;
                 preset_table_record = table_options
                     .as_ref()
                     .and_then(|opts| opts.record.to_owned());
                 if preset_table_record.is_none() {
-                    process_table_fields(s, &mut pk_data, debug_msgs);
+                    process_table_fields(s, &mut pk_data)?;
                 } else {
                     let fields_named: syn::FieldsNamed =
                         parse_quote! {{ db_id: #psibase_mod::DbId, prefix: Vec<u8> }};
                     s.fields = syn::Fields::Named(fields_named);
                 }
                 table_vis = Some(s.vis.clone());
+                Ok(())
             }
-            Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys, debug_msgs),
-            item => emit_error!(item, "Unknown table item to be processed"),
-        }
+            Item::Impl(i) => process_table_impls(i, &mut pk_data, &mut secondary_keys),
+            item => {
+                emit_error!(item, "Unknown table item to be processed");
+                Ok(())
+            }
+        }?
     }
 
     if table_options.is_none() {
-        abort!(table_record_struct_name, "Table name and index not defined");
+        emit_error!(table_record_struct_name, "Table name and index not defined");
+        return Err(());
     }
     let table_options = table_options.unwrap();
 
     if pk_data.is_none() && preset_table_record.is_none() {
-        abort!(
+        emit_error!(
             table_record_struct_name,
             "Table record has not defined a primary key"
         );
+        return Err(());
     }
 
     secondary_keys.sort_by_key(|sk| sk.idx);
@@ -225,24 +230,13 @@ pub fn process_service_tables(
         }
     };
     items.push(parse_quote! {#table_struct_impl});
-
-    // TODO: remove? Can i add the call_site() part to what i've got for more context in the error messages?
-    // for (idx, itm) in debug_msgs.iter().enumerate() {
-    //     let idnt = Ident::new(&format!("t{}", idx), Span::call_site());
-    //     items.push(parse_quote! {
-    //         #[doc = #itm]
-    //         struct #idnt {}
-    //     });
-    // }
-
-    table_options.index
+    Ok(table_options.index)
 }
 
 fn process_table_attrs(
     table_struct: &mut ItemStruct,
     table_options: &mut Option<TableOptions>,
-    debug_msgs: &mut Vec<String>,
-) {
+) -> Result<(), ()> {
     // Parse table name and remove #[table]
     if let Some(i) = table_struct.attrs.iter().position(is_table_attr) {
         let attr = &table_struct.attrs[i];
@@ -252,7 +246,8 @@ fn process_table_attrs(
                 *table_options = Some(options);
             }
             Err(err) => {
-                abort!(attr, format!("Invalid service table attribute, expected `#[table(name = \"TableName\", index = N)]\n{}`", err));
+                emit_error!(attr, format!("Invalid service table attribute, expected `#[table(name = \"TableName\", index = N)]\n{}`", err));
+                return Err(());
             }
         };
 
@@ -269,24 +264,20 @@ fn process_table_attrs(
 
         table_struct.attrs.remove(i);
     }
+    Ok(())
 }
 
 fn process_table_fields(
     table_record_struct: &mut ItemStruct,
     pk_data: &mut Option<PkIdentData>,
-    debug_msgs: &mut Vec<String>,
-) {
+) -> Result<(), ()> {
     for field in table_record_struct.fields.iter_mut() {
         let mut removable_attr_idxs = Vec::new();
 
         for (field_attr_idx, field_attr) in field.attrs.iter().enumerate() {
-            debug_msgs.push(String::from(format!(
-                "processing attr: {:?}...",
-                field_attr.meta
-            )));
             if field_attr.style == AttrStyle::Outer {
                 if field_attr.meta.path().is_ident("primary_key") {
-                    process_table_pk_field(pk_data, field);
+                    process_table_pk_field(pk_data, field)?;
                     removable_attr_idxs.push(field_attr_idx);
                 }
             }
@@ -296,24 +287,23 @@ fn process_table_fields(
             field.attrs.remove(i);
         }
     }
+    Ok(())
 }
 
 fn process_table_impls(
     table_impl: &mut ItemImpl,
     pk_data: &mut Option<PkIdentData>,
     secondary_keys: &mut Vec<SkIdentData>,
-    debug_msgs: &mut Vec<String>,
-) {
+) -> Result<(), ()> {
     for impl_item in table_impl.items.iter_mut() {
         if let ImplItem::Fn(method) = impl_item {
             let mut removable_attr_idxs = Vec::new();
 
             for (attr_idx, attr) in method.attrs.iter().enumerate() {
                 if attr.style == AttrStyle::Outer {
-                    debug_msgs.push(String::from(format!("processing outer attr: {:?}", attr)));
                     if attr.meta.path().is_ident("primary_key") {
                         let pk_method = &method.sig.ident;
-                        check_unique_pk(pk_data, pk_method);
+                        check_unique_pk(pk_data, pk_method)?;
 
                         if let ReturnType::Type(_, return_type) = &method.sig.output {
                             let pk_type = quote! {#return_type};
@@ -330,7 +320,8 @@ fn process_table_impls(
                         if let Ok(lit) = attr.parse_args::<syn::LitInt>() {
                             if let Ok(idx) = lit.base10_parse::<u8>() {
                                 if idx == 0 {
-                                    abort!(method, "Index 0 is reserved for Primary Key, secondary keys needs to be at least 1");
+                                    emit_error!(method, "Index 0 is reserved for Primary Key, secondary keys needs to be at least 1");
+                                    continue;
                                 }
 
                                 if let ReturnType::Type(_, return_type) = &method.sig.output {
@@ -342,16 +333,19 @@ fn process_table_impls(
                                         sk_type,
                                     ));
                                 } else {
-                                    abort!(impl_item, "Invalid secondary key return type, make sure it is a valid ToKey.");
+                                    emit_error!(method, "Invalid secondary key return type, make sure it is a valid ToKey.");
+                                    continue;
                                 }
                             } else {
-                                abort!(
+                                emit_error!(
                                     method,
                                     "Invalid secondary key index number it needs to be a valid u8."
                                 );
+                                continue;
                             }
                         } else {
-                            abort!(method, "Unable to parse secondary key index number.");
+                            emit_error!(method, "Unable to parse secondary key index number.");
+                            continue;
                         }
 
                         removable_attr_idxs.push(attr_idx);
@@ -364,26 +358,29 @@ fn process_table_impls(
             }
         }
     }
+    Ok(())
 }
 
-fn check_unique_pk(pk_data: &Option<PkIdentData>, item_ident: &Ident) {
+fn check_unique_pk(pk_data: &Option<PkIdentData>, item_ident: &Ident) -> Result<(), ()> {
     if pk_data.is_some() {
-        abort!(
+        emit_error!(
             item_ident,
             format!(
                 "Primary key already set on {}.",
                 pk_data.as_ref().unwrap().ident
             )
-        )
+        );
+        return Err(());
     }
+    Ok(())
 }
 
-fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) {
+fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) -> Result<(), ()> {
     let pk_field_ident = field
         .ident
         .as_ref()
         .expect("Attempt to add a Primary key field with no ident");
-    check_unique_pk(pk_data, pk_field_ident);
+    check_unique_pk(pk_data, pk_field_ident)?;
 
     let pk_fn_name = quote! {#pk_field_ident};
     let pk_type = &field.ty;
@@ -394,4 +391,5 @@ fn process_table_pk_field(pk_data: &mut Option<PkIdentData>, field: &Field) {
         pk_type,
         pk_fn_name,
     ));
+    Ok(())
 }

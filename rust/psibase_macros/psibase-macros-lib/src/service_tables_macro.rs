@@ -1,10 +1,10 @@
 mod tables;
 
 use proc_macro2::TokenStream;
-use proc_macro_error::abort;
+use proc_macro_error::{abort, emit_error};
 use quote::quote;
 use std::{collections::HashMap, str::FromStr};
-use syn::{parse_quote, Ident, Item, ItemMod, Type};
+use syn::{Ident, Item, ItemMod, Type};
 use tables::{is_table_attr, process_service_tables};
 
 pub fn service_tables_macro_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -25,7 +25,6 @@ pub fn service_tables_macro_impl(_attr: TokenStream, item: TokenStream) -> Token
 
 fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) -> TokenStream {
     if let Some((_, items)) = &mut impl_mod.content {
-        let mut debug_msgs: Vec<String> = Vec::new();
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
 
         // collect all tables
@@ -53,32 +52,17 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
         // Transform table attributes into expanded code.
         let mut processed_tables = Vec::new();
         for (tb_name, items_idxs) in table_structs.iter() {
-            let table_idx =
-                process_service_tables(psibase_mod, tb_name, items, items_idxs, &mut debug_msgs);
-            processed_tables.push((tb_name, table_idx));
-        }
-
-        // Add errors as doc attributes in expanded code
-        // TODO: if debug_msgs.len() > 0; add doc-attrs *and abort*. i don't think current code fails as it should / used to
-        let doc_attrs = debug_msgs.into_iter().map(|msg| {
-            quote! {
-                #[doc = #msg]
+            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs);
+            if table_idx.is_ok() {
+                processed_tables.push((tb_name, table_idx.unwrap()));
             }
-        });
-
-        // Combine the struct and its documentation attributes into a single token stream
-        let output = parse_quote! {
-            #(#doc_attrs)*
-            struct macro_debug_msgs {}
-        };
-
-        items.push(output);
+        }
 
         // Validates table indexes
         processed_tables.sort_by_key(|t| t.1);
         for (expected_idx, (table_struct, tb_index)) in processed_tables.iter().enumerate() {
             if *tb_index as usize != expected_idx {
-                abort!(
+                emit_error!(
                     table_struct,
                     format!("Missing expected table index {}; tables may not have gaps and may not be removed or reordered.", expected_idx)
                 );
@@ -90,7 +74,7 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
         //     struct test_string1 {}
         // });
     } else {
-        abort!(
+        emit_error!(
             impl_mod,
             "#[psibase::service_tables] module must have inline contents"
         )

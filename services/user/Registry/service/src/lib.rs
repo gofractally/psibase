@@ -1,31 +1,30 @@
 mod utils;
 
-#[psibase::service(name = "registry")]
-#[allow(non_snake_case)]
-pub mod service {
-    use std::collections::HashSet;
-
-    use async_graphql::*;
-    use serde::{Deserialize, Serialize};
-    use url::Url;
-
-    use psibase::services::accounts::Wrapper as AccountsSvc;
-    use psibase::services::transact;
-    use psibase::*;
-    use services::events::Wrapper as EventsSvc;
-
-    use crate::utils::increment_last_char;
-
+mod consts {
     // An App can't have more than 3 tags
     pub const MAX_APP_TAGS: usize = 3;
     pub const MAX_TAG_LENGTH: usize = 30;
     pub const MAX_APP_NAME_LENGTH: usize = 30;
     pub const MAX_APP_SHORT_DESCRIPTION_LENGTH: usize = 100;
     pub const MAX_APP_LONG_DESCRIPTION_LENGTH: usize = 1000;
+}
+#[psibase::service_tables]
+mod tables {
+    use async_graphql::*;
+    use psibase::services::accounts::Wrapper as AccountsSvc;
+    use psibase::{check, AccountNumber, Fracpack, ToKey, ToSchema};
+    use serde::{Deserialize, Serialize};
+    use url::Url;
+
+    use crate::consts::{
+        MAX_APP_LONG_DESCRIPTION_LENGTH, MAX_APP_NAME_LENGTH, MAX_APP_SHORT_DESCRIPTION_LENGTH,
+        MAX_TAG_LENGTH,
+    };
+    use crate::service::{AppStatus, AppStatusU32};
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    struct InitRow {}
+    pub struct InitRow {}
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
@@ -50,7 +49,7 @@ pub mod service {
         }
 
         /// Validate the tag is lowercase alphanumeric and dashes, under the max length
-        fn check_valid(&self) {
+        pub fn check_valid(&self) {
             check(self.tag.len() > 0, "Tag cannot be empty");
 
             check(
@@ -71,27 +70,6 @@ pub mod service {
             );
         }
     }
-
-    pub type AppStatusU32 = u32;
-
-    pub enum AppStatus {
-        Draft = 0,
-        Published = 1,
-        Unpublished = 2,
-    }
-
-    impl From<AppStatusU32> for AppStatus {
-        fn from(status: AppStatusU32) -> Self {
-            match status {
-                0 => AppStatus::Draft,
-                1 => AppStatus::Published,
-                2 => AppStatus::Unpublished,
-                _ => abort_message("Invalid app status"),
-            }
-        }
-    }
-
-    /// Holds metadata for a registered app
     #[table(name = "AppMetadataTable", index = 2)]
     #[derive(Default, Debug, Clone, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     #[serde(rename_all = "camelCase")]
@@ -138,7 +116,7 @@ pub mod service {
     }
 
     impl AppMetadata {
-        fn check_valid(&self) {
+        pub fn check_valid(&self) {
             check(
                 self.name.len() <= MAX_APP_NAME_LENGTH,
                 format!(
@@ -254,6 +232,47 @@ pub mod service {
             (self.tag_id, self.app_id)
         }
     }
+}
+
+#[psibase::service(name = "registry")]
+#[allow(non_snake_case)]
+pub mod service {
+    use std::collections::HashSet;
+
+    use async_graphql::*;
+
+    use psibase::services::transact;
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+    use services::events::Wrapper as EventsSvc;
+
+    use crate::consts::MAX_APP_TAGS;
+    use crate::tables::{
+        AppMetadata, AppMetadataTable, AppTag, AppTagsTable, InitRow, InitTable, TagRecord,
+        TagsTable,
+    };
+    use crate::utils::increment_last_char;
+
+    pub type AppStatusU32 = u32;
+
+    pub enum AppStatus {
+        Draft = 0,
+        Published = 1,
+        Unpublished = 2,
+    }
+
+    impl From<AppStatusU32> for AppStatus {
+        fn from(status: AppStatusU32) -> Self {
+            match status {
+                0 => AppStatus::Draft,
+                1 => AppStatus::Published,
+                2 => AppStatus::Unpublished,
+                _ => abort_message("Invalid app status"),
+            }
+        }
+    }
+
+    /// Holds metadata for a registered app
 
     #[derive(SimpleObject, Pack, Unpack, Deserialize, Serialize, ToSchema)]
     pub struct AppMetadataWithTags {
@@ -331,7 +350,7 @@ pub mod service {
         metadata.check_valid();
 
         check(
-            tags.len() <= MAX_APP_TAGS,
+            tags.len() <= crate::consts::MAX_APP_TAGS,
             format!("App can only have up to {} tags", MAX_APP_TAGS).as_str(),
         );
 
