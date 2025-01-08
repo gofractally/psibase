@@ -524,6 +524,7 @@ namespace psio
                   }
                   break;
                case '"':
+                  // String parsing follows the GraphQL spec at: https://spec.graphql.org/October2021/#sec-String-Value
                   parse_string();
                   return;
                default:;
@@ -893,6 +894,12 @@ namespace psio
                {
                   return;
                }
+            }
+            else if (ch == '\n' || ch == '\r')
+            {
+               // Literal line terminators can only be used in block strings
+               current_type = error;
+               return;
             }
             else
             {
