@@ -1,11 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::AccountNumber;
-    use psibase::Fracpack;
-    use psibase::TimePointSec;
-    use psibase::ToKey;
-    use psibase::ToSchema;
+    use psibase::{AccountNumber, Fracpack, TimePointSec, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
