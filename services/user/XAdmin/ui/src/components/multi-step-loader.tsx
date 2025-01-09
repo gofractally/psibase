@@ -98,7 +98,6 @@ export const MultiStepLoader = ({
     loadingStates: LoadingState[];
     loading?: boolean;
 }) => {
-    console.log(currentState, "is the current state");
     return (
         <AnimatePresence mode="wait">
             {loading && (

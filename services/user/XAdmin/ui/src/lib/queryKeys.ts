@@ -5,4 +5,5 @@ export const queryKeys = {
     connect: ["connect"] as const,
     statuses: ["statuses"] as const,
     packages: ["packages"] as const,
+    addServerKey: ["addServerKey"] as const,
 };
