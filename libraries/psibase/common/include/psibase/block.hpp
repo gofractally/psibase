@@ -146,7 +146,8 @@ namespace psibase
    {
       AccountNumber name;
       Claim         auth;
-      friend bool   operator==(const Producer&, const Producer&) = default;
+
+      friend bool operator==(const Producer&, const Producer&) = default;
       PSIO_REFLECT(Producer, name, auth);
    };
 
@@ -214,7 +215,7 @@ namespace psibase
       BlockNum      blockNum = 0;  // TODO: pack into previous instead?
       BlockTime     time;
       AccountNumber producer;
-      TermNum       term;
+      TermNum       term = 0;
       BlockNum      commitNum;
 
       // Holds a sha256 of the current JointConsensus

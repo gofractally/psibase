@@ -76,19 +76,19 @@ export function HoverBorderGradient({
                 className={cn(
                     "absolute inset-0 z-0 flex-none overflow-hidden rounded-[inherit]",
                 )}
-                style={{
+                style={ {
                     filter: "blur(2px)",
                     position: "absolute",
                     width: "100%",
                     height: "100%",
-                }}
-                initial={{ background: movingMap[direction] }}
-                animate={{
+                } }
+                initial={ { background: movingMap[direction] } }
+                animate={ {
                     background: hovered
                         ? [movingMap[direction], highlight]
                         : movingMap[direction],
-                }}
-                transition={{ ease: "linear", duration: duration ?? 1 }}
+                } }
+                transition={ { ease: "linear", duration: duration ?? 1 } }
             />
             <div className="z-1 absolute inset-[2px] flex-none rounded-[100px] bg-black" />
         </Tag>
