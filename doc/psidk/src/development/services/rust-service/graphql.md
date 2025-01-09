@@ -79,22 +79,19 @@ We need some data to query. Let's build on the example from the
 [Tables Section](tables.md).
 
 ```rust
-#[allow(non_snake_case)]
-#[psibase::service]
-mod service {
+#[psibase::service_tables]
+mod tables {
     use async_graphql::*;
-    use psibase::{AccountNumber, *};
-    use rand::prelude::*;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "MessageTable", index = 0)]
     #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
     pub struct Message {
         #[primary_key]
-        id: u64,
-        from: AccountNumber,
-        to: AccountNumber,
-        content: String,
+        pub id: u64,
+        pub from: AccountNumber,
+        pub to: AccountNumber,
+        pub content: String,
     }
 
     // A variety of secondary keys to support queries
@@ -130,6 +127,16 @@ mod service {
         #[primary_key]
         fn pk(&self) {}
     }
+}
+
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use async_graphql::*;
+    use psibase::{AccountNumber, *};
+    use rand::prelude::*;
+
+    use crate::tables::{Message, MessageTable, LastUsed, LastUsedTable};
 
     fn get_next_message_id() -> u64 {
         let table = LastUsedTable::new();
@@ -224,10 +231,11 @@ psibase create -i joe
 psibase create -i sue
 ```
 
-If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service. 
+If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service.
 
-Use `generateRandom` to create messages. 
-- Use `1000` for `numMessages`. 
+Use `generateRandom` to create messages.
+
+- Use `1000` for `numMessages`.
 - Use `["alice","bob","frank","jennifer","joe","sue"]` for `users`.
 
 Access the `/graphiql.html` endpoint on this service, and run the following query:
