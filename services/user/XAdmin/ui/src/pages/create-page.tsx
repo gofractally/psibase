@@ -24,26 +24,29 @@ import { MultiStepLoader } from "@/components/multi-step-loader";
 import { PrevNextButtons } from "@/components/PrevNextButtons";
 import { Steps } from "@/components/steps";
 
-// hooks
-import { useAddServerKey } from "@/hooks/useAddServerKey";
-import { useConfig } from "@/hooks/useConfig";
-import { usePackages } from "@/hooks/usePackages";
-import { useSelectedRows } from "@/hooks/useSelectedRows";
-import { useStepper } from "@/hooks/useStepper";
-import { getDefaultSelectedPackages } from "@/hooks/useTemplatedPackages";
-
 // lib
 import { bootChain } from "@/lib/bootChain";
 import { calculateIndex } from "@/lib/calculateIndex";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
+
+// types
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
     PackageInfo,
     RequestUpdate,
     RequestUpdateSchema,
-} from "@/types";
+} from "../types";
+
+// hooks
+import { useAddServerKey } from "../hooks/useAddServerKey";
+import { useConfig } from "../hooks/useConfig";
+import { useImportKey } from "../hooks/useImportKey";
+import { usePackages } from "../hooks/usePackages";
+import { useSelectedRows } from "../hooks/useSelectedRows";
+import { useStepper } from "../hooks/useStepper";
+import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 
 // relative imports
 import { SetupWrapper } from "./setup-wrapper";
@@ -112,6 +115,7 @@ export const CreatePage = () => {
     );
 
     const { mutateAsync: createAndSetKey } = useAddServerKey();
+    const { mutateAsync: importKey } = useImportKey();
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -165,8 +169,9 @@ export const CreatePage = () => {
     useEffect(() => {
         const setKeysAndBoot = async () => {
             try {
+                let key: CryptoKey | undefined;
                 if (!isDev) {
-                    await createAndSetKey();
+                    key = await createAndSetKey();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -193,6 +198,10 @@ export const CreatePage = () => {
                                 title: "Success",
                                 description: "Successfully booted chain.",
                             });
+
+                            // TODO: handle errors
+                            if (!key) return;
+                            importKey(key);
                         } else {
                             setLoading(false);
                             const message = "Something went wrong.";

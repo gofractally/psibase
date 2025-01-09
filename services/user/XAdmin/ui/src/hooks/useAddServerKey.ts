@@ -5,7 +5,7 @@ import { chain } from "@/lib/chainEndpoints";
 import { exportKeyToDER, generateP256Key } from "@/lib/keys";
 
 export const useAddServerKey = () =>
-    useMutation<void, string>({
+    useMutation<CryptoKey, string>({
         mutationKey: queryKeys.addServerKey,
         mutationFn: async () => {
             const { publicKey, privateKey } = await generateP256Key();
@@ -17,6 +17,7 @@ export const useAddServerKey = () =>
             console.log("PUBLIC:", publicDER);
 
             chain.addServerKey(privateDER);
+            return privateKey;
         },
         onError: (err) => {
             console.log("ERROR:", err);

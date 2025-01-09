@@ -1,9 +1,10 @@
 export const queryKeys = {
-    peers: ["peers"] as const,
+    addServerKey: ["addServerKey"] as const,
     config: ["config"] as const,
     configUpdate: ["configUpdate"] as const,
     connect: ["connect"] as const,
-    statuses: ["statuses"] as const,
+    importKey: ["importKey"] as const,
     packages: ["packages"] as const,
-    addServerKey: ["addServerKey"] as const,
+    peers: ["peers"] as const,
+    statuses: ["statuses"] as const,
 };
