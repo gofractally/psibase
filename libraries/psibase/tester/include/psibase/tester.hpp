@@ -13,8 +13,9 @@
 
 namespace psibase
 {
-   using KeyList = std::vector<std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
-                                         SystemService::AuthSig::PrivateKeyInfo>>;
+   using KeyPair = std::pair<SystemService::AuthSig::SubjectPublicKeyInfo,
+                             SystemService::AuthSig::PrivateKeyInfo>;
+   using KeyList = std::vector<KeyPair>;
 
    inline std::string show(bool include, TransactionTrace t)
    {
@@ -56,6 +57,8 @@ namespace psibase
          if (auto at = std::get_if<ActionTrace>(&inner.inner))
             if (isUserAction(at->action))
                top_traces.push_back(at);
+      if (top_traces.size() & 1)
+         std::cout << prettyTrace(trimRawData(t)).c_str();
       check(!(top_traces.size() & 1), "unexpected number of action traces");
       check(2 * num + 1 < top_traces.size(), "trace not found");
       return *top_traces[2 * num + 1];
@@ -313,13 +316,13 @@ namespace psibase
             {
                if (response.contentType == "text/html")
                {
-                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
-                               std::string(response.body.begin(), response.body.end()));
+                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " "
+                               + std::string(response.body.begin(), response.body.end()));
                }
                else
                {
-                  abortMessage("Request returned " +
-                               std::to_string(static_cast<std::uint16_t>(response.status)));
+                  abortMessage("Request returned "
+                               + std::to_string(static_cast<std::uint16_t>(response.status)));
                }
             }
             if (response.contentType != "application/json")
