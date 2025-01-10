@@ -1178,7 +1178,7 @@ namespace psibase::net
             // Check whether the snapshot should be loaded
             if (getBlockNum(msg.blockId) <= chain().commit_index())
             {
-               // The snapshot is in the past
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because it is in the past";
                auto id          = ExtendedBlockId{msg.blockId, getBlockNum(msg.blockId)};
                connection.state = ConnectionStateReady{.last_sent = id, .last_received = id};
                if (!connection.sending)
@@ -1188,6 +1188,7 @@ namespace psibase::net
             else if (auto existing = chain().get_state(msg.blockId))
             {
                // We already have an existing state for the snapshot
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because its state is already known";
                connection.state =
                    ConnectionStateReady{.last_sent = chain().get_common_ancestor(existing->xid()),
                                         .last_received = existing->xid()};
@@ -1220,6 +1221,21 @@ namespace psibase::net
                //
                do_gc();
                switch_fork();
+            }
+            else
+            {
+               PSIBASE_LOG(logger, info) << "Snapshot ignored";
+            }
+         }
+         else
+         {
+            if (getBlockNum(msg.blockId) > chain().commit_index())
+            {
+               PSIBASE_LOG(logger, warning) << "Unexpected snapshot ignored";
+            }
+            else
+            {
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because it is in the past";
             }
          }
       }
