@@ -1384,10 +1384,6 @@ namespace psibase
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
               row      = db.kvLessThanRaw(DbId::nativeSubjective, key, prefixLen))
          {
-            PSIBASE_LOG(logger, debug)
-                << "snapshot key: " << psio::hex(row->key.pos, row->key.end) << std::endl;
-            PSIBASE_LOG(logger, debug)
-                << "snapshot row: " << psio::hex(row->value.pos, row->value.end) << std::endl;
             auto value = psio::view<const SnapshotRow>(std::span{row->value.pos, row->value.end});
             if (value.state())
             {

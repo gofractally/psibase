@@ -492,7 +492,6 @@ namespace psibase::net
              headerNum && *headerNum <= getBlockNum(snapshotId))
          {
             // Lookup block and discard transactions
-            PSIBASE_LOG(logger, debug) << "sending header: " << *headerNum;
             auto blockptr = chain().get_block_by_num(*headerNum);
             if (!blockptr)
             {
