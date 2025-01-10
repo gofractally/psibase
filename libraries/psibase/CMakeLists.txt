@@ -156,6 +156,7 @@ function(add suffix)
             ../../services/system/CpuLimit/include
             ../../services/system/HttpServer/include
             ../../services/system/SetCode/include
+            ../../services/system/StagedTx/service/cpp/include
             ../../services/system/Transact/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
