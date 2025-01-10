@@ -29,6 +29,7 @@ impl StagedTxPolicy {
             auth_action_structs::isAuthSys {
                 sender: self.user,
                 authorizers: accepters,
+                authSet: None,
             },
         )
     }
@@ -39,6 +40,7 @@ impl StagedTxPolicy {
             auth_action_structs::isRejectSys {
                 sender: self.user,
                 rejecters,
+                authSet: None,
             },
         )
     }

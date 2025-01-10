@@ -45,7 +45,7 @@ pub mod tables {
     }
 
     #[table(name = "ResponseTable", index = 3)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct Response {
         pub id: u32,
         pub account: AccountNumber,
@@ -58,8 +58,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_responder(&self) -> AccountNumber {
-            self.account
+        fn by_responder(&self) -> (AccountNumber, u32) {
+            (self.account, self.id)
         }
     }
 }

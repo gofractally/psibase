@@ -32,6 +32,14 @@ pub mod service {
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
+    const ENABLE_PRINT: bool = true;
+
+    fn debug_print(msg: &str) {
+        if ENABLE_PRINT {
+            psibase::write_console(msg);
+        }
+    }
+
     /// Runs before every other action except 'init', verifies that the service
     /// has been initialized.
     #[pre_action(exclude(init))]
@@ -96,6 +104,8 @@ pub mod service {
             .iter()
             .all(|action| StagedTxPolicy::new(action.sender).does_auth(staged_tx.accepters()));
 
+        debug_print(&format!("authorized: {}\n", authorized.to_string()));
+
         if authorized {
             execute(staged_tx);
         }
@@ -144,6 +154,7 @@ pub mod service {
     }
 
     fn execute(staged_tx: StagedTx) {
+        debug_print("Executing staged tx\n");
         staged_tx.delete();
 
         staged_tx
@@ -151,6 +162,13 @@ pub mod service {
             .actions
             .into_iter()
             .for_each(|action| {
+                debug_print(&format!(
+                    "Executing action: {}@{}:{}\n",
+                    &action.sender.to_string(),
+                    &action.service.to_string(),
+                    &action.method.to_string()
+                ));
+
                 let act = action.packed();
                 unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
             });
