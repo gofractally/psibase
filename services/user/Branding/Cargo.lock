@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "branding_package"
-version = "0.0.0"
+version = "0.14.0"
 dependencies = [
  "branding",
  "plugin",
