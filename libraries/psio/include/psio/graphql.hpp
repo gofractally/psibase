@@ -686,12 +686,6 @@ namespace psio
 
       void interpret_escape_sequence(std::string& result, char escape_char)
       {
-         if (escape_char == 'u')
-         {
-            parse_unicode_escape_sequence(result);
-            return;
-         }
-
          switch (escape_char)
          {
             case '"':
@@ -717,6 +711,9 @@ namespace psio
                break;
             case 't':
                result.push_back('\t');
+               break;
+            case 'u':
+               parse_unicode_escape_sequence(result);
                break;
             default:
                current_type = error;
@@ -759,8 +756,6 @@ namespace psio
          for (size_t i = 1; i < lines.size(); ++i)
          {
             const auto& line = lines[i];
-            if (is_whitespace_line(line) || line.empty())
-               continue;
 
             auto indent = line.find_first_not_of(" \t");
             if (indent != std::string_view::npos && (!common_indent || indent < *common_indent))
@@ -770,54 +765,63 @@ namespace psio
          return common_indent;
       }
 
-      static std::vector<std::string> process_lines(const std::vector<std::string_view>& lines,
-                                                    std::optional<size_t> common_indent)
+      static std::vector<std::string_view> remove_common_indents(
+          const std::vector<std::string_view>& lines,
+          size_t                               common_indent)
       {
-         auto process_line = [&](std::string_view line)
+         if (lines.empty())
+            return {};
+
+         auto remove_indent = [&](std::string_view line)
          {
-            if (is_whitespace_line(line))
-               return std::string_view{};
-            if (common_indent && !line.empty())
-               line.remove_prefix(*common_indent);
+            auto prefix = std::min(common_indent, line.size());
+            line.remove_prefix(prefix);
             return line;
          };
 
-         std::vector<std::string> processed_lines;
+         std::vector<std::string_view> processed_lines;
          processed_lines.reserve(lines.size());
 
-         for (auto line : lines | std::views::transform(process_line))
+         // First line's indentation is preserved
+         processed_lines.push_back(lines.front());
+
+         // Remove common indentation from all subsequent lines
+         for (auto line : lines | std::views::drop(1) | std::views::transform(remove_indent))
          {
-            processed_lines.push_back(std::string{line});
+            processed_lines.push_back(line);
          }
 
          return processed_lines;
       }
 
-      static std::string join_lines(const std::vector<std::string>& lines)
+      static std::string join_lines(const std::vector<std::string_view>& lines)
       {
-         auto notEmpty = [](const std::string& s) { return !s.empty(); };
+         auto notWhitespace = [](const std::string_view& s) { return !is_whitespace_line(s); };
 
-         auto start = std::ranges::find_if(lines, notEmpty);
+         auto start = std::ranges::find_if(lines, notWhitespace);
          if (start == lines.end())
             return {};
 
-         auto end = std::ranges::find_if(lines.rbegin(), lines.rend(), notEmpty).base();
+         auto end = std::ranges::find_if(lines.rbegin(), lines.rend(), notWhitespace).base();
 
-         std::string result = *start;
+         std::string result{*start};
          for (auto it = std::next(start); it != end; ++it)
          {
-            result += '\n';
-            result += *it;
+            result.push_back('\n');
+            result.append(*it);
          }
          return result;
       }
 
       std::string process_block_string_value(std::string_view raw_value)
       {
-         auto lines           = split_into_lines(raw_value);
-         auto common_indent   = find_common_indent(lines);
-         auto processed_lines = process_lines(lines, common_indent);
-         return join_lines(processed_lines);
+         auto lines         = split_into_lines(raw_value);
+         auto common_indent = find_common_indent(lines);
+         if (common_indent)
+         {
+            lines = remove_common_indents(lines, *common_indent);
+         }
+         return join_lines(lines);
       }
 
       void parse_block_string()
