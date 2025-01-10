@@ -58,14 +58,6 @@ namespace psibase::net
    };
    PSIO_REFLECT(HelloRequest, xid, committed)
 
-   struct HelloResponse
-   {
-      static constexpr unsigned type  = 33;
-      char                      dummy = 0;
-      std::string               to_string() const { return "hello response"; }
-   };
-   PSIO_REFLECT(HelloResponse, dummy)
-
    struct BlockMessage
    {
       static constexpr unsigned          type = 34;
@@ -168,6 +160,10 @@ namespace psibase::net
 
    struct ConnectionStateStart
    {
+      // The most recent hello message sent or the next queued hello message
+      HelloRequest                   hello;
+      bool                           hello_sent;
+      std::optional<ExtendedBlockId> last_received;
    };
 
    struct ConnectionStateSendFastForward
@@ -193,6 +189,8 @@ namespace psibase::net
 
    struct ConnectionStateReady
    {
+      ExtendedBlockId last_sent;
+      ExtendedBlockId last_received;
    };
 
    using ConnectionState = std::variant<ConnectionStateStart,
@@ -236,19 +234,9 @@ namespace psibase::net
       {
          explicit peer_connection(peer_id id) : id(id) {}
          ~peer_connection() {}
-         ExtendedBlockId last_sent;
-         ExtendedBlockId last_received;
-         bool            syncing = false;
-         peer_id         id;
-         bool            ready  = false;
-         bool            closed = false;
-         // True once we have received a HelloResponse from the peer
-         bool peer_ready = false;
-         // TODO: we may be able to save some space, because last_received is
-         // not meaningful until we're finished with hello.
-         // The most recent hello message sent or the next queued hello message
-         HelloRequest hello;
-         bool         hello_sent;
+         peer_id id;
+         bool    closed  = false;
+         bool    sending = false;
 
          ConnectionState state;
       };
@@ -303,7 +291,6 @@ namespace psibase::net
       loggers::common_logger logger;
 
       using message_type = std::variant<HelloRequest,
-                                        HelloResponse,
                                         BlockMessage,
                                         StateChecksumMessage,
                                         BlockHeaderMessage,
@@ -329,7 +316,7 @@ namespace psibase::net
          auto pos =
              std::find_if(_peers.begin(), _peers.end(), [&](const auto& p) { return p->id == id; });
          assert(pos != _peers.end());
-         if ((*pos)->syncing || !(*pos)->peer_ready)
+         if ((*pos)->sending)
          {
             (*pos)->closed = true;
          }
@@ -339,25 +326,70 @@ namespace psibase::net
          }
       }
 
+      // This should be called by any async callback that is part of a send loop.
+      // If the connection has been cancelled, it will destroy it and return true.
+      bool check_cancel(peer_connection& connection)
+      {
+         assert(connection.sending);
+         connection.sending = false;
+         if (connection.closed)
+         {
+            auto pos =
+                std::ranges::find_if(_peers, [&](const auto& p) { return p.get() == &connection; });
+            assert(pos != _peers.end());
+            _peers.erase(pos);
+            return true;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
       void connect(peer_id id)
       {
          _peers.push_back(std::make_unique<peer_connection>(id));
          peer_connection& connection = get_connection(id);
-         connection.hello_sent       = false;
-         connection.hello.xid        = chain().get_head_state()->xid();
-         async_send_hello(connection);
-         if (connection.hello.xid.id() == Checksum256{})
-         {
-            connection.last_received = {Checksum256{}, 1};
-            connection.last_sent     = connection.last_received;
-            connection.ready         = true;
-         }
+         connection.state =
+             ConnectionStateStart{.hello = chain().get_head_state()->xid(), .hello_sent = false};
+         async_send_next(connection);
       }
-      void async_send_hello(peer_connection& connection)
+      auto send_handler(peer_connection& connection)
       {
-         if (connection.hello_sent)
+         return [&](const std::error_code& ec)
          {
-            auto b = chain().get_state(connection.hello.xid.id());
+            if (check_cancel(connection) || ec)
+               return;
+            async_send_next(connection);
+         };
+      }
+      void async_send_next(peer_connection& connection)
+      {
+         assert(!connection.sending);
+         std::visit(
+             [&](auto& state)
+             {
+                if constexpr (requires { async_send_next(connection, state); })
+                {
+                   async_send_next(connection, state);
+                }
+             },
+             connection.state);
+      }
+      void async_send_next(peer_connection& connection, ConnectionStateStart& state)
+      {
+         if (state.hello.committed)
+         {
+            if (state.last_received)
+            {
+               connection.state = make_connection_ready(state);
+               async_send_next(connection);
+            }
+            return;
+         }
+         if (state.hello_sent)
+         {
+            auto b = chain().get_state(state.hello.xid.id());
             if (b)
                b = chain().get_state(b->info.header.previous);
             if (!b)
@@ -366,43 +398,33 @@ namespace psibase::net
                // Just reset to the committed block.
                b = chain().get_state(chain().get_block_id(chain().commit_index()));
             }
-            connection.hello = {b->xid()};
+            state.hello = {b->xid()};
          }
-         connection.hello_sent      = true;
-         connection.hello.committed = connection.hello.xid.num() <= chain().commit_index();
-         network().async_send(connection.id, connection.hello,
-                              [this, &connection](const std::error_code& ec)
-                              {
-                                 if (connection.closed)
-                                 {
-                                    connection.peer_ready = true;
-                                    disconnect(connection.id);
-                                    return;
-                                 }
-                                 else if (ec)
-                                 {
-                                    connection.peer_ready = true;
-                                 }
-                                 if (!connection.peer_ready && !connection.hello.committed)
-                                 {
-                                    async_send_hello(connection);
-                                 }
-                              });
+         state.hello_sent      = true;
+         state.hello.committed = state.hello.xid.num() <= chain().commit_index();
+         network().async_send(connection.id, state.hello, send_handler(connection));
+         connection.sending = true;
       }
+
+      ConnectionStateReady make_connection_ready(const ConnectionStateStart& state)
+      {
+         return ConnectionStateReady{.last_sent = chain().get_common_ancestor(*state.last_received),
+                                     .last_received = *state.last_received};
+      }
+
       void recv(peer_id origin, const HelloRequest& request)
       {
          auto& connection = get_connection(origin);
-         if (connection.ready)
+         auto* state      = std::get_if<ConnectionStateStart>(&connection.state);
+         if (!state)
          {
+            // TODO: this will happen if the peer loaded a snapshot
             return;
          }
-         if (!connection.peer_ready &&
-             connection.hello.xid.num() > request.xid.num() + connection.hello_sent)
+         if (state->last_received)
          {
-            // TODO: if the block num is not known, then we've failed to find a common ancestor
-            // so bail (only possible with a truncated block log)
-            connection.hello.xid  = {chain().get_block_id(request.xid.num()), request.xid.num()};
-            connection.hello_sent = false;
+            // We've already found a common ancestor
+            return;
          }
          if (request.committed && request.xid.num() < chain().getLogStart())
          {
@@ -411,58 +433,60 @@ namespace psibase::net
                PSIBASE_LOG(logger, info) << "Sending snapshot because the block log is truncated "
                                             "and the peer is too far behind";
                connection.state = ConnectionStateSendFastForward{request.xid.num()};
-               async_send_fast_forward(connection);
+               if (!connection.sending)
+               {
+                  async_send_next(connection);
+               }
             }
             return;
+         }
+         // Skip blocks that we know the peer doesn't have.
+         if (!state->hello.committed &&
+             state->hello.xid.num() > request.xid.num() + state->hello_sent)
+         {
+            state->hello.xid  = {chain().get_block_id(request.xid.num()), request.xid.num()};
+            state->hello_sent = false;
          }
          if (request.xid.id() == Checksum256{})
          {
             // sync from genesis
-            connection.last_received = {Checksum256{}, 1};
-            connection.last_sent     = connection.last_received;
-            // With no common block, we don't expect to get a HelloResponse
-            connection.peer_ready = true;
+            state->last_received = {Checksum256{}, 1};
          }
          else
          {
-            if (auto b = chain().get(request.xid.id()))
+            if (auto* b = chain().get_state(request.xid.id()))
             {
-               // Ensure that the block number is accurate.  I have not worked out
-               // what happens if the peer lies, but at least this way we guarantee
-               // that our local invariants hold.
-               connection.last_received = {request.xid.id(),
-                                           BlockNum(b->block().header().blockNum())};
+               state->last_received = {request.xid.id(), b->blockNum()};
             }
-            else if (auto* b = chain().get_state(request.xid.id()))
+            else if (chain().get_block_id(request.xid.num()) == request.xid.id())
             {
-               connection.last_received = {request.xid.id(), b->blockNum()};
+               state->last_received = request.xid;
+            }
+            else if (request.committed && request.xid.num() <= chain().commit_index())
+            {
+               // The peer sent a block id that it claims is committed, but it doesn't
+               // match the block id that we have for that block number
+               throw std::runtime_error("No common block found");
             }
             else
             {
+               // We don't know the block. Wait for one that we do know.
                return;
             }
-            connection.last_sent = chain().get_common_ancestor(connection.last_received);
          }
-         // async_send_fork will reset syncing if there is nothing to sync
-         connection.syncing = true;
-         connection.ready   = true;
-         //std::cout << "ready: received=" << to_string(connection.last_received.id())
-         //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
-         // FIXME: blocks and hellos need to be sequenced correctly
-         network().async_send(connection.id, HelloResponse{},
-                              [this, &connection](const std::error_code&)
-                              { async_send_fork(connection); });
-      }
-      void recv(peer_id origin, const HelloResponse&)
-      {
-         auto& connection      = get_connection(origin);
-         connection.peer_ready = true;
+         if (state->hello.committed)
+         {
+            connection.state = make_connection_ready(*state);
+            if (!connection.sending)
+            {
+               async_send_next(connection);
+            }
+         }
       }
 
-      void async_send_fast_forward(peer_connection& connection)
+      void async_send_next(peer_connection& connection, ConnectionStateSendFastForward& state)
       {
-         auto& state      = std::get<ConnectionStateSendFastForward>(connection.state);
-         auto  snapshotId = chain().get_last_snapshot_id();
+         auto snapshotId = chain().get_last_snapshot_id();
          PSIBASE_LOG(logger, debug) << "Last snapshot: " << loggers::to_string(snapshotId);
          if (auto headerNum = chain().get_next_light_header_num(state.blockNum, snapshotId);
              headerNum && *headerNum <= getBlockNum(snapshotId))
@@ -481,44 +505,37 @@ namespace psibase::net
                 Block{std::move(header)}, std::move(signature), std::move(auxConsensusData)});
             state.blockNum        = *headerNum;
             network().async_send(connection.id, BlockHeaderMessage{std::move(headerptr)},
-                                 [this, &connection](const std::error_code&)
-                                 { async_send_fast_forward(connection); });
+                                 send_handler(connection));
+            connection.sending = true;
          }
          else
          {
             connection.state = ConnectionStateSendSnapshot{
                 snapshotId, std::unique_ptr<SnapshotSender>{
                                 new SnapshotSender(chain().send_snapshot(snapshotId))}};
-            async_send_snapshot(connection);
+            async_send_next(connection);
          }
       }
 
-      void async_send_snapshot(peer_connection& connection)
+      void async_send_next(peer_connection& connection, ConnectionStateSendSnapshot& state)
       {
-         auto&               state = std::get<ConnectionStateSendSnapshot>(connection.state);
          SnapshotPartMessage msg;
          if (state.sender->next(msg.db, msg.lowKey, msg.highKey, msg.rows))
          {
             msg.blockId = state.blockId;
-            network().async_send(connection.id, std::move(msg),
-                                 [this, &connection](const std::error_code&)
-                                 { async_send_snapshot(connection); });
+            network().async_send(connection.id, std::move(msg), send_handler(connection));
+            connection.sending = true;
          }
          else
          {
-            auto row = chain().get_snapshot_info(state.blockId);
+            auto row         = chain().get_snapshot_info(state.blockId);
+            auto id          = ExtendedBlockId{state.blockId, getBlockNum(state.blockId)};
+            connection.state = ConnectionStateReady{id, id};
             network().async_send(
                 connection.id,
                 SnapshotVerifyMessage{row.id, row.state->state, row.state->signatures},
-                [this, &connection](const std::error_code&)
-                {
-                   auto& state = std::get<ConnectionStateSendSnapshot>(connection.state);
-                   connection.last_sent =
-                       connection.last_received = {state.blockId, getBlockNum(state.blockId)};
-                   connection.ready             = true;
-                   connection.peer_ready        = true;
-                   connection.state             = ConnectionStateReady{};
-                });
+                send_handler(connection));
+            connection.sending = true;
          }
       }
 
@@ -855,29 +872,18 @@ namespace psibase::net
 
       // invariants: if the head block is not the last sent block, then
       //             exactly one instance of async_send_fork is active
-      void async_send_fork(auto& peer)
+      void async_send_next(peer_connection& peer, ConnectionStateReady& state)
       {
-         if (peer.closed)
+         if (state.last_sent.num() != chain().get_head()->blockNum)
          {
-            peer.syncing = false;
-            disconnect(peer.id);
-            return;
-         }
-         if (peer.last_sent.num() != chain().get_head()->blockNum)
-         {
-            auto next_block_id = chain().get_block_id(peer.last_sent.num() + 1);
+            auto next_block_id = chain().get_block_id(state.last_sent.num() + 1);
             assert(next_block_id != Checksum256());
-            peer.last_sent  = {next_block_id, peer.last_sent.num() + 1};
+            state.last_sent = {next_block_id, state.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send(peer.id, BlockMessage{next_block},
-                                 [this, &peer](const std::error_code& e)
-                                 { async_send_fork(peer); });
-            consensus().post_send_block(peer.id, peer.last_sent.id());
-         }
-         else
-         {
-            peer.syncing = false;
+            network().async_send(peer.id, BlockMessage{next_block}, send_handler(peer));
+            peer.sending = true;
+            consensus().post_send_block(peer.id, state.last_sent.id());
          }
       }
       // This should be run whenever there is a new head block on the local chain
@@ -890,34 +896,33 @@ namespace psibase::net
          for (auto& peer : _peers)
          {
             // ---------- TODO: dispatch to peer connection strand -------------
-            if (!peer->peer_ready)
+            if (auto* state = std::get_if<ConnectionStateStart>(&peer->state))
             {
-               auto new_id = chain().get_common_ancestor(peer->hello.xid);
-               if (peer->hello.xid != new_id)
+               auto new_id = chain().get_common_ancestor(state->hello.xid);
+               if (state->hello.xid != new_id)
                {
-                  peer->hello.xid  = new_id;
-                  peer->hello_sent = false;
+                  state->hello.xid  = new_id;
+                  state->hello_sent = false;
                }
             }
             // if last sent block is after committed, back it up to the nearest block in the chain
-            if (peer->ready)
+            if (auto* state = std::get_if<ConnectionStateReady>(&peer->state))
             {
                // Note: Checking best_received primarily prevents received blocks
                // from being echoed back to their origin.
-               peer->last_sent = chain().get_common_ancestor(peer->last_sent);
-               if (chain().get_state(peer->last_received.id()))
+               state->last_sent = chain().get_common_ancestor(state->last_sent);
+               if (chain().get_state(state->last_received.id()))
                {
-                  auto best_received = chain().get_common_ancestor(peer->last_received);
-                  if (best_received.num() > peer->last_sent.num())
+                  auto best_received = chain().get_common_ancestor(state->last_received);
+                  if (best_received.num() > state->last_sent.num())
                   {
-                     peer->last_sent = best_received;
+                     state->last_sent = best_received;
                   }
                }
-               // if the peer is synced, start async_send_fork
-               if (!peer->syncing)
+               // if the peer is synced, start async_send_next
+               if (!peer->sending)
                {
-                  peer->syncing = true;
-                  async_send_fork(*peer);
+                  async_send_next(*peer);
                }
             }
             else
@@ -930,10 +935,13 @@ namespace psibase::net
 
       void update_last_received(auto& peer, const ExtendedBlockId& xid)
       {
-         peer.last_received = xid;
-         if (chain().in_best_chain(xid) && xid.num() > peer.last_sent.num())
+         if (auto* state = std::get_if<ConnectionStateReady>(&peer.state))
          {
-            peer.last_sent = xid;
+            state->last_received = xid;
+            if (chain().in_best_chain(xid) && xid.num() > state->last_sent.num())
+            {
+               state->last_sent = xid;
+            }
          }
          consensus().post_send_block(peer.id, xid.id());
       }
@@ -1009,13 +1017,19 @@ namespace psibase::net
          // If peer_has_block returns false, then one of the following will eventually happen:
          // - The block is not in the best chain
          // - post_send_block(peer, id)
+         //
+         // FIXME: Make sure that state is properly cleaned up
 
          auto& connection = get_connection(peer);
-         if (chain().in_best_chain(id) && getBlockNum(id) <= connection.last_sent.num())
+         if (auto* state = std::get_if<ConnectionStateReady>(&connection.state))
          {
-            return true;
+            if (chain().in_best_chain(id) && getBlockNum(id) <= state->last_sent.num())
+            {
+               return true;
+            }
+            return chain().is_ancestor(id, state->last_received);
          }
-         return chain().is_ancestor(id, connection.last_received);
+         return false;
       }
 
       std::optional<Checksum256> validate_message(const StateChecksumMessage& msg)
@@ -1032,15 +1046,32 @@ namespace psibase::net
          }
       }
 
-      void recv(peer_id origin, const BlockHeaderMessage& msg)
+      void start_receive_fast_forward(peer_connection& connection)
       {
-         auto& connection = get_connection(origin);
          if (std::holds_alternative<ConnectionStateStart>(connection.state))
          {
             PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
             connection.state = ConnectionStateReceiveFastForward{
                 std::unique_ptr<LightHeaderState>(new LightHeaderState(chain().light_validate()))};
          }
+      }
+
+      void start_receive_snapshot(peer_connection& connection, const Checksum256& blockId)
+      {
+         // Note: there might not be any block headers if the block producers
+         // haven't changed, so we might receive a SnapshotPartMessage immediately.
+         start_receive_fast_forward(connection);
+         if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
+         {
+            connection.state = ConnectionStateReceiveSnapshot{std::unique_ptr<SnapshotLoader>(
+                new SnapshotLoader(chain().start_snapshot(std::move(*state->state), blockId)))};
+         }
+      }
+
+      void recv(peer_id origin, const BlockHeaderMessage& msg)
+      {
+         auto& connection = get_connection(origin);
+         start_receive_fast_forward(connection);
          if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
          {
             chain().push_light_header(*state->state, msg.block, consensus());
@@ -1050,11 +1081,7 @@ namespace psibase::net
       void recv(peer_id origin, const SnapshotPartMessage& msg)
       {
          auto& connection = get_connection(origin);
-         if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
-         {
-            connection.state = ConnectionStateReceiveSnapshot{std::unique_ptr<SnapshotLoader>(
-                new SnapshotLoader(chain().start_snapshot(std::move(*state->state), msg.blockId)))};
-         }
+         start_receive_snapshot(connection, msg.blockId);
          if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
          {
             check(msg.blockId == state->loader->blockId, "Unexpected snapshot blockId");
@@ -1075,11 +1102,8 @@ namespace psibase::net
             if (auto* head =
                     chain().apply_snapshot(std::move(*state->loader), msg.hash, msg.signatures))
             {
-               auto id              = head->xid();
-               connection.last_sent = connection.last_received = id;
-               connection.ready                                = true;
-               connection.peer_ready                           = true;
-               connection.state                                = ConnectionStateReady{};
+               auto id          = head->xid();
+               connection.state = ConnectionStateReady{.last_sent = id, .last_received = id};
 
                {
                   PSIBASE_LOG_CONTEXT_BLOCK(logger, head->info.header, head->info.blockId);
