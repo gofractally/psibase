@@ -282,9 +282,15 @@ pub fn js_create_boot_transactions(
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
     let initial_key = public_key_pem
-        .map(|k| {
-            AnyPublicKey::from_str(&k)
-                .map_err(|e| JsValue::from_str(&format!("Failed to parse initial key: {}", e)))
+        .map(|k| -> Result<AnyPublicKey, JsValue> {
+            let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+            Ok(AnyPublicKey {
+                key: crate::Claim {
+                    service: AccountNumber::from_str("verify-sig").unwrap(),
+                    rawData: data.contents().to_vec().into(),
+                },
+            })
         })
         .transpose()?;
 
