@@ -106,7 +106,6 @@ void write_consensus_change_blocks(std::uint32_t             chain,
    {
       if (num <= last || num >= end)
          return;
-      std::cout << "copying block header: " << num << std::endl;
       blockKey.clear();
       psio::vector_stream kstream{blockKey};
       psio::to_key(num, kstream);

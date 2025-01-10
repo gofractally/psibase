@@ -436,7 +436,6 @@ void writeSnapshotRow(psibase::ChainHandle      chain,
    psibase::SnapshotRow row{
        .id    = status.head->blockId,
        .state = psibase::SnapshotStateItem{.state = *footer.hash, .signatures = footer.signatures}};
-   std::cerr << "signature count: " << row.state->signatures.size() << std::endl;
    chain.kvPut(psibase::SnapshotRow::db, row.key(), row);
 }
 
