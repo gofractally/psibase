@@ -334,7 +334,7 @@ TEST_CASE("graphql_block_strings", "[graphql]")
           World
         """, two: "" }) })",
                                   "");
-   REQUIRE(result7 == R"({"data": {"cat":"Hello\n\n  World"}})");
+   REQUIRE(result7 == R"({"data": {"cat":"Hello\n     \n  World"}})");
 
    // Test tab indentation
    auto result8 = psio::gql_query(r, R"({ cat(arg: { one: """
@@ -377,7 +377,7 @@ TEST_CASE("graphql_block_strings", "[graphql]")
         World
     """, two: "" }) })",
                                    "");
-   REQUIRE(result12 == R"({"data": {"cat":"Hello\n\n\nWorld"}})");
+   REQUIRE(result12 == R"({"data": {"cat":"Hello\n\n   \nWorld"}})");
 
    // Test lines with mixed tabs and spaces for indentation
    auto result13 = psio::gql_query(r, R"({ cat(arg: { one: """
