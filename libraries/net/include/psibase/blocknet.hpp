@@ -1222,10 +1222,6 @@ namespace psibase::net
                switch_fork();
             }
          }
-         else
-         {
-            throw std::runtime_error("Not receiving a snapshot");
-         }
       }
 
       void recv(peer_id origin, const WasmProducerMessage& msg)
