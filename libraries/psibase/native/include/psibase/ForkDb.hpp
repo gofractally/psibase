@@ -542,7 +542,7 @@ namespace psibase
             nextProducers(base->nextProducers),
             state(base->readState(context)),
             stateHash(sha256(state)),
-            database(context->sharedDatabase, base->revision)
+            revision(base->revision)
       {
          if (state.next && base->info.header.commitNum >= state.next->blockNum)
          {
@@ -560,7 +560,7 @@ namespace psibase
       Checksum256    stateHash;
       bool           consensusChangeReady = false;
 
-      Database database;
+      ConstRevisionPtr revision;
 
       template <typename Consensus>
       void push(SystemContext*                            systemContext,
@@ -597,15 +597,23 @@ namespace psibase
             systemContext->sharedDatabase.kvPutSubjective(
                 *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
          }
-         prevBlockNum     = info.header.blockNum;
-         auto blockNumKey = psio::to_frac(info.header.blockNum);
-         auto session     = database.startWrite(writer);
+         prevBlockNum         = info.header.blockNum;
+         auto     blockNumKey = psio::convert_to_key(info.header.blockNum);
+         Database database(systemContext->sharedDatabase, revision);
+         auto     session = database.startWrite(writer);
          database.kvPutRaw(DbId::blockLog, blockNumKey, psio::to_frac(block->block().unpack()));
          if (!block->signature().empty())
          {
             database.kvPutRaw(DbId::blockProof, blockNumKey,
-                              std::span<const char>(block->signature()));
+                              psio::to_frac(block->signature().unpack()));
          }
+         if (block->auxConsensusData())
+         {
+            BlockDataRow row{info.blockId, *block->auxConsensusData()};
+            systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
+                                                          psio::to_frac(row));
+         }
+         revision = database.getModifiedRevision();
       }
 
       void maybeAdvance()
@@ -705,23 +713,11 @@ namespace psibase
       KeyRanges        serviceKeys;
       KeyRanges        nativeKeys;
 
-      std::shared_ptr<ProducerSet> producers;
-      std::shared_ptr<ProducerSet> nextProducers;
-      BlockNum                     nextProducersBlockNum;
-      Checksum256                  stateHash;
+      std::unique_ptr<LightHeaderState> validator;
 
-      SnapshotLoader(LightHeaderState&& state, const Checksum256& blockId)
-          : blockId(blockId),
-            revision(state.database.getModifiedRevision()),
-            producers(std::move(state.producers)),
-            nextProducers(std::move(state.nextProducers)),
-            nextProducersBlockNum(0),
-            stateHash(std::move(state.stateHash))
+      SnapshotLoader(std::unique_ptr<LightHeaderState>&& state, const Checksum256& blockId)
+          : blockId(blockId), revision(state->revision), validator(std::move(state))
       {
-         if (state.state.next)
-         {
-            nextProducersBlockNum = state.state.next->blockNum;
-         }
       }
 
       KeyRanges* getRanges(DbId db)
@@ -1283,11 +1279,12 @@ namespace psibase
          }
          return {};
       }
-      SnapshotLoader start_snapshot(LightHeaderState&& state, const Checksum256& blockId)
+      SnapshotLoader start_snapshot(std::unique_ptr<LightHeaderState>&& state,
+                                    const Checksum256&                  blockId)
       {
-         if (getBlockNum(blockId) > state.prevBlockNum)
+         if (getBlockNum(blockId) > state->prevBlockNum)
          {
-            state.maybeAdvance();
+            state->maybeAdvance();
          }
          return SnapshotLoader(std::move(state), blockId);
       }
@@ -1309,15 +1306,17 @@ namespace psibase
          snapshot::StateSignatureInfo preimage{hash};
          // verify signatures
          AccountNumber prev{};
-         PSIBASE_LOG(logger, info) << "Verifying snapshot with producers: " << *loader.producers;
+         PSIBASE_LOG(logger, info)
+             << "Verifying snapshot with producers: " << *loader.validator->producers;
          for (const auto& sig : signatures)
          {
-            check(!!loader.producers->getIndex(sig.account, sig.claim),
+            check(!!loader.validator->producers->getIndex(sig.account, sig.claim),
                   "Not a producer " + sig.account.str());
             check(prev < sig.account, "Producers must be in order");
-            verify(loader.producers->authState->revision, preimage, sig.claim, sig.rawData);
+            verify(loader.validator->producers->authState->revision, preimage, sig.claim,
+                   sig.rawData);
          }
-         check(signatures.size() >= loader.producers->weak_threshold(),
+         check(signatures.size() >= loader.validator->producers->weak_threshold(),
                "Not enough signatures on snapshot");
          // verify hash
          auto revision   = loader.revision;
@@ -1360,7 +1359,9 @@ namespace psibase
          }
          systemContext->sharedDatabase.setHead(*writer, revision);
          head = &pos->second;
-         commit(head->blockNum());
+         // Do not call commit(). It tries to step forward over blocks that
+         // we don't have.
+         commitIndex = head->blockNum();
          byBlocknumIndex.clear();
          byBlocknumIndex.insert({head->blockNum(), head->blockId()});
          // Record the snapshot

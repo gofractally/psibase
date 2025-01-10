@@ -1046,9 +1046,19 @@ namespace psibase::net
          }
       }
 
-      void start_receive_fast_forward(peer_connection& connection)
+      void start_receive_fast_forward(peer_connection& connection, BlockNum num)
       {
-         if (std::holds_alternative<ConnectionStateStart>(connection.state))
+         if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
+         {
+            if (num > getBlockNum(state->loader->blockId))
+            {
+               PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
+               connection.state =
+                   ConnectionStateReceiveFastForward{std::move(state->loader->validator)};
+            }
+         }
+         else if (!std::holds_alternative<ConnectionStateReceiveFastForward>(connection.state) &&
+                  num > chain().commit_index())
          {
             PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
             connection.state = ConnectionStateReceiveFastForward{
@@ -1060,18 +1070,18 @@ namespace psibase::net
       {
          // Note: there might not be any block headers if the block producers
          // haven't changed, so we might receive a SnapshotPartMessage immediately.
-         start_receive_fast_forward(connection);
+         start_receive_fast_forward(connection, getBlockNum(blockId));
          if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
          {
             connection.state = ConnectionStateReceiveSnapshot{std::unique_ptr<SnapshotLoader>(
-                new SnapshotLoader(chain().start_snapshot(std::move(*state->state), blockId)))};
+                new SnapshotLoader(chain().start_snapshot(std::move(state->state), blockId)))};
          }
       }
 
       void recv(peer_id origin, const BlockHeaderMessage& msg)
       {
          auto& connection = get_connection(origin);
-         start_receive_fast_forward(connection);
+         start_receive_fast_forward(connection, msg.block->block().header().blockNum());
          if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
          {
             chain().push_light_header(*state->state, msg.block, consensus());
@@ -1087,9 +1097,76 @@ namespace psibase::net
             check(msg.blockId == state->loader->blockId, "Unexpected snapshot blockId");
             chain().add_to_snapshot(*state->loader, msg.db, msg.lowKey, msg.highKey, msg.rows);
          }
-         else
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&      connection,
+                                    ConnectionStateStart& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId& to)
+      {
+         if (!state.hello.committed)
          {
-            throw std::runtime_error("Not receiving a snapshot");
+            state.hello.xid = to;
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                connection,
+                                    ConnectionStateSendFastForward& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId&)
+      {
+         // Nothing to do. We'll just keep sending headers until we reach the new snapshot.
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&             connection,
+                                    ConnectionStateSendSnapshot& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId& to)
+      {
+         // If we're sending a snapshot that is behind the one we loaded, switch back
+         // to sending block headers.
+         if (to.num() > getBlockNum(state.blockId))
+         {
+            connection.state = ConnectionStateSendFastForward{getBlockNum(state.blockId)};
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                   connection,
+                                    ConnectionStateReceiveFastForward& state,
+                                    const ExtendedBlockId&             from,
+                                    const ExtendedBlockId&             to)
+      {
+         if (state.state->prevBlockNum < to.num())
+         {
+            connection.state = ConnectionStateSendFastForward{state.state->prevBlockNum};
+            if (!connection.sending)
+               async_send_next(connection);
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                connection,
+                                    ConnectionStateReceiveSnapshot& state,
+                                    const ExtendedBlockId&          from,
+                                    const ExtendedBlockId&          to)
+      {
+         if (to.num() > getBlockNum(state.loader->blockId))
+         {
+            connection.state = ConnectionStateSendFastForward{getBlockNum(state.loader->blockId)};
+            if (!connection.sending)
+               async_send_next(connection);
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&       connection,
+                                    ConnectionStateReady&  state,
+                                    const ExtendedBlockId& from,
+                                    const ExtendedBlockId& to)
+      {
+         if (state.last_sent != to)
+         {
+            connection.state = ConnectionStateSendFastForward{from.num()};
+            if (!connection.sending)
+               async_send_next(connection);
          }
       }
 
@@ -1099,6 +1176,29 @@ namespace psibase::net
          if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
          {
             check(msg.blockId == state->loader->blockId, "Unexpected snapshot blockId");
+            // Check whether the snapshot should be loaded
+            if (getBlockNum(msg.blockId) <= chain().commit_index())
+            {
+               // The snapshot is in the past
+               auto id          = ExtendedBlockId{msg.blockId, getBlockNum(msg.blockId)};
+               connection.state = ConnectionStateReady{.last_sent = id, .last_received = id};
+               if (!connection.sending)
+                  async_send_next(connection);
+               return;
+            }
+            else if (auto existing = chain().get_state(msg.blockId))
+            {
+               // We already have an existing state for the snapshot
+               connection.state =
+                   ConnectionStateReady{.last_sent = chain().get_common_ancestor(existing->xid()),
+                                        .last_received = existing->xid()};
+               if (!connection.sending)
+                  async_send_next(connection);
+               return;
+            }
+
+            auto oldCommit = chain().get_state(chain().get_block_id(chain().commit_index()))->xid();
+
             if (auto* head =
                     chain().apply_snapshot(std::move(*state->loader), msg.hash, msg.signatures))
             {
@@ -1114,7 +1214,9 @@ namespace psibase::net
                // Propagate the snapshot to all peers
                for (auto& peer : _peers)
                {
-                  // TODO: switch to sending snapshot
+                  std::visit([&](auto& state)
+                             { adjust_peer_for_snapshot(*peer, state, oldCommit, id); },
+                             peer->state);
                }
                //
                do_gc();

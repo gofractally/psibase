@@ -50,8 +50,12 @@ class TestSnapshot(unittest.TestCase):
         b.wait(predicates.producers_are(['e', 'f', 'missing']))
         # Make sure that nodes can sync with a node that loaded a snapshot
         g = cluster.make_node('g')
+        h = cluster.make_node('h') # connected to g before g loads a snapshot
+        g.connect(h)
         g.connect(e)
-        g.wait(predicates.new_block());
+        pred = predicates.new_block()
+        g.wait(pred)
+        h.wait(pred)
 
 if __name__ == '__main__':
     testutil.main()
