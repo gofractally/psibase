@@ -169,9 +169,9 @@ export const CreatePage = () => {
     useEffect(() => {
         const setKeysAndBoot = async () => {
             try {
-                let key: CryptoKey | undefined;
+                let keyPair: CryptoKeyPair | undefined;
                 if (!isDev) {
-                    key = await createAndSetKey();
+                    keyPair = await createAndSetKey();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -181,40 +181,45 @@ export const CreatePage = () => {
                     packages,
                     desiredPackages.map((pack) => pack.name)
                 );
-                bootChain(requiredPackages, bpName, (state) => {
-                    if (isRequestingUpdate(state)) {
-                        const [_, current, total] = state;
-                        const newIndex = calculateIndex(
-                            loadingStates.length,
-                            current,
-                            total
-                        );
-                        setCurrentState(newIndex);
-                    } else if (isBootCompleteUpdate(state)) {
-                        if (state.success) {
-                            navigate("/Dashboard");
-                            setCurrentState(loadingStates.length + 1);
-                            toast({
-                                title: "Success",
-                                description: "Successfully booted chain.",
-                            });
+                bootChain(
+                    requiredPackages,
+                    bpName,
+                    keyPair?.publicKey,
+                    (state) => {
+                        if (isRequestingUpdate(state)) {
+                            const [_, current, total] = state;
+                            const newIndex = calculateIndex(
+                                loadingStates.length,
+                                current,
+                                total
+                            );
+                            setCurrentState(newIndex);
+                        } else if (isBootCompleteUpdate(state)) {
+                            if (state.success) {
+                                navigate("/Dashboard");
+                                setCurrentState(loadingStates.length + 1);
+                                toast({
+                                    title: "Success",
+                                    description: "Successfully booted chain.",
+                                });
 
-                            // TODO: handle errors
-                            if (!key) return;
-                            importKey(key);
+                                // TODO: handle errors
+                                if (!keyPair) return;
+                                importKey(keyPair.privateKey);
+                            } else {
+                                setLoading(false);
+                                const message = "Something went wrong.";
+                                toast({
+                                    title: "Error",
+                                    description: message,
+                                });
+                                setErrorMessage(message);
+                            }
                         } else {
-                            setLoading(false);
-                            const message = "Something went wrong.";
-                            toast({
-                                title: "Error",
-                                description: message,
-                            });
-                            setErrorMessage(message);
+                            console.warn(state, "Unrecognised message.");
                         }
-                    } else {
-                        console.warn(state, "Unrecognised message.");
                     }
-                });
+                );
             } catch (e) {
                 console.error("Error booting chain");
                 console.error(e);
