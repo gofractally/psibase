@@ -30,8 +30,9 @@ export const bootChain = async (
 
         let publicKeyPem: string | undefined;
         try {
-            if (!publicKey) return;
-            publicKeyPem = await exportKeyToPEM(publicKey, "PUBLIC KEY");
+            if (publicKey) {
+                publicKeyPem = await exportKeyToPEM(publicKey, "PUBLIC KEY");
+            }
         } catch (e) {
             onProgressUpdate("Failed to export publicKey to PEM format");
             return;
