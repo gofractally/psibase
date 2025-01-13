@@ -187,7 +187,6 @@ function(add suffix)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/ConfigFile.cpp
-            native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
             native/src/log.cpp
             native/src/NativeFunctions.cpp
