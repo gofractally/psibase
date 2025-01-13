@@ -1,41 +1,54 @@
 import { useLoggedInUser } from "@/hooks/useLoggedInUser";
-import { supervisor } from "@/main";
-import { useMutation } from "@tanstack/react-query";
 import { Button } from "./ui/button";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useSetMetadata } from "@/hooks/useSetMetadata";
 
 export const AccountSelection = () => {
-  const { mutateAsync: importAccount } = useMutation<void, string, string>({
-    mutationFn: async (accountName) => {
-      await supervisor.functionCall({
-        method: "importAccount",
-        params: [accountName],
-        service: "accounts",
-        intf: "admin",
-      });
-    },
-  });
-
-  // perform a login
-  // engage the app, set the meta data
-
-  console.log({ importAccount });
+  const { status, mutateAsync } = useSetMetadata();
 
   const { data: currentUser } = useLoggedInUser();
 
   const { mutateAsync: login } = useCreateConnectionToken();
 
+  const setMetadata = async () => {
+    await mutateAsync({
+      appHomepageSubpage: "",
+      icon: "",
+      iconMimeType: "",
+      longDescription: "I dunno bro",
+      name: "Derp",
+      owners: ["a"],
+      privacyPolicySubpage: "/privacy-policy",
+      redirectUris: [],
+      shortDescription: "Hello world",
+      tags: [],
+      tosSubpage: "/tos",
+    });
+  };
+
   return (
     <div>
       <div>Current user - {currentUser || "None"}</div>
+      <div>Status: {status}</div>
+      <div className="flex flex-col gap-4">
+        <Button
+          variant="outline"
+          onClick={() => {
+            login();
+          }}
+        >
+          Login
+        </Button>
 
-      <Button
-        onClick={() => {
-          login();
-        }}
-      >
-        Login
-      </Button>
+        <Button
+          onClick={() => {
+            setMetadata();
+          }}
+          disabled={!currentUser}
+        >
+          Set metadata {!currentUser && "- Login to continue"}
+        </Button>
+      </div>
     </div>
   );
 };
