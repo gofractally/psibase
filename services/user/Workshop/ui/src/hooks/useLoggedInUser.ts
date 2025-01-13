@@ -13,10 +13,6 @@ export const useLoggedInUser = () =>
         service: "accounts",
         intf: "activeApp",
       });
-      if (res) {
-        return z.string().parse(res);
-      } else {
-        return null;
-      }
+      return res ? z.string().parse(res) : null;
     },
   });
