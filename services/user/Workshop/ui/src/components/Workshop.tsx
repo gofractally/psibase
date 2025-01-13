@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 
-export const AccountSelection = () => {
+export const Workshop = () => {
   const { status, mutateAsync } = useSetMetadata();
 
   const { data: currentUser } = useLoggedInUser();
@@ -15,8 +15,8 @@ export const AccountSelection = () => {
       appHomepageSubpage: "",
       icon: "",
       iconMimeType: "",
-      longDescription: "I dunno bro",
-      name: "Derp",
+      longDescription: "lorem ipsum",
+      name: "AppName",
       owners: ["a"],
       privacyPolicySubpage: "/privacy-policy",
       redirectUris: [],
