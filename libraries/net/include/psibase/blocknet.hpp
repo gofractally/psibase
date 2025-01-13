@@ -468,6 +468,14 @@ namespace psibase::net
                // match the block id that we have for that block number
                throw std::runtime_error("No common block found");
             }
+            else if (request.committed)
+            {
+               // The peer is ahead of us.
+               // TODO: Avoid sending spurious blocks
+               auto num             = chain().commit_index();
+               auto id              = chain().get_block_id(num);
+               state->last_received = {id, num};
+            }
             else
             {
                // We don't know the block. Wait for one that we do know.
