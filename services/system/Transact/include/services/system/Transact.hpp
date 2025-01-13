@@ -145,24 +145,30 @@ namespace SystemService
       ///
       /// * `sender`: The sender account for the transaction potentially being authorized.
       /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+      /// * `authSet`: The set of accounts that are already being checked for authorization. If
+      ///              the sender is already in this set, then the function should return false.
       ///
       /// Returns:
       /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
-      bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers);
+      bool isAuthSys(psibase::AccountNumber                             sender,
+                     std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<std::vector<psibase::AccountNumber>> authSet);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
       ///
       /// * `sender`: The sender account for the transaction potentially being rejected.
       /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+      /// * `authSet`: The set of accounts that are already being checked for authorization. If
+      ///              the sender is already in this set, then the function should return false.
       ///
       /// Returns:
       /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
-      bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters);
+      bool isRejectSys(psibase::AccountNumber                             sender,
+                       std::vector<psibase::AccountNumber>                rejecters,
+                       std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

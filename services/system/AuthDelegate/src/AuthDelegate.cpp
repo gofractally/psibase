@@ -31,28 +31,48 @@ namespace SystemService
       getOwner(user);
    }
 
-   bool AuthDelegate::isAuthSys(psibase::AccountNumber              sender,
-                                std::vector<psibase::AccountNumber> authorizers)
+   bool AuthDelegate::isAuthSys(psibase::AccountNumber                             sender,
+                                std::vector<psibase::AccountNumber>                authorizers,
+                                std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
    {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
+      // Base case to prevent infinite recursion
+      if (std::ranges::contains(authSet, sender))
+         return false;
+
+      authSet.push_back(sender);
+
       auto owner = getOwner(sender);
 
       if (std::ranges::contains(authorizers, owner))
          return true;
 
       auto _ = recurse();
-      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers));
+      return authServiceOf(owner).isAuthSys(owner, std::move(authorizers),
+                                            std::optional(std::move(authSet)));
    }
 
-   bool AuthDelegate::isRejectSys(psibase::AccountNumber              sender,
-                                  std::vector<psibase::AccountNumber> rejecters)
+   bool AuthDelegate::isRejectSys(psibase::AccountNumber                             sender,
+                                  std::vector<psibase::AccountNumber>                rejecters,
+                                  std::optional<std::vector<psibase::AccountNumber>> authSet_opt)
    {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
+      // Base case to prevent infinite recursion
+      if (std::ranges::contains(authSet, sender))
+         return false;
+
+      authSet.push_back(sender);
+
       auto owner = getOwner(sender);
 
       if (std::ranges::contains(rejecters, owner))
          return true;
 
       auto _ = recurse();
-      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters));
+      return authServiceOf(owner).isRejectSys(owner, std::move(rejecters),
+                                              std::make_optional(authSet));
    }
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
@@ -70,13 +90,7 @@ namespace SystemService
 
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)
    {
-      auto accountRow = to<Accounts>().getAccount(account);
-      if (!accountRow)
-      {
-         abortMessage("unknown account \"" + account.str() + "\"");
-      }
-
-      return Actor<AuthInterface>{service, accountRow->authService};
+      return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
    }
 
 }  // namespace SystemService
