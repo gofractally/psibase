@@ -59,3 +59,18 @@ export interface FunctionCallRequest {
 
 export const isFunctionCallRequest = (data: any): data is FunctionCallRequest =>
     data && data.type == FUNCTION_CALL_REQUEST;
+
+export const buildFunctionCallRequest = (
+    args: FunctionCallArgs,
+): FunctionCallRequest => {
+    const fqArgs: QualifiedFunctionCallArgs = {
+        ...args,
+        plugin: args.plugin || "plugin",
+    };
+
+    return {
+        type: FUNCTION_CALL_REQUEST,
+        id: window.crypto.randomUUID?.() ?? Math.random().toString(), // if insecure context and randomUUID is unavailable, use Math.random
+        args: fqArgs,
+    };
+};

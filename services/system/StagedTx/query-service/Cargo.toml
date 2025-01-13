@@ -1,0 +1,15 @@
+[package]
+name = "r-staged-tx"
+description = "Query service for staged transaction service"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
+serde = "1.0"
+staged-tx = { path = "../service", version = "0.14.0" }
+async-graphql = { version = "7.0.10" }

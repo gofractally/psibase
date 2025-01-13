@@ -1,14 +1,15 @@
-use crate::bindings;
 use crate::errors::ErrorType::*;
+use crate::{bindings, InviteToken};
 
-use base64::{engine::general_purpose::URL_SAFE, Engine};
+use bindings::accounts::account_tokens::api::deserialize_token;
+use bindings::accounts::account_tokens::types::*;
 use bindings::host::common::types as CommonTypes;
-use bindings::invite::plugin::types::InviteToken;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct InviteParams {
-    pub app: String,
+    pub app: Option<String>,
+    pub app_domain: String,
     pub pk: String,
 }
 
@@ -26,7 +27,7 @@ pub trait TryParseGqlResponse: Sized {
 pub struct InviteRecordSubset {
     pub inviter: psibase::AccountNumber,
     pub actor: psibase::AccountNumber,
-    pub expiry: u32,
+    pub expiry: String,
     pub state: u8,
 }
 
@@ -46,29 +47,18 @@ impl TryParseGqlResponse for InviteRecordSubset {
     }
 }
 
-impl From<InviteParams> for InviteToken {
-    fn from(params: InviteParams) -> Self {
-        let params_str = serde_json::to_string(&params).unwrap();
-        URL_SAFE.encode(params_str)
-    }
-}
+impl InviteToken {
+    pub fn from_encoded(token: &str) -> Result<Self, CommonTypes::Error> {
+        let invite_params =
+            deserialize_token(token).ok_or(DecodeInviteError("maybe incorrect token?"))?;
 
-pub trait TryFromInviteToken: Sized {
-    fn try_from_invite_id(id: &str) -> Result<Self, CommonTypes::Error>;
-}
+        let invite_token = match invite_params {
+            Token::InviteToken(params) => params,
+            _ => {
+                return Err(DecodeInviteError("maybe incorrect token?").into());
+            }
+        };
 
-impl TryFromInviteToken for InviteParams {
-    fn try_from_invite_id(id: &str) -> Result<Self, CommonTypes::Error> {
-        let bytes = URL_SAFE
-            .decode(id)
-            .map_err(|_| DecodeInviteError("Error decoding base64"))?;
-
-        let str = String::from_utf8(bytes)
-            .map_err(|_| DecodeInviteError("Error converting from UTF8"))?;
-
-        let result: InviteParams = serde_json::from_str(&str)
-            .map_err(|_| DecodeInviteError("Error deserializing JSON string into object"))?;
-
-        Ok(result)
+        Ok(invite_token)
     }
 }

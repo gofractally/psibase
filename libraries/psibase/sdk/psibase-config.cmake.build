@@ -41,7 +41,7 @@ function(add_libs suffix)
         boost
         wasm-base${suffix}
     )
-    target_compile_features(psio${suffix} INTERFACE cxx_std_20)
+    target_compile_features(psio${suffix} INTERFACE cxx_std_23)
 
     add_library(psibase${suffix} INTERFACE)
     target_include_directories(psibase${suffix} INTERFACE
@@ -135,7 +135,7 @@ function(add_libs suffix)
         -lSpki${suffix}
         -lPrivateKeyInfo${suffix}
         ${LIBCLANG_RT_BUILTINS}
-        ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
+        ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasip1/crt1.o
     )
     target_include_directories(Psibase::test${suffix} INTERFACE
         @ROOT_SOURCE_DIR@/libraries/psibase/tester/include

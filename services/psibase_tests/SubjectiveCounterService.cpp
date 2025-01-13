@@ -20,7 +20,7 @@ PSIO_REFLECT(SubjectiveCounterRow, key, value)
 
 using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
 
-struct SubjectiveCounterService : psibase::Service<SubjectiveCounterService>
+struct SubjectiveCounterService : psibase::Service
 {
    using Tables                  = psibase::SubjectiveTables<SubjectiveCounterTable>;
    static constexpr auto service = psibase::AccountNumber{"counter"};

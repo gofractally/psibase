@@ -1,11 +1,7 @@
-import { QualifiedFunctionCallArgs } from "@psibase/common-lib";
+import { assertTruthy, QualifiedFunctionCallArgs } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
-import {
-    assertTruthy,
-    OriginationData,
-    QualifiedOriginationData,
-} from "../utils";
+import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 interface HttpRequest {
@@ -180,8 +176,8 @@ export class PluginHost implements HostInterface {
         return res;
     }
 
-    getActiveAppDomain(): string {
-        return this.supervisor.getActiveAppDomain(this.self);
+    getActiveApp(): OriginationData {
+        return this.supervisor.getActiveApp(this.self);
     }
 
     // Client interface

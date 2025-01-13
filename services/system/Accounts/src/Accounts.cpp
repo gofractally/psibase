@@ -101,7 +101,7 @@ namespace SystemService
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
       auto   account      = accountIndex.get((getSender()));
-      check(account.has_value(), "account does not exist");
+      check(account.has_value(), "account " + getSender().str() + " does not exist");
 
       to<AuthInterface>(authService).canAuthUserSys(getSender());
 
@@ -109,12 +109,24 @@ namespace SystemService
       accountTable.put(*account);
    }
 
-   bool Accounts::exists(AccountNumber name)
+   std::optional<Account> Accounts::getAccount(AccountNumber name)
    {
       Tables tables{getReceiver()};
       auto   accountTable = tables.open<AccountTable>();
       auto   accountIndex = accountTable.getIndex<0>();
-      return accountIndex.get(name) != std::nullopt;
+      return accountIndex.get(name);
+   }
+
+   psibase::AccountNumber Accounts::getAuthOf(psibase::AccountNumber account)
+   {
+      auto accountRow = getAccount(account);
+      check(accountRow.has_value(), "account " + account.str() + " does not exist");
+      return accountRow->authService;
+   }
+
+   bool Accounts::exists(AccountNumber name)
+   {
+      return getAccount(name) != std::nullopt;
    }
 
    void Accounts::billCpu(AccountNumber name, std::chrono::nanoseconds amount)
@@ -124,7 +136,7 @@ namespace SystemService
       auto accountTable = tables.open<AccountTable>();
       auto accountIndex = accountTable.getIndex<0>();
       auto row          = accountIndex.get(name);
-      check(!!row, "account does not exist");
+      check(!!row, "account " + name.str() + " does not exist");
       if (row->resourceBalance)
       {
          row->resourceBalance->billCpu(amount);

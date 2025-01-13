@@ -309,7 +309,7 @@ endfunction()
 
 # Description:              - Use this function when you want to add additional details to a package that is 
 #                             built/managed by cargo-psibase, as opposed to packages built entirely using CMake.
-# OUTPUT <filename>         - [Required] The package file.
+# OUTPUT <filename>         - [Required] The package file. Must be identical to 'package.metadata.psibase.package-name' in project's Cargo.toml
 # PATH <filepath>           - [Required] The path to the cargo workspace (e.g. `services/user/Branding`).
 # DEPENDS <targets>...      - Targets that this target depends on
 function(cargo_psibase_package)
@@ -322,7 +322,7 @@ function(cargo_psibase_package)
     # Set variables
     get_filename_component(PACKAGE_NAME ${ARG_OUTPUT} NAME)
     get_filename_component(TARGET_NAME ${ARG_OUTPUT} NAME_WE)
-    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasi/release/packages/${PACKAGE_NAME})
+    set(PACKAGE_OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/target/wasm32-wasip1/release/packages/${PACKAGE_NAME})
 
     # Build the package if needed
     ExternalProject_Add(${TARGET_NAME}_ext

@@ -9,7 +9,7 @@ cd $root_dir
 
 # Account Creation
 echo "Creating demoapp1 account..."
-psibase -a dev create -i $account_name
+psibase create -a dev -i $account_name
 
 pushd ./service
 # Build service and deploy
@@ -26,6 +26,6 @@ cd ./ui
 rm -rf node_modules
 rm -rf dist
 yarn --mutex network && yarn build
-psibase -a dev upload -r ./dist / -S $account_name
+psibase upload -a dev -r ./dist / -S $account_name
 
 

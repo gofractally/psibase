@@ -42,8 +42,8 @@ export const App = () => {
         try {
             await supervisor.functionCall({
                 service: "accounts",
-                intf: "accounts",
-                method: "loginTemp",
+                intf: "activeApp",
+                method: "login",
                 params: ["branding"],
             });
 

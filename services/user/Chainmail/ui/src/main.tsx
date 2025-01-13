@@ -5,14 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 
-import { Drafts, Editor, Home, Sent, Viewer } from "@routes";
+import { Archived, Drafts, Editor, Home, Sent, Saved, Viewer } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
+
+import { Supervisor } from "@psibase/common-lib";
 
 import DefaultLayout from "./layouts/default";
 
 import "./styles/globals.css";
-import Archived from "@routes/archived";
 
+export const supervisor = new Supervisor();
 const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
@@ -27,6 +29,11 @@ const router = createBrowserRouter([
             {
                 path: "/drafts",
                 element: <Drafts />,
+                children: [],
+            },
+            {
+                path: "/saved",
+                element: <Saved />,
                 children: [],
             },
             {

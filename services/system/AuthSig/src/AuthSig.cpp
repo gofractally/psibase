@@ -1,7 +1,9 @@
 #include <services/system/AuthSig.hpp>
 
 #include <psibase/dispatch.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/Spki.hpp>
+#include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
 
 #include <concepts>
@@ -63,10 +65,10 @@ namespace SystemService
                return;
             }
          }
-         abortMessage("transaction does not include a claim for the key " +
-                      keyFingerprint(row->pubkey) + " needed to authenticate sender " +
-                      sender.str() + " for action " + action.service.str() +
-                      "::" + action.method.str());
+         abortMessage("transaction does not include a claim for the key "
+                      + keyFingerprint(row->pubkey) + " needed to authenticate sender "
+                      + sender.str() + " for action " + action.service.str()
+                      + "::" + action.method.str());
       }
 
       void AuthSig::canAuthUserSys(psibase::AccountNumber user)
@@ -80,6 +82,18 @@ namespace SystemService
       {
          auto authTable = db.open<AuthTable>();
          authTable.put(AuthRecord{.account = getSender(), .pubkey = std::move(key)});
+      }
+
+      bool AuthSig::isAuthSys(psibase::AccountNumber              sender,
+                              std::vector<psibase::AccountNumber> authorizers)
+      {
+         return std::ranges::contains(authorizers, sender);
+      }
+
+      bool AuthSig::isRejectSys(psibase::AccountNumber              sender,
+                                std::vector<psibase::AccountNumber> rejecters)
+      {
+         return std::ranges::contains(rejecters, sender);
       }
    }  // namespace AuthSig
 }  // namespace SystemService

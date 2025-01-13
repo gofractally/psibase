@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <compare>
+#include <optional>
 #include <psibase/check.hpp>
 #include <string>
 #include <string_view>

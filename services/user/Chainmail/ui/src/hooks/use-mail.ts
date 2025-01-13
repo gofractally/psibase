@@ -1,9 +1,10 @@
 import { atom, useAtom } from "jotai";
 
-import { useUser } from "./use-user";
+import { useLoggedInUser } from "./use-logged-in-user";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalStorage } from "./use-local-storage";
-import { getSupervisor } from "@lib/supervisor";
+
+import { supervisor } from "src/main";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -32,8 +33,6 @@ type RawMessage = {
 };
 
 const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
-    console.info("transformRawMessagesToMessages().top; rawMessagses:");
-    console.info(rawMessages);
     return rawMessages.reverse().map(
         (msg, i) =>
             ({
@@ -51,10 +50,7 @@ const transformRawMessagesToMessages = (rawMessages: RawMessage[]) => {
     );
 };
 
-const getIncomingMessages = async (account: string | undefined) => {
-    console.info(`ui.getIncomingMessages(undefined, ${account}).top`);
-    const supervisor = await getSupervisor();
-    // const res = await fetch(`/messages?receiver=${account}`);
+const getIncomingMessages = async (account?: string | null) => {
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
@@ -66,8 +62,7 @@ const getIncomingMessages = async (account: string | undefined) => {
 
 const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
-    const { user } = useUser();
-    console.info(`ui.callingUseQuery(incoming, user[${user}])`);
+    const { data: user } = useLoggedInUser();
     const query = useQuery({
         queryKey: ["incoming", user],
         queryFn: () => getIncomingMessages(user),
@@ -86,24 +81,19 @@ export function useIncomingMessages() {
     };
 }
 
-const getArchivedMessages = async (account: string | undefined) => {
-    console.info("getArchivedMessages().top");
-    const supervisor = await getSupervisor();
-    console.info("[archived] got Supervisor instance");
-    // const res = await fetch(`/messages?receiver=${account}`);
+const getArchivedMessages = async (account?: string | null) => {
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
         method: "getArchivedMsgs",
         params: [, account],
     })) as RawMessage[];
-    console.info("rawMessages: ", rawMessages);
     return transformRawMessagesToMessages(rawMessages);
 };
 
 const archivedMsgAtom = atom<Message["id"]>("");
 export function useArchivedMessages() {
-    const { user } = useUser();
+    const { data: user } = useLoggedInUser();
     const query = useQuery({
         queryKey: ["archived", user, ""],
         queryFn: () => getArchivedMessages(user),
@@ -122,29 +112,52 @@ export function useArchivedMessages() {
     };
 }
 
-const getSentMessages = async (account: string | undefined) => {
-    console.info(`ui.getSentMessages(${account}, undefined).top`);
-    // const res = await fetch(`/messages?sender=${account}`);
+const getSavedMessages = async (account?: string | null) => {
+    let rawMessages = (await supervisor.functionCall({
+        service: "chainmail",
+        intf: "queries",
+        method: "getSavedMsgs",
+        params: [account],
+    })) as RawMessage[];
 
-    const supervisor = await getSupervisor();
-    console.info("[sent] got Supervisor instance");
-    // const res = await fetch(`/messages?receiver=${account}`);
+    return transformRawMessagesToMessages(rawMessages);
+};
+
+const savedMsgAtom = atom<Message["id"]>("");
+export function useSavedMessages() {
+    const { data: user } = useLoggedInUser();
+    const query = useQuery({
+        queryKey: ["saved", user],
+        queryFn: () => getSavedMessages(user),
+        enabled: Boolean(user),
+    });
+
+    const [selectedMessageId, setSelectedMessageId] = useAtom(sentMsgAtom);
+    const selectedMessage = query.data?.find(
+        (msg) => msg.id === selectedMessageId,
+    );
+
+    return {
+        query,
+        selectedMessage,
+        setSelectedMessageId,
+    };
+}
+
+const getSentMessages = async (account?: string | null) => {
     let rawMessages = (await supervisor.functionCall({
         service: "chainmail",
         intf: "queries",
         method: "getMsgs",
         params: [account],
     })) as RawMessage[];
-    console.info("account:", account);
-    console.info("rawMessages: ", rawMessages);
 
-    // const rawMessages = (await res.json()) as RawMessage[];
     return transformRawMessagesToMessages(rawMessages);
 };
 
 const sentMsgAtom = atom<Message["id"]>("");
 export function useSentMessages() {
-    const { user } = useUser();
+    const { data: user } = useLoggedInUser();
     const query = useQuery({
         queryKey: ["sent", user],
         queryFn: () => getSentMessages(user),
@@ -165,7 +178,7 @@ export function useSentMessages() {
 
 const draftMsgAtom = atom<Message["id"]>("");
 export function useDraftMessages() {
-    const { user } = useUser();
+    const { data: user } = useLoggedInUser();
 
     const [allDrafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
         "drafts",

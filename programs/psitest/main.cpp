@@ -266,8 +266,7 @@ struct test_chain
    {
       if (blockContext)
       {
-         return std::chrono::system_clock::time_point{
-             std::chrono::seconds{blockContext->current.header.time.seconds}};
+         return blockContext->current.header.time;
       }
       else
       {
@@ -336,8 +335,7 @@ struct test_chain
       db     = {};
    }
 
-   // TODO: Support sub-second block times
-   void startBlock(std::optional<psibase::TimePointSec> time = std::nullopt)
+   void startBlock(std::optional<psibase::BlockTime> time = std::nullopt)
    {
       // TODO: undo control
       finishBlock();
@@ -367,8 +365,8 @@ struct test_chain
                 },
                 status->consensus.next->consensus.data);
          }
-         if (!status->consensus.next ||
-             status->current.commitNum < status->consensus.next->blockNum)
+         if (!status->consensus.next
+             || status->current.commitNum < status->consensus.next->blockNum)
          {
             std::visit(
                 [&](const auto& c)
@@ -382,7 +380,12 @@ struct test_chain
          }
       }
 
-      blockContext->start(time, producer);
+      // These are not the correct values if we want the chain to actually
+      // sync correctly, but it's sufficient for the tester to test services.
+      auto term      = status->current.term;
+      auto commitNum = status->current.blockNum;
+
+      blockContext->start(time, producer, term, commitNum);
       blockContext->callStartBlock();
    }
 
@@ -630,8 +633,8 @@ struct HttpSocket : psibase::AutoCloseSocket
          case psibase::HttpStatus::notFound:
             break;
          default:
-            psibase::check(false, "HTTP response code not allowed: " +
-                                      std::to_string(static_cast<std::uint16_t>(status)));
+            psibase::check(false, "HTTP response code not allowed: "
+                                      + std::to_string(static_cast<std::uint16_t>(status)));
       }
       sendImpl(std::vector(data.begin(), data.end()));
    }
@@ -830,8 +833,8 @@ struct callbacks
 
    file* get_file(int32_t file_index)
    {
-      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size() ||
-          !state.files[file_index].f)
+      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size()
+          || !state.files[file_index].f)
          return nullptr;
       return &state.files[file_index];
    }
@@ -1241,12 +1244,11 @@ struct callbacks
       c.db = {};
    }
 
-   // TODO: Support sub-second block times
-   void testerStartBlock(uint32_t chain_index, uint32_t time_seconds)
+   void testerStartBlock(uint32_t chain_index, int64_t time_us)
    {
       assert_chain(chain_index)
-          .startBlock(time_seconds ? std::optional{psibase::TimePointSec{time_seconds}}
-                                   : std::nullopt);
+          .startBlock(time_us ? std::optional{psibase::BlockTime{psibase::MicroSeconds{time_us}}}
+                              : std::nullopt);
    }
 
    void testerFinishBlock(uint32_t chain_index) { assert_chain(chain_index).finishBlock(); }
@@ -1361,7 +1363,7 @@ struct callbacks
 
       psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
-      psibase::check(!bc.needGenesisAction, "Need genesis block; use 'psibase boot' to boot chain");
+      psibase::check(!bc.needGenesisAction, "Node is not connected to any psibase network.");
       psibase::SignedTransaction  trx;
       psibase::TransactionContext tc{bc, trx, trace, true, false, true};
 
@@ -1400,8 +1402,8 @@ struct callbacks
                 socket->queryTimes.databaseTime =
                     std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
                 socket->queryTimes.wasmExecTime =
-                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
-                                                                          tc.databaseTime);
+                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime()
+                                                                          - tc.databaseTime);
                 socket->queryTimes.startTime = startTime;
              });
          psibase::Action action{

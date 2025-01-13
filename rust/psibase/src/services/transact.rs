@@ -152,6 +152,46 @@ pub mod auth_interface {
     fn canAuthUserSys(user: crate::AccountNumber) {
         unimplemented!()
     }
+
+    /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+    /// transaction from a specified sender.
+    ///
+    /// * `sender`: The sender account for the transaction potentially being authorized.
+    /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    /// * `authSet`: The set of accounts that are already being checked for authorization.
+    ///              If the sender is already in this set, then the function should return false.
+    ///
+    /// Returns:
+    /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
+    /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
+    #[action]
+    fn isAuthSys(
+        sender: crate::AccountNumber,
+        authorizers: Vec<crate::AccountNumber>,
+        authSet: Option<Vec<crate::AccountNumber>>,
+    ) -> bool {
+        unimplemented!()
+    }
+
+    /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+    /// transaction from a specified sender.
+    ///
+    /// * `sender`: The sender account for the transaction potentially being rejected.
+    /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    /// * `authSet`: The set of accounts that are already being checked for authorization.
+    ///              If the sender is already in this set, then the function should return false.
+    ///
+    /// Returns:
+    /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
+    /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
+    #[action]
+    fn isRejectSys(
+        sender: crate::AccountNumber,
+        rejecters: Vec<crate::AccountNumber>,
+        authSet: Option<Vec<crate::AccountNumber>>,
+    ) -> bool {
+        unimplemented!()
+    }
 }
 
 /// All transactions enter the chain through this service

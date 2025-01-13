@@ -1,12 +1,16 @@
 #pragma once
 
+#include <rapidjson/encodings.h>
 #include <cctype>
 #include <charconv>
+#include <chrono>
+#include <numeric>
 #include <psio/from_json.hpp>
 #include <psio/reflect.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
 #include <psio/to_json.hpp>
+#include <ranges>
 #include <set>
 #include <typeindex>
 #include <variant>
@@ -40,6 +44,12 @@ namespace psio
 
    template <std::size_t Size>
    constexpr bool use_json_string_for_gql(std::array<signed char, Size>*)
+   {
+      return true;
+   }
+
+   template <typename Clock, typename Duration>
+   constexpr bool use_json_string_for_gql(std::chrono::time_point<Clock, Duration>*)
    {
       return true;
    }
@@ -149,13 +159,13 @@ namespace psio
                                  S&                                          stream,
                                  std::set<std::pair<std::type_index, bool>>& defined_types)
    {
-      if constexpr (MemPtr::isConstFunction)
+      if constexpr (gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
-      {
+         if constexpr (MemPtr::numArgs != 0)
+         {
+            forEachType(typename MemPtr::ArgTypes{},
+                        [&](auto* p) { fill_gql_schema(p, stream, defined_types, true); });
+         }
          fill_gql_schema_fn_types((MemberPtrType<decltype(gql_callable_fn(
                                        (typename MemPtr::ReturnType*)nullptr))>*)nullptr,
                                   stream, defined_types);
@@ -169,25 +179,51 @@ namespace psio
       }
    }
 
+   template <typename R, typename A1, typename A2>
+   struct GqlDeduceMergeArgs;
+
+   template <typename R, typename... A1, typename... A2>
+   struct GqlDeduceMergeArgs<R, std::tuple<A1...>, std::tuple<A2...>>
+   {
+      auto operator()(const A1&... a1, const A2&... a2) const -> R;
+   };
+
    template <typename MemPtr, typename S>
    void fill_gql_schema_fn(MemPtr*,
                            const char*                  name,
                            std::span<const char* const> argNames,
                            S&                           stream)
    {
-      if constexpr (MemPtr::isConstFunction)
+      if constexpr (gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
       {
-      }
-      else if constexpr (MemPtr::numArgs == 0 &&
-                         gql_callable_args(
-                             (std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr))
-      {
-         return fill_gql_schema_fn(
-             (MemberPtrType<decltype(gql_callable_fn(                                         //
-                  (typename MemPtr::ReturnType*)nullptr))>*)nullptr,                          //
-             name,                                                                            //
-             *gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),  //
-             stream);
+         if constexpr (MemPtr::numArgs == 0)
+         {
+            return fill_gql_schema_fn(
+                (MemberPtrType<decltype(gql_callable_fn(                                         //
+                     (typename MemPtr::ReturnType*)nullptr))>*)nullptr,                          //
+                name,                                                                            //
+                *gql_callable_args((std::remove_cvref_t<typename MemPtr::ReturnType>*)nullptr),  //
+                stream);
+         }
+         else
+         {
+            using F2          = decltype(gql_callable_fn((typename MemPtr::ReturnType*)nullptr));
+            using args_tuple  = TupleFromTypeList<typename MemPtr::SimplifiedArgTypes>;
+            using args2_tuple = TupleFromTypeList<typename MemberPtrType<F2>::SimplifiedArgTypes>;
+            const char* merged_names[MemPtr::numArgs + std::tuple_size_v<args2_tuple>];
+            auto        arg_names2 = *gql_callable_args((typename MemPtr::ReturnType*)nullptr);
+            check(argNames.size() + arg_names2.size() == std::ranges::size(merged_names),
+                  "Wrong number of argument names: " + std::to_string(argNames.size()) + " + " +
+                      std::to_string(arg_names2.size()) +
+                      " != " + std::to_string(std::ranges::size(merged_names)));
+            auto pos = merged_names;
+            pos      = std::ranges::copy(argNames, pos).out;
+            std::ranges::copy(arg_names2, pos);
+            using MergeFn =
+                GqlDeduceMergeArgs<typename MemberPtrType<F2>::ReturnType, args_tuple, args2_tuple>;
+            return fill_gql_schema_fn((MemberPtrType<decltype(&MergeFn::operator())>*)nullptr, name,
+                                      merged_names, stream);
+         }
       }
       else
       {
@@ -325,14 +361,18 @@ namespace psio
                              bool                                        is_input,
                              bool                                        is_query_root)
    {
-      (fill_gql_schema((T*)nullptr, stream, defined_types, is_input, false), ...);
-      write_str("union ", stream);
-      write_str(generate_gql_partial_name((std::variant<T...>*)nullptr, is_input), stream);
-      write_str(" =", stream);
-      ((write_str("\n  | ", stream),
-        write_str(generate_gql_partial_name((T*)nullptr, is_input), stream)),
-       ...);
-      write_str("\n", stream);
+      if (defined_types.insert({typeid(std::variant<T...>), is_input}).second)
+      {
+         (fill_gql_schema((T*)nullptr, stream, defined_types, is_input, false), ...);
+
+         write_str("union ", stream);
+         write_str(generate_gql_partial_name((std::variant<T...>*)nullptr, is_input), stream);
+         write_str(" =", stream);
+         ((write_str("\n  | ", stream),
+           write_str(generate_gql_partial_name((T*)nullptr, is_input), stream)),
+          ...);
+         write_str("\n", stream);
+      }
    }
 
    template <typename T, typename S>
@@ -390,6 +430,14 @@ namespace psio
       fill_gql_schema_impl((T*)nullptr, stream, defined_types, is_input, is_query_root);
    }
 
+   // Adaptor for RapidJSON UTF8 encoding output
+   struct utf8_output_adaptor
+   {
+      utf8_output_adaptor(std::string& out) : out(out) {}
+      void         Put(char ch) { out.push_back(ch); }
+      std::string& out;
+   };
+
    struct gql_stream
    {
       enum token_type
@@ -408,6 +456,7 @@ namespace psio
       token_type       current_type = unstarted;
       std::string_view current_value;
       char             current_punctuator = 0;
+      std::string      processed_string;
 
       gql_stream(input_stream input) : input{input} { skip(); }
       gql_stream(const gql_stream&)            = default;
@@ -479,34 +528,8 @@ namespace psio
                   }
                   break;
                case '"':
-                  // Notes:
-                  // * Block strings (""") not currently supported and escape processing not
-                  //   currently done; we may have to revisit this if we add either mutation
-                  //   support or searches through text fields, or if clients or client
-                  //   libraries end up using them unnecessarily
-                  // * Doesn't detect and reject unescaped code points that the GraphQL
-                  //   spec prohibits
-                  if (input.remaining() >= 3 && input.pos[1] == '"' && input.pos[2] == '"')
-                  {
-                     current_type = error;
-                     return;
-                  }
-                  ++input.pos;
-                  while (input.remaining() && input.pos[0] != '"')
-                  {
-                     auto ch = *input.pos++;
-                     if (ch == '\\')
-                     {
-                        if (!input.remaining())
-                           return;
-                        ++input.pos;
-                     }
-                  }
-                  if (!input.remaining())
-                     return;
-                  ++input.pos;
-                  current_value = {begin + 1, size_t(input.pos - begin - 2)};
-                  current_type  = string;
+                  // String parsing follows the GraphQL spec at: https://spec.graphql.org/October2021/#sec-String-Value
+                  parse_string();
                   return;
                default:;
             }  // switch (input.pos[0])
@@ -579,8 +602,330 @@ namespace psio
                return;
             }
          }  // while (true)
-      }     // skip()
-   };       // gql_stream
+      }  // skip()
+
+      uint16_t parse_hex_code_unit()
+      {
+         if (input.remaining() < 4)
+         {
+            current_type = error;
+            return 0;
+         }
+
+         std::string_view hex{input.pos, 4};
+         if (!std::ranges::all_of(
+                 hex, [](char c) { return std::isxdigit(static_cast<unsigned char>(c)); }))
+         {
+            current_type = error;
+            return 0;
+         }
+
+         uint16_t code_unit;
+         auto [ptr, ec] = std::from_chars(hex.data(), hex.data() + hex.size(), code_unit, 16);
+         if (ec != std::errc{})
+         {
+            current_type = error;
+            return 0;
+         }
+
+         input.pos += 4;
+         return code_unit;
+      }
+
+      void adapt_code_point_for_surrogate_pair(uint16_t code_unit, uint32_t& code_point)
+      {
+         // https://www.unicode.org/versions/Unicode15.0.0/ch03.pdf
+         constexpr uint16_t HIGH_SURROGATE_START = 0xD800;
+         constexpr uint16_t HIGH_SURROGATE_END   = 0xDBFF;
+         constexpr uint16_t LOW_SURROGATE_START  = 0xDC00;
+         constexpr uint16_t LOW_SURROGATE_END    = 0xDFFF;
+         constexpr uint32_t SURROGATE_OFFSET     = 0x10000;
+
+         if (code_unit >= HIGH_SURROGATE_START && code_unit <= HIGH_SURROGATE_END)
+         {
+            // Need a low surrogate to follow
+            if (input.remaining() < 2 || input.pos[0] != '\\' || input.pos[1] != 'u')
+            {
+               current_type = error;
+               return;
+            }
+            input.pos += 2;
+
+            uint16_t low_surrogate = parse_hex_code_unit();
+            if (current_type == error)
+               return;
+
+            if (low_surrogate < LOW_SURROGATE_START || low_surrogate > LOW_SURROGATE_END)
+            {
+               current_type = error;
+               return;
+            }
+
+            // Combine into single code point
+            code_point = SURROGATE_OFFSET + ((code_unit - HIGH_SURROGATE_START) << 10) +
+                         (low_surrogate - LOW_SURROGATE_START);
+         }
+         else if (code_unit >= LOW_SURROGATE_START && code_unit <= LOW_SURROGATE_END)
+         {
+            // Unpaired low surrogate
+            current_type = error;
+            return;
+         }
+      }
+
+      void parse_unicode_escape_sequence(std::string& result)
+      {
+         uint16_t code_unit = parse_hex_code_unit();
+         if (current_type == error)
+            return;
+
+         uint32_t code_point = code_unit;
+         adapt_code_point_for_surrogate_pair(code_unit, code_point);
+         if (current_type == error)
+            return;
+
+         utf8_output_adaptor out(result);
+         rapidjson::UTF8<>::Encode(out, code_point);
+      }
+
+      void interpret_escape_sequence(std::string& result, char escape_char)
+      {
+         switch (escape_char)
+         {
+            case '"':
+               result.push_back('"');
+               break;
+            case '\\':
+               result.push_back('\\');
+               break;
+            case '/':
+               result.push_back('/');
+               break;
+            case 'b':
+               result.push_back('\b');
+               break;
+            case 'f':
+               result.push_back('\f');
+               break;
+            case 'n':
+               result.push_back('\n');
+               break;
+            case 'r':
+               result.push_back('\r');
+               break;
+            case 't':
+               result.push_back('\t');
+               break;
+            case 'u':
+               parse_unicode_escape_sequence(result);
+               break;
+            default:
+               current_type = error;
+               return;
+         }
+      }
+
+      static std::vector<std::string_view> split_into_lines(std::string_view input)
+      {
+         std::vector<std::string_view> lines;
+         size_t                        pos = 0;
+         while (pos < input.size())
+         {
+            size_t end = input.find_first_of("\r\n", pos);
+            if (end == std::string_view::npos)
+            {
+               lines.push_back(input.substr(pos));
+               break;
+            }
+
+            lines.push_back(input.substr(pos, end - pos));
+            pos = end + 1;
+
+            // Handle crlf
+            if (input[end] == '\r' && pos < input.size() && input[pos] == '\n')
+               ++pos;
+         }
+         return lines;
+      }
+
+      static bool is_whitespace_line(std::string_view line)
+      {
+         return line.find_first_not_of(" \t") == std::string_view::npos;
+      }
+
+      static std::optional<size_t> find_common_indent(const std::vector<std::string_view>& lines)
+      {
+         std::optional<size_t> common_indent;
+
+         for (size_t i = 1; i < lines.size(); ++i)
+         {
+            const auto& line = lines[i];
+
+            auto indent = line.find_first_not_of(" \t");
+            if (indent != std::string_view::npos && (!common_indent || indent < *common_indent))
+               common_indent = indent;
+         }
+
+         return common_indent;
+      }
+
+      static std::vector<std::string_view> remove_common_indents(
+          const std::vector<std::string_view>& lines,
+          size_t                               common_indent)
+      {
+         if (lines.empty())
+            return {};
+
+         auto remove_indent = [&](std::string_view line)
+         {
+            auto prefix = std::min(common_indent, line.size());
+            line.remove_prefix(prefix);
+            return line;
+         };
+
+         std::vector<std::string_view> processed_lines;
+         processed_lines.reserve(lines.size());
+
+         // First line's indentation is preserved
+         processed_lines.push_back(lines.front());
+
+         // Remove common indentation from all subsequent lines
+         for (auto line : lines | std::views::drop(1) | std::views::transform(remove_indent))
+         {
+            processed_lines.push_back(line);
+         }
+
+         return processed_lines;
+      }
+
+      static std::string join_lines(const std::vector<std::string_view>& lines)
+      {
+         auto notWhitespace = [](const std::string_view& s) { return !is_whitespace_line(s); };
+
+         auto start = std::ranges::find_if(lines, notWhitespace);
+         if (start == lines.end())
+            return {};
+
+         auto end = std::ranges::find_if(lines.rbegin(), lines.rend(), notWhitespace).base();
+
+         std::string result{*start};
+         for (auto it = std::next(start); it != end; ++it)
+         {
+            result.push_back('\n');
+            result.append(*it);
+         }
+         return result;
+      }
+
+      std::string process_block_string_value(std::string_view raw_value)
+      {
+         auto lines         = split_into_lines(raw_value);
+         auto common_indent = find_common_indent(lines);
+         if (common_indent)
+         {
+            lines = remove_common_indents(lines, *common_indent);
+         }
+         return join_lines(lines);
+      }
+
+      void parse_block_string()
+      {
+         input.pos += 3;  // Skip opening """
+         std::string raw_storage;
+
+         while (input.remaining())
+         {
+            if (input.remaining() >= 4 && input.pos[0] == '\\' && input.pos[1] == '"' &&
+                input.pos[2] == '"' && input.pos[3] == '"')
+            {
+               // Escaped triple quote
+               raw_storage += "\"\"\"";
+               input.pos += 4;
+            }
+            else if (input.remaining() >= 3 && input.pos[0] == '"' && input.pos[1] == '"' &&
+                     input.pos[2] == '"')
+            {
+               // Closing triple quote
+               input.pos += 3;
+               processed_string = process_block_string_value(raw_storage);
+               current_value    = processed_string;
+               current_type     = string;
+               return;
+            }
+            else if (input.pos[0] == '\r')
+            {
+               // New line
+               raw_storage += '\n';
+               ++input.pos;
+
+               if (input.remaining() && input.pos[0] == '\n')  // Handle crlf
+                  ++input.pos;
+            }
+            else
+            {
+               // From the spec: "If non-printable ASCII characters are needed in a string value,
+               //   a standard quoted string with appropriate escape sequences must be used instead of a block string."
+               unsigned char ch = *input.pos;
+               if (ch < 32 && ch != '\n' && ch != '\r' && ch != '\t')
+               {
+                  current_type = error;
+                  return;
+               }
+               raw_storage += *input.pos++;
+            }
+         }
+         current_type = error;
+      }
+
+      void parse_string()
+      {
+         if (input.remaining() >= 3 && input.pos[1] == '"' && input.pos[2] == '"')
+         {
+            parse_block_string();
+            return;
+         }
+
+         std::string result;
+         ++input.pos;
+         while (input.remaining() && input.pos[0] != '"')
+         {
+            auto ch = *input.pos++;
+            if (ch == '\\')
+            {
+               if (!input.remaining())
+               {
+                  current_type = error;
+                  return;
+               }
+               interpret_escape_sequence(result, *input.pos++);
+               if (current_type == error)
+               {
+                  return;
+               }
+            }
+            else if (ch == '\n' || ch == '\r')
+            {
+               // Literal line terminators can only be used in block strings
+               current_type = error;
+               return;
+            }
+            else
+            {
+               result.push_back(ch);
+            }
+         }
+         if (!input.remaining())
+         {
+            current_type = error;
+            return;
+         }
+         ++input.pos;  // (Closing quote)
+
+         processed_string = std::move(result);
+         current_value    = processed_string;
+         current_type     = string;
+      }
+   };  // gql_stream
 
    template <typename E>
    auto gql_parse_arg(std::string& arg, gql_stream& input_stream, const E& error)
@@ -945,6 +1290,21 @@ namespace psio
       return gql_query(value.unpack(), input_stream, output_stream, error, allow_unknown_members);
    }
 
+   template <typename T, typename F1, typename F2, typename A1, typename A2>
+   struct GqlMergeArgs;
+
+   template <typename T, typename F1, typename F2, typename... A1, typename... A2>
+   struct GqlMergeArgs<T, F1, F2, std::tuple<A1...>, std::tuple<A2...>>
+   {
+      decltype(auto) operator()(const A1&... a1, const A2&... a2) const
+      {
+         return f2(std::invoke(f1, t, a1...), a2...);
+      }
+      T  t;
+      F1 f1;
+      F2 f2;
+   };
+
    template <typename T, typename MPtr, typename OS, typename E>
    bool gql_query_fn(const T&                     value,
                      std::span<const char* const> argNames,
@@ -957,11 +1317,31 @@ namespace psio
       using args_tuple = TupleFromTypeList<typename MemberPtrType<MPtr>::SimplifiedArgTypes>;
       static constexpr int num_args = std::tuple_size_v<args_tuple>;
       using ReturnType              = std::remove_cvref_t<typename MemberPtrType<MPtr>::ReturnType>;
-      if constexpr (num_args == 0 && gql_callable_args((ReturnType*)nullptr))
+      if constexpr (gql_callable_args((ReturnType*)nullptr))
       {
-         return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
-                             gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
-                             error, allow_unknown_members);
+         if constexpr (num_args == 0)
+         {
+            return gql_query_fn((value.*mptr)(), *gql_callable_args((ReturnType*)nullptr),
+                                gql_callable_fn((ReturnType*)nullptr), input_stream, output_stream,
+                                error, allow_unknown_members);
+         }
+         else
+         {
+            auto fn2 = gql_callable_fn((ReturnType*)nullptr);
+            using args2_tuple =
+                TupleFromTypeList<typename MemberPtrType<decltype(fn2)>::SimplifiedArgTypes>;
+            const char* merged_names[num_args + std::tuple_size_v<args2_tuple>];
+            auto        arg_names2 = *gql_callable_args((ReturnType*)nullptr);
+            check(argNames.size() + arg_names2.size() == std::ranges::size(merged_names),
+                  "Wrong number of argument names");
+            auto pos = merged_names;
+            pos      = std::ranges::copy(argNames, pos).out;
+            std::ranges::copy(arg_names2, pos);
+            using MergeFn = GqlMergeArgs<const T&, MPtr, decltype(fn2), args_tuple, args2_tuple>;
+            MergeFn mergedFn{value, mptr, fn2};
+            return gql_query_fn(mergedFn, merged_names, &MergeFn::operator(), input_stream,
+                                output_stream, error, allow_unknown_members);
+         }
       }
       else
       {

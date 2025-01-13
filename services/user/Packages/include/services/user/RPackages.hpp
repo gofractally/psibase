@@ -4,7 +4,7 @@
 
 namespace UserService
 {
-   class RPackages : public psibase::Service<RPackages>
+   class RPackages : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("r-packages");

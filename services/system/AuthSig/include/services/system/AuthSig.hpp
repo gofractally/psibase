@@ -24,7 +24,7 @@ namespace SystemService
          /// The public key included in the claims for each transaction sent by this account.
          SubjectPublicKeyInfo pubkey;
 
-         auto byPubkey() const { return std::tuple{pubkey, account}; }
+         auto byPubkey() const { return std::tuple{keyFingerprint(pubkey), account}; }
       };
       PSIO_REFLECT(AuthRecord, account, pubkey)
 
@@ -35,7 +35,7 @@ namespace SystemService
       /// transaction sent by this account.
       ///
       /// This service supports K1 or R1 keys (Secp256K1 or Secp256R1) keys.
-      class AuthSig : public psibase::Service<AuthSig>
+      class AuthSig : public psibase::Service
       {
         public:
          static constexpr auto service = psibase::AccountNumber("auth-sig");
@@ -70,13 +70,39 @@ namespace SystemService
          /// submits a transaction.
          void setKey(SubjectPublicKeyInfo key);
 
+         /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+         /// transaction from a specified sender.
+         ///
+         /// * `sender`: The sender account for the transaction potentially being authorized.
+         /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+         ///
+         /// Returns:
+         /// * `true`: If the sender is among the authorizers
+         /// * `false`: If the sender is not among the authorizers
+         bool isAuthSys(psibase::AccountNumber              sender,
+                        std::vector<psibase::AccountNumber> authorizers);
+
+         /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+         /// transaction from a specified sender.
+         ///
+         /// * `sender`: The sender account for the transaction potentially being rejected.
+         /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+         ///
+         /// Returns:
+         /// * `true`: If the sender is among the rejecters
+         /// * `false`: If the sender is not among the rejecters
+         bool isRejectSys(psibase::AccountNumber              sender,
+                          std::vector<psibase::AccountNumber> rejecters);
+
         private:
          Tables db{psibase::getReceiver()};
       };
       PSIO_REFLECT(AuthSig,  //
                    method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                    method(canAuthUserSys, user),
-                   method(setKey, key)
+                   method(setKey, key),
+                   method(isAuthSys, sender, authorizers),
+                   method(isRejectSys, sender, rejecters)
                    //
       )
    }  // namespace AuthSig

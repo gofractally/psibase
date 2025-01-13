@@ -1,5 +1,5 @@
 find_package(Threads REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost CONFIG REQUIRED)
 
 link_directories( ${ICU_LIBRARY_DIR} )
 

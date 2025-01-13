@@ -270,7 +270,7 @@ namespace psibase
    /// - `MyTypeEdge` and `MyTypeConnection` are automatically generated from `MyType`.
    /// - Returned rows (`MyType`) include MyType's fields and the `someFn` method. Only `const` methods are exposed.
    /// - [serveGraphQL] automatically chooses GraphQL types which cover the range of numeric types. When no suitable match is found (e.g. no GraphQL type covers the range of `int64_t`), it falls back to `String`.
-   template <typename Connection, typename T, typename Key>
+   template <typename Connection, typename T, typename Key, typename Proj = std::identity>
    Connection makeConnection(const TableIndex<T, Key>&         index,
                              const std::optional<Key>&         gt,
                              const std::optional<Key>&         ge,
@@ -279,7 +279,8 @@ namespace psibase
                              std::optional<uint32_t>           first,
                              std::optional<uint32_t>           last,
                              const std::optional<std::string>& before,
-                             const std::optional<std::string>& after)
+                             const std::optional<std::string>& after,
+                             Proj&&                            proj = {})
    {
       auto keyFromHex = [&](const std::optional<std::string>& s) -> std::vector<char>
       {
@@ -316,7 +317,7 @@ namespace psibase
       auto       add_edge = [&](const auto& it)
       {
          auto cursor = psio::to_hex(it.keyWithoutPrefix());
-         result.edges.push_back(typename Connection::Edge{*it, std::move(cursor)});
+         result.edges.push_back(typename Connection::Edge{proj(*it), std::move(cursor)});
       };
 
       if (last && !first)
@@ -459,6 +460,45 @@ namespace psibase
       return result;
    }  // makeConnection
 
+   template <typename Index, typename F>
+   struct TransformedConnection
+   {
+      Index index;
+      F     f;
+   };
+
+   namespace detail
+   {
+      template <typename Connection, typename T, typename Key>
+      Connection makeConnectionFn(const TableIndex<T, Key>&         index,
+                                  const std::optional<Key>&         gt,
+                                  const std::optional<Key>&         ge,
+                                  const std::optional<Key>&         lt,
+                                  const std::optional<Key>&         le,
+                                  std::optional<uint32_t>           first,
+                                  std::optional<uint32_t>           last,
+                                  const std::optional<std::string>& before,
+                                  const std::optional<std::string>& after)
+      {
+         return makeConnection<Connection>(index, gt, ge, lt, le, first, last, before, after);
+      }
+
+      template <typename Connection, typename Index, typename F, typename Key>
+      Connection makeTransformedConnection(const TransformedConnection<Index, F>& index,
+                                           const std::optional<Key>&              gt,
+                                           const std::optional<Key>&              ge,
+                                           const std::optional<Key>&              lt,
+                                           const std::optional<Key>&              le,
+                                           std::optional<uint32_t>                first,
+                                           std::optional<uint32_t>                last,
+                                           const std::optional<std::string>&      before,
+                                           const std::optional<std::string>&      after)
+      {
+         return makeConnection<Connection>(index.index, gt, ge, lt, le, first, last, before, after,
+                                           index.f);
+      }
+   }  // namespace detail
+
    template <typename T, typename K>
    constexpr std::optional<std::array<const char*, 8>> gql_callable_args(TableIndex<T, K>*)
    {
@@ -470,7 +510,23 @@ namespace psibase
    {
       using Connection = psibase::Connection<  //
           T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
-      return makeConnection<Connection, T, K>;
+      return &detail::makeConnectionFn<Connection, T, K>;
+   }  // gql_callable_fn
+
+   template <typename Index, typename F>
+   constexpr std::optional<std::array<const char*, 8>> gql_callable_args(
+       TransformedConnection<Index, F>*)
+   {
+      return std::array{"gt", "ge", "lt", "le", "first", "last", "before", "after"};
+   }
+
+   template <typename T, typename Key, typename F>
+   constexpr auto gql_callable_fn(const TransformedConnection<TableIndex<T, Key>, F>*)
+   {
+      using R          = decltype(std::declval<F>()(std::declval<T>()));
+      using Connection = psibase::Connection<  //
+          R, psio::reflect<R>::name + "Connection", psio::reflect<R>::name + "Edge">;
+      return &detail::makeTransformedConnection<Connection, TableIndex<T, Key>, F, Key>;
    }  // gql_callable_fn
 
    // These fields are in snake_case and have the event_ prefix
@@ -944,315 +1000,5 @@ namespace psibase
 
       friend auto get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
    };  // EventQuery
-
-   /// GraphQL support for a linked list of events
-   ///
-   /// This function returns a GraphQL [Connection] which pages
-   /// through a linked list of events, starting at either `eventId`
-   /// or one event past `after` (a decimal number in string form
-   /// which acts as a GraphQL cursor). At each decoded event, it
-   /// looks for a field with a name which matches `fieldName`.
-   /// If it finds one, and it's a numeric type, then it uses that
-   /// field as the link to the next event. It stops when the
-   /// maximum number of results (`first`) is found, it encounters
-   /// an event from another service, it encounters an event not
-   /// defined in `Events`, it can't find a field with a name
-   /// that matches `fieldName`, or there's a decoding error. Each
-   /// node in the resulting Connection is produced by [EventDecoder].
-   ///
-   /// #### makeEventConnection example
-   ///
-   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](services-events.md#defining-events) for your service.
-   ///
-   /// ```c++
-   /// struct Query
-   /// {
-   ///    psibase::AccountNumber service;
-   ///
-   ///    auto userEvents(
-   ///        psibase::AccountNumber      holder,
-   ///        std::optional<uint32_t>     first,
-   ///        std::optional<std::string>  after
-   ///    ) const
-   ///    {
-   ///       ExampleTokenService::Tables tables{service};
-   ///
-   ///       // Each holder (user) has a record which points to the most recent event
-   ///       // which affected the user's balance.
-   ///       auto     holders = tables.open<TokenHolderTable>().getIndex<0>();
-   ///       uint64_t eventId = 0;
-   ///       if (auto record = holders.get(holder))
-   ///          eventId = record->eventHead;
-   ///
-   ///       // Create the Connection. Each event has a field named "prevEvent"
-   ///       // which points to the previous event which affected the user's balance.
-   ///       return psibase::makeEventConnection<ExampleTokenService::Events::History>(
-   ///           psibase::DbId::historyEvent, eventId, service, "prevEvent", first, after);
-   ///    }
-   /// };
-   /// PSIO_REFLECT(Query, method(userEvents, holder, first, after))
-   /// ```
-   ///
-   /// Example query:
-   ///
-   /// ```text
-   /// {
-   ///   userEvents(holder: "alice", first: 3) {
-   ///     pageInfo {
-   ///       hasNextPage
-   ///       endCursor
-   ///     }
-   ///     edges {
-   ///       node {
-   ///         event_id
-   ///         event_type
-   ///         event_all_content
-   ///       }
-   ///     }
-   ///   }
-   /// }
-   /// ```
-   ///
-   /// Example reply:
-   ///
-   /// ```text
-   /// {
-   ///   "data": {
-   ///     "userEvents": {
-   ///       "pageInfo": {
-   ///         "hasNextPage": true,
-   ///         "endCursor": "13"
-   ///       },
-   ///       "edges": [
-   ///         {
-   ///           "node": {
-   ///             "event_id": "17",
-   ///             "event_type": "transferred",
-   ///             "tokenId": 1,
-   ///             "prevEvent": "15",
-   ///             "sender": "bob",
-   ///             "receiver": "alice",
-   ///             "amount": {
-   ///               "value": "4000000000"
-   ///             },
-   ///             "memo": {
-   ///               "contents": "memo"
-   ///             }
-   ///           }
-   ///         },
-   ///         {
-   ///           "node": {
-   ///             "event_id": "15",
-   ///             "event_type": "recalled",
-   ///             "tokenId": 1,
-   ///             "prevEvent": "13",
-   ///             "from": "alice",
-   ///             "amount": {
-   ///               "value": "1000000000"
-   ///             },
-   ///             "memo": {
-   ///               "contents": "penalty for spamming"
-   ///             }
-   ///           }
-   ///         },
-   ///         {
-   ///           "node": {
-   ///             "event_id": "13",
-   ///             "event_type": "transferred",
-   ///             "tokenId": 1,
-   ///             "prevEvent": "10",
-   ///             "sender": "alice",
-   ///             "receiver": "bob",
-   ///             "amount": {
-   ///               "value": "30000000000"
-   ///             },
-   ///             "memo": {
-   ///               "contents": "memo"
-   ///             }
-   ///           }
-   ///         }
-   ///       ]
-   ///     }
-   ///   }
-   /// }
-   /// ```
-   // TODO: range search with just a prefix of multi-field keys. Should we
-   //       play games by relaxing GraphQL's too-strict rules again? e.g.
-   //       allowing `le:{a:7}` when the key also has fields b and c?
-   template <typename Events>
-   auto makeEventConnection(DbId                              db,
-                            uint64_t                          eventId,
-                            AccountNumber                     service,
-                            std::string_view                  fieldName,
-                            std::optional<uint32_t>           first,
-                            const std::optional<std::string>& after)
-   {
-      using Decoder    = EventDecoder<Events>;
-      using Connection = psibase::Connection<  //
-          Decoder, psio::reflect<Events>::name + "Connection",
-          psio::reflect<Events>::name + "Edge">;
-      Connection result;
-      result.pageInfo.hasNextPage = true;
-      bool excludeFirst           = false;
-      if (after.has_value())
-      {
-         uint64_t a;
-         auto     result = std::from_chars(after->c_str(), after->c_str() + after->size(), a);
-         if (result.ec == std::errc{} && result.ptr == after->c_str() + after->size())
-         {
-            eventId      = a;
-            excludeFirst = true;
-         }
-      }
-
-      while (eventId && (!first || result.edges.size() < *first))
-      {
-         if (!excludeFirst)
-            result.edges.push_back({
-                .node   = {db, eventId, service},
-                .cursor = std::to_string(eventId),
-            });
-         excludeFirst = false;
-         auto v       = getSequentialRaw(db, eventId);
-         if (!v)
-         {
-            result.pageInfo.hasNextPage = false;
-            break;
-         }
-
-         SequentialRecord<MethodNumber> header;
-         if (!psio::from_frac(header, *v) && header.service != service)
-         {
-            result.pageInfo.hasNextPage = false;
-            break;
-         }
-
-         bool found = false;
-         psio::get_member_function_type<Events>(
-             header.type->value,
-             [&](auto member, std::span<const char* const> names)
-             {
-                using MT = psio::MemberPtrType<decltype(member)>;
-                static_assert(MT::isFunction);
-                using TT = typename psio::make_param_value_tuple<decltype(member)>::type;
-                // TODO: EventDecoder validates and unpacks this again
-                SequentialRecord<MethodNumber, TT> eventData;
-                if (psio::from_frac(eventData, *v))
-                {
-                   get_event_field<0>(  //
-                       *eventData.value, fieldName, {}, names.subspan(1),
-                       [&](auto _, const auto& field)
-                       {
-                          if constexpr (std::is_arithmetic_v<std::remove_cvref_t<decltype(field)>>)
-                          {
-                             if (field)
-                             {
-                                eventId = field;
-                                found   = true;
-                             }
-                          }
-                       });
-                }
-             });
-         if (!found)
-         {
-            result.pageInfo.hasNextPage = false;
-            break;
-         }
-      }  // while (!first || result.edges.size() < *first)
-
-      if (!result.edges.empty())
-      {
-         result.pageInfo.startCursor = result.edges.front().cursor;
-         result.pageInfo.endCursor   = result.edges.back().cursor;
-      }
-      return result;
-   }  // makeEventConnection
-
-   /// Helper function to allow graphql queries of History event chains
-   template <typename Tables, typename Events, typename RecordType, typename PrimaryKeyType>
-   auto historyQuery(AccountNumber service,
-                     uint64_t RecordType::*eventHead,
-                     std::string_view      previousEventFieldName,
-                     PrimaryKeyType        key,
-                     auto                  first,
-                     auto                  after)
-   {
-      uint64_t eventId = 0;
-      if (auto record = Tables{service}.template open<RecordType>().template getIndex<0>().get(key))
-      {
-         eventId = (*record).*eventHead;
-      }
-
-      return makeEventConnection<typename Events::History>(DbId::historyEvent, eventId, service,
-                                                           previousEventFieldName, first, after);
-   }
-
-   /// Construct a QueryableService object to simplify the
-   /// implementation of a GraphQL QueryRoot object for your
-   /// service.
-   ///
-   /// The class template takes the Tables and Events objects
-   /// as template parameters, and is constructed with the
-   /// account number at which your service is deployed. E.g.
-   /// ```c++
-   /// auto myService = QueryableService<MyService::Tables, MyService::Events>{"myservice"};
-   /// ```
-   ///
-   /// A QueryableService object can then be used to simplify
-   /// querying table indices and historical events in the
-   /// QueryRoot object definition. E.g.
-   /// ```c++
-   /// struct MyQueryRoot
-   /// {
-   ///    auto readTableA() const
-   ///    {  //
-   ///       return myService.index<TableA, 0>();
-   ///    }
-   ///
-   ///    auto events() const
-   ///    {  //
-   ///       return myService.allEvents();
-   ///    }
-   ///
-   ///    auto userEvents(AccountNumber          user,
-   ///                   optional<uint32_t>      first,
-   ///                   const optional<string>& after) const
-   ///    {
-   ///       return myService.eventIndex<MyService::UserEvents>(user, first, after);
-   ///    }
-   /// };
-   /// PSIO_REFLECT(MyQueryRoot,
-   ///              method(readTableA),
-   ///              method(events),
-   ///              method(userEvents, user, first, after))
-   /// ```
-   ///
-   template <typename Tables, typename Events = void>
-   struct QueryableService
-   {
-      AccountNumber service;
-
-      template <typename TableType, int Idx>
-      auto index()
-      {
-         return Tables{service}.template open<TableType>().template getIndex<Idx>();
-      }
-
-      auto allEvents()
-      {  //
-         return EventQuery<Events>{service};
-      }
-
-      template <typename EventType>
-      auto eventIndex(auto                              key,
-                      std::optional<uint32_t>           first,
-                      const std::optional<std::string>& after)
-      {
-         return historyQuery<Tables, Events>(service, EventType::evHead, EventType::prevField, key,
-                                             first, after);
-      }
-   };
 
 }  // namespace psibase

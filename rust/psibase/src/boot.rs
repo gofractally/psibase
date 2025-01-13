@@ -73,6 +73,25 @@ fn genesis_transaction<R: Read + Seek>(
     })
 }
 
+/// genesis_block_actions
+///
+/// This returns all actions that need to be packed into the boot block.
+fn genesis_block_actions<R: Read + Seek>(
+    _initial_key: &Option<AnyPublicKey>,
+    _initial_producer: AccountNumber,
+    service_packages: &mut [PackagedService<R>],
+) -> Result<Vec<Action>, anyhow::Error> {
+    let mut actions = Vec::new();
+
+    for s in &mut service_packages[..] {
+        if s.get_accounts().contains(&transact::SERVICE) {
+            s.reg_server(&mut actions)?;
+            s.postinstall(&mut actions)?;
+        }
+    }
+    Ok(actions)
+}
+
 /// Get initial actions
 ///
 /// This returns all actions that need to be packed into the transactions pushed after the
@@ -82,6 +101,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     let has_packages = true;
@@ -95,7 +115,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 
         if install_ui {
             s.reg_server(&mut actions)?;
-            s.store_data(&mut actions)?;
+            s.store_data(&mut actions, compression_level)?;
         }
 
         s.postinstall(&mut actions)?;
@@ -179,11 +199,17 @@ pub fn create_boot_transactions<R: Read + Seek>(
     install_ui: bool,
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
+    compression_level: u32,
 ) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
-    let mut actions =
-        get_initial_actions(initial_key, initial_producer, install_ui, service_packages)?;
+    let mut actions = get_initial_actions(
+        initial_key,
+        initial_producer,
+        install_ui,
+        service_packages,
+        compression_level,
+    )?;
     let mut transactions = Vec::new();
     while !actions.is_empty() {
         let mut n = 0;
@@ -199,6 +225,16 @@ pub fn create_boot_transactions<R: Read + Seek>(
             proofs: vec![],
         });
     }
+
+    boot_transactions.push(SignedTransaction {
+        transaction: without_tapos(
+            genesis_block_actions(initial_key, initial_producer, service_packages)?,
+            expiration,
+        )
+        .packed()
+        .into(),
+        proofs: vec![],
+    });
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
     for trx in &transactions {
@@ -237,17 +273,18 @@ pub fn js_create_boot_transactions(
         services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
     }
     let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec {
-        seconds: now_plus_120secs.timestamp() as u32,
-    };
+    let expiration = TimePointSec::from(now_plus_120secs);
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
+    // Todo: Allow parameterization of compression level from browser
+    let compression_level = 4;
     let (boot_transactions, transactions) = js_err(create_boot_transactions(
         &None,
         prod.into(),
         true,
         expiration,
         &mut services[..],
+        compression_level,
     ))?;
 
     let boot_transactions = boot_transactions.packed();

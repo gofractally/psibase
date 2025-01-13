@@ -24,8 +24,9 @@ import {
     ReplyDialogTriggerIconWithTooltip,
 } from "@components";
 import { Message, useDraftMessages, useIncomingMessages } from "@hooks";
-import { getSupervisor } from "@lib/supervisor";
 import { wait } from "@lib/utils";
+
+import { supervisor } from "src/main";
 
 export function MailDisplay({
     message,
@@ -97,14 +98,6 @@ const ActionBar = ({
 
     const onArchive = async (itemId: string) => {
         let id = parseInt(itemId);
-        const supervisor = await getSupervisor();
-        // TODO: Unsave if saved
-        // await supervisor.functionCall({
-        //     service: "chainmail",
-        //     intf: "api",
-        //     method: "unsave",
-        //     params: [id],
-        // });
         // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
         await supervisor.functionCall({
             service: "chainmail",
@@ -120,12 +113,18 @@ const ActionBar = ({
         });
     };
 
-    const onUnArchive = (itemId: string) => {
+    const onUnArchive = async (itemId: string) => {
         toast.error("Not implemented");
     };
 
-    const onSave = (itemId: string) => {
-        toast.error("Not implemented");
+    const onSave = async (itemId: string) => {
+        let id = parseInt(itemId);
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "api",
+            method: "save",
+            params: [id],
+        });
     };
 
     const onDeleteDraft = () => {

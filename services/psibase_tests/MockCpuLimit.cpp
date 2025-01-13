@@ -7,7 +7,7 @@
 
 // This is a replacement for CpuLimit that always returns a fixed value
 // to make tests deterministic
-class MockCpuLimit : public psibase::Service<MockCpuLimit>
+class MockCpuLimit : public psibase::Service
 {
   public:
    static constexpr auto service = psibase::AccountNumber("cpu-limit");

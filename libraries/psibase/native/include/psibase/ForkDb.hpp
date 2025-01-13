@@ -1449,7 +1449,7 @@ namespace psibase
          try
          {
             if (bc->needGenesisAction)
-               trace.error = "Need genesis block; use 'psibase boot' to boot chain";
+               trace.error = "Node is not connected to any psibase network.";
             else
             {
                check(trx.proofs.size() == trx.transaction->claims().size(),

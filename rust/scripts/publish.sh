@@ -9,14 +9,14 @@
 #   ~ Dependencies ~
 #
 #                               ,---> fracpack -->--,
-#   cargo-psibase --> psibase --|                   |
-#                               |--->---------------'--> psibase-macros -->--,
-#                               |                                             |
+#   cargo-psibase --> psibase --|                   |                         ,--> psibase-macros-derive --> psibase-macros-lib
+#                               |--->---------------'--> psibase-macros -->--|
+#                               |                                            |
 #                               '--->-----------------------------------------'--> psibase-names
 ######
 
 # Dependencies above imply the following publish order:
-dirs=(psibase_names psibase_macros fracpack psibase cargo-psibase)
+dirs=(psibase_names psibase_macros/psibase-macros-lib psibase_macros/psibase-macros-derive psibase_macros fracpack psibase cargo-psibase)
 
 cd "$(dirname "$0")/../"
 
@@ -25,7 +25,7 @@ for dir in "${dirs[@]}"; do
     cd "$dir" || exit
     echo "Building $dir..."
     cargo build || exit
-    cd ..
+    cd - > /dev/null
 done
 
 # Now publish each crate
@@ -33,5 +33,5 @@ for dir in "${dirs[@]}"; do
     cd "$dir"
     echo "Publishing $dir..."
     cargo publish $1
-    cd ..
+    cd - > /dev/null
 done

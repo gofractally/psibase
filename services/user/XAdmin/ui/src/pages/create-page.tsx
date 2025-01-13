@@ -45,7 +45,7 @@ import { PrevNextButtons } from "../components/PrevNextButtons";
 import { calculateIndex } from "../lib/calculateIndex";
 
 const BlockProducerSchema = z.object({
-    name: z.string().min(2),
+    name: z.string().min(1),
 });
 
 interface DependencyState {
@@ -238,7 +238,7 @@ export const CreatePage = () => {
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Boot template
                             </h1>{" "}
-                            <ChainTypeForm form={chainTypeForm} />
+                            <ChainTypeForm form={chainTypeForm} next={next} />
                         </div>
                     )}
                     {currentStep == 2 && (
@@ -246,7 +246,10 @@ export const CreatePage = () => {
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Name yourself
                             </h1>{" "}
-                            <BlockProducerForm form={blockProducerForm} />
+                            <BlockProducerForm
+                                form={blockProducerForm}
+                                next={next}
+                            />
                         </div>
                     )}
                     {currentStep == 3 && (

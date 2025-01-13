@@ -5,6 +5,34 @@ function(add_system_service suffix name)
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
+function(add_system_test_impl suffix name)
+    set(TARGET ${name}-test${suffix})
+    add_executable(${TARGET} ${ARGN})
+    target_include_directories(${TARGET} PUBLIC
+      ../include
+     ${CMAKE_CURRENT_LIST_DIR})
+    target_link_libraries(${TARGET} services_system${suffix} psitestlib${suffix})
+    set_target_properties(${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
+endfunction()
+
+function(add_system_test_release name)
+    if(BUILD_RELEASE_WASM)
+        add_system_test_impl("" ${name} ${ARGN})
+        add_wasm_test(${name}-test)
+    endif()
+endfunction()
+
+function(add_system_test_debug name)
+    if(BUILD_DEBUG_WASM)
+        add_system_test_impl("-debug" ${name} ${ARGN})
+    endif()
+endfunction()
+
+function(add_system_test name)
+    add_system_test_release(${name} ${ARGN})
+    add_system_test_debug(${name} ${ARGN})
+endfunction()
+
 function(add suffix)
     add_library(services_system${suffix} INTERFACE)
     target_mapped_include_directories(services_system${suffix} INTERFACE
@@ -16,6 +44,7 @@ function(add suffix)
         Producers/include
         HttpServer/include
         SetCode/include
+        StagedTx/service/cpp/include
         Transact/include
         VerifySig/include
     )

@@ -1,26 +1,26 @@
-use crate::services::{accounts, auth_delegate, http_server, packages, setcode, sites};
+use crate::services::{
+    accounts, auth_delegate, http_server, packages, psi_brotli::brotli_impl, setcode, sites,
+};
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
     GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
+use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
-use std::io::{Read, Seek};
+use std::ffi::OsString;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
-
-use async_trait::async_trait;
-use std::ffi::OsString;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::{Path, PathBuf};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
@@ -44,6 +44,43 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+}
+
+fn should_compress(content_type: &str) -> bool {
+    matches!(
+        content_type,
+        "text/plain"
+            | "text/html"
+            | "text/css"
+            | "application/javascript"
+            | "application/json"
+            | "application/xml"
+            | "application/rss+xml"
+            | "application/atom+xml"
+            | "image/svg+xml"
+            | "font/ttf"
+            | "font/otf"
+            | "application/wasm"
+    )
+}
+
+pub fn compress_content(
+    content: &[u8],
+    content_type: &str,
+    compression_level: u32,
+) -> (Vec<u8>, Option<String>) {
+    if should_compress(content_type) {
+        assert!(
+            compression_level >= 1 && compression_level <= 11,
+            "Compression level must be between 1 and 11"
+        );
+
+        let compressed_content = brotli_impl::compress(content.to_vec(), compression_level as u8);
+
+        (compressed_content, Some("br".to_string()))
+    } else {
+        (content.to_vec(), None)
+    }
 }
 
 #[derive(
@@ -270,22 +307,33 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         false
     }
-    pub fn store_data(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+    pub fn store_data(
+        &mut self,
+        actions: &mut Vec<Action>,
+        compression_level: u32,
+    ) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
         for (sender, index) in &self.data {
             let mut file = self.archive.by_index(*index)?;
+            let file_name = file.name().to_string();
             let path = data_re
-                .captures(file.name())
+                .captures(&file_name)
                 .unwrap()
                 .get(1)
                 .unwrap()
                 .as_str();
+
             if let Some(t) = mime_guess::from_path(path).first() {
+                let content = read(&mut file)?;
+                let (content, content_encoding) =
+                    compress_content(&content, t.essence_str(), compression_level);
+
                 actions.push(
                     sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
                         path.to_string(),
                         t.essence_str().to_string(),
-                        read(&mut file)?.into(),
+                        content_encoding,
+                        content.into(),
                     ),
                 );
             } else {
@@ -425,10 +473,11 @@ impl<R: Read + Seek> PackagedService<R> {
         actions: &mut Vec<Action>,
         sender: AccountNumber,
         install_ui: bool,
+        compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
-            self.store_data(actions)?;
+            self.store_data(actions, compression_level)?;
         }
 
         self.postinstall(actions)?;

@@ -10,6 +10,8 @@ namespace psibase
 {
    using BlockNum = uint32_t;
 
+   using BlockTime = TimePointUSec;
+
    /// A synchronous call
    ///
    /// An Action represents a synchronous call between services.
@@ -144,7 +146,8 @@ namespace psibase
    {
       AccountNumber name;
       Claim         auth;
-      friend bool   operator==(const Producer&, const Producer&) = default;
+
+      friend bool operator==(const Producer&, const Producer&) = default;
       PSIO_REFLECT(Producer, name, auth);
    };
 
@@ -210,9 +213,9 @@ namespace psibase
    {
       Checksum256   previous = {};
       BlockNum      blockNum = 0;  // TODO: pack into previous instead?
-      TimePointSec  time;          // TODO: switch to microseconds
+      BlockTime     time;
       AccountNumber producer;
-      TermNum       term;
+      TermNum       term = 0;
       BlockNum      commitNum;
 
       // Holds a sha256 of the current JointConsensus

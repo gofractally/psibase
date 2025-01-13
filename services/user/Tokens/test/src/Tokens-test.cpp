@@ -800,3 +800,55 @@ TEST_CASE("Testing custom tokens")
       }
    }
 }
+
+TEST_CASE("GraphQL Queries")
+{
+   DefaultTestChain t;
+
+   auto alice = t.from(t.addAccount("alice"_a));
+   auto a     = alice.to<Tokens>();
+   auto bob   = t.from(t.addAccount("bob"_a));
+
+   auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
+   auto userBalance = 1'000'000e4;
+   auto sysToken    = Tokens::sysToken;
+   sysIssuer.mint(sysToken, userBalance, memo);
+
+   REQUIRE(sysIssuer.credit(sysToken, alice, userBalance, memo).succeeded());
+   REQUIRE(sysIssuer.setTokenConf(sysToken, untradeable, false).succeeded());
+   t.finishBlock();
+
+   auto userBalaces = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{
+           R"( query { userBalances(user: "alice") { edges { node { symbolId tokenId precision { value } balance } } } } )"});
+   CHECK(
+       std::string(userBalaces.body.begin(), userBalaces.body.end()) ==
+       R"({"data": {"userBalances":{"edges":[{"node":{"symbolId":"psi","tokenId":1,"precision":{"value":4},"balance":"10000000000"}}]}}})");
+
+   REQUIRE(bob.to<Tokens>().setUserConf(manualDebit, true).succeeded());
+   REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
+   auto userCredits = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{
+           R"( query { userCredits(user: "alice") { edges { node { symbolId tokenId precision { value } balance creditedTo } } } } )"});
+   CHECK(
+       std::string(userCredits.body.begin(), userCredits.body.end()) ==
+       R"({"data": {"userCredits":{"edges":[{"node":{"symbolId":"psi","tokenId":1,"precision":{"value":4},"balance":"10000000","creditedTo":"bob"}}]}}})");
+
+   auto userDebits = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{
+           R"( query { userDebits(user: "bob") { edges { node { symbolId tokenId precision { value } balance debitableFrom } } } } )"});
+   CHECK(
+       std::string(userDebits.body.begin(), userDebits.body.end()) ==
+       R"({"data": {"userDebits":{"edges":[{"node":{"symbolId":"psi","tokenId":1,"precision":{"value":4},"balance":"10000000","debitableFrom":"alice"}}]}}})");
+
+   auto userTokens = t.post(
+       Tokens::service, "/graphql",
+       GraphQLBody{
+           R"( query { userTokens(user: "symbol") { edges { node { id precision { value } currentSupply { value }  maxSupply { value } symbolId } } } } )"});
+   CHECK(
+       std::string(userTokens.body.begin(), userTokens.body.end()) ==
+       R"({"data": {"userTokens":{"edges":[{"node":{"id":1,"precision":{"value":4},"currentSupply":{"value":"10000000000"},"maxSupply":{"value":"10000000000000"},"symbolId":"psi"}}]}}})");
+}

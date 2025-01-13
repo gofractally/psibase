@@ -34,13 +34,13 @@ version = "0.1.0"
 description = "An example package"
 
 [package.metadata.psibase]
-# (required) Builds example.psi
+# (required) Builds example.psi (<package-name>.psi (case-sensitive))
 package-name = "example"
 # package includes `service1` service
 services = ["service1"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.13.0"
+HttpServer = "0.14.0"
 ```
 
 ./service/Cargo.toml

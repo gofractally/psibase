@@ -114,6 +114,15 @@ struct InstallCommand {
     /// that they create will be owned by this account.
     #[clap(short = 'S', long, value_name = "SENDER")]
     sender: Option<ExactAccountNumber>,
+
+    /// Configure compression level for package file uploads
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL")]
+    compression_level: Option<u32>,
+
+    /// Reinstall the package
+    #[clap(short = 'r', long)]
+    reinstall: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -321,7 +330,7 @@ async fn build(
         .arg("rustc")
         .args(extra_args)
         .arg("--release")
-        .arg("--target=wasm32-wasi")
+        .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
         .arg("--message-format=json-diagnostic-rendered-ansi")
@@ -360,7 +369,7 @@ async fn build_plugin(
         .arg("build")
         .args(extra_args)
         .arg("--release")
-        .arg("--target=wasm32-wasi")
+        .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
         .arg("--message-format=json-render-diagnostics")
@@ -385,7 +394,7 @@ async fn build_plugin(
 
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
     if let Some(platform) = &dep.target {
-        if platform.matches("wasm32-wasi", &[]) {
+        if platform.matches("wasm32-wasip1", &[]) {
             true
         } else {
             false
@@ -518,7 +527,7 @@ async fn test(
         || metadata.metadata.target_directory.as_std_path(),
         |p| p.as_path(),
     );
-    let out_dir = target_dir.join("wasm32-wasi/release/packages");
+    let out_dir = target_dir.join("wasm32-wasip1/release/packages");
     let index_file =
         out_dir.join(metadata.packages.get(root).unwrap().name.clone() + "-index.json");
     serde_json::to_writer(File::create(&index_file)?, &index)?;
@@ -581,12 +590,12 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let mut args = vec!["--suppress-ok".into()];
+    let mut args = vec!["deploy".into()];
     if let Some(api) = &opts.api {
         args.push("--api".into());
         args.push(api.to_string());
     }
-    args.push("deploy".into());
+    args.push("--suppress-ok".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
@@ -636,13 +645,21 @@ async fn install(
 
     let mut command = std::process::Command::new("psibase");
 
-    command.arg("--suppress-ok");
+    command.arg("install");
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
-    command.arg("install");
+    command.arg("--suppress-ok");
     if let Some(sender) = &opts.sender {
         command.args(["--sender", &sender.to_string()]);
+    }
+
+    if opts.reinstall {
+        command.args(["--reinstall"]);
+    }
+
+    if let Some(compression_level) = opts.compression_level {
+        command.args(["--compression-level", &compression_level.to_string()]);
     }
 
     // Get package files

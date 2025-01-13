@@ -11,7 +11,8 @@ function(add suffix)
         common/src/crypto.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
-        common/src/time.cpp
+        common/src/Rpc.cpp
+        common/src/schema.cpp
         common/src/trace.cpp
     )
 
@@ -25,7 +26,7 @@ function(add suffix)
         add_custom_command(
             OUTPUT libc-simple-malloc${suffix}.a
             DEPENDS simple-malloc-objects${suffix}
-            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc.a libc-simple-malloc${suffix}.a
+            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasip1/libc.a libc-simple-malloc${suffix}.a
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar d libc-simple-malloc${suffix}.a dlmalloc.o
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar rs libc-simple-malloc${suffix}.a $<TARGET_OBJECTS:simple-malloc-objects${suffix}>
             COMMAND_EXPAND_LISTS
@@ -37,7 +38,7 @@ function(add suffix)
         add_custom_command(
             OUTPUT libc++abi-replacements${suffix}.a
             DEPENDS c++abi-objects${suffix}
-            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/libc++abi.a libc++abi-replacements${suffix}.a
+            COMMAND cp ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasip1/libc++abi.a libc++abi-replacements${suffix}.a
             COMMAND ${WASI_SDK_PREFIX}/bin/llvm-ar rs libc++abi-replacements${suffix}.a $<TARGET_OBJECTS:c++abi-objects${suffix}>
         )
 
@@ -142,7 +143,7 @@ function(add suffix)
             -L${CMAKE_CURRENT_BINARY_DIR}
             -lc
             ${LIBCLANG_RT_BUILTINS}
-            ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasi/crt1.o
+            ${WASI_SDK_PREFIX}/share/wasi-sysroot/lib/wasm32-wasip1/crt1.o
         )
         target_mapped_include_directories(psitestlib${suffix} PUBLIC
             service/include
@@ -155,6 +156,7 @@ function(add suffix)
             ../../services/system/CpuLimit/include
             ../../services/system/HttpServer/include
             ../../services/system/SetCode/include
+            ../../services/system/StagedTx/service/cpp/include
             ../../services/system/Transact/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
@@ -176,7 +178,7 @@ function(add suffix)
     endif()
 
     if(DEFINED IS_NATIVE)
-        find_package(Boost 1.67 REQUIRED COMPONENTS filesystem log)
+        find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
         target_link_libraries(psibase${suffix} PUBLIC eos-vm triedent secp256k1 Boost::filesystem Boost::log debug_eos_vm -ldl)
         target_include_directories(psibase${suffix} PUBLIC

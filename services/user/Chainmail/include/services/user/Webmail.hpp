@@ -6,7 +6,7 @@
 
 namespace UserService
 {
-   class Chainmail : public psibase::Service<Chainmail>
+   class Chainmail : public psibase::Service
    {
      public:
       static constexpr auto service = psibase::AccountNumber("chainmail");

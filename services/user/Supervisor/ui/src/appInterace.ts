@@ -12,5 +12,15 @@ export interface AppInterface {
         plugins: QualifiedPluginId[],
     ) => void;
 
-    entry: (callerOrigin: string, id: UUID, args: QualifiedFunctionCallArgs) => void;
+    entry: (
+        callerOrigin: string,
+        id: UUID,
+        args: QualifiedFunctionCallArgs,
+    ) => void;
+
+    getJson: (
+        callerOrigin: string,
+        id: string,
+        plugin: QualifiedPluginId,
+    ) => void;
 }

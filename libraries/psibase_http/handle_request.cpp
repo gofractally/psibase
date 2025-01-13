@@ -12,6 +12,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
 #include <psio/to_json.hpp>
+#include <unordered_set>
 
 namespace beast     = boost::beast;
 namespace bhttp     = beast::http;
@@ -20,6 +21,16 @@ using steady_clock  = std::chrono::steady_clock;
 
 namespace psibase::http
 {
+
+   // Private HTTP headers that are not forwarded to wasm
+   const std::unordered_set<std::string> private_headers = {"authorization", "proxy-authorization"};
+
+   bool is_private_header(const std::string& name)
+   {
+      std::string lower_name = name;
+      std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+      return private_headers.find(lower_name) != private_headers.end();
+   }
 
    template <typename T>
    constexpr std::size_t function_arg_count = 0;
@@ -333,7 +344,7 @@ namespace psibase::http
          if (!server.http_config->allow_origin.empty() && req_allow_cors)
          {
             res.set(bhttp::field::access_control_allow_origin, server.http_config->allow_origin);
-            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS");
+            res.set(bhttp::field::access_control_allow_methods, "POST, GET, OPTIONS, HEAD");
             res.set(bhttp::field::access_control_allow_headers, "*");
          }
       };
@@ -616,10 +627,10 @@ namespace psibase::http
                   {
                      return send(ok_no_content());
                   }
-                  else if (req.method() != bhttp::verb::get)
+                  else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
                   {
-                     return send(
-                         method_not_allowed(req.target(), req.method_string(), "GET, OPTIONS"));
+                     return send(method_not_allowed(req.target(), req.method_string(),
+                                                    "GET, OPTIONS, HEAD"));
                   }
 
                   std::vector<char> contents;
@@ -647,10 +658,23 @@ namespace psibase::http
 
             auto        startTime = steady_clock::now();
             HttpRequest data;
+            for (auto iter = req.begin(); iter != req.end(); ++iter)
+            {
+               auto header =
+                   HttpHeader{std::string(iter->name_string()), std::string(iter->value())};
+
+               if (!is_private_header(header.name))
+               {
+                  data.headers.emplace_back(std::move(header));
+               }
+            }
+
             if (req.method() == bhttp::verb::get)
                data.method = "GET";
             else if (req.method() == bhttp::verb::post)
                data.method = "POST";
+            else if (req.method() == bhttp::verb::head)
+               data.method = "HEAD";
             else
                return send(
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
@@ -672,7 +696,7 @@ namespace psibase::http
             bc.start();
             if (bc.needGenesisAction)
                return send(error(bhttp::status::internal_server_error,
-                                 "Need genesis block; use 'psibase boot' to boot chain"));
+                                 "Node is not connected to any psibase network."));
 
             SignedTransaction  trx;
             TransactionTrace   trace;

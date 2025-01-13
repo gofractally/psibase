@@ -5,6 +5,7 @@ world impl {
     include transact:plugin/imports;
     import auth-sig:plugin/keyvault;
     include accounts:plugin/imports;
+    include accounts:account-tokens/imports;
     include auth-invite:plugin/imports;
 
     export inviter;

@@ -23,7 +23,7 @@ TEST_CASE("block signature")
    prover->add(ecc);
    nodes.add(AccountNumber{"prod"}, prover);
    nodes.add(AccountNumber{"client"});
-   boot(nodes.getBlockContext(), ConsensusData{CftConsensus{{Producer{prod, ecc->get()}}}}, true);
+   boot(nodes[0], ConsensusData{CftConsensus{{Producer{prod, ecc->get()}}}}, true);
    runFor(ctx, 5s);
    nodes.connect_all();
    runFor(ctx, 1s);
@@ -48,8 +48,7 @@ TEST_CASE("load signature state")
       node_type               node{ctx, system.get(), prover};
       node.set_producer_id(prod);
       node.load_producers();
-      boot(node.chain().getBlockContext(),
-           ConsensusData{CftConsensus{{Producer{prod, prover->get()}}}}, true);
+      boot(node, ConsensusData{CftConsensus{{Producer{prod, prover->get()}}}}, true);
       runFor(ctx, 5s);
    }
    {

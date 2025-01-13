@@ -10,8 +10,6 @@ import { toast } from "sonner";
 
 import { type PluginId } from "@psibase/common-lib";
 
-import { getSupervisor } from "@lib/supervisor";
-
 import { Button } from "@shadcn/button";
 import {
     Dialog,
@@ -27,7 +25,7 @@ import { Separator } from "@shadcn/separator";
 
 import { MarkdownEditor } from "@components";
 import { ControlBar } from "@components/editor";
-import { type Message, useDraftMessages, useUser } from "@hooks";
+import { type Message, useDraftMessages, useLoggedInUser } from "@hooks";
 
 import {
     Form,
@@ -37,6 +35,8 @@ import {
     FormMessage,
 } from "@shadcn/form";
 import { Input } from "@shadcn/input";
+
+import { supervisor } from "src/main";
 
 interface SupervisorError {
     code: number;
@@ -58,7 +58,7 @@ export const ComposeDialog = ({
 }) => {
     const [open, setOpen] = useState(false);
     const isSent = useRef(false);
-    const { user } = useUser();
+    const { data: user } = useLoggedInUser();
     const { drafts, setDrafts, getDrafts, deleteDraftById } =
         useDraftMessages();
 
@@ -122,7 +122,6 @@ export const ComposeDialog = ({
         }
 
         try {
-            const supervisor = await getSupervisor();
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
                 service: "chainmail",
@@ -169,72 +168,78 @@ export const ComposeDialog = ({
         >
             {trigger}
             <DialogContent
-                className="flex h-[90dvh] max-w-screen-2xl flex-col"
+                className="flex h-[90dvh] max-w-screen-lg flex-col"
                 onCloseAutoFocus={(e) => {
                     // This helps in not focusing on the trigger after closing the modal
                     e.preventDefault();
                 }}
             >
-                <DialogHeader>
-                    <DialogTitle>Compose message</DialogTitle>
-                    <DialogDescription>
-                        Send a message to another account on the network
-                    </DialogDescription>
-                </DialogHeader>
-                <Separator />
-                <Form {...form}>
-                    <form
-                        onSubmit={form.handleSubmit(onSubmit)}
-                        className="flex h-[80dvh] flex-1 flex-grow flex-col space-y-2"
-                    >
-                        <FormField
-                            control={form.control}
-                            name="to"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormControl>
-                                        <Input placeholder="To" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="subject"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormControl>
-                                        <Input
-                                            placeholder="Subject"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <MilkdownProvider>
-                            <ProsemirrorAdapterProvider>
-                                <div className="sticky top-0 z-10">
-                                    <ControlBar />
-                                    <Separator />
-                                </div>
-                                <MarkdownEditor
-                                    initialValue={
-                                        message?.status === "draft"
-                                            ? message.body
-                                            : ""
-                                    }
-                                    updateMarkdown={updateDraft}
-                                />
-                            </ProsemirrorAdapterProvider>
-                        </MilkdownProvider>
-                        <DialogFooter>
-                            <Button type="submit">Send</Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                <div className="flex max-h-full flex-1 flex-col">
+                    <Form {...form}>
+                        <form
+                            onSubmit={form.handleSubmit(onSubmit)}
+                            className="flex max-h-full flex-1 flex-grow flex-col space-y-2"
+                        >
+                            <DialogHeader>
+                                <DialogTitle>Compose message</DialogTitle>
+                                <DialogDescription>
+                                    Send a message to another account on the
+                                    network
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Separator />
+                            <FormField
+                                control={form.control}
+                                name="to"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="To"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="subject"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Subject"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <MilkdownProvider>
+                                <ProsemirrorAdapterProvider>
+                                    <div className="sticky top-0 z-10">
+                                        <ControlBar />
+                                        <Separator />
+                                    </div>
+                                    <MarkdownEditor
+                                        initialValue={
+                                            message?.status === "draft"
+                                                ? message.body
+                                                : ""
+                                        }
+                                        updateMarkdown={updateDraft}
+                                    />
+                                </ProsemirrorAdapterProvider>
+                            </MilkdownProvider>
+                            <DialogFooter>
+                                <Button type="submit">Send</Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </div>
             </DialogContent>
         </Dialog>
     );

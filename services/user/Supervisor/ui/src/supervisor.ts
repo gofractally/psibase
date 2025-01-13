@@ -2,19 +2,13 @@ import {
     QualifiedPluginId,
     QualifiedFunctionCallArgs,
     siblingUrl,
-    FunctionCallArgs,
     buildFunctionCallResponse,
     PluginError,
+    assertTruthy,
 } from "@psibase/common-lib";
 
 import { AppInterface } from "./appInterace";
-import {
-    OriginationData,
-    assert,
-    assertTruthy,
-    parser,
-    serviceFromOrigin,
-} from "./utils";
+import { OriginationData, assert, parser, serviceFromOrigin } from "./utils";
 import { CallContext } from "./callContext";
 import { isRecoverableError } from "./plugin/errors";
 import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
@@ -60,15 +54,17 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        if (callerOrigin === supervisorDomain) {
-            console.info(
-                "TODO: handle calls directly from the rootdomain itself",
-            );
+        if (callerOrigin === siblingUrl(null, null, null, true)) {
+            this.parentOrigination = {
+                app: "homepage",
+                origin: callerOrigin,
+            };
+        } else {
+            this.parentOrigination = {
+                app: serviceFromOrigin(callerOrigin),
+                origin: callerOrigin,
+            };
         }
-        this.parentOrigination = {
-            app: serviceFromOrigin(callerOrigin),
-            origin: callerOrigin,
-        };
     }
 
     private async preload(plugins: QualifiedPluginId[]) {
@@ -92,10 +88,10 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
     }
 
-    private replyToParent(id: string, call: FunctionCallArgs, result: any) {
+    private replyToParent(id: string, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
         window.parent.postMessage(
-            buildFunctionCallResponse(id, call, result),
+            buildFunctionCallResponse(id, result),
             this.parentOrigination.origin,
         );
     }
@@ -125,7 +121,7 @@ export class Supervisor implements AppInterface {
         let getLoggedInUser = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "activeApp",
             "getLoggedInUser",
             [],
         );
@@ -138,7 +134,7 @@ export class Supervisor implements AppInterface {
         const getAccount = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "api",
             "getAccount",
             [user],
         );
@@ -152,7 +148,7 @@ export class Supervisor implements AppInterface {
         const logout = getCallArgs(
             "accounts",
             "plugin",
-            "accounts",
+            "activeApp",
             "logout",
             [],
         );
@@ -186,18 +182,18 @@ export class Supervisor implements AppInterface {
         });
     }
 
-    getActiveAppDomain(sender: OriginationData): string {
+    getActiveApp(sender: OriginationData): OriginationData {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveAppDomain] Unauthorized - only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - only callable by Accounts plugin",
         );
         assert(
             sender.app === "accounts",
-            "[supervisor:getActiveAppDomain] Unauthorized - Only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by Accounts plugin",
         );
 
-        return this.parentOrigination.origin;
+        return this.parentOrigination;
     }
 
     // Called by the current plugin looking to identify its caller
@@ -254,6 +250,22 @@ export class Supervisor implements AppInterface {
         }
 
         return ret;
+    }
+
+    // This is an entrypoint that returns the JSON interface for a plugin.
+    async getJson(
+        callerOrigin: string,
+        id: string,
+        plugin: QualifiedPluginId,
+    ) {
+        try {
+            this.setParentOrigination(callerOrigin);
+            await this.preload([plugin]);
+            const json = this.plugins.getPlugin(plugin).plugin.getJson();
+            this.replyToParent(id, json);
+        } catch (e) {
+            this.replyToParent(id, e);
+        }
     }
 
     // This is an entrypoint for apps to preload plugins.
@@ -318,7 +330,7 @@ export class Supervisor implements AppInterface {
             assert(this.context.stack.isEmpty(), "Callstack should be empty");
 
             // Send plugin result to parent window
-            this.replyToParent(id, args, result);
+            this.replyToParent(id, result);
 
             this.context = undefined;
         } catch (e) {
@@ -328,11 +340,10 @@ export class Supervisor implements AppInterface {
                 //   converted to a PluginError to be handled by the client.
                 this.replyToParent(
                     id,
-                    args,
                     new PluginError(e.payload.producer, e.payload.message),
                 );
             } else {
-                this.replyToParent(id, args, e);
+                this.replyToParent(id, e);
             }
 
             this.context = undefined;

@@ -1,0 +1,25 @@
+[package]
+name = "basicwquery"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition = "2021"
+publish = false
+
+[package.metadata.psibase]
+package-name = "basicwquery"
+server = "basicwquery"
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.14.0"
+
+[dependencies]
+psibase = { path = "../../../psibase" }
+psibase_macros = { path = "../../../psibase_macros" }
+async-graphql = "7.0.7"
+serde = { version = "1.0.209", features = ["derive"] }
+mincallrecvr = { path = "../min-call-recvr" }
+
+[dev-dependencies]
+psimacrotest = { path = "../.." }

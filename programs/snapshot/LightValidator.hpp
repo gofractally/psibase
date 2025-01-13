@@ -107,6 +107,21 @@ namespace psibase
       PSIO_REFLECT(BlockConfirm, blockNum, commits, nextCommits)
    };
 
+   inline std::size_t strongThreshold(const BftConsensus& c)
+   {
+      return c.producers.size() * 2 / 3 + 1;
+   }
+
+   inline std::size_t strongThreshold(const CftConsensus& c)
+   {
+      return c.producers.size() / 2 + 1;
+   }
+
+   inline std::size_t strongThreshold(const Consensus& consensus)
+   {
+      return std::visit([](const auto& c) { return strongThreshold(c); }, consensus.data);
+   }
+
    struct LightValidator
    {
       explicit LightValidator(ChainHandle handle, const std::optional<psibase::StatusRow>& status)
@@ -214,12 +229,17 @@ namespace psibase
          check(!!block.auxConsensusData, "BFT requires auxConsensusData to prove irreversibility");
          auto confirms = psio::from_frac<BlockConfirm>(*block.auxConsensusData);
          auto blockId  = getBlockId(confirms.blockNum);
+
+         check(confirms.commits.size() >= strongThreshold(consensus), "Not enough confirmations");
          // verify old producers
+         AccountNumber prevAccount{};
          for (const auto& msg : confirms.commits)
          {
+            check(prevAccount < msg.producer, "Confirmations must be ordered by producer");
             auto key  = getProducerKey(consensus.producers, msg.producer);
             auto hash = makeSignatureHash(CommitMessage{blockId, msg.producer, key});
             verifySignature(hash, key, msg.signature);
+            prevAccount = msg.producer;
          }
          updateVerifyState();
          // verify new producers
@@ -228,11 +248,16 @@ namespace psibase
             check(!!confirms.nextCommits, "Missing commits");
             auto& producers = std::visit([](auto& c) -> auto& { return c.producers; },
                                          jointConsensus.next->consensus.data);
+            check(confirms.nextCommits->size() >= strongThreshold(jointConsensus.next->consensus),
+                  "Not enough confirmations");
+            AccountNumber prevAccount{};
             for (const auto& msg : *confirms.nextCommits)
             {
+               check(prevAccount < msg.producer, "Confirmations must be ordered by producer");
                auto key  = getProducerKey(producers, msg.producer);
                auto hash = makeSignatureHash(CommitMessage{blockId, msg.producer, key});
                verifySignature(hash, key, msg.signature);
+               prevAccount = msg.producer;
             }
          }
          return confirms.blockNum;

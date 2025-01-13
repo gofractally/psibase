@@ -139,10 +139,44 @@ namespace SystemService
       /// * `user`:  The user being checked
       // TODO: Return error message instead?
       void canAuthUserSys(psibase::AccountNumber user);
+
+      /// Check whether a specified set of authorizer accounts are sufficient to authorize sending a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being authorized.
+      /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+      /// * `authSet`: The set of accounts that are already being checked for authorization. If
+      ///              the sender is already in this set, then the function should return false.
+      ///
+      /// Returns:
+      /// * `true`: The authorizers are sufficient to authorize a transaction from the sender.
+      /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
+      bool isAuthSys(psibase::AccountNumber                             sender,
+                     std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+
+      /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
+      /// transaction from a specified sender.
+      ///
+      /// * `sender`: The sender account for the transaction potentially being rejected.
+      /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+      /// * `authSet`: The set of accounts that are already being checked for authorization. If
+      ///              the sender is already in this set, then the function should return false.
+      ///
+      /// Returns:
+      /// * `true`: The rejecters are sufficient to reject a transaction from the sender.
+      /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
+      bool isRejectSys(psibase::AccountNumber                             sender,
+                       std::vector<psibase::AccountNumber>                rejecters,
+                       std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-                method(canAuthUserSys, user))
+                method(canAuthUserSys, user),
+                method(isAuthSys, sender, authorizers),
+                method(isRejectSys, sender, rejecters)
+                //
+   )
 
    struct TransactStatus
    {
@@ -194,9 +228,9 @@ namespace SystemService
 
    struct SnapshotInfo
    {
-      psibase::TimePointSec lastSnapshot;
-      std::uint32_t         snapshotInterval;
-      auto                  key() const { return psibase::SingletonKey(); }
+      psibase::BlockTime lastSnapshot;
+      psibase::Seconds   snapshotInterval;
+      auto               key() const { return psibase::SingletonKey(); }
    };
    PSIO_REFLECT(SnapshotInfo, lastSnapshot, snapshotInterval)
    using SnapshotInfoTable = psibase::Table<SnapshotInfo, &SnapshotInfo::key>;
@@ -210,7 +244,7 @@ namespace SystemService
    /// Other services use it to get information about the chain,
    /// current block, and head block. They also use it to call actions
    /// using other accounts' authorities via [runAs].
-   struct Transact : psibase::Service<Transact>
+   struct Transact : psibase::Service
    {
       /// "transact"
       static constexpr auto service = psibase::AccountNumber("transact");
@@ -250,7 +284,7 @@ namespace SystemService
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
       /// setting because snapshots are signed by the block producers.
-      void setSnapTime(std::uint32_t seconds);
+      void setSnapTime(psibase::Seconds seconds);
 
       /// Adds a callback that will be run whenever the trigger happens.
       /// - onTransaction is run at the end of every transaction
@@ -262,8 +296,10 @@ namespace SystemService
       ///
       /// Subjective callbacks are run by native and must have no sender.
       ///
-      /// TODO: Generalize implementation. Currently the only supported
-      /// combinations are objective+transaction and subjective+block.
+      /// Callbacks are unique. `addCallback` will have no effect if an
+      /// identical callback is already registered.
+      ///
+      /// The order in which callbacks are executed is unspecified.
       void addCallback(CallbackType type, bool objective, psibase::Action act);
       /// Removes an existing callback
       void removeCallback(CallbackType type, bool objective, psibase::Action act);
@@ -309,7 +345,7 @@ namespace SystemService
       ///
       /// This is *not* the currently executing block time.
       /// TODO: remove
-      psibase::TimePointSec headBlockTime() const;
+      psibase::BlockTime headBlockTime() const;
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),

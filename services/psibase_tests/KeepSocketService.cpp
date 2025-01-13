@@ -6,7 +6,7 @@
 using SystemService::HttpServer;
 using namespace psibase;
 
-struct KeepSocket : Service<KeepSocket>
+struct KeepSocket : Service
 {
    std::optional<HttpReply> serveSys(HttpRequest req, const std::optional<std::uint32_t> socket)
    {

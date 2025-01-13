@@ -8,3 +8,4 @@
 - [Minimal UI](minimal-ui.md)
 - [Tables](tables.md)
 - [GraphQL](graphql.md)
+- [Pre-action Initialization](pre-action.md)

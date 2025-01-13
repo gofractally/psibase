@@ -1,0 +1,27 @@
+[package]
+name = "registry"
+description = "Registry Service"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish = false
+
+[package.metadata.psibase]
+server = "r-registry"
+plugin = "registry-plugin"
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.14.0"
+Sites = "0.14.0"
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase" }
+serde = { version = "1", features = ["derive"] }
+async-graphql = "7.0.7"
+serde_json = "1.0.120"
+url = "2.5.2"
+
+[dev-dependencies]
+registry_package = { path = ".." }

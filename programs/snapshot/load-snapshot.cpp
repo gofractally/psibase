@@ -1,3 +1,5 @@
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -452,6 +454,24 @@ void clearDb(std::uint32_t chain, DbId db)
    }
 }
 
+using input_stream = boost::iostreams::filtering_stream<boost::iostreams::input>;
+
+bool setup_input(std::istream& is, input_stream& stream)
+{
+   switch (is.peek())
+   {
+      case '\0':
+         break;
+      case '\x1f':
+         stream.push(boost::iostreams::gzip_decompressor());
+         break;
+      default:
+         return false;
+   }
+   stream.push(is);
+   return true;
+}
+
 int main(int argc, const char* const* argv)
 {
    if (argc < 3)
@@ -464,10 +484,26 @@ int main(int argc, const char* const* argv)
    psibase::TestChain chain(out_path, O_CREAT | O_RDWR);
    auto               handle = chain.nativeHandle();
    auto          oldStatus   = chain.kvGet<psibase::StatusRow>(DbId::native, psibase::statusKey());
-   std::ifstream in(in_path);
-   if (!in)
+   std::ifstream file;
+   std::istream* is;
+   if (in_path == std::string_view{"-"})
    {
-      std::cerr << "Failed to open " << in_path << std::endl;
+      is = &std::cin;
+   }
+   else
+   {
+      file.open(in_path, std::ios_base::binary);
+      if (!file)
+      {
+         std::cerr << "Failed to open " << argv[2] << std::endl;
+         return 1;
+      }
+      is = &file;
+   }
+   input_stream in;
+   if (!setup_input(*is, in))
+   {
+      std::cerr << in_path << " is not a snapshot file" << std::endl;
       return 1;
    }
    read_header({}, in);
