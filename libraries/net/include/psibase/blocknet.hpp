@@ -382,6 +382,16 @@ namespace psibase::net
          {
             if (state.last_received)
             {
+               if (auto* b = chain().get_state(state.last_received->id()))
+               {
+                  state.last_received = b->xid();
+               }
+               else if (state.last_received->num() > chain().commit_index())
+               {
+                  // The peer gave us a future block. It is impossible for both peers
+                  // to reach this state.
+                  return;
+               }
                connection.state = make_connection_ready(state);
                async_send_next(connection);
             }
@@ -452,7 +462,7 @@ namespace psibase::net
          {
             if (auto* b = chain().get_state(request.xid.id()))
             {
-               state->last_received = {request.xid.id(), b->blockNum()};
+               state->last_received = b->xid();
             }
             else if (chain().get_block_id(request.xid.num()) == request.xid.id())
             {
@@ -466,11 +476,13 @@ namespace psibase::net
             }
             else if (request.committed)
             {
-               // The peer is ahead of us.
-               // TODO: Avoid sending spurious blocks
-               auto num             = chain().commit_index();
-               auto id              = chain().get_block_id(num);
-               state->last_received = {id, num};
+               // Do NOT ready the connection. If we've already sent
+               // our committed block ID, then we know that the peer is
+               // definitely ahead of us, and we need to wait.
+               // If we have not yet sent our committed block ID, then
+               // we'll re-evaluate when we do.
+               state->last_received = request.xid;
+               return;
             }
             else
             {
@@ -938,7 +950,12 @@ namespace psibase::net
 
       void update_last_received(auto& peer, const ExtendedBlockId& xid)
       {
-         if (auto* state = std::get_if<ConnectionStateReady>(&peer.state))
+         if (std::holds_alternative<ConnectionStateStart>(peer.state))
+         {
+            peer.state = ConnectionStateReady{.last_sent     = chain().get_common_ancestor(xid),
+                                              .last_received = xid};
+         }
+         else if (auto* state = std::get_if<ConnectionStateReady>(&peer.state))
          {
             state->last_received = xid;
             if (chain().in_best_chain(xid) && xid.num() > state->last_sent.num())
