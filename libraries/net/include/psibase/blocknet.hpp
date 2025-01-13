@@ -416,14 +416,10 @@ namespace psibase::net
       {
          auto& connection = get_connection(origin);
          auto* state      = std::get_if<ConnectionStateStart>(&connection.state);
-         if (!state)
+         if (!state || state->last_received)
          {
-            // TODO: this will happen if the peer loaded a snapshot
-            return;
-         }
-         if (state->last_received)
-         {
-            // We've already found a common ancestor
+            // If we've already found a common block, we can ignore the
+            // rest of the peer's hello messages.
             return;
          }
          if (request.committed && request.xid.num() < chain().getLogStart())
