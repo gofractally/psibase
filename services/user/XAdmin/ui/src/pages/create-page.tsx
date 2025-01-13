@@ -205,7 +205,10 @@ export const CreatePage = () => {
 
                                 // TODO: handle errors
                                 if (!keyPair) return;
-                                importKey(keyPair.privateKey);
+                                importKey({
+                                    privateKey: keyPair.privateKey,
+                                    account: bpName,
+                                });
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";
