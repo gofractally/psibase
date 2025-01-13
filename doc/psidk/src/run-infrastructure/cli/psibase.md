@@ -37,7 +37,6 @@ psibase - The psibase blockchain command line client
   Sign transactions with this key. The key can be in any of the following forms:
   - A file containing a PEM or DER encoded private key
   - A PKCS #11 URI
-  - An EOS style base58-encoded private key beginning `PVT_K1_`
 
 - `--trace` *format*
 
@@ -64,7 +63,6 @@ The boot command deploys a set of system services and web interfaces suitable fo
   Set all accounts to authenticate using this key. The key will also be used for block production. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
-  - An EOS style base58-encoded public key beginning `PUB_K1_`
 
 - `-p`, `--producer` *name*
 
@@ -89,7 +87,6 @@ Create or modify an account
   Set the account to authenticate using this key. Also works if the account already exists. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
-  - An EOS style base58-encoded public key beginning `PUB_K1_`
 
 - `-S`, `--sender` *account*
 
@@ -154,7 +151,6 @@ Install packages to the chain along with all dependencies. If any of the request
   Set all accounts created by the new packages to authenticate using this key. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
-  - An EOS style base58-encoded public key beginning `PUB_K1_`
 
 - `--reinstall`
 
@@ -201,7 +197,6 @@ Modify an account
   Set the account to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
-  - An EOS style base58-encoded public key beginning `PUB_K1_`
 
 ### search
 
