@@ -1,0 +1,33 @@
+[package]
+name = "plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+staged-tx = { path = "../service/", version = "0.14.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = { version = "1.0.125" }
+wit-bindgen-rt = { version = "0.36.0", features = ["bitflags"] }
+once_cell = "1.18.0"
+lazy_static = "1.4.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "staged-tx:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
+
+[dev-dependencies]
+staged-tx-pkg = { path = "..", version = "0.14.0" }

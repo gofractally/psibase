@@ -1,0 +1,55 @@
+/// The staged-tx plugin allows apps to set a "propose latch" for an account. What makes it a "latch" is that 
+/// gets automatically unset after the completion of the call context in which it is set.
+/// 
+/// When the latch is set, server actions scheduled by plugins are staged by the current user
+/// instead of being executed by the logged-in user. These actions are proposed for execution
+/// by the account specified when enabling the latch.
+package staged-tx:plugin;
+
+interface admin {
+    use host:common/types.{error};
+
+    /// This is a global setting for an account that will act as a persistent propose-latch across 
+    /// all apps for this user.
+    ///
+    /// This is an advanced user configuration, only callable by the homepage app.
+    /// 
+    /// `proposer` - The account that will propose transactions.
+    /// `account` - The account on behalf of which the proposer is proposing transactions
+    enable-proposal-mode: func(proposer: string, account: string) -> result<_, error>;
+
+    /// Disables the proposal mode global setting.
+    /// 
+    /// Only callable by the homepage app.
+    /// 
+    /// `proposer` - The account that is no longer going to be proposing transactions.
+    disable-proposal-mode: func(proposer: string) -> result<_, error>;
+
+    /// Unset the propose latch.
+    /// 
+    /// Only callable by the transact plugin.
+    unset-propose-latch: func();
+
+    /// Returns the current latch account, if any.
+    /// 
+    /// Only callable by the transact plugin.
+    /// 
+    /// `proposer` - The account whose propose latch is being checked.
+    get-propose-latch: func(proposer: string) -> option<string>;
+}
+
+interface api {
+    use host:common/types.{error};
+
+    /// This is a latch that is set for this callContext, and unset when the callContext is completed.
+    /// It can only be called by the plugin of the currently active application.
+    /// 
+    /// `account` - The account on behalf of which the currently logged-in user is 
+    ///             proposing transactions.
+    set-propose-latch: func(account: string) -> result<_, error>;
+}
+
+world imports {
+    import api;
+    import admin;
+}
