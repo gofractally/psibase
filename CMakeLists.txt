@@ -739,7 +739,7 @@ psibase_package(
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
-        SERVER r-workshop
+        SERVER workshop
     DEPENDS ${Workshop_js_DEP}
 )
 
