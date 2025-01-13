@@ -203,7 +203,6 @@ export const CreatePage = () => {
                                     description: "Successfully booted chain.",
                                 });
 
-                                // TODO: handle errors
                                 if (!keyPair) return;
                                 importKey({
                                     privateKey: keyPair.privateKey,

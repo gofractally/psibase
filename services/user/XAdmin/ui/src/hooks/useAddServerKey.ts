@@ -14,14 +14,6 @@ export const useAddServerKey = () =>
                 "PRIVATE KEY"
             );
 
-            // TODO: Remove the next three lines
-            const publicDER = await exportKeyToDER(
-                keyPair.publicKey,
-                "PUBLIC KEY"
-            );
-            console.log("PRIVATE:", privateDER);
-            console.log("PUBLIC:", publicDER);
-
             chain.addServerKey(privateDER);
             return keyPair;
         },
