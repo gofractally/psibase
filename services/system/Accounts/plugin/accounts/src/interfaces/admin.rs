@@ -12,8 +12,9 @@ use crate::helpers::*;
 fn get_assert_caller_admin(context: &str) -> OriginationData {
     let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
     assert!(
-        caller.origin == Client::my_service_origin(),
-        "{} only callable by `accounts`",
+        caller.origin == Client::my_service_origin()
+            || (caller.app.is_some() && caller.app.as_ref().unwrap() == "x-admin"),
+        "{} only callable by `accounts` or `x-admin`",
         context
     );
     caller
