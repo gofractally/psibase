@@ -285,6 +285,13 @@ pub fn js_create_boot_transactions(
         .map(|k| -> Result<AnyPublicKey, JsValue> {
             let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+            if data.tag() != "PUBLIC KEY" {
+                return Err(JsValue::from_str("Invalid public key"));
+            }
+
+            spki::SubjectPublicKeyInfoRef::try_from(data.contents())
+                .map_err(|e| JsValue::from_str(&format!("Invalid SPKI format: {}", e)))?;
+
             Ok(AnyPublicKey {
                 key: crate::Claim {
                     service: AccountNumber::from_str("verify-sig").unwrap(),
