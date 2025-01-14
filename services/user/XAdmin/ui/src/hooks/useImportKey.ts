@@ -28,11 +28,13 @@ export const useImportKey = () =>
                 intf: "keyvault",
             }));
 
-            void (await supervisor.functionCall({
-                method: "importAccount",
-                params: [account],
-                service: "accounts",
-                intf: "admin",
-            }));
+            // TODO: This function call does not properly import the account into the accounts app
+            // TODO: When we add the new method here, ensure it also fires for Development boots
+            // void (await supervisor.functionCall({
+            //     method: "importAccount",
+            //     params: [account],
+            //     service: "accounts",
+            //     intf: "admin",
+            // }));
         },
     });
