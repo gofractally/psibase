@@ -1539,6 +1539,8 @@ namespace psibase
          return result;
       }
 
+      void onChangeNextTransaction(auto&& fn) { dbCallbacks.nextTransaction = fn; }
+
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
          Action action{.service = proxyServiceNum,
@@ -1672,7 +1674,11 @@ namespace psibase
          assert(!byBlocknumIndex.empty());
          commitIndex = byBlocknumIndex.begin()->first;
          currentTerm = head->info.header.term;
+
+         systemContext->sharedDatabase.setCallbacks(&dbCallbacks);
       }
+      ~ForkDb() { systemContext->sharedDatabase.setCallbacks(nullptr); }
+
       BlockContext* getBlockContext()
       {
          if (blockContext)
@@ -1748,6 +1754,7 @@ namespace psibase
       std::map<BlockNum, Checksum256>                                           byBlocknumIndex;
 
       std::function<void(BlockHeaderState*)> onCommitFn;
+      DatabaseCallbacks                      dbCallbacks;
 
       loggers::common_logger logger;
       loggers::common_logger blockLogger;

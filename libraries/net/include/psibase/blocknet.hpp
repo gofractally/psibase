@@ -130,7 +130,6 @@ namespace psibase::net
       template <typename ExecutionContext>
       explicit blocknet(ExecutionContext& ctx)
           : _ioctx(ctx),
-            _trx_timer(ctx),
             _block_timer(ctx),
             prods_socket(std::make_shared<ProducerMulticastSocket>(this))
       {
@@ -193,7 +192,6 @@ namespace psibase::net
       std::uint64_t _leader_cancel = 0;
 
       boost::asio::io_context&  _ioctx;
-      Timer                     _trx_timer;
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
@@ -361,6 +359,16 @@ namespace psibase::net
       void load_producers()
       {
          chain().addSocket(prods_socket);
+         chain().onChangeNextTransaction(
+             [this]
+             {
+                boost::asio::post(_ioctx,
+                                  [this]
+                                  {
+                                     PSIBASE_LOG(logger, debug) << "transactions available";
+                                     schedule_process_transactions();
+                                  });
+             });
          chain().onCommit(
              [this](BlockHeaderState* state)
              {
@@ -650,13 +658,12 @@ namespace psibase::net
             if (auto trx = chain().nextTransaction())
             {
                chain().pushTransaction(std::move(*trx));
-               _trx_timer.expires_after(std::chrono::microseconds{0});
+               boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
             else
             {
-               _trx_timer.expires_after(std::chrono::milliseconds{100});
+               _trx_loop_running = false;
             }
-            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
          }
          else
          {
@@ -669,8 +676,7 @@ namespace psibase::net
          if (!_trx_loop_running && _state == producer_state::leader)
          {
             _trx_loop_running = true;
-            _trx_timer.expires_after(std::chrono::microseconds{0});
-            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
+            boost::asio::post(_ioctx, [this] { process_transactions(); });
          }
       }
 
