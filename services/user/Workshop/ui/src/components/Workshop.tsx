@@ -2,6 +2,7 @@ import { useLoggedInUser } from "@/hooks/useLoggedInUser";
 import { Button } from "./ui/button";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
+import { useAppMetadata } from "@/hooks/useAppMetadata";
 
 export const Workshop = () => {
   const { status, mutateAsync } = useSetMetadata();
@@ -10,9 +11,11 @@ export const Workshop = () => {
 
   const { mutateAsync: login } = useCreateConnectionToken();
 
+  const { data } = useAppMetadata(currentUser);
+
   const setMetadata = async () => {
     await mutateAsync({
-      appHomepageSubpage: "",
+      appHomepageSubpage: "/",
       icon: "",
       iconMimeType: "",
       longDescription: "lorem ipsum",
@@ -48,6 +51,7 @@ export const Workshop = () => {
         >
           Set metadata {!currentUser && "- Login to continue"}
         </Button>
+        <div>{JSON.stringify(data, null, 4)}</div>
       </div>
     </div>
   );

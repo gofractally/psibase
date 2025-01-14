@@ -87,7 +87,7 @@ pub fn query_app_metadata(
                     redirectUris,
                     owners,
                     createdAt {{
-                        seconds
+                        microseconds
                     }}
                 }}
                 tags {{

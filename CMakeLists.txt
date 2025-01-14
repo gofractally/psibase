@@ -739,7 +739,6 @@ psibase_package(
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
-        SERVER workshop
     DEPENDS ${Workshop_js_DEP}
 )
 
@@ -784,9 +783,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AppRegistry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -794,9 +793,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts AppRegistry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
 
