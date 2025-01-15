@@ -1,6 +1,6 @@
 import { SchemaFunction, Schema } from "../types";
 import { ParameterEditor } from "./ParameterEditor";
-import { generateInitialValue } from "../utils";
+import { generateInitialValue, camelCase } from "../utils";
 import { useEffect, useState } from "react";
 
 interface ParametersSectionProps {
@@ -18,7 +18,7 @@ export const ParametersSection = ({
 
   useEffect(() => {
     const initialParams = selectedFunction.params.reduce((acc, param) => {
-      acc[param.name] = generateInitialValue(param.type, schema);
+      acc[camelCase(param.name)] = generateInitialValue(param.type, schema);
       return acc;
     }, {} as Record<string, unknown>);
     const newParamValues = JSON.stringify(initialParams, null, 2);
@@ -38,7 +38,12 @@ export const ParametersSection = ({
   return (
     <>
       <h3 style={{ marginBottom: "0.5rem" }}>Parameters</h3>
-      <ParameterEditor value={paramValues} onChange={handleParamChange} />
+      <ParameterEditor
+        value={paramValues}
+        onChange={handleParamChange}
+        selectedFunction={selectedFunction}
+        schema={schema}
+      />
     </>
   );
 };

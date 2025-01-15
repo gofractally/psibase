@@ -53,3 +53,91 @@
 .function-button.selected {
   background-color: #666;
 }
+
+.input-field {
+  margin-bottom: 1rem;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ddd;
+}
+
+.common-input {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: #1f1f1f;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.common-checkbox {
+  margin-right: 0.5rem;
+}
+
+.rich-editor {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.optional-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.optional-content {
+  margin-left: 1.5rem;  /* indent the inner content */
+}
+
+.list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.list-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.list-item .input-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.remove-item {
+  background-color: #662222;
+}
+
+.add-item {
+  background-color: #226622;
+  width: 100%;
+}
+
+.type-label {
+  font-family: monospace;
+  color: #888;
+}
+
+.base64-status {
+  font-size: 0.8em;
+  margin-top: 0.25rem;
+}
+
+.base64-status.valid {
+  color: #22cc22;
+}
+
+.base64-status.invalid {
+  color: #cc2222;
+}
