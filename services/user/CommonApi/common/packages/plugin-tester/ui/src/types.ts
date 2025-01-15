@@ -45,6 +45,11 @@ export interface TypeDefinition {
         type?: unknown;
       }>;
     };
+    enum?: {
+      cases: Array<{
+        name: string;
+      }>;
+    };
   };
 }
 

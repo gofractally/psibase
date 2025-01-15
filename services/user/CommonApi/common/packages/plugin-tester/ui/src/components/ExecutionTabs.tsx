@@ -58,6 +58,9 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
       [firstCase.name]: generateInitialValue(firstCase.type, schema),
     };
   }
+  if (typeObj.enum) {
+    return typeObj.enum.cases[0].name;
+  }
 
   return "";
 };
