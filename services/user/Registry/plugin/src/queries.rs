@@ -86,9 +86,7 @@ pub fn query_app_metadata(
                     status,
                     redirectUris,
                     owners,
-                    createdAt {{
-                        microseconds
-                    }}
+                    createdAt
                 }}
                 tags {{
                     id,
