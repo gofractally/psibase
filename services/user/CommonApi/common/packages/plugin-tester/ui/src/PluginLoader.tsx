@@ -13,6 +13,18 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [selectedFunction, setSelectedFunction] =
     useState<SchemaFunction | null>(null);
 
+  const downloadSchema = () => {
+    const dataStr =
+      "data:text/json;charset=utf-8," +
+      encodeURIComponent(JSON.stringify(schema, null, 2));
+    const downloadAnchorNode = document.createElement("a");
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "schema.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
   return (
     <div className="plugin-container">
       <ServiceInput
@@ -25,6 +37,9 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
 
       {schema && (
         <>
+          <button onClick={downloadSchema} className="common-button">
+            Download JSON
+          </button>
           <FunctionSelector
             schema={schema}
             onFunctionSelect={setSelectedFunction}
