@@ -1,17 +1,14 @@
 [package]
-name = "registry-plugin"
+name = "plugin"
 version.workspace = true
 rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
 edition.workspace = true
-publish = false
+publish.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-psibase = { path="../../../../rust/psibase" }
-fracpack = { path = "../../../../rust/fracpack" }
-registry = { path="../service" }
+psibase = { path = "../../../../rust/psibase", version = "0.14.0" }
+registry = { path = "../service", version = "0.14.0" }
 serde = "1.0"
 serde_json = "1.0"
 chrono = "0.4"
@@ -21,7 +18,7 @@ chrono = "0.4"
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "registry:psibase-plugin"
+package = "registry:plugin"
 
 [package.metadata.component.dependencies]
 
@@ -33,4 +30,4 @@ package = "registry:psibase-plugin"
 world = "impl"
 
 [dev-dependencies]
-registry_package = { path = ".." }
+registry-pkg = { path = "..", version = "0.14.0" }
