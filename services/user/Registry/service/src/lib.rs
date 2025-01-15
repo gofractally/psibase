@@ -554,13 +554,13 @@ pub mod service {
 mod tests {
     use super::*;
     use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord, MAX_APP_NAME_LENGTH};
-    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointSec};
+    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointUSec};
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
             account_id: AccountNumber::new(0),
             status: AppStatus::Draft as AppStatusU32,
-            created_at: TimePointSec::from(0),
+            created_at: TimePointUSec::from(0),
             redirect_uris: vec!["http://localhost:3000/callback".to_string()],
             owners: vec![account!("alice"), account!("bob")],
             name: "Super Cooking App".to_string(),
