@@ -101,7 +101,12 @@ export function ExecutionTabs({
       setResponseText(
         response === undefined
           ? "Execution successful"
-          : JSON.stringify(response, null, 2)
+          : JSON.stringify(
+              response,
+              (_key, value) =>
+                typeof value === "bigint" ? value.toString() : value,
+              2
+            )
       );
     } catch (e) {
       console.error(e);
