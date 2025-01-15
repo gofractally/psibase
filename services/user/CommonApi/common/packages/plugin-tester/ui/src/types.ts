@@ -25,9 +25,23 @@ export interface World {
   exports?: Record<string, ExportedInterface>;
 }
 
+export interface TypeDefinition {
+  kind: {
+    record?: {
+      fields: Array<{
+        name: string;
+        type: unknown;
+      }>;
+    };
+    list?: unknown;
+    type?: string;
+  };
+}
+
 export interface Schema {
   worlds: World[];
   interfaces: SchemaInterface[];
+  types: TypeDefinition[];
 }
 
 export interface ExportedMethodsByInterface {

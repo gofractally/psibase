@@ -1,7 +1,51 @@
-import { SchemaFunction } from "../types";
+import { SchemaFunction, Schema, TypeDefinition } from "../types";
 import { camelCase, withArgs } from "../utils";
 import { Supervisor } from "@psibase/common-lib";
 import { useState, useEffect } from "react";
+
+const handlePrimitiveType = (type: string): unknown => {
+  switch (type) {
+    case "string":
+      return "";
+    case "u32":
+    case "u64":
+      return 0;
+    default:
+      return "";
+  }
+};
+
+const generateInitialValue = (type: unknown, schema: Schema): unknown => {
+  if (typeof type === "number") {
+    return generateInitialValue(schema.types[type].kind, schema);
+  }
+
+  if (typeof type === "string") {
+    return handlePrimitiveType(type);
+  }
+
+  if (typeof type !== "object" || type === null) {
+    return "";
+  }
+
+  const typeObj = type as TypeDefinition["kind"];
+  if (typeObj.record) {
+    return typeObj.record.fields.reduce(
+      (
+        acc: Record<string, unknown>,
+        field: { name: string; type: unknown }
+      ) => {
+        acc[camelCase(field.name)] = generateInitialValue(field.type, schema);
+        return acc;
+      },
+      {}
+    );
+  }
+  if (typeObj.list) return [];
+  if (typeObj.type) return generateInitialValue(typeObj.type, schema);
+
+  return "";
+};
 
 export function ExecutionTabs({
   selectedFunction,
@@ -9,12 +53,14 @@ export function ExecutionTabs({
   plugin,
   selectedInterfaceName,
   supervisor,
+  schema,
 }: {
   selectedFunction: SchemaFunction;
   service: string;
   plugin: string;
   selectedInterfaceName: string;
   supervisor: Supervisor;
+  schema: Schema;
 }) {
   const [paramValues, setParamValues] = useState("");
   const [responseText, setResponseText] = useState("No response yet");
@@ -23,16 +69,14 @@ export function ExecutionTabs({
   );
 
   useEffect(() => {
-    const initialParams = Object.fromEntries(
-      selectedFunction.params.map((p) => [p.name, ""])
-    );
+    const initialParams = selectedFunction.params.reduce((acc, param) => {
+      acc[param.name] = generateInitialValue(param.type, schema);
+      return acc;
+    }, {} as Record<string, unknown>);
     setParamValues(JSON.stringify(initialParams, null, 2));
-  }, [selectedFunction]);
-
-  useEffect(() => {
     setResponseText("No response yet");
     setExecutionTab("Execution");
-  }, [selectedFunction]);
+  }, [selectedFunction, schema]);
 
   const parseParams = (): unknown[] => {
     try {
@@ -133,7 +177,13 @@ export function ExecutionTabs({
             className="common-textarea"
             style={{ height: "200px" }}
             readOnly
-            value={generateEmbedCode()}
+            value={(() => {
+              try {
+                return generateEmbedCode();
+              } catch (e) {
+                return "Parameters configuration produces invalid JSON";
+              }
+            })()}
           />
         </div>
       )}

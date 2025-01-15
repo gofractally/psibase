@@ -36,6 +36,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
               plugin={plugin}
               supervisor={supervisor}
               selectedInterfaceName={selectedFunction.interfaceName}
+              schema={schema}
             />
           )}
         </>
