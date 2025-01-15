@@ -5,28 +5,30 @@ import { queryKeys } from "@/lib/queryKeys";
 import { exportKeyToPEM } from "@/lib/keys";
 
 const ImportKeyParams = z.object({
-    privateKey: z.instanceof(CryptoKey),
+    privateKey: z.instanceof(CryptoKey).optional(),
     account: z.string(),
 });
 
-export const useImportKey = () =>
+export const useImportAccount = () =>
     useMutation<void, Error, z.infer<typeof ImportKeyParams>>({
         mutationKey: queryKeys.importKey,
         mutationFn: async (data) => {
             const { privateKey, account } = ImportKeyParams.parse(data);
 
-            const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
-
             // supervisor is only available after the chain boots
             const s = await import("@psibase/common-lib");
             const supervisor = new s.Supervisor();
 
-            void (await supervisor.functionCall({
-                method: "importKey",
-                params: [key],
-                service: "auth-sig",
-                intf: "keyvault",
-            }));
+            if (privateKey) {
+                const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
+
+                void (await supervisor.functionCall({
+                    method: "importKey",
+                    params: [key],
+                    service: "auth-sig",
+                    intf: "keyvault",
+                }));
+            }
 
             void (await supervisor.functionCall({
                 method: "importAccount",

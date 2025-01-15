@@ -42,7 +42,7 @@ import {
 // hooks
 import { useAddServerKey } from "../hooks/useAddServerKey";
 import { useConfig } from "../hooks/useConfig";
-import { useImportKey } from "../hooks/useImportKey";
+import { useImportAccount } from "../hooks/useImportAccount";
 import { usePackages } from "../hooks/usePackages";
 import { useSelectedRows } from "../hooks/useSelectedRows";
 import { useStepper } from "../hooks/useStepper";
@@ -115,7 +115,7 @@ export const CreatePage = () => {
     );
 
     const { mutateAsync: createAndSetKey } = useAddServerKey();
-    const { mutateAsync: importKey } = useImportKey();
+    const { mutateAsync: importAccount } = useImportAccount();
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -203,9 +203,8 @@ export const CreatePage = () => {
                                     description: "Successfully booted chain.",
                                 });
 
-                                if (!keyPair) return;
-                                importKey({
-                                    privateKey: keyPair.privateKey,
+                                importAccount({
+                                    privateKey: keyPair?.privateKey,
                                     account: bpName,
                                 });
                             } else {
