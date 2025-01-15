@@ -796,6 +796,14 @@ psibase_package(
                     SetCode Transact
 )
 
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/TestDefault.psi
+    NAME TestDefault
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Services used in the tester"
+    PACKAGE_DEPENDS Minimal AuthSig Brotli Events Nft Sites StagedTx Supervisor Symbol Tokens
+)
+
 function(write_package_index target dir)
     set(deps ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh)
     foreach(service IN LISTS ARGN)
@@ -811,7 +819,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
+    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
@@ -839,6 +847,7 @@ install(
           ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
+          ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/Sites.psi
