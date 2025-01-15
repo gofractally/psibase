@@ -24,6 +24,13 @@ fn assert_caller_admin(context: &str) {
     let _ = get_assert_caller_admin(context);
 }
 
+fn get_accounts_app() -> OriginationData {
+    OriginationData {
+        app: Some(Client::my_service_account()),
+        origin: Client::my_service_origin(),
+    }
+}
+
 fn assert_valid_account(account: &str) {
     let account_details =
         AccountsPlugin::get_account(account.to_string()).expect("Get account failed");
@@ -63,13 +70,13 @@ impl Admin for AccountsPlugin {
     }
 
     fn import_account(account: String) {
-        let caller = get_assert_caller_admin("import_account");
+        assert_caller_admin("import_account");
         assert_valid_account(&account);
-        AppsTable::new(&caller).connect(&account);
+        AppsTable::new(&get_accounts_app()).connect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {
-        let caller = get_assert_caller_admin("get_all_accounts");
-        AppsTable::new(&caller).get_connected_accounts()
+        assert_caller_admin("get_all_accounts");
+        AppsTable::new(&get_accounts_app()).get_connected_accounts()
     }
 }
