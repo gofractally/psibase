@@ -39,6 +39,12 @@ export interface TypeDefinition {
     tuple?: {
       types: unknown[];
     };
+    variant?: {
+      cases: Array<{
+        name: string;
+        type?: unknown;
+      }>;
+    };
   };
 }
 

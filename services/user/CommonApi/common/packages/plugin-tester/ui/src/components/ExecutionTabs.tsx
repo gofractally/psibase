@@ -49,6 +49,15 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
       generateInitialValue(type, schema)
     );
   }
+  if (typeObj.variant) {
+    const firstCase = typeObj.variant.cases[0];
+    if (!firstCase.type) {
+      return firstCase.name;
+    }
+    return {
+      [firstCase.name]: generateInitialValue(firstCase.type, schema),
+    };
+  }
 
   return "";
 };
