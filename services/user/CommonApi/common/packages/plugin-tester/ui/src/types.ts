@@ -36,6 +36,9 @@ export interface TypeDefinition {
     list?: unknown;
     type?: string;
     option?: unknown;
+    tuple?: {
+      types: unknown[];
+    };
   };
 }
 
