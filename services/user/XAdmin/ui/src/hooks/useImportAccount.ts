@@ -1,19 +1,18 @@
 import { useMutation } from "@tanstack/react-query";
-import { z } from "zod";
 
 import { queryKeys } from "@/lib/queryKeys";
 import { exportKeyToPEM } from "@/lib/keys";
 
-const ImportKeyParams = z.object({
-    privateKey: z.instanceof(CryptoKey).optional(),
-    account: z.string(),
-});
+type ImportKeyParams = {
+    privateKey?: CryptoKey;
+    account: string;
+};
 
 export const useImportAccount = () =>
-    useMutation<void, Error, z.infer<typeof ImportKeyParams>>({
+    useMutation<void, Error, ImportKeyParams>({
         mutationKey: queryKeys.importKey,
         mutationFn: async (data) => {
-            const { privateKey, account } = ImportKeyParams.parse(data);
+            const { privateKey, account } = data;
 
             // supervisor is only available after the chain boots
             const s = await import("@psibase/common-lib");
