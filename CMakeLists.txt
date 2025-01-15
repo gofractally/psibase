@@ -427,7 +427,7 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/AppRegistry.psi
+    OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH services/user/Registry
 )
 
@@ -771,7 +771,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
@@ -781,7 +781,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
@@ -812,7 +812,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    AppRegistry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -840,7 +840,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/HttpServer.psi
-          ${SERVICE_DIR}/AppRegistry.psi
+          ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/StagedTx.psi
