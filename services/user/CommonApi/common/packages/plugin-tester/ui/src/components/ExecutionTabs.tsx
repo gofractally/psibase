@@ -43,6 +43,7 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
   }
   if (typeObj.list) return [];
   if (typeObj.type) return generateInitialValue(typeObj.type, schema);
+  if (typeObj.option) return null;
 
   return "";
 };
