@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { Schema, SchemaFunction, ExportedMethodsByInterface } from "../types";
-import { InterfaceTabs } from "./InterfaceTabs";
+import { TabControl } from "./TabControl";
 
 interface FunctionSelectorProps {
   schema: Schema;
@@ -64,10 +64,10 @@ export function FunctionSelector({
 
   return (
     <div>
-      <InterfaceTabs
-        interfaces={Object.keys(exportedMethods)}
-        selectedInterface={selectedInterfaceName}
-        onSelect={handleInterfaceSelect}
+      <TabControl
+        selectedTab={selectedInterfaceName || ""}
+        onTabChange={handleInterfaceSelect}
+        tabs={Object.keys(exportedMethods)}
       />
       {selectedInterfaceName && (
         <div

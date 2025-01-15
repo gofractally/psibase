@@ -5,6 +5,7 @@ import { ExecutionTabs } from "./components/ExecutionTabs";
 import { SchemaFunction } from "./types";
 import { usePluginSchema } from "./hooks/usePluginSchema";
 import { FunctionSelector } from "./components/FunctionSelector";
+import { ParametersSection } from "./components/ParametersSection";
 
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [service, setService] = useState("");
@@ -12,6 +13,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const { schema, loadSchema } = usePluginSchema(supervisor);
   const [selectedFunction, setSelectedFunction] =
     useState<SchemaFunction | null>(null);
+  const [paramValues, setParamValues] = useState("");
 
   const downloadSchema = () => {
     const dataStr =
@@ -45,14 +47,21 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
             onFunctionSelect={setSelectedFunction}
           />
           {selectedFunction && selectedFunction.interfaceName && (
-            <ExecutionTabs
-              selectedFunction={selectedFunction}
-              service={service}
-              plugin={plugin}
-              supervisor={supervisor}
-              selectedInterfaceName={selectedFunction.interfaceName}
-              schema={schema}
-            />
+            <>
+              <ParametersSection
+                selectedFunction={selectedFunction}
+                schema={schema}
+                onParamValuesChange={setParamValues}
+              />
+              <ExecutionTabs
+                selectedFunction={selectedFunction}
+                service={service}
+                plugin={plugin}
+                supervisor={supervisor}
+                selectedInterfaceName={selectedFunction.interfaceName}
+                paramValues={paramValues}
+              />
+            </>
           )}
         </>
       )}

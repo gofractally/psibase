@@ -1,69 +1,17 @@
-import { SchemaFunction, Schema, TypeDefinition } from "../types";
+import { SchemaFunction } from "../types";
 import { camelCase, withArgs } from "../utils";
 import { Supervisor } from "@psibase/common-lib";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { TabControl } from "./TabControl";
 
-const handlePrimitiveType = (type: string): unknown => {
-  switch (type) {
-    case "string":
-      return "";
-    case "u32":
-    case "u64":
-      return 0;
-    default:
-      return "";
-  }
-};
-
-const generateInitialValue = (type: unknown, schema: Schema): unknown => {
-  if (typeof type === "number") {
-    return generateInitialValue(schema.types[type].kind, schema);
-  }
-
-  if (typeof type === "string") {
-    return handlePrimitiveType(type);
-  }
-
-  if (typeof type !== "object" || type === null) {
-    return "";
-  }
-
-  const typeObj = type as TypeDefinition["kind"];
-  if (typeObj.record) {
-    return typeObj.record.fields.reduce(
-      (
-        acc: Record<string, unknown>,
-        field: { name: string; type: unknown }
-      ) => {
-        acc[camelCase(field.name)] = generateInitialValue(field.type, schema);
-        return acc;
-      },
-      {}
-    );
-  }
-  if (typeObj.list) return [];
-  if (typeObj.type) return generateInitialValue(typeObj.type, schema);
-  if (typeObj.option) return null;
-  if (typeObj.tuple) {
-    return typeObj.tuple.types.map((type) =>
-      generateInitialValue(type, schema)
-    );
-  }
-  if (typeObj.variant) {
-    const firstCase = typeObj.variant.cases[0];
-    if (!firstCase.type) {
-      return firstCase.name;
-    }
-    return {
-      [firstCase.name]: generateInitialValue(firstCase.type, schema),
-    };
-  }
-  if (typeObj.enum) {
-    return typeObj.enum.cases[0].name;
-  }
-
-  return "";
-};
+interface ExecutionTabsProps {
+  selectedFunction: SchemaFunction;
+  service: string;
+  plugin: string;
+  selectedInterfaceName: string;
+  supervisor: Supervisor;
+  paramValues: string;
+}
 
 export function ExecutionTabs({
   selectedFunction,
@@ -71,30 +19,12 @@ export function ExecutionTabs({
   plugin,
   selectedInterfaceName,
   supervisor,
-  schema,
-}: {
-  selectedFunction: SchemaFunction;
-  service: string;
-  plugin: string;
-  selectedInterfaceName: string;
-  supervisor: Supervisor;
-  schema: Schema;
-}) {
-  const [paramValues, setParamValues] = useState("");
+  paramValues,
+}: ExecutionTabsProps) {
   const [responseText, setResponseText] = useState("No response yet");
   const [executionTab, setExecutionTab] = useState<"Execution" | "Embed">(
     "Execution"
   );
-
-  useEffect(() => {
-    const initialParams = selectedFunction.params.reduce((acc, param) => {
-      acc[param.name] = generateInitialValue(param.type, schema);
-      return acc;
-    }, {} as Record<string, unknown>);
-    setParamValues(JSON.stringify(initialParams, null, 2));
-    setResponseText("No response yet");
-    setExecutionTab("Execution");
-  }, [selectedFunction, schema]);
 
   const parseParams = (): unknown[] => {
     try {
@@ -144,35 +74,11 @@ export function ExecutionTabs({
 
   return (
     <>
-      {selectedFunction.params.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: "0.5rem" }}>Parameters</h3>
-          <textarea
-            className="common-textarea"
-            style={{ marginBottom: "1rem" }}
-            value={paramValues}
-            onChange={(e) => setParamValues(e.target.value)}
-          />
-        </>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          marginBottom: "1rem",
-          borderBottom: "1px solid #555",
-        }}
-      >
-        {["Execution", "Embed"].map((tab) => (
-          <div
-            key={tab}
-            onClick={() => setExecutionTab(tab as "Execution" | "Embed")}
-            className={`tab ${executionTab === tab ? "selected" : ""}`}
-          >
-            {tab}
-          </div>
-        ))}
-      </div>
+      <TabControl
+        selectedTab={executionTab}
+        onTabChange={(tab) => setExecutionTab(tab as "Execution" | "Embed")}
+        tabs={["Execution", "Embed"]}
+      />
 
       {executionTab === "Execution" ? (
         <>
