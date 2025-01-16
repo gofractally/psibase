@@ -7,12 +7,21 @@ import { exportKeyToPEM } from "./keys";
 import { queryKeys } from "./queryKeys";
 import { queryClient } from "../main";
 
-export const bootChain = async (
-    packages: PackageInfo[],
-    producerName: string,
-    publicKey: CryptoKey | undefined,
-    onProgressUpdate: (state: BootState) => void
-): Promise<void> => {
+type BootChainParams = {
+    packages: PackageInfo[];
+    producerName: string;
+    publicKey: CryptoKey | undefined;
+    compression: number;
+    onProgressUpdate: (state: BootState) => void;
+};
+
+export const bootChain = async ({
+    packages,
+    producerName,
+    publicKey,
+    compression,
+    onProgressUpdate,
+}: BootChainParams): Promise<void> => {
     try {
         try {
             await chain.extendConfig({
@@ -46,7 +55,7 @@ export const bootChain = async (
                 producerName,
                 fetchedPackages,
                 publicKeyPem,
-                4
+                compression
             );
 
         let i = 1;

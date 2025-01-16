@@ -181,11 +181,12 @@ export const CreatePage = () => {
                     packages,
                     desiredPackages.map((pack) => pack.name)
                 );
-                bootChain(
-                    requiredPackages,
-                    bpName,
-                    keyPair?.publicKey,
-                    (state) => {
+                bootChain({
+                    packages: requiredPackages,
+                    producerName: bpName,
+                    publicKey: keyPair?.publicKey,
+                    compression: isDev ? 4 : 7,
+                    onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
                             const [_, current, total] = state;
                             const newIndex = calculateIndex(
@@ -219,8 +220,8 @@ export const CreatePage = () => {
                         } else {
                             console.warn(state, "Unrecognised message.");
                         }
-                    }
-                );
+                    },
+                });
             } catch (e) {
                 console.error("Error booting chain");
                 console.error(e);
