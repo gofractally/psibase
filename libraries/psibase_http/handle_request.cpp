@@ -48,6 +48,18 @@ namespace psibase::http
       return origin;
    }
 
+   std::pair<beast::string_view, beast::string_view> split_port(beast::string_view host)
+   {
+      if (auto pos = host.rfind(':'); pos != std::string::npos)
+      {
+         if (host.find(']', pos) == std::string::npos)
+         {
+            return {host.substr(0, pos), host.substr(pos)};
+         }
+      }
+      return {host, {}};
+   }
+
    beast::string_view deport(beast::string_view host)
    {
       if (auto pos = host.rfind(':'); pos != std::string::npos)
@@ -460,6 +472,21 @@ namespace psibase::http
          return res;
       };
 
+      const auto redirect = [req_version, set_cors, set_keep_alive](
+                                bhttp::status status, beast::string_view location,
+                                beast::string_view msg, const char* content_type = "text/html")
+      {
+         bhttp::response<bhttp::vector_body<char>> res{status, req_version};
+         res.set(bhttp::field::server, BOOST_BEAST_VERSION_STRING);
+         res.set(bhttp::field::location, location);
+         res.set(bhttp::field::content_type, content_type);
+         set_cors(res);
+         set_keep_alive(res);
+         res.body() = std::vector(msg.begin(), msg.end());
+         res.prepare_payload();
+         return res;
+      };
+
       // Returns true on success
       // Sends an appropriate error response and returns false on failure
       const auto check_admin_auth = [&server, &req, &send, &auth_error](authz::mode_type mode)
@@ -617,7 +644,7 @@ namespace psibase::http
          }
          else if (!req_target.starts_with("/native"))
          {
-            auto host = deport(req_host);
+            auto [host, port] = split_port(req_host);
 
             if (auto iter = server.http_config->services.find(host);
                 iter != server.http_config->services.end())
@@ -704,8 +731,37 @@ namespace psibase::http
                             system->sharedDatabase.createWriter(), true};
             bc.start();
             if (bc.needGenesisAction)
-               return send(error(bhttp::status::internal_server_error,
-                                 "Node is not connected to any psibase network."));
+            {
+               std::string location;
+               if (send.is_secure())
+                  location += "https://";
+               else
+                  location += "http://";
+               l.lock();
+               auto suffix = '.' + data.rootHost;
+               auto pos =
+                   std::ranges::find_if(server.http_config->services, [&suffix](const auto& entry)
+                                        { return entry.first.ends_with(suffix); });
+               if (pos != server.http_config->services.end())
+               {
+                  location.append(pos->first);
+                  l.unlock();
+                  location.append(port.data(), port.size());
+                  location.push_back('/');
+                  return send(redirect(bhttp::status::found, location,
+                                       "<html><body>Node is not connected to any psibase network.  "
+                                       "Visit <a href=\"" +
+                                           location + "\">" + location +
+                                           "</a> for node setup.</body></html>\n"));
+               }
+               else
+               {
+                  // No native service to redirect to. Just report an error
+                  l.unlock();
+                  return send(error(bhttp::status::internal_server_error,
+                                    "Node is not connected to any psibase network."));
+               }
+            }
 
             SignedTransaction  trx;
             TransactionTrace   trace;
