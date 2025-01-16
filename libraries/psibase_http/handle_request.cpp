@@ -77,10 +77,12 @@ namespace psibase::http
 
    bool is_admin(AccountNumber admin, const http_config& cfg, beast::string_view host)
    {
-      if (host.size() > cfg.host.size() && host.ends_with(cfg.host) &&
-          host[host.size() - cfg.host.size() - 1] == '.')
+      auto root_host =
+          std::ranges::find_if(cfg.hosts, [&](const auto& name) { return host.ends_with(name); });
+      if (root_host != cfg.hosts.end() && host.size() > root_host->size() &&
+          host[host.size() - root_host->size() - 1] == '.')
       {
-         return admin.str() == host.substr(0, host.size() - cfg.host.size() - 1);
+         return admin.str() == host.substr(0, host.size() - root_host->size() - 1);
       }
       else
       {
@@ -648,7 +650,14 @@ namespace psibase::http
                }
             }
 
-            if (server.http_config->host.empty())
+            auto root_host_pos = std::ranges::find_if(
+                server.http_config->hosts,
+                [&](const auto& name)
+                {
+                   return host.ends_with(name) && (host.size() == name.size() ||
+                                                   host[host.size() - name.size() - 1] == '.');
+                });
+            if (root_host_pos == server.http_config->hosts.end())
                return send(not_found(req.target()));
 
             if (req.method() == bhttp::verb::options)
@@ -679,7 +688,7 @@ namespace psibase::http
                return send(
                    method_not_allowed(req.target(), req.method_string(), "GET, POST, OPTIONS"));
             data.host        = {host.begin(), host.size()};
-            data.rootHost    = server.http_config->host;
+            data.rootHost    = *root_host_pos;
             data.target      = std::string(req_target);
             data.contentType = (std::string)req[bhttp::field::content_type];
             data.body        = std::move(req.body());
