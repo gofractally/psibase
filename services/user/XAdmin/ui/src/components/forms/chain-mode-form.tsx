@@ -39,18 +39,18 @@ export const ChainTypeForm = ({ form, next }: Props) => (
                                         : "outline"
                                 }
                                 className={cn(
-                                    "flex h-20 w-0 grow basis-0 flex-col gap-3",
+                                    "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal disabled:cursor-not-allowed",
                                     {
                                         "border-2 border-primary":
                                             field.value === "dev",
                                     }
                                 )}
                             >
-                                <div className="text-2xl">Development</div>
-                                <div className="w-full text-left text-sm text-muted-foreground">
+                                <h2 className="text-2xl">Development</h2>
+                                <p className="text-center text-sm text-muted-foreground">
                                     Boot chain with development apps, pre-built
                                     users and insecure authentication.
-                                </div>
+                                </p>
                             </Button>
                             <Button
                                 onClick={(event) => {
@@ -64,17 +64,18 @@ export const ChainTypeForm = ({ form, next }: Props) => (
                                         : "outline"
                                 }
                                 className={cn(
-                                    "flex h-20 w-0 grow basis-0 flex-col gap-3",
+                                    "h-auto w-0 flex-1 select-none flex-col gap-1.5 whitespace-normal disabled:cursor-not-allowed",
                                     {
                                         "border-2 border-primary":
                                             field.value === "prod",
                                     }
                                 )}
+                                disabled
                             >
-                                <div className="text-2xl">Production</div>
-                                <div className="w-full text-left text-sm text-muted-foreground">
+                                <h2 className="text-2xl">Production</h2>
+                                <p className="text-center text-sm text-muted-foreground">
                                     Create a secure production blockchain.
-                                </div>
+                                </p>
                             </Button>
                         </div>
                         <div className="flex justify-center">
