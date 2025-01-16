@@ -1,6 +1,5 @@
 use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::ScalarType;
-use async_graphql::{InputObject, SimpleObject};
+use async_graphql::{scalar, InputObject, SimpleObject};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{
     de::{Deserializer, Error as _},
@@ -8,6 +7,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::ops::{Add, Sub};
+use std::str::FromStr;
 
 #[derive(
     Debug,
@@ -84,11 +84,13 @@ impl<'de> Deserialize<'de> for TimePointSec {
 pub struct TimePointUSec {
     pub microseconds: i64,
 }
+scalar!(TimePointUSec);
 
-impl TryFrom<String> for TimePointUSec {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        DateTime::<FixedOffset>::parse_from_rfc3339(&s)
+impl FromStr for TimePointUSec {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        DateTime::<FixedOffset>::parse_from_rfc3339(s)
             .map(|dt| dt.to_utc().into())
             .map_err(|e| e.to_string())
     }
@@ -97,21 +99,6 @@ impl TryFrom<String> for TimePointUSec {
 impl ToString for TimePointUSec {
     fn to_string(&self) -> String {
         DateTime::<Utc>::from(*self).to_rfc3339()
-    }
-}
-
-#[async_graphql::Scalar]
-impl ScalarType for TimePointUSec {
-    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        if let async_graphql::Value::String(s) = value {
-            Self::try_from(s).map_err(async_graphql::InputValueError::custom)
-        } else {
-            Err(async_graphql::InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> async_graphql::Value {
-        async_graphql::Value::String(self.to_string())
     }
 }
 
@@ -152,7 +139,7 @@ impl Serialize for TimePointUSec {
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <String>::deserialize(deserializer)?;
-        Self::try_from(s).map_err(D::Error::custom)
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
