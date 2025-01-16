@@ -138,8 +138,8 @@ impl Serialize for TimePointUSec {
 
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <String>::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let s = <&str>::deserialize(deserializer)?;
+        Self::from_str(s).map_err(D::Error::custom)
     }
 }
 
