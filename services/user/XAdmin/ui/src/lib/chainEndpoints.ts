@@ -165,6 +165,13 @@ class Chain {
         return postArrayBufferGetJson("/native/push_transaction", buffer);
     }
 
+    public addServerKey(key: string) {
+        return postJson("/native/admin/keys", {
+            service: "verify-sig",
+            rawData: key,
+        });
+    }
+
     public async restart(): Promise<void> {
         await postJson("/native/admin/shutdown", {
             restart: true,
