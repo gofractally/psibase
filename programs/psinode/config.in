@@ -3,7 +3,7 @@
 p2p      = off
 # producer = psibase
 # key      = <private key>
-host     = localhost
+host     = psibase.localhost
 host     = psibase.127.0.0.1.sslip.io
 listen   = 8080
 # peer     = http://localhost:8080/

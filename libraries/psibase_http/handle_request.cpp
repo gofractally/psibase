@@ -685,7 +685,29 @@ namespace psibase::http
                                                    host[host.size() - name.size() - 1] == '.');
                 });
             if (root_host_pos == server.http_config->hosts.end())
-               return send(not_found(req.target()));
+            {
+               if (server.http_config->hosts.empty())
+                  return send(not_found(req.target()));
+               else
+               {
+                  std::string location;
+                  if (send.is_secure())
+                     location += "https://";
+                  else
+                     location += "http://";
+                  // Ideally, we want to choose a hostname that the client will
+                  // resolve to the same address that was used for this connection.
+                  // Unfortunately, it isn't really possible in the general case
+                  // because we don't have access to the client's DNS.
+                  location += server.http_config->hosts.front();
+                  location.append(port.data(), port.size());
+                  location.append(req_target.data(), req_target.size());
+                  return send(redirect(bhttp::status::moved_permanently, location,
+                                       "<html><body>"
+                                       "This psibase server is hosted at <a href=\"" +
+                                           location + "\">" + location + "</a>.</body></html>\n"));
+               }
+            }
 
             if (req.method() == bhttp::verb::options)
             {
