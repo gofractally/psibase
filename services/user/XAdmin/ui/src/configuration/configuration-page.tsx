@@ -187,7 +187,7 @@ export const ConfigurationForm = ({
                                 </div>
                                 <div className="grid w-full items-center gap-1.5">
                                     <Label>Host</Label>
-                                    <Input {...configForm.register("host")} />
+                                    <Input {...configForm.register("hosts")} />
                                 </div>
                             </div>
                             <div>
