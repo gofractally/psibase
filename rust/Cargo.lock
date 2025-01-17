@@ -2521,6 +2521,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hmac",
+ "hyper",
  "include_dir",
  "indexmap 2.2.6",
  "indicatif",
