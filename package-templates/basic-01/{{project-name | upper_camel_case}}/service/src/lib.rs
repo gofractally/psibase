@@ -1,7 +1,7 @@
-#[psibase::service(name = "{{project-name}}")]
-pub mod service {
+#[psibase::service_tables]
+pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::*;
+    use psibase::{Fracpack, SingletonKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -11,6 +11,25 @@ pub mod service {
         #[primary_key]
         fn pk(&self) {}
     }
+
+    #[table(name = "ExampleThingTable", index = 1)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct ExampleThing {
+        pub thing: String,
+    }
+
+    impl ExampleThing {
+        #[primary_key]
+        fn pk(&self) -> SingletonKey {
+            SingletonKey {}
+        }
+    }
+}
+
+#[psibase::service(name = "{{project-name}}")]
+pub mod service {
+    use crate::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable};
+    use psibase::*;
 
     #[action]
     fn init() {
@@ -38,19 +57,6 @@ pub mod service {
             table.get_index_pk().get(&()).is_some(),
             "service not inited",
         );
-    }
-
-    #[table(name = "ExampleThingTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ExampleThing {
-        pub thing: String,
-    }
-
-    impl ExampleThing {
-        #[primary_key]
-        fn pk(&self) -> SingletonKey {
-            SingletonKey {}
-        }
     }
 
     #[action]

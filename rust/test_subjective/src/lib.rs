@@ -1,15 +1,21 @@
-#[psibase::service(name = "subjective")]
-mod service {
-    use psibase::*;
+#[psibase::service_tables]
+mod tables {
+    use psibase::Fracpack;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "SubjectiveTable", index = 0, db = "Subjective")]
     #[derive(Fracpack, Serialize, Deserialize)]
     pub struct SubjectiveRow {
         #[primary_key]
-        id: i32,
-        value: i32,
+        pub id: i32,
+        pub value: i32,
     }
+}
+#[psibase::service(name = "subjective")]
+mod service {
+    use psibase::*;
+
+    use crate::tables::{SubjectiveRow, SubjectiveTable};
 
     #[action]
     fn inc() -> i32 {
