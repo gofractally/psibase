@@ -1,18 +1,15 @@
-import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
-import { readLoggers } from "../log/utils";
 import {
     PsinodeConfigUI,
     ServiceConfig,
     ListenConfig,
-    PsinodeConfigSelect,
     PsinodeConfigUpdate,
 } from "./interfaces";
 
 export const initialConfigForm = (): PsinodeConfigUI => ({
     p2p: false,
     producer: "",
-    host: "",
+    hosts: [],
     peers: [],
     listen: [],
     services: [{ host: "", root: "", key: "x" }],
@@ -276,7 +273,7 @@ export const mergeConfig = (
         ...updated,
         p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
         producer: mergeSimple(prev.producer, updated.producer, user.producer),
-        host: mergeSimple(prev.host, updated.host, user.host),
+        hosts: mergeSimple(prev.hosts, updated.hosts, user.hosts),
         listen: mergeList(prev.listen, updated.listen, user.listen),
         services: mergeList(
             prev.services.filter((item) => !emptyService(item)),
