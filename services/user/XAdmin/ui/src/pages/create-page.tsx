@@ -1,18 +1,36 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
-
-import { SetupWrapper } from "./setup-wrapper";
+import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
+
+// ShadCN UI Imports
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
+import { useToast } from "@/components/ui/use-toast";
+
+// components
 import {
     ChainTypeForm,
     chainTypeSchema,
 } from "@/components/forms/chain-mode-form";
 import { BlockProducerForm } from "@/components/forms/block-producer";
 import { ConfirmationForm } from "@/components/forms/confirmation-form";
+import { MultiStepLoader } from "@/components/multi-step-loader";
+import { PrevNextButtons } from "@/components/PrevNextButtons";
+import { Steps } from "@/components/steps";
 
-import { usePackages } from "../hooks/usePackages";
+// lib
+import { bootChain } from "@/lib/bootChain";
+import { calculateIndex } from "@/lib/calculateIndex";
+import { getId } from "@/lib/getId";
+import { getRequiredPackages } from "@/lib/getRequiredPackages";
+
+// types
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
@@ -21,28 +39,18 @@ import {
     RequestUpdateSchema,
 } from "../types";
 
-import { useSelectedRows } from "../hooks/useSelectedRows";
-import { Steps } from "@/components/steps";
-import { DependencyDialog } from "./dependency-dialog";
-import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
-import { getId } from "@/lib/getId";
-
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
-import { MultiStepLoader } from "@/components/multi-step-loader";
-import { getRequiredPackages } from "../lib/getRequiredPackages";
-import { bootChain } from "../lib/bootChain";
+// hooks
+import { useAddServerKey } from "../hooks/useAddServerKey";
 import { useConfig } from "../hooks/useConfig";
-import { useToast } from "@/components/ui/use-toast";
-
-import { useNavigate } from "react-router-dom";
+import { useImportAccount } from "../hooks/useImportAccount";
+import { usePackages } from "../hooks/usePackages";
+import { useSelectedRows } from "../hooks/useSelectedRows";
 import { useStepper } from "../hooks/useStepper";
-import { PrevNextButtons } from "../components/PrevNextButtons";
-import { calculateIndex } from "../lib/calculateIndex";
+import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
+
+// relative imports
+import { SetupWrapper } from "./setup-wrapper";
+import { DependencyDialog } from "./dependency-dialog";
 
 const BlockProducerSchema = z.object({
     name: z.string().min(1),
@@ -106,6 +114,9 @@ export const CreatePage = () => {
         packages
     );
 
+    const { mutateAsync: createAndSetKey } = useAddServerKey();
+    const { mutateAsync: importAccount } = useImportAccount();
+
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
         setWarningState,
@@ -156,47 +167,71 @@ export const CreatePage = () => {
     const [currentState, setCurrentState] = useState(1);
 
     useEffect(() => {
+        const setKeysAndBoot = async () => {
+            try {
+                let keyPair: CryptoKeyPair | undefined;
+                if (!isDev) {
+                    keyPair = await createAndSetKey();
+                }
+                const desiredPackageIds = Object.keys(rows);
+                const desiredPackages = packages.filter((pack) =>
+                    desiredPackageIds.some((id) => id == getId(pack))
+                );
+                const requiredPackages = getRequiredPackages(
+                    packages,
+                    desiredPackages.map((pack) => pack.name)
+                );
+                bootChain({
+                    packages: requiredPackages,
+                    producerName: bpName,
+                    publicKey: keyPair?.publicKey,
+                    compression: isDev ? 4 : 7,
+                    onProgressUpdate: (state) => {
+                        if (isRequestingUpdate(state)) {
+                            const [_, current, total] = state;
+                            const newIndex = calculateIndex(
+                                loadingStates.length,
+                                current,
+                                total
+                            );
+                            setCurrentState(newIndex);
+                        } else if (isBootCompleteUpdate(state)) {
+                            if (state.success) {
+                                navigate("/Dashboard");
+                                setCurrentState(loadingStates.length + 1);
+                                toast({
+                                    title: "Success",
+                                    description: "Successfully booted chain.",
+                                });
+
+                                importAccount({
+                                    privateKey: keyPair?.privateKey,
+                                    account: bpName,
+                                });
+                            } else {
+                                setLoading(false);
+                                const message = "Something went wrong.";
+                                toast({
+                                    title: "Error",
+                                    description: message,
+                                });
+                                setErrorMessage(message);
+                            }
+                        } else {
+                            console.warn(state, "Unrecognised message.");
+                        }
+                    },
+                });
+            } catch (e) {
+                console.error("Error booting chain");
+                console.error(e);
+            }
+        };
+
         if (currentStep == 4 && !installRan.current && config) {
             setLoading(true);
             installRan.current = true;
-            const desiredPackageIds = Object.keys(rows);
-            const desiredPackages = packages.filter((pack) =>
-                desiredPackageIds.some((id) => id == getId(pack))
-            );
-            const requiredPackages = getRequiredPackages(
-                packages,
-                desiredPackages.map((pack) => pack.name)
-            );
-            bootChain(requiredPackages, bpName, (state) => {
-                if (isRequestingUpdate(state)) {
-                    const [_, current, total] = state;
-                    const newIndex = calculateIndex(
-                        loadingStates.length,
-                        current,
-                        total
-                    );
-                    setCurrentState(newIndex);
-                } else if (isBootCompleteUpdate(state)) {
-                    if (state.success) {
-                        navigate("/Dashboard");
-                        setCurrentState(loadingStates.length + 1);
-                        toast({
-                            title: "Success",
-                            description: "Successfully booted chain.",
-                        });
-                    } else {
-                        setLoading(false);
-                        const message = "Something went wrong.";
-                        toast({
-                            title: "Error",
-                            description: message,
-                        });
-                        setErrorMessage(message);
-                    }
-                } else {
-                    console.warn(state, "Unrecognised message.");
-                }
-            });
+            setKeysAndBoot();
         } else if (currentStep == 3) {
             // This case allows the user to retry after a failed step 4.
             if (installRan.current) {

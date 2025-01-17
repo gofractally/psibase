@@ -1,5 +1,4 @@
 #include <psibase/ConfigFile.hpp>
-#include <psibase/EcdsaProver.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/TransactionContext.hpp>
@@ -460,20 +459,6 @@ void load_service(const native_service& config,
 
 namespace psibase
 {
-   void validate(boost::any& v, const std::vector<std::string>& values, PrivateKey*, int)
-   {
-      boost::program_options::validators::check_first_occurrence(v);
-      const auto& s = boost::program_options::validators::get_single_string(values);
-      try
-      {
-         v = privateKeyFromString(s);
-      }
-      catch (std::exception&)
-      {
-         throw boost::program_options::invalid_option_value(s);
-      }
-   }
-
    void validate(boost::any&                     v,
                  const std::vector<std::string>& values,
                  std::shared_ptr<Prover>*,

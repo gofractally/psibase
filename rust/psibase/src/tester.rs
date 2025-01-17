@@ -60,7 +60,7 @@ impl Chain {
 
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
-        let default_services: Vec<String> = vec!["DevDefault".to_string()];
+        let default_services: Vec<String> = vec!["TestDefault".to_string()];
         self.boot_with(&Self::default_registry(), &default_services[..])
     }
 
@@ -103,6 +103,7 @@ impl Chain {
     /// The arguments are the file sizes in bytes for the database's
     /// various files.
     pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
+        println!("TESTER CREATE");
         let chain_handle =
             unsafe { tester_raw::createChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes) };
         if chain_handle == 0 {

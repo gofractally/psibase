@@ -3,16 +3,14 @@ name = "r-registry"
 description = "Query service for Registry"
 version.workspace = true
 rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
-edition = "2021"
-publish = false
+edition.workspace = true
+publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase" }
+psibase = { path = "../../../../rust/psibase", version = "0.14.0" }
 serde = "1.0"
-registry = { path = "../service" }
+registry = { path = "../service", version = "0.14.0" }
 async-graphql = "7.0.7"
 
 [dev-dependencies]
-registry_package = { path = ".." }
+registry-pkg = { path = "..", version = "0.14.0" }

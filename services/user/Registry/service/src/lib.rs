@@ -568,7 +568,7 @@ mod tests {
     use super::*;
     use crate::consts::MAX_APP_NAME_LENGTH;
     use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord};
-    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointSec, TimePointUSec};
+    use psibase::{account, AccountNumber, ChainEmptyResult, TimePointUSec};
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
