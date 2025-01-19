@@ -6,6 +6,7 @@ import { OptionalInput } from "./OptionalInput";
 import { ListInput } from "./ListInput";
 import { ByteListInput } from "./ByteListInput";
 import { getTypeInfo } from "../../utils";
+import { useMemo } from "react";
 
 interface TypeBasedInputProps {
   type: unknown;
@@ -15,6 +16,13 @@ interface TypeBasedInputProps {
   label?: string;
 }
 
+// Convert to Uint8Array if needed
+const getByteArray = (val: unknown): Uint8Array => {
+  if (val instanceof Uint8Array) return val;
+  if (Array.isArray(val)) return new Uint8Array(val);
+  return new Uint8Array();
+};
+
 export const TypeBasedInput = ({
   type,
   schema,
@@ -22,27 +30,24 @@ export const TypeBasedInput = ({
   onChange,
   label,
 }: TypeBasedInputProps) => {
-  // Handle type references (numbers in the schema)
-  if (typeof type === "number") {
-    return (
-      <TypeBasedInput
-        type={schema.types[type].kind}
-        schema={schema}
-        value={value}
-        onChange={onChange}
-        label={label}
-      />
-    );
-  }
+  const resolvedType =
+    typeof type === "number" ? schema.types[type].kind : type;
+  const { inputType, typeName, defaultValue } = getTypeInfo(
+    resolvedType,
+    schema
+  );
+  const actualValue = value ?? defaultValue;
+  const memoizedBytes = useMemo(
+    () =>
+      inputType === "bytelist" ? getByteArray(actualValue) : new Uint8Array(),
+    [inputType, actualValue]
+  );
 
-  const { inputType, typeName, defaultValue } = getTypeInfo(type, schema);
   const typeLabel = label ? (
     <>
       {label} <span className="type-label">({typeName})</span>
     </>
   ) : undefined;
-
-  const actualValue = value ?? defaultValue;
 
   switch (inputType) {
     case "string":
@@ -59,7 +64,7 @@ export const TypeBasedInput = ({
           value={actualValue as number}
           onChange={onChange}
           label={typeLabel}
-          type={type as string}
+          type={resolvedType as string}
         />
       );
     case "boolean":
@@ -71,8 +76,8 @@ export const TypeBasedInput = ({
         />
       );
     case "optional":
-      if (typeof type === "object" && type !== null) {
-        const typeObj = type as { option?: unknown };
+      if (typeof resolvedType === "object" && resolvedType !== null) {
+        const typeObj = resolvedType as { option?: unknown };
         return (
           <OptionalInput
             innerType={typeObj.option}
@@ -87,14 +92,14 @@ export const TypeBasedInput = ({
     case "bytelist":
       return (
         <ByteListInput
-          value={Array.isArray(value) ? value : []}
+          value={memoizedBytes}
           onChange={onChange}
           label={typeLabel}
         />
       );
     case "list":
-      if (typeof type === "object" && type !== null) {
-        const typeObj = type as { list?: unknown };
+      if (typeof resolvedType === "object" && resolvedType !== null) {
+        const typeObj = resolvedType as { list?: unknown };
         return (
           <ListInput
             itemType={typeObj.list}

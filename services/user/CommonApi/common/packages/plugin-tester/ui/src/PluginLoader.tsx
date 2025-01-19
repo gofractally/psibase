@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Supervisor } from "@psibase/common-lib";
+import { SchemaFunction } from "./types";
 import { ServiceInput } from "./components/ServiceInput";
 import { ExecutionTabs } from "./components/ExecutionTabs";
-import { SchemaFunction } from "./types";
-import { usePluginSchema } from "./hooks/usePluginSchema";
 import { FunctionSelector } from "./components/FunctionSelector";
 import { ParametersSection } from "./components/ParametersSection";
+import { usePluginSchema } from "./hooks/usePluginSchema";
+import { getTypeInfo } from "./utils";
 
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [service, setService] = useState("");
@@ -13,7 +14,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const { schema, loadSchema } = usePluginSchema(supervisor);
   const [selectedFunction, setSelectedFunction] =
     useState<SchemaFunction | null>(null);
-  const [paramValues, setParamValues] = useState("");
+  const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     const fetchCurrentService = async () => {
@@ -30,6 +31,20 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
     };
     fetchCurrentService();
   }, [plugin, loadSchema]);
+
+  // Initialize parameter values when selected function changes
+  useEffect(() => {
+    if (selectedFunction && schema) {
+      const initialValues = selectedFunction.params.reduce(
+        (acc, param) => ({
+          ...acc,
+          [param.name]: getTypeInfo(param.type, schema).defaultValue,
+        }),
+        {}
+      );
+      setParamValues(initialValues);
+    }
+  }, [selectedFunction, schema]);
 
   const downloadSchema = () => {
     const dataStr =
@@ -67,6 +82,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
               <ParametersSection
                 selectedFunction={selectedFunction}
                 schema={schema}
+                values={paramValues}
                 onParamValuesChange={setParamValues}
               />
               <ExecutionTabs

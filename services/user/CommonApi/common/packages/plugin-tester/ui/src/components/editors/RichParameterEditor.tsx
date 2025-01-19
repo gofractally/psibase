@@ -4,27 +4,14 @@ import { TypeBasedInput } from "../inputs/TypeBasedInput";
 import { camelCase } from "../../utils";
 
 interface RichParameterEditorProps {
-  value: string;
-  onChange: (value: string) => void;
+  values: Record<string, unknown>;
+  onChange: (values: Record<string, unknown>) => void;
   selectedFunction: SchemaFunction;
   schema: Schema;
 }
 
-const parseParameterValues = (value: string): Record<string, unknown> => {
-  try {
-    return value ? JSON.parse(value) : {};
-  } catch (e) {
-    console.error("Failed to parse parameter values:", e);
-    return {};
-  }
-};
-
-const stringify = (values: Record<string, unknown>): string => {
-  return JSON.stringify(values, null, 2);
-};
-
 export const RichParameterEditor: FC<RichParameterEditorProps> = ({
-  value,
+  values,
   onChange,
   selectedFunction,
   schema,
@@ -32,17 +19,40 @@ export const RichParameterEditor: FC<RichParameterEditorProps> = ({
   const getParamKey = (paramName: string) => camelCase(paramName);
 
   const handleRichEdit = (paramName: string, newValue: unknown) => {
-    const currentValues = parseParameterValues(value);
-    const updatedValues = {
-      ...currentValues,
-      [getParamKey(paramName)]: newValue,
-    };
-    onChange(stringify(updatedValues));
+    const paramKey = getParamKey(paramName);
+    const updatedValues = { ...values };
+
+    if (
+      newValue &&
+      typeof newValue === "object" &&
+      "bytes" in newValue &&
+      "rawInput" in newValue
+    ) {
+      // For bytelist parameters, store both bytes and rawInput
+      updatedValues[paramKey] = (newValue as { bytes: unknown }).bytes;
+      updatedValues[`${paramKey}RawInput`] = (
+        newValue as { rawInput: string }
+      ).rawInput;
+    } else {
+      updatedValues[paramKey] = newValue;
+    }
+
+    onChange(updatedValues);
   };
 
   const getParamValue = (paramName: string) => {
-    const values = parseParameterValues(value);
-    return values[getParamKey(paramName)] ?? null;
+    const paramKey = getParamKey(paramName);
+    const rawInputKey = `${paramKey}RawInput`;
+
+    // If this parameter has both a value and a rawInput, it's a bytelist
+    if (rawInputKey in values) {
+      return {
+        bytes: values[paramKey],
+        rawInput: values[rawInputKey] as string,
+      };
+    }
+
+    return values[paramKey] ?? null;
   };
 
   return (

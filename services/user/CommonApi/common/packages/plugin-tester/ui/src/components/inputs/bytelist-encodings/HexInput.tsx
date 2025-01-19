@@ -1,44 +1,39 @@
-import { ReactNode } from "react";
+import { ChangeEvent } from "react";
 
 interface HexInputProps {
-  value: number[];
-  onChange: (value: number[]) => void;
-  label?: ReactNode;
+  value: Uint8Array;
+  onChange: (value: Uint8Array, rawInput: string) => void;
+  rawInput: string;
 }
 
-export const HexInput = ({ value, onChange }: HexInputProps) => {
-  const bytesToHex = (bytes: number[]): string => {
-    return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-  };
+export const HexInput = ({ onChange, rawInput }: HexInputProps) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    // Keep only valid hex characters
+    const newHexString = e.target.value.replace(/[^0-9a-fA-F]/g, "");
 
-  const hexToBytes = (hex: string): number[] => {
-    const normalized = hex.replace(/[^0-9a-fA-F]/g, "");
-    const bytes: number[] = [];
-    for (let i = 0; i < normalized.length; i += 2) {
-      const byte = normalized.slice(i, i + 2);
-      if (byte.length === 2) {
-        bytes.push(parseInt(byte, 16));
-      }
+    // Parse to bytes
+    const normalized = newHexString.toLowerCase();
+    // Only parse complete pairs
+    const completePairsLength = normalized.length & ~1; // round down to even
+    const byteCount = completePairsLength / 2;
+    const byteArray = new Uint8Array(byteCount);
+
+    for (let i = 0; i < completePairsLength; i += 2) {
+      byteArray[i >> 1] = parseInt(normalized.slice(i, i + 2), 16);
     }
-    return bytes;
-  };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newInput = e.target.value.replace(/[^0-9a-fA-F]/gi, "");
-    const bytes = hexToBytes(newInput);
-    onChange(bytes);
+    // Push only the fully parsed bytes to the parent
+    onChange(byteArray, newHexString);
   };
 
   return (
-    <div style={{ width: "100%" }}>
-      <input
-        type="text"
-        className="common-input"
-        value={bytesToHex(value)}
-        onChange={handleChange}
-        placeholder="Enter hex string (e.g. 0123456789abcdef)"
-        pattern="[0-9a-fA-F]*"
-      />
-    </div>
+    <input
+      type="text"
+      className="common-input"
+      value={rawInput}
+      onChange={handleChange}
+      placeholder="Enter hex value (e.g. 48656c6c6f)"
+      spellCheck={false}
+    />
   );
 };

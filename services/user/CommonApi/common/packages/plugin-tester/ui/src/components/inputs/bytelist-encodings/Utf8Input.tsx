@@ -1,36 +1,42 @@
-import { ReactNode } from "react";
+import { ChangeEvent } from "react";
 
 interface Utf8InputProps {
-  value: number[];
-  onChange: (value: number[]) => void;
-  label?: ReactNode;
+  value: Uint8Array;
+  onChange: (value: Uint8Array, rawInput: string) => void;
+  rawInput: string;
 }
 
-export const Utf8Input = ({ value, onChange }: Utf8InputProps) => {
-  const bytesToUtf8 = (bytes: number[]): string => {
-    try {
-      return new TextDecoder().decode(new Uint8Array(bytes));
-    } catch {
-      return "";
+const isValidUtf8String = (str: string): boolean => {
+  try {
+    return str === decodeURIComponent(encodeURIComponent(str));
+  } catch {
+    return false;
+  }
+};
+
+export const Utf8Input = ({ onChange, rawInput }: Utf8InputProps) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+
+    // Validate UTF-8
+    if (!isValidUtf8String(newValue)) {
+      return;
     }
-  };
 
-  const utf8ToBytes = (text: string): number[] => {
-    return Array.from(new TextEncoder().encode(text));
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const bytes = utf8ToBytes(e.target.value);
-    onChange(bytes);
+    // Convert string to byte array
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(newValue);
+    onChange(bytes, newValue);
   };
 
   return (
     <input
       type="text"
       className="common-input"
-      value={bytesToUtf8(value)}
+      value={rawInput}
       onChange={handleChange}
       placeholder="Enter UTF-8 text"
+      spellCheck={false}
     />
   );
 };

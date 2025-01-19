@@ -10,7 +10,7 @@ interface ExecutionTabsProps {
   plugin: string;
   selectedInterfaceName: string;
   supervisor: Supervisor;
-  paramValues: string;
+  paramValues: Record<string, unknown>;
 }
 
 export function ExecutionTabs({
@@ -26,13 +26,18 @@ export function ExecutionTabs({
     "Execution"
   );
 
+  const getCleanValues = () => {
+    // Filter out rawInput fields for bytelists
+    return Object.fromEntries(
+      Object.entries(paramValues).filter(([key]) => !key.endsWith("RawInput"))
+    );
+  };
+
   const parseParams = (): unknown[] => {
-    try {
-      const parsed = JSON.parse(paramValues);
-      return Array.isArray(parsed) ? parsed : Object.values(parsed);
-    } catch {
-      return [];
-    }
+    const cleanValues = getCleanValues();
+    return Array.isArray(cleanValues)
+      ? cleanValues
+      : Object.values(cleanValues);
   };
 
   const handleExecute = async () => {
@@ -63,12 +68,13 @@ export function ExecutionTabs({
   };
 
   const generateEmbedCode = (): string => {
+    const cleanValues = getCleanValues();
     return `const response = await supervisor.functionCall({
   service: "${service}",
   plugin: "${plugin}",
   intf: "${camelCase(selectedInterfaceName)}",
   method: "${camelCase(selectedFunction.name)}",
-  params: ${JSON.stringify(JSON.parse(paramValues), null, 2)}
+  params: ${JSON.stringify(cleanValues, null, 2)}
 });`;
   };
 
@@ -106,13 +112,7 @@ export function ExecutionTabs({
             className="common-textarea"
             style={{ height: "200px" }}
             readOnly
-            value={(() => {
-              try {
-                return generateEmbedCode();
-              } catch (e) {
-                return "Parameters configuration produces invalid JSON";
-              }
-            })()}
+            value={generateEmbedCode()}
           />
         </div>
       )}
