@@ -95,6 +95,7 @@ export const TypeBasedInput = ({
           value={memoizedBytes}
           onChange={onChange}
           label={typeLabel}
+          schema={schema}
         />
       );
     case "list":

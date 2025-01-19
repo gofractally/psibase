@@ -3,6 +3,8 @@ import { HexInput } from "./bytelist-encodings/HexInput";
 import { Base64Input } from "./bytelist-encodings/Base64Input";
 import { Utf8Input } from "./bytelist-encodings/Utf8Input";
 import { FileInput } from "./bytelist-encodings/FileInput";
+import { ListInput } from "./ListInput";
+import { Schema } from "../../types";
 import {
   EncodingSelector,
   Encoding,
@@ -12,6 +14,7 @@ interface ByteListInputProps {
   value: Uint8Array;
   onChange: (value: Uint8Array) => void;
   label?: ReactNode;
+  schema: Schema;
 }
 
 function arraysEqual(a: Uint8Array, b?: Uint8Array) {
@@ -27,6 +30,7 @@ interface RawInputs {
   base64: string;
   utf8: string;
   file: string;
+  manual: string;
 }
 
 type EncodingInputProps = {
@@ -35,54 +39,60 @@ type EncodingInputProps = {
   rawInput: string;
 };
 
+const getEncodedString = (
+  bytes: Uint8Array,
+  encoding: Encoding,
+  filename = ""
+): string => {
+  switch (encoding) {
+    case "hex":
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    case "base64":
+      return btoa(
+        Array.from(bytes)
+          .map((b) => String.fromCharCode(b))
+          .join("")
+      );
+    case "utf8":
+      return new TextDecoder().decode(bytes);
+    case "file":
+      return filename;
+    default:
+      return "";
+  }
+};
+
 export const ByteListInput = ({
   value: externalValue,
   onChange: externalOnChange,
   label,
+  schema,
 }: ByteListInputProps) => {
   const [encoding, setEncoding] = useState<Encoding>("hex");
   const internalValue = useRef(externalValue ?? new Uint8Array());
   const [rawInputs, setRawInputs] = useState<RawInputs>(() => ({
-    hex: Array.from(externalValue ?? new Uint8Array())
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join(""),
-    base64: "", // Will be initialized when switching to base64
-    utf8: "", // Will be initialized when switching to utf8
-    file: "", // Will be initialized when switching to file
+    hex: getEncodedString(externalValue ?? new Uint8Array(), "hex"),
+    base64: "",
+    utf8: "",
+    file: "",
+    manual: "",
   }));
 
-  // Only update our internal value if the external value has actually changed
   useEffect(() => {
     if (!arraysEqual(externalValue, internalValue.current)) {
       internalValue.current = externalValue ?? new Uint8Array();
-      // Only initialize raw inputs for the current encoding
       setRawInputs((prev) => ({
         ...prev,
-        [encoding]: getEncodedString(internalValue.current, encoding),
+        [encoding]: getEncodedString(
+          internalValue.current,
+          encoding,
+          prev.file
+        ),
       }));
     }
   }, [externalValue, encoding]);
-
-  const getEncodedString = (bytes: Uint8Array, encoding: Encoding): string => {
-    switch (encoding) {
-      case "hex":
-        return Array.from(bytes)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-      case "base64":
-        return btoa(
-          Array.from(bytes)
-            .map((b) => String.fromCharCode(b))
-            .join("")
-        );
-      case "utf8":
-        return new TextDecoder().decode(bytes);
-      case "file":
-        return rawInputs.file; // Keep existing filename
-      default:
-        return "";
-    }
-  };
 
   const handleChange = (newValue: Uint8Array, rawInput: string) => {
     internalValue.current = newValue;
@@ -94,8 +104,11 @@ export const ByteListInput = ({
   };
 
   const handleEncodingChange = (newEncoding: Encoding) => {
-    // Reset the raw input for the new encoding based on the current byte array
-    const newRawInput = getEncodedString(internalValue.current, newEncoding);
+    const newRawInput = getEncodedString(
+      internalValue.current,
+      newEncoding,
+      rawInputs.file
+    );
     setRawInputs((prev) => ({
       ...prev,
       [newEncoding]: newRawInput,
@@ -119,6 +132,17 @@ export const ByteListInput = ({
         return <Utf8Input {...props} />;
       case "file":
         return <FileInput {...props} />;
+      case "manual":
+        return (
+          <ListInput
+            itemType="u8"
+            schema={schema}
+            value={Array.from(internalValue.current)}
+            onChange={(value) =>
+              handleChange(new Uint8Array(value as number[]), "")
+            }
+          />
+        );
     }
   };
 

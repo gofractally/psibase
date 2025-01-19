@@ -1,4 +1,4 @@
-export type Encoding = "hex" | "base64" | "utf8" | "file";
+export type Encoding = "hex" | "base64" | "utf8" | "file" | "manual";
 
 interface EncodingSelectorProps {
   value: Encoding;
@@ -20,6 +20,7 @@ export const EncodingSelector = ({
       <option value="base64">Base64</option>
       <option value="utf8">UTF-8</option>
       <option value="file">File</option>
+      <option value="manual">Manual</option>
     </select>
   );
 };
