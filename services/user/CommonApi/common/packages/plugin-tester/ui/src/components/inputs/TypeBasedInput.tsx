@@ -30,6 +30,7 @@ export const TypeBasedInput = ({
         schema={schema}
         value={value}
         onChange={onChange}
+        label={label}
       />
     );
   }
