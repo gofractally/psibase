@@ -44,28 +44,38 @@ export const ByteListInput = ({
     hex: Array.from(externalValue ?? new Uint8Array())
       .map((b) => b.toString(16).padStart(2, "0"))
       .join(""),
-    base64: "", // Will be initialized on first switch to base64
-    utf8: "", // Will be initialized on first switch to utf8
+    base64: "", // Will be initialized when switching to base64
+    utf8: "", // Will be initialized when switching to utf8
   }));
 
   // Only update our internal value if the external value has actually changed
   useEffect(() => {
     if (!arraysEqual(externalValue, internalValue.current)) {
       internalValue.current = externalValue ?? new Uint8Array();
-      // Update all raw inputs when external value changes
-      setRawInputs({
-        hex: Array.from(internalValue.current)
+      // Only initialize raw inputs for the current encoding
+      setRawInputs((prev) => ({
+        ...prev,
+        [encoding]: getEncodedString(internalValue.current, encoding),
+      }));
+    }
+  }, [externalValue, encoding]);
+
+  const getEncodedString = (bytes: Uint8Array, encoding: Encoding): string => {
+    switch (encoding) {
+      case "hex":
+        return Array.from(bytes)
           .map((b) => b.toString(16).padStart(2, "0"))
-          .join(""),
-        base64: btoa(
-          Array.from(internalValue.current)
+          .join("");
+      case "base64":
+        return btoa(
+          Array.from(bytes)
             .map((b) => String.fromCharCode(b))
             .join("")
-        ),
-        utf8: new TextDecoder().decode(internalValue.current),
-      });
+        );
+      case "utf8":
+        return new TextDecoder().decode(bytes);
     }
-  }, [externalValue]);
+  };
 
   const handleChange = (newValue: Uint8Array, rawInput: string) => {
     internalValue.current = newValue;
@@ -74,6 +84,16 @@ export const ByteListInput = ({
       [encoding]: rawInput,
     }));
     externalOnChange(newValue);
+  };
+
+  const handleEncodingChange = (newEncoding: Encoding) => {
+    // Reset the raw input for the new encoding based on the current byte array
+    const newRawInput = getEncodedString(internalValue.current, newEncoding);
+    setRawInputs((prev) => ({
+      ...prev,
+      [newEncoding]: newRawInput,
+    }));
+    setEncoding(newEncoding);
   };
 
   const renderInput = () => {
@@ -103,7 +123,7 @@ export const ByteListInput = ({
           marginBottom: "0.5rem",
         }}
       >
-        <EncodingSelector value={encoding} onChange={setEncoding} />
+        <EncodingSelector value={encoding} onChange={handleEncodingChange} />
         {label && <label style={{ margin: 0 }}>{label}</label>}
       </div>
       <div style={{ marginTop: "0.5rem" }}>{renderInput()}</div>
