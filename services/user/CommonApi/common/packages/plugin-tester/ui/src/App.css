@@ -141,3 +141,12 @@
 .base64-status.invalid {
   color: #cc2222;
 }
+
+.file-status {
+  font-size: 0.8em;
+  margin-top: 0.25rem;
+}
+
+.file-status.success {
+  color: #22cc22;
+}

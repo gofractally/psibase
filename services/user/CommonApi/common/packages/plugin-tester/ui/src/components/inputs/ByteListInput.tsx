@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect, useRef } from "react";
 import { HexInput } from "./bytelist-encodings/HexInput";
 import { Base64Input } from "./bytelist-encodings/Base64Input";
 import { Utf8Input } from "./bytelist-encodings/Utf8Input";
+import { FileInput } from "./bytelist-encodings/FileInput";
 import {
   EncodingSelector,
   Encoding,
@@ -25,6 +26,7 @@ interface RawInputs {
   hex: string;
   base64: string;
   utf8: string;
+  file: string;
 }
 
 type EncodingInputProps = {
@@ -46,6 +48,7 @@ export const ByteListInput = ({
       .join(""),
     base64: "", // Will be initialized when switching to base64
     utf8: "", // Will be initialized when switching to utf8
+    file: "", // Will be initialized when switching to file
   }));
 
   // Only update our internal value if the external value has actually changed
@@ -74,6 +77,10 @@ export const ByteListInput = ({
         );
       case "utf8":
         return new TextDecoder().decode(bytes);
+      case "file":
+        return rawInputs.file; // Keep existing filename
+      default:
+        return "";
     }
   };
 
@@ -110,6 +117,8 @@ export const ByteListInput = ({
         return <Base64Input {...props} />;
       case "utf8":
         return <Utf8Input {...props} />;
+      case "file":
+        return <FileInput {...props} />;
     }
   };
 
