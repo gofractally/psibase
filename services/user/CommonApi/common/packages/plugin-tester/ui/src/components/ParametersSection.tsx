@@ -1,7 +1,6 @@
-import { SchemaFunction, Schema } from "../types";
+import { useState } from "react";
+import { Schema, SchemaFunction } from "../types";
 import { ParameterEditor } from "./ParameterEditor";
-import { generateInitialValue, camelCase } from "../utils";
-import { useEffect, useState } from "react";
 
 interface ParametersSectionProps {
   selectedFunction: SchemaFunction;
@@ -15,16 +14,6 @@ export const ParametersSection = ({
   onParamValuesChange,
 }: ParametersSectionProps) => {
   const [paramValues, setParamValues] = useState("");
-
-  useEffect(() => {
-    const initialParams = selectedFunction.params.reduce((acc, param) => {
-      acc[camelCase(param.name)] = generateInitialValue(param.type, schema);
-      return acc;
-    }, {} as Record<string, unknown>);
-    const newParamValues = JSON.stringify(initialParams, null, 2);
-    setParamValues(newParamValues);
-    onParamValuesChange(newParamValues);
-  }, [selectedFunction, schema, onParamValuesChange]);
 
   const handleParamChange = (newValue: string) => {
     setParamValues(newValue);

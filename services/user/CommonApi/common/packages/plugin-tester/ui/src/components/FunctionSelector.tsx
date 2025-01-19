@@ -39,7 +39,7 @@ export function FunctionSelector({
         }
       });
       return result;
-    }, [getExportedInterfaceIds]);
+    }, [getExportedInterfaceIds, schema.interfaces]);
 
   const exportedMethods = useMemo(getExportedMethodsByInterface, [
     getExportedMethodsByInterface,

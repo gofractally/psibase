@@ -5,7 +5,7 @@ import { BooleanInput } from "./BooleanInput";
 import { OptionalInput } from "./OptionalInput";
 import { ListInput } from "./ListInput";
 import { ByteListInput } from "./ByteListInput";
-import { formatTypeName } from "../../utils";
+import { getTypeInfo } from "../../utils";
 
 interface TypeBasedInputProps {
   type: unknown;
@@ -22,13 +22,6 @@ export const TypeBasedInput = ({
   onChange,
   label,
 }: TypeBasedInputProps) => {
-  const typeLabel = label ? (
-    <>
-      {label}{" "}
-      <span className="type-label">({formatTypeName(type, schema)})</span>
-    </>
-  ) : undefined;
-
   // Handle type references (numbers in the schema)
   if (typeof type === "number") {
     return (
@@ -37,96 +30,84 @@ export const TypeBasedInput = ({
         schema={schema}
         value={value}
         onChange={onChange}
-        label={label}
       />
     );
   }
 
-  // Handle primitive types
-  if (typeof type === "string") {
-    switch (type) {
-      case "string":
-        return (
-          <StringInput
-            value={value as string}
-            onChange={onChange}
-            label={typeLabel}
-          />
-        );
-      case "u8":
-      case "u16":
-      case "u32":
-      case "u64":
-      case "s8":
-      case "s16":
-      case "s32":
-      case "s64":
-      case "f32":
-      case "f64":
-        return (
-          <NumberInput
-            value={value as number}
-            onChange={onChange}
-            label={typeLabel}
-            type={type}
-          />
-        );
-      case "bool":
-        return (
-          <BooleanInput
-            value={value as boolean}
-            onChange={onChange}
-            label={typeLabel}
-          />
-        );
-      default:
-        return <div>Unsupported type: {type}</div>;
-    }
-  }
+  const { inputType, typeName, defaultValue } = getTypeInfo(type, schema);
+  const typeLabel = label ? (
+    <>
+      {label} <span className="type-label">({typeName})</span>
+    </>
+  ) : undefined;
 
-  // Handle complex types
-  if (typeof type === "object" && type !== null) {
-    const typeObj = type as { option?: unknown; list?: unknown };
+  const actualValue = value ?? defaultValue;
 
-    if (typeObj.option) {
+  switch (inputType) {
+    case "string":
       return (
-        <OptionalInput
-          innerType={typeObj.option}
-          schema={schema}
-          value={value}
+        <StringInput
+          value={actualValue as string}
           onChange={onChange}
           label={typeLabel}
         />
       );
-    }
-
-    if (typeObj.list) {
-      // Special case for list<u8> (bytelist)
-      if (typeObj.list === "u8") {
-        const arrayValue = Array.isArray(value) ? value : [];
+    case "number":
+      return (
+        <NumberInput
+          value={actualValue as number}
+          onChange={onChange}
+          label={typeLabel}
+          type={type as string}
+        />
+      );
+    case "boolean":
+      return (
+        <BooleanInput
+          value={actualValue as boolean}
+          onChange={onChange}
+          label={typeLabel}
+        />
+      );
+    case "optional":
+      if (typeof type === "object" && type !== null) {
+        const typeObj = type as { option?: unknown };
         return (
-          <ByteListInput
-            value={arrayValue}
+          <OptionalInput
+            innerType={typeObj.option}
+            schema={schema}
+            value={value}
             onChange={onChange}
             label={typeLabel}
           />
         );
       }
-
-      // Regular list handling
-      const arrayValue = Array.isArray(value) ? value : [];
+      break;
+    case "bytelist":
       return (
-        <ListInput
-          itemType={typeObj.list}
-          schema={schema}
-          value={arrayValue}
+        <ByteListInput
+          value={Array.isArray(value) ? value : []}
           onChange={onChange}
           label={typeLabel}
         />
       );
-    }
+    case "list":
+      if (typeof type === "object" && type !== null) {
+        const typeObj = type as { list?: unknown };
+        return (
+          <ListInput
+            itemType={typeObj.list}
+            schema={schema}
+            value={Array.isArray(value) ? value : []}
+            onChange={onChange}
+            label={typeLabel}
+          />
+        );
+      }
+      break;
+    case "unsupported":
+      return <div>Unsupported type: {typeName}</div>;
   }
 
-  // For now, show placeholder for other complex types
   return <div>Complex type editor coming soon...</div>;
 };
