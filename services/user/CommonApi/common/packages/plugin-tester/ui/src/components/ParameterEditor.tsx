@@ -17,7 +17,7 @@ export const ParameterEditor = ({
   selectedFunction,
   schema,
 }: ParameterEditorProps) => {
-  const [mode, setMode] = useState<"Raw" | "Rich">("Raw");
+  const [mode, setMode] = useState<"Raw" | "Rich">("Rich");
 
   const handleRichEdit = (paramName: string, newValue: unknown) => {
     try {
@@ -45,7 +45,7 @@ export const ParameterEditor = ({
       <TabControl
         selectedTab={mode}
         onTabChange={(tab) => setMode(tab as "Raw" | "Rich")}
-        tabs={["Raw", "Rich"]}
+        tabs={["Rich", "Raw"]}
       />
 
       {mode === "Raw" ? (
