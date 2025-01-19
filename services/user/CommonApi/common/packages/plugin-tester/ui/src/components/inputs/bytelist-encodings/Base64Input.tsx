@@ -11,27 +11,25 @@ const needsBase64Padding = (str: string): number => {
   return (4 - (len % 4)) % 4;
 };
 
-const isValidBase64 = (str: string): boolean => {
-  if (!/^[A-Za-z0-9+/]*=*$/.test(str)) {
-    return false;
+const base64ToBytes = (base64: string): Uint8Array | null => {
+  try {
+    const binary = atob(base64);
+    return new Uint8Array(Array.from(binary, (char) => char.charCodeAt(0)));
+  } catch {
+    return null;
   }
+};
+
+const isValidBase64 = (str: string): boolean => {
+  if (!/^[A-Za-z0-9+/]*=*$/.test(str)) return false;
 
   const existingPadding = (str.match(/=+$/)?.[0] || "").length;
   const neededPadding = needsBase64Padding(str);
 
-  if (existingPadding === 0 && neededPadding !== 0) {
-    return false;
-  }
-  if (existingPadding > 0 && existingPadding !== neededPadding) {
-    return false;
-  }
+  if (existingPadding === 0 && neededPadding !== 0) return false;
+  if (existingPadding > 0 && existingPadding !== neededPadding) return false;
 
-  try {
-    atob(str);
-    return true;
-  } catch {
-    return false;
-  }
+  return base64ToBytes(str) !== null;
 };
 
 export const Base64Input = ({ onChange, rawInput }: Base64InputProps) => {
@@ -39,22 +37,12 @@ export const Base64Input = ({ onChange, rawInput }: Base64InputProps) => {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newInput = e.target.value.replace(/[^A-Za-z0-9+/=]/g, "");
-    setIsValid(isValidBase64(newInput));
-
-    if (isValidBase64(newInput)) {
-      try {
-        const binary = atob(newInput);
-        const bytes = new Uint8Array(
-          Array.from(binary, (char) => char.charCodeAt(0))
-        );
-        onChange(bytes, newInput);
-      } catch {
-        // Invalid base64, but keep the raw input
-        onChange(new Uint8Array(), newInput);
-      }
-    } else {
-      onChange(new Uint8Array(), newInput);
-    }
+    const isValid = isValidBase64(newInput);
+    setIsValid(isValid);
+    onChange(
+      isValid ? base64ToBytes(newInput) ?? new Uint8Array() : new Uint8Array(),
+      newInput
+    );
   };
 
   const handleBlur = (e: ChangeEvent<HTMLInputElement>) => {
@@ -65,10 +53,7 @@ export const Base64Input = ({ onChange, rawInput }: Base64InputProps) => {
     if (missingPadding > 0 && existingPadding === 0) {
       const paddedValue = value + "=".repeat(missingPadding);
       if (isValidBase64(paddedValue)) {
-        const binary = atob(paddedValue);
-        const bytes = new Uint8Array(
-          Array.from(binary, (char) => char.charCodeAt(0))
-        );
+        const bytes = base64ToBytes(paddedValue) ?? new Uint8Array();
         onChange(bytes, paddedValue);
         setIsValid(true);
       }

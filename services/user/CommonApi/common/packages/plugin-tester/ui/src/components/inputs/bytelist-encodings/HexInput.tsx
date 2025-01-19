@@ -6,24 +6,22 @@ interface HexInputProps {
   rawInput: string;
 }
 
+const hexToBytes = (hex: string): Uint8Array => {
+  const normalized = hex.toLowerCase();
+  const completePairsLength = normalized.length & ~1; // round down to even
+  const byteArray = new Uint8Array(completePairsLength >> 1);
+
+  for (let i = 0; i < completePairsLength; i += 2) {
+    byteArray[i >> 1] = Number.parseInt(normalized.slice(i, i + 2), 16);
+  }
+
+  return byteArray;
+};
+
 export const HexInput = ({ onChange, rawInput }: HexInputProps) => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    // Keep only valid hex characters
     const newHexString = e.target.value.replace(/[^0-9a-fA-F]/g, "");
-
-    // Parse to bytes
-    const normalized = newHexString.toLowerCase();
-    // Only parse complete pairs
-    const completePairsLength = normalized.length & ~1; // round down to even
-    const byteCount = completePairsLength / 2;
-    const byteArray = new Uint8Array(byteCount);
-
-    for (let i = 0; i < completePairsLength; i += 2) {
-      byteArray[i >> 1] = parseInt(normalized.slice(i, i + 2), 16);
-    }
-
-    // Push only the fully parsed bytes to the parent
-    onChange(byteArray, newHexString);
+    onChange(hexToBytes(newHexString), newHexString);
   };
 
   return (

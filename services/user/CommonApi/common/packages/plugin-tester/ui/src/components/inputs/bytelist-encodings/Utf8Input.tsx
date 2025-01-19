@@ -6,7 +6,9 @@ interface Utf8InputProps {
   rawInput: string;
 }
 
-const isValidUtf8String = (str: string): boolean => {
+const encoder = new TextEncoder();
+
+const isValidUtf8 = (str: string): boolean => {
   try {
     return str === decodeURIComponent(encodeURIComponent(str));
   } catch {
@@ -17,16 +19,9 @@ const isValidUtf8String = (str: string): boolean => {
 export const Utf8Input = ({ onChange, rawInput }: Utf8InputProps) => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-
-    // Validate UTF-8
-    if (!isValidUtf8String(newValue)) {
-      return;
+    if (isValidUtf8(newValue)) {
+      onChange(encoder.encode(newValue), newValue);
     }
-
-    // Convert string to byte array
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(newValue);
-    onChange(bytes, newValue);
   };
 
   return (
