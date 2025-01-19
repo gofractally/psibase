@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TabControl } from "./TabControl";
-import { TypeBasedInput } from "./inputs/TypeBasedInput";
 import { Schema, SchemaFunction } from "../types";
-import { camelCase } from "../utils";
+import { RawParameterEditor } from "./editors/RawParameterEditor";
+import { RichParameterEditor } from "./editors/RichParameterEditor";
+import { camelCase, getTypeInfo } from "../utils";
 
 interface ParameterEditorProps {
   value: string;
@@ -11,6 +12,20 @@ interface ParameterEditorProps {
   schema: Schema;
 }
 
+const generateInitialParameterValues = (
+  params: { name: string; type: unknown }[],
+  schema: Schema
+): Record<string, unknown> => {
+  return params.reduce((acc, param) => {
+    acc[camelCase(param.name)] = getTypeInfo(param.type, schema).defaultValue;
+    return acc;
+  }, {} as Record<string, unknown>);
+};
+
+const stringify = (values: Record<string, unknown>): string => {
+  return JSON.stringify(values, null, 2);
+};
+
 export const ParameterEditor = ({
   value,
   onChange,
@@ -18,27 +33,20 @@ export const ParameterEditor = ({
   schema,
 }: ParameterEditorProps) => {
   const [mode, setMode] = useState<"Raw" | "Rich">("Rich");
+  const lastFunctionRef = useRef(selectedFunction);
 
-  const handleRichEdit = (paramName: string, newValue: unknown) => {
-    try {
-      const currentValues = JSON.parse(value);
-      const updatedValues = {
-        ...currentValues,
-        [camelCase(paramName)]: newValue,
-      };
-      onChange(JSON.stringify(updatedValues, null, 2));
-    } catch (e) {
-      console.error("Failed to parse parameter values:", e);
+  // Initialize values when selectedFunction changes or value is empty
+  useEffect(() => {
+    const functionChanged = lastFunctionRef.current !== selectedFunction;
+    if (functionChanged || !value) {
+      const initialValues = generateInitialParameterValues(
+        selectedFunction.params,
+        schema
+      );
+      onChange(stringify(initialValues));
+      lastFunctionRef.current = selectedFunction;
     }
-  };
-
-  const getParamValue = (paramName: string) => {
-    try {
-      return JSON.parse(value)[camelCase(paramName)];
-    } catch {
-      return null;
-    }
-  };
+  }, [selectedFunction, schema, onChange, value]);
 
   return (
     <div style={{ marginBottom: "1rem" }}>
@@ -49,24 +57,14 @@ export const ParameterEditor = ({
       />
 
       {mode === "Raw" ? (
-        <textarea
-          className="common-textarea"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <RawParameterEditor value={value} onChange={onChange} />
       ) : (
-        <div className="rich-editor">
-          {selectedFunction.params.map((param) => (
-            <TypeBasedInput
-              key={param.name}
-              type={param.type}
-              schema={schema}
-              value={getParamValue(param.name)}
-              onChange={(newValue) => handleRichEdit(param.name, newValue)}
-              label={camelCase(param.name)}
-            />
-          ))}
-        </div>
+        <RichParameterEditor
+          value={value}
+          onChange={onChange}
+          selectedFunction={selectedFunction}
+          schema={schema}
+        />
       )}
     </div>
   );
