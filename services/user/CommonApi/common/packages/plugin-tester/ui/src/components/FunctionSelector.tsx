@@ -64,6 +64,7 @@ export function FunctionSelector({
 
   return (
     <div>
+      <h3 style={{ marginBottom: "0.5rem" }}>Functions</h3>
       <TabControl
         selectedTab={selectedInterfaceName || ""}
         onTabChange={handleInterfaceSelect}
