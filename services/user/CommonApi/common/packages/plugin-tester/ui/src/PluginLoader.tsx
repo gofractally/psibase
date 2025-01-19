@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Supervisor } from "@psibase/common-lib";
 import { ServiceInput } from "./components/ServiceInput";
 import { ExecutionTabs } from "./components/ExecutionTabs";
@@ -14,6 +14,22 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [selectedFunction, setSelectedFunction] =
     useState<SchemaFunction | null>(null);
   const [paramValues, setParamValues] = useState("");
+
+  useEffect(() => {
+    const fetchCurrentService = async () => {
+      try {
+        const response = await fetch("/common/thisservice");
+        const currentService = JSON.parse(await response.text());
+        if (currentService) {
+          setService(currentService);
+          loadSchema(currentService, plugin);
+        }
+      } catch (e) {
+        console.error("Error fetching current service:", e);
+      }
+    };
+    fetchCurrentService();
+  }, [plugin, loadSchema]);
 
   const downloadSchema = () => {
     const dataStr =
