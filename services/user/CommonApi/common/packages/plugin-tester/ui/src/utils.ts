@@ -14,7 +14,7 @@ export type NumericType =
   | "f32"
   | "f64";
 
-export type PrimitiveType = NumericType | "string" | "bool";
+export type PrimitiveType = NumericType | "string" | "bool" | "char";
 
 export type InputComponentType =
   | "string"
@@ -23,6 +23,7 @@ export type InputComponentType =
   | "optional"
   | "list"
   | "bytelist"
+  | "char"
   | "unsupported";
 
 interface NumericConstraints {
@@ -79,17 +80,16 @@ const numericConstraints: Record<NumericType, NumericConstraints> = {
 
 // Primitive type utilities
 export const isPrimitiveType = (type: string): type is PrimitiveType => {
-  return type === "string" || type === "bool" || type in numericConstraints;
+  return (
+    type === "string" ||
+    type === "bool" ||
+    type === "char" ||
+    type in numericConstraints
+  );
 };
 
 export const isNumericType = (type: string): type is NumericType => {
   return type in numericConstraints;
-};
-
-export const getPrimitiveDefaultValue = (type: PrimitiveType): unknown => {
-  if (isNumericType(type)) return 0;
-  if (type === "bool") return false;
-  return "";
 };
 
 export const getNumericConstraints = (
@@ -102,25 +102,19 @@ export const validateNumericInput = (value: string, type: string): boolean => {
   const constraints = getNumericConstraints(type);
   if (!constraints) return false;
 
-  if (constraints.is64Bit) {
-    try {
-      const bigValue = BigInt(value);
-      const minValue = BigInt(constraints.min);
-      const maxValue = BigInt(constraints.max);
-      return bigValue >= minValue && bigValue <= maxValue;
-    } catch {
-      return false;
-    }
-  }
-
-  const numValue = Number(value);
-  if (!constraints.allowFloat && !Number.isInteger(numValue)) {
+  if (value === "") return true;
+  if (value === "-" && !constraints.min.toString().startsWith("-"))
     return false;
-  }
 
-  return (
-    numValue >= Number(constraints.min) && numValue <= Number(constraints.max)
-  );
+  const num = constraints.is64Bit ? BigInt(value) : Number(value);
+  const min = constraints.is64Bit
+    ? BigInt(constraints.min.toString())
+    : Number(constraints.min);
+  const max = constraints.is64Bit
+    ? BigInt(constraints.max.toString())
+    : Number(constraints.max);
+
+  return num >= min && num <= max;
 };
 
 // String utilities
@@ -162,6 +156,7 @@ const getInputType = (type: unknown, schema: Schema): InputComponentType => {
     if (!isPrimitiveType(type)) return "unsupported";
     if (type === "string") return "string";
     if (type === "bool") return "boolean";
+    if (type === "char") return "char";
     if (isNumericType(type)) return "number";
     return "unsupported";
   }
@@ -235,6 +230,8 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
       return 0;
     case "boolean":
       return false;
+    case "char":
+      return "";
     case "list":
     case "bytelist":
       return [];

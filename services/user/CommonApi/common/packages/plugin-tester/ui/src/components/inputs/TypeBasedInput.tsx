@@ -5,6 +5,7 @@ import { BooleanInput } from "./BooleanInput";
 import { OptionalInput } from "./OptionalInput";
 import { ListInput } from "./ListInput";
 import { ByteListInput } from "./ByteListInput";
+import { CharInput } from "./CharInput";
 import { getTypeInfo } from "../../utils";
 import { useMemo } from "react";
 
@@ -53,6 +54,14 @@ export const TypeBasedInput = ({
     case "string":
       return (
         <StringInput
+          value={actualValue as string}
+          onChange={onChange}
+          label={typeLabel}
+        />
+      );
+    case "char":
+      return (
+        <CharInput
           value={actualValue as string}
           onChange={onChange}
           label={typeLabel}
