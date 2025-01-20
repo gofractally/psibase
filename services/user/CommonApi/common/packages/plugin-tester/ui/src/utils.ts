@@ -26,6 +26,7 @@ export type InputComponentType =
   | "char"
   | "tuple"
   | "variant"
+  | "enum"
   | "unsupported";
 
 interface NumericConstraints {
@@ -169,6 +170,7 @@ const getInputType = (type: unknown, schema: Schema): InputComponentType => {
     if (typeObj.list) return typeObj.list === "u8" ? "bytelist" : "list";
     if (typeObj.tuple) return "tuple";
     if (typeObj.variant) return "variant";
+    if (typeObj.enum) return "enum";
     if (typeObj.type) return getInputType(typeObj.type, schema);
   }
 
@@ -201,6 +203,9 @@ const getTypeName = (type: unknown, schema: Schema): string => {
       return `variant<${typeObj.variant.cases
         .map((c) => c.name + (c.type ? `<${getTypeName(c.type, schema)}>` : ""))
         .join(" | ")}>`;
+    }
+    if (typeObj.enum) {
+      return `enum<${typeObj.enum.cases.map((c) => c.name).join(" | ")}>`;
     }
     if (typeObj.type) {
       return getTypeName(typeObj.type, schema);
@@ -248,6 +253,13 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
           tag: firstCase.name,
           value: generateInitialValue(firstCase.type, schema),
         };
+      }
+      return "";
+    case "enum":
+      if (typeof type === "object" && type !== null && "enum" in type) {
+        const firstCase = (type as { enum: { cases: { name: string }[] } }).enum
+          .cases[0];
+        return firstCase.name;
       }
       return "";
   }

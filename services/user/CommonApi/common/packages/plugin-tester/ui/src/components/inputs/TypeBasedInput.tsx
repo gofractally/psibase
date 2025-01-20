@@ -8,6 +8,7 @@ import { ByteListInput } from "./ByteListInput";
 import { CharInput } from "./CharInput";
 import { TupleInput } from "./TupleInput";
 import { VariantInput, VariantValue } from "./VariantInput";
+import { EnumInput } from "./EnumInput";
 import { getTypeInfo } from "../../utils";
 import { useMemo } from "react";
 
@@ -152,6 +153,23 @@ export const TypeBasedInput = ({
               schema={schema}
               value={variantValue}
               onChange={onChange as (value: VariantValue) => void}
+              label={typeLabel}
+            />
+          );
+        }
+      }
+      break;
+    case "enum":
+      if (typeof resolvedType === "object" && resolvedType !== null) {
+        const typeObj = resolvedType as {
+          enum?: { cases: { name: string }[] };
+        };
+        if (typeObj.enum) {
+          return (
+            <EnumInput
+              cases={typeObj.enum.cases}
+              value={actualValue as string}
+              onChange={onChange}
               label={typeLabel}
             />
           );
