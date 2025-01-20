@@ -127,6 +127,9 @@
 .type-label {
   font-family: monospace;
   color: #888;
+  word-break: break-word;
+  white-space: normal;
+  display: inline-block;
 }
 
 .base64-status {
@@ -167,4 +170,56 @@
   margin-top: 0.5rem;
   padding-left: 1rem;
   border-left: 2px solid #555;
+}
+
+/* Record Input */
+.record-input {
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.record-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.record-header .expand-icon {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #226622;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  transform: rotate(0);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.record-header.expanded .expand-icon {
+  transform: rotate(90deg);
+}
+
+.record-header-content {
+  flex: 1;
+  min-width: 0;  /* allows content to shrink below flex item's min-content width */
+}
+
+.record-fields {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.2s ease;
+  padding-left: 20px;
+}
+
+.record-fields.expanded {
+  max-height: none;
+  opacity: 1;
+  padding-top: 8px;
 }

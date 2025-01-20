@@ -1,5 +1,8 @@
 import { ReactNode } from "react";
-import { getNumericConstraints, validateNumericInput } from "../../utils";
+import {
+  getNumericConstraints,
+  validateNumericInput,
+} from "../../NumericConstraints";
 
 interface NumberInputProps {
   value: number | bigint;

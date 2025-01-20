@@ -1,19 +1,9 @@
-import { Schema, TypeDefinition, VariantCase } from "./types";
-import { FunctionCallArgs } from "@psibase/common-lib";
+import { Schema, TypeDefinition } from "./types";
+import { NumericType, isNumericType } from "./NumericConstraints";
+import { camelCase } from "./StringUtils";
+import { withArgs } from "./RpcUtils";
 
 // Type definitions
-export type NumericType =
-  | "u8"
-  | "u16"
-  | "u32"
-  | "u64"
-  | "s8"
-  | "s16"
-  | "s32"
-  | "s64"
-  | "f32"
-  | "f64";
-
 export type PrimitiveType = NumericType | "string" | "bool" | "char";
 
 export type InputComponentType =
@@ -27,261 +17,149 @@ export type InputComponentType =
   | "tuple"
   | "variant"
   | "enum"
+  | "record"
   | "unsupported";
 
-interface NumericConstraints {
-  min: string | number;
-  max: string | number;
-  step: number | "any";
-  allowFloat: boolean;
-  is64Bit: boolean;
-}
+export const isPrimitiveType = (type: string): type is PrimitiveType =>
+  type === "string" ||
+  type === "bool" ||
+  type === "char" ||
+  isNumericType(type);
 
-// Numeric type constraints
-const numericConstraints: Record<NumericType, NumericConstraints> = {
-  u8: { min: 0, max: 255, step: 1, allowFloat: false, is64Bit: false },
-  u16: { min: 0, max: 65535, step: 1, allowFloat: false, is64Bit: false },
-  u32: { min: 0, max: 4294967295, step: 1, allowFloat: false, is64Bit: false },
-  u64: {
-    min: "0",
-    max: "18446744073709551615",
-    step: 1,
-    allowFloat: false,
-    is64Bit: true,
-  },
-  s8: { min: -128, max: 127, step: 1, allowFloat: false, is64Bit: false },
-  s16: { min: -32768, max: 32767, step: 1, allowFloat: false, is64Bit: false },
-  s32: {
-    min: -2147483648,
-    max: 2147483647,
-    step: 1,
-    allowFloat: false,
-    is64Bit: false,
-  },
-  s64: {
-    min: "-9223372036854775808",
-    max: "9223372036854775807",
-    step: 1,
-    allowFloat: false,
-    is64Bit: true,
-  },
-  f32: {
-    min: -3.4e38,
-    max: 3.4e38,
-    step: "any",
-    allowFloat: true,
-    is64Bit: false,
-  },
-  f64: {
-    min: -1.7976931348623157e308,
-    max: 1.7976931348623157e308,
-    step: "any",
-    allowFloat: true,
-    is64Bit: false,
-  },
-} as const;
+// Re-export utilities
+export { camelCase, withArgs };
 
-// Primitive type utilities
-export const isPrimitiveType = (type: string): type is PrimitiveType => {
-  return (
-    type === "string" ||
-    type === "bool" ||
-    type === "char" ||
-    type in numericConstraints
-  );
-};
-
-export const isNumericType = (type: string): type is NumericType => {
-  return type in numericConstraints;
-};
-
-export const getNumericConstraints = (
-  type: string
-): NumericConstraints | null => {
-  return isNumericType(type) ? numericConstraints[type] : null;
-};
-
-export const validateNumericInput = (value: string, type: string): boolean => {
-  const constraints = getNumericConstraints(type);
-  if (!constraints) return false;
-
-  if (value === "") return true;
-  if (value === "-" && !constraints.min.toString().startsWith("-"))
-    return false;
-
-  const num = constraints.is64Bit ? BigInt(value) : Number(value);
-  const min = constraints.is64Bit
-    ? BigInt(constraints.min.toString())
-    : Number(constraints.min);
-  const max = constraints.is64Bit
-    ? BigInt(constraints.max.toString())
-    : Number(constraints.max);
-
-  return num >= min && num <= max;
-};
-
-// String utilities
-export function camelCase(str: string): string {
-  return str
-    .split(/[-_ ]+/)
-    .map((w, i) =>
-      i === 0
-        ? w.toLowerCase()
-        : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-    )
-    .join("");
-}
-
-// RPC utilities
-export function withArgs(
-  service: string,
-  plugin: string,
-  intf: string,
-  method: string,
-  params: unknown[] = []
-): FunctionCallArgs {
-  return {
-    service,
-    plugin,
-    intf,
-    method,
-    params,
-  };
-}
-
-// Internal type utilities
-const getInputType = (type: unknown, schema: Schema): InputComponentType => {
-  if (typeof type === "number") {
-    return getInputType(schema.types[type].kind, schema);
-  }
-
-  if (typeof type === "string") {
-    if (!isPrimitiveType(type)) return "unsupported";
-    if (type === "string") return "string";
-    if (type === "bool") return "boolean";
-    if (type === "char") return "char";
-    if (isNumericType(type)) return "number";
-    return "unsupported";
-  }
-
-  if (typeof type === "object" && type !== null) {
-    const typeObj = type as TypeDefinition["kind"];
-    if (typeObj.option) return "optional";
-    if (typeObj.list) return typeObj.list === "u8" ? "bytelist" : "list";
-    if (typeObj.tuple) return "tuple";
-    if (typeObj.variant) return "variant";
-    if (typeObj.enum) return "enum";
-    if (typeObj.type) return getInputType(typeObj.type, schema);
-  }
-
-  return "unsupported";
-};
-
-const getTypeName = (type: unknown, schema: Schema): string => {
-  if (typeof type === "number") {
-    return getTypeName(schema.types[type].kind, schema);
-  }
-
-  if (typeof type === "string") {
-    return type;
-  }
-
-  if (typeof type === "object" && type !== null) {
-    const typeObj = type as TypeDefinition["kind"];
-    if (typeObj.option) {
-      return `optional<${getTypeName(typeObj.option, schema)}>`;
-    }
-    if (typeObj.list) {
-      return `list<${getTypeName(typeObj.list, schema)}>`;
-    }
-    if (typeObj.tuple) {
-      return `tuple<${typeObj.tuple.types
-        .map((t) => getTypeName(t, schema))
-        .join(", ")}>`;
-    }
-    if (typeObj.variant) {
-      return `variant<${typeObj.variant.cases
-        .map((c) => c.name + (c.type ? `<${getTypeName(c.type, schema)}>` : ""))
-        .join(" | ")}>`;
-    }
-    if (typeObj.enum) {
-      return `enum<${typeObj.enum.cases.map((c) => c.name).join(" | ")}>`;
-    }
-    if (typeObj.type) {
-      return getTypeName(typeObj.type, schema);
-    }
-  }
-
-  return "unsupported";
-};
-
-const generateInitialValue = (type: unknown, schema: Schema): unknown => {
-  if (typeof type === "number") {
-    return generateInitialValue(schema.types[type].kind, schema);
-  }
-
-  const inputType = getInputType(type, schema);
-  switch (inputType) {
-    case "string":
-      return "";
-    case "number":
-      return 0;
-    case "boolean":
-      return false;
-    case "char":
-      return "";
-    case "list":
-    case "bytelist":
-      return [];
-    case "optional":
-      return null;
-    case "tuple":
-      if (typeof type === "object" && type !== null && "tuple" in type) {
-        const tupleTypes = (type as { tuple: { types: unknown[] } }).tuple
-          .types;
-        return tupleTypes.map((t) => generateInitialValue(t, schema));
-      }
-      return [];
-    case "variant":
-      if (typeof type === "object" && type !== null && "variant" in type) {
-        const firstCase = (type as { variant: { cases: VariantCase[] } })
-          .variant.cases[0];
-        if (!firstCase.type) {
-          return { tag: firstCase.name };
-        }
-        return {
-          tag: firstCase.name,
-          value: generateInitialValue(firstCase.type, schema),
-        };
-      }
-      return "";
-    case "enum":
-      if (typeof type === "object" && type !== null && "enum" in type) {
-        const firstCase = (type as { enum: { cases: { name: string }[] } }).enum
-          .cases[0];
-        return firstCase.name;
-      }
-      return "";
-  }
-
-  return "";
-};
-
-export interface TypeInfo {
+// Type system types
+interface TypeInfo {
   inputType: InputComponentType;
   typeName: string;
   defaultValue: unknown;
 }
 
-export const getTypeInfo = (type: unknown, schema: Schema): TypeInfo => {
-  // Handle type references first
+interface TypeField {
+  name: string;
+  type: unknown;
+}
+
+interface TypeCase {
+  name: string;
+  type?: unknown;
+}
+
+interface TypeHandler<T> {
+  primitive: (type: string) => T;
+  option: (inner: TypeKind, schema: Schema) => T;
+  list: (inner: TypeKind, schema: Schema) => T;
+  tuple: (types: TypeKind[], schema: Schema) => T;
+  variant: (cases: TypeCase[], schema: Schema) => T;
+  enum: (cases: { name: string }[]) => T;
+  record: (fields: TypeField[], schema: Schema) => T;
+  unsupported: () => T;
+}
+
+type TypeKind = unknown;
+
+// Type system implementation
+const handleType = <T>(
+  type: TypeKind,
+  schema: Schema,
+  handler: TypeHandler<T>
+): T => {
   if (typeof type === "number") {
-    return getTypeInfo(schema.types[type].kind, schema);
+    return handleType(schema.types[type].kind, schema, handler);
   }
 
-  return {
-    inputType: getInputType(type, schema),
-    typeName: getTypeName(type, schema),
-    defaultValue: generateInitialValue(type, schema),
-  };
+  if (typeof type === "string") {
+    return isPrimitiveType(type)
+      ? handler.primitive(type)
+      : handler.unsupported();
+  }
+
+  if (typeof type === "object" && type !== null) {
+    const typeObj = type as TypeDefinition["kind"];
+    if (typeObj.option) return handler.option(typeObj.option, schema);
+    if (typeObj.list) return handler.list(typeObj.list, schema);
+    if (typeObj.tuple) return handler.tuple(typeObj.tuple.types, schema);
+    if (typeObj.variant) return handler.variant(typeObj.variant.cases, schema);
+    if (typeObj.enum) return handler.enum(typeObj.enum.cases);
+    if (typeObj.record) return handler.record(typeObj.record.fields, schema);
+    if (typeObj.type) return handleType(typeObj.type, schema, handler);
+  }
+
+  return handler.unsupported();
 };
+
+const inputTypeHandler: TypeHandler<InputComponentType> = {
+  primitive: (type) =>
+    type === "string"
+      ? "string"
+      : type === "char"
+      ? "char"
+      : type === "bool"
+      ? "boolean"
+      : "number",
+  option: () => "optional",
+  list: (inner) => (inner === "u8" ? "bytelist" : "list"),
+  tuple: () => "tuple",
+  variant: () => "variant",
+  enum: () => "enum",
+  record: () => "record",
+  unsupported: () => "unsupported",
+};
+
+const typeNameHandler: TypeHandler<string> = {
+  primitive: (type) => type,
+  option: (inner, schema) =>
+    `option<${handleType(inner, schema, typeNameHandler)}>`,
+  list: (inner, schema) =>
+    `list<${handleType(inner, schema, typeNameHandler)}>`,
+  tuple: (types, schema) =>
+    `tuple<${types
+      .map((t) => handleType(t, schema, typeNameHandler))
+      .join(", ")}>`,
+  variant: (cases, schema) =>
+    `variant<${cases
+      .map((c) =>
+        c.type
+          ? `${c.name}: ${handleType(c.type, schema, typeNameHandler)}`
+          : c.name
+      )
+      .join(", ")}>`,
+  enum: (cases) => `enum<${cases.map((c) => c.name).join(", ")}>`,
+  record: (fields, schema) =>
+    `record<${fields
+      .map((f) => `${f.name}: ${handleType(f.type, schema, typeNameHandler)}`)
+      .join(", ")}>`,
+  unsupported: () => "unknown",
+};
+
+const initialValueHandler: TypeHandler<unknown> = {
+  primitive: (type) =>
+    type === "string" || type === "char" ? "" : type === "bool" ? false : 0,
+  option: () => null,
+  list: (inner) => (inner === "u8" ? new Uint8Array() : []),
+  tuple: (types, schema) =>
+    types.map((t) => handleType(t, schema, initialValueHandler)),
+  variant: (cases, schema) => ({
+    tag: cases[0].name,
+    val: cases[0].type
+      ? handleType(cases[0].type, schema, initialValueHandler)
+      : undefined,
+  }),
+  enum: (cases) => cases[0].name,
+  record: (fields, schema) =>
+    fields.reduce(
+      (acc, field) => ({
+        ...acc,
+        [field.name]: handleType(field.type, schema, initialValueHandler),
+      }),
+      {}
+    ),
+  unsupported: () => null,
+};
+
+export const getTypeInfo = (type: TypeKind, schema: Schema): TypeInfo => ({
+  inputType: handleType(type, schema, inputTypeHandler),
+  typeName: handleType(type, schema, typeNameHandler),
+  defaultValue: handleType(type, schema, initialValueHandler),
+});
