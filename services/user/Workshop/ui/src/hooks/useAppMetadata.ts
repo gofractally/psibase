@@ -1,9 +1,26 @@
 import { supervisor } from "@/main";
 import { useQuery } from "@tanstack/react-query";
+import { Params } from "./useSetMetadata";
+import { z } from "zod";
+
+export const Status = z.enum(["draft", "published", "unpublished"]);
+
+export const MetadataResponse = z.object({
+  appMetadata: Params,
+  extraMetadata: z.object({
+    createdAt: z.string(),
+    status: Status,
+  }),
+});
+
+export const appMetadataQueryKey = (appName: string | undefined | null) => [
+  "appMetadata",
+  appName,
+];
 
 export const useAppMetadata = (appName: string | undefined | null) =>
   useQuery({
-    queryKey: ["appMetadata", appName],
+    queryKey: appMetadataQueryKey(appName),
     enabled: !!appName,
     queryFn: async () => {
       const res = await supervisor.functionCall({
@@ -12,7 +29,7 @@ export const useAppMetadata = (appName: string | undefined | null) =>
         service: "registry",
         intf: "consumer",
       });
-      console.log(res, "is the res");
-      return res;
+
+      return MetadataResponse.parse(res);
     },
   });
