@@ -163,7 +163,7 @@ namespace psibase::net
       // The most recent hello message sent or the next queued hello message
       HelloRequest                   hello;
       bool                           hello_sent;
-      std::optional<ExtendedBlockId> last_received;
+      std::optional<ExtendedBlockId> common;
    };
 
    struct ConnectionStateSendFastForward
@@ -380,13 +380,13 @@ namespace psibase::net
       {
          if (state.hello.committed)
          {
-            if (state.last_received)
+            if (state.common)
             {
-               if (auto* b = chain().get_state(state.last_received->id()))
+               if (auto* b = chain().get_state(state.common->id()))
                {
-                  state.last_received = b->xid();
+                  state.common = chain().get_common_ancestor(b->xid());
                }
-               else if (state.last_received->num() > chain().commit_index())
+               else if (state.common->num() > chain().commit_index())
                {
                   // The peer gave us a future block. It is impossible for both peers
                   // to reach this state.
@@ -418,15 +418,14 @@ namespace psibase::net
 
       ConnectionStateReady make_connection_ready(const ConnectionStateStart& state)
       {
-         return ConnectionStateReady{.last_sent = chain().get_common_ancestor(*state.last_received),
-                                     .last_received = *state.last_received};
+         return ConnectionStateReady{.last_sent = *state.common, .last_received = *state.common};
       }
 
       void recv(peer_id origin, const HelloRequest& request)
       {
          auto& connection = get_connection(origin);
          auto* state      = std::get_if<ConnectionStateStart>(&connection.state);
-         if (!state || state->last_received)
+         if (!state || state->common)
          {
             // If we've already found a common block, we can ignore the
             // rest of the peer's hello messages.
@@ -456,17 +455,17 @@ namespace psibase::net
          if (request.xid.id() == Checksum256{})
          {
             // sync from genesis
-            state->last_received = {Checksum256{}, 1};
+            state->common = {Checksum256{}, 1};
          }
          else
          {
             if (auto* b = chain().get_state(request.xid.id()))
             {
-               state->last_received = b->xid();
+               state->common = chain().get_common_ancestor(b->xid());
             }
             else if (chain().get_block_id(request.xid.num()) == request.xid.id())
             {
-               state->last_received = request.xid;
+               state->common = request.xid;
             }
             else if (request.committed && request.xid.num() <= chain().commit_index())
             {
@@ -481,7 +480,7 @@ namespace psibase::net
                // definitely ahead of us, and we need to wait.
                // If we have not yet sent our committed block ID, then
                // we'll re-evaluate when we do.
-               state->last_received = request.xid;
+               state->common = request.xid;
                return;
             }
             else
@@ -918,6 +917,13 @@ namespace psibase::net
                {
                   state->hello.xid  = new_id;
                   state->hello_sent = false;
+               }
+               if (state->common)
+               {
+                  if (auto common_state = chain().get_state(state->common->id()))
+                  {
+                     state->common = chain().get_common_ancestor(common_state->xid());
+                  }
                }
             }
             // if last sent block is after committed, back it up to the nearest block in the chain
