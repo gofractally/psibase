@@ -6,6 +6,7 @@ import { OptionalInput } from "./OptionalInput";
 import { ListInput } from "./ListInput";
 import { ByteListInput } from "./ByteListInput";
 import { CharInput } from "./CharInput";
+import { TupleInput } from "./TupleInput";
 import { getTypeInfo } from "../../utils";
 import { useMemo } from "react";
 
@@ -119,6 +120,22 @@ export const TypeBasedInput = ({
             label={typeLabel}
           />
         );
+      }
+      break;
+    case "tuple":
+      if (typeof resolvedType === "object" && resolvedType !== null) {
+        const typeObj = resolvedType as { tuple?: { types: unknown[] } };
+        if (typeObj.tuple) {
+          return (
+            <TupleInput
+              types={typeObj.tuple.types}
+              schema={schema}
+              value={Array.isArray(value) ? value : []}
+              onChange={onChange}
+              label={typeLabel}
+            />
+          );
+        }
       }
       break;
     case "unsupported":

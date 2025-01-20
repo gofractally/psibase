@@ -24,6 +24,7 @@ export type InputComponentType =
   | "list"
   | "bytelist"
   | "char"
+  | "tuple"
   | "unsupported";
 
 interface NumericConstraints {
@@ -162,11 +163,11 @@ const getInputType = (type: unknown, schema: Schema): InputComponentType => {
   }
 
   if (typeof type === "object" && type !== null) {
-    const typeObj = type as { option?: unknown; list?: unknown };
+    const typeObj = type as TypeDefinition["kind"];
     if (typeObj.option) return "optional";
-    if (typeObj.list) {
-      return typeObj.list === "u8" ? "bytelist" : "list";
-    }
+    if (typeObj.list) return typeObj.list === "u8" ? "bytelist" : "list";
+    if (typeObj.tuple) return "tuple";
+    if (typeObj.type) return getInputType(typeObj.type, schema);
   }
 
   return "unsupported";
@@ -181,40 +182,25 @@ const getTypeName = (type: unknown, schema: Schema): string => {
     return type;
   }
 
-  if (typeof type !== "object" || type === null) {
-    return "unknown";
+  if (typeof type === "object" && type !== null) {
+    const typeObj = type as TypeDefinition["kind"];
+    if (typeObj.option) {
+      return `optional<${getTypeName(typeObj.option, schema)}>`;
+    }
+    if (typeObj.list) {
+      return `list<${getTypeName(typeObj.list, schema)}>`;
+    }
+    if (typeObj.tuple) {
+      return `tuple<${typeObj.tuple.types
+        .map((t) => getTypeName(t, schema))
+        .join(", ")}>`;
+    }
+    if (typeObj.type) {
+      return getTypeName(typeObj.type, schema);
+    }
   }
 
-  const typeObj = type as TypeDefinition["kind"];
-  if (typeObj.list) {
-    return `list<${getTypeName(typeObj.list, schema)}>`;
-  }
-  if (typeObj.option) {
-    return `optional<${getTypeName(typeObj.option, schema)}>`;
-  }
-  if (typeObj.tuple) {
-    return `tuple<${typeObj.tuple.types
-      .map((t) => getTypeName(t, schema))
-      .join(", ")}>`;
-  }
-  if (typeObj.variant) {
-    return `variant<${typeObj.variant.cases
-      .map((c) => c.name + (c.type ? `<${getTypeName(c.type, schema)}>` : ""))
-      .join(" | ")}>`;
-  }
-  if (typeObj.enum) {
-    return `enum<${typeObj.enum.cases.map((c) => c.name).join(" | ")}>`;
-  }
-  if (typeObj.record) {
-    return `record<${typeObj.record.fields
-      .map((f) => `${f.name}: ${getTypeName(f.type, schema)}`)
-      .join(", ")}>`;
-  }
-  if (typeObj.type) {
-    return getTypeName(typeObj.type, schema);
-  }
-
-  return "unknown";
+  return "unsupported";
 };
 
 const generateInitialValue = (type: unknown, schema: Schema): unknown => {
@@ -237,6 +223,13 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
       return [];
     case "optional":
       return null;
+    case "tuple":
+      if (typeof type === "object" && type !== null && "tuple" in type) {
+        const tupleTypes = (type as { tuple: { types: unknown[] } }).tuple
+          .types;
+        return tupleTypes.map((t) => generateInitialValue(t, schema));
+      }
+      return [];
   }
 
   // Handle remaining complex types
@@ -252,11 +245,6 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
       );
     }
     if (typeObj.type) return generateInitialValue(typeObj.type, schema);
-    if (typeObj.tuple) {
-      return typeObj.tuple.types.map((type) =>
-        generateInitialValue(type, schema)
-      );
-    }
     if (typeObj.variant) {
       const firstCase = typeObj.variant.cases[0];
       if (!firstCase.type) {
