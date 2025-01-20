@@ -25,6 +25,11 @@ export interface World {
   exports?: Record<string, ExportedInterface>;
 }
 
+export interface VariantCase {
+  name: string;
+  type?: unknown;
+}
+
 export interface TypeDefinition {
   kind: {
     record?: {
@@ -40,10 +45,7 @@ export interface TypeDefinition {
       types: unknown[];
     };
     variant?: {
-      cases: Array<{
-        name: string;
-        type?: unknown;
-      }>;
+      cases: VariantCase[];
     };
     enum?: {
       cases: Array<{

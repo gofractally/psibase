@@ -7,6 +7,7 @@ import { ListInput } from "./ListInput";
 import { ByteListInput } from "./ByteListInput";
 import { CharInput } from "./CharInput";
 import { TupleInput } from "./TupleInput";
+import { VariantInput, VariantValue } from "./VariantInput";
 import { getTypeInfo } from "../../utils";
 import { useMemo } from "react";
 
@@ -132,6 +133,25 @@ export const TypeBasedInput = ({
               schema={schema}
               value={Array.isArray(value) ? value : []}
               onChange={onChange}
+              label={typeLabel}
+            />
+          );
+        }
+      }
+      break;
+    case "variant":
+      if (typeof resolvedType === "object" && resolvedType !== null) {
+        const typeObj = resolvedType as {
+          variant?: { cases: { name: string; type?: unknown }[] };
+        };
+        if (typeObj.variant) {
+          const variantValue = actualValue as VariantValue;
+          return (
+            <VariantInput
+              cases={typeObj.variant.cases}
+              schema={schema}
+              value={variantValue}
+              onChange={onChange as (value: VariantValue) => void}
               label={typeLabel}
             />
           );

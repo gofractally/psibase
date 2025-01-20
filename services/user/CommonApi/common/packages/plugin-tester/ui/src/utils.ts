@@ -1,4 +1,4 @@
-import { Schema, TypeDefinition } from "./types";
+import { Schema, TypeDefinition, VariantCase } from "./types";
 import { FunctionCallArgs } from "@psibase/common-lib";
 
 // Type definitions
@@ -25,6 +25,7 @@ export type InputComponentType =
   | "bytelist"
   | "char"
   | "tuple"
+  | "variant"
   | "unsupported";
 
 interface NumericConstraints {
@@ -167,6 +168,7 @@ const getInputType = (type: unknown, schema: Schema): InputComponentType => {
     if (typeObj.option) return "optional";
     if (typeObj.list) return typeObj.list === "u8" ? "bytelist" : "list";
     if (typeObj.tuple) return "tuple";
+    if (typeObj.variant) return "variant";
     if (typeObj.type) return getInputType(typeObj.type, schema);
   }
 
@@ -194,6 +196,11 @@ const getTypeName = (type: unknown, schema: Schema): string => {
       return `tuple<${typeObj.tuple.types
         .map((t) => getTypeName(t, schema))
         .join(", ")}>`;
+    }
+    if (typeObj.variant) {
+      return `variant<${typeObj.variant.cases
+        .map((c) => c.name + (c.type ? `<${getTypeName(c.type, schema)}>` : ""))
+        .join(" | ")}>`;
     }
     if (typeObj.type) {
       return getTypeName(typeObj.type, schema);
@@ -230,33 +237,19 @@ const generateInitialValue = (type: unknown, schema: Schema): unknown => {
         return tupleTypes.map((t) => generateInitialValue(t, schema));
       }
       return [];
-  }
-
-  // Handle remaining complex types
-  if (typeof type === "object" && type !== null) {
-    const typeObj = type as TypeDefinition["kind"];
-    if (typeObj.record) {
-      return typeObj.record.fields.reduce(
-        (acc: Record<string, unknown>, field) => {
-          acc[camelCase(field.name)] = generateInitialValue(field.type, schema);
-          return acc;
-        },
-        {}
-      );
-    }
-    if (typeObj.type) return generateInitialValue(typeObj.type, schema);
-    if (typeObj.variant) {
-      const firstCase = typeObj.variant.cases[0];
-      if (!firstCase.type) {
-        return firstCase.name;
+    case "variant":
+      if (typeof type === "object" && type !== null && "variant" in type) {
+        const firstCase = (type as { variant: { cases: VariantCase[] } })
+          .variant.cases[0];
+        if (!firstCase.type) {
+          return { tag: firstCase.name };
+        }
+        return {
+          tag: firstCase.name,
+          value: generateInitialValue(firstCase.type, schema),
+        };
       }
-      return {
-        [firstCase.name]: generateInitialValue(firstCase.type, schema),
-      };
-    }
-    if (typeObj.enum) {
-      return typeObj.enum.cases[0].name;
-    }
+      return "";
   }
 
   return "";
