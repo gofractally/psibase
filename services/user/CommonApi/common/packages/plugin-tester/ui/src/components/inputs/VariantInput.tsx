@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Schema } from "../../types";
 import { TypeBasedInput } from "./TypeBasedInput";
+import { EnumInput } from "./EnumInput";
 import { getTypeInfo } from "../../utils";
 
 interface VariantCase {
@@ -10,7 +11,7 @@ interface VariantCase {
 
 export interface VariantValue {
   tag: string;
-  value?: unknown;
+  val?: unknown;
 }
 
 interface VariantInputProps {
@@ -28,53 +29,41 @@ export const VariantInput = ({
   onChange,
   label,
 }: VariantInputProps) => {
-  // Get the currently selected case, defaulting to first case if value is null/undefined
   const selectedCase = value?.tag ?? cases[0].name;
+  const selectedVariant = cases.find((c) => c.name === selectedCase);
 
   const handleCaseChange = (caseName: string) => {
     const selectedVariant = cases.find((c) => c.name === caseName);
     if (!selectedVariant) return;
 
-    // If the variant case has no type, just use the tag
     if (!selectedVariant.type) {
       onChange({ tag: caseName });
-      return;
+    } else {
+      onChange({
+        tag: caseName,
+        val: getTypeInfo(selectedVariant.type, schema).defaultValue,
+      });
     }
-
-    // Otherwise include both tag and value
-    onChange({
-      tag: caseName,
-      value: getTypeInfo(selectedVariant.type, schema).defaultValue,
-    });
   };
 
   const handleValueChange = (newValue: unknown) => {
-    onChange({ tag: selectedCase, value: newValue });
+    onChange({ tag: selectedCase, val: newValue });
   };
-
-  const selectedVariant = cases.find((c) => c.name === selectedCase);
 
   return (
     <div className="input-field">
-      {label && <label>{label}</label>}
-      <select
-        className="common-input"
+      <EnumInput
+        cases={cases}
         value={selectedCase}
-        onChange={(e) => handleCaseChange(e.target.value)}
-        style={{ marginBottom: "0.5rem" }}
-      >
-        {cases.map((c) => (
-          <option key={c.name} value={c.name}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+        onChange={handleCaseChange}
+        label={label}
+      />
       {!!selectedVariant?.type && (
         <div className="variant-content">
           <TypeBasedInput
             type={selectedVariant.type}
             schema={schema}
-            value={value?.value}
+            value={value?.val}
             onChange={handleValueChange}
           />
         </div>
