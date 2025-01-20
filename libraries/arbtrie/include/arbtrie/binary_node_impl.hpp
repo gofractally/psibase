@@ -103,7 +103,7 @@ namespace arbtrie
                                    const clone_config& cfg)
        : node_header(asize, nid, node_type::binary), _alloc_pos(0)
    {
-      assert(asize <= 4096);
+      assert(asize <= binary_node_max_size);
       _branch_cap = cfg.branch_cap;
    }
    inline binary_node::binary_node(int_fast16_t        asize,
@@ -136,7 +136,7 @@ namespace arbtrie
        : node_header(asize, nid, node_type::binary, src->num_branches()),
          _alloc_pos(src->_alloc_pos)
    {
-      assert(asize <= 4096);
+      assert(asize <= binary_node_max_size);
       assert(not cfg.set_prefix);
       assert(alloc_size(src, cfg) <= asize);
 
@@ -171,7 +171,7 @@ namespace arbtrie
                                    const clone_update& up)
        : node_header(asize, nid, node_type::binary, src->num_branches()), _alloc_pos(0)
    {
-      assert(asize <= 4096);
+      assert(asize <= binary_node_max_size);
       assert(alloc_size(src, cfg, up) <= asize);
       _branch_cap = min_branch_cap(src->num_branches());
       _dead_space = 0;
@@ -236,7 +236,7 @@ namespace arbtrie
                                    const clone_remove& rem)
        : node_header(asize, nid, node_type::binary, src->num_branches() - 1), _alloc_pos(0)
    {
-      assert(asize <= 4096);
+      assert(asize <= binary_node_max_size);
       assert(alloc_size(src, cfg, rem) <= asize);
       _branch_cap = min_branch_cap(src->num_branches()-1); //round_up_multiple<64>(bcap * 4) / 4;
       _branch_id_region = src->_branch_id_region;

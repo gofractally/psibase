@@ -4,10 +4,12 @@ namespace arbtrie
 {
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
+      pushkey( in->key() );
       return query == key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
+      pushkey( in->key() );
       return query == key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
@@ -268,8 +270,16 @@ namespace arbtrie
             return handle_inner(oref.as<full_node>());
          case node_type::setlist:
             return handle_inner(oref.as<setlist_node>());
+         case node_type::value:
+         {
+            auto vn = oref.as<value_node>();
+            popkey( vn->key().size() );
+            _path.pop_back();
+            return next();
+         }
          default:
-            throw std::runtime_error("iterator::next unexpected type");
+            TRIEDENT_WARN( "unexpected type: ", oref.type() );
+            throw std::runtime_error("iterator::next unexpected type: ");
       }
       // unreachable
    }

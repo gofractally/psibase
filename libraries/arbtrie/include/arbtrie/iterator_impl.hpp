@@ -46,7 +46,7 @@ namespace arbtrie
          {
             auto b0 = rr.as<value_node>();
             buffer.resize(b0->value_size());
-            memcpy(buffer.data(), b0->body(), b0->value_size());
+            memcpy(buffer.data(), b0->value().data(), b0->value_size());
             return b0->value_size();
          }
 

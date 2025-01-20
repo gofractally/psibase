@@ -165,7 +165,6 @@ namespace arbtrie
       friend class node_handle;
       read_session(database& db);
       database&              _db;
-      seg_allocator::session _segas;
 
       int get(object_ref<node_header>&                root,
               key_view                                key,
@@ -184,6 +183,8 @@ namespace arbtrie
               std::invocable<bool, value_type> auto&& callback);
 
      public:
+      seg_allocator::session _segas;
+
       iterator    create_iterator(node_handle h) { return iterator(*this, h); }
       node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
 

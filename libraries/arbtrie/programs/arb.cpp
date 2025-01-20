@@ -217,7 +217,7 @@ void print_pre(session_rlock&           state,
          std::cerr << "VALUE: id: " << i << "\n";
          return;
       default:
-         std::cerr << "UNKNOWN!: id: " << i << "\n";
+         std::cerr << "UNKNOWN!: id: " << i << "  " << obj.type() <<"\n";
          return;
    }
 }
@@ -256,10 +256,35 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
    }
 }
 
+void print(session_rlock& state, const full_node* sl, int depth = 0) {
+   std::cerr << "FULL r" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
+             << "\" cps: " <<sl->get_prefix().size() << " id: " << sl->address() << " ";
+   if (sl->has_eof_value())
+   {
+      std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
+                << "' branches: " << std::dec << sl->num_branches() << " \n";
+   } else  {
+      std::cerr <<"\n";
+   }
+   sl->visit_branches_with_br(
+       [&](int br, fast_meta_address bid)
+       {
+          if (not br)
+             return;
+          indent(depth);
+          //std::cerr << "'"<<char(br-1)<<"' -> ";
+          std::cerr << "'" << br << "' -> ";
+          print(state, bid, depth + 1);
+       });
+}
+void print(session_rlock& state, const value_node* sl, int depth = 0)
+{
+   std::cerr << "KSIZE: " << sl->key().size() << " VSIZE: " << sl->value_size() <<" id: "<< sl->address() <<  " key: " << bswap( *(uint64_t*)sl->key().data() ) <<" = " <<bswap( *(uint64_t*)sl->value().data() ) << "\n";
+}
 void print(session_rlock& state, const setlist_node* sl, int depth = 0)
 {
-   std::cerr << "SLN r" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
-             << "\"  id: " << sl->address() << " ";
+   std::cerr << "SLNr" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
+             << "\" cps: " <<sl->get_prefix().size() << " id: " << sl->address() << " ";
    if (sl->has_eof_value())
    {
       std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
@@ -338,11 +363,14 @@ void print(session_rlock& state, fast_meta_address i, int depth)
          return print(state, obj.as<binary_node>(), depth);
       case node_type::setlist:
          return print(state, obj.as<setlist_node>(), depth);
+      case node_type::full:
+         return print(state, obj.as<full_node>(), depth);
       case node_type::value:
+         return print(state, obj.as<value_node>(), depth);
          std::cerr << "VALUE: id: " << i << "\n";
          return;
       default:
-         std::cerr << "UNKNOWN!: id: " << i << "\n";
+         std::cerr << "UNKNOWN!: id: " << i << " " << obj.type() << " -\n";
          return;
    }
 }
@@ -398,10 +426,15 @@ int  main(int argc, char** argv)
 
          auto iterate_all = [&]()
          {
-            {
+            try {
                uint64_t item_count = 0;
                auto     itr        = ws.create_iterator(r);
                assert(not itr.valid());
+
+               //{
+               //auto l = ws._segas.lock();
+               //print(l, r.address());
+              // }
 
                std::vector<uint8_t> data;
                auto              start = std::chrono::steady_clock::now();
@@ -409,11 +442,13 @@ int  main(int argc, char** argv)
                {
                   itr.read_value(data);
                   ++item_count;
+    //              std::cerr << bswap(*((uint64_t*)data.data())) <<" - key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data()) ) <<" \n";
                }
                while (itr.next())
                {
                   itr.key();
                   itr.read_value(data);
+     //             std::cerr << bswap(*((uint64_t*)data.data())) <<" + key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data() )) <<" \n";
                   ++item_count;
                }
                auto end   = std::chrono::steady_clock::now();
@@ -423,6 +458,11 @@ int  main(int argc, char** argv)
                                 int64_t(item_count) /
                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                          << " items/sec  total items: " << add_comma(item_count) << "\n";
+            }
+            catch (const std::exception& e)
+            {
+               TRIEDENT_WARN("Caught Exception: ", e.what());
+               throw;
             }
          };
 
@@ -522,7 +562,7 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
-         iterate_all();
+         //iterate_all();
          /*
          {
             auto l = ws._segas.lock();
@@ -530,7 +570,7 @@ int  main(int argc, char** argv)
          }
          */
          auto start_big_end = seq3;
-         std::cerr << "insert big endian seq\n";
+         std::cerr << "insert big endian seq starting with: "<< seq3 <<"\n";
          for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
@@ -545,7 +585,7 @@ int  main(int argc, char** argv)
                   ws.set_root<sync_type::sync>(r);
                }
                
-               /*
+               
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -559,7 +599,6 @@ int  main(int argc, char** argv)
                             assert(r.view() == kstr);
                          }
                       });
-                      */
                       
             }
             ws.set_root<sync_type::sync>(r);
@@ -571,9 +610,11 @@ int  main(int argc, char** argv)
                              (count) /
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
+            iterate_all();
+         //   TRIEDENT_WARN( "didn't fail.." );
          }
          //print_pre(l, r.address(), "");
-         iterate_all();
+         
 
          uint64_t seq4 = -1;
          std::cerr << "insert big endian rev seq\n";
@@ -647,6 +688,7 @@ int  main(int argc, char** argv)
                       << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
+         
          //validate_invariant( l, r.address() );
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;

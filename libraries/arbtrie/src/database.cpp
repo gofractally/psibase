@@ -643,7 +643,7 @@ namespace arbtrie
                        src->key_offsets()[i].val_type());
          }
       };
-      return make<binary_node>(reg, state, {.branch_cap = nbranch, .data_cap = 2*total_kv_size},
+      return make<binary_node>(reg, state, {.branch_cap = nbranch, .data_cap = total_kv_size},
                                init_binary)
           .address();
    }
@@ -714,7 +714,6 @@ namespace arbtrie
 
       if (nbranch > 128)
       {
-         //     TRIEDENT_WARN("REFACTOR TO FULL");
          auto init_full = [&](full_node* fn)
          {
             fn->set_branch_region(bregion);
@@ -735,7 +734,6 @@ namespace arbtrie
 
       auto init_setlist = [&](setlist_node* sl)
       {
-         //TRIEDENT_WARN("REFACTOR TO SETLIST");
          sl->set_branch_region(bregion);
          assert(sl->_num_branches == 0);
          assert(sl->branch_capacity() >= nbranch - has_eof_value);
