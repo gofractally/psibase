@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Schema } from "../../types";
 import { TypeBasedInput } from "./TypeBasedInput";
+import { getTypeInfo } from "../../utils";
 
 interface OptionalInputProps {
   innerType: unknown;
@@ -29,7 +30,7 @@ export const OptionalInput = ({
             if (!e.target.checked) {
               onChange(null);
             } else {
-              onChange("");
+              onChange(getTypeInfo(innerType, schema).defaultValue);
             }
           }}
           className="common-checkbox"
