@@ -439,6 +439,22 @@ void writeSnapshotRow(psibase::ChainHandle      chain,
    chain.kvPut(psibase::SnapshotRow::db, row.key(), row);
 }
 
+void writeLogTruncateRow(psibase::ChainHandle         chain,
+                         const psibase::StatusRow&    status,
+                         const std::vector<BlockNum>& blocks)
+{
+   BlockNum start = status.head->header.blockNum;
+   for (auto num : blocks | std::views::reverse)
+   {
+      if (num == start - 1)
+         start = num;
+      else if (num < start - 1)
+         break;
+   }
+   psibase::LogTruncateRow row{start};
+   chain.kvPut(psibase::LogTruncateRow::db, row.key(), row);
+}
+
 void clearDb(std::uint32_t chain, DbId db)
 {
    std::vector<char> key;
@@ -567,6 +583,7 @@ int main(int argc, const char* const* argv)
    if (newStatus->consensus.next)
       validator.writePrevAuthServices({handle});
    writeSnapshotRow({handle}, *newStatus, footer);
+   writeLogTruncateRow({handle}, *newStatus, blocks);
    if (!raw::commitSubjective(handle))
    {
       std::cerr << "Failed to commit database changes" << std::endl;
