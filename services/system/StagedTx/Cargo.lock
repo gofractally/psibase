@@ -1630,8 +1630,6 @@ dependencies = [
 name = "plugin"
 version = "0.14.0"
 dependencies = [
- "lazy_static",
- "once_cell",
  "psibase",
  "serde",
  "serde_json",
