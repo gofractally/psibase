@@ -262,10 +262,15 @@ fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
 /// This function reuses the same boot transaction construction as the psibase CLI, and
 /// is used to generate a wasm that may be called from the browser to construct the boot
 /// transactions when booting the chain from the GUI.
+///
+/// If specified, `public_key_pem` is used to set the initial key for the producer account authorization.
+/// Compression level is used for brotli compression, must be between 1 and 11 inclusive.
 #[wasm_bindgen]
 pub fn js_create_boot_transactions(
     producer: String,
     js_services: JsValue,
+    public_key_pem: Option<String>,
+    compression_level: u32,
 ) -> Result<JsValue, JsValue> {
     let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
     let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
@@ -276,10 +281,28 @@ pub fn js_create_boot_transactions(
     let expiration = TimePointSec::from(now_plus_120secs);
     let prod = js_err(ExactAccountNumber::from_str(&producer))?;
 
-    // Todo: Allow parameterization of compression level from browser
-    let compression_level = 4;
+    let initial_key = public_key_pem
+        .map(|k| -> Result<AnyPublicKey, JsValue> {
+            let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+            if data.tag() != "PUBLIC KEY" {
+                return Err(JsValue::from_str("Invalid public key"));
+            }
+
+            spki::SubjectPublicKeyInfoRef::try_from(data.contents())
+                .map_err(|e| JsValue::from_str(&format!("Invalid SPKI format: {}", e)))?;
+
+            Ok(AnyPublicKey {
+                key: crate::Claim {
+                    service: AccountNumber::from_str("verify-sig").unwrap(),
+                    rawData: data.contents().to_vec().into(),
+                },
+            })
+        })
+        .transpose()?;
+
     let (boot_transactions, transactions) = js_err(create_boot_transactions(
-        &None,
+        &initial_key,
         prod.into(),
         true,
         expiration,

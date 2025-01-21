@@ -1,5 +1,5 @@
 use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::{InputObject, SimpleObject};
+use async_graphql::{scalar, InputObject, SimpleObject};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{
     de::{Deserializer, Error as _},
@@ -7,6 +7,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::ops::{Add, Sub};
+use std::str::FromStr;
 
 #[derive(
     Debug,
@@ -72,20 +73,7 @@ impl<'de> Deserialize<'de> for TimePointSec {
 }
 
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Pack,
-    Unpack,
-    ToKey,
-    ToSchema,
-    SimpleObject,
-    InputObject,
+    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Pack, Unpack, ToKey, ToSchema,
 )]
 #[fracpack(
     definition_will_not_change,
@@ -93,9 +81,25 @@ impl<'de> Deserialize<'de> for TimePointSec {
     custom = "TimePointUSec"
 )]
 #[to_key(psibase_mod = "crate")]
-#[graphql(input_name = "TimePointUSecInput")]
 pub struct TimePointUSec {
     pub microseconds: i64,
+}
+scalar!(TimePointUSec);
+
+impl FromStr for TimePointUSec {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        DateTime::<FixedOffset>::parse_from_rfc3339(s)
+            .map(|dt| dt.to_utc().into())
+            .map_err(|e| e.to_string())
+    }
+}
+
+impl ToString for TimePointUSec {
+    fn to_string(&self) -> String {
+        DateTime::<Utc>::from(*self).to_rfc3339()
+    }
 }
 
 impl TimePointUSec {
@@ -128,17 +132,14 @@ impl From<TimePointUSec> for DateTime<Utc> {
 
 impl Serialize for TimePointUSec {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&DateTime::<Utc>::from(*self).to_rfc3339())
+        serializer.serialize_str(&self.to_string())
     }
 }
 
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <&str>::deserialize(deserializer)?;
-        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(s)
-            .map_err(|e| D::Error::custom(e.to_string()))?
-            .to_utc()
-            .into())
+        Self::from_str(s).map_err(D::Error::custom)
     }
 }
 

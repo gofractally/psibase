@@ -110,7 +110,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 .packages
                 .0
                 .iter()
-                .fold(quote! { "DevDefault".to_string() }, |acc, p| {
+                .fold(quote! { "TestDefault".to_string() }, |acc, p| {
                     quote! {
                         #acc, #p.to_string()
                     }

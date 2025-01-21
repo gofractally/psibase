@@ -13,6 +13,7 @@
 #include <psibase/headerValidation.hpp>
 #include <psibase/log.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <psio/to_hex.hpp>
 
 #include <ranges>
 
@@ -296,6 +297,8 @@ namespace psibase
       SharedDatabase   sharedDatabase;
    };
 
+   class SnapshotLoader;
+
    struct BlockHeaderState
    {
       BlockInfo info;
@@ -374,6 +377,9 @@ namespace psibase
             nextProducersBlockNum = info.header.blockNum;
          }
       }
+
+      BlockHeaderState(SystemContext* systemContext, SnapshotLoader&& loader);
+
       // initAuthState and loadAuthState should only be used when
       // loading blocks from the database. initAuthState is preferred
       // because it saves space.
@@ -528,6 +534,280 @@ namespace psibase
       ExtendedBlockId    xid() const { return ExtendedBlockId{blockId(), blockNum()}; }
    };
 
+   struct LightHeaderState
+   {
+      LightHeaderState(SystemContext* context, const BlockHeaderState* base)
+          : prevBlockNum(base->blockNum()),
+            producers(base->producers),
+            nextProducers(base->nextProducers),
+            state(base->readState(context)),
+            stateHash(sha256(state)),
+            revision(base->revision)
+      {
+         if (state.next && base->info.header.commitNum >= state.next->blockNum)
+         {
+            state.current = std::move(state.next->consensus);
+            state.next.reset();
+            stateHash = sha256(state);
+         }
+      }
+      BlockNum                     prevBlockNum;
+      std::shared_ptr<ProducerSet> producers;
+      std::shared_ptr<ProducerSet> nextProducers;
+      std::vector<ExtendedBlockId> pendingBlocks;
+
+      JointConsensus state;
+      Checksum256    stateHash;
+      bool           consensusChangeReady = false;
+
+      ConstRevisionPtr revision;
+
+      template <typename Consensus>
+      void push(SystemContext*                            systemContext,
+                const WriterPtr&                          writer,
+                const psio::shared_view_ptr<SignedBlock>& block,
+                Consensus&                                consensus)
+      {
+         BlockInfo info{block->block().header()};
+         // The initial state used to contruct the light validator
+         // might be ahead of the point that the peer starts sending.
+         if (info.header.blockNum <= prevBlockNum)
+            return;
+         maybeAdvance();
+         if (info.header.newConsensus)
+         {
+            check(!nextProducers, "Already in joint consensus");
+            nextProducers = std::make_shared<ProducerSet>(*info.header.newConsensus);
+            nextProducers->authState =
+                BlockAuthState::next(systemContext, writer, producers->authState, info.header);
+            state.next = {*info.header.newConsensus, info.header.blockNum};
+            stateHash  = sha256(state);
+         }
+         check(stateHash == info.header.consensusState, "consensus state does not match");
+         if (state.next)
+         {
+            pendingBlocks.push_back({BlockInfo{info.header}.blockId, info.header.blockNum});
+         }
+         if (state.next && info.header.commitNum >= state.next->blockNum)
+         {
+            auto start           = state.next->blockNum;
+            auto commit          = consensus.light_verify(*this, info, block);
+            consensusChangeReady = true;
+            ConsensusChangeRow changeRow{start, commit, info.header.blockNum};
+            systemContext->sharedDatabase.kvPutSubjective(
+                *writer, psio::convert_to_key(changeRow.key()), psio::to_frac(changeRow));
+         }
+         prevBlockNum         = info.header.blockNum;
+         auto     blockNumKey = psio::convert_to_key(info.header.blockNum);
+         Database database(systemContext->sharedDatabase, revision);
+         auto     session = database.startWrite(writer);
+         database.kvPutRaw(DbId::blockLog, blockNumKey, psio::to_frac(block->block().unpack()));
+         if (!block->signature().empty())
+         {
+            database.kvPutRaw(DbId::blockProof, blockNumKey,
+                              psio::to_frac(block->signature().unpack()));
+         }
+         if (block->auxConsensusData())
+         {
+            BlockDataRow row{info.blockId, *block->auxConsensusData()};
+            systemContext->sharedDatabase.kvPutSubjective(*writer, psio::convert_to_key(row.key()),
+                                                          psio::to_frac(row));
+         }
+         revision = database.getModifiedRevision();
+      }
+
+      void maybeAdvance()
+      {
+         if (consensusChangeReady)
+         {
+            state.current = std::move(state.next->consensus);
+            state.next.reset();
+            stateHash = sha256(state);
+            pendingBlocks.clear();
+            producers            = std::move(nextProducers);
+            consensusChangeReady = false;
+         }
+      }
+   };
+
+   struct SnapshotItem
+   {
+      std::vector<char> key;
+      std::vector<char> value;
+      PSIO_REFLECT(SnapshotItem, key, value)
+   };
+
+   struct SnapshotLoader
+   {
+      struct KeyRange
+      {
+         std::vector<char> low;
+         std::vector<char> high;
+      };
+      struct KeyRanges
+      {
+         // sorted, non-overlapping
+         std::vector<KeyRange> ranges;
+         // returns false if the new range overlaps with an existing range
+         bool add(std::vector<char>&& low, std::vector<char>&& high)
+         {
+            auto pos = std::ranges::lower_bound(ranges, low, blob_less{}, &KeyRange::low);
+            if (pos != ranges.begin())
+            {
+               auto prev = pos;
+               --prev;
+               if (prev->high.empty())
+                  return false;
+               if (auto cmp = compare_blob(low, prev->high); cmp == 0)
+               {
+                  if (pos != ranges.end())
+                  {
+                     if (high.empty())
+                        return false;
+                     if (auto cmp = compare_blob(high, pos->low); cmp == 0)
+                     {
+                        // merge both
+                        prev->high = std::move(pos->high);
+                        ranges.erase(pos);
+                     }
+                     else if (cmp > 0)
+                     {
+                        return false;
+                     }
+                  }
+                  // merge left
+                  prev->high = high;
+                  return true;
+               }
+               else if (cmp < 0)
+               {
+                  return false;
+               }
+            }
+            if (pos != ranges.end())
+            {
+               if (high.empty())
+                  return false;
+               if (auto cmp = compare_blob(high, pos->low); cmp == 0)
+               {
+                  // merge right
+                  pos->low = std::move(low);
+                  return true;
+               }
+               else if (cmp > 0)
+               {
+                  return false;
+               }
+            }
+            // insert new range
+            ranges.insert(pos, {std::move(low), std::move(high)});
+            return true;
+         }
+         bool complete() const
+         {
+            return ranges.size() == 1 && ranges.front().low.empty() && ranges.front().high.empty();
+         }
+      };
+      Checksum256      blockId;
+      ConstRevisionPtr revision;
+      KeyRanges        serviceKeys;
+      KeyRanges        nativeKeys;
+
+      std::unique_ptr<LightHeaderState> validator;
+
+      SnapshotLoader(std::unique_ptr<LightHeaderState>&& state, const Checksum256& blockId)
+          : blockId(blockId), revision(state->revision), validator(std::move(state))
+      {
+      }
+
+      KeyRanges* getRanges(DbId db)
+      {
+         switch (db)
+         {
+            case DbId::service:
+               return &serviceKeys;
+            case DbId::native:
+               return &nativeKeys;
+            default:
+               abortMessage("Wrong database in snapshot");
+         }
+      }
+      void add(SystemContext*                   systemContext,
+               const WriterPtr&                 writer,
+               DbId                             db,
+               std::vector<char>                low,
+               std::vector<char>                high,
+               const std::vector<SnapshotItem>& rows)
+      {
+         // TODO: consider allowing overlapping ranges, but verify that the contents
+         // are identical.
+         if (!getRanges(db)->add(std::move(low), std::move(high)))
+            abortMessage("Snapshot parts overlap");
+         Database database(systemContext->sharedDatabase, revision);
+         auto     session = database.startWrite(writer);
+         for (const SnapshotItem& row : rows)
+         {
+            database.kvPutRaw(db, row.key, row.value);
+         }
+         revision = database.getModifiedRevision();
+      }
+      bool complete() const { return serviceKeys.complete() && nativeKeys.complete(); }
+   };
+
+   struct SnapshotSender
+   {
+      SnapshotSender(SystemContext* context, ConstRevisionPtr revision)
+          : database(context->sharedDatabase, std::move(revision))
+      {
+      }
+      std::vector<char> currentKey;
+      DbId              currentDb = DbId::service;
+      Database          database;
+      bool              next(DbId&                      db,
+                             std::vector<char>&         low,
+                             std::vector<char>&         high,
+                             std::vector<SnapshotItem>& rows)
+      {
+         static constexpr DbId nullDb = static_cast<DbId>(0xffffffffu);
+         if (currentDb == nullDb)
+            return false;
+         db                              = currentDb;
+         low                             = currentKey;
+         constexpr std::size_t limit     = 1024 * 1024;
+         std::size_t           totalSize = 0;
+         {
+            auto sesssion = database.startRead();
+            while (totalSize < limit)
+            {
+               if (auto row = database.kvGreaterEqualRaw(currentDb, currentKey, 0))
+               {
+                  auto key   = std::vector<char>{row->key.pos, row->key.end};
+                  auto value = std::vector<char>{row->value.pos, row->value.end};
+                  currentKey = key;
+                  totalSize += key.size() + value.size() + 16;
+                  rows.push_back({std::move(key), std::move(value)});
+               }
+               else
+               {
+                  currentKey.clear();
+                  if (currentDb == DbId::service)
+                  {
+                     currentDb = DbId::native;
+                  }
+                  else
+                  {
+                     currentDb = nullDb;
+                  }
+                  break;
+               }
+               currentKey.push_back(0);
+            }
+         }
+         high = currentKey;
+         return true;
+      }
+   };
+
    ExtendedBlockId orderToXid(const auto& order)
    {
       return ExtendedBlockId{std::get<2>(order), std::get<1>(order)};
@@ -679,8 +959,9 @@ namespace psibase
             if (auto block = db.kvGet<Block>(DbId::blockLog, num))
             {
                auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, num);
+               auto id    = BlockInfo{*block}.blockId;
                return psio::shared_view_ptr<SignedBlock>(
-                   SignedBlock{*block, proof ? *proof : std::vector<char>()});
+                   SignedBlock{*block, proof ? *proof : std::vector<char>(), getBlockData(id)});
             }
             else
             {
@@ -951,6 +1232,199 @@ namespace psibase
             }
          }
          return true;
+      }
+      LightHeaderState light_validate()
+      {
+         return LightHeaderState{systemContext, get_state(get_block_id(commitIndex))};
+      }
+      void push_light_header(LightHeaderState&                         state,
+                             const psio::shared_view_ptr<SignedBlock>& block,
+                             auto&                                     consensus)
+      {
+         state.push(systemContext, writer, block, consensus);
+      }
+      std::optional<BlockNum> get_next_light_header_num(BlockNum           prev,
+                                                        const Checksum256& snapshotId)
+      {
+         // If the snapshot is in joint consensus, send all the headers after
+         // the new producers were set.
+         {
+            auto revision = systemContext->sharedDatabase.getRevision(*writer, snapshotId);
+            auto status   = getStatus(revision);
+            if (status.consensus.next && status.consensus.next->blockNum <= prev)
+            {
+               return prev + 1;
+            }
+         }
+         Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
+         auto     session = database.startRead();
+         database.checkoutSubjective();
+         psio::size_stream prefixLen;
+         psio::to_key(consensusChangePrefix(), prefixLen);
+         auto key = psio::convert_to_key(consensusChangeKey(prev + 1));
+         if (auto row = database.kvLessThanRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         {
+            auto value = psio::from_frac<ConsensusChangeRow>(row->value);
+            if (value.start > prev)
+               return value.start;
+            if (value.commit > prev)
+               return value.commit;
+            if (value.end > prev)
+               return value.end;
+         }
+         if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen.size))
+         {
+            auto value = psio::from_frac<ConsensusChangeRow>(row->value);
+            return value.start;
+         }
+         return {};
+      }
+      SnapshotLoader start_snapshot(std::unique_ptr<LightHeaderState>&& state,
+                                    const Checksum256&                  blockId)
+      {
+         if (getBlockNum(blockId) > state->prevBlockNum)
+         {
+            state->maybeAdvance();
+         }
+         return SnapshotLoader(std::move(state), blockId);
+      }
+      void add_to_snapshot(SnapshotLoader&                  loader,
+                           DbId                             db,
+                           std::vector<char>                low,
+                           std::vector<char>                high,
+                           const std::vector<SnapshotItem>& rows)
+      {
+         loader.add(systemContext, writer, db, std::move(low), std::move(high), rows);
+      }
+      // \post fork switch needed to execute any post-snapshot blocks
+      // returns the state for the snapshot or nullptr if the snapshot was not ignored.
+      BlockHeaderState* apply_snapshot(SnapshotLoader&&                             loader,
+                                       snapshot::StateChecksum                      hash,
+                                       const std::vector<snapshot::StateSignature>& signatures)
+      {
+         check(loader.complete(), "Incomplete snapshot");
+         snapshot::StateSignatureInfo preimage{hash};
+         // verify signatures
+         AccountNumber prev{};
+         PSIBASE_LOG(logger, info)
+             << "Verifying snapshot with producers: " << *loader.validator->producers;
+         for (const auto& sig : signatures)
+         {
+            check(!!loader.validator->producers->getIndex(sig.account, sig.claim),
+                  "Not a producer " + sig.account.str());
+            check(prev < sig.account, "Producers must be in order");
+            verify(loader.validator->producers->authState->revision, preimage, sig.claim,
+                   sig.rawData);
+         }
+         check(signatures.size() >= loader.validator->producers->weak_threshold(),
+               "Not enough signatures on snapshot");
+         // verify hash
+         auto revision   = loader.revision;
+         auto actualHash = BuildStateChecksum{revision, systemContext->sharedDatabase}();
+         check(actualHash == hash, "State checksum does not match");
+         // Load state
+         auto id              = loader.blockId;
+         auto [pos, inserted] = states.try_emplace(id, systemContext, std::move(loader));
+         if (id != pos->second.blockId())
+         {
+            states.erase(pos);
+            throw std::runtime_error("Wrong id in snapshot: " + loggers::to_string(id) +
+                                     " != " + loggers::to_string(pos->second.blockId()));
+         }
+         if (!inserted)
+         {
+            if (pos->second.revision)
+               // We've already executed the block. The snapshot isn't needed
+               return nullptr;
+            else if (pos->second.invalid)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(logger, pos->second.info.header, pos->second.info.blockId);
+               PSIBASE_LOG(logger, critical) << "Received verified snapshot for invalid block";
+               throw consensus_failure{};
+            }
+            else
+               pos->second.revision = revision;
+         }
+         else if (pos->second.blockNum() < commitIndex)
+         {
+            states.erase(pos);
+            return nullptr;
+         }
+         currentTerm = std::max(currentTerm, pos->second.info.header.term);
+         set_subtree(&pos->second, "received snapshot");
+         {
+            Database database{systemContext->sharedDatabase, revision};
+            auto     session = database.startWrite(writer);
+            database.writeRevision(session, id);
+         }
+         systemContext->sharedDatabase.setHead(*writer, revision);
+         head = &pos->second;
+         // Do not call commit(). It tries to step forward over blocks that
+         // we don't have.
+         commitIndex = head->blockNum();
+         byBlocknumIndex.clear();
+         byBlocknumIndex.insert({head->blockNum(), head->blockId()});
+         // Record the snapshot
+         SnapshotRow snapshotRow{id, SnapshotRow::Item{hash, signatures}};
+         systemContext->sharedDatabase.kvPutSubjective(
+             *writer, psio::convert_to_key(snapshotRow.key()), psio::to_frac(snapshotRow));
+         logStart = head->blockNum();
+         LogTruncateRow logTruncateRow{logStart};
+         systemContext->sharedDatabase.kvPutSubjective(
+             *writer, psio::convert_to_key(logTruncateRow.key()), psio::to_frac(logTruncateRow));
+         return head;
+      }
+      Checksum256 get_last_snapshot_id()
+      {
+         Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
+         auto     session = db.startRead();
+         db.checkoutSubjective();
+         auto key       = psio::convert_to_key(snapshotPrefix());
+         auto prefixLen = key.size();
+         for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
+              row      = db.kvLessThanRaw(DbId::nativeSubjective, key, prefixLen))
+         {
+            auto value = psio::view<const SnapshotRow>(std::span{row->value.pos, row->value.end});
+            if (value.state())
+            {
+               auto        id       = value.id().unpack();
+               auto        revision = systemContext->sharedDatabase.getRevision(*writer, id);
+               auto        status   = getStatus(revision);
+               ProducerSet producers(status.consensus.current.data);
+               if (value.state()->signatures().size() >= producers.weak_threshold())
+               {
+                  return id;
+               }
+               else
+               {
+                  PSIBASE_LOG(logger, debug)
+                      << "Snapshot " << loggers::to_string(value.id())
+                      << " cannot be sent because it does not have enough producer signatures "
+                      << value.state()->signatures().size() << "/" << producers.size();
+               }
+            }
+            else
+            {
+               PSIBASE_LOG(logger, debug)
+                   << "Snapshot " << loggers::to_string(value.id())
+                   << " cannot be sent, because its checksum is not available";
+            }
+            key.assign(row->key.pos, row->key.end);
+         }
+         return Checksum256{};
+      }
+      SnapshotSender send_snapshot(const Checksum256& id)
+      {
+         return SnapshotSender(systemContext,
+                               systemContext->sharedDatabase.getRevision(*writer, id));
+      }
+      SnapshotRow get_snapshot_info(const Checksum256& id)
+      {
+         auto row = systemContext->sharedDatabase.kvGetSubjective(
+             *writer, psio::convert_to_key(snapshotKey(id)));
+         if (!row)
+            return SnapshotRow{id};
+         return psio::from_frac<SnapshotRow>(*row);
       }
       BlockHeaderState* get_state(const id_type& id)
       {
@@ -1239,15 +1713,30 @@ namespace psibase
             psio::from_frac(row, *bytes);
          }
          // Check whether there are existing signatures for the same state
-         auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
-         if (pos != row.other.end())
+         if (row.state)
          {
-            row.state = std::move(*pos);
-            row.other.erase(pos);
+            if (row.state->state != checksum)
+            {
+               PSIBASE_LOG_CONTEXT_BLOCK(logger, status.head->header, id);
+               PSIBASE_LOG(logger, error)
+                   << "The recorded state checksum (" << psio::convert_to_json(row.state->state)
+                   << ") does not match the newly computed checksum ("
+                   << psio::convert_to_json(checksum) << ")";
+               row.state = {.state = checksum};
+            }
          }
          else
          {
-            row.state = {.state = checksum};
+            auto pos = std::ranges::find(row.other, checksum, &SnapshotRow::Item::state);
+            if (pos != row.other.end())
+            {
+               row.state = std::move(*pos);
+               row.other.erase(pos);
+            }
+            else
+            {
+               row.state = {.state = checksum};
+            }
          }
          // Add my signature
          if (auto claim = producers.getClaim(me))
@@ -1273,7 +1762,7 @@ namespace psibase
          }
       }
 
-      StatusRow getStatus(ConstRevisionPtr revision)
+      StatusRow getStatus(ConstRevisionPtr revision) const
       {
          check(!!revision, "Missing revision for state signature");
          // look up active producers
@@ -1675,6 +2164,13 @@ namespace psibase
          commitIndex = byBlocknumIndex.begin()->first;
          currentTerm = head->info.header.term;
 
+         // If the block log is truncated, find where it starts
+         if (auto row = sc->sharedDatabase.kvGetSubjective(*writer,
+                                                           psio::convert_to_key(logTruncateKey())))
+         {
+            logStart = psio::from_frac<LogTruncateRow>(*row).start;
+         }
+
          systemContext->sharedDatabase.setCallbacks(&dbCallbacks);
       }
       ~ForkDb() { systemContext->sharedDatabase.setCallbacks(nullptr); }
@@ -1737,6 +2233,8 @@ namespace psibase
          return *status->head;
       }
 
+      BlockNum getLogStart() const { return logStart; }
+
      private:
       // TODO: Use command line argument (read from database?, rearrange so services can set it explicitly?)
       std::chrono::microseconds                                 proofWatchdogLimit{200000};
@@ -1745,6 +2243,7 @@ namespace psibase
       WriterPtr                                                 writer;
       CheckedProver                                             prover;
       BlockNum                                                  commitIndex = 1;
+      BlockNum                                                  logStart    = 0;
       TermNum                                                   currentTerm = 1;
       BlockHeaderState*                                         head        = nullptr;
       std::map<Checksum256, psio::shared_view_ptr<SignedBlock>> blocks;
