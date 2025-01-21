@@ -1110,10 +1110,47 @@ class Hex(TypeBase):
 
 Bytes = Hex(List(u8))
 
+def _as_pair(item):
+    if isinstance(item, tuple):
+        return item
+    else:
+        return tuple(item.values())
+
+@_fracpackmeta(['type'], lambda type: 'Map', object)
+class Map(TypeBase):
+    def __init__(self, ty):
+        self.ty = ty
+    def unpack(self, stream):
+        return dict(_as_pair(item) for item in self.ty.unpack(stream))
+    def pack(self, value, stream):
+        elemtype = self.ty.ty
+        if issubclass(self.ty, elemtype):
+            value = value.items()
+        else:
+            value = [elemtype(*item) for item in value.items()]
+        self.ty.pack(value, stream)
+    def is_empty_container(self, value, stream):
+        return len(value) == 0
+    def get_canonical(self):
+        return self.ty
+    @property
+    def is_variable_size(self):
+        return self.ty.is_variable_size
+    @property
+    def fixed_size(self):
+        return self.ty.fixed_size
+    @property
+    def is_container(self):
+        return self.ty.is_container
+    @property
+    def is_optional(self):
+        return self.ty.is_optional
+
 default_custom = {
     "bool": Bool,
     "string": String,
-    "hex": Hex
+    "hex": Hex,
+    "map": Map,
 }
 
 class FunctionType:

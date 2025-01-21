@@ -297,6 +297,8 @@ int main()
    builder.add<WrongCustom>("WrongCustom", {{3}});
    builder.add<std::tuple<Empty>>("(Empty)", {{Empty{}}});
    builder.add<EmptyMember>("EmptyMember", {{Empty{}}});
+   builder.add<std::map<std::string, std::string>>("string-map",
+                                                   {{}, {{"foo", "x"}, {"bar", "y"}}});
 
    // Compatible serialization
    builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
