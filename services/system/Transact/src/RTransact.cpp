@@ -10,11 +10,12 @@ using namespace SystemService;
 
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
-   check(getSender() == Transact::service, "Wrong sender");
+   check(getSender() == AccountNumber{}, "Wrong sender");
    auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
    auto nextSequence =
        unapplied.get(SingletonKey{}).value_or(UnappliedTransactionRecord{0}).nextSequence;
    auto included = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
+   std::optional<SignedTransaction> result;
    PSIBASE_SUBJECTIVE_TX
    {
       auto table = Subjective{}.open<PendingTransactionTable>();
@@ -25,19 +26,34 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
          nextSequence = item.sequence + 1;
          if (!included.get(std::tuple(item.expiration, item.id)))
          {
-            unapplied.put({nextSequence});
             auto trxData = Subjective{}.open<TransactionDataTable>();
-            if (auto result = trxData.get(item.id))
-            {
-               return std::move(result->trx);
-            }
-            check(false, "Internal error: missing transaction data");
+            auto data    = trxData.get(item.id);
+            check(!!data, "Internal error: missing transaction data");
+            result = std::move(data->trx);
+            break;
          }
       }
       unapplied.put({nextSequence});
-      return {};
+      if (!result)
+      {
+         // Unregister callback
+         auto key = notifyKey(NotifyType::nextTransaction);
+         if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+         {
+            std::erase_if(existing->actions,
+                          [](const auto& act) { return act.service == RTransact::service; });
+            if (existing->actions.empty())
+            {
+               kvRemove(DbId::nativeSubjective, key);
+            }
+            else
+            {
+               kvPut(DbId::nativeSubjective, key, *existing);
+            }
+         }
+      }
    }
-   __builtin_unreachable();
+   return result;
 }
 
 void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
@@ -171,6 +187,27 @@ namespace
                           std::chrono::system_clock::now()),
                       .sequence = sequence});
          Subjective{}.open<TransactionDataTable>().put({id, std::move(trx)});
+
+         // Tell native that we have a transaction
+         {
+            auto key = notifyKey(NotifyType::nextTransaction);
+            if (auto existing = kvGet<NotifyRow>(DbId::nativeSubjective, key))
+            {
+               if (!std::ranges::any_of(existing->actions, [](const auto& act)
+                                        { return act.service == RTransact::service; }))
+               {
+                  existing->actions.push_back(
+                      {.service = RTransact::service, .method = MethodNumber{"next"}});
+                  kvPut(DbId::nativeSubjective, key, *existing);
+               }
+            }
+            else
+            {
+               kvPut(DbId::nativeSubjective, key,
+                     NotifyRow{NotifyType::nextTransaction,
+                               {{.service = RTransact::service, .method = MethodNumber{"next"}}}});
+            }
+         }
       }
       return true;
    }

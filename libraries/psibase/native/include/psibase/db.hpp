@@ -55,6 +55,23 @@ namespace psibase
    using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
    using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
 
+   // Certain rows may trigger callbacks when they are written.
+   //
+   struct DatabaseCallbacks
+   {
+      std::function<void()> nextTransaction;
+      static const unsigned nextTransactionFlag = 1;
+      using Flags                               = unsigned;
+      void run(Flags& flags)
+      {
+         if ((flags & nextTransactionFlag) != 0 && nextTransaction)
+         {
+            nextTransaction();
+         }
+         flags = 0;
+      }
+   };
+
    struct SharedDatabaseImpl;
    struct SharedDatabase
    {
@@ -96,6 +113,8 @@ namespace psibase
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
+
+      void setCallbacks(DatabaseCallbacks*);
    };
 
    struct DatabaseImpl;
@@ -227,5 +246,7 @@ namespace psibase
             return std::move(*obj);
          return {};
       }
+
+      void setCallbackFlags(DatabaseCallbacks::Flags);
    };  // Database
 }  // namespace psibase

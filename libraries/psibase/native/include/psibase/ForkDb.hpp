@@ -2022,34 +2022,13 @@ namespace psibase
          auto bc = getBlockContext();
          if (!bc || bc->needGenesisAction)
             return {};
-         Action action{.service = transactionServiceNum, .rawData = psio::to_frac(std::tuple())};
-         std::optional<SignedTransaction> result;
-         TransactionTrace                 trace;
-         try
-         {
-            auto& atrace = bc->execExport("nextTransaction", std::move(action), trace);
-            if (!psio::from_frac(result, atrace.rawRetval))
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-               PSIBASE_LOG(bc->trxLogger, warning) << "failed to deserialize result of "
-                                                   << action.service.str() << "::nextTransaction";
-               result.reset();
-            }
-            else
-            {
-               BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-               PSIBASE_LOG(bc->trxLogger, debug)
-                   << action.service.str() << "::nextTransaction succeeded";
-            }
-         }
-         catch (std::exception& e)
-         {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc->trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc->trxLogger, warning)
-                << action.service.str() << "::nextTransaction failed: " << e.what();
-         }
+         auto session = bc->db.startWrite(writer);
+         auto result  = bc->callNextTransaction();
+         session.commit();
          return result;
       }
+
+      void onChangeNextTransaction(auto&& fn) { dbCallbacks.nextTransaction = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
@@ -2184,13 +2163,18 @@ namespace psibase
          assert(!byBlocknumIndex.empty());
          commitIndex = byBlocknumIndex.begin()->first;
          currentTerm = head->info.header.term;
+
          // If the block log is truncated, find where it starts
          if (auto row = sc->sharedDatabase.kvGetSubjective(*writer,
                                                            psio::convert_to_key(logTruncateKey())))
          {
             logStart = psio::from_frac<LogTruncateRow>(*row).start;
          }
+
+         systemContext->sharedDatabase.setCallbacks(&dbCallbacks);
       }
+      ~ForkDb() { systemContext->sharedDatabase.setCallbacks(nullptr); }
+
       BlockContext* getBlockContext()
       {
          if (blockContext)
@@ -2269,6 +2253,7 @@ namespace psibase
       std::map<BlockNum, Checksum256>                                           byBlocknumIndex;
 
       std::function<void(BlockHeaderState*)> onCommitFn;
+      DatabaseCallbacks                      dbCallbacks;
 
       loggers::common_logger logger;
       loggers::common_logger blockLogger;
