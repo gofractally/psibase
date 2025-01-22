@@ -15,6 +15,10 @@ import { queryClient } from "@/main";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Label } from "./ui/label";
+import { Spinner } from "./ui/spinner";
+import { useBranding } from "@/hooks/useBranding";
+import { ErrorCard } from "./error-card";
+import { IntroCard } from "./intro-card";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -36,11 +40,20 @@ const setCacheData = (appName: string, checked: boolean) => {
 };
 
 export const Workshop = () => {
-  const { data: currentUser, isFetched } = useLoggedInUser();
+  const {
+    data: currentUser,
+    isFetched: isFetchedUser,
+    error: loggedInUserError,
+  } = useLoggedInUser();
+  const {
+    data: metadata,
+    isSuccess,
+    error: metadataError,
+  } = useAppMetadata(currentUser);
+
+  const { data: networkName } = useBranding();
 
   const { mutateAsync: login } = useCreateConnectionToken();
-  const { data: metadata, isSuccess } = useAppMetadata(currentUser);
-
   const { mutateAsync: updateMetadata } = useSetMetadata();
   const { mutateAsync: publishApp } = usePublishApp();
 
@@ -51,8 +64,10 @@ export const Workshop = () => {
         description: `${checked ? "Publishing" : "Unpublishing"} ${appName}`,
       });
       void (await publishApp({ account: appName, publish: checked }));
-      toast("Update success", {
-        description: `${checked ? "Published" : "Unpublished"} ${appName}`,
+      toast(checked ? "Published" : "Unpublished", {
+        description: checked
+          ? `${appName} is now published.`
+          : `${appName} is no longer published.`,
       });
     } catch (e) {
       toast("Failed to update", {
@@ -67,48 +82,81 @@ export const Workshop = () => {
     ? metadata.extraMetadata.status == Status.Enum.published
     : false;
 
-  return (
-    <div className="mt-4">
-      <div className="flex flex-col gap-4">
-        <Button
-          variant="secondary"
-          onClick={() => {
-            login();
-          }}
-          disabled={!isFetched}
-        >
-          {!isFetched ? "Loading" : currentUser ? "Change App" : "Select app"}
-        </Button>
+  const error = loggedInUserError || metadataError;
+  const isLoading = !isSuccess;
+  const isNotLoggedIn = currentUser === null && isFetchedUser;
 
-        <div className="flex justify-between">
-          <div className="text-lg font-semibold text-center">{currentUser}</div>
-          <div className="flex gap-2">
-            <div className="flex flex-col justify-center">
-              <Label>Publish</Label>
-            </div>
-            <Switch
-              checked={isAppPublished}
-              disabled={!currentUser}
-              onCheckedChange={(checked) =>
-                handleChecked(checked, z.string().parse(currentUser))
-              }
-            />
+  if (error) {
+    return <ErrorCard error={error} />;
+  } else if (isNotLoggedIn) {
+    return (
+      <IntroCard
+        networkName={networkName}
+        onLogin={() => {
+          login();
+        }}
+      />
+    );
+  } else if (isLoading) {
+    return (
+      <div className="h-dvh w-full flex justify-center">
+        <div className="w-full">
+          <div className="w-full flex justify-center">
+            <Spinner size="lg" className="bg-black text-center dark:bg-white" />
+          </div>
+          <div>
+            {isFetchedUser
+              ? "Fetching app metadata..."
+              : "Fetching account status..."}
           </div>
         </div>
-
-        {isSuccess && (
-          <MetaDataForm
-            existingValues={metadata && metadata.appMetadata}
-            onSubmit={async (x) => {
-              await updateMetadata({
-                ...x,
-                owners: [],
-              });
-              return x;
-            }}
-          />
-        )}
       </div>
-    </div>
-  );
+    );
+  } else
+    return (
+      <div className="mt-4 mx-4">
+        <div className="flex flex-col gap-4">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              login();
+            }}
+          >
+            Change app
+          </Button>
+          <div className="flex justify-between">
+            <div className="text-lg font-semibold text-center">
+              {currentUser}
+            </div>
+            {isSuccess && (
+              <div className="flex gap-2">
+                <div className="flex flex-col justify-center">
+                  <Label>Publish</Label>
+                </div>
+                <Switch
+                  checked={isAppPublished}
+                  disabled={!currentUser}
+                  onCheckedChange={(checked) =>
+                    handleChecked(checked, z.string().parse(currentUser))
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          {isSuccess && (
+            <MetaDataForm
+              existingValues={metadata ? metadata.appMetadata : undefined}
+              onSubmit={async (x) => {
+                await updateMetadata({
+                  ...x,
+                  owners: [],
+                });
+                return x;
+              }}
+            />
+          )}
+        </div>
+      </div>
+    );
 };

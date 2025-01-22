@@ -23,13 +23,24 @@ export const useAppMetadata = (appName: string | undefined | null) =>
     queryKey: appMetadataQueryKey(appName),
     enabled: !!appName,
     queryFn: async () => {
-      const res = await supervisor.functionCall({
-        method: "getAppMetadata",
-        params: [appName],
-        service: "registry",
-        intf: "consumer",
-      });
-
-      return MetadataResponse.parse(res);
+      try {
+        const res = await supervisor.functionCall({
+          method: "getAppMetadata",
+          params: [appName],
+          service: "registry",
+          intf: "consumer",
+        });
+        return MetadataResponse.parse(res);
+      } catch (e) {
+        if (e instanceof Error) {
+          if (e.message.includes("App metadata not found")) {
+            return null;
+          } else {
+            throw e;
+          }
+        } else {
+          throw new Error(`Unrecognised error`);
+        }
+      }
     },
   });
