@@ -177,7 +177,7 @@ namespace arbtrie
       _path.push_back({r.address(), 257});
       if (not cast_and_call(r.header(),
                             [&](const auto* n) { return reverse_lower_bound_impl(r, n, query); }))
-         return next();
+         return prev();
       return true;
    }
 
@@ -355,6 +355,13 @@ namespace arbtrie
          case node_type::setlist:
     //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
             return handle_inner(oref.as<setlist_node>());
+         case node_type::value:
+         {
+            auto vn = oref.as<value_node>();
+            popkey( vn->key().size() );
+            _path.pop_back();
+            return prev();
+         }
          default:
             throw std::runtime_error("iterator::prevunexpected type");
       }

@@ -118,9 +118,11 @@ TEST_CASE("insert-words")
    while (file >> key)
    {
       keys.push_back(key);
-      values.push_back(key);
-      toupper(values.back());
+   //   values.push_back(key);
+   //   toupper(values.back());
    }
+   std::sort( keys.begin(), keys.end() );
+   values = keys;
 
    auto test_words = [&](bool shared)
    {
@@ -177,19 +179,37 @@ TEST_CASE("insert-words")
 
             std::vector<char> data;
             auto              start = std::chrono::steady_clock::now();
+            auto fkeys = keys.begin();
             if (itr.lower_bound())
             {
                itr.read_value(data);
+
+               if( fkeys->size() != data.size() or
+                   0 != memcmp( fkeys->data(), data.data(), data.size() ) ) {
+                  TRIEDENT_WARN( "expected '", *fkeys, " got ", std::string(data.data(),data.size()) );
+               }
+               REQUIRE( fkeys->size() == data.size() );
+               REQUIRE( 0 == memcmp( fkeys->data(), data.data(), data.size() ) );
+
                ++item_count;
+               ++fkeys;
             }
             while (itr.next())
             {
                itr.key();
                assert(itr.key().size() < 1024);
-               //     std::cerr << itr.key() <<"\n";
                itr.read_value(data);
                assert(itr.key().size() == data.size());
+
+               if( fkeys->size() != data.size() or
+                   0 != memcmp( fkeys->data(), data.data(), data.size() ) ) {
+                  TRIEDENT_WARN( "expected '", *fkeys, " got ", std::string(data.data(),data.size()) );
+               }
+               REQUIRE( fkeys->size() == data.size() );
+               REQUIRE( 0 == memcmp( fkeys->data(), data.data(), data.size() ) );
+
                ++item_count;
+               ++fkeys;
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -202,13 +222,23 @@ TEST_CASE("insert-words")
 
             int rcount = 0;
             itr.reverse_lower_bound();
+            auto rkeys = keys.rbegin();
             while (itr.valid())
             {
+               REQUIRE( rkeys != keys.rend() );
                itr.read_value(data);
+               if( rkeys->size() != data.size() or
+                   0 != memcmp( rkeys->data(), data.data(), data.size() ) ) {
+                  TRIEDENT_WARN( "count: ", rcount, " expected '", *rkeys, " got ", std::string(data.data(),data.size()) );
+               }
+               REQUIRE( rkeys->size() == data.size() );
+               REQUIRE( 0 == memcmp( rkeys->data(), data.data(), data.size() ) );
+
                //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
                REQUIRE(itr.key().size() == data.size());
                itr.prev();
                ++rcount;
+               ++rkeys;
             }
             REQUIRE(rcount == keys.size());
          }
