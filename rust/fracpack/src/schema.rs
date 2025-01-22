@@ -773,14 +773,117 @@ impl CustomHandler for CustomHex {
     }
 }
 
+struct CustomMap;
+
+impl CustomHandler for CustomMap {
+    fn matches(&self, schema: &CompiledSchema, ty: &CompiledType) -> bool {
+        use CompiledType::*;
+        if let List(item) = ty {
+            use CompiledType::*;
+            match schema.get_by_id(*item) {
+                Object { children, .. } | Struct { children, .. } => children.len() == 2,
+                Tuple(children) => children.len() == 2,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+    fn frac2json(
+        &self,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        src: &[u8],
+        pos: &mut u32,
+    ) -> Result<serde_json::Value, Error> {
+        let mut stream = FracInputStream::new(src);
+        stream.pos = *pos;
+        let mut result = frac2json_impl(schema, ty, &mut stream, true)?;
+        *pos = stream.pos;
+        use serde_json::{
+            Map, Value,
+            Value::{Array, Object},
+        };
+        let arr = result.as_array_mut().unwrap();
+        let mut obj_result: Map<String, Value> = Map::with_capacity(arr.len());
+        for item in arr {
+            match std::mem::take(item) {
+                Object(m) => {
+                    assert!(m.len() == 2);
+                    let mut iter = m.into_values();
+                    let Value::String(k) = iter.next().unwrap() else {
+                        return Err(Error::ExpectedStringKey);
+                    };
+                    let v = iter.next().unwrap();
+                    obj_result.insert(k, v);
+                }
+                Array(v) => {
+                    assert!(v.len() == 2);
+                    let mut iter = v.into_iter();
+                    let Value::String(k) = iter.next().unwrap() else {
+                        return Err(Error::ExpectedStringKey);
+                    };
+                    let v = iter.next().unwrap();
+                    obj_result.insert(k, v);
+                }
+                _ => panic!("Expected object or array"),
+            }
+        }
+        Ok(Object(obj_result))
+    }
+    fn json2frac(
+        &self,
+        schema: &CompiledSchema,
+        ty: &CompiledType,
+        val: &serde_json::Value,
+        dest: &mut Vec<u8>,
+    ) -> Result<(), serde_json::Error> {
+        // ty must be a list
+        use CompiledType::*;
+        let List(elemid) = ty else {
+            panic!("Expected List type");
+        };
+        let elemty = schema.get_by_id(*elemid);
+        let Some(map) = val.as_object() else {
+            return Err(serde_json::Error::custom("Expected map"));
+        };
+        let mut tmp = Vec::with_capacity(map.len());
+        match elemty {
+            Struct { children, .. } | Object { children, .. } => {
+                for (k, v) in map {
+                    let mut item = serde_json::Map::with_capacity(2);
+                    item.insert(children[0].0.clone(), serde_json::Value::String(k.clone()));
+                    item.insert(children[1].0.clone(), v.clone());
+                    tmp.push(serde_json::Value::Object(item))
+                }
+            }
+            Tuple(..) => {
+                for (k, v) in map {
+                    tmp.push(serde_json::Value::Array(vec![
+                        serde_json::Value::String(k.clone()),
+                        v.clone(),
+                    ]));
+                }
+            }
+            _ => panic!("Expected Struct, Object, or Tuple"),
+        }
+        json2frac(schema, ty, &serde_json::Value::Array(tmp), dest)
+    }
+    fn is_empty_container(&self, _ty: &CompiledType, value: &serde_json::Value) -> bool {
+        value.as_object().map_or(false, |s| s.is_empty())
+    }
+}
+
 pub fn standard_types() -> CustomTypes<'static> {
     static BOOL: CustomBool = CustomBool;
     static STRING: CustomString = CustomString;
     static HEX: CustomHex = CustomHex;
+    static MAP: CustomMap = CustomMap;
     let mut result = CustomTypes::new();
     result.insert("bool".to_string(), &BOOL);
     result.insert("string".to_string(), &STRING);
     result.insert("hex".to_string(), &HEX);
+    result.insert("map".to_string(), &MAP);
     result
 }
 
