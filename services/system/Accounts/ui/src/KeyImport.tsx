@@ -9,6 +9,8 @@ import { Button } from "./components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { supervisor } from "./main";
 import { z } from "zod";
+import { toast } from "sonner";
+import { siblingUrl } from "@psibase/common-lib";
 
 const ImportKeyParams = z.object({
   accounts: z.string().array(),
@@ -16,7 +18,7 @@ const ImportKeyParams = z.object({
 });
 
 const useImportKey = () =>
-  useMutation<null, Error, z.infer<typeof ImportKeyParams>>({
+  useMutation<string[], Error, z.infer<typeof ImportKeyParams>>({
     mutationKey: ["importKey"],
     mutationFn: async (data) => {
       const { accounts, privateKey } = ImportKeyParams.parse(data);
@@ -27,15 +29,42 @@ const useImportKey = () =>
         intf: "keyvault",
       }));
 
+      const successfulImports: string[] = [];
       for (const account of accounts) {
-        void (await supervisor.functionCall({
-          method: "importAccount",
-          params: [account],
-          service: "accounts",
-          intf: "admin",
-        }));
+        try {
+          void (await supervisor.functionCall({
+            method: "importAccount",
+            params: [account],
+            service: "accounts",
+            intf: "admin",
+          }));
+          successfulImports.push(account);
+          toast(`Imported ${account}`);
+        } catch (e) {
+          toast(`Failed to import ${account}`, {
+            description:
+              e instanceof Error ? e.message : "Unrecognised error, see log.",
+          });
+        }
       }
-      return null;
+      return successfulImports;
+    },
+    onSuccess: () => {
+      toast("Account import successful", {
+        duration: 180000,
+        description: "You may now return to the homepage.",
+        action: (
+          <div className="w-full flex justify-end">
+            <Button
+              onClick={() => {
+                window.location.href = siblingUrl();
+              }}
+            >
+              Homepage
+            </Button>
+          </div>
+        ),
+      });
     },
   });
 
@@ -49,7 +78,7 @@ function KeyImport() {
   const extractedPrivateKey = key && base64ToPem(key);
 
   const { data: publicKey } = usePrivateToPublicKey(extractedPrivateKey || "");
-  const { data: availableAccounts } = useAccountsLookup(publicKey);
+  const { data: importableAccounts } = useAccountsLookup(publicKey);
 
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
@@ -61,15 +90,24 @@ function KeyImport() {
   };
 
   useEffect(() => {
-    if (awaitingAccounts && availableAccounts.length > 0) {
+    if (awaitingAccounts && importableAccounts.length > 0) {
       awaitingAccounts = false;
-      setSelectedAccounts(availableAccounts);
+      setSelectedAccounts(importableAccounts);
     }
-  }, [availableAccounts]);
+  }, [importableAccounts]);
 
-  const { isPending, mutate } = useImportKey();
+  const {
+    isPending,
+    mutate: importAccounts,
+    data: importedAccounts,
+  } = useImportKey();
 
-  const isNoAccountSelected = selectedAccounts.length == 0;
+  const successfullyImportedAccounts: string[] = importedAccounts || [];
+
+  const isNoAccountSelected =
+    selectedAccounts.filter(
+      (account) => !successfullyImportedAccounts.some((acc) => acc == account)
+    ).length == 0;
   const disableImportButton =
     isNoAccountSelected || isPending || !extractedPrivateKey;
 
@@ -82,19 +120,23 @@ function KeyImport() {
         Select an account to import to your wallet.
       </p>
       <div className="flex  py-4 flex-col gap-3">
-        {availableAccounts.map((account) => {
+        {importableAccounts.map((account) => {
           const isSelected = selectedAccounts.includes(account);
+          const isImported = successfullyImportedAccounts.includes(account);
           return (
             <button
               onClick={() => handleCheck(account, !isSelected)}
               key={account}
+              disabled={isImported}
               className={cn("p-4 w-full flex rounded-sm justify-between", {
-                "bg-muted": isSelected,
-                "bg-muted/25": !isSelected,
+                "bg-muted": isSelected && !isImported,
+                "bg-muted/25": !isSelected && !isImported,
+                "border border-green-300 opacity-50": isImported,
               })}
             >
               <Checkbox
-                checked={isSelected}
+                checked={isSelected && !isImported}
+                disabled={isImported}
                 onCheckedChange={(e: boolean) => handleCheck(account, e)}
               />
               {account}
@@ -105,9 +147,12 @@ function KeyImport() {
       <div className="flex justify-between text-muted-foreground text-sm">
         <Button
           onClick={() => {
-            mutate({
+            importAccounts({
               privateKey: extractedPrivateKey!,
-              accounts: selectedAccounts,
+              accounts: selectedAccounts.filter(
+                (account) =>
+                  !successfullyImportedAccounts.some((acc) => acc == account)
+              ),
             });
           }}
           disabled={disableImportButton}
