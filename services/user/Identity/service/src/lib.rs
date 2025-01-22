@@ -2,22 +2,12 @@ mod stats;
 #[cfg(test)]
 mod tests;
 
-/// Identity service to log identity attestations, and provide a graphiql
-/// query interface.
-#[psibase::service(name = "identity")]
-#[allow(non_snake_case)]
-mod service {
-    use core::fmt;
-
+#[psibase::service_tables]
+mod tables {
     use async_graphql::*;
-
     use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
     use psibase::*;
-
     use serde::{Deserialize, Serialize};
-
-    use crate::stats::update_attestation_stats;
-
     #[table(name = "AttestationTable", index = 0)]
     #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Attestation {
@@ -83,6 +73,21 @@ mod service {
             )
         }
     }
+}
+
+/// Identity service to log identity attestations, and provide a graphiql
+/// query interface.
+#[psibase::service(name = "identity")]
+#[allow(non_snake_case)]
+mod service {
+    use core::fmt;
+
+    use async_graphql::*;
+    use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
+    use psibase::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::stats::update_attestation_stats;
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {

@@ -17,7 +17,7 @@ cargo add -F derive serde
 #[allow(non_snake_case)]
 #[psibase::service]
 mod service {
-    use async_graphql::*;
+    use async_graphql::Object;
     use psibase::*;
 
     // Root query object
@@ -79,22 +79,20 @@ We need some data to query. Let's build on the example from the
 [Tables Section](tables.md).
 
 ```rust
-#[allow(non_snake_case)]
-#[psibase::service]
-mod service {
-    use async_graphql::*;
-    use psibase::{AccountNumber, *};
-    use rand::prelude::*;
+#[psibase::service_tables]
+mod tables {
+    use async_graphql::SimpleObject;
+    use psibase::{AccountNumber, Fracpack, ToKey};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
     pub struct Message {
         #[primary_key]
-        id: u64,
-        from: AccountNumber,
-        to: AccountNumber,
-        content: String,
+        pub id: u64,
+        pub from: AccountNumber,
+        pub to: AccountNumber,
+        pub content: String,
     }
 
     // A variety of secondary keys to support queries
@@ -121,15 +119,24 @@ mod service {
     }
 
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Default, Fracpack, Serialize, Deserialize)]
     pub struct LastUsed {
-        lastMessageId: u64,
+        pub lastMessageId: u64,
     }
 
     impl LastUsed {
         #[primary_key]
         fn pk(&self) {}
     }
+}
+
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use psibase::{AccountNumber, *};
+    use rand::prelude::*;
+
+    use crate::tables::{Message, MessageTable, LastUsedTable};
 
     fn get_next_message_id() -> u64 {
         let table = LastUsedTable::new();
@@ -198,7 +205,7 @@ The above won't build until we define our Query root. Let's start with something
 ```rust
 struct Query;
 
-#[Object]
+#[async_graphql::Object]
 impl Query {
     // Get the first n messages
     async fn messages(&self, n: u32) -> Vec<Message> {
@@ -224,10 +231,11 @@ psibase create -i joe
 psibase create -i sue
 ```
 
-If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service. 
+If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service.
 
-Use `generateRandom` to create messages. 
-- Use `1000` for `numMessages`. 
+Use `generateRandom` to create messages.
+
+- Use `1000` for `numMessages`.
 - Use `["alice","bob","frank","jennifer","joe","sue"]` for `users`.
 
 Access the `/graphiql.html` endpoint on this service, and run the following query:

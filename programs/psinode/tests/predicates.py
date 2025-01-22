@@ -1,5 +1,6 @@
 import calendar
 from datetime import datetime, timedelta, timezone
+import requests
 
 def _get_producer_name(prod):
     if isinstance(prod, str):
@@ -22,7 +23,13 @@ def new_block():
     now = datetime.now(timezone.utc)
     print("waiting for block produced after %s" % now.isoformat())
     def result(node):
-        timestamp = node.get_block_header()['time']
+        try:
+            header = node.get_block_header()
+            if header is None:
+                return False
+            timestamp = header['time']
+        except requests.exceptions.HTTPError:
+            return False
         print(timestamp)
         if timestamp.endswith('Z'):
             timestamp = timestamp[:-1] + '+00:00'

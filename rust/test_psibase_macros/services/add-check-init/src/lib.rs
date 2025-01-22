@@ -1,9 +1,7 @@
-#[psibase::service(name = "addcheckinit")]
-#[allow(non_snake_case)]
-pub mod service {
-    use psibase::{check, Fracpack, Table, ToSchema};
+#[psibase::service_tables]
+mod service_tables {
+    use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
-
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct InitRow {}
@@ -11,6 +9,14 @@ pub mod service {
         #[primary_key]
         fn pk(&self) {}
     }
+}
+
+#[psibase::service(name = "addcheckinit")]
+#[allow(non_snake_case)]
+pub mod service {
+    use crate::service_tables::{InitRow, InitTable};
+    use psibase::check;
+    use psibase::Table;
 
     #[action]
     fn init() {
