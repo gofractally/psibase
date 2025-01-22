@@ -18,11 +18,17 @@ export type ListenConfig = {
     text?: string;
 };
 
+export type HostConfig = {
+    host: string;
+    // auto-generated
+    key: string;
+};
+
 export type PsinodeConfigUI = {
     p2p: boolean;
     peers: string[];
     producer: string;
-    hosts: string[];
+    hosts: HostConfig[];
     port?: number;
     listen: ListenConfig[];
     services: ServiceConfig[];
