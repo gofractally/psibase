@@ -117,9 +117,9 @@ namespace arbtrie
          _block_alloc.reserve( block_num+1, true );
       return get(nid);
    }
+
    inline node_meta_type& id_alloc::get(fast_meta_address nid)
    {
-      // TODO verify compiler converted all multiply and divide operations to shifts
       uint64_t abs_pos        = nid.index * sizeof(node_meta_type);
       uint64_t block_num      = abs_pos / id_page_size;
       uint64_t index_in_block = abs_pos & uint64_t(id_page_size - 1);

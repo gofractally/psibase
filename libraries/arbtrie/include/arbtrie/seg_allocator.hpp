@@ -10,7 +10,7 @@
 /**
  *  @file seg_allocator.hpp
  *
- *  Responsible for allocating large segments of memory (256MB), each
+ *  Responsible for allocating large segments of memory (segment_size = 128 MB), each
  *  segment in turn stores objects pointed to from the id_allocator.
  *
  *  1. Each thread has its own session and allocates to its own
@@ -35,7 +35,7 @@
  *
  *  5. A garbage-collector (GC) thread finds the most empty segment and moves 
  *     all of the objects that remain to its own segment, then makes the
- *     segment available for reuse by other threads (one all threads have
+ *     segment available for reuse by other threads (once all threads have
  *     released the implied write lock)
  *  6. the Object ID allocation system can be made thread safe by giving
  *     each "writing session" a "segment" of the object id space. Writers would
@@ -43,15 +43,46 @@
  *
  *  Theory: 
  *      a. data will be organized in the order it tends to be accessed in
- *      b. infrequently accessed data will be grouped together by GC
+ *      b. infrequently modified data will be grouped together by GC 
+ *          - because as things are modified they are moved away 
  *      c. the most-recent N segments can have their memory pinned
  *      d. madvise can be effeciently used to mark alloc segmentsfor
  *           SEQ and/or pin them to memory. It can also mark segments as
  *           RANDOM or UNNEEDED to improve OS cache managment.
  *
- *   
+ *   Future Work:
+ *      0. Large objects should not get moved around and could utilize their own allocation
+ *         system... or at the very least get grouped together because they are less likely to
+ *         be modified than smaller objects.
+ *      1. separating binary nodes and value nodes from other inner node types reduces probability of
+ *         loading unecessary data from disk.
+ *      2. as nodes are being read set a "read bit", then when compacting, move read nodes to different
+ *         segments from unread ones. 
+ *              - take a bit from the reference count in node_meta
+ *                   a. this would not result in an extra cacheline miss
+ *                   b. this could be lazy non-looping compare & swap to prevent
+ *                      readers/writers from stomping on eachother. 
+ *                   c. the read bit only needs to modified if not already set
+ *                   d. the read bit only needs to be set on segments not mmapped
+ *                   e. the read bit gets automatically cleared when node is moved
+ *                   f. generate a random number and only update the read bit some of the time.
+ *                             - the probability of updating the read bit depends upon how "cold"
+ *                             the object is (age of segment). Colder segments are less likely to
+ *                             mark an object read because of one access. But if an object "becomes hot"
+ *                             then it is more likely to get its read bit set.
+ *              - add meta data to the segment that tracks how many times the objects
+ *                in the segment have been moved due to lack of access. When compacting
+ *                a segment you add one to that source segments "access age" for the segment
+ *                that is receiving the idol segments. 
+ *              - when selecting a segment to compact there are several metrics to consider:
+ *                   a. what percentage of the segment has been freed and therefore net recaptured space
+ *                   b. what percentage of remaining data has been read at least once
+ *                          - a segment that is 50% read has greater sorting effeciency than
+ *                            a segment that is 10% or 90% read. 
+ *                   c. the number of times the objects in the segment have been moved because
+ *                      of lack of access. 
+ *
  */
-
 namespace arbtrie
 {
    /// index into meta[free_segment_index]._free_segment_number
@@ -778,6 +809,7 @@ namespace arbtrie
          }
          assert(r->validate_checksum());
       }
+      // TODO: determine if we need to set read bit on node
       return r;
    }
 

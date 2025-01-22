@@ -70,8 +70,8 @@ namespace arbtrie
             /// don't let the alloc threads starve for want of a free segment
             /// if the free segment queue is getting low, top it up... but
             /// don't top it up just because read threads have things blocked
-            /// because they could "block" for a long time... hrmn... could we
-            /// put this at prior ap loc?
+            /// because they could "block" for a long time... 
+
             auto min = get_min_read_ptr();
             auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
             auto ep  = _header->end_ptr.load(std::memory_order_relaxed);
@@ -181,7 +181,6 @@ namespace arbtrie
       while (foo < send and foo->address())
       {
          assert(intptr_t(foo) % 64 == 0);
-         assert(foo->_nsize < 2 * 4096);
 
          if constexpr (update_checksum_on_modify)
             assert(foo->validate_checksum());
@@ -214,7 +213,6 @@ namespace arbtrie
          }
 
          auto obj_size = foo->size();
-         assert(obj_size < 4096 * 2);
          auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
 
          if (obj_ref.try_start_move(obj_ref.loc())) [[likely]]

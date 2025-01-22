@@ -8,7 +8,6 @@
 #define XXH_INLINE_ALL
 #include <arbtrie/xxhash.h>
 
-
 namespace arbtrie
 {
    struct node_header;
@@ -58,7 +57,7 @@ namespace arbtrie
             _node_id(nid.to_int())
       {
          assert(fast_meta_address::from_int(_node_id) == nid);
-         assert( intptr_t(this) % 64 == 0 );
+         assert(intptr_t(this) % 64 == 0);
       }
 
       void      set_address(fast_meta_address a) { _node_id = a.to_int(); }
@@ -77,22 +76,18 @@ namespace arbtrie
          return static_cast<const T*>(this);
       }
 
-      //template <typename T>
-      //inline static T* make(uint32_t size, uint16_t num_branch, uint8_t prefix_len = 0);
-
       void set_type(node_type t) { _ntype = (int)t; }
       void set_id(fast_meta_address i) { _node_id = i.to_int(); }
       void set_branch_region(id_region r) { _branch_id_region = r.to_int(); }
 
       uint32_t          size() const { return _nsize; }
       fast_meta_address address() const { return fast_meta_address::from_int(_node_id); }
-      //     object_id      id() const { return object_id(_node_id); }
-      node_type      get_type() const { return (node_type)_ntype; }
-      uint16_t       num_branches() const { return _num_branches; }
-      char*          body() { return (char*)(this + 1); }
-      const char*    body() const { return (const char*)(this + 1); }
-      char*          tail() { return ((char*)this) + _nsize; }
-      const uint8_t* tail() const { return ((const uint8_t*)this) + _nsize; }
+      node_type         get_type() const { return (node_type)_ntype; }
+      uint16_t          num_branches() const { return _num_branches; }
+      char*             body() { return (char*)(this + 1); }
+      const char*       body() const { return (const char*)(this + 1); }
+      char*             tail() { return ((char*)this) + _nsize; }
+      const uint8_t*    tail() const { return ((const uint8_t*)this) + _nsize; }
 
       // size rounded up to the nearest 16 bytes
       inline uint32_t     object_capacity() const { return (_nsize + 15) & -16; }
@@ -101,10 +96,11 @@ namespace arbtrie
       uint32_t calculate_checksum() const;
 
       void update_checksum() { checksum = calculate_checksum(); }
-      bool has_checksum()const { return checksum; }
-      bool validate_checksum() const { 
-         if( checksum )
-            return (checksum == calculate_checksum()); 
+      bool has_checksum() const { return checksum; }
+      bool validate_checksum() const
+      {
+         if (checksum)
+            return (checksum == calculate_checksum());
          return true;
       }
    } __attribute((packed));
