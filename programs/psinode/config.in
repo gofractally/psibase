@@ -9,6 +9,7 @@ listen   = 8080
 # peer     = http://localhost:8080/
 service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
 admin    = static:*
+database-cache-size = 256MiB
 
 http-timeout = 4s
 
