@@ -6,38 +6,6 @@
 /// by the account specified when enabling the latch.
 package staged-tx:plugin;
 
-interface admin {
-    use host:common/types.{error};
-
-    /// This is a global setting for an account that will act as a persistent propose-latch across 
-    /// all apps for this user.
-    ///
-    /// This is an advanced user configuration, only callable by the homepage app.
-    /// 
-    /// `proposer` - The account that will propose transactions.
-    /// `account` - The account on behalf of which the proposer is proposing transactions
-    enable-proposal-mode: func(proposer: string, account: string) -> result<_, error>;
-
-    /// Disables the proposal mode global setting.
-    /// 
-    /// Only callable by the homepage app.
-    /// 
-    /// `proposer` - The account that is no longer going to be proposing transactions.
-    disable-proposal-mode: func(proposer: string) -> result<_, error>;
-
-    /// Unset the propose latch.
-    /// 
-    /// Only callable by the transact plugin.
-    unset-propose-latch: func();
-
-    /// Returns the current latch account, if any.
-    /// 
-    /// Only callable by the transact plugin.
-    /// 
-    /// `proposer` - The account whose propose latch is being checked.
-    get-propose-latch: func(proposer: string) -> option<string>;
-}
-
 interface api {
     use host:common/types.{error};
 
@@ -51,5 +19,4 @@ interface api {
 
 world imports {
     import api;
-    import admin;
 }

@@ -23,8 +23,9 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
-"clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
+"transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
+
 
 [dev-dependencies]
 staged-tx-pkg = { path = "..", version = "0.14.0" }

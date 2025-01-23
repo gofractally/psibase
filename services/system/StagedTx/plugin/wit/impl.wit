@@ -2,9 +2,8 @@ package staged-tx:plugin;
 
 world impl {
     include host:common/imports;
-    include clientdata:plugin/imports;
     include accounts:plugin/imports;
+    include transact:plugin/hook-tx-transform;
 
     export api;
-    export admin;
 }

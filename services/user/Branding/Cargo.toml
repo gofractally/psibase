@@ -12,6 +12,7 @@ homepage = "https://psibase.io"
 
 [package]
 name = "branding_package"
+edition = "2021"
 
 [profile.release]
 codegen-units = 1

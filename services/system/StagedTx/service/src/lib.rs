@@ -393,7 +393,7 @@ pub mod service {
     }
 
     #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject, Clone)]
-    struct StagedTxEvent {
+    pub struct StagedTxEvent {
         ty: u8,
     }
 

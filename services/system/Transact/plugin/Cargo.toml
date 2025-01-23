@@ -25,7 +25,6 @@ world = "impl"
 "host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
 "clientdata:plugin" = { path = "../../../user/ClientData/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
-"accounts:smart-auth" = { path = "../../Accounts/plugin/smartAuth/import.wit" }
 
 [package.metadata.component.bindings]
 derives = ["psibase::Pack", "psibase::Unpack"]

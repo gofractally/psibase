@@ -1,9 +1,18 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::connection::Connection;
+    use async_graphql::{connection::Connection, *};
     use psibase::*;
+    use serde::Deserialize;
     use staged_tx::service::*;
+
+    #[derive(Deserialize, SimpleObject)]
+    struct Updates {
+        txid: [u8; 32],            // The txid of the staged transaction
+        actor: AccountNumber,      // The sender of the action causing the event
+        datetime: TimePointUSec,   // The time of the event emission
+        event_type: StagedTxEvent, // The type of event
+    }
 
     struct Query;
 
@@ -20,6 +29,13 @@ mod service {
                 .query()
                 .await
         }
+
+        /// This query gets the historical staged-tx updates
+        async fn historical_updates(&self) -> Vec<Updates> {
+            let json_str = services::r_events::Wrapper::call()
+                .sqlQuery("SELECT * FROM \"history.staged_tx.updated\" ORDER BY ROWID".to_string());
+            serde_json::from_str(&json_str).unwrap_or_default()
+        }
     }
 
     #[action]
@@ -28,5 +44,6 @@ mod service {
         None.or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<staged_tx::Wrapper>(&request))
+            .or_else(|| serve_schema::<staged_tx::Wrapper>(&request))
     }
 }

@@ -1,5 +1,8 @@
 import { siblingUrl } from "./rpc";
-import { buildFunctionCallRequest } from "./messaging/FunctionCallRequest";
+import {
+    buildFunctionCallRequest,
+    toString,
+} from "./messaging/FunctionCallRequest";
 import {
     PluginId,
     pluginString,
@@ -131,14 +134,20 @@ export class Supervisor {
         if (isPluginError(result)) {
             const { service, plugin } = result.pluginId;
 
-            console.error(`Call to ${resolved.details} failed`);
+            console.error(
+                `Call failed`,
+                JSON.stringify(resolved.details, null, 2),
+            );
             console.error(`[${service}:${plugin}] ${result.message}`);
             pendingRequest.reject(result);
             return;
         }
 
         if (isGenericError(result)) {
-            console.error(`Call to ${resolved.details} failed`);
+            console.error(
+                `Call failed`,
+                JSON.stringify(resolved.details, null, 2),
+            );
             console.error(result.message);
             pendingRequest.reject(result);
             return;
@@ -180,7 +189,7 @@ export class Supervisor {
 
     public functionCall(args: FunctionCallArgs) {
         const request = buildFunctionCallRequest(args);
-        return this.sendRequest(args.toString(), request);
+        return this.sendRequest(toString(args), request);
     }
 
     public getJson(plugin: QualifiedPluginId) {

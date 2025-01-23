@@ -1797,6 +1797,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "serde",
+ "serde_json",
  "staged-tx",
 ]
 
