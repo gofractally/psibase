@@ -372,7 +372,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
-        FLAGS allowWriteSubjective
+        FLAGS allowWriteSubjective allowNativeSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
@@ -428,7 +428,7 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/AppRegistry.psi
+    OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH services/user/Registry
 )
 
@@ -774,7 +774,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
@@ -784,7 +784,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
 )
@@ -797,6 +797,14 @@ psibase_package(
     DESCRIPTION "Minimum services for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Packages Producers HttpServer
                     SetCode Transact
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/TestDefault.psi
+    NAME TestDefault
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Services used in the tester"
+    PACKAGE_DEPENDS Minimal AuthSig Brotli Events Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 function(write_package_index target dir)
@@ -814,8 +822,8 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers HttpServer
-    AppRegistry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers TestDefault HttpServer
+    Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -842,8 +850,9 @@ install(
           ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Producers.psi
+          ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/HttpServer.psi
-          ${SERVICE_DIR}/AppRegistry.psi
+          ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/StagedTx.psi

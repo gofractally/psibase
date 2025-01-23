@@ -15,6 +15,7 @@
       - [CFT](specifications/blockchain/peer-consensus/cft.md)
       - [BFT](specifications/blockchain/peer-consensus/bft.md)
       - [Joint Consensus](specifications/blockchain/peer-consensus/joint-consensus.md)
+    - [Synchronization](specifications/blockchain/synchronization.md)
     - [Snapshots](specifications/blockchain/snapshots.md)
   - [App architecture](specifications/app-architecture/README.md)
     - [Events](specifications/app-architecture/events.md)

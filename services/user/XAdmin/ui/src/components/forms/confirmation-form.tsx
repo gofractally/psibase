@@ -114,7 +114,7 @@ export function ConfirmationForm({
             sorting,
             columnFilters,
             pagination: {
-                pageSize: 30,
+                pageSize: 999,
                 pageIndex: 0,
             },
             columnVisibility,

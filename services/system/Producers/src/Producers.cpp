@@ -1,5 +1,7 @@
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
+#include <ranges>
+#include <services/system/Accounts.hpp>
 #include <services/system/Producers.hpp>
 
 using namespace psibase;
@@ -8,6 +10,82 @@ namespace
 {
    auto compare_claim = [](const Claim& lhs, const Claim& rhs)
    { return std::tie(lhs.service, lhs.rawData) < std::tie(rhs.service, rhs.rawData); };
+
+   bool satisfiesClaim(const Claim& expected, const std::vector<Claim>& claims_sorted)
+   {
+      return expected == Claim{} ||
+             std::ranges::binary_search(claims_sorted, expected, compare_claim);
+   }
+
+   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
+   {
+      if (account == SystemService::Producers::producerAccountWeak)
+         return 1;
+      else
+         return cft.producers.size() / 2 + 1;
+   }
+
+   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
+   {
+      if (account == SystemService::Producers::producerAccountWeak)
+         return (bft.producers.size() + 2) / 3;
+      else
+         return bft.producers.size() * 2 / 3 + 1;
+   }
+
+   std::size_t getNrProds()
+   {
+      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
+      check(status.has_value(), "status row invalid");
+      return std::visit([&](const auto& c) { return c.producers.size(); },
+                        status->consensus.current.data);
+   }
+
+   std::vector<Producer> getProducers()
+   {
+      auto status = kvGet<StatusRow>(StatusRow::db, StatusRow::key());
+      check(status.has_value(), "status row invalid");
+      return std::visit([](const auto& c) -> std::vector<Producer>
+                        { return std::move(c.producers); }, status->consensus.current.data);
+   }
+
+   using IndirectCheckFunc =
+       bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
+                                                     std::vector<AccountNumber>,
+                                                     std::optional<std::vector<AccountNumber>>);
+
+   bool checkOverlapping(std::vector<AccountNumber> producers,
+                         std::vector<AccountNumber> authorizers,
+                         std::size_t                threshold,
+                         IndirectCheckFunc          indirectCheck,
+                         std::vector<AccountNumber> authSet)
+   {
+      // We only check for indirect auth if there are insufficient direct auths.
+      auto nonOverlapping = std::ranges::partition(
+          producers, [&](const auto& p) { return std::ranges::contains(authorizers, p); });
+      auto numOverlapping = std::ranges::distance(producers.begin(), nonOverlapping.begin());
+      if (numOverlapping >= threshold)
+      {
+         return true;
+      }
+
+      // Now check for indirect authorization
+      for (const auto& account :
+           std::ranges::subrange(nonOverlapping.begin(), nonOverlapping.end()))
+      {
+         auto toAuth = Actor<SystemService::AuthInterface>{
+             SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
+
+         if ((toAuth.*indirectCheck)(account, authorizers, std::optional(std::move(authSet))) &&
+             ++numOverlapping >= threshold)
+         {
+            return true;
+         }
+      }
+
+      return false;
+   }
+
 }  // namespace
 
 namespace SystemService
@@ -74,25 +152,32 @@ namespace SystemService
       psibase::kvPut(StatusRow::db, StatusRow::key(), *status);
    }
 
-   std::size_t getThreshold(const CftConsensus& cft, AccountNumber account)
+   std::vector<psibase::AccountNumber> Producers::getProducers()
    {
-      if (account == Producers::producerAccountWeak)
-         return 1;
-      else
-         return cft.producers.size() / 2 + 1;
+      return ::getProducers()                          //
+             | std::views::transform(&Producer::name)  //
+             | std::ranges::to<std::vector>();
    }
 
-   std::size_t getThreshold(const BftConsensus& bft, AccountNumber account)
+   uint32_t Producers::getThreshold(AccountNumber account)
    {
-      if (account == Producers::producerAccountWeak)
-         return (bft.producers.size() + 2) / 3;
-      else
-         return bft.producers.size() * 2 / 3 + 1;
+      check(account == producerAccountWeak || account == producerAccountStrong, "Invalid account");
+      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      check(!!status, "Missing status row");
+      auto threshold = std::visit([&](const auto& c) { return ::getThreshold(c, account); },
+                                  status->consensus.current.data);
+
+      return threshold;
+   }
+
+   uint32_t Producers::antiThreshold(AccountNumber account)
+   {
+      return ::getNrProds() - getThreshold(account) + 1;
    }
 
    void Producers::checkAuthSys(uint32_t                    flags,
-                                psibase::AccountNumber      requester,
-                                psibase::AccountNumber      sender,
+                                AccountNumber               requester,
+                                AccountNumber               sender,
                                 ServiceMethod               action,
                                 std::vector<ServiceMethod>  allowedActions,
                                 std::vector<psibase::Claim> claims)
@@ -113,27 +198,16 @@ namespace SystemService
       else if (type != AuthInterface::topActionReq)
          abortMessage("unsupported auth type");
 
-      auto status = psibase::kvGet<psibase::StatusRow>(StatusRow::db, StatusRow::key());
+      auto expectedClaims = ::getProducers()                          //
+                            | std::views::transform(&Producer::auth)  //
+                            | std::ranges::to<std::vector>();
 
-      std::vector<psibase::Claim> expectedClaims;
-      std::visit(
-          [&](auto& c)
-          {
-             for (const auto& [name, auth] : c.producers)
-             {
-                expectedClaims.push_back(auth);
-             }
-          },
-          status->consensus.current.data);
-      std::sort(claims.begin(), claims.end(), compare_claim);
-      auto matching = std::ranges::count_if(
-          expectedClaims, [&](const auto& claim)
-          { return claim == Claim{} || std::ranges::binary_search(claims, claim, compare_claim); });
+      std::ranges::sort(claims, compare_claim);
+      auto matching = std::ranges::count_if(expectedClaims, [&](const auto& expected) {  //
+         return satisfiesClaim(expected, claims);
+      });
 
-      auto threshold = expectedClaims.empty()
-                           ? 0
-                           : std::visit([&](const auto& c) { return getThreshold(c, sender); },
-                                        status->consensus.current.data);
+      auto threshold = expectedClaims.empty() ? 0 : getThreshold(sender);
       if (matching < threshold)
       {
          abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +
@@ -141,10 +215,59 @@ namespace SystemService
       }
    }
 
-   void Producers::canAuthUserSys(psibase::AccountNumber user)
+   void Producers::canAuthUserSys(AccountNumber user)
    {
       check(user == producerAccountStrong || user == producerAccountWeak,
             "Can only authorize predefined accounts");
+   }
+
+   bool Producers::isAuthSys(AccountNumber                             sender,
+                             std::vector<AccountNumber>                authorizers,
+                             std::optional<std::vector<AccountNumber>> authSet_opt)
+   {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
+      // Base case to prevent infinite recursion
+      if (std::ranges::contains(authSet, sender))
+         return false;
+
+      authSet.push_back(sender);
+
+      auto producers = ::getProducers()                          //
+                       | std::views::transform(&Producer::name)  //
+                       | std::ranges::to<std::vector>();
+
+      auto threshold = producers.empty() ? 0 : getThreshold(sender);
+
+      auto _ = recurse();
+      return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
+                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
+   }
+
+   bool Producers::isRejectSys(AccountNumber                             sender,
+                               std::vector<AccountNumber>                rejecters,
+                               std::optional<std::vector<AccountNumber>> authSet_opt)
+   {
+      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
+
+      // Base case to prevent infinite recursion
+      if (std::ranges::contains(authSet, sender))
+         return false;
+
+      authSet.push_back(sender);
+
+      auto producers = ::getProducers()                          //
+                       | std::views::transform(&Producer::name)  //
+                       | std::ranges::to<std::vector>();
+
+      if (producers.empty())
+         return false;
+
+      auto threshold = antiThreshold(sender);
+
+      auto _ = recurse();
+      return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
+                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
    }
 
 }  // namespace SystemService

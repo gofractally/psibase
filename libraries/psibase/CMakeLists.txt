@@ -156,6 +156,7 @@ function(add suffix)
             ../../services/system/CpuLimit/include
             ../../services/system/HttpServer/include
             ../../services/system/SetCode/include
+            ../../services/system/StagedTx/service/cpp/include
             ../../services/system/Transact/include
             ../../services/user/CommonApi/include
             ../../services/user/Explorer/include
@@ -186,8 +187,8 @@ function(add suffix)
         target_sources(psibase${suffix} PRIVATE
             native/src/BlockContext.cpp
             native/src/ConfigFile.cpp
-            native/src/EcdsaProver.cpp
             native/src/ExecutionContext.cpp
+            native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/NativeFunctions.cpp
             native/src/OpenSSLProver.cpp

@@ -6,12 +6,17 @@ members = ["service", "plugin"]
 version = "0.14.0"
 rust-version = "1.64"
 edition = "2021"
-publish = false
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+publish = false
 
 [package]
-name = "branding_package"
+name = "branding-pkg"
+description = "Allow operators to rebrand their network easily"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
 
 [profile.release]
 codegen-units = 1
@@ -22,7 +27,6 @@ lto = true
 
 [package.metadata.psibase]
 package-name = "Branding"
-description = "Allow operators to rebrand their network easily"
 services = ["branding"]
 
 [package.metadata.psibase.dependencies]
@@ -33,5 +37,5 @@ Sites = "0.14.0"
 crate-type = ["rlib"]
 
 [dependencies]
-branding = { path = "service" }
-plugin = { path = "plugin" }
+branding = { path = "service", version = "0.14.0" }
+plugin = { path = "plugin", version = "0.14.0" }

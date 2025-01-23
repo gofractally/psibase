@@ -208,6 +208,7 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
             "isAuthService" => 1 << 6,
             "forceReplay" => 1 << 7,
             "allowSocket" => 1 << 8,
+            "allowNativeSubjective" => 1 << 9,
             _ => Err(Error::InvalidFlags)?,
         };
     }

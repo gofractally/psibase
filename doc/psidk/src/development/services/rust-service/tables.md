@@ -14,15 +14,14 @@ cargo add -F derive serde
 ```
 
 ```rust
-#[allow(non_snake_case)] // javascript-friendly names
-#[psibase::service]
-mod service {
-    use psibase::*;
+#[psibase::service_tables]
+mod tables {
+    use psibase::{AccountNumber, Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
 
     // Our first table (index 0) is MessageTable. It stores Message.
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct Message {
         // Every table has a unique primary key. This doesn't have
         // to be a u64; many types may be keys, including String,
@@ -31,12 +30,19 @@ mod service {
         // Primary key methods often return tuples containing field
         // values.
         #[primary_key]
-        id: u64,
+        pub id: u64,
 
-        from: AccountNumber,
-        to: AccountNumber,
-        content: String,
+        pub from: AccountNumber,
+        pub to: AccountNumber,
+        pub content: String,
     }
+}
+
+#[allow(non_snake_case)] // javascript-friendly names
+#[psibase::service]
+mod service {
+    use psibase::*;
+    use crate::tables::{Message, MessageTable};
 
     // Store a message
     #[action]
@@ -107,6 +113,7 @@ fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         "^/messages/([0-9]+)/([0-9]+)$").unwrap();
     if let Some(captures) = re.captures(&request.target) {
         return Some(HttpReply {
+            status: 200,
             contentType: "application/json".into(),
             body: serde_json::to_vec(&getMessages(
                 captures[1].parse().unwrap(),
@@ -138,30 +145,29 @@ curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/20/30 | jq
 A singleton is a table that has at most 1 row. Let's add one to track the most-recent message ID so we can keep messages in order.
 
 ```rust
-#[allow(non_snake_case)]
-#[psibase::service]
-mod service {
-    use psibase::*;
+#[psibase::service_tables]
+mod tables {
+    use psibase::{AccountNumber, Fracpack, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     // We can't renumber tables without corrupting
     // them. This table remains 0.
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
     pub struct Message {
         #[primary_key]
-        id: u64,
+        pub id: u64,
 
-        from: AccountNumber,
-        to: AccountNumber,
-        content: String,
+        pub from: AccountNumber,
+        pub to: AccountNumber,
+        pub content: String,
     }
 
     // This table stores the last used message ID
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Default, Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
     pub struct LastUsed {
-        lastMessageId: u64,
+        pub lastMessageId: u64,
     }
 
     impl LastUsed {
@@ -170,6 +176,13 @@ mod service {
         #[primary_key]
         fn pk(&self) {}
     }
+}
+
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use psibase::*;
+    use crate::tables::{Message, MessageTable, LastUsedTable};
 
     // This is not an action; others can't call it.
     fn get_next_message_id() -> u64 {
@@ -241,22 +254,21 @@ We modified the behavior of an already-deployed service and introduced a bug in 
 So far we have a way to page through all messages, but don't have a good way to page through all messages from a particular user, or to a particular user. We can add secondary indexes to solve this.
 
 ```rust
-#[allow(non_snake_case)]
-#[psibase::service]
-mod service {
-    use psibase::*;
+#[psibase::service_tables]
+mod tables {
+    use psibase::{AccountNumber, Fracpack, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     // Same as before
     #[table(name = "MessageTable", index = 0)]
-    #[derive(Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
     pub struct Message {
         #[primary_key]
-        id: u64,
+        pub id: u64,
 
-        from: AccountNumber,
-        to: AccountNumber,
-        content: String,
+        pub from: AccountNumber,
+        pub to: AccountNumber,
+        pub content: String,
     }
 
     impl Message {
@@ -280,9 +292,9 @@ mod service {
 
     // Same as before
     #[table(name = "LastUsedTable", index = 1)]
-    #[derive(Default, Fracpack, Reflect, Serialize, Deserialize)]
+    #[derive(Default, Fracpack, Serialize, Deserialize, ToSchema)]
     pub struct LastUsed {
-        lastMessageId: u64,
+        pub lastMessageId: u64,
     }
 
     // Same as before
@@ -290,6 +302,13 @@ mod service {
         #[primary_key]
         fn pk(&self) {}
     }
+}
+
+#[allow(non_snake_case)]
+#[psibase::service]
+mod service {
+    use psibase::*;
+    use crate::tables::{Message, MessageTable, LastUsedTable};
 
     // Same as before
     fn get_next_message_id() -> u64 {
@@ -336,6 +355,7 @@ mod service {
                 let index = message_table.get_index_by_from();
 
                 return Some(HttpReply {
+                    status: 200,
                     contentType: "application/json".into(),
                     body: serde_json::to_vec(
                         &index
@@ -353,6 +373,7 @@ mod service {
                 let index = message_table.get_index_by_to();
 
                 return Some(HttpReply {
+                    status: 200,
                     contentType: "application/json".into(),
                     body: serde_json::to_vec(
                         &index
@@ -397,11 +418,11 @@ There is an exemption to the last rule. You may add new `Option<...>` fields to 
 
 ## Reading Tables in Test Cases
 
-Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid testability. We also changed the fields to public.
+Let's make the following adjustment to Message. `Debug, PartialEq, Eq` aid testability.
 
 ```rust
 #[table(name = "MessageTable", index = 0)]
-#[derive(Debug, PartialEq, Eq, Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToKey, ToSchema)]
 pub struct Message {
     #[primary_key]
     pub id: u64,
@@ -420,6 +441,7 @@ fn test_store_message(chain: psibase::Chain)
 -> Result<(), psibase::Error> {
     use psibase::*;
     use service::*;
+    use crate::tables::{Message, MessageTable};
 
     chain.new_account(account!("alice")).unwrap();
     chain.new_account(account!("bob")).unwrap();
@@ -480,12 +502,13 @@ cargo psibase test
 Sometimes services need to define tables whose struct isn't defined within the service module itself. Here's an example where we define the struct in the service's crate. It could also be defined in another library.
 
 ```rust
-// This definition lives outside of the service module. We can't use
+// This definition lives outside of the service_tables module. We can't use
 // `#[table]`, `#[primary_key]`, or `#[secondary_key]` here since
-// those attributes are part of the `#[service]` macro.
-#[derive(psibase::Fracpack, psibase::Reflect, serde::Serialize, serde::Deserialize)]
+// those attributes are part of the `#[service_tables]` macro.
+#[derive(psibase::Fracpack, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     pub id: u64,
+
     pub from: psibase::AccountNumber,
     pub to: psibase::AccountNumber,
     pub content: String,
@@ -493,9 +516,9 @@ pub struct Message {
 ```
 
 ```rust
-// Inside the service module
+// Inside the service_tables module (replacing both the `struct Message` and `impl Message`)
 #[table(name = "MessageTable", index = 0)]
-#[derive(Fracpack, Reflect, Serialize, Deserialize)]
+#[derive(Fracpack, Serialize, Deserialize, ToSchema)]
 pub struct WrapMessage(crate::Message);
 
 impl WrapMessage {

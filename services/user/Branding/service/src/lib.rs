@@ -1,12 +1,8 @@
-#[psibase::service(name = "branding")]
-mod service {
-    use async_graphql::{Object, SimpleObject};
-    use psibase::{
-        serve_graphql, Fracpack, HttpReply, HttpRequest, SingletonKey,
-        Table, ToSchema,
-    };
+#[psibase::service_tables]
+mod tables {
+    use async_graphql::SimpleObject;
+    use psibase::{Fracpack, SingletonKey, ToSchema};
     use serde::{Deserialize, Serialize};
-
     #[table(name = "NetworkNameTable")]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct NetworkName {
@@ -27,6 +23,14 @@ mod service {
             }
         }
     }
+}
+
+#[psibase::service(name = "branding")]
+mod service {
+    use async_graphql::Object;
+    use psibase::{serve_graphql, HttpReply, HttpRequest, SingletonKey, Table};
+
+    use crate::tables::{NetworkName, NetworkNameTable};
 
     #[action]
     #[allow(non_snake_case)]

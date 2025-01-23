@@ -9,25 +9,16 @@ mod tables;
 #[psibase::service]
 mod service {
     use crate::event_query_helpers::serve_rest_api;
-    use crate::tables::{SavedMessage, SavedMessageTable};
+    use crate::tables::tables::{InitRow, InitTable, SavedMessage, SavedMessageTable};
 
     use psibase::services::accounts::Wrapper as AccountsSvc;
     use psibase::services::events::Wrapper as EventsSvc;
     use psibase::services::sites::Wrapper as SitesSvc;
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
-        check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, Fracpack,
-        HttpReply, HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec, ToSchema,
+        check, create_schema, get_sender, serve_graphql, AccountNumber, DbId, HttpReply,
+        HttpRequest, MethodNumber, RawKey, Table, TableQuery, TimePointSec,
     };
-    use serde::{Deserialize, Serialize};
-
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
 
     #[action]
     fn init() {
@@ -146,8 +137,9 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, SavedMessage>, async_graphql::Error> {
+            let saved_msgs_table = SavedMessageTable::new();
             TableQuery::subindex::<AccountNumber>(
-                SavedMessageTable::new().get_index_by_receiver(),
+                saved_msgs_table.get_index_by_receiver(),
                 &receiver,
             )
             .first(first)

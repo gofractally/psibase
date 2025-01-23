@@ -125,12 +125,7 @@ struct FuzzNode
       node.set_producer_id(name);
       node.load_producers();
       node.network().init(network);
-      ctx.post(
-          [this]()
-          {
-             node.network().recv(psibase::net::HelloRequest{});
-             node.network().recv(psibase::net::HelloResponse{});
-          });
+      ctx.post([this]() { node.network().recv(psibase::net::HelloRequest{.committed = true}); });
       ctx.poll();
    }
    boost::asio::io_context ctx;
@@ -272,9 +267,12 @@ struct NetworkBase
    }
 
    void recv(const psibase::net::HelloRequest&) {}
-   void recv(const psibase::net::HelloResponse&) {}
    void recv(const psibase::net::WasmProducerMessage&) {}
    void recv(const psibase::net::StateChecksumMessage&) {}
+
+   void recv(const psibase::net::SnapshotPartMessage&) {}
+   void recv(const psibase::net::SnapshotVerifyMessage&) {}
+   void recv(const psibase::net::BlockHeaderMessage&) {}
 
    template <typename T>
    static bool has_message(const psibase::net::SignedMessage<T>&              message,

@@ -1,6 +1,7 @@
-use psibase::services::accounts::Wrapper as Accounts;
-use psibase::AccountNumber;
 use sha2::{Digest, Sha256};
+
+mod db;
+mod policy;
 
 pub fn sha256(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
@@ -8,9 +9,6 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-pub fn get_auth_service(sender: AccountNumber) -> Option<AccountNumber> {
-    Accounts::call().getAccount(sender).map(|a| a.authService)
-}
 /// A service for staged transaction proposal and execution
 ///
 /// A staged transaction allows an account (the proposer) to propose a set of
@@ -26,217 +24,31 @@ pub fn get_auth_service(sender: AccountNumber) -> Option<AccountNumber> {
 /// (a.k.a. a "multi-sig" or multi-signature transaction), among many other uses.
 #[psibase::service(recursive = true)]
 pub mod service {
-    use crate::get_auth_service;
-    use crate::sha256;
+    pub use crate::db::tables::*;
+    use crate::policy::StagedTxPolicy;
     use async_graphql::SimpleObject;
-    use psibase::fracpack::Pack;
-    use psibase::services::transact::auth_interface::auth_action_structs;
-    use psibase::services::{
-        accounts::Wrapper as Accounts, events::Wrapper as Events, transact::Wrapper as Transact,
-    };
+    use fracpack::Pack;
+    use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
     use serde::{Deserialize, Serialize};
 
-    struct StagedTxPolicy {
-        user: AccountNumber,
-        service_caller: ServiceCaller,
-    }
-    impl StagedTxPolicy {
-        pub fn new(user: AccountNumber) -> Self {
-            StagedTxPolicy {
-                user,
-                service_caller: ServiceCaller {
-                    sender: Wrapper::SERVICE,
-                    service: get_auth_service(user).unwrap(),
-                },
-            }
-        }
+    const ENABLE_PRINT: bool = true;
 
-        pub fn does_auth(&self, accepters: Vec<AccountNumber>) -> bool {
-            self.service_caller.call(
-                MethodNumber::from(auth_action_structs::isAuthSys::ACTION_NAME),
-                auth_action_structs::isAuthSys {
-                    sender: self.user,
-                    authorizers: accepters,
-                },
-            )
-        }
-
-        pub fn does_reject(&self, rejecters: Vec<AccountNumber>) -> bool {
-            self.service_caller.call(
-                MethodNumber::from(auth_action_structs::isRejectSys::ACTION_NAME),
-                auth_action_structs::isRejectSys {
-                    sender: self.user,
-                    rejecters,
-                },
-            )
+    fn debug_print(msg: &str) {
+        if ENABLE_PRINT {
+            psibase::write_console(msg);
         }
     }
 
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    pub struct ActionList {
-        actions: Vec<Action>,
-    }
-
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
-    struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "StagedTxTable", index = 1)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    pub struct StagedTx {
-        pub id: u32,
-        pub txid: [u8; 32],
-        pub propose_block: u32,
-        pub propose_date: TimePointUSec,
-        pub proposer: AccountNumber,
-        pub action_list: ActionList,
-    }
-    impl StagedTx {
-        #[primary_key]
-        fn by_id(&self) -> u32 {
-            self.id
-        }
-
-        fn new(actions: Vec<Action>) -> Self {
-            check(
-                actions.len() > 0,
-                "Staged transaction must contain at least one action",
-            );
-
-            for action in &actions {
-                let sender = action.sender;
-                check(
-                    Accounts::call().getAccount(sender).is_some(),
-                    "Sender account in staged tx is invalid",
-                );
-            }
-
-            let monotonic_id = LastUsed::get_next_id();
-            let current_block = Transact::call().currentBlock();
-            let packed = (monotonic_id, current_block.blockNum, &actions).packed();
-            let txid = sha256(&packed);
-
-            StagedTx {
-                id: monotonic_id,
-                txid,
-                propose_block: current_block.blockNum,
-                propose_date: current_block.time,
-                proposer: get_sender(),
-                action_list: ActionList { actions },
-            }
-        }
-
-        fn get(id: u32, txid: [u8; 32]) -> Self {
-            let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
-            check(staged_tx.is_some(), "Unknown staged tx");
-            let staged_tx = staged_tx.unwrap();
-            check(
-                staged_tx.txid == txid,
-                "specified txid must match staged tx txid",
-            );
-
-            staged_tx
-        }
-
-        fn accept(&self) {
-            Response::upsert(self.id, true);
-        }
-
-        fn reject(&self) {
-            Response::upsert(self.id, false);
-        }
-
-        fn delete(&self) {
-            // Delete all responses for this staged tx
-            let id = self.id;
-            let responses = ResponseTable::new();
-            responses
-                .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
-                .for_each(|r| responses.erase(&(r.id, r.account)));
-
-            // Delete the staged tx itself
-            StagedTxTable::new().erase(&id);
-        }
-
-        fn accepters(&self) -> Vec<AccountNumber> {
-            ResponseTable::new()
-                .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| response.accepted)
-                .map(|response| response.account)
-                .collect()
-        }
-
-        fn rejecters(&self) -> Vec<AccountNumber> {
-            ResponseTable::new()
-                .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| !response.accepted)
-                .map(|response| response.account)
-                .collect()
-        }
-    }
-
-    #[table(name = "LastUsedTable", index = 2)]
-    #[derive(Default, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    pub struct LastUsed {
-        pub id: u32,
-    }
-    impl LastUsed {
-        #[primary_key]
-        fn pk(&self) {}
-
-        fn get_next_id() -> u32 {
-            let table = LastUsedTable::new();
-            let mut last_used = table.get_index_pk().get(&()).unwrap_or_default();
-            last_used.id += 1;
-            table.put(&last_used).unwrap();
-
-            last_used.id
-        }
-    }
-
-    #[table(name = "ResponseTable", index = 3)]
-    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
-    pub struct Response {
-        pub id: u32,
-        pub account: AccountNumber,
-        pub accepted: bool,
-    }
-    impl Response {
-        #[primary_key]
-        fn by_id(&self) -> (u32, AccountNumber) {
-            (self.id, self.account)
-        }
-
-        #[secondary_key(1)]
-        fn by_responder(&self) -> AccountNumber {
-            self.account
-        }
-
-        fn upsert(id: u32, accepted: bool) {
-            let table = ResponseTable::new();
-            let response = table
-                .get_index_pk()
-                .get(&(id, get_sender()))
-                .map(|mut response| {
-                    response.accepted = accepted;
-                    response
-                })
-                .unwrap_or_else(|| Response {
-                    id,
-                    account: get_sender(),
-                    accepted,
-                });
-
-            table.put(&response).unwrap();
-        }
+    /// Runs before every other action except 'init', verifies that the service
+    /// has been initialized.
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        let table: InitTable = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_some(),
+            "service not initialized",
+        );
     }
 
     /// Initialize the staged-tx service
@@ -249,15 +61,6 @@ pub mod service {
         Events::call().setSchema(create_schema::<Wrapper>());
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 0); // Index events related to specific txid
         Events::call().addIndex(DbId::HistoryEvent, SERVICE, updated, 1); // Index events related to specific proposer/accepter/rejecter
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table: InitTable = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not initialized",
-        );
     }
 
     /// Proposes a new staged transaction containing the specified actions.
@@ -300,6 +103,8 @@ pub mod service {
             .actions
             .iter()
             .all(|action| StagedTxPolicy::new(action.sender).does_auth(staged_tx.accepters()));
+
+        debug_print(&format!("authorized: {}\n", authorized.to_string()));
 
         if authorized {
             execute(staged_tx);
@@ -349,6 +154,7 @@ pub mod service {
     }
 
     fn execute(staged_tx: StagedTx) {
+        debug_print("Executing staged tx\n");
         staged_tx.delete();
 
         staged_tx
@@ -356,6 +162,13 @@ pub mod service {
             .actions
             .into_iter()
             .for_each(|action| {
+                debug_print(&format!(
+                    "Executing action: {}@{}:{}\n",
+                    &action.sender.to_string(),
+                    &action.service.to_string(),
+                    &action.method.to_string()
+                ));
+
                 let act = action.packed();
                 unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
             });

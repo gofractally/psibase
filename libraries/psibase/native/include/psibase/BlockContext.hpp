@@ -37,16 +37,17 @@ namespace psibase
 
       void checkActive() { check(active, "block is not active"); }
 
-      StatusRow   start(std::optional<BlockTime> time     = {},
-                        AccountNumber            producer = {},
-                        TermNum                  term     = {},
-                        BlockNum                 irr      = {});
-      void        start(Block&& src);
-      void        callStartBlock();
-      void        callOnBlock();
-      void        callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
-      Checksum256 makeEventMerkleRoot();
-      Checksum256 makeTransactionMerkle();
+      StatusRow start(std::optional<BlockTime> time     = {},
+                      AccountNumber            producer = {},
+                      TermNum                  term     = {},
+                      BlockNum                 irr      = {});
+      void      start(Block&& src);
+      void      callStartBlock();
+      void      callOnBlock();
+      void      callOnTransaction(const Checksum256& id, const TransactionTrace& trace);
+      std::optional<SignedTransaction>         callNextTransaction();
+      Checksum256                              makeEventMerkleRoot();
+      Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(
           const Prover&,
           const Claim&,
