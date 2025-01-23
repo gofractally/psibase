@@ -5,6 +5,7 @@
 #include <psibase/net_base.hpp>
 #include <psio/finally.hpp>
 #include <psio/reflect.hpp>
+#include <psio/to_hex.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -48,21 +49,14 @@ namespace psibase::net
    {
       static constexpr unsigned type = 32;
       ExtendedBlockId           xid;
+      bool                      committed;
       std::string               to_string() const
       {
          return "hello: id=" + loggers::to_string(xid.id()) +
                 " blocknum=" + std::to_string(xid.num());
       }
    };
-   PSIO_REFLECT(HelloRequest, xid)
-
-   struct HelloResponse
-   {
-      static constexpr unsigned type  = 33;
-      char                      dummy = 0;
-      std::string               to_string() const { return "hello response"; }
-   };
-   PSIO_REFLECT(HelloResponse, dummy)
+   PSIO_REFLECT(HelloRequest, xid, committed)
 
    struct BlockMessage
    {
@@ -75,7 +69,8 @@ namespace psibase::net
                 " leader=" + AccountNumber{block->block().header().producer()}.str() +
                 " id=" + loggers::to_string(info.blockId) +
                 " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
-                " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()});
+                " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
+                (block->auxConsensusData() ? " auxConsensusData" : "");
       }
    };
    PSIO_REFLECT(BlockMessage, block)
@@ -96,6 +91,61 @@ namespace psibase::net
    };
    PSIO_REFLECT(StateChecksumMessage, blockId, state, signature)
 
+   struct BlockHeaderMessage
+   {
+      static constexpr unsigned          type = 44;
+      psio::shared_view_ptr<SignedBlock> block;
+      std::string                        to_string() const
+      {
+         BlockInfo info{block->block()};
+         return "block header: term=" + std::to_string(TermNum{block->block().header().term()}) +
+                " leader=" + AccountNumber{block->block().header().producer()}.str() +
+                " id=" + loggers::to_string(info.blockId) +
+                " blocknum=" + std::to_string(BlockNum{block->block().header().blockNum()}) +
+                " irreversible=" + std::to_string(BlockNum{block->block().header().commitNum()}) +
+                (block->auxConsensusData() ? " auxConsensusData" : "");
+      }
+   };
+   PSIO_REFLECT(BlockHeaderMessage, block)
+
+   // snapshot protocol
+   //
+   // A->B offer snapshot
+   // B->A request snapshot
+   // A->B signed block headers
+   // A->B snapshot data
+   struct SnapshotPartMessage
+   {
+      static const unsigned     type = 43;
+      Checksum256               blockId;
+      DbId                      db;
+      std::vector<char>         lowKey;
+      std::vector<char>         highKey;
+      std::vector<SnapshotItem> rows;
+      std::string               to_string() const
+      {
+         return "snapshot part: blockid=" + loggers::to_string(blockId) +
+                " nrows=" + std::to_string(rows.size()) +
+                " db=" + std::to_string(static_cast<unsigned>(db)) + " [" + psio::to_hex(lowKey) +
+                "," + psio::to_hex(highKey) + ")";
+      }
+   };
+   PSIO_REFLECT(SnapshotPartMessage, blockId, db, lowKey, highKey, rows)
+
+   struct SnapshotVerifyMessage
+   {
+      static const unsigned                 type = 45;
+      Checksum256                           blockId;
+      snapshot::StateChecksum               hash;
+      std::vector<snapshot::StateSignature> signatures;
+      std::string                           to_string() const
+      {
+         return "snapshot verify: block=" + loggers::to_string(blockId) +
+                " nsig=" + std::to_string(signatures.size());
+      }
+   };
+   PSIO_REFLECT(SnapshotVerifyMessage, blockId, hash, signatures)
+
    // A producer-to-producer message with contents completely defined by services.
    struct WasmProducerMessage
    {
@@ -107,6 +157,48 @@ namespace psibase::net
       std::string to_string() const { return "wasm prod: producer=" + producer.str(); }
    };
    PSIO_REFLECT(WasmProducerMessage, data, producer, signer)
+
+   struct ConnectionStateStart
+   {
+      // The most recent hello message sent or the next queued hello message
+      HelloRequest                   hello;
+      bool                           hello_sent;
+      std::optional<ExtendedBlockId> common;
+   };
+
+   struct ConnectionStateSendFastForward
+   {
+      BlockNum blockNum;
+   };
+
+   struct ConnectionStateReceiveFastForward
+   {
+      std::unique_ptr<LightHeaderState> state;
+   };
+
+   struct ConnectionStateSendSnapshot
+   {
+      Checksum256                     blockId;
+      std::unique_ptr<SnapshotSender> sender;
+   };
+
+   struct ConnectionStateReceiveSnapshot
+   {
+      std::unique_ptr<SnapshotLoader> loader;
+   };
+
+   struct ConnectionStateReady
+   {
+      ExtendedBlockId last_sent;
+      ExtendedBlockId last_received;
+   };
+
+   using ConnectionState = std::variant<ConnectionStateStart,
+                                        ConnectionStateSendFastForward,
+                                        ConnectionStateReceiveFastForward,
+                                        ConnectionStateSendSnapshot,
+                                        ConnectionStateReceiveSnapshot,
+                                        ConnectionStateReady>;
 
    // This class manages production and distribution of blocks
    // The consensus algorithm is provided by the derived class
@@ -130,7 +222,6 @@ namespace psibase::net
       template <typename ExecutionContext>
       explicit blocknet(ExecutionContext& ctx)
           : _ioctx(ctx),
-            _trx_timer(ctx),
             _block_timer(ctx),
             prods_socket(std::make_shared<ProducerMulticastSocket>(this))
       {
@@ -141,20 +232,12 @@ namespace psibase::net
       struct peer_connection
       {
          explicit peer_connection(peer_id id) : id(id) {}
-         ~peer_connection() { std::memset(this, 0xCC, sizeof(*this)); }
-         ExtendedBlockId last_sent;
-         ExtendedBlockId last_received;
-         bool            syncing = false;
-         peer_id         id;
-         bool            ready  = false;
-         bool            closed = false;
-         // True once we have received a HelloResponse from the peer
-         bool peer_ready = false;
-         // TODO: we may be able to save some space, because last_received is
-         // not meaningful until we're finished with hello.
-         // The most recent hello message sent or the next queued hello message
-         HelloRequest hello;
-         bool         hello_sent;
+         ~peer_connection() {}
+         peer_id id;
+         bool    closed  = false;
+         bool    sending = false;
+
+         ConnectionState state;
       };
 
       struct ProducerMulticastSocket : Socket
@@ -193,7 +276,6 @@ namespace psibase::net
       std::uint64_t _leader_cancel = 0;
 
       boost::asio::io_context&  _ioctx;
-      Timer                     _trx_timer;
       Timer                     _block_timer;
       std::chrono::milliseconds _timeout        = std::chrono::seconds(3);
       std::chrono::milliseconds _block_interval = std::chrono::seconds(1);
@@ -207,9 +289,11 @@ namespace psibase::net
       loggers::common_logger logger;
 
       using message_type = std::variant<HelloRequest,
-                                        HelloResponse,
                                         BlockMessage,
                                         StateChecksumMessage,
+                                        BlockHeaderMessage,
+                                        SnapshotPartMessage,
+                                        SnapshotVerifyMessage,
                                         WasmProducerMessage>;
 
       peer_connection& get_connection(peer_id id)
@@ -230,7 +314,7 @@ namespace psibase::net
          auto pos =
              std::find_if(_peers.begin(), _peers.end(), [&](const auto& p) { return p->id == id; });
          assert(pos != _peers.end());
-         if ((*pos)->syncing || !(*pos)->peer_ready)
+         if ((*pos)->sending)
          {
             (*pos)->closed = true;
          }
@@ -240,127 +324,247 @@ namespace psibase::net
          }
       }
 
+      // This should be called by any async callback that is part of a send loop.
+      // If the connection has been cancelled, it will destroy it and return true.
+      bool check_cancel(peer_connection& connection)
+      {
+         assert(connection.sending);
+         connection.sending = false;
+         if (connection.closed)
+         {
+            auto pos =
+                std::ranges::find_if(_peers, [&](const auto& p) { return p.get() == &connection; });
+            assert(pos != _peers.end());
+            _peers.erase(pos);
+            return true;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
       void connect(peer_id id)
       {
          _peers.push_back(std::make_unique<peer_connection>(id));
          peer_connection& connection = get_connection(id);
-         connection.hello_sent       = false;
-         connection.hello.xid        = chain().get_head_state()->xid();
-         async_send_hello(connection);
-         if (connection.hello.xid.id() == Checksum256{})
-         {
-            connection.last_received = {Checksum256{}, 1};
-            connection.last_sent     = connection.last_received;
-            connection.ready         = true;
-         }
+         connection.state =
+             ConnectionStateStart{.hello = chain().get_head_state()->xid(), .hello_sent = false};
+         async_send_next(connection);
       }
-      void async_send_hello(peer_connection& connection)
+      auto send_handler(peer_connection& connection)
       {
-         if (connection.hello_sent)
+         return [&](const std::error_code& ec)
          {
-            auto b = chain().get(connection.hello.xid.id());
+            if (check_cancel(connection) || ec)
+               return;
+            async_send_next(connection);
+         };
+      }
+      void async_send_next(peer_connection& connection)
+      {
+         assert(!connection.sending);
+         std::visit(
+             [&](auto& state)
+             {
+                if constexpr (requires { async_send_next(connection, state); })
+                {
+                   async_send_next(connection, state);
+                }
+             },
+             connection.state);
+      }
+      void async_send_next(peer_connection& connection, ConnectionStateStart& state)
+      {
+         if (state.hello.committed)
+         {
+            if (state.common)
+            {
+               if (auto* b = chain().get_state(state.common->id()))
+               {
+                  state.common = chain().get_common_ancestor(b->xid());
+               }
+               else if (state.common->num() > chain().commit_index())
+               {
+                  // The peer gave us a future block. It is impossible for both peers
+                  // to reach this state.
+                  return;
+               }
+               connection.state = make_connection_ready(state);
+               async_send_next(connection);
+            }
+            return;
+         }
+         if (state.hello_sent)
+         {
+            auto b = chain().get_state(state.hello.xid.id());
+            if (b)
+               b = chain().get_state(b->info.header.previous);
             if (!b)
             {
-               return;
+               // If the state is missing, it means that irreversibility advanced
+               // Just reset to the committed block.
+               b = chain().get_state(chain().get_block_id(chain().commit_index()));
             }
-            auto prev = chain().get(Checksum256(b->block().header().previous()));
-            if (prev)
-            {
-               connection.hello = {Checksum256(b->block().header().previous()),
-                                   BlockNum(b->block().header().blockNum()) - 1};
-            }
-            else
-            {
-               // TODO: detect the case where the two nodes have no blocks in common
-               // This could happen when an out-dated node tries to sync with a node
-               // with a trimmed block log, for instance.
-               return;
-            }
+            state.hello = {b->xid()};
          }
-         connection.hello_sent = true;
-         network().async_send(connection.id, connection.hello,
-                              [this, &connection](const std::error_code& ec)
-                              {
-                                 if (connection.closed)
-                                 {
-                                    connection.peer_ready = true;
-                                    disconnect(connection.id);
-                                    return;
-                                 }
-                                 else if (ec)
-                                 {
-                                    connection.peer_ready = true;
-                                 }
-                                 if (!connection.peer_ready)
-                                 {
-                                    // TODO: rate limit hellos, delay second hello until we have received the first peer hello
-                                    async_send_hello(connection);
-                                 }
-                              });
+         state.hello_sent      = true;
+         state.hello.committed = state.hello.xid.num() <= chain().commit_index();
+         network().async_send(connection.id, state.hello, send_handler(connection));
+         connection.sending = true;
       }
+
+      ConnectionStateReady make_connection_ready(const ConnectionStateStart& state)
+      {
+         return ConnectionStateReady{.last_sent = *state.common, .last_received = *state.common};
+      }
+
       void recv(peer_id origin, const HelloRequest& request)
       {
          auto& connection = get_connection(origin);
-         if (connection.ready)
+         auto* state      = std::get_if<ConnectionStateStart>(&connection.state);
+         if (!state || state->common)
          {
+            // If we've already found a common block, we can ignore the
+            // rest of the peer's hello messages.
             return;
          }
-         if (!connection.peer_ready &&
-             connection.hello.xid.num() > request.xid.num() + connection.hello_sent)
+         if (request.committed && request.xid.num() < chain().getLogStart())
          {
-            // TODO: if the block num is not known, then we've failed to find a common ancestor
-            // so bail (only possible with a truncated block log)
-            connection.hello.xid  = {chain().get_block_id(request.xid.num()), request.xid.num()};
-            connection.hello_sent = false;
+            if (std::holds_alternative<ConnectionStateStart>(connection.state))
+            {
+               PSIBASE_LOG(logger, info) << "Sending snapshot because the block log is truncated "
+                                            "and the peer is too far behind";
+               connection.state = ConnectionStateSendFastForward{request.xid.num()};
+               if (!connection.sending)
+               {
+                  async_send_next(connection);
+               }
+            }
+            return;
+         }
+         // Skip blocks that we know the peer doesn't have.
+         if (!state->hello.committed &&
+             state->hello.xid.num() > request.xid.num() + state->hello_sent)
+         {
+            state->hello.xid  = {chain().get_block_id(request.xid.num()), request.xid.num()};
+            state->hello_sent = false;
          }
          if (request.xid.id() == Checksum256{})
          {
             // sync from genesis
-            connection.last_received = {Checksum256{}, 1};
-            connection.last_sent     = connection.last_received;
-            // With no common block, we don't expect to get a HelloResponse
-            connection.peer_ready = true;
+            state->common = {Checksum256{}, 1};
          }
          else
          {
-            if (auto b = chain().get(request.xid.id()))
+            if (auto* b = chain().get_state(request.xid.id()))
             {
-               // Ensure that the block number is accurate.  I have not worked out
-               // what happens if the peer lies, but at least this way we guarantee
-               // that our local invariants hold.
-               connection.last_received = {request.xid.id(),
-                                           BlockNum(b->block().header().blockNum())};
+               state->common = chain().get_common_ancestor(b->xid());
             }
-            else if (auto* b = chain().get_state(request.xid.id()))
+            else if (chain().get_block_id(request.xid.num()) == request.xid.id())
             {
-               connection.last_received = {request.xid.id(), b->blockNum()};
+               state->common = request.xid;
+            }
+            else if (request.committed && request.xid.num() <= chain().commit_index())
+            {
+               // The peer sent a block id that it claims is committed, but it doesn't
+               // match the block id that we have for that block number
+               throw std::runtime_error("No common block found");
+            }
+            else if (request.committed)
+            {
+               // Do NOT ready the connection. If we've already sent
+               // our committed block ID, then we know that the peer is
+               // definitely ahead of us, and we need to wait.
+               // If we have not yet sent our committed block ID, then
+               // we'll re-evaluate when we do.
+               state->common = request.xid;
+               return;
             }
             else
             {
+               // We don't know the block. Wait for one that we do know.
                return;
             }
-            connection.last_sent = chain().get_common_ancestor(connection.last_received);
          }
-         // async_send_fork will reset syncing if there is nothing to sync
-         connection.syncing = true;
-         connection.ready   = true;
-         //std::cout << "ready: received=" << to_string(connection.last_received.id())
-         //          << " common=" << to_string(connection.last_sent.id()) << std::endl;
-         // FIXME: blocks and hellos need to be sequenced correctly
-         network().async_send(connection.id, HelloResponse{},
-                              [this, &connection](const std::error_code&)
-                              { async_send_fork(connection); });
+         if (state->hello.committed)
+         {
+            connection.state = make_connection_ready(*state);
+            if (!connection.sending)
+            {
+               async_send_next(connection);
+            }
+         }
       }
-      void recv(peer_id origin, const HelloResponse&)
+
+      void async_send_next(peer_connection& connection, ConnectionStateSendFastForward& state)
       {
-         auto& connection      = get_connection(origin);
-         connection.peer_ready = true;
+         auto snapshotId = chain().get_last_snapshot_id();
+         PSIBASE_LOG(logger, debug) << "Last snapshot: " << loggers::to_string(snapshotId);
+         if (auto headerNum = chain().get_next_light_header_num(state.blockNum, snapshotId);
+             headerNum && *headerNum <= getBlockNum(snapshotId))
+         {
+            // Lookup block and discard transactions
+            auto blockptr = chain().get_block_by_num(*headerNum);
+            if (!blockptr)
+            {
+               throw std::runtime_error("Missing block header " + std::to_string(*headerNum));
+            }
+            auto header           = blockptr->block().header().unpack();
+            auto signature        = blockptr->signature().unpack();
+            auto auxConsensusData = blockptr->auxConsensusData().unpack();
+            auto headerptr        = psio::shared_view_ptr<SignedBlock>(SignedBlock{
+                Block{std::move(header)}, std::move(signature), std::move(auxConsensusData)});
+            state.blockNum        = *headerNum;
+            network().async_send(connection.id, BlockHeaderMessage{std::move(headerptr)},
+                                 send_handler(connection));
+            connection.sending = true;
+         }
+         else
+         {
+            connection.state = ConnectionStateSendSnapshot{
+                snapshotId, std::unique_ptr<SnapshotSender>{
+                                new SnapshotSender(chain().send_snapshot(snapshotId))}};
+            async_send_next(connection);
+         }
+      }
+
+      void async_send_next(peer_connection& connection, ConnectionStateSendSnapshot& state)
+      {
+         SnapshotPartMessage msg;
+         if (state.sender->next(msg.db, msg.lowKey, msg.highKey, msg.rows))
+         {
+            msg.blockId = state.blockId;
+            network().async_send(connection.id, std::move(msg), send_handler(connection));
+            connection.sending = true;
+         }
+         else
+         {
+            auto row         = chain().get_snapshot_info(state.blockId);
+            auto id          = ExtendedBlockId{state.blockId, getBlockNum(state.blockId)};
+            connection.state = ConnectionStateReady{id, id};
+            network().async_send(
+                connection.id,
+                SnapshotVerifyMessage{row.id, row.state->state, row.state->signatures},
+                send_handler(connection));
+            connection.sending = true;
+         }
       }
 
       // TODO: rename this function to a more generic init routine
       void load_producers()
       {
          chain().addSocket(prods_socket);
+         chain().onChangeNextTransaction(
+             [this]
+             {
+                boost::asio::post(_ioctx,
+                                  [this]
+                                  {
+                                     PSIBASE_LOG(logger, debug) << "transactions available";
+                                     schedule_process_transactions();
+                                  });
+             });
          chain().onCommit(
              [this](BlockHeaderState* state)
              {
@@ -650,13 +854,12 @@ namespace psibase::net
             if (auto trx = chain().nextTransaction())
             {
                chain().pushTransaction(std::move(*trx));
-               _trx_timer.expires_after(std::chrono::microseconds{0});
+               boost::asio::post(_ioctx, [this] { process_transactions(); });
             }
             else
             {
-               _trx_timer.expires_after(std::chrono::milliseconds{100});
+               _trx_loop_running = false;
             }
-            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
          }
          else
          {
@@ -669,8 +872,7 @@ namespace psibase::net
          if (!_trx_loop_running && _state == producer_state::leader)
          {
             _trx_loop_running = true;
-            _trx_timer.expires_after(std::chrono::microseconds{0});
-            _trx_timer.async_wait([this](const std::error_code&) { process_transactions(); });
+            boost::asio::post(_ioctx, [this] { process_transactions(); });
          }
       }
 
@@ -690,29 +892,18 @@ namespace psibase::net
 
       // invariants: if the head block is not the last sent block, then
       //             exactly one instance of async_send_fork is active
-      void async_send_fork(auto& peer)
+      void async_send_next(peer_connection& peer, ConnectionStateReady& state)
       {
-         if (peer.closed)
+         if (state.last_sent.num() != chain().get_head()->blockNum)
          {
-            peer.syncing = false;
-            disconnect(peer.id);
-            return;
-         }
-         if (peer.last_sent.num() != chain().get_head()->blockNum)
-         {
-            auto next_block_id = chain().get_block_id(peer.last_sent.num() + 1);
+            auto next_block_id = chain().get_block_id(state.last_sent.num() + 1);
             assert(next_block_id != Checksum256());
-            peer.last_sent  = {next_block_id, peer.last_sent.num() + 1};
+            state.last_sent = {next_block_id, state.last_sent.num() + 1};
             auto next_block = chain().get(next_block_id);
 
-            network().async_send(peer.id, BlockMessage{next_block},
-                                 [this, &peer](const std::error_code& e)
-                                 { async_send_fork(peer); });
-            consensus().post_send_block(peer.id, peer.last_sent.id());
-         }
-         else
-         {
-            peer.syncing = false;
+            network().async_send(peer.id, BlockMessage{next_block}, send_handler(peer));
+            peer.sending = true;
+            consensus().post_send_block(peer.id, state.last_sent.id());
          }
       }
       // This should be run whenever there is a new head block on the local chain
@@ -725,34 +916,40 @@ namespace psibase::net
          for (auto& peer : _peers)
          {
             // ---------- TODO: dispatch to peer connection strand -------------
-            if (!peer->peer_ready)
+            if (auto* state = std::get_if<ConnectionStateStart>(&peer->state))
             {
-               auto new_id = chain().get_common_ancestor(peer->hello.xid);
-               if (peer->hello.xid != new_id)
+               auto new_id = chain().get_common_ancestor(state->hello.xid);
+               if (state->hello.xid != new_id)
                {
-                  peer->hello.xid  = new_id;
-                  peer->hello_sent = false;
+                  state->hello.xid  = new_id;
+                  state->hello_sent = false;
+               }
+               if (state->common)
+               {
+                  if (auto common_state = chain().get_state(state->common->id()))
+                  {
+                     state->common = chain().get_common_ancestor(common_state->xid());
+                  }
                }
             }
             // if last sent block is after committed, back it up to the nearest block in the chain
-            if (peer->ready)
+            if (auto* state = std::get_if<ConnectionStateReady>(&peer->state))
             {
                // Note: Checking best_received primarily prevents received blocks
                // from being echoed back to their origin.
-               peer->last_sent = chain().get_common_ancestor(peer->last_sent);
-               if (chain().get_state(peer->last_received.id()))
+               state->last_sent = chain().get_common_ancestor(state->last_sent);
+               if (chain().get_state(state->last_received.id()))
                {
-                  auto best_received = chain().get_common_ancestor(peer->last_received);
-                  if (best_received.num() > peer->last_sent.num())
+                  auto best_received = chain().get_common_ancestor(state->last_received);
+                  if (best_received.num() > state->last_sent.num())
                   {
-                     peer->last_sent = best_received;
+                     state->last_sent = best_received;
                   }
                }
-               // if the peer is synced, start async_send_fork
-               if (!peer->syncing)
+               // if the peer is synced, start async_send_next
+               if (!peer->sending)
                {
-                  peer->syncing = true;
-                  async_send_fork(*peer);
+                  async_send_next(*peer);
                }
             }
             else
@@ -765,10 +962,18 @@ namespace psibase::net
 
       void update_last_received(auto& peer, const ExtendedBlockId& xid)
       {
-         peer.last_received = xid;
-         if (chain().in_best_chain(xid) && xid.num() > peer.last_sent.num())
+         if (std::holds_alternative<ConnectionStateStart>(peer.state))
          {
-            peer.last_sent = xid;
+            peer.state = ConnectionStateReady{.last_sent     = chain().get_common_ancestor(xid),
+                                              .last_received = xid};
+         }
+         else if (auto* state = std::get_if<ConnectionStateReady>(&peer.state))
+         {
+            state->last_received = xid;
+            if (chain().in_best_chain(xid) && xid.num() > state->last_sent.num())
+            {
+               state->last_sent = xid;
+            }
          }
          consensus().post_send_block(peer.id, xid.id());
       }
@@ -797,6 +1002,23 @@ namespace psibase::net
          }
       }
 
+      // This should be called after the head block is updated
+      void reset_producers(const BlockInfo& head)
+      {
+         auto producers = chain().getProducers();
+         if (producers.first != active_producers[0] || producers.second != active_producers[1])
+         {
+            consensus().set_producers(std::move(producers));
+            network().on_producer_change();
+         }
+         if (_state == producer_state::leader &&
+             chain().getBlockContext()->current.header.previous != head.blockId)
+         {
+            stop_leader("Pending block aborted because the head block changed");
+            start_leader();
+         }
+      }
+
       // This should be called after any operation that might change the head block.
       void switch_fork()
       {
@@ -807,20 +1029,7 @@ namespace psibase::net
                    PSIBASE_LOG_CONTEXT_BLOCK(logger, head.header, head.blockId);
                    PSIBASE_LOG(logger, debug) << "New head block";
                 }
-                // TODO: only run set_producers when the producers actually changed
-                auto producers = chain().getProducers();
-                if (producers.first != active_producers[0] ||
-                    producers.second != active_producers[1])
-                {
-                   consensus().set_producers(std::move(producers));
-                   network().on_producer_change();
-                }
-                if (_state == producer_state::leader &&
-                    chain().getBlockContext()->current.header.previous != head.blockId)
-                {
-                   stop_leader("Pending block aborted because the head block changed");
-                   start_leader();
-                }
+                reset_producers(head);
                 consensus().on_fork_switch(&head.header);
                 do_gc();
              },
@@ -840,13 +1049,25 @@ namespace psibase::net
          // If peer_has_block returns false, then one of the following will eventually happen:
          // - The block is not in the best chain
          // - post_send_block(peer, id)
+         //
+         // FIXME: Make sure that state is properly cleaned up
 
          auto& connection = get_connection(peer);
-         if (chain().in_best_chain(id) && getBlockNum(id) <= connection.last_sent.num())
+         if (auto* state = std::get_if<ConnectionStateReady>(&connection.state))
          {
-            return true;
+            if (chain().in_best_chain(id) && getBlockNum(id) <= state->last_sent.num())
+            {
+               return true;
+            }
+            return chain().is_ancestor(id, state->last_received);
          }
-         return chain().is_ancestor(id, connection.last_received);
+         return false;
+      }
+
+      std::optional<Checksum256> validate_message(const StateChecksumMessage& msg)
+      {
+         // TODO: actual validation
+         return msg.blockId;
       }
 
       void recv(peer_id origin, const StateChecksumMessage& msg)
@@ -854,6 +1075,201 @@ namespace psibase::net
          if (chain().on_state_signature(msg.blockId, msg.state, msg.signature))
          {
             network().multicast(msg);
+         }
+      }
+
+      void start_receive_fast_forward(peer_connection& connection, BlockNum num)
+      {
+         if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
+         {
+            if (num > getBlockNum(state->loader->blockId))
+            {
+               PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
+               connection.state =
+                   ConnectionStateReceiveFastForward{std::move(state->loader->validator)};
+            }
+         }
+         else if (!std::holds_alternative<ConnectionStateReceiveFastForward>(connection.state) &&
+                  num > chain().commit_index())
+         {
+            PSIBASE_LOG(logger, info) << "Receiving snapshot from peer";
+            connection.state = ConnectionStateReceiveFastForward{
+                std::unique_ptr<LightHeaderState>(new LightHeaderState(chain().light_validate()))};
+         }
+      }
+
+      void start_receive_snapshot(peer_connection& connection, const Checksum256& blockId)
+      {
+         // Note: there might not be any block headers if the block producers
+         // haven't changed, so we might receive a SnapshotPartMessage immediately.
+         start_receive_fast_forward(connection, getBlockNum(blockId));
+         if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
+         {
+            connection.state = ConnectionStateReceiveSnapshot{std::unique_ptr<SnapshotLoader>(
+                new SnapshotLoader(chain().start_snapshot(std::move(state->state), blockId)))};
+         }
+      }
+
+      void recv(peer_id origin, const BlockHeaderMessage& msg)
+      {
+         auto& connection = get_connection(origin);
+         start_receive_fast_forward(connection, msg.block->block().header().blockNum());
+         if (auto* state = std::get_if<ConnectionStateReceiveFastForward>(&connection.state))
+         {
+            chain().push_light_header(*state->state, msg.block, consensus());
+         }
+      }
+
+      void recv(peer_id origin, const SnapshotPartMessage& msg)
+      {
+         auto& connection = get_connection(origin);
+         start_receive_snapshot(connection, msg.blockId);
+         if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
+         {
+            check(msg.blockId == state->loader->blockId, "Unexpected snapshot blockId");
+            chain().add_to_snapshot(*state->loader, msg.db, msg.lowKey, msg.highKey, msg.rows);
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&      connection,
+                                    ConnectionStateStart& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId& to)
+      {
+         if (!state.hello.committed)
+         {
+            state.hello.xid = to;
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                connection,
+                                    ConnectionStateSendFastForward& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId&)
+      {
+         // Nothing to do. We'll just keep sending headers until we reach the new snapshot.
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&             connection,
+                                    ConnectionStateSendSnapshot& state,
+                                    const ExtendedBlockId&,
+                                    const ExtendedBlockId& to)
+      {
+         // If we're sending a snapshot that is behind the one we loaded, switch back
+         // to sending block headers.
+         if (to.num() > getBlockNum(state.blockId))
+         {
+            connection.state = ConnectionStateSendFastForward{getBlockNum(state.blockId)};
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                   connection,
+                                    ConnectionStateReceiveFastForward& state,
+                                    const ExtendedBlockId&             from,
+                                    const ExtendedBlockId&             to)
+      {
+         if (state.state->prevBlockNum < to.num())
+         {
+            connection.state = ConnectionStateSendFastForward{state.state->prevBlockNum};
+            if (!connection.sending)
+               async_send_next(connection);
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&                connection,
+                                    ConnectionStateReceiveSnapshot& state,
+                                    const ExtendedBlockId&          from,
+                                    const ExtendedBlockId&          to)
+      {
+         if (to.num() > getBlockNum(state.loader->blockId))
+         {
+            connection.state = ConnectionStateSendFastForward{getBlockNum(state.loader->blockId)};
+            if (!connection.sending)
+               async_send_next(connection);
+         }
+      }
+
+      void adjust_peer_for_snapshot(peer_connection&       connection,
+                                    ConnectionStateReady&  state,
+                                    const ExtendedBlockId& from,
+                                    const ExtendedBlockId& to)
+      {
+         if (state.last_sent != to)
+         {
+            connection.state = ConnectionStateSendFastForward{from.num()};
+            if (!connection.sending)
+               async_send_next(connection);
+         }
+      }
+
+      void recv(peer_id origin, const SnapshotVerifyMessage& msg)
+      {
+         auto& connection = get_connection(origin);
+         if (auto* state = std::get_if<ConnectionStateReceiveSnapshot>(&connection.state))
+         {
+            check(msg.blockId == state->loader->blockId, "Unexpected snapshot blockId");
+            // Check whether the snapshot should be loaded
+            if (getBlockNum(msg.blockId) <= chain().commit_index())
+            {
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because it is in the past";
+               auto id          = ExtendedBlockId{msg.blockId, getBlockNum(msg.blockId)};
+               connection.state = ConnectionStateReady{.last_sent = id, .last_received = id};
+               if (!connection.sending)
+                  async_send_next(connection);
+               return;
+            }
+            else if (auto existing = chain().get_state(msg.blockId))
+            {
+               // We already have an existing state for the snapshot
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because its state is already known";
+               connection.state =
+                   ConnectionStateReady{.last_sent = chain().get_common_ancestor(existing->xid()),
+                                        .last_received = existing->xid()};
+               if (!connection.sending)
+                  async_send_next(connection);
+               return;
+            }
+
+            auto oldCommit = chain().get_state(chain().get_block_id(chain().commit_index()))->xid();
+
+            if (auto* head =
+                    chain().apply_snapshot(std::move(*state->loader), msg.hash, msg.signatures))
+            {
+               auto id          = head->xid();
+               connection.state = ConnectionStateReady{.last_sent = id, .last_received = id};
+
+               {
+                  PSIBASE_LOG_CONTEXT_BLOCK(logger, head->info.header, head->info.blockId);
+                  PSIBASE_LOG(logger, debug) << "New head block";
+               }
+               reset_producers(head->info);
+
+               // Propagate the snapshot to all peers
+               for (auto& peer : _peers)
+               {
+                  std::visit([&](auto& state)
+                             { adjust_peer_for_snapshot(*peer, state, oldCommit, id); },
+                             peer->state);
+               }
+               //
+               do_gc();
+               switch_fork();
+            }
+            else
+            {
+               PSIBASE_LOG(logger, info) << "Snapshot ignored";
+            }
+         }
+         else
+         {
+            if (getBlockNum(msg.blockId) > chain().commit_index())
+            {
+               PSIBASE_LOG(logger, warning) << "Unexpected snapshot ignored";
+            }
+            else
+            {
+               PSIBASE_LOG(logger, info) << "Ignoring snapshot because it is in the past";
+            }
          }
       }
 
@@ -879,7 +1295,13 @@ namespace psibase::net
          active_producers[0] = std::move(prods.first);
          active_producers[1] = std::move(prods.second);
       }
-      void cancel() {}
-      void validate_message() {}
+      void     cancel() {}
+      void     validate_message() {}
+      BlockNum light_verify(const LightHeaderState&                   state,
+                            const BlockInfo&                          info,
+                            const psio::shared_view_ptr<SignedBlock>& block)
+      {
+         throw std::runtime_error("light verify: Unknown consensus algorithm");
+      }
    };
 }  // namespace psibase::net

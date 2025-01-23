@@ -54,6 +54,7 @@ toml = "0.8.19"
 clap = { version = "4.5", features = ["derive", "env", "string"] }
 
 hmac = "0.12"
+hyper = "0.14"
 indicatif = "0.17"
 jwt = "0.16"
 reqwest = { version = "0.11", default-features = false, features = [

@@ -36,7 +36,7 @@ psinode - The psibase blockchain server
 
 - `-o` *hostname*, `--host` *hostname*
 
-  Enable the service http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.127.0.0.1.sslip.io`. This argument allows on-chain services to handle HTTP requests and also allows the node to accept transactions.
+  Enable the service http interface. Its argument is a domain name which supports virtual hosting. e.g. if it's running on your local machine, use `psibase.localhost`. This argument allows on-chain services to handle HTTP requests. It can be specified multiple times. Arguments passed on the command line override those in the config file. HTTP requests that do not match any host will be redirected to the first host.
 
 - `-k` *private-key*, `--key` *private-key*
 

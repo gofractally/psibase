@@ -2,24 +2,32 @@
 /// numbers, similar to test_contract. This service has additional
 /// features such as writing tables, and providing a graphiql
 /// query interface.
-#[psibase::service]
-#[allow(non_snake_case)]
-mod service {
+
+#[psibase::service_tables]
+mod tables {
     use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
-
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
     #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
-        id: AccountNumber,
+        pub id: AccountNumber,
 
         /// The result of the calculation
-        result: i32,
+        pub result: i32,
     }
+}
+
+#[psibase::service]
+#[allow(non_snake_case)]
+mod service {
+    use async_graphql::*;
+    use psibase::*;
+
+    use crate::tables::{Answer, AnswerTable};
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {

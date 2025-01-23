@@ -262,6 +262,73 @@ namespace psibase
       }
    }
 
+   std::optional<SignedTransaction> BlockContext::callNextTransaction()
+   {
+      auto notifyType = NotifyType::nextTransaction;
+      auto notifyData = systemContext.sharedDatabase.kvGetSubjective(
+          *writer, psio::convert_to_key(notifyKey(notifyType)));
+      if (!notifyData)
+         return {};
+      if (!psio::fracpack_validate<NotifyRow>(*notifyData))
+         return {};
+
+      auto actions = psio::view<const NotifyRow>(psio::prevalidated{*notifyData}).actions();
+
+      auto oldIsProducing = isProducing;
+      auto restore        = psio::finally{[&] { isProducing = oldIsProducing; }};
+      isProducing         = true;
+
+      Action action{.sender = AccountNumber{}, .rawData = psio::to_frac(std::tuple())};
+
+      for (auto a : actions)
+      {
+         if (a.sender() != AccountNumber{})
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid nextTransaction callback" << std::endl;
+            continue;
+         }
+         if (!a.rawData().empty())
+         {
+            PSIBASE_LOG(trxLogger, warning) << "Invalid nextTransaction callback" << std::endl;
+            continue;
+         }
+         action.service = a.service();
+         action.method  = a.method();
+         SignedTransaction  trx;
+         TransactionTrace   trace;
+         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         auto&              atrace = trace.actionTraces.emplace_back();
+
+         try
+         {
+            tc.execNonTrxAction(0, action, atrace);
+
+            std::optional<SignedTransaction> result;
+            if (!psio::from_frac(result, atrace.rawRetval))
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(trxLogger, warning)
+                   << "failed to deserialize result of " << action.service.str()
+                   << "::" << action.method.str();
+            }
+            else
+            {
+               BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", std::move(trace));
+               PSIBASE_LOG(trxLogger, debug) << "nextTransaction succeeded";
+               if (result)
+                  return result;
+            }
+         }
+         catch (std::exception& e)
+         {
+            trace.error = e.what();
+            BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+            PSIBASE_LOG(trxLogger, warning) << "nextTransaction failed: " << e.what();
+         }
+      }
+      return {};
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       Merkle m;

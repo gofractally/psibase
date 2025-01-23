@@ -23,6 +23,8 @@ namespace psibase::http
          return stream.next_layer().socket().remote_endpoint().address() == addr.address;
       }
 
+      virtual bool is_secure() const override { return true; }
+
       void shutdown_impl();
       void close_impl(boost::beast::error_code& ec);
 

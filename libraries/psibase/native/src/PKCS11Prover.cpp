@@ -3,7 +3,6 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/x509.h>
-#include <psibase/EcdsaProver.hpp>
 #include <psibase/block.hpp>
 #include <psibase/log.hpp>
 #include <psibase/openssl.hpp>

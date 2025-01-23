@@ -4,6 +4,7 @@ use clap::{Args, FromArgMatches, Parser, Subcommand};
 use fracpack::Pack;
 use futures::future::join_all;
 use hmac::{Hmac, Mac};
+use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, sites};
@@ -27,6 +28,7 @@ use std::fs::{metadata, read_dir, File};
 use std::io::BufReader;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 mod cli;
 use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
@@ -1428,11 +1430,48 @@ fn parse_args() -> Result<BasicArgs, anyhow::Error> {
     Ok(BasicArgs::from_arg_matches(&command.get_matches())?)
 }
 
+struct LocalhostResolver {
+    resolver: hyper::client::connect::dns::GaiResolver,
+}
+
+impl LocalhostResolver {
+    fn new() -> LocalhostResolver {
+        LocalhostResolver {
+            resolver: hyper::client::connect::dns::GaiResolver::new(),
+        }
+    }
+}
+
+async fn forward_resolve(
+    mut resolver: hyper::client::connect::dns::GaiResolver,
+    mut name: hyper::client::connect::dns::Name,
+) -> Result<reqwest::dns::Addrs, Box<dyn core::error::Error + Send + Sync>> {
+    if name.as_str().ends_with(".localhost") {
+        name = "localhost".parse().map_err(|err| Box::new(err))?
+    }
+    match resolver.call(name).await {
+        Ok(addrs) => Ok(Box::new(addrs)),
+        Err(err) => Err(Box::new(err)),
+    }
+}
+
+impl reqwest::dns::Resolve for LocalhostResolver {
+    fn resolve(&self, name: hyper::client::connect::dns::Name) -> reqwest::dns::Resolving {
+        Box::pin(forward_resolve(self.resolver.clone(), name))
+    }
+}
+
 async fn build_client(
     proxy: &Option<Url>,
 ) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
     let (builder, result) = apply_proxy(reqwest::Client::builder(), proxy).await?;
-    Ok((builder.gzip(true).build()?, result))
+    Ok((
+        builder
+            .gzip(true)
+            .dns_resolver(Arc::new(LocalhostResolver::new()))
+            .build()?,
+        result,
+    ))
 }
 
 pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {

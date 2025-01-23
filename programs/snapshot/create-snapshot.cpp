@@ -89,6 +89,7 @@ void write_rows(std::uint32_t chain, DbId db, std::span<const char> prefix, auto
 // - BlockData
 // - ConsensusChange(?) can be reconstructed
 void write_consensus_change_blocks(std::uint32_t             chain,
+                                   const psibase::StatusRow& status,
                                    BlockNum                  start,
                                    BlockNum                  end,
                                    auto&                     stream,
@@ -139,17 +140,38 @@ void write_consensus_change_blocks(std::uint32_t             chain,
       raw::getKey(key.data(), key.size());
       key.push_back('\0');
       auto result = psio::from_frac<psibase::ConsensusChangeRow>(value);
-      if (result.end >= end)
+      if (result.start >= end)
          return {};
       return result;
    };
    while (auto item = read_next())
    {
-      copy_block(item->start);
-      copy_block(item->commit);
-      commit_required.push_back(lastId);
-      copy_block(item->end);
-      signatures_required.push_back(item->end);
+      if (item->end < end)
+      {
+         copy_block(item->start);
+         copy_block(item->commit);
+         copy_block(item->end);
+         commit_required.push_back(lastId);
+         signatures_required.push_back(item->end);
+      }
+      else
+      {
+         for (BlockNum i = item->start; i < end; ++i)
+         {
+            copy_block(i);
+            commit_required.push_back(lastId);
+            signatures_required.push_back(i);
+         }
+      }
+   }
+   if (status.consensus.next)
+   {
+      for (BlockNum i = status.consensus.next->blockNum; i < end; ++i)
+      {
+         copy_block(i);
+         commit_required.push_back(lastId);
+         signatures_required.push_back(i);
+      }
    }
 }
 
@@ -346,7 +368,7 @@ int main(int argc, const char* const* argv)
    std::vector<psibase::Checksum256> need_commit;
    if (!blocks)
    {
-      write_consensus_change_blocks(handle, 0, status->head->header.blockNum + 1, out,
+      write_consensus_change_blocks(handle, *status, 0, status->head->header.blockNum + 1, out,
                                     need_signatures, need_commit);
    }
    if (blocks)

@@ -262,10 +262,6 @@ namespace SystemService
       }
 
       auto account = getTargetService(request);
-      if (account == Sites::service)
-      {
-         return serveSitesApp(request);
-      }
 
       if (request.method == "GET" || request.method == "HEAD")
       {
@@ -402,6 +398,11 @@ namespace SystemService
 
             return reply;
          }
+      }
+
+      if (account == Sites::service)
+      {
+         return serveSitesApp(request);
       }
 
       return std::nullopt;

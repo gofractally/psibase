@@ -299,7 +299,7 @@ namespace psibase::http
       std::atomic<int64_t>     idle_timeout_us  = {};
       std::string              allow_origin     = {};
       std::vector<listen_spec> listen           = {};
-      std::string              host             = {};
+      std::vector<std::string> hosts            = {};
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif

@@ -1,7 +1,7 @@
 [package]
 name = "service"
 edition = "2021"
-version = "0.1.0"
+version = "0.14.0"
 
 [lib]
 path = "src/lib.rs"
@@ -9,10 +9,7 @@ path = "src/lib.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-psibase_macros = { path = "../../../rust/psibase_macros" }
-psibase = { path = "../../../rust/psibase" }
+psibase_macros = { path = "../../../rust/psibase_macros", version = "0.14.0" }
+psibase = { path = "../../../rust/psibase", version = "0.14.0" }
 serde = { version = "1", features = ["derive"] }
 async-graphql = "7.0.6"
-
-
-

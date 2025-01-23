@@ -20,6 +20,7 @@ namespace psibase
    static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
    static constexpr NativeTableNum snapshotTable              = 11;  // subjective
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
+   static constexpr NativeTableNum logTruncateTable           = 13;
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -94,15 +95,16 @@ namespace psibase
    struct CodeRow
    {
       // Constants for flags
-      static constexpr uint64_t allowSudo            = uint64_t(1) << 0;
-      static constexpr uint64_t allowWriteNative     = uint64_t(1) << 1;
-      static constexpr uint64_t isSubjective         = uint64_t(1) << 2;
-      static constexpr uint64_t allowWriteSubjective = uint64_t(1) << 3;
-      static constexpr uint64_t canNotTimeOut        = uint64_t(1) << 4;
-      static constexpr uint64_t canSetTimeLimit      = uint64_t(1) << 5;
-      static constexpr uint64_t isAuthService        = uint64_t(1) << 6;
-      static constexpr uint64_t forceReplay          = uint64_t(1) << 7;
-      static constexpr uint64_t allowSocket          = uint64_t(1) << 8;
+      static constexpr uint64_t allowSudo             = uint64_t(1) << 0;
+      static constexpr uint64_t allowWriteNative      = uint64_t(1) << 1;
+      static constexpr uint64_t isSubjective          = uint64_t(1) << 2;
+      static constexpr uint64_t allowWriteSubjective  = uint64_t(1) << 3;
+      static constexpr uint64_t canNotTimeOut         = uint64_t(1) << 4;
+      static constexpr uint64_t canSetTimeLimit       = uint64_t(1) << 5;
+      static constexpr uint64_t isAuthService         = uint64_t(1) << 6;
+      static constexpr uint64_t forceReplay           = uint64_t(1) << 7;
+      static constexpr uint64_t allowSocket           = uint64_t(1) << 8;
+      static constexpr uint64_t allowNativeSubjective = uint64_t(1) << 9;
 
       AccountNumber codeNum;
       uint64_t      flags = 0;  // Constants above
@@ -178,6 +180,8 @@ namespace psibase
       acceptTransaction,
       // A transaction is rejected
       rejectTransaction,
+      // Returns a transaction to apply
+      nextTransaction,
    };
 
    using NotifyKeyType = std::tuple<std::uint16_t, std::uint8_t, NotifyType>;
@@ -253,6 +257,18 @@ namespace psibase
       static constexpr auto db = psibase::DbId::native;
       auto                  key() const -> ScheduledSnapshotKeyType;
       PSIO_REFLECT(ScheduledSnapshotRow, blockNum)
+   };
+
+   // If this row is present it indicates the height the block log starts at.
+   using LogTruncateKeyType = KeyPrefixType;
+   auto logTruncateKey() -> LogTruncateKeyType;
+   struct LogTruncateRow
+   {
+      BlockNum start;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> LogTruncateKeyType;
+      PSIO_REFLECT(LogTruncateRow, start)
    };
 
 }  // namespace psibase

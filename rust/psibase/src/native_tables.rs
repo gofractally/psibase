@@ -21,6 +21,7 @@ pub const BLOCK_DATA_TABLE: NativeTable = 9;
 pub const CONSENSUS_CHANGE_TABLE: NativeTable = 10;
 pub const SNAPSHOT_TABLE: NativeTable = 11;
 pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
+pub const LOG_TRUNCATE_TABLE: NativeTable = 13;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -105,6 +106,7 @@ impl CodeRow {
     pub const IS_AUTH_SERVICE: u64 = 1u64 << 6;
     pub const FORCE_REPLAY: u64 = 1u64 << 7;
     pub const ALLOW_SOCKET: u64 = 1u64 << 8;
+    pub const ALLOW_NATIVE_SUBJECTIVE: u64 = 1u64 << 9;
     pub fn key(&self) -> (NativeTable, NativeIndex, AccountNumber) {
         (CODE_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.codeNum)
     }
@@ -254,5 +256,17 @@ impl ScheduledSnapshotRow {
             NATIVE_TABLE_PRIMARY_INDEX,
             self.blockNum,
         )
+    }
+}
+
+// If this row is present it indicates the height the block log starts at.
+pub struct LogTruncateRow {
+    pub start: BlockNum,
+}
+
+impl LogTruncateRow {
+    pub const DB: DbId = DbId::NativeSubjective;
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
+        (LOG_TRUNCATE_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }

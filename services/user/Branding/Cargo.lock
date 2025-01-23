@@ -355,7 +355,7 @@ name = "branding"
 version = "0.14.0"
 dependencies = [
  "async-graphql",
- "branding_package",
+ "branding-pkg",
  "psibase",
  "psibase_macros",
  "serde",
@@ -363,8 +363,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "branding_package"
-version = "0.0.0"
+name = "branding-pkg"
+version = "0.14.0"
 dependencies = [
  "branding",
  "plugin",
@@ -1529,7 +1529,7 @@ name = "plugin"
 version = "0.14.0"
 dependencies = [
  "branding",
- "branding_package",
+ "branding-pkg",
  "psibase",
  "serde",
  "serde_json",
@@ -1605,6 +1605,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hmac",
+ "hyper",
  "include_dir",
  "indexmap",
  "indicatif",

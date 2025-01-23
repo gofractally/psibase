@@ -12,8 +12,9 @@ use crate::helpers::*;
 fn get_assert_caller_admin(context: &str) -> OriginationData {
     let caller = get_assert_top_level_app("admin interface", &vec![]).unwrap();
     assert!(
-        caller.origin == Client::my_service_origin(),
-        "{} only callable by `accounts`",
+        caller.origin == Client::my_service_origin()
+            || (caller.app.is_some() && caller.app.as_ref().unwrap() == "x-admin"),
+        "{} only callable by `accounts` or `x-admin`",
         context
     );
     caller
@@ -21,6 +22,13 @@ fn get_assert_caller_admin(context: &str) -> OriginationData {
 
 fn assert_caller_admin(context: &str) {
     let _ = get_assert_caller_admin(context);
+}
+
+fn get_accounts_app() -> OriginationData {
+    OriginationData {
+        app: Some(Client::my_service_account()),
+        origin: Client::my_service_origin(),
+    }
 }
 
 fn assert_valid_account(account: &str) {
@@ -62,13 +70,13 @@ impl Admin for AccountsPlugin {
     }
 
     fn import_account(account: String) {
-        let caller = get_assert_caller_admin("import_account");
+        assert_caller_admin("import_account");
         assert_valid_account(&account);
-        AppsTable::new(&caller).connect(&account);
+        AppsTable::new(&get_accounts_app()).connect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {
-        let caller = get_assert_caller_admin("get_all_accounts");
-        AppsTable::new(&caller).get_connected_accounts()
+        assert_caller_admin("get_all_accounts");
+        AppsTable::new(&get_accounts_app()).get_connected_accounts()
     }
 }

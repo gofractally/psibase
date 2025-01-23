@@ -5,7 +5,7 @@ use cargo_metadata::Message;
 use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
-use psibase::{ExactAccountNumber, PackageInfo, PrivateKey, PublicKey};
+use psibase::{ExactAccountNumber, PackageInfo};
 use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File, OpenOptions};
@@ -50,7 +50,7 @@ enum PsibaseCommand {
 struct Args {
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<PrivateKey>,
+    sign: Vec<String>,
 
     /// Path to Cargo.toml
     #[clap(long, global = true, value_name = "PATH")]
@@ -81,7 +81,7 @@ struct DeployCommand {
     /// Create the account if it doesn't exist. Also set the account to
     /// authenticate using this key, even if the account already existed.
     #[clap(short = 'c', long, value_name = "KEY")]
-    create_account: Option<PublicKey>,
+    create_account: Option<String>,
 
     /// Create the account if it doesn't exist. The account won't be secured;
     /// anyone can authorize as this account without signing. Caution: this option
@@ -390,6 +390,29 @@ async fn build_plugin(
     }
 
     Ok(files?)
+}
+
+async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .arg("rustc")
+        .args(&["-p", package])
+        .arg("--release")
+        .arg("--lib")
+        .arg("--target=wasm32-wasi")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--color=always")
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+
+    let status = command.wait().await?;
+
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    Ok(())
 }
 
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {

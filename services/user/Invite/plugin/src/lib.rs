@@ -105,7 +105,7 @@ impl Invitee for InvitePlugin {
 
         let query = format!(
             r#"query {{
-                getInvite(pubkey: "{pubkey}") {{
+                getInvite(pubkey: """{pubkey}""") {{
                     inviter,
                     actor,
                     expiry,

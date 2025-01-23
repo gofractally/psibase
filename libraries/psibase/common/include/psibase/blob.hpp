@@ -19,8 +19,8 @@ namespace psibase
       requires IsByteRange<A> && IsByteRange<B>
    int compare_blob(const A& a, const B& b)
    {
-      auto r = memcmp(std::ranges::data(a), std::ranges::data(b),
-                      std::min(std::ranges::size(a), std::ranges::size(b)));
+      auto min_size = std::min(std::ranges::size(a), std::ranges::size(b));
+      auto r = min_size == 0 ? 0 : memcmp(std::ranges::data(a), std::ranges::data(b), min_size);
       if (r)
          return r;
       if (std::ranges::size(a) < std::ranges::size(b))

@@ -1505,6 +1505,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugin"
+version = "0.14.0"
+dependencies = [
+ "chrono",
+ "psibase",
+ "registry",
+ "registry-pkg",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1573,6 +1586,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hmac",
+ "hyper",
  "include_dir",
  "indexmap",
  "indicatif",
@@ -1658,12 +1672,12 @@ dependencies = [
 
 [[package]]
 name = "r-registry"
-version = "0.1.0"
+version = "0.14.0"
 dependencies = [
  "async-graphql",
  "psibase",
  "registry",
- "registry_package",
+ "registry-pkg",
  "serde",
 ]
 
@@ -1707,37 +1721,23 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "registry"
-version = "0.1.0"
+version = "0.14.0"
 dependencies = [
  "async-graphql",
  "psibase",
- "registry_package",
+ "registry-pkg",
  "serde",
  "serde_json",
  "url",
 ]
 
 [[package]]
-name = "registry-plugin"
-version = "0.1.0"
+name = "registry-pkg"
+version = "0.14.0"
 dependencies = [
- "chrono",
- "fracpack",
- "psibase",
- "registry",
- "registry_package",
- "serde",
- "serde_json",
- "wit-bindgen-rt",
-]
-
-[[package]]
-name = "registry_package"
-version = "0.1.0"
-dependencies = [
+ "plugin",
  "r-registry",
  "registry",
- "registry-plugin",
 ]
 
 [[package]]

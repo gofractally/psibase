@@ -18,6 +18,10 @@ const transformConfigServerToUI = (
             ...listen,
             key: listen.protocol + listen.address + listen.path + listen.port,
         })),
+        hosts: serverConfig.hosts.map((host, index) => ({
+            host,
+            key: host + index.toString(),
+        })),
         services: serverConfig.services.map((service, index) => ({
             ...service,
             key: service.host + service.root + index.toString(),
