@@ -753,6 +753,13 @@ class VariantValue:
         self.type = type
         self.value = value
 
+def _match_untagged(ty, value, tmp_stream):
+    try:
+        ty.pack(value, tmp_stream)
+    except:
+        return False
+    return True
+
 @_fracpackmeta(['name', 'members'], lambda name, members: name, VariantValue)
 class Variant(TypeBase, metaclass=DerivedAsInstance):
     def __init__(self, name, members):
@@ -780,18 +787,35 @@ class Variant(TypeBase, metaclass=DerivedAsInstance):
         end_pos = stream.pos + size
         result = self.members[idx][1].unpack(stream)
         stream.set_pos(end_pos)
-        return {self.members[idx][0]: result}
+        if self.members[idx][0].startswith('@'):
+            return result
+        else:
+            return {self.members[idx][0]: result}
     def pack(self, value, stream):
         if isinstance(value, VariantValue):
             value = {value.type: value.value}
-        assert(len(value) == 1)
-        for (name, v) in dict(value).items():
-            idx = self.members_by_name[name]
-            stream.write_u8(idx)
-            pos = stream.pos
-            stream.write_u32(0)
-            self.members[idx][1].pack(v, stream)
-            stream.repack_u32(pos, stream.pos - pos - 4)
+        idx = None
+        if isinstance(value, dict) and len(value) == 1:
+            for (name, v) in value.items():
+                if name in self.members_by_name:
+                    value = v
+                    idx = self.members_by_name[name]
+        if idx is None:
+            tmp_stream = OutputStream()
+            if hasattr(stream, 'custom'):
+                tmp_stream.custom = stream.custom
+            for i in self.untagged:
+                ty = self.members[i][1]
+                if _match_untagged(ty, value, tmp_stream):
+                    idx = i
+                    break
+        if idx is None:
+            raise Exception('Unknown variant alternative')
+        stream.write_u8(idx)
+        pos = stream.pos
+        stream.write_u32(0)
+        self.members[idx][1].pack(value, stream)
+        stream.repack_u32(pos, stream.pos - pos - 4)
     @property
     def members_by_name(self):
         if not hasattr(self, "_members_by_name"):
@@ -799,6 +823,14 @@ class Variant(TypeBase, metaclass=DerivedAsInstance):
             for (i, (name, ty)) in enumerate(self.members):
                 self._members_by_name[name] = i
         return self._members_by_name
+    @property
+    def untagged(self):
+        if not hasattr(self, "_untagged"):
+            self._untagged = []
+            for (i, (name, ty)) in enumerate(self.members):
+                if name.startswith('@'):
+                    self._untagged.append(i)
+        return self._untagged
     def match(self, other, context):
         if not isinstance(other, Variant):
             return False

@@ -331,9 +331,10 @@ namespace psio
       {
          std::string type;
       };
-      constexpr const char* get_type_name(const Type*)
+      PSIO_REFLECT_TYPENAME(Type)
+      constexpr bool psio_is_untagged(const Type*)
       {
-         return "@Type";
+         return true;
       }
 
       void to_json(const Type& type, auto& stream)
@@ -384,18 +385,11 @@ namespace psio
          const AnyType*         resolve(const Schema& schema) const;
       };
       PSIO_REFLECT_TYPENAME(AnyType)
+
       void to_json(const AnyType& type, auto& stream)
       {
-         if (auto* alias = std::get_if<Type>(&type.value))
-         {
-            to_json(*alias, stream);
-         }
-         else
-         {
-            to_json(type.value, stream);
-         }
+         to_json(type.value, stream);
       }
-
       inline auto& clio_unwrap_packable(AnyType& type)
       {
          return type.value;
@@ -1081,12 +1075,29 @@ namespace psio
       template <typename Clock, typename Duration>
       constexpr bool is_time_point_v<std::chrono::time_point<Clock, Duration>> = true;
 
+      template <typename T>
+      std::string get_alternative_name(const T*)
+      {
+         using psio::get_type_name;
+         using psio::psio_is_untagged;
+         if constexpr (psio_is_untagged(static_cast<const T*>(nullptr)))
+         {
+            std::string result("@");
+            result += get_type_name(static_cast<const T*>(nullptr));
+            return result;
+         }
+         else
+         {
+            return get_type_name(static_cast<const T*>(nullptr));
+         }
+      }
+
       template <typename S, typename... T>
       std::vector<Member> insert_variant_alternatives(S& schema, std::variant<T...>*)
       {
          using psio::get_type_name;
-         return {
-             Member{.name = get_type_name((T*)nullptr), .type = schema.template insert<T>()}...};
+         return {Member{.name = get_alternative_name((T*)nullptr),
+                        .type = schema.template insert<T>()}...};
       }
 
       template <typename T, typename S, std::size_t... I>

@@ -228,19 +228,37 @@ template <typename S> void to_json(float value, S& stream)              { return
       }
    }
 
+   template <typename T>
+   constexpr bool psio_is_untagged(const T*)
+   {
+      return false;
+   }
+
    template <typename... T, typename S>
    void to_json(const std::variant<T...>& obj, S& stream)
    {
-      stream.write('{');
-      increase_indent(stream);
-      write_newline(stream);
       std::visit(
-          [&](const auto& t) { to_json(get_type_name<std::decay_t<decltype(t)>>(), stream); }, obj);
-      write_colon(stream);
-      std::visit([&](auto& x) { return to_json(x, stream); }, obj);
-      decrease_indent(stream);
-      write_newline(stream);
-      stream.write('}');
+          [&](const auto& t)
+          {
+             using Alternative = std::remove_cvref_t<decltype(t)>;
+             if constexpr (psio_is_untagged(static_cast<const Alternative*>(nullptr)))
+             {
+                to_json(t, stream);
+             }
+             else
+             {
+                stream.write('{');
+                increase_indent(stream);
+                write_newline(stream);
+                to_json(get_type_name<Alternative>(), stream);
+                write_colon(stream);
+                to_json(t, stream);
+                decrease_indent(stream);
+                write_newline(stream);
+                stream.write('}');
+             }
+          },
+          obj);
    }
 
    template <typename... T, typename S>

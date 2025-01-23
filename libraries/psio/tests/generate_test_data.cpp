@@ -244,6 +244,32 @@ struct EmptyTrailing
 };
 PSIO_REFLECT(EmptyTrailing, v0, v1)
 
+struct Untagged
+{
+   std::string value;
+};
+PSIO_REFLECT_TYPENAME(Untagged)
+auto& clio_unwrap_packable(Untagged& obj)
+{
+   return obj.value;
+}
+auto& clio_unwrap_packable(const Untagged& obj)
+{
+   return obj.value;
+}
+void from_json(Untagged& obj, auto& stream)
+{
+   from_json(obj.value, stream);
+}
+void to_json(const Untagged& obj, auto& stream)
+{
+   to_json(obj.value, stream);
+}
+constexpr bool psio_is_untagged(const Untagged*)
+{
+   return true;
+}
+
 int main()
 {
    test_builder builder;
@@ -299,6 +325,7 @@ int main()
    builder.add<EmptyMember>("EmptyMember", {{Empty{}}});
    builder.add<std::map<std::string, std::string>>("string-map",
                                                    {{}, {{"foo", "x"}, {"bar", "y"}}});
+   builder.add<std::variant<V0, Untagged>>("untagged-alternative", {V0{}, Untagged{"foo"}});
 
    // Compatible serialization
    builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),
