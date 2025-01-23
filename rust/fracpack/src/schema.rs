@@ -1552,11 +1552,12 @@ fn frac2json_impl(
             let mut substream = stream.read_fixed(len)?;
             let (name, child) = &alternatives[index as usize];
             let ty = schema.get_by_id(*child);
+            let untagged = frac2json_impl(schema, ty, &mut substream, true)?;
+            if name.starts_with("@") {
+                return Ok(untagged);
+            }
             let mut result = serde_json::Map::with_capacity(1);
-            result.insert(
-                name.clone(),
-                frac2json_impl(schema, ty, &mut substream, true)?,
-            );
+            result.insert(name.clone(), untagged);
             stream.has_unknown |= substream.has_unknown;
             substream.finish()?;
             Ok(result.into())
@@ -1825,6 +1826,31 @@ impl<'a> ObjectWriter<'a> {
     }
 }
 
+fn json2frac_untagged(
+    schema: &CompiledSchema,
+    alternatives: &Vec<(String, usize)>,
+    val: &serde_json::Value,
+    dest: &mut Vec<u8>,
+) -> Option<()> {
+    let alt_pos = dest.len();
+    0u8.pack(dest);
+    let size_pos = dest.len();
+    0u32.pack(dest);
+    let alt = alternatives.iter().position(|(name, id)| {
+        if name.starts_with("@") {
+            dest.truncate(alt_pos + 5);
+            json2frac(schema, schema.get_by_id(*id), val, dest).is_ok()
+        } else {
+            false
+        }
+    })?;
+    let end_pos = dest.len();
+    let size = (end_pos - size_pos - 4) as u32;
+    dest[alt_pos] = alt as u8;
+    dest[size_pos..size_pos + 4].copy_from_slice(&size.to_le_bytes());
+    Some(())
+}
+
 fn json2frac(
     schema: &CompiledSchema,
     ty: &CompiledType,
@@ -1912,14 +1938,18 @@ fn json2frac(
             json2frac_variable(schema, item, dest)
         }
         Variant(alternatives) => {
-            let (alt, val) = val
-                .as_object()
-                .and_then(|m| if m.len() == 1 { m.iter().next() } else { None })
-                .ok_or_else(|| serde_json::Error::custom("Expected variant"))?;
-            let alt = alternatives
-                .iter()
-                .position(|(name, _)| name == alt)
-                .ok_or_else(|| serde_json::Error::custom("Unknown variant alternative"))?;
+            let Some((alt, val)) =
+                val.as_object()
+                    .and_then(|m| if m.len() == 1 { m.iter().next() } else { None })
+            else {
+                return json2frac_untagged(schema, alternatives, val, dest)
+                    .ok_or_else(|| serde_json::Error::custom("Expected variant"));
+            };
+
+            let Some(alt) = alternatives.iter().position(|(name, _)| name == alt) else {
+                return json2frac_untagged(schema, alternatives, val, dest)
+                    .ok_or_else(|| serde_json::Error::custom("Unknown variant alternative"));
+            };
             (alt as u8).pack(dest);
             let size_pos = dest.len();
             0u32.pack(dest);
