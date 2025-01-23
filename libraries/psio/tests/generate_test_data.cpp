@@ -76,7 +76,11 @@ struct test_builder
 
 void to_json(test_builder& t, std::ostream& os)
 {
-   os << "{\"schema\":" << psio::convert_to_json(std::move(t.builder).build()) << ",\"values\":[";
+   auto schema = std::move(t.builder).build();
+   os << "{\"schema\":" << psio::convert_to_json(schema)
+      << ",\"schema_bin\":" << psio::convert_to_json(psio::to_frac(schema)) << ",\"schema_schema\":"
+      << psio::convert_to_json(psio::SchemaBuilder{}.insert<psio::Schema>("schema").build())
+      << ",\"values\":[";
    bool first = true;
    for (const auto& v : t.tests)
    {
