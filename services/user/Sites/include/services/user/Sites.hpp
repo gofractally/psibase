@@ -122,7 +122,7 @@ namespace SystemService
       bool                              useSpa(const psibase::AccountNumber& account);
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
-      std::string                       getCspHeader(const std::optional<SitesContentRow>& content,
+      std::optional<std::string>        getCspHeader(const std::optional<SitesContentRow>& content,
                                                      const psibase::AccountNumber&         account);
    };
 

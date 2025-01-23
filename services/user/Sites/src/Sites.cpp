@@ -300,8 +300,8 @@ namespace SystemService
 
          if (content)
          {
-            std::string cspHeader = getCspHeader(content, account);
-            auto        etag      = std::to_string(content->hash);
+            auto cspHeader = getCspHeader(content, account);
+            auto etag      = std::to_string(content->hash);
 
             if (useCache(account) && shouldCache(request, etag))
             {
@@ -314,10 +314,14 @@ namespace SystemService
             }
 
             std::vector<HttpHeader> headers = {{
-                {"Content-Security-Policy", cspHeader},
                 {"Cache-Control", "no-cache"},
                 {"ETag", etag},
             }};
+
+            if (cspHeader)
+            {
+               headers.push_back({"Content-Security-Policy", *cspHeader});
+            }
 
             // RFC 7231
             // "A request without an Accept-Encoding header field implies that the
@@ -538,23 +542,19 @@ namespace SystemService
       return siteConfig && siteConfig->spa;
    }
 
-   std::string Sites::getCspHeader(const std::optional<SitesContentRow>& content,
-                                   const AccountNumber&                  account)
+   std::optional<std::string> Sites::getCspHeader(const std::optional<SitesContentRow>& content,
+                                                  const AccountNumber&                  account)
    {
-      std::string cspHeader = DEFAULT_CSP_HEADER;
       if (content && !content->csp.empty())
       {
-         cspHeader = content->csp;
+         return content->csp;
       }
-      else
+      auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
+      if (globalCsp)
       {
-         auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
-         if (globalCsp)
-         {
-            cspHeader = globalCsp->csp;
-         }
+         return globalCsp->csp;
       }
-      return cspHeader;
+      return std::nullopt;
    }
 
    bool Sites::useCache(const AccountNumber& account)
