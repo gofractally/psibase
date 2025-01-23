@@ -1280,7 +1280,7 @@ struct PsinodeConfig
    autoconnect_t               autoconnect;
    AccountNumber               producer;
    std::vector<std::string>    pkcs11_modules;
-   std::string                 host;
+   std::vector<std::string>    hosts;
    std::vector<listen_spec>    listen;
    TLSConfig                   tls;
    std::vector<native_service> services;
@@ -1295,7 +1295,7 @@ PSIO_REFLECT(PsinodeConfig,
              autoconnect,
              producer,
              pkcs11_modules,
-             host,
+             hosts,
              listen,
 #ifdef PSIBASE_ENABLE_SSL
              tls,
@@ -1330,9 +1330,11 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
           "", "pkcs11-module", config.pkcs11_modules,
           [](std::string_view text) { return std::string(text); }, "PKCS #11 modules to load");
    }
-   if (!config.host.empty())
+   if (!config.hosts.empty())
    {
-      file.set("", "host", config.host, "The HTTP server's host name");
+      file.set(
+          "", "host", config.hosts, [](std::string_view text) { return std::string(text); },
+          "The HTTP server's host name");
    }
    if (!config.listen.empty())
    {
@@ -1413,7 +1415,7 @@ void run(const std::string&              db_path,
          const std::vector<std::string>& peers,
          autoconnect_t                   autoconnect,
          bool                            enable_incoming_p2p,
-         std::string                     host,
+         std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          http::admin_service&            admin,
@@ -1629,14 +1631,17 @@ void run(const std::string&              db_path,
       http_config->idle_timeout_us     = http_timeout.duration.count();
       http_config->allow_origin        = "*";
       http_config->listen              = listen;
-      http_config->host                = host;
-      http_config->enable_transactions = !host.empty();
+      http_config->hosts               = hosts;
+      http_config->enable_transactions = !hosts.empty();
       http_config->status              = http::http_status{
                        .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
       for (const auto& entry : services)
       {
-         load_service(entry, http_config->services, host);
+         for (const auto& host : hosts)
+         {
+            load_service(entry, http_config->services, host);
+         }
       }
       http_config->admin       = admin;
       http_config->admin_authz = admin_authz;
@@ -1826,7 +1831,7 @@ void run(const std::string&              db_path,
       };
 
       http_config->set_config =
-          [&chainContext, &node, &db_path, &runResult, &http_config, &host, &admin, &admin_authz,
+          [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &admin, &admin_authz,
            &http_timeout, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one,
            setPKCS11Libs](std::vector<char> json, http::connect_callback callback)
       {
@@ -1836,7 +1841,7 @@ void run(const std::string&              db_path,
          boost::asio::post(
              chainContext,
              [&chainContext, &node, config = psio::from_json<PsinodeConfig>(stream), &db_path,
-              &runResult, &http_config, &host, &services, &admin, &admin_authz, &http_timeout,
+              &runResult, &http_config, &hosts, &services, &admin, &admin_authz, &http_timeout,
               &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &connect_one, setPKCS11Libs,
               callback = std::move(callback)]() mutable
              {
@@ -1846,12 +1851,15 @@ void run(const std::string&              db_path,
                    entry.root =
                        parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
                 }
-                if (services != config.services || host != config.host)
+                if (services != config.services || hosts != config.hosts)
                 {
                    new_services.emplace();
                    for (const auto& entry : config.services)
                    {
-                      load_service(entry, *new_services, config.host);
+                      for (const auto& host : config.hosts)
+                      {
+                         load_service(entry, *new_services, host);
+                      }
                    }
                 }
                 // Error handling for PKCS #11 modules loading is tricky because
@@ -1877,7 +1885,7 @@ void run(const std::string&              db_path,
                                     connect_one);
                 }
                 pkcs11_modules = config.pkcs11_modules;
-                host           = config.host;
+                hosts          = config.hosts;
                 services       = config.services;
                 admin          = config.admin;
                 admin_authz    = config.admin_authz;
@@ -1890,11 +1898,11 @@ void run(const std::string&              db_path,
                 loggers::configure(config.loggers);
                 {
                    std::lock_guard l{http_config->mutex};
-                   http_config->host                = host;
+                   http_config->hosts               = hosts;
                    http_config->listen              = config.listen;
                    http_config->admin               = admin;
                    http_config->admin_authz         = admin_authz;
-                   http_config->enable_transactions = !host.empty();
+                   http_config->enable_transactions = !hosts.empty();
                    http_config->idle_timeout_us     = http_timeout.duration.count();
                    if (new_services)
                    {
@@ -1921,12 +1929,12 @@ void run(const std::string&              db_path,
              });
       };
 
-      http_config->get_config = [&chainContext, &node, &http_config, &host, &admin, &admin_authz,
+      http_config->get_config = [&chainContext, &node, &http_config, &hosts, &admin, &admin_authz,
                                  &http_timeout, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
                                  &services](http::get_config_callback callback)
       {
          boost::asio::post(chainContext,
-                           [&chainContext, &node, &http_config, &host, &services, &admin,
+                           [&chainContext, &node, &http_config, &hosts, &services, &admin,
                             &admin_authz, &http_timeout, &tls_cert, &tls_key, &root_ca,
                             &pkcs11_modules, callback = std::move(callback)]() mutable
                            {
@@ -1935,7 +1943,7 @@ void run(const std::string&              db_path,
                               std::tie(result.peers, result.autoconnect.value) = node.autoconnect();
                               result.producer       = node.producer_name();
                               result.pkcs11_modules = pkcs11_modules;
-                              result.host           = host;
+                              result.hosts          = hosts;
                               result.listen         = http_config->listen;
 #ifdef PSIBASE_ENABLE_SSL
                               result.tls.certificate = tls_cert;
@@ -2220,11 +2228,20 @@ void run(const std::string&              db_path,
       std::string xAdminSubdomain;
       for (const auto& service : services)
       {
-         if (service.root.string().find("services/x-admin") != std::string::npos &&
-             service.host.ends_with('.'))
+         if (service.root.string().find("services/x-admin") != std::string::npos)
          {
-            xAdminSubdomain = service.host + host;
-            break;
+            if (service.host.ends_with('.'))
+            {
+               if (!hosts.empty())
+               {
+                  xAdminSubdomain = service.host + hosts.front();
+                  break;
+               }
+            }
+            else if (xAdminSubdomain.empty())
+            {
+               xAdminSubdomain = service.host;
+            }
          }
       }
 
@@ -2341,7 +2358,7 @@ int main(int argc, char* argv[])
    std::string                 producer = {};
    auto                        keys     = std::make_shared<CompoundProver>();
    std::vector<std::string>    pkcs11_modules;
-   std::string                 host = {};
+   std::vector<std::string>    hosts = {};
    std::vector<listen_spec>    listen;
    uint32_t                    leeway_us = 200000;  // TODO: real value once resources are in place
    std::vector<std::string>    peers;
@@ -2366,7 +2383,7 @@ int main(int argc, char* argv[])
        "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
        "A private key to use for block production");
-   opt("host,o", po::value<std::string>(&host)->value_name("name")->default_value(""),
+   opt("host,o", po::value(&hosts)->value_name("name")->default_value({}, ""),
        "Root host name for the http server");
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
@@ -2489,7 +2506,7 @@ int main(int argc, char* argv[])
          restart.shouldRestart     = true;
          restart.soft              = true;
          run(db_path, DbConfig{db_cache_size}, AccountNumber{producer}, keys, pkcs11_modules, peers,
-             autoconnect, enable_incoming_p2p, host, listen, services, admin, admin_authz,
+             autoconnect, enable_incoming_p2p, hosts, listen, services, admin, admin_authz,
              http_timeout, root_ca, tls_cert, tls_key, leeway_us, restart);
          if (!restart.shouldRestart || !restart.shutdownRequested)
          {
