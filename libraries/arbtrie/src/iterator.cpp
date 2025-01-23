@@ -5,12 +5,12 @@ namespace arbtrie
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
       pushkey( in->key() );
-      return query == key_view();
+      return query >= key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
       pushkey( in->key() );
-      return query == key_view();
+      return query <= key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
    {

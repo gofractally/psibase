@@ -219,6 +219,7 @@ TEST_CASE("insert-words")
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000))
                       << " items/sec  total items: " << add_comma(item_count) << "\n";
             REQUIRE(item_count == keys.size());
+            start = std::chrono::steady_clock::now();
 
             int rcount = 0;
             itr.reverse_lower_bound();
@@ -226,6 +227,7 @@ TEST_CASE("insert-words")
             while (itr.valid())
             {
                REQUIRE( rkeys != keys.rend() );
+         //      TRIEDENT_WARN( "checking ", *rkeys );
                itr.read_value(data);
                if( rkeys->size() != data.size() or
                    0 != memcmp( rkeys->data(), data.data(), data.size() ) ) {
@@ -236,11 +238,21 @@ TEST_CASE("insert-words")
 
                //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
                REQUIRE(itr.key().size() == data.size());
+               if( *rkeys == "zuccarino" ) {
+                  TRIEDENT_WARN( "break" );
+               }
                itr.prev();
                ++rcount;
                ++rkeys;
             }
             REQUIRE(rcount == keys.size());
+            end   = std::chrono::steady_clock::now();
+            delta = end - start;
+            std::cout << "reverse iterated " << std::setw(12)
+                      << add_comma(
+                             int64_t(item_count) /
+                             (std::chrono::duration<double, std::milli>(delta).count() / 1000))
+                      << " items/sec  total items: " << add_comma(item_count) << "\n";
          }
       };
       iterate_all();
