@@ -463,6 +463,13 @@ namespace arbtrie
       auto  vn           = root.as<value_node>();
       auto  new_val_size = _cur_val.size();
 
+      if constexpr (mode.is_remove() ) {
+         if( vn->key() == key )
+            return fast_meta_address();
+         TRIEDENT_DEBUG( "attempt to remove key that doesn't exist" );
+         return root.address(); 
+      }
+
       if (vn->key() == key)
       {
          if constexpr (mode.is_unique())
@@ -486,11 +493,13 @@ namespace arbtrie
             return remake<value_node>(root, key, _cur_val).address();
          }
          else  // shared
+         {    
             return make<value_node>(
                        root.address().region, state, key, _cur_val)
                 .address();
+         }
       }
-      else // shared 
+      else // add key
       {  // convert to binary node
          key_view   k1      = vn->key();
          value_type v1      = vn->get_value();
