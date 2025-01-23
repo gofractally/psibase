@@ -1,5 +1,4 @@
 use crate::{Pack, ToKey, ToSchema, Unpack};
-use async_graphql::ScalarType;
 use async_graphql::{InputObject, SimpleObject};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{
@@ -73,7 +72,20 @@ impl<'de> Deserialize<'de> for TimePointSec {
 }
 
 #[derive(
-    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Pack, Unpack, ToKey, ToSchema,
+    Debug,
+    Copy,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Pack,
+    Unpack,
+    ToKey,
+    ToSchema,
+    SimpleObject,
+    InputObject,
 )]
 #[fracpack(
     definition_will_not_change,
@@ -81,38 +93,9 @@ impl<'de> Deserialize<'de> for TimePointSec {
     custom = "TimePointUSec"
 )]
 #[to_key(psibase_mod = "crate")]
+#[graphql(input_name = "TimePointUSecInput")]
 pub struct TimePointUSec {
     pub microseconds: i64,
-}
-
-impl TryFrom<String> for TimePointUSec {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        DateTime::<FixedOffset>::parse_from_rfc3339(&s)
-            .map(|dt| dt.to_utc().into())
-            .map_err(|e| e.to_string())
-    }
-}
-
-impl ToString for TimePointUSec {
-    fn to_string(&self) -> String {
-        DateTime::<Utc>::from(*self).to_rfc3339()
-    }
-}
-
-#[async_graphql::Scalar]
-impl ScalarType for TimePointUSec {
-    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        if let async_graphql::Value::String(s) = value {
-            Self::try_from(s).map_err(async_graphql::InputValueError::custom)
-        } else {
-            Err(async_graphql::InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> async_graphql::Value {
-        async_graphql::Value::String(self.to_string())
-    }
 }
 
 impl TimePointUSec {
@@ -145,14 +128,17 @@ impl From<TimePointUSec> for DateTime<Utc> {
 
 impl Serialize for TimePointUSec {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+        serializer.serialize_str(&DateTime::<Utc>::from(*self).to_rfc3339())
     }
 }
 
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <String>::deserialize(deserializer)?;
-        Self::try_from(s).map_err(D::Error::custom)
+        let s = <&str>::deserialize(deserializer)?;
+        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(s)
+            .map_err(|e| D::Error::custom(e.to_string()))?
+            .to_utc()
+            .into())
     }
 }
 
