@@ -7,14 +7,15 @@ export const usePrivateToPublicKey = (key: string) =>
     queryKey: ["privateToPublicKey", key],
     enabled: !!key,
     queryFn: async () => {
-      const res = await supervisor.functionCall({
-        method: "pubFromPriv",
-        params: [key],
-        service: "auth-sig",
-        intf: "keyvault",
-      });
+      const res = z.string().parse(
+        await supervisor.functionCall({
+          method: "pubFromPriv",
+          params: [key],
+          service: "auth-sig",
+          intf: "keyvault",
+        })
+      );
 
-
-      return z.string().parse(res);
+      return res.replace(/\n/g, " ");
     },
   });
