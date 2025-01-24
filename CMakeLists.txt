@@ -735,7 +735,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Workshop.psi
     NAME Workshop
     VERSION ${PSIBASE_VERSION}
-    DESCRIPTION "Add apps to registry"
+    DESCRIPTION "A dashboard for developers to create and manage apps"
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Registry(^${PSIBASE_VERSION})"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /

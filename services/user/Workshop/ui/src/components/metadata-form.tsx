@@ -131,7 +131,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
             <FormItem>
               <FormLabel>App Name</FormLabel>
               <FormControl>
-                <Input placeholder="MonsterEOS" {...field} />
+                <Input placeholder="MonsterApp" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
