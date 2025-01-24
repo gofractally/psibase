@@ -6,6 +6,11 @@ use bindings::exports::staged_tx::plugin::api::Guest as Api;
 use bindings::exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
 use bindings::host::common::{client as Client, types::Error};
 use bindings::transact::plugin::hooks::hook_tx_transform_label;
+use psibase::services::staged_tx::action_structs::propose;
+use psibase::{AccountNumber, Hex, MethodNumber};
+use std::collections::HashMap;
+
+use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
@@ -42,20 +47,62 @@ impl HookTxTransform for StagedTxPlugin {
         label: Option<String>,
         actions: Vec<Action>,
     ) -> Result<Option<Vec<Action>>, Error> {
+        let Some(label) = label else {
+            return Ok(None);
+        };
+
         let transact = psibase::services::transact::SERVICE.to_string();
         get_assert_caller("on_tx_transform", &[&transact])?;
 
-        let mut actions = actions;
-        if label.is_some() {
-            let label = label.unwrap();
-            for action in &mut actions {
-                action.sender = label.clone();
-            }
-            return Ok(Some(actions));
-        }
+        let action_groups = group_by_sender(actions);
+        let actions = action_groups
+            .into_iter()
+            .map(|group| propose_wrap(group, &label))
+            .collect();
 
-        Ok(None)
+        Ok(Some(actions))
     }
+}
+
+fn propose_wrap(mut actions: Vec<Action>, label: &str) -> Action {
+    let sender = actions[0].sender.clone();
+
+    for action in &mut actions {
+        action.sender = label.to_string();
+    }
+
+    let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+
+    Action {
+        sender,
+        service: psibase::services::staged_tx::SERVICE.to_string(),
+        method: propose::ACTION_NAME.to_string(),
+        raw_data: propose { actions }.packed(),
+    }
+}
+
+impl From<Action> for psibase::Action {
+    fn from(action: Action) -> Self {
+        psibase::Action {
+            sender: AccountNumber::from(action.sender.as_str()),
+            service: AccountNumber::from(action.service.as_str()),
+            method: MethodNumber::from(action.method.as_str()),
+            rawData: Hex::from(action.raw_data),
+        }
+    }
+}
+
+fn group_by_sender(actions: Vec<Action>) -> Vec<Vec<Action>> {
+    let mut sender_groups: HashMap<String, Vec<Action>> = HashMap::new();
+
+    for action in actions {
+        sender_groups
+            .entry(action.sender.clone())
+            .or_default()
+            .push(action);
+    }
+
+    sender_groups.into_values().collect()
 }
 
 bindings::export!(StagedTxPlugin with_types_in bindings);

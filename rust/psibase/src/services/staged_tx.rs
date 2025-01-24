@@ -1,32 +1,18 @@
-use crate::ToKey;
-use async_graphql::SimpleObject;
-use fracpack::{Pack, ToSchema, Unpack};
-use serde::{Deserialize, Serialize};
-
 #[crate::service(name = "staged-tx", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::*;
-    use crate::{AccountNumber, Action, Checksum256, TimePointUSec};
+    use crate::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec};
+    use async_graphql::SimpleObject;
+    use fracpack::ToSchema;
+    use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct ActionList {
         pub actions: Vec<Action>,
     }
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, Pack, Unpack)]
-    #[fracpack(fracpack_mod = "fracpack")]
-    struct InitRow {}
-
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "StagedTxTable", index = 1)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
         pub id: u32,
@@ -35,48 +21,6 @@ mod service {
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
         pub action_list: ActionList,
-    }
-
-    impl StagedTx {
-        #[primary_key]
-        fn by_id(&self) -> u32 {
-            self.id
-        }
-    }
-
-    #[table(name = "LastUsedTable", index = 2)]
-    #[derive(
-        Debug, Clone, Default, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject,
-    )]
-    #[fracpack(fracpack_mod = "fracpack")]
-    pub struct LastUsed {
-        pub id: u32,
-    }
-
-    impl LastUsed {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "ResponseTable", index = 3)]
-    #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Pack, Unpack, SimpleObject)]
-    #[fracpack(fracpack_mod = "fracpack")]
-    pub struct Response {
-        pub id: u32,
-        pub account: AccountNumber,
-        pub accepted: bool,
-    }
-
-    impl Response {
-        #[primary_key]
-        fn by_id(&self) -> (u32, AccountNumber) {
-            (self.id, self.account)
-        }
-
-        #[secondary_key(1)]
-        fn by_responder(&self) -> (AccountNumber, u32) {
-            (self.account, self.id)
-        }
     }
 
     /// Initialize the service

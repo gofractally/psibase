@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, Fracpack, TimePointUSec, ToKey, ToSchema};
+    use psibase::{AccountNumber, Action, Fracpack, Hex, TimePointUSec, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
@@ -21,7 +21,7 @@ pub mod tables {
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTx {
         pub id: u32,
-        pub txid: [u8; 32],
+        pub txid: Hex<[u8; 32]>,
         pub propose_block: u32,
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
@@ -68,7 +68,7 @@ pub mod impls {
     use super::tables::*;
     use psibase::fracpack::Pack;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::{check, get_sender, AccountNumber, Action, Table};
+    use psibase::{check, get_sender, AccountNumber, Action, Hex, Table};
 
     impl StagedTx {
         pub fn new(actions: Vec<Action>) -> Self {
@@ -92,7 +92,7 @@ pub mod impls {
 
             StagedTx {
                 id: monotonic_id,
-                txid,
+                txid: txid.into(),
                 propose_block: current_block.blockNum,
                 propose_date: current_block.time,
                 proposer: get_sender(),
@@ -100,12 +100,12 @@ pub mod impls {
             }
         }
 
-        pub fn get(id: u32, txid: [u8; 32]) -> Self {
+        pub fn get(id: u32, txid: Hex<[u8; 32]>) -> Self {
             let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
             check(staged_tx.is_some(), "Unknown staged tx");
             let staged_tx = staged_tx.unwrap();
             check(
-                staged_tx.txid == txid,
+                staged_tx.txid == txid.into(),
                 "specified txid must match staged tx txid",
             );
 

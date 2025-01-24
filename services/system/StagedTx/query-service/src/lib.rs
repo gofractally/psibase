@@ -7,11 +7,11 @@ mod service {
     use staged_tx::service::*;
 
     #[derive(Deserialize, SimpleObject)]
-    struct Updates {
-        txid: [u8; 32],            // The txid of the staged transaction
-        actor: AccountNumber,      // The sender of the action causing the event
-        datetime: TimePointUSec,   // The time of the event emission
-        event_type: StagedTxEvent, // The type of event
+    struct Update {
+        txid: Hex<[u8; 32]>,     // The txid of the staged transaction
+        actor: AccountNumber,    // The sender of the action causing the event
+        datetime: TimePointUSec, // The time of the event emission
+        event_type: String,      // The type of event
     }
 
     struct Query;
@@ -20,20 +20,22 @@ mod service {
     impl Query {
         /// Gets a staged transaction by its ID
         async fn get_staged_tx(&self, id: u32) -> Option<StagedTx> {
-            StagedTxTable::new().get_index_pk().get(&id)
+            StagedTxTable::with_service(staged_tx::SERVICE)
+                .get_index_pk()
+                .get(&id)
         }
 
         /// Gets all staged transactions
         async fn get_all_staged(&self) -> async_graphql::Result<Connection<RawKey, StagedTx>> {
-            TableQuery::new(StagedTxTable::new().get_index_pk())
+            TableQuery::new(StagedTxTable::with_service(staged_tx::SERVICE).get_index_pk())
                 .query()
                 .await
         }
 
         /// This query gets the historical staged-tx updates
-        async fn historical_updates(&self) -> Vec<Updates> {
+        async fn historical_updates(&self) -> Vec<Update> {
             let json_str = services::r_events::Wrapper::call()
-                .sqlQuery("SELECT * FROM \"history.staged_tx.updated\" ORDER BY ROWID".to_string());
+                .sqlQuery("SELECT * FROM \"history.staged-tx.updated\" ORDER BY ROWID".to_string());
             serde_json::from_str(&json_str).unwrap_or_default()
         }
     }
