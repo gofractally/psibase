@@ -105,6 +105,111 @@ void validate_refcount(session_rlock& state, fast_meta_address i, int c)
    }
 }
 
+TEST_CASE("binary-node") {
+   alignas(64)char node_buffer[64*16];
+   auto bn = new(node_buffer) binary_node( sizeof(node_buffer), fast_meta_address{}, clone_config{} );
+   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
+   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
+   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
+   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
+   TRIEDENT_WARN( "reserving 8 branches" );
+   bn->reserve_branch_cap(8);
+   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
+   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
+   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
+   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
+
+   auto idx = bn->lower_bound_idx( to_key_view( "hello" ) );
+   bn->insert( idx, to_key_view("hello"), to_value_view("world") );
+
+   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
+   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
+   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
+   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
+}
+
+TEST_CASE("update-size") {
+   environ env;
+   {
+      auto    ws    = env.db->start_write_session();
+      auto    root  = ws.create_root();
+
+      std::string big_value;
+
+      auto old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("world") );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("new world") );
+      REQUIRE( old_key_size == 5 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("the old world") );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("world") );
+      REQUIRE( old_key_size == 13 );
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 5 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 0 );
+      big_value.resize( 10 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      big_value.resize( 0 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 10 );
+      big_value.resize( 1000 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 0 );
+      big_value.resize( 500 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 1000 );
+      big_value.resize(50);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 500);
+      big_value.resize(300);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 50);
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 300 );
+
+      big_value.resize(60);
+      old_key_size = ws.upsert( root, to_key_view("afill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("bfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("cfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("dfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("efill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("ffill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      std::string key = "fill";
+      for( int i = 0; i < 22; ++i ) {
+         old_key_size = ws.upsert( root, to_key_view(key), to_value_view(big_value) );
+         key += 'a';
+      }
+
+      big_value.resize(500);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1);
+      big_value.resize(50);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 500);
+      big_value.resize(300);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 50);
+      big_value.resize(50);
+      /// this will should change a key that is currely a 4 byte ptr to an inline 50 bytes
+      /// but the existing binary node is unable to accomodate the extra space
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 300);
+
+      env.db->print_stats(std::cerr);
+   }
+   env.db->print_stats(std::cerr);
+}
+
 TEST_CASE("insert-words")
 {
    auto          filename = "/usr/share/dict/words";

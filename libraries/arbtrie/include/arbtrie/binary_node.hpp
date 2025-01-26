@@ -225,7 +225,8 @@ namespace arbtrie
          enum value_type
          {
             inline_data = 0,
-            obj_id      = 1
+            obj_id      = 1 
+            // TODO: how are subtrees handled...
          };
          uint16_t   pos : 12 = 0;
          uint16_t   type : 4 = inline_data;
@@ -593,8 +594,7 @@ namespace arbtrie
             auto kvp = get_key_val_ptr(i);
             // TRIEDENT_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
             assert((uint8_t*)kvp < tail());
-            assert(kvp->value_size() > 0);
-            assert(kvp->key_size() < 25);
+            assert(kvp->value_size() >= 0);
          }
 
          return true;
@@ -642,6 +642,7 @@ namespace arbtrie
 
       // reinsert existing key (likely because size grew)
       void reinsert(int kidx, key_view key, const value_type& val);
+      bool can_reinsert( const key_view& key, const value_type& val )const;
 
    } __attribute((packed));
    static_assert(sizeof(binary_node) == sizeof(node_header) + 6);

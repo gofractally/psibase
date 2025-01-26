@@ -468,9 +468,15 @@ namespace arbtrie
       assert((char*)new_kh + num_branches() <= tail());
    }
 
+   inline bool binary_node::can_reinsert( const key_view& key, const value_type& val )const {
+      auto kvs = calc_key_val_pair_size(key, val);
+      return kvs <= spare_capacity();
+   }
+
    inline void binary_node::reinsert( int lbx, key_view key, const value_type& val )
    {
       assert( get_key_val_ptr(lbx)->key() == key );
+      assert( can_reinsert( key, val ) );
       auto kvs = calc_key_val_pair_size(key, val);
 
       assert( kvs <= spare_capacity() );
@@ -489,6 +495,7 @@ namespace arbtrie
          auto vv = val.view();
          kvp->_val_size = vv.size();
          memcpy(kvp->val_ptr(), vv.data(), vv.size());
+         ko[lbx].type= key_index::inline_data;
       }
       assert( validate() );
    }

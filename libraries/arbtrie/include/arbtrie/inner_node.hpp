@@ -1,39 +1,10 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
+#include <arbtrie/saturated_uint32.hpp>
 
 namespace arbtrie
 {
 
-   struct saturated_uint32
-   {
-      saturated_uint32(uint32_t v = 0) : _value(v) {}
-
-      saturated_uint32& operator-=(uint32_t v)
-      {
-         uint32_t c = _value - v;
-         if (c > _value)
-            _value = 0;
-         else
-            _value = c;
-         return *this;
-      }
-
-      saturated_uint32& operator+=(uint32_t v)
-      {
-         uint32_t c = _value + v;
-         if (c < _value)
-            _value = -1;
-         else
-            _value = c;
-         return *this;
-      }
-
-      uint32_t value() const { return _value; }
-
-     private:
-      uint32_t _value = 0;
-   };
-   static_assert(sizeof(saturated_uint32) == sizeof(uint32_t));
 
    /**
     *  Extra header information shared by all inner nodes,
@@ -82,7 +53,11 @@ namespace arbtrie
          }
       }
 
-      saturated_uint32 _descendants;
+      inner_node& set_descendants( int c )   { _descendants = c ; return *this; }
+      inner_node& add_descendant( int c )    { _descendants += c ; return *this; }
+      inner_node& remove_descendant( int c ) { _descendants -= c ; return *this; }
+
+      saturated_uint32 _descendants = 0;
       uint32_t         _prefix_capacity : 10;
       uint32_t         _prefix_size : 10;
       uint32_t         _unused : 12;

@@ -74,7 +74,7 @@ namespace arbtrie
       }
 
       bool can_add_branch() const { return num_branches() < branch_capacity(); }
-      void add_branch(branch_index_type br, fast_meta_address b);
+      setlist_node& add_branch(branch_index_type br, fast_meta_address b);
 
       void set_index(int idx, uint8_t byte, fast_meta_address adr)
       {
@@ -193,7 +193,7 @@ namespace arbtrie
              char_to_branch(*p), {branch_region(), get_branch_ptr()[(p - s)]});
       }
 
-      void set_branch(branch_index_type br, fast_meta_address b)
+      auto& set_branch(branch_index_type br, fast_meta_address b)
       {
          assert(br < 257);
          assert( br > 0 );
@@ -203,6 +203,7 @@ namespace arbtrie
          auto pos = get_setlist().find(br - 1);
          assert(pos != key_view::npos);
          get_branch_ptr()[pos].index = b.index;
+         return *this;
       }
 
       fast_meta_address get_branch(uint_fast16_t br) const
@@ -255,7 +256,7 @@ namespace arbtrie
 
       // @pre has_eof_value() == true
       // branch exists and is set
-      void remove_branch(int_fast16_t br)
+      auto& remove_branch(int_fast16_t br)
       {
          assert( br > 0 );
          assert(num_branches() > 0); 
@@ -274,6 +275,7 @@ namespace arbtrie
          memmove(slp + pos, slp + pos1, remain);
          memmove(bptr + pos, bptr + pos1, remain * sizeof(id_index));
          --_num_branches;
+         return *this;
       }
 
       inline static int_fast16_t alloc_size(const clone_config& cfg)
@@ -327,7 +329,7 @@ namespace arbtrie
    static_assert(sizeof(setlist_node) ==
                  sizeof(node_header) + sizeof(uint64_t) + sizeof(id_address));
 
-   inline void setlist_node::add_branch(branch_index_type br, fast_meta_address b)
+   inline setlist_node& setlist_node::add_branch(branch_index_type br, fast_meta_address b)
    {
       assert(br < max_branch_count);
       assert(br > 0);
@@ -359,6 +361,7 @@ namespace arbtrie
       b_found->index = b.index;
 
       ++_num_branches;
+      return *this;
    }
 
 }  // namespace arbtrie

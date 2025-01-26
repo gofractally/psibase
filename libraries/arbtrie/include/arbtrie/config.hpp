@@ -121,6 +121,9 @@ namespace arbtrie {
    using segment_offset = uint32_t;
    using segment_number = uint64_t;
 
+   inline key_view   to_key( const char* c ) { return key_view( (const unsigned char*) c ); }
+   inline value_view to_value( const char* c ) { return value_view( (const unsigned char*) c ); }
+
    struct recover_args
    {
    //   recover_args() noexcept : validate_checksum(false), recover_unsync(false){};

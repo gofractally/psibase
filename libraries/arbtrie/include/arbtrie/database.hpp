@@ -266,6 +266,17 @@ namespace arbtrie
       value_type _cur_val;
       bool       _sync_lock = false;
 
+      // when a new key is inserted this is set to 1 and the and
+      // when a key is removed this is set to -1
+      // innner_node::_descendants field is updated by this delta
+      // as the stack unwinds after writing, then it is reset to 0
+      int        _delta_keys = 0;
+
+      // when updating or removing a node, it is useful to know
+      // the delta "space" without having to first query the value
+      // you are about to delete.
+      int        _old_value_size = -1;
+
      public:
       ~write_session();
 
@@ -300,17 +311,33 @@ namespace arbtrie
        * @return -1 on insert, otherwise the size of the old value
        */
       int upsert(node_handle& r, key_view key, value_view val);
-      int insert(node_handle& r, key_view key, value_view val);
+
+      /**
+       * throws if existing key is found
+       */
+      void insert(node_handle& r, key_view key, value_view val);
+
+      /**
+       * @return size of the old value, throws if key not found
+       */
       int update(node_handle& r, key_view key, value_view val);
 
+      /*
       int                        insert(node_handle& r, key_view key, node_handle subtree);
       std::optional<node_handle> upsert(node_handle& r, key_view key, node_handle subtree);
       node_handle                update(node_handle& r, key_view key, node_handle subtree);
+      */
+
+      // return the number of bytes removed, or -1 if nothing was removed
+      int remove(node_handle& r, key_view key);
+
+      // throws if no key was removed, return the number of bytes removed
+      int require_remove( node_handle& r, key_view key );
+
+      uint32_t count_keys( node_handle& r, key_view from, key_view to );
 
       // return the number of keys removed
-      int remove(node_handle& r, key_view key);
-      // return the number of keys removed
-      int remove(node_handle& r, key_view from, key_view to);
+      // int remove(node_handle& r, key_view from, key_view to);
 
      private:
       template <upsert_mode mode, typename NodeType>

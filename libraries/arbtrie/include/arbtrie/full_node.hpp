@@ -82,7 +82,7 @@ namespace arbtrie
          return {-1, {}};
       }
 
-      void add_branch(branch_index_type br, fast_meta_address b)
+      auto& add_branch(branch_index_type br, fast_meta_address b)
       {
          assert(br < max_branch_count);
          assert(br > 0);
@@ -93,9 +93,10 @@ namespace arbtrie
          ++_num_branches;
          auto& idx = branches()[br - 1];
          idx.index = b.index;
+         return *this;
       }
 
-      void remove_branch(branch_index_type br)
+      auto& remove_branch(branch_index_type br)
       {
          assert(br < max_branch_count);
          assert(br > 0);
@@ -104,9 +105,10 @@ namespace arbtrie
 
          --_num_branches;
          branches()[br - 1] = {};
+         return *this;
       }
 
-      void set_branch(branch_index_type br, fast_meta_address b)
+      auto& set_branch(branch_index_type br, fast_meta_address b)
       {
          assert(br < max_branch_count);
          assert(br > 0);
@@ -115,6 +117,8 @@ namespace arbtrie
 
          auto& idx = branches()[br - 1];
          idx.index = b.index;
+
+         return *this;
       }
 
       fast_meta_address get_branch(branch_index_type br) const
