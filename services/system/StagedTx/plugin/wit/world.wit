@@ -6,17 +6,54 @@
 /// by the account specified when enabling the latch.
 package staged-tx:plugin;
 
-interface api {
+interface proposer {
     use host:common/types.{error};
 
-    /// This is a latch that is set for this callContext, and unset when the callContext is completed.
-    /// It can only be called by the plugin of the currently active application.
+    /// This is a latch that is set for this plugin call context, and unset when the call context 
+    /// is resolved.
+    /// 
+    /// Any actions that are scheduled for execution by the currently logged-in user while there is
+    /// an active propose-latch are staged for execution by the specified `account` rather than being
+    /// executed by the currently logged-in user.
     /// 
     /// `account` - The account on behalf of which the currently logged-in user is 
     ///             proposing transactions.
     set-propose-latch: func(account: string) -> result<_, error>;
+
+    /// Removes (deletes) the specified staged transaction
+    ///
+    /// This is only callable by the proposer of the staged transaction
+    /// 
+    /// Parameters:
+    /// * `id`: The ID of the database record containing the staged transaction
+    remove: func(id: u32) -> result<_, error>;
+}
+
+interface respondent {
+    use host:common/types.{error};
+
+    /// Accept the specified staged transaction
+    ///
+    /// Depending on the staging rules enforced by the auth service of the sender
+    /// of the staged transaction, this could result in the execution of the staged 
+    /// transaction.
+    ///
+    /// Parameters:
+    /// * `id`: The ID of the database record containing the staged transaction
+    accept: func(id: u32) -> result<_, error>;
+
+    /// Reject the specified staged transaction
+    ///
+    /// Depending on the staging rules enforced by the auth service of the sender
+    /// of the staged transaction, this could result in the complete rejection and deletion of the 
+    /// staged transaction.
+    ///
+    /// Parameters:
+    /// * `id`: The ID of the database record containing the staged transaction
+    reject: func(id: u32) -> result<_, error>;
 }
 
 world imports {
-    import api;
+    import proposer;
+    import respondent;
 }

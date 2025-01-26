@@ -4,6 +4,8 @@ world impl {
     include host:common/imports;
     include accounts:plugin/imports;
     include transact:plugin/hook-tx-transform;
+    include transact:plugin/imports;
 
-    export api;
+    export proposer;
+    export respondent;
 }

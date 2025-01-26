@@ -32,6 +32,11 @@ pub mod tables {
         fn by_id(&self) -> u32 {
             self.id
         }
+
+        #[secondary_key(1)]
+        fn by_proposer(&self) -> (AccountNumber, u32) {
+            (self.proposer, self.id)
+        }
     }
 
     #[table(name = "LastUsedTable", index = 2)]
@@ -62,6 +67,24 @@ pub mod tables {
             (self.account, self.id)
         }
     }
+
+    #[table(name = "StagedTxPartyTable", index = 4)]
+    #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
+    pub struct StagedTxParty {
+        pub id: u32,
+        pub party: AccountNumber,
+    }
+    impl StagedTxParty {
+        #[primary_key]
+        fn pk(&self) -> (u32, AccountNumber) {
+            (self.id, self.party)
+        }
+
+        #[secondary_key(1)]
+        fn by_party(&self) -> (AccountNumber, u32) {
+            (self.party, self.id)
+        }
+    }
 }
 
 pub mod impls {
@@ -71,7 +94,7 @@ pub mod impls {
     use psibase::{check, get_sender, AccountNumber, Action, Hex, Table};
 
     impl StagedTx {
-        pub fn new(actions: Vec<Action>) -> Self {
+        pub fn add(actions: Vec<Action>) -> Self {
             check(
                 actions.len() > 0,
                 "Staged transaction must contain at least one action",
@@ -90,14 +113,24 @@ pub mod impls {
             let packed = (monotonic_id, current_block.blockNum, &actions).packed();
             let txid = crate::sha256(&packed);
 
-            StagedTx {
+            for action in &actions {
+                StagedTxParty::add(monotonic_id, action.sender);
+            }
+
+            let new_tx = StagedTx {
                 id: monotonic_id,
                 txid: txid.into(),
                 propose_block: current_block.blockNum,
                 propose_date: current_block.time,
                 proposer: get_sender(),
                 action_list: ActionList { actions },
-            }
+            };
+
+            psibase::write_console("Adding staged tx to db\n");
+
+            StagedTxTable::new().put(&new_tx).unwrap();
+
+            new_tx
         }
 
         pub fn get(id: u32, txid: Hex<[u8; 32]>) -> Self {
@@ -128,6 +161,13 @@ pub mod impls {
                 .get_index_pk()
                 .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
                 .for_each(|r| responses.erase(&(r.id, r.account)));
+
+            // Delete all stored parties for this staged tx
+            let parties = StagedTxPartyTable::new();
+            parties
+                .get_index_pk()
+                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .for_each(|p| parties.erase(&(p.id, p.party)));
 
             // Delete the staged tx itself
             StagedTxTable::new().erase(&id);
@@ -180,6 +220,15 @@ pub mod impls {
                 });
 
             table.put(&response).unwrap();
+        }
+    }
+
+    impl StagedTxParty {
+        fn add(id: u32, party: AccountNumber) {
+            let table = StagedTxPartyTable::new();
+            if table.get_index_pk().get(&(id, party)).is_none() {
+                table.put(&StagedTxParty { id, party }).unwrap();
+            }
         }
     }
 }

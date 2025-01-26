@@ -6,7 +6,7 @@ use bindings::exports::branding::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::sites::plugin::sites::{upload, File};
-use bindings::staged_tx::plugin::api::*;
+use bindings::staged_tx::plugin::proposer::*;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;

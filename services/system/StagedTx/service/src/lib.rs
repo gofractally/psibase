@@ -69,9 +69,7 @@ pub mod service {
     /// * `actions` - The actions to be staged
     #[action]
     fn propose(actions: Vec<Action>) -> u32 {
-        let new_tx = StagedTx::new(actions);
-
-        StagedTxTable::new().put(&new_tx).unwrap();
+        let new_tx = StagedTx::add(actions);
 
         emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);
 
@@ -96,6 +94,8 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
+        debug_print("accepted\n");
+
         let authorized = staged_tx
             .action_list
             .actions
@@ -106,6 +106,7 @@ pub mod service {
 
         if authorized {
             execute(staged_tx);
+            debug_print("executed\n");
         }
     }
 
@@ -187,7 +188,7 @@ pub mod service {
 
     fn emit_update(txid: Hex<[u8; 32]>, event_type: u8) {
         Wrapper::emit().history().updated(
-            txid,
+            txid.to_string(),
             get_sender(),
             Transact::call().currentBlock().time,
             StagedTxEvent::from(event_type).to_string(),
@@ -196,7 +197,7 @@ pub mod service {
 
     #[event(history)]
     pub fn updated(
-        txid: Hex<[u8; 32]>,     // The txid of the staged transaction
+        txid: String,            // The txid of the staged transaction
         actor: AccountNumber,    // The sender of the action causing the event
         datetime: TimePointUSec, // The time of the event emission
         event_type: String,      // The type of event

@@ -2,15 +2,20 @@
 mod bindings;
 
 use bindings::accounts::plugin::api::get_account;
-use bindings::exports::staged_tx::plugin::api::Guest as Api;
+use bindings::exports::staged_tx::plugin::test::Guest as Test;
+use bindings::exports::staged_tx::plugin::{
+    proposer::Guest as Proposer, respondent::Guest as Respondent,
+};
 use bindings::exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
-use bindings::host::common::{client as Client, types::Error};
-use bindings::transact::plugin::hooks::hook_tx_transform_label;
+use bindings::host::common::{client as Client, server as Server, types::Error};
+use bindings::transact::plugin::{hooks::hook_tx_transform_label, intf::add_action_to_transaction};
+use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
 use psibase::{AccountNumber, Hex, MethodNumber};
+use staged_tx::action_structs::*;
 use std::collections::HashMap;
 
-use psibase::fracpack::Pack;
+use serde::{Deserialize, Serialize};
 
 mod errors;
 use errors::ErrorType;
@@ -32,13 +37,120 @@ fn get_assert_caller(context: &str, allowed_apps: &[&str]) -> Result<(), Error> 
     Ok(())
 }
 
+#[derive(Deserialize, Serialize)]
+struct StagedTxDetails {
+    data: StagedTxData,
+}
+
+#[derive(Deserialize, Serialize)]
+struct StagedTxData {
+    details: StagedTxDetailsInner,
+}
+
+#[derive(Deserialize, Serialize)]
+struct StagedTxDetailsInner {
+    txid: String,
+    #[serde(rename = "proposeBlock")]
+    propose_block: u32,
+    #[serde(rename = "proposeDate")]
+    propose_date: String,
+    proposer: String,
+    #[serde(rename = "actionList")]
+    action_list: ActionList,
+}
+
+#[derive(Deserialize, Serialize)]
+struct ActionList {
+    actions: Vec<ActionDetails>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct ActionDetails {
+    sender: String,
+    service: String,
+    method: String,
+    #[serde(rename = "rawData")]
+    raw_data: String,
+}
+
+fn get_staged_txid(id: u32) -> Result<Hex<[u8; 32]>, Error> {
+    let query = format!(
+        r#"query {{
+            details(id: {id}) {{
+                txid
+                proposeBlock
+                proposeDate
+                proposer
+                actionList {{
+                    actions {{
+                        sender
+                        service
+                        method
+                        rawData
+                    }}
+                }}
+            }}
+        }}"#,
+        id = id
+    );
+
+    let details = Server::post_graphql_get_json(&query).unwrap();
+    let details = serde_json::from_str::<StagedTxDetails>(&details).unwrap();
+    let txid = details.data.details.txid;
+    if txid.len() % 2 != 0 {
+        return Err(ErrorType::InvalidTxId.into());
+    }
+    let txid: Vec<u8> = (0..txid.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&txid[i..i + 2], 16).unwrap())
+        .collect();
+    let txid: [u8; 32] = txid.try_into().map_err(|_| ErrorType::InvalidTxId)?;
+
+    Ok(txid.into())
+}
+
 struct StagedTxPlugin;
 
-impl Api for StagedTxPlugin {
+impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: String) -> Result<(), Error> {
         validate_account(&account)?;
         hook_tx_transform_label(Some(account.as_str()));
         Ok(())
+    }
+
+    fn remove(id: u32) -> Result<(), Error> {
+        add_action_to_transaction(
+            remove::ACTION_NAME,
+            &remove {
+                id,
+                txid: get_staged_txid(id)?,
+            }
+            .packed(),
+        )
+    }
+}
+
+impl Respondent for StagedTxPlugin {
+    fn accept(id: u32) -> Result<(), Error> {
+        add_action_to_transaction(
+            accept::ACTION_NAME,
+            &accept {
+                id,
+                txid: get_staged_txid(id)?,
+            }
+            .packed(),
+        )
+    }
+
+    fn reject(id: u32) -> Result<(), Error> {
+        add_action_to_transaction(
+            reject::ACTION_NAME,
+            &reject {
+                id,
+                txid: get_staged_txid(id)?,
+            }
+            .packed(),
+        )
     }
 }
 
