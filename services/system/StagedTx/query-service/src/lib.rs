@@ -183,6 +183,12 @@ mod event_query {
             if has_next && !is_before_query {
                 // Only truncate for non-before queries
                 rows.truncate((self.first.or(self.last).unwrap()) as usize);
+            } else if self.first.is_some() {
+                // Always truncate to first if specified
+                rows.truncate(self.first.unwrap() as usize);
+            } else if self.last.is_some() {
+                // Always truncate to last if specified
+                rows.truncate(self.last.unwrap() as usize);
             }
 
             // For 'last' queries, we've retrieved in DESC order, so reverse to get ascending order
@@ -214,7 +220,7 @@ mod event_query {
         s.parse().map_err(serde::de::Error::custom)
     }
 
-    fn generate_sql_query(
+    pub fn generate_sql_query(
         table: &str,
         condition: String,
         first: Option<i32>,
@@ -244,19 +250,17 @@ mod event_query {
             filters.push(format!("ROWID > {}", a));
         }
 
-        let where_clause = if filters.is_empty() {
-            "".to_string()
-        } else {
-            format!("WHERE {}", filters.join(" AND "))
-        };
-
         // Decide order and limit
         let order = if descending { "DESC" } else { "ASC" };
         let limit = last.or(first);
 
         // Construct the final SQL
-        let mut query =
-            format!("SELECT ROWID, * FROM {table} {where_clause} ORDER BY ROWID {order}");
+        let mut query = format!("SELECT ROWID, * FROM {table}");
+        if !filters.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(&filters.join(" AND "));
+        }
+        query.push_str(&format!(" ORDER BY ROWID {order}"));
 
         if let Some(l) = limit {
             query.push_str(&format!(" LIMIT {}", l));
@@ -311,10 +315,7 @@ mod service {
 
     use super::event_query;
     use super::event_query_derive::generate_event_query;
-    use async_graphql::{
-        connection::{Connection, EmptyFields},
-        *,
-    };
+    use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
     use staged_tx::service::*;
@@ -447,5 +448,66 @@ mod service {
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<staged_tx::Wrapper>(&request))
             .or_else(|| serve_schema::<staged_tx::Wrapper>(&request))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::event_query::generate_sql_query;
+
+    #[test]
+    fn test_basic_query() {
+        let query = generate_sql_query("test_table", "".to_string(), Some(10), None, None, None);
+        assert_eq!(
+            query,
+            "SELECT ROWID, * FROM test_table ORDER BY ROWID ASC LIMIT 10"
+        );
+    }
+
+    #[test]
+    fn test_before_after_query() {
+        let query = generate_sql_query(
+            "test_table",
+            "".to_string(),
+            Some(5),
+            None,
+            Some("30".to_string()),
+            Some("21".to_string()),
+        );
+        assert_eq!(
+            query,
+            "SELECT ROWID, * FROM test_table WHERE ROWID < 30 AND ROWID > 21 ORDER BY ROWID ASC LIMIT 5"
+        );
+    }
+
+    #[test]
+    fn test_last_query() {
+        let query = generate_sql_query("test_table", "".to_string(), None, Some(3), None, None);
+        assert_eq!(
+            query,
+            "SELECT ROWID, * FROM test_table ORDER BY ROWID DESC LIMIT 3"
+        );
+    }
+
+    #[test]
+    fn test_with_condition() {
+        let query = generate_sql_query(
+            "test_table",
+            "actor = 'test'".to_string(),
+            Some(5),
+            None,
+            None,
+            None,
+        );
+        assert_eq!(
+            query,
+            "SELECT ROWID, * FROM test_table WHERE actor = 'test' ORDER BY ROWID ASC LIMIT 5"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot specify both 'first' and 'last'")]
+    fn test_first_and_last_error() {
+        generate_sql_query("test_table", "".to_string(), Some(5), Some(5), None, None);
     }
 }

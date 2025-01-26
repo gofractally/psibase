@@ -94,8 +94,6 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
-        debug_print("accepted\n");
-
         let authorized = staged_tx
             .action_list
             .actions
@@ -106,7 +104,6 @@ pub mod service {
 
         if authorized {
             execute(staged_tx);
-            debug_print("executed\n");
         }
     }
 
