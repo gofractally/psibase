@@ -610,6 +610,7 @@ TEST_CASE("random-size-updates")
    auto words = load_words(ws, root);
 
 
+   std::optional<node_handle> tmp;
    std::string data;
    std::vector<char> result;
    auto rng = std::default_random_engine{};
@@ -617,9 +618,37 @@ TEST_CASE("random-size-updates")
       auto idx = rng()%words.size();
       data.resize( rng()%250);
 
-      if( i == 188620) {
-         std::cerr<<"break\n";
-      }
+      auto initsize = ws.get( root, to_key_view(words[idx]), nullptr );
+      auto prevsize = ws.upsert( root, to_key_view(words[idx]), to_value_view(data) );
+      assert( initsize == prevsize );
+      REQUIRE( initsize == prevsize );
+      auto postsize = ws.get( root, to_key_view(words[idx]), nullptr );
+      REQUIRE( postsize == data.size() );
+      tmp = root;
+   }
+   env.db->print_stats(std::cerr);
+   }
+   // let the compactor catch up
+   usleep(1000000 * 2);
+   env.db->print_stats(std::cerr);
+}
+TEST_CASE("random-size-updates-shared")
+{
+   environ env;
+   {
+   auto    ws   = env.db->start_write_session();
+   auto    root = ws.create_root();
+
+   auto words = load_words(ws, root);
+
+
+   std::string data;
+   std::vector<char> result;
+   auto rng = std::default_random_engine{};
+   for( int i = 0; i < 1000000; ++i ) {
+      auto idx = rng()%words.size();
+      data.resize( rng()%250);
+
       auto initsize = ws.get( root, to_key_view(words[idx]), nullptr );
       auto prevsize = ws.upsert( root, to_key_view(words[idx]), to_value_view(data) );
       assert( initsize == prevsize );

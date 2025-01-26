@@ -51,7 +51,7 @@ namespace arbtrie
    inline int binary_node::alloc_size(const binary_node* src, const clone_config& cfg)
    {
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches());
-      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
+      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size()-src->_dead_space);
       return alloc_size( bcap, dcap );
    }
 
@@ -71,7 +71,7 @@ namespace arbtrie
                                       const clone_insert& ins)
    {
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches() + 1);
-      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
+      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size()-src->_dead_space);
       dcap += calc_key_val_pair_size(ins.key, ins.val);
       return alloc_size( bcap, dcap );
    }
@@ -80,7 +80,7 @@ namespace arbtrie
                                       const clone_update& ins)
    {
       auto bcap = std::max<int>(cfg.branch_cap, src->_branch_cap);
-      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size());
+      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size()-src->_dead_space);
       auto keyval = src->get_key_val_ptr(ins.idx);
       dcap += ins.val.size() - keyval->value_size();
 
@@ -93,7 +93,7 @@ namespace arbtrie
    {
       auto v    = src->get_key_val_ptr(rem.idx);
       auto bcap = std::max<int>(cfg.branch_cap, src->num_branches() - 1);
-      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size() - v->total_size());
+      auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size() - v->total_size()-src->_dead_space);
 
       return alloc_size( bcap, dcap );
    }

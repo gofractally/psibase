@@ -597,6 +597,11 @@ namespace arbtrie
    template <upsert_mode mode>
    fast_meta_address write_session::upsert_eof_value(object_ref<node_header>& root)
    {
+      if constexpr (mode.is_unique() ){
+         if( root.ref() > 1 ) 
+            return upsert_eof_value<mode.make_shared()>(root);
+      }
+
       auto& state = root.rlock();
       if (_cur_val.is_object_id())
       {
@@ -1334,7 +1339,6 @@ namespace arbtrie
    {
       auto kvp = bn->get_key_val_ptr(lb_idx);
       _old_value_size = kvp->value_size();
-      // TODO: what if the value is a "big value" 
 
       assert(kvp->key() == key);
       if constexpr (mode.is_unique())
@@ -1472,7 +1476,6 @@ namespace arbtrie
                }
                // inline -> larger inline
                else if( bn->can_inline( new_value_size ) ) {
-                  // TODO: if bn.size would exceede max binary node size, then refactor
                   if( bn->can_reinsert( key, _cur_val ) ) {
                      root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
                      return root.address();

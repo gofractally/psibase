@@ -286,12 +286,15 @@ namespace arbtrie
             _val_size = v.size();
             memcpy(val_ptr(), v.data(), v.size());
          }
-         void set_value(const value_type& v)
+         // @return deadspace 
+         int set_value(const value_type& v)
          {
+            int deadspace = 0;
             assert(v.size() <= _val_size);
             if (v.is_object_id())
             {
                assert(_val_size >= sizeof(id_address));
+               deadspace = _val_size - sizeof(id_address);
                _val_size   = sizeof(id_address);
                value_id() = v.id().to_address();
             }
@@ -300,10 +303,12 @@ namespace arbtrie
                auto vv = v.view();
                assert(_val_size >= vv.size());
                assert(vv.size() <= max_inline_value_size);
-               _val_size = vv.size();
-
-               memcpy(val_ptr(), vv.data(), vv.size());
+               auto vvsize = vv.size();
+               deadspace = _val_size - vvsize;
+               _val_size = vvsize;
+               memcpy(val_ptr(), vv.data(), vvsize);
             }
+            return deadspace;
          }
 
          /*
@@ -437,7 +442,8 @@ namespace arbtrie
          static_assert( key_index::inline_data== 0 );
          idx.type = val.is_object_id();// ? key_index::obj_id : key_index::inline_data;
          assert((char*)get_key_val_ptr(lb_idx) < tail());
-         get_key_val_ptr(lb_idx)->set_value(val);
+         auto kvp = get_key_val_ptr(lb_idx);
+         _dead_space += kvp->set_value(val);
       }
 
       inline static constexpr bool can_inline(int size) { return size <= max_inline_value_size; }
