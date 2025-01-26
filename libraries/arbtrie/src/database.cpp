@@ -599,11 +599,27 @@ namespace arbtrie
    {
       auto& state = root.rlock();
       if (_cur_val.is_object_id())
+      {
+         TRIEDENT_WARN( "setting subtree for eof value should break assumptions" );
+         assert( !"while it is technically a valid node, "
+                 "there are different ref counting/traveral/fetching requirments" );
+         throw std::runtime_error( "subtree feature not throught out in this case" );
          return _cur_val.id();  // replace what ever was here with a subtree
+      }
 
       if constexpr (mode.is_shared())
       {
-         return make_value(state.get_new_region(), root.rlock(), _cur_val.view());
+         if (root.type() == node_type::value)
+         {
+            // TODO: the only reason we have to fetch the old value 
+            // is to get its size.  If we aren't interested in the old value
+            // size, then this could be skipped, perhaps another 'mode' flag?
+            auto vn = root.as<value_node>();
+            _old_value_size = vn->value_size();
+
+            return make_value(state.get_new_region(), root.rlock(), _cur_val);
+         }
+         throw std::runtime_error( "unexpected eof node type" );
       }
       else if constexpr (mode.is_unique())
       {
@@ -611,20 +627,22 @@ namespace arbtrie
          if (root.type() == node_type::value)
          {
             auto vn = root.as<value_node>();
+            _old_value_size = vn->value_size();
+
             assert(_cur_val.is_view());
             auto vv = _cur_val.view();
             if (vn->value_capacity() >= _cur_val.size())
             {
-               TRIEDENT_DEBUG("update in place");
+             //  TRIEDENT_DEBUG("update in place");
                root.modify().as<value_node>()->set_value(vv);
                return root.address();
             }
-            TRIEDENT_DEBUG("remake value to make more space");
+            //TRIEDENT_DEBUG("remake value to make more space");
             return remake<value_node>(root, key_view{}, _cur_val).address();
          }
          else  // replacing a subtree with some other kind of value
          {
-            return make_value(state.get_new_region(), root.rlock(), _cur_val.view());
+            return make_value(state.get_new_region(), root.rlock(), _cur_val);
          }
       }
    }
@@ -674,7 +692,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-   //     TRIEDENT_WARN("REFACTOR! ", r.address());
+        //TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);
@@ -717,8 +735,21 @@ namespace arbtrie
             new_child = clone_binary_range(bregion, r, root, k.substr(0, cpre.size() + 1), from, to);
          else {
             auto kvp = root->get_key_val_ptr(from);
-            new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr( cpre.size() + 1 ), 
-                                         root->get_value( from )).address();
+            // TODO: handle subtree 
+            if( root->is_obj_id(from) ) {
+               // TODO: when mode is unique we may be able to use remake rather than make; however,
+               //       we must make sure that the reference count isn't lost and that the 
+               //       value node also has a ref count of 1... may have to retain it in that event
+               //       so that when the binary node is released it goes back to 1... for the time being
+               //       we will just allocate a new value node and let the binary node clean up the old
+               //       binary node at the expense of an extra ID allocation.
+               auto cval = r.rlock().get(kvp->value_id());
+               new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr( cpre.size() + 1 ), 
+                                            cval.as<value_node>()->value() ).address();
+            } else {
+               new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr( cpre.size() + 1 ), 
+                                            root->get_value( from )).address();
+            }
          }
          from = to;
 
@@ -1018,10 +1049,12 @@ namespace arbtrie
                   auto              old_val = state.get(val_nid);
                   if constexpr (mode.is_unique())
                   {
-                     TRIEDENT_DEBUG("... upsert_value<mode>\n");
+                     //TRIEDENT_DEBUG("... upsert_value<mode>\n");
                      fast_meta_address new_id = upsert_eof_value<mode>(old_val);
+                     //TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
                      if (new_id != val_nid)
                      {
+                      //  TRIEDENT_WARN( "replacing.." );
                         r.modify().as<NodeType>()->set_eof(new_id);
                         release_node(old_val);
                      }
@@ -1338,27 +1371,25 @@ namespace arbtrie
    }
 
    /**
-    *  update_binary_key
-    *
-    *  simple case:
-    *     unique, equal or smaller current inline capacity -> update in place and return
-    *     unique, value node to value node -> recurse to value node then update in place
-    *     unique, inline>sizeof(value_node) to value node -> make value node, update in place
-    *  medium case:
-    *     unique, inline to inline to larger than capacity
-    *          - maybe realloc in place if spare capacity in node
-    *          - must remake node with more space or refactor to radix and recruse 
-    *
-    *     
-    *  
+    *  update_binary_key: 
+    *   
     *
     *  cases:
-    *     inline -> smaller inline
-    *     inline -> bigger inline
-    *     inline -> value node
+    *    refactoring could be growing the node or splitting to radix if
+    *    the binary node is already too full
+    *
+    *    unique & shared:
+    *     inline     -> smaller inline
+    *     inline     -> bigger inline (or maybe refactor)
+    *     inline     -> value node (or maybe refactor)
+    *     inline     -> subtree (or maybe refactor)
     *     value node -> bigger value node
     *     value node -> smaller value node
-    *     value node -> inline 
+    *     value node -> smaller inline (new value less than ptr)
+    *     value node -> inline (or maybe refactor)
+    *     value node -> subtree
+    *     subtree    -> inline (or maybe refactor)
+    *     subtree    -> value node
     */
    template <upsert_mode mode>
    fast_meta_address write_session::update_binary_key(object_ref<node_header>& root,
@@ -1369,95 +1400,13 @@ namespace arbtrie
       const auto* kvp = bn->get_key_val_ptr(lb_idx);
       assert(kvp->key() == key);
 
-#if 0 // attempt at refactor
-      if constexpr ( mode.is_shared() ) {
-         if( bn->is_obj_id(lb_idx) ) {
-            if ( not bn->can_inline( _cur_val.size() ) )  // value_node -> value_node
-            {
-               // old and new value are just ids; therefore no refactor of size required
-               auto cval = root.rlock().get(kvp->value_id());
-               auto nval = upsert<mode, value_node>( cval, {} );
-               assert( nval != cval ); // because we are shared, so it should have cloned
-               return clone<mode>( root, bn, {}, binary_node::clone_update( lb_idx, nval));
-            }
-            else // maybe value_node->inline or refactor
-            {
-               // we might be able to inline the new value if it wouldn't make the
-               // binary grow beyond the refactor threshold.
-               if( bn->can_update_with_compaction( _cur_val.size() - sizeof(fast_meta_address) ) )
-               {
-                  // value_node -> inline 
-                  return clone<mode>( root, bn, {}, binary_node::clone_update( lb_idx, _cur_val) );
-               }
-               else 
-               {
-                  // binary_node -> radix_node and then recurse 
-                  auto rid = refactor<mode>(root, bn);
-                  return upsert<mode.make_unique()>(rid, key);
-               }
-            }
-         }
-         else  // currently inline
-         {
-            if( not bn->can_inline( _cur_val.size() ) ) // inline -> value_node 
-            {
-               auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-               return clone<mode>( root, bn, {}, binary_node::clone_update( lb_idx, nval ) );
-            }
-            else  // inline -> maybe inline or refactor + recurse
-            {
-               // 
-               if ( bn->can_update_with_compaction( int(_cur_val.size()) - int(kvp->value_size()) ) )
-                  return clone<mode>( root, bn, {}, binary_node::clone_update( lb_idx, _cur_val) );
+      int inline_size = _cur_val.size();
+      if( not bn->can_inline( inline_size ) )
+         inline_size = sizeof(id_address);
+      auto delta_s = inline_size - kvp->value_size();
 
-               // refactor, not enough space for new data
-               auto rid = refactor<mode>(root, bn);
-               return upsert<mode.make_unique()>(rid, key);
-            }
-         }
-      }
-      else  // mode is unique
-      {
-         if( bn->is_obj_id( lb_idx ) ) {
-            if( not bn->can_inline( _cur_val.size() ) ) {
-               auto cval = root.rlock().get(kvp->value_id());
-               auto nval = upsert<mode, value_node>( cval, {} );
-               if( nval != cval ) {
-                  root.modify().as<binary_node>()->set_value( lb_idx, nval );
-               }
-            }
-            else  // the new value can, in theory be inlined
-            {
-               if( _cur_val.size() <= kvp->value_size() ) {
-                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val );
-               }
-               if ( bn->can_update_with_compaction( int(_cur_val.size()) - int(kvp->value_size()) ) )
-               {
-                  // remake and 
-                  // return 
-               }
-
-               // refactor because we cannot
-               auto rid = refactor<mode>(root, bn);
-               return upsert<mode.make_unique()>(rid, key);
-            }
-
-         }
-         else {
-            if( kvp->value_size() <= _cur_val.size() )
-
-         }
-         // can I update in place
-         // else... use logic of shared
-      }
-
-#endif 
-
-
-
-      auto delta_s = _cur_val.size() - kvp->value_size();
-      _old_value_size = kvp->value_size();
-
+      // this handles the case where the would be forced to grow 
+      // beyond the maximum size of a binary node
       if (not bn->can_update_with_compaction(delta_s))
       {
          // reclaims free space within the node...
@@ -1467,14 +1416,145 @@ namespace arbtrie
 
       if constexpr (mode.is_unique())
       {
-         TRIEDENT_DEBUG( "delta s: ", delta_s );
+         // current value is value node
+         if( bn->is_obj_id(lb_idx) ) 
+         {
+            auto cval = root.rlock().get(kvp->value_id());
+            _old_value_size = cval.as<value_node>()->value_size();
+
+            // TODO: handle subtree
+
+            auto new_value_size = _cur_val.view().size();
+
+            if( bn->can_inline( _cur_val.view() ) ) {
+               release_node( cval );
+
+               // value node -> smaller inline 
+               if( new_value_size <= sizeof( id_address ) )  
+               {
+                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                  return root.address();
+               }
+               else // value node -> larger inline 
+               {
+                  // inplace
+                  if( bn->can_reinsert( key, _cur_val ) )
+                  {
+                     root.modify().as<binary_node>()->reinsert( lb_idx, key,  _cur_val.view() );
+                     return root.address();
+                  }
+
+                  // recapture deadspace 
+                  return remake<binary_node>(root, bn, clone_config{}, 
+                                             binary_node::clone_update(lb_idx, _cur_val))
+                         .address();
+               }
+            }
+            else // value node -> updated value node
+            {
+               auto nv = upsert_value<mode>( cval, {} );
+               if( nv != kvp->value_id()) {
+                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+               }
+               return root.address();
+            }
+         }
+         else // current value is inline
+         {
+            _old_value_size = kvp->value_size();
+            if( _cur_val.is_view() ) {
+               auto new_value_size = _cur_val.view().size();
+               // inline -> eq or smaller inline
+               if( _cur_val.view().size() <= _old_value_size ) {
+                  // TODO: make sure binary_node::set_value updates deadspace
+                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                  return root.address();
+               }
+               // inline -> larger inline
+               else if( bn->can_inline( new_value_size ) ) {
+                  // TODO: if bn.size would exceede max binary node size, then refactor
+                  if( bn->can_reinsert( key, _cur_val ) ) {
+                     root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
+                     return root.address();
+                  }
+                  else
+                     return remake<binary_node>(root, bn, clone_config{}, 
+                                                binary_node::clone_update(lb_idx, _cur_val))
+                            .address();
+               }
+               else  // inline -> value_node
+               {
+                  auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
+
+                  if( _old_value_size >= sizeof(id_address) ) {
+                     // we can update the value in place
+                     root.modify().as<binary_node>()->set_value(lb_idx, nval);
+                     return root.address();
+                  }
+                  else
+                  {
+                     // reinsert in place in current node.
+                     if( bn->can_reinsert( key, nval ) )
+                     {
+                        root.modify().as<binary_node>()->reinsert( lb_idx, key, nval );
+                        return root.address();
+                     }
+                     // grow to larger binary node
+                     return remake<binary_node>(root, bn, clone_config{}, 
+                                                binary_node::clone_update(lb_idx, nval))
+                            .address();
+                  }
+               }
+
+            } else {
+               TRIEDENT_WARN( "subtree case not implimented yet" );
+               throw std::runtime_error( "subtree not implimented" );
+            }
+         }
+      }
+      else  // shared mode
+      {
+         if (bn->is_obj_id(lb_idx))  // current address (subtree/value_node)
+         {
+            auto cval = root.rlock().get(kvp->value_id());
+            _old_value_size = cval->as<value_node>()->value_size();
+         }
+         else
+         {
+            _old_value_size = kvp->value_size();
+         }
+
+         if( _cur_val.is_view() ) // we are inserting data blob
+         {
+            if( bn->can_inline( _cur_val.view() ) ) {
+               return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val)).address();
+            }
+            else 
+            {
+               auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
+               return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval)).address();
+            }
+         }
+         else {
+            TRIEDENT_WARN( "subtree case not implimented yet" );
+            throw std::runtime_error( "subtree not implimented" );
+         }
+         
+      }
+
+#if 0
+
          if (delta_s <= 0)  // update doesn't require reinsert
          {
             if (bn->is_obj_id(lb_idx))  // current address (subtree/value_node)
             {
+               // TODO: this assumes no subtrees have been stored directly.
                auto cval = root.rlock().get(kvp->value_id());
-               if (_cur_val.is_object_id())
-               {  // so is updated value
+
+               if (_cur_val.is_object_id()) // we are inserting a subtree
+               {  
+                  throw std::runtime_error( "subtrees need to be tested" );
+                  // so is updated value
                   // store the new value, if necessary
                   if (_cur_val.id() != cval.address())
                      root.modify().as<binary_node>()->set_value(lb_idx, _cur_val.id());
@@ -1484,30 +1564,50 @@ namespace arbtrie
                   release_node(cval);
                   return root.address();  // update in place is complete
                }
-               else  // updated value is data
+
+               if( not bn->can_inline( _cur_val.view() ) ) {
+                  auto nval = upsert_value<mode>( cval );
+                  if( nval != kvp->value_id() ) {
+                     root.modify().as<binary_node>()->set_value(lb_idx, _cur_val.id());
+                  }
+                  return root.address();
+               }
+               _old_value_size = cval.as<value_node>()->value_size();
+
+               if (bn->can_inline(_cur_val.view()))
                {
-                  if (bn->can_inline(_cur_val.view()))
-                  {
-                     // that can be inlined in the same space as existing address
-                     assert(_cur_val.view().size() <= sizeof(object_id));
-                     root.modify().as<binary_node>(
-                         [&](auto* b)
-                         {
-                            b->get_key_val_ptr(lb_idx)->set_value(_cur_val.view());
-                            b->key_offsets()[lb_idx].type = binary_node::key_index::inline_data;
-                         });
+                  // that can be inlined in the same space as existing address
+                  assert( _cur_val.view().size() <= b->get_key_val_ptr(lb_idx)->value_size() );
+                  assert(_cur_val.view().size() <= sizeof(id_address));
+                  if(_cur_val.view().size() <= sizeof(id_address)) {
+                     root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                     release_node( cval ); // because we just overwrote its reference.
                   }
-                  else  // data must be put in a value node
-                  {
-                     // TODO: make_value knows type, why erase it again
-                     auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-                     root.modify().as<binary_node>()->set_value(lb_idx, nval);
+                  else {
+                     if( bn->can_reinsert( key, _cur_val ) ) {
+                        root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
+                     } else {
+                        return remake<binary_node>(root, bn, clone_config{}, binary_node::clone_update(lb_idx, _cur_val))
+                            .address();
+
+                     }
                   }
+                  return root.address();
+               }
+               /*
+               else  // data must be put in a value node
+               {
+                  // TODO: if it is already in a value node...
+                  // TODO: make_value knows type, why erase it again
+                  auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
+                  root.modify().as<binary_node>()->set_value(lb_idx, nval);
+               }
+               */
+
                   // release the old value regardless because old and update value each
                   // owns one retain() for a total of 2, but only stored once.
-                  release_node(cval);
-                  return root.address();  // update in place is complete
-               }
+                 // TODO: why was this here... release_node(cval);
+                 //  return root.address();  // update in place is complete
             }
             else  // current key value is not obj id
             {
@@ -1560,15 +1660,6 @@ namespace arbtrie
 
                if( bn->can_inline( _cur_val ) ) 
                {
-                  TRIEDENT_WARN( "move to inline data" );
-
-                  TRIEDENT_DEBUG( "size: ", bn->_nsize );
-                  TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
-                  TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
-                  TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
-                  TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
-                  TRIEDENT_DEBUG( "deadspace: ", bn->_dead_space );
-
                   _old_value_size = cvalp->value_size();
                   release_node(cval);
 
@@ -1576,18 +1667,10 @@ namespace arbtrie
                   if( bn->can_reinsert( key, _cur_val ) ) {
                      root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
                   } else {
-                     TRIEDENT_WARN( "remake" );
                      return remake<binary_node>(root, bn, clone_config{}, binary_node::clone_update(lb_idx, _cur_val))
                          .address();
 
                   }
-
-                  TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
-                  TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
-                  TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
-                  TRIEDENT_DEBUG( "deadspace: ", bn->_dead_space );
-                  //    [&](auto* b)
-                  //    { b->key_offsets()[lb_idx].type = binary_node::key_index::inline_data; });
                } else {
                   auto nval = upsert_value<mode>(cval,{}); 
                   if( nval != kvp->value_id() )
@@ -1620,14 +1703,21 @@ namespace arbtrie
                else  // cannot be inlined, so make a new value node
                {
                   auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-                  if (bn->can_insert(sizeof(object_id)))  // reinsert if possible
+                 // TRIEDENT_DEBUG( "making new value_node: ", nval );
+                  if( _old_value_size >= sizeof(id_address) ) {
+                  //   TRIEDENT_WARN( "storing new value node id in location of prior inline data" );
+                     root.modify().as<binary_node>()->set_value(lb_idx, nval);
+                     return root.address();
+                  }
+                  else if (bn->can_reinsert(key, nval) )  // reinsert if possible
                   {
-                     // TODO: why erase type on reinsert?
+               //      TRIEDENT_WARN( "reinsert binary node key as value node" );
                      root.modify().as<binary_node>()->reinsert(lb_idx, key, nval);
                      return root.address();
                   }
                   else  // clone to reinsert new node
                   {
+                //     TRIEDENT_WARN( "forced to clone binary node to make room to inline key..." );
                      return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval))
                          .address();
                   }
@@ -1651,18 +1741,7 @@ namespace arbtrie
             }
          }
       }
-      else  // shared mode
-      {
-         if (_cur_val.is_view())
-         {
-            if (not bn->can_inline(_cur_val.view().size()))
-            {
-               auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-               return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval)).address();
-            }
-         }
-         return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val)).address();
-      }
+#endif
    }  // update_binary_key()
 
    fast_meta_address write_session::make_binary(id_region         reg,

@@ -52,15 +52,16 @@ namespace arbtrie
       friend auto         operator<=>(const node_stats&, const node_stats&) = default;
       inline friend auto& operator<<(auto& stream, const node_stats& s)
       {
-         return stream 
-        << std::setw(10) << std::right << add_comma(s.total_keys) << " keys | "
-        << std::setw(10) << std::right << add_comma(s.total_nodes()) << " nodes | "
-        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::value]) << " value nodes | " 
-        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::binary]) << " binary nodes | " 
-        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::setlist]) << " setlist nodes | " 
-        << std::setw(10) << std::right << add_comma(s.node_counts[node_type::full]) << " full nodes | " 
-        << std::setw(10) << std::right << s.total_size() / double(GB) << " GB | " 
-        << std::setw(10) << std::right
+         return stream << std::setw(10) << std::right << add_comma(s.total_keys) << " keys | "
+                       << std::setw(10) << std::right << add_comma(s.total_nodes()) << " nodes | "
+                       << std::setw(10) << std::right << add_comma(s.node_counts[node_type::value])
+                       << " value nodes | " << std::setw(10) << std::right
+                       << add_comma(s.node_counts[node_type::binary]) << " binary nodes | "
+                       << std::setw(10) << std::right
+                       << add_comma(s.node_counts[node_type::setlist]) << " setlist nodes | "
+                       << std::setw(10) << std::right << add_comma(s.node_counts[node_type::full])
+                       << " full nodes | " << std::setw(10) << std::right
+                       << s.total_size() / double(GB) << " GB | " << std::setw(10) << std::right
                        << s.average_depth() << " avg depth | " << std::setw(10) << std::right
                        << s.average_binary_size() << " avg binary size | " << std::setw(10)
                        << std::right << s.average_value_size() << " avg value node size | "
@@ -164,7 +165,7 @@ namespace arbtrie
       friend class root;
       friend class node_handle;
       read_session(database& db);
-      database&              _db;
+      database& _db;
 
       int get(object_ref<node_header>&                root,
               key_view                                key,
@@ -192,14 +193,15 @@ namespace arbtrie
                      key_view                                key,
                      std::invocable<bool, value_view> auto&& callback);
 
-      // reads the last value called by
-      node_handle get_root(int index = 0);
-
       /**
        * resizes result to the size of the value and copies the value into result
        * @return -1 if not found, otherwise the size of the value
        */
-      int  get(root& r, key_view key, std::vector<char>* result = nullptr);
+      inline int get(const node_handle& r, key_view key, std::vector<char>* data = nullptr);
+
+      // reads the last value called by
+      node_handle get_root(int index = 0);
+
       bool validate(const root& r);
 
       void visit_nodes(const node_handle& r, auto&& on_node);
@@ -216,7 +218,7 @@ namespace arbtrie
                            result.total_keys += node->_num_branches;
                         if constexpr (std::is_same_v<decltype(node), const value_node*>)
                            result.total_keys++;
-                           /*
+                        /*
                         if constexpr (std::is_same_v<decltype(node), const setlist_node*> or
                                       std::is_same_v<decltype(node), const full_node*> or
                                       std::is_same_v<decltype(node), const bitset_node*>)
@@ -270,12 +272,12 @@ namespace arbtrie
       // when a key is removed this is set to -1
       // innner_node::_descendants field is updated by this delta
       // as the stack unwinds after writing, then it is reset to 0
-      int        _delta_keys = 0;
+      int _delta_keys = 0;
 
       // when updating or removing a node, it is useful to know
       // the delta "space" without having to first query the value
       // you are about to delete.
-      int        _old_value_size = -1;
+      int _old_value_size = -1;
 
      public:
       ~write_session();
@@ -332,9 +334,9 @@ namespace arbtrie
       int remove(node_handle& r, key_view key);
 
       // throws if no key was removed, return the number of bytes removed
-      int require_remove( node_handle& r, key_view key );
+      int require_remove(node_handle& r, key_view key);
 
-      uint32_t count_keys( node_handle& r, key_view from, key_view to );
+      uint32_t count_keys(node_handle& r, key_view from, key_view to);
 
       // return the number of keys removed
       // int remove(node_handle& r, key_view from, key_view to);
@@ -497,6 +499,27 @@ namespace arbtrie
       auto state = _segas.lock();
       auto ref   = state.get(r.address());
       return get(ref, key, std::forward<decltype(callback)>(callback));
+   }
+
+   inline int read_session::get(const node_handle& r, key_view key, std::vector<char>* data)
+   {
+      int data_size = -1;
+      this->get(r, key,
+          [&](bool found, value_type v)
+          {
+             if (found)
+             {
+                if( v.is_view() ) {
+                   data_size = v.view().size();
+                   if (data)
+                   {
+                      data->resize(v.view().size());
+                      memcpy(data->data(), v.view().data(), v.view().size());
+                   }
+                }
+             }
+          });
+      return data_size;
    }
 
    int read_session::get(object_ref<node_header>&                root,

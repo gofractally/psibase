@@ -38,9 +38,10 @@ struct environ
    arbtrie::database* db;
 };
 
-void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
+std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
 {
    auto filename = "/usr/share/dict/words";
+   std::vector<std::string> result;
    {
       auto          start = std::chrono::steady_clock::now();
       std::ifstream file(filename);
@@ -56,6 +57,7 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
       {
          val = key;
          toupper(val);
+         result.push_back( key );
          ws.upsert(root, to_key_view(key), to_value_view(val));
          /*
          ws.get(root, key,
@@ -78,7 +80,8 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
                 << add_comma(int64_t(
                        (count) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                 << " words/sec  total items: " << add_comma(count) << " from " << filename << "\n";
-      usleep(1000000 * 3);
+      usleep(1000000 * 2);
+      return result;
    }
 }
 void validate_refcount(session_rlock& state, fast_meta_address i, int c = 1);
@@ -205,6 +208,111 @@ TEST_CASE("update-size") {
       old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
       REQUIRE( old_key_size == 300);
 
+      env.db->print_stats(std::cerr);
+   }
+   env.db->print_stats(std::cerr);
+}
+TEST_CASE("update-size-shared") {
+   environ env;
+   {
+      auto    ws    = env.db->start_write_session();
+      auto    root  = ws.create_root();
+
+      std::optional<node_handle> tmp;
+      std::string big_value;
+
+      auto old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("world") );
+      REQUIRE( old_key_size == -1 );
+      tmp = root;
+      old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("new world") );
+      REQUIRE( old_key_size == 5 );
+      tmp = root;
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("the old world") );
+      REQUIRE( old_key_size == -1 );
+      tmp = root;
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("world") );
+      REQUIRE( old_key_size == 13 );
+      tmp = root;
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 5 );
+      tmp = root;
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      tmp = root;
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 0 );
+      tmp = root;
+      big_value.resize( 10 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      tmp = root;
+      big_value.resize( 0 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 10 );
+      tmp = root;
+      big_value.resize( 1000 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 0 );
+      tmp = root;
+      big_value.resize( 500 );
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 1000 );
+
+      tmp = root;
+      big_value.resize(50);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 500);
+      tmp = root;
+      big_value.resize(300);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 50);
+      tmp = root;
+      old_key_size = ws.remove( root, to_key_view("goodbye") );
+      REQUIRE( old_key_size == 300 );
+      tmp = root;
+
+      big_value.resize(60);
+      old_key_size = ws.upsert( root, to_key_view("afill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("bfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("cfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("dfill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("efill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert( root, to_key_view("ffill"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1 );
+      std::string key = "fill";
+      for( int i = 0; i < 22; ++i ) {
+         old_key_size = ws.upsert( root, to_key_view(key), to_value_view(big_value) );
+         key += 'a';
+      tmp = root;
+      }
+
+      big_value.resize(500);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == -1);
+      tmp = root;
+      big_value.resize(50);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 500);
+      tmp = root;
+      big_value.resize(300);
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 50);
+      tmp = root;
+      big_value.resize(50);
+      /// this will should change a key that is currely a 4 byte ptr to an inline 50 bytes
+      /// but the existing binary node is unable to accomodate the extra space
+      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
+      REQUIRE( old_key_size == 300);
+      tmp = root;
+
+      env.db->print_stats(std::cerr);
+      TRIEDENT_WARN( "resetting temp" );
+      tmp.reset();
       env.db->print_stats(std::cerr);
    }
    env.db->print_stats(std::cerr);
@@ -489,6 +597,40 @@ TEST_CASE("update")
              REQUIRE(val.view() == to_value_view("short"));
           });
    root = ws.create_root();
+   env.db->print_stats(std::cerr);
+}
+
+TEST_CASE("random-size-updates")
+{
+   environ env;
+   {
+   auto    ws   = env.db->start_write_session();
+   auto    root = ws.create_root();
+
+   auto words = load_words(ws, root);
+
+
+   std::string data;
+   std::vector<char> result;
+   auto rng = std::default_random_engine{};
+   for( int i = 0; i < 1000000; ++i ) {
+      auto idx = rng()%words.size();
+      data.resize( rng()%250);
+
+      if( i == 188620) {
+         std::cerr<<"break\n";
+      }
+      auto initsize = ws.get( root, to_key_view(words[idx]), nullptr );
+      auto prevsize = ws.upsert( root, to_key_view(words[idx]), to_value_view(data) );
+      assert( initsize == prevsize );
+      REQUIRE( initsize == prevsize );
+      auto postsize = ws.get( root, to_key_view(words[idx]), nullptr );
+      REQUIRE( postsize == data.size() );
+   }
+   env.db->print_stats(std::cerr);
+   }
+   // let the compactor catch up
+   usleep(1000000 * 2);
    env.db->print_stats(std::cerr);
 }
 

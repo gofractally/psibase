@@ -269,7 +269,11 @@ namespace arbtrie
             assert(_val_size == sizeof(id_address));
             return *((id_address*)(_key + _key_size));
          }
-         void set_value(id_address adr) { memcpy(val_ptr(), &adr, sizeof(adr)); }
+         void set_value(id_address adr) { 
+            assert( _val_size >= sizeof(id_address) );
+            _val_size = sizeof(fast_meta_address);
+            value_id() = adr;
+         }
 
          void set_key(key_view v)
          {
@@ -289,7 +293,7 @@ namespace arbtrie
             {
                assert(_val_size >= sizeof(id_address));
                _val_size   = sizeof(id_address);
-               object_id() = v.id().to_address();
+               value_id() = v.id().to_address();
             }
             else
             {
@@ -429,7 +433,9 @@ namespace arbtrie
          assert(not val.is_remove());
 
          auto& idx = key_offsets()[lb_idx];
-         idx.type  = val.is_object_id();
+         static_assert( key_index::obj_id == 1 );
+         static_assert( key_index::inline_data== 0 );
+         idx.type = val.is_object_id();// ? key_index::obj_id : key_index::inline_data;
          assert((char*)get_key_val_ptr(lb_idx) < tail());
          get_key_val_ptr(lb_idx)->set_value(val);
       }
