@@ -15,6 +15,7 @@ server = "example"
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.14.0"
+Events = "0.14.0"
 
 [lib]
 path = "src/lib.rs"
