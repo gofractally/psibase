@@ -993,8 +993,29 @@ void column_to_json(sqlite3_stmt* stmt, int i, auto& stream)
    switch (sqlite3_column_type(stmt, i))
    {
       case SQLITE_INTEGER:
-         to_json(sqlite3_column_int64(stmt, i), stream);
+      {
+         // Trying to avoid quoting all numbers in the json output.
+         //    SQLITE appears only able to give us numbers as 64 bit, but
+         //    to_json quotes numbers >32 bits which disrupts parsing json
+         //    back into numbers. This so this tries to downcast before
+         //    serializing if possible.
+         int64_t value = sqlite3_column_int64(stmt, i);
+         if (value >= std::numeric_limits<int32_t>::min() &&
+             value <= std::numeric_limits<int32_t>::max())
+         {
+            to_json(static_cast<int32_t>(value), stream);
+         }
+         else if (value >= 0 && value <= std::numeric_limits<uint32_t>::max())
+         {
+            to_json(static_cast<uint32_t>(value), stream);
+         }
+         else
+         {
+            to_json(value, stream);
+         }
          break;
+      }
+
       case SQLITE_FLOAT:
          to_json(sqlite3_column_double(stmt, i), stream);
          break;
