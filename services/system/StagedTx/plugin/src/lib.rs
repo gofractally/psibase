@@ -2,7 +2,6 @@
 mod bindings;
 
 use bindings::accounts::plugin::api::get_account;
-use bindings::exports::staged_tx::plugin::test::Guest as Test;
 use bindings::exports::staged_tx::plugin::{
     proposer::Guest as Proposer, respondent::Guest as Respondent,
 };
