@@ -60,10 +60,20 @@ namespace arbtrie
       saturated_uint32 _descendants = 0;
       uint32_t         _prefix_capacity : 10;
       uint32_t         _prefix_size : 10;
-      uint32_t         _unused : 12;
+      uint32_t         _unused : 11; // TODO: this could be used extend range of _descendants
+      uint32_t         _eof_subtree: 1;
       id_address       _eof_value;
 
-      void set_eof(fast_meta_address e) { _eof_value = e.to_address(); }
+      void set_eof(fast_meta_address e) { 
+         _eof_value = e.to_address(); 
+         _eof_subtree = false;
+      }
+      void set_eof_subtree(fast_meta_address e ){
+         _eof_value = e.to_address(); 
+         _eof_subtree = true;
+      }
+
+      bool eof_is_subtree()const { return _eof_subtree; }
       bool has_eof_value() const { return _eof_value; }
       fast_meta_address get_eof_value()const { return _eof_value; }
 

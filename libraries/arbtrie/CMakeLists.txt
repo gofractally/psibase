@@ -3,7 +3,7 @@ enable_testing()
 find_package(Threads REQUIRED)
 
 add_library(arbtrie
-    src/root.cpp
+    src/node_handle.cpp
     src/database.cpp
     src/mapping.cpp
     src/seg_allocator.cpp

@@ -77,11 +77,14 @@ namespace arbtrie
     *  offset is reserved for metadata that indicates the type of value stored.
     *
     *       Value Types stored in top 4 bits:
-    *       0    - inline bytes
-    *       1    - object_id
-    *       2-15 - reserved
+    *       0      - inline bytes
+    *       1      - object_id
+    *       3      - subtree
+    *       2,4-15 - reserved
     *
-    *
+    *  subtree is implimented as 3 so that if bit 1 is set then we have an object id,
+    *  that needs retained / released, otherwise we have inline bytes. 
+    * 
     *  notional layout
     *  ------------------------
     *  uint16_t     alloc_pos     - tail()-16*alloc_pos = start of allocated key_vals
@@ -113,9 +116,25 @@ namespace arbtrie
               // around
       uint8_t _key_hashes[];
 
+      struct key_index
+      {
+         enum value_type
+         {
+            inline_data = 0,
+            obj_id      = 1,
+            subtree     = 3 // because it is also an object_id
+         };
+         uint16_t   pos : 12 = 0;
+         uint16_t   type : 4 = inline_data;
+         value_type val_type() const { return (value_type)type; }
+         key_index& operator=(const key_index&) = default;
+         explicit key_index( uint16_t p = 0, value_type t = inline_data ):pos(p),type(t){}
+      } __attribute((packed, aligned(1)));
+      static_assert(sizeof(key_index) == sizeof(uint16_t));
+
       struct clone_update
       {
-         uint16_t   idx;  // the index to update
+         key_index  idx;  // the index to update
          value_type val;
       };
       struct clone_remove
@@ -125,7 +144,7 @@ namespace arbtrie
 
       struct clone_insert
       {
-         uint16_t   lb_idx;  // the lower bound to insert before
+         key_index  lb_idx;  // the lower bound to insert before
          key_view   key;
          value_type val;
       };
@@ -167,10 +186,13 @@ namespace arbtrie
 
       inline static int alloc_size(const clone_config& cfg,
                                    id_region,
-                                   key_view          k1,
-                                   const value_type& v1,
-                                   key_view          k2,
-                                   const value_type& v2);
+                  key_view            k1,
+                  const value_type&   v1,
+                  key_index::value_type t1,           
+                  key_view            k2,
+                  const value_type&   v2, 
+                  key_index::value_type t2           
+                  );
 
       binary_node(int_fast16_t        asize,
                   fast_meta_address   nid,
@@ -178,8 +200,11 @@ namespace arbtrie
                   id_region           branch_reg,
                   key_view            k1,
                   const value_type&   v1,
+                  key_index::value_type t1,           
                   key_view            k2,
-                  const value_type&   v2);
+                  const value_type&   v2, 
+                  key_index::value_type t2           
+                  );
 
       // make empty
       binary_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg);
@@ -220,20 +245,6 @@ namespace arbtrie
       static inline uint8_t key_header_hash(uint64_t kh) { return uint8_t(kh); }
       static inline uint8_t value_header_hash(uint64_t vh) { return uint8_t(vh); }
 
-      struct key_index
-      {
-         enum value_type
-         {
-            inline_data = 0,
-            obj_id      = 1 
-            // TODO: how are subtrees handled...
-         };
-         uint16_t   pos : 12 = 0;
-         uint16_t   type : 4 = inline_data;
-         value_type val_type() const { return (value_type)type; }
-         key_index& operator=(const key_index&) = default;
-      } __attribute((packed, aligned(1)));
-      static_assert(sizeof(key_index) == sizeof(uint16_t));
 
       struct key_val_pair
       {
@@ -286,12 +297,14 @@ namespace arbtrie
             _val_size = v.size();
             memcpy(val_ptr(), v.data(), v.size());
          }
-         // @return deadspace 
+
+
+         // @return deadspace created
          int set_value(const value_type& v)
          {
             int deadspace = 0;
             assert(v.size() <= _val_size);
-            if (v.is_object_id())
+            if (v.is_subtree())
             {
                assert(_val_size >= sizeof(id_address));
                deadspace = _val_size - sizeof(id_address);
@@ -310,14 +323,6 @@ namespace arbtrie
             }
             return deadspace;
          }
-
-         /*
-         key_val_pair*       next() { return (key_val_pair*)(((char*)this) + padded_size()); }
-         const key_val_pair* next() const
-         {
-            return (const key_val_pair*)(((const char*)this) + padded_size());
-         }
-         */
       } __attribute((packed)) __attribute((aligned(1)));
 
       static_assert(sizeof(key_val_pair) == 2);
@@ -336,7 +341,7 @@ namespace arbtrie
       const key_index* key_offsets() const { return (const key_index*)(_key_hashes + _branch_cap); }
 
       int  key_offset_from_tail(int n) const { return key_offsets()[n].pos; }
-      bool is_obj_id(uint8_t n) const { return key_offsets()[n].type == key_index::obj_id; }
+      bool is_obj_id(uint8_t n) const { return key_offsets()[n].type & key_index::obj_id; }
 
       uint8_t*       value_hashes() { return (uint8_t*)(key_offsets() + _branch_cap); }
       const uint8_t* value_hashes() const { return (const uint8_t*)(key_offsets() + _branch_cap); }
@@ -433,16 +438,16 @@ namespace arbtrie
          return ts;
       }
 
-      void set_value(int lb_idx, const value_type& val)
+      void set_value(key_index lb_idx, const value_type& val)
       {
          assert(not val.is_remove());
 
-         auto& idx = key_offsets()[lb_idx];
-         static_assert( key_index::obj_id == 1 );
-         static_assert( key_index::inline_data== 0 );
-         idx.type = val.is_object_id();// ? key_index::obj_id : key_index::inline_data;
-         assert((char*)get_key_val_ptr(lb_idx) < tail());
-         auto kvp = get_key_val_ptr(lb_idx);
+         auto& idx = key_offsets()[lb_idx.pos];
+   //      static_assert( key_index::obj_id == 1 );
+    //     static_assert( key_index::inline_data== 0 );
+         idx.type = lb_idx.val_type(); //val.is_object_id();// ? key_index::obj_id : key_index::inline_data;
+         assert((char*)get_key_val_ptr(lb_idx.pos) < tail());
+         auto kvp = get_key_val_ptr(lb_idx.pos);
          _dead_space += kvp->set_value(val);
       }
 
@@ -473,7 +478,7 @@ namespace arbtrie
       }
       inline static int calc_key_val_pair_size(key_view key, const value_type& val)
       {
-         if (val.is_object_id())
+         if (val.is_subtree())
             return calc_key_val_pair_size(key, val.id().to_address());
          return calc_key_val_pair_size(key, val.view());
       }
@@ -650,10 +655,11 @@ namespace arbtrie
          }
       }
 
-      void insert(int kidx, key_view key, const value_type& val);
+      // key_index contains the index position + type 
+      void insert(key_index kidx, key_view key, const value_type& val);
 
       // reinsert existing key (likely because size grew)
-      void reinsert(int kidx, key_view key, const value_type& val);
+      void reinsert( key_index kidx, key_view key, const value_type& val);
       bool can_reinsert( const key_view& key, const value_type& val )const;
 
    } __attribute((packed));

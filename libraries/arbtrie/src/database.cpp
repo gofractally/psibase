@@ -302,10 +302,8 @@ namespace arbtrie
 
    fast_meta_address make_value(id_region reg, session_rlock& state, const value_type& val)
    {
-      assert(not val.is_object_id());
-      return make<value_node>(
-                 reg, state, [](auto) {}, val.view())
-          .address();
+      return make<value_node>( reg, state, [](auto) {}, val)
+             .address();
    }
 
    int write_session::upsert(node_handle& r, key_view key, value_view val)
@@ -462,6 +460,10 @@ namespace arbtrie
 
    //================================
    //  upsert_value
+   //
+   //  Given a value node, if the key is the same then this will
+   //  update the data, otherwise if there is a key collision it will
+   //  split into a binary node containing both keys
    //================================
    template <upsert_mode mode>
    fast_meta_address write_session::upsert_value(object_ref<node_header>& root, key_view key)
@@ -473,7 +475,8 @@ namespace arbtrie
       if constexpr (mode.is_remove() ) {
          if( vn->key() == key )
             return fast_meta_address();
-         TRIEDENT_DEBUG( "attempt to remove key that doesn't exist" );
+         if constexpr ( mode.must_remove() )
+            throw std::runtime_error( "attempt to remove key that does not exist" );
          return root.address(); 
       }
 
@@ -509,10 +512,12 @@ namespace arbtrie
       }
       else // add key
       {  // convert to binary node
-         key_view   k1      = vn->key();
-         value_type v1      = vn->get_value();
-         key_view   k2      = key;
-         value_type v2      = _cur_val;
+         key_view   k1 = vn->key();
+         value_type v1 = vn->get_value();
+         auto       t1 = vn->is_subtree() ? binary_node::key_index::subtree : binary_node::key_index::inline_data;
+         key_view   k2 = key;
+         value_type v2 = _cur_val;
+         auto       t2 = _cur_val.is_subtree() ? binary_node::key_index::subtree : binary_node::key_index::inline_data;
          auto       new_reg = state.get_new_region();
 
          if constexpr ( use_binary_nodes ) {
@@ -525,22 +530,30 @@ namespace arbtrie
             // if unique, reuse id of value node
             if constexpr (mode.is_unique())
             {
-               return remake<binary_node>(root, clone_config{.data_cap=binary_node_initial_size}, new_reg, k1, v1, k2, v2).address();
+               return remake<binary_node>(root, 
+                                          clone_config{.data_cap=binary_node_initial_size}, new_reg, 
+                                          k1, v1, t1, 
+                                          k2, v2, t2).address();
             }
             else  // shared
             {
                return make<binary_node>(
-                          root.address().region, state, clone_config{.data_cap=binary_node_initial_size}, new_reg, k1, v1,
-                          k2, v2)
+                          root.address().region, state, 
+                          clone_config{.data_cap=binary_node_initial_size}, new_reg, 
+                          k1, v1, t1,
+                          k2, v2, t2)
                    .address();
             }
          } 
          else // don't use binary nodes 
          {
+            static_assert( false, "TODO: handle subtrees properly" );
+#if 0
             auto cpre    = common_prefix(k1,k2);
             if( k1 > k2 ) {
                std::swap( k1,k2 );
                std::swap( v1,v2 );
+               std::swap( t1,t2 );
             }
 
             if( k1.size() > cpre.size() ) {
@@ -584,8 +597,8 @@ namespace arbtrie
                                          clone_config{.branch_cap=2, .set_prefix=cpre}
                                            ).address();
             }
+#endif
          }
-         // else create new id
       }
    }
 
@@ -603,14 +616,9 @@ namespace arbtrie
       }
 
       auto& state = root.rlock();
-      if (_cur_val.is_object_id())
-      {
-         TRIEDENT_WARN( "setting subtree for eof value should break assumptions" );
-         assert( !"while it is technically a valid node, "
-                 "there are different ref counting/traveral/fetching requirments" );
-         throw std::runtime_error( "subtree feature not throught out in this case" );
-         return _cur_val.id();  // replace what ever was here with a subtree
-      }
+      
+      // this should be handled at the inner node layer
+      assert( not _cur_val.is_subtree() ); 
 
       if constexpr (mode.is_shared())
       {
@@ -979,6 +987,8 @@ namespace arbtrie
                   throw std::runtime_error("unable to find key to update value");
                else
                {
+                  // NOTE: make_binary with one key is currently implimented
+                  // as making a value node
                   auto new_bin = make_binary(fn->branch_region(), state,
                                              key.substr(cpre.size() + 1), _cur_val);
                   if constexpr (mode.is_unique())
@@ -1054,54 +1064,86 @@ namespace arbtrie
                   auto              old_val = state.get(val_nid);
                   if constexpr (mode.is_unique())
                   {
-                     //TRIEDENT_DEBUG("... upsert_value<mode>\n");
-                     fast_meta_address new_id = upsert_eof_value<mode>(old_val);
-                     //TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
-                     if (new_id != val_nid)
+                     if( _cur_val.is_subtree() ) {
+                        r.modify().as<NodeType>()->set_eof_subtree(_cur_val.id());
+                        release_node( old_val );
+                     }
+                     else 
                      {
-                      //  TRIEDENT_WARN( "replacing.." );
-                        r.modify().as<NodeType>()->set_eof(new_id);
-                        release_node(old_val);
+                        //TRIEDENT_DEBUG("... upsert_value<mode>\n");
+                        fast_meta_address new_id = upsert_eof_value<mode>(old_val);
+                        //TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
+                        if (new_id != val_nid)
+                        {
+                         //  TRIEDENT_WARN( "replacing.." );
+                           r.modify().as<NodeType>()->set_eof(new_id);
+                           release_node(old_val);
+                        }
                      }
                      return r.address();
                   }
                   else  // shared node
                   {
-                     //  TRIEDENT_WARN("upsert value node on inner node");
-                     auto new_id = upsert_eof_value<mode>(old_val);
-                     assert(new_id != val_nid);  // because shared state
-                     auto cref = clone<mode>(r, fn, {.branch_cap = 16},
-                                             [&](auto cl) { cl->set_eof(new_id); });
-                     release_node(old_val);
-                     return cref.address();
+                     if( _cur_val.is_subtree() ) {
+                        auto cref = clone<mode>(r, fn, {.branch_cap = 16},
+                                                [&](auto cl) { cl->set_eof_subtree(_cur_val.id()); });
+                        release_node(old_val);
+                        return cref.address();
+                     }
+                     else 
+                     {
+                        //  TRIEDENT_WARN("upsert value node on inner node");
+                        auto new_id = upsert_eof_value<mode>(old_val);
+                        assert(new_id != val_nid);  // because shared state
+                        auto cref = clone<mode>(r, fn, {.branch_cap = 16},
+                                                [&](auto cl) { cl->set_eof(new_id); });
+                        release_node(old_val);
+                        return cref.address();
+                     }
                   }
                }
                else  // there is no value stored here
                {
-                  fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
-
-                  if constexpr (mode.is_unique())
-                  {
-                     if (fn->can_add_branch())
-                     {
-                        r.modify().template as<NodeType>()->set_eof(new_id);
+                  if( _cur_val.is_subtree() ) {
+                      if constexpr ( mode.is_unique() ) {
+                        r.modify().template as<NodeType>()->set_eof_subtree(_cur_val.id());
                         return r.address();
+                      }
+                      else 
+                      {
+                           return clone<mode>(r, fn, {.branch_cap = 1},
+                                              [&](auto cl) { cl->set_eof_subtree(_cur_val.id()); })
+                               .address();
+                      }
+                  }
+                  else 
+                  {
+                     fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
+                     if constexpr (mode.is_unique())
+                     {
+                       // setting eof has nothing to do with adding branches..
+                       // if (fn->can_add_branch())
+                        {
+                           r.modify().template as<NodeType>()->set_eof(new_id);
+                           return r.address();
+                        }
+                       /* else
+                        {
+                           // cloning unique reuses ID and bypasses need to
+                           // retain/release all children
+                           return clone<mode>(r, fn, {.branch_cap = 1},
+                                              [&](auto cl) { cl->set_eof(new_id); })
+                               .address();
+                        }
+                        */
                      }
                      else
                      {
-                        // cloning unique reuses ID and bypasses need to
-                        // retain/release all children
-                        return clone<mode>(r, fn, {.branch_cap = 1},
+                        TRIEDENT_DEBUG(" clone add new value to branch 0, val =", _cur_val);
+                        return clone<mode>(r, fn, {.branch_cap = 16},
                                            [&](auto cl) { cl->set_eof(new_id); })
                             .address();
                      }
-                  }
-                  else
-                  {
-                     TRIEDENT_DEBUG(" clone add new value to branch 0, val =", _cur_val);
-                     return clone<mode>(r, fn, {.branch_cap = 16},
-                                        [&](auto cl) { cl->set_eof(new_id); })
-                         .address();
                   }
                }
             }
@@ -1288,10 +1330,10 @@ namespace arbtrie
             if (bn->can_insert(key, _cur_val)) [[likely]]
             {
                if (bn->can_inline(_cur_val))
-                  root.modify().as<binary_node>()->insert(lb_idx, key, _cur_val);
+                  root.modify().as<binary_node>()->insert(kv_index(lb_idx), key, _cur_val);
                else
                   root.modify().as<binary_node>()->insert(
-                      lb_idx, key, make_value(bn->branch_region(), root.rlock(), _cur_val));
+                      kv_index(lb_idx,kv_type::obj_id), key, make_value(bn->branch_region(), root.rlock(), _cur_val));
                return root.address();
             }
          }
@@ -1312,13 +1354,13 @@ namespace arbtrie
          }
 
          if (binary_node::can_inline(_cur_val))
-            return clone<mode>(root, bn, {}, binary_node::clone_insert(lb_idx, key, _cur_val))
+            return clone<mode>(root, bn, {}, binary_node::clone_insert(kv_index(lb_idx), key, _cur_val))
                 .address();
          else
             return clone<mode>(
                        root, bn, {},
                        binary_node::clone_insert(
-                           lb_idx, key, make_value(bn->branch_region(), root.rlock(), _cur_val)))
+                           kv_index(lb_idx,kv_type::obj_id), key, make_value(bn->branch_region(), root.rlock(), _cur_val)))
                 .address();
       }
       if constexpr (mode.is_remove())
@@ -1426,31 +1468,31 @@ namespace arbtrie
             auto cval = root.rlock().get(kvp->value_id());
             _old_value_size = cval.as<value_node>()->value_size();
 
-            // TODO: handle subtree
-
             auto new_value_size = _cur_val.view().size();
 
-            if( bn->can_inline( _cur_val.view() ) ) {
+            if( bn->can_inline( _cur_val ) ) {
                release_node( cval );
 
-               // value node -> smaller inline 
+               // value node -> smaller inline (or subtree)
                if( new_value_size <= sizeof( id_address ) )  
                {
-                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                  auto kvt = _cur_val.is_subtree() ? kv_type::subtree : kv_type::inline_data;
+                  root.modify().as<binary_node>()->set_value( kv_index(lb_idx,kvt), _cur_val );
                   return root.address();
                }
                else // value node -> larger inline 
                {
+                  assert( _cur_val.is_view() );
                   // inplace
                   if( bn->can_reinsert( key, _cur_val ) )
                   {
-                     root.modify().as<binary_node>()->reinsert( lb_idx, key,  _cur_val.view() );
+                     root.modify().as<binary_node>()->reinsert( kv_index(lb_idx), key,  _cur_val.view() );
                      return root.address();
                   }
 
                   // recapture deadspace 
                   return remake<binary_node>(root, bn, clone_config{}, 
-                                             binary_node::clone_update(lb_idx, _cur_val))
+                                             binary_node::clone_update(kv_index(lb_idx), _cur_val))
                          .address();
                }
             }
@@ -1458,7 +1500,7 @@ namespace arbtrie
             {
                auto nv = upsert_value<mode>( cval, {} );
                if( nv != kvp->value_id()) {
-                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                  root.modify().as<binary_node>()->set_value( kv_index(lb_idx,kv_type::obj_id), nv );//_cur_val.view() );
                }
                return root.address();
             }
@@ -1470,28 +1512,28 @@ namespace arbtrie
                auto new_value_size = _cur_val.view().size();
                // inline -> eq or smaller inline
                if( _cur_val.view().size() <= _old_value_size ) {
-                  // TODO: make sure binary_node::set_value updates deadspace
-                  root.modify().as<binary_node>()->set_value( lb_idx, _cur_val.view() );
+                  root.modify().as<binary_node>()->set_value( kv_index(lb_idx), _cur_val.view() );
                   return root.address();
                }
                // inline -> larger inline
                else if( bn->can_inline( new_value_size ) ) {
                   if( bn->can_reinsert( key, _cur_val ) ) {
-                     root.modify().as<binary_node>()->reinsert( lb_idx, key, _cur_val );
+                     root.modify().as<binary_node>()->reinsert( kv_index(lb_idx), key, _cur_val );
                      return root.address();
                   }
                   else
                      return remake<binary_node>(root, bn, clone_config{}, 
-                                                binary_node::clone_update(lb_idx, _cur_val))
+                                                binary_node::clone_update(kv_index(lb_idx), _cur_val))
                             .address();
                }
                else  // inline -> value_node
                {
                   auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
+                  kv_index kidx(lb_idx, kv_type::obj_id );
 
                   if( _old_value_size >= sizeof(id_address) ) {
                      // we can update the value in place
-                     root.modify().as<binary_node>()->set_value(lb_idx, nval);
+                     root.modify().as<binary_node>()->set_value( kidx, nval);
                      return root.address();
                   }
                   else
@@ -1499,12 +1541,12 @@ namespace arbtrie
                      // reinsert in place in current node.
                      if( bn->can_reinsert( key, nval ) )
                      {
-                        root.modify().as<binary_node>()->reinsert( lb_idx, key, nval );
+                        root.modify().as<binary_node>()->reinsert( kidx, key, nval );
                         return root.address();
                      }
                      // grow to larger binary node
                      return remake<binary_node>(root, bn, clone_config{}, 
-                                                binary_node::clone_update(lb_idx, nval))
+                                                binary_node::clone_update(kidx, nval))
                             .address();
                   }
                }
@@ -1530,12 +1572,12 @@ namespace arbtrie
          if( _cur_val.is_view() ) // we are inserting data blob
          {
             if( bn->can_inline( _cur_val.view() ) ) {
-               return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, _cur_val)).address();
+               return clone<mode>(root, bn, {}, binary_node::clone_update(kv_index(lb_idx), _cur_val)).address();
             }
             else 
             {
                auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-               return clone<mode>(root, bn, {}, binary_node::clone_update(lb_idx, nval)).address();
+               return clone<mode>(root, bn, {}, binary_node::clone_update( kv_index(lb_idx,kv_type::obj_id), nval)).address();
             }
          }
          else {
@@ -1747,15 +1789,24 @@ namespace arbtrie
 #endif
    }  // update_binary_key()
 
+
+   /**
+    * A binary node with a single key is now just a value node until there
+    * is a collision. 
+    */  
    fast_meta_address write_session::make_binary(id_region         reg,
                                                 session_rlock&    state,
                                                 key_view          key,
                                                 const value_type& val)
    {
       return make<value_node>( reg, state, key, val ).address();
+
+      // old impl below just in case.
+
       //TODO: configure how much spare capacity goes into nodes as they are being
       //created.  Currently adding 128 (2 cachelines) + what ever ounding out to nearest
       // 64 bytes is already going on.
+      /*
       auto ss = binary_node::calc_key_val_pair_size(key, val) + binary_node_initial_size;
       return make<binary_node>(
                  reg, state, {.branch_cap = binary_node_initial_branch_cap, .data_cap = ss},
@@ -1776,6 +1827,7 @@ namespace arbtrie
                     }
                  })
           .address();
+      */
    }
 
 }  // namespace arbtrie

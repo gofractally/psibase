@@ -4,6 +4,9 @@ namespace arbtrie {
 
    /**
     *  Variant Wrapper to pass different types of values through update/insert
+    *  - data (value_view)
+    *  - subtree (fast_meta_address)
+    *  - remove (tombstone for nothing)
     */
    struct value_type {
       struct remove{};
@@ -23,7 +26,7 @@ namespace arbtrie {
       }
       const value_view& view()const { return std::get<value_view>(data); }
       fast_meta_address id()const   { return std::get<fast_meta_address>(data);  }
-      bool is_object_id()const      { return data.index() == 1;          }
+      bool is_subtree()const        { return data.index() == 1;          }
       bool is_view()const           { return data.index() == 0;          }
       bool is_remove()const         { return data.index() == 2;          }
 
@@ -41,7 +44,7 @@ namespace arbtrie {
          }
       }
       friend std::ostream& operator << ( std::ostream& out, const value_type& v ) {
-         if( v.is_object_id() )
+         if( v.is_subtree() )
             return out << v.id();
          return out << to_str(v.view());
       }

@@ -1,6 +1,6 @@
 #pragma once
 #include <arbtrie/arbtrie.hpp>
-#include <arbtrie/root.hpp>
+#include <arbtrie/node_handle.hpp>
 #include <arbtrie/seg_allocator.hpp>
 #include <vector>
 
@@ -58,8 +58,8 @@ namespace arbtrie
 
 
       // if the value is a subtree, return an iterator into that subtree
-      iterator sub_iterator() const;
-      bool     is_node() const;
+      iterator subtree_iterator() const;
+      bool     is_subtree() const;
       bool     is_data() const;
 
       // return -1 if no

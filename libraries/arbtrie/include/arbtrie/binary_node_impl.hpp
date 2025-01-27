@@ -56,8 +56,8 @@ namespace arbtrie
    }
 
    inline int binary_node::alloc_size(const clone_config& cfg, id_region,
-                                key_view k1, const value_type& v1,
-                                key_view k2, const value_type& v2 ) {
+                                key_view k1, const value_type& v1, key_index::value_type t1,
+                                key_view k2, const value_type& v2, key_index::value_type t2 ) {
       auto bcap = std::max<int>(cfg.branch_cap, 2);
       auto dcap = cfg.data_cap + 
                   calc_key_val_pair_size( k1,v1 ) +
@@ -81,7 +81,7 @@ namespace arbtrie
    {
       auto bcap = std::max<int>(cfg.branch_cap, src->_branch_cap);
       auto dcap = std::max<int>(cfg.data_cap, src->key_val_section_size()-src->_dead_space);
-      auto keyval = src->get_key_val_ptr(ins.idx);
+      auto keyval = src->get_key_val_ptr(ins.idx.pos);
       dcap += ins.val.size() - keyval->value_size();
 
       return alloc_size( bcap, dcap );
@@ -110,21 +110,21 @@ namespace arbtrie
                                    fast_meta_address   nid,
                                    const clone_config& cfg,
                                    id_region           branch_reg, 
-                                   key_view k1, const value_type& v1,
-                                   key_view k2, const value_type& v2 )
+                                   key_view k1, const value_type& v1, binary_node::key_index::value_type t1,
+                                   key_view k2, const value_type& v2, binary_node::key_index::value_type t2 )
        : node_header(asize, nid, node_type::binary, 0), _alloc_pos(0)
    {
       _branch_id_region = branch_reg.region;
       _branch_cap = min_branch_cap(2);
       if( k1 < k2 )
       {
-         insert( 0, k1, v1 );
-         insert( 1, k2, v2 );
+         insert( key_index(0,t1), k1, v1 );
+         insert( key_index(1,t2), k2, v2 );
       }
       else 
       {
-         insert( 0, k2, v2 );
-         insert( 1, k1, v1 );
+         insert( key_index(0,t2), k2, v2 );
+         insert( key_index(1,t1), k1, v1 );
       }
       assert( num_branches() == 2 );
    }
@@ -192,7 +192,7 @@ namespace arbtrie
       {
          auto idx = seq[x];
          auto kvp = src->get_key_val_ptr(idx);
-         if (idx != up.idx) [[likely]]
+         if (idx != up.idx.pos) [[likely]]
          {
             auto ts = kvp->total_size();
             _alloc_pos += ts;
@@ -212,7 +212,7 @@ namespace arbtrie
             up.val.place_into(nkvp->val_ptr(), vs);
             vh[idx]      = value_header_hash(value_hash(nkvp->value()));
             ko[idx].pos  = _alloc_pos;
-            ko[idx].type = up.val.is_object_id();
+            ko[idx].type = up.idx.val_type();
          }
       }
       assert(spare_capacity() >= 0);
@@ -336,9 +336,10 @@ namespace arbtrie
       _branch_id_region = src->_branch_id_region;
 
       _branch_cap = min_branch_cap( std::max<int>(cfg.branch_cap, src->num_branches() + 1) );
-      assert( _nsize >= alloc_size( _branch_cap, src->key_val_section_size() + calc_key_val_pair_size( ins.key, ins.val) ) );
+      assert( _nsize >= alloc_size( src, cfg, ins ) );
+      //_branch_cap, src->key_val_section_size() + calc_key_val_pair_size( ins.key, ins.val) ) );
 
-      const auto lb     = ins.lb_idx;
+      const auto lb     = ins.lb_idx.pos;
       const auto lb1    = lb + 1;
       const auto remain = src->num_branches() - lb;
 
@@ -368,9 +369,9 @@ namespace arbtrie
             key_hashes()[lb]   = key_header_hash(key_hash(ins.key));
 
             ko[idx].pos  = _alloc_pos;
-            if ( ins.val.is_object_id() )
+            if ( ins.val.is_subtree() )
             {
-               ko[idx].type = key_index::obj_id;
+               ko[idx].type = ins.lb_idx.val_type();//key_index::obj_id;
                kvp->_val_size  = sizeof(id_address);
                kvp->value_id() = ins.val.id().to_address();
                value_hashes()[lb] = value_header_hash(value_hash(ins.val.id()));
@@ -473,9 +474,9 @@ namespace arbtrie
       return kvs <= spare_capacity();
    }
 
-   inline void binary_node::reinsert( int lbx, key_view key, const value_type& val )
+   inline void binary_node::reinsert( key_index lbx, key_view key, const value_type& val )
    {
-      assert( get_key_val_ptr(lbx)->key() == key );
+      assert( get_key_val_ptr(lbx.pos)->key() == key );
       assert( can_reinsert( key, val ) );
       auto kvs = calc_key_val_pair_size(key, val);
 
@@ -483,25 +484,26 @@ namespace arbtrie
 
       _alloc_pos += kvs;
       auto ko = key_offsets();
-      ko[lbx].pos = _alloc_pos;
-      auto kvp = get_key_val_ptr(lbx);
+      ko[lbx.pos].pos = _alloc_pos;
+      auto kvp = get_key_val_ptr(lbx.pos);
       kvp->set_key(key);
-      if( val.is_object_id() ) {
+      if( val.is_subtree() ) {
          kvp->_val_size  = sizeof(id_address);
          kvp->value_id() = val.id().to_address();
-         ko[lbx].type= key_index::obj_id;
+         ko[lbx.pos].type= lbx.val_type(); //key_index::obj_id;
       }
       else {
          auto vv = val.view();
          kvp->_val_size = vv.size();
          memcpy(kvp->val_ptr(), vv.data(), vv.size());
-         ko[lbx].type= key_index::inline_data;
+         ko[lbx.pos].type= key_index::inline_data;
       }
       assert( validate() );
    }
 
-   inline void binary_node::insert(int lbx, key_view key, const value_type& val)
+   inline void binary_node::insert(key_index lbx, key_view key, const value_type& val)
    {
+      assert( val.is_subtree() ? lbx.type != key_index::inline_data : true );
       assert(get_type() == node_type::binary);
       assert(can_insert(key, val));
 
@@ -521,7 +523,7 @@ namespace arbtrie
 
       key_index kidx;
       kidx.pos  = _alloc_pos;
-      kidx.type = (key_index::value_type)val.is_object_id();
+      kidx.type = lbx.type; //(key_index::value_type)val.is_object_id();
 
       if (kidx.type )
       {
@@ -539,7 +541,7 @@ namespace arbtrie
       const auto kh = key_hash(key);
       const auto vh = value_hash(kvp->value());
 
-      const auto lb     = lbx;  
+      const auto lb     = lbx.pos;  
       const auto lb1    = lb + 1;
       const auto remain = num_branches() - lb;
 

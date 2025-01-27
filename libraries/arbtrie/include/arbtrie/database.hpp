@@ -2,7 +2,8 @@
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
 #include <arbtrie/iterator.hpp>
-#include <arbtrie/root.hpp>
+#include <arbtrie/node_handle.hpp>
+#include <arbtrie/node_stats.hpp>
 #include <arbtrie/seg_allocator.hpp>
 #include <arbtrie/value_type.hpp>
 #include <memory>
@@ -11,63 +12,8 @@
 namespace arbtrie
 {
    using session_rlock = seg_allocator::session::read_lock;
-
-   struct node_stats
-   {
-      node_stats()
-      {
-         memset(node_counts, 0, sizeof(node_counts));
-         memset(node_data_size, 0, sizeof(node_data_size));
-      }
-      int total_nodes() const
-      {
-         int sum = 0;
-         for (auto c : node_counts)
-            sum += c;
-         return sum;
-      }
-      int64_t total_size() const
-      {
-         int64_t sum = 0;
-         for (auto c : node_data_size)
-            sum += c;
-         return sum;
-      }
-      double average_depth() const { return double(total_depth) / total_nodes(); }
-      double average_binary_size() const
-      {
-         return double(node_data_size[node_type::binary] / node_counts[node_type::binary]);
-      }
-      double average_value_size() const
-      {
-         return double(node_data_size[node_type::value] / node_counts[node_type::value]);
-      }
-
-      int     node_counts[num_types];
-      int64_t node_data_size[num_types];
-      int     max_depth   = 0;
-      int64_t total_depth = 0;
-      int64_t total_keys  = 0;
-
-      friend auto         operator<=>(const node_stats&, const node_stats&) = default;
-      inline friend auto& operator<<(auto& stream, const node_stats& s)
-      {
-         return stream << std::setw(10) << std::right << add_comma(s.total_keys) << " keys | "
-                       << std::setw(10) << std::right << add_comma(s.total_nodes()) << " nodes | "
-                       << std::setw(10) << std::right << add_comma(s.node_counts[node_type::value])
-                       << " value nodes | " << std::setw(10) << std::right
-                       << add_comma(s.node_counts[node_type::binary]) << " binary nodes | "
-                       << std::setw(10) << std::right
-                       << add_comma(s.node_counts[node_type::setlist]) << " setlist nodes | "
-                       << std::setw(10) << std::right << add_comma(s.node_counts[node_type::full])
-                       << " full nodes | " << std::setw(10) << std::right
-                       << s.total_size() / double(GB) << " GB | " << std::setw(10) << std::right
-                       << s.average_depth() << " avg depth | " << std::setw(10) << std::right
-                       << s.average_binary_size() << " avg binary size | " << std::setw(10)
-                       << std::right << s.average_value_size() << " avg value node size | "
-                       << std::setw(10) << std::right << s.max_depth << " max depth  ";
-      }
-   };
+   using kv_type = binary_node::key_index::value_type;
+   using kv_index = binary_node::key_index;
 
    struct upsert_mode
    {
@@ -199,10 +145,20 @@ namespace arbtrie
        */
       inline int get(const node_handle& r, key_view key, std::vector<char>* data = nullptr);
 
-      // reads the last value called by
-      node_handle get_root(int index = 0);
+      /**
+       * The database supports up to 488 top root nodes that can be 
+       * accessed by index. This limit is based upon the minimum disk
+       * sync unit being 4kb; therefore, every it can sync up to 488 bytes
+       * of root nodes without extra cost.
+       *
+       * It is possible to write to independent top roots in parallel because
+       * there would be no conflict in updating the root; however, if two
+       * threads attempt to get, modify, and set the same root then the last
+       * write will win.
+       */
+      node_handle        get_root(int root_index = 0);
+      constexpr uint32_t max_roots()const{ return num_top_roots; }
 
-      bool validate(const root& r);
 
       void visit_nodes(const node_handle& r, auto&& on_node);
 
@@ -306,6 +262,7 @@ namespace arbtrie
       // to release it, if ignored it will be released immediately
       template <sync_type sype = sync_type::none>
       node_handle set_root(node_handle, int index = 0);
+
       template <sync_type stype = sync_type::sync>
       void sync();
 
@@ -324,11 +281,13 @@ namespace arbtrie
        */
       int update(node_handle& r, key_view key, value_view val);
 
-      /*
-      int                        insert(node_handle& r, key_view key, node_handle subtree);
+      /**
+       * Inserts the subtree at key, throws if key already exists
+       */
+      void insert(node_handle& r, key_view key, node_handle subtree);
+
       std::optional<node_handle> upsert(node_handle& r, key_view key, node_handle subtree);
       node_handle                update(node_handle& r, key_view key, node_handle subtree);
-      */
 
       // return the number of bytes removed, or -1 if nothing was removed
       int remove(node_handle& r, key_view key);
@@ -613,8 +572,8 @@ namespace arbtrie
    }
 
    // NOTE This will currently recurse into subtree's which could create
-   // infinite loop or over counting... TODO: fix this so it doesn't recurse
-   // through subtrees
+   // infinite loop or over counting... 
+   // TODO: fix this so it doesn't recurse through subtrees
    void visit_node(object_ref<node_header>&& n, int depth, auto& on_node)
    {
       assert(n.type() == n.header()->get_type());
@@ -637,7 +596,9 @@ namespace arbtrie
    /**
     * @param r is passed by value, so it owns a reference,
     *        it gives this reference to the top root and the
-    *        old top root's reference is taken over by r
+    *        old top root's reference is taken over by r and
+    *        returned so that the caller can control when it
+    *        goes out of scope and resources are freed.
     */
    template <sync_type stype>
    node_handle write_session::set_root(node_handle r, int index)
@@ -667,6 +628,11 @@ namespace arbtrie
       return r.give(fast_meta_address::from_int(old_r));
    }
 
+   /**
+    * flushes state to disk according to sync_type,
+    * only one thread may call this method at a time and it will
+    * block until all msync() calls have returned. 
+    */
    template <sync_type stype>
    void write_session::sync()
    {

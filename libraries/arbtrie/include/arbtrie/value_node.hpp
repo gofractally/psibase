@@ -83,6 +83,7 @@ namespace arbtrie {
       uint32_t value_capacity()const { return _nsize - sizeof(value_node) - _ksize; }
       uint32_t value_size() const { return _vsize; }
 
+      bool is_subtree()const { return _is_subtree; }
       value_type get_value()const {
          if( _is_subtree )
             return subtree();

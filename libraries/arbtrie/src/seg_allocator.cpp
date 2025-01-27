@@ -334,6 +334,9 @@ namespace arbtrie
       {
          // TODO: don't hardcode MS_SYNC here, this will cause unnessary SSD wear on
          //       systems that opt not to flush
+         //
+         //       In theory, this should only be done with segments that were
+         //       previously msync.
          if (-1 == msync(start_seg_ptr, start_seg_ptr->_alloc_pos, MS_SYNC))
          {
             std::cerr << "msync errorno: " << strerror(errno) << "\n";
@@ -480,7 +483,9 @@ namespace arbtrie
          //    madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
          madvise(sp, segment_size, MADV_RANDOM);
 
-         // TODO: only do this if not already mlock
+         // TODO: only do this if not already mlock, to avoid sys call 
+         // - on many systems there must be a all to munlock for each call to mlock
+         //   because mlock nests (see man); therefore, we should track this better
          auto r = mlock(sp, segment_size);
 
          if (r)

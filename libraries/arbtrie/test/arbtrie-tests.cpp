@@ -123,7 +123,7 @@ TEST_CASE("binary-node") {
    TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
 
    auto idx = bn->lower_bound_idx( to_key_view( "hello" ) );
-   bn->insert( idx, to_key_view("hello"), to_value_view("world") );
+   bn->insert( kv_index(idx), to_key_view("hello"), to_value_view("world") );
 
    TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
    TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );

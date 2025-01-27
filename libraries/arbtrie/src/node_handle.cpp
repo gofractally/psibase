@@ -1,6 +1,6 @@
 
 #include <arbtrie/database.hpp>
-#include <arbtrie/root.hpp>
+#include <arbtrie/node_handle.hpp>
 
 namespace arbtrie
 {

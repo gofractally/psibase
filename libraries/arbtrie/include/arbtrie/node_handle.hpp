@@ -5,10 +5,8 @@
 namespace arbtrie
 {
    class database;
-   class root;
    class read_session;
    class write_session;
-   using root_ptr = std::shared_ptr<root>;
 
 
 
