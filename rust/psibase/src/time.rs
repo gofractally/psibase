@@ -64,8 +64,10 @@ impl Serialize for TimePointSec {
 
 impl<'de> Deserialize<'de> for TimePointSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <&str>::deserialize(deserializer)?;
-        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(s)
+        // String was needed over <&str> because deserialization during serde_json::from_value
+        //   cannot provide a borrowed string.
+        let s = String::deserialize(deserializer)?;
+        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(&s)
             .map_err(|e| D::Error::custom(e.to_string()))?
             .to_utc()
             .into())
@@ -138,8 +140,10 @@ impl Serialize for TimePointUSec {
 
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <&str>::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        // String was needed over <&str> because deserialization during serde_json::from_value
+        //   cannot provide a borrowed string.
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
