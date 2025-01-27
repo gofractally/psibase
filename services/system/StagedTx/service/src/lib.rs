@@ -87,7 +87,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn accept(id: u32, txid: Hex<[u8; 32]>) {
+    fn accept(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         staged_tx.accept();
@@ -112,7 +112,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn reject(id: u32, txid: Hex<[u8; 32]>) {
+    fn reject(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         staged_tx.reject();
@@ -137,7 +137,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn remove(id: u32, txid: Hex<[u8; 32]>) {
+    fn remove(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         check(
@@ -183,7 +183,7 @@ pub mod service {
         staged_tx.unwrap()
     }
 
-    fn emit_update(txid: Hex<[u8; 32]>, event_type: u8) {
+    fn emit_update(txid: Checksum256, event_type: u8) {
         Wrapper::emit().history().updated(
             txid.to_string(),
             get_sender(),

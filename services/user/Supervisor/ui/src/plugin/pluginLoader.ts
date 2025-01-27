@@ -33,39 +33,13 @@ class PluginIdSet {
 }
 export class PluginLoader {
     private plugins: Plugins;
-    // private dynamicPlugins: Array<
-    //     [QualifiedPluginId, () => QualifiedPluginId | null]
-    // > = [];
-
     private allLoadedPlugins: PluginIdSet = new PluginIdSet();
-    // private processedDeferred: PluginIdSet = new PluginIdSet();
-    // private deferred: PluginIdSet = new PluginIdSet();
     private currentPlugins: QualifiedPluginId[] = [];
 
     private reset() {
         this.allLoadedPlugins.clear();
-        // this.processedDeferred.clear();
-        // this.deferred.clear();
         this.currentPlugins = [];
     }
-
-    /**
-     * Marks deferred plugins as processed after mapping them
-     */
-    // private mapDeferredPlugins() {
-    //     let mappedPlugins: QualifiedPluginId[] = [];
-
-    //     let deferred = this.deferred.values();
-    //     for (const d of deferred) {
-    //         if (!this.processedDeferred.has(d)) {
-    //             mappedPlugins.push(this.resolve(d));
-    //             this.processedDeferred.add(d);
-    //         }
-    //     }
-    //     this.deferred.clear();
-
-    //     this.currentPlugins = mappedPlugins;
-    // }
 
     private async getAllDependencies(): Promise<QualifiedPluginId[]> {
         if (this.currentPlugins.length === 0) {
@@ -93,22 +67,6 @@ export class PluginLoader {
         return dependencies;
     }
 
-    // private removeDeferredPlugins() {
-    //     // Defer loading any dynamic plugins
-    //     let deferred: QualifiedPluginId[] = [];
-    //     let remaining = this.currentPlugins.filter((id) => {
-    //         if (this.isDynamic(id)) {
-    //             if (!this.processedDeferred.has(id)) {
-    //                 deferred.push(id);
-    //             }
-    //         } else
-    //         return true;
-    //     });
-
-    //     deferred.forEach((p) => this.deferred.add(p));
-    //     this.currentPlugins = remaining;
-    // }
-
     private removeHostPlugins() {
         // Plugins at these namespace are built into the supervisor host itself and
         //  are not pulled from the chain.
@@ -123,36 +81,9 @@ export class PluginLoader {
         );
     }
 
-    // private isDynamic(pluginId: QualifiedPluginId): boolean {
-    //     return this.dynamicPlugins.some(([p]) => isEqual(p, pluginId));
-    // }
-
-    // private resolve(pluginId: QualifiedPluginId): QualifiedPluginId {
-    //     const dynPlugin = this.dynamicPlugins.find(([p]) =>
-    //         isEqual(p, pluginId),
-    //     );
-    //     if (!dynPlugin) {
-    //         return pluginId;
-    //     }
-
-    //     const resolver = dynPlugin[1];
-    //     assertTruthy(resolver, "Dynamic plugin has no resolver");
-    //     const resolved = resolver();
-    //     assertTruthy(resolved, "Dynamic plugin resolver returned null");
-
-    //     return resolved;
-    // }
-
     constructor(plugins: Plugins) {
         this.plugins = plugins;
     }
-
-    // private registerDynamic(
-    //     plugin: QualifiedPluginId,
-    //     resolver: () => QualifiedPluginId | null,
-    // ) {
-    //     this.dynamicPlugins.push([plugin, resolver]);
-    // }
 
     public trackPlugins(plugins: QualifiedPluginId[]) {
         this.reset();
@@ -176,13 +107,6 @@ export class PluginLoader {
             this.currentPlugins = await this.getAllDependencies();
         }
     }
-
-    // public async processDeferred() {
-    //     while (this.deferred.size() > 0) {
-    //         this.mapDeferredPlugins();
-    //         await this.processPlugins();
-    //     }
-    // }
 
     public async awaitReady() {
         await Promise.all(

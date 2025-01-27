@@ -11,7 +11,7 @@ use bindings::host::common::{client as Client, server as Server, types::Error};
 use bindings::transact::plugin::{hooks::hook_tx_transform_label, intf::add_action_to_transaction};
 use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
-use psibase::{AccountNumber, Hex, MethodNumber};
+use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};
 use staged_tx::action_structs::*;
 use std::collections::HashMap;
 
@@ -73,7 +73,7 @@ struct ActionDetails {
     raw_data: String,
 }
 
-fn get_staged_txid(id: u32) -> Result<Hex<[u8; 32]>, Error> {
+fn get_staged_txid(id: u32) -> Result<Checksum256, Error> {
     let query = format!(
         r#"query {{
             details(id: {id}) {{
@@ -165,6 +165,13 @@ impl HookTxTransform for StagedTxPlugin {
 
         let transact = psibase::services::transact::SERVICE.to_string();
         get_assert_caller("on_tx_transform", &[&transact])?;
+
+        // There is typically only one sender for a set of actions, but in rare cases where
+        // hooks were used to simultaneously execute actions from multiple users *and* a propose
+        // latch was set, the result is:
+        // 1. Multiple staged transactions are proposed, one for each sender.
+        // 2. The actions contained in a staged transaction correspond to the actions originally executed by sender.
+        // 3. The new sender of the staged actions correspond to the latch that was set at the time the action was scheduled.
 
         let action_groups = group_by_sender(actions);
         let actions = action_groups

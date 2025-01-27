@@ -16,7 +16,7 @@ mod service {
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct StagedTx {
         pub id: u32,
-        pub txid: [u8; 32],
+        pub txid: Checksum256,
         pub propose_block: u32,
         pub propose_date: TimePointUSec,
         pub proposer: AccountNumber,
@@ -60,6 +60,16 @@ mod service {
     /// Gets a staged transaction by id.
     #[action]
     fn get_staged_tx(id: u32) -> StagedTx {
+        unimplemented!()
+    }
+
+    #[event(history)]
+    pub fn updated(
+        txid: String,            // The txid of the staged transaction
+        actor: AccountNumber,    // The sender of the action causing the event
+        datetime: TimePointUSec, // The time of the event emission
+        event_type: String,      // The type of event
+    ) {
         unimplemented!()
     }
 }

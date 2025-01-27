@@ -1,9 +1,9 @@
 /// The staged-tx plugin allows apps to set a "propose latch" for an account. What makes it a "latch" is that 
-/// gets automatically unset after the completion of the call context in which it is set.
+/// gets automatically unset after the completion of the call context in which it is set. A plugin must continually
+/// opt-in to transaction staging by setting the latch at the beginning of every call context in which it is desired.
 /// 
-/// When the latch is set, server actions scheduled by plugins are staged by the current user
-/// instead of being executed by the logged-in user. These actions are proposed for execution
-/// by the account specified when enabling the latch.
+/// When the latch is set, server actions scheduled by plugins are staged by the current user instead of being
+/// executed them. These actions are proposed for execution by the account specified when enabling the latch.
 package staged-tx:plugin;
 
 interface proposer {
@@ -13,8 +13,8 @@ interface proposer {
     /// is resolved.
     /// 
     /// Any actions that are scheduled for execution by the currently logged-in user while there is
-    /// an active propose-latch are staged for execution by the specified `account` rather than being
-    /// executed by the currently logged-in user.
+    /// an active propose-latch are staged (by the logged-in user) for execution by the specified `account`
+    /// rather than being executed by the currently logged-in user.
     /// 
     /// `account` - The account on behalf of which the currently logged-in user is 
     ///             proposing transactions.

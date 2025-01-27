@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Action, Fracpack, Hex, TimePointUSec, ToKey, ToSchema};
+    use psibase::{AccountNumber, Action, Checksum256, Fracpack, TimePointUSec, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
@@ -17,14 +17,28 @@ pub mod tables {
         fn pk(&self) {}
     }
 
+    /// A table that contains all of the transactions currently staged.
     #[table(name = "StagedTxTable", index = 1)]
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTx {
+        /// Unique ID for a staged transaction
         pub id: u32,
-        pub txid: Hex<[u8; 32]>,
+
+        /// A unique ID for a staged transaction that can be computed client-side
+        ///   by fracpacking a tuple containing (id, proposed block number, vec<action>) and
+        ///   then computing the sha256 of the result.
+        pub txid: Checksum256,
+
+        /// The block number at which the staged transaction was proposed
         pub propose_block: u32,
+
+        /// The time at which the staged transaction was proposed
         pub propose_date: TimePointUSec,
+
+        /// The account that proposed the staged transaction
         pub proposer: AccountNumber,
+
+        /// The list of actions that are staged for execution
         pub action_list: ActionList,
     }
     impl StagedTx {
@@ -49,11 +63,17 @@ pub mod tables {
         fn pk(&self) {}
     }
 
+    /// A table that contains all of the responses to staged transactions.
     #[table(name = "ResponseTable", index = 3)]
     #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct Response {
+        /// The ID of the staged transaction
         pub id: u32,
+
+        /// The account that responded to the staged transaction
         pub account: AccountNumber,
+
+        /// Whether the response is an acceptance or rejection
         pub accepted: bool,
     }
     impl Response {
@@ -68,10 +88,19 @@ pub mod tables {
         }
     }
 
+    /// A table that tracks the accounts that the senders of the staged actions
+    /// in a particular staged transaction. These senders are known as the "parties"
+    /// of the staged transaction.
+    ///
+    /// Table can be used to search for all parties in a staged transaction, or all
+    /// staged transactions related to a given party.
     #[table(name = "StagedTxPartyTable", index = 4)]
     #[derive(Fracpack, Serialize, Deserialize, ToSchema, SimpleObject)]
     pub struct StagedTxParty {
+        /// The ID of the staged transaction
         pub id: u32,
+
+        /// The account that is a party to the staged transaction
         pub party: AccountNumber,
     }
     impl StagedTxParty {
@@ -91,7 +120,7 @@ pub mod impls {
     use super::tables::*;
     use psibase::fracpack::Pack;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
-    use psibase::{check, get_sender, AccountNumber, Action, Hex, Table};
+    use psibase::{check, get_sender, AccountNumber, Action, Checksum256, Table};
 
     impl StagedTx {
         pub fn add(actions: Vec<Action>) -> Self {
@@ -133,7 +162,7 @@ pub mod impls {
             new_tx
         }
 
-        pub fn get(id: u32, txid: Hex<[u8; 32]>) -> Self {
+        pub fn get(id: u32, txid: Checksum256) -> Self {
             let staged_tx = StagedTxTable::new().get_index_pk().get(&id);
             check(staged_tx.is_some(), "Unknown staged tx");
             let staged_tx = staged_tx.unwrap();

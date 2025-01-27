@@ -92,7 +92,7 @@ export class Supervisor implements AppInterface {
                     `Invalid user account '${user}' detected. Automatically logging out.`,
                 );
                 this.logout();
-                this.loader.trackPlugins([pluginId("auth-invite", "plugin")]); // TODO: Do I need this? I think the current app will load the invite plugin, which will depend on auth-invite, so this shouldn't be needed.
+                // Consider deleting the user from the accounts plugin db
             } else {
                 // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
                 this.loader.trackPlugins([
@@ -102,10 +102,6 @@ export class Supervisor implements AppInterface {
             await this.loader.processPlugins();
             await this.loader.awaitReady();
         }
-
-        // Phase 2: Loads all dynamic plugins
-        // await this.loader.processDeferred();
-        // await this.loader.awaitReady();
     }
 
     private replyToParent(id: string, result: any) {
@@ -182,24 +178,6 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
-        // this.loader.registerDynamic(pluginId("accounts", "smart-auth"), () => {
-        //     let user = this.getLoggedInUser();
-        //     if (user === undefined) {
-        //         return pluginId("auth-invite", "plugin");
-        //     }
-        //     const account = this.getAccount(user);
-        //     if (account === undefined) {
-        //         console.warn(
-        //             `Invalid user account '${user}' detected. Automatically logging out.`,
-        //         );
-        //         this.logout();
-        //         return pluginId("auth-invite", "plugin");
-        //     }
-        //     // Temporary limitation: the auth service plugin must be called "plugin" ("<namespace>:plugin")
-        //     // Or, we could just eliminate the possiblity of storing multiple plugins per namespace (and *everything*
-        //     //   would have to be named "plugin")
-        //     return pluginId(account.authService, "plugin");
-        // });
     }
 
     getActiveApp(sender: OriginationData): OriginationData {
