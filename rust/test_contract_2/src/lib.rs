@@ -24,10 +24,31 @@ mod tables {
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::*;
+    use async_graphql::{connection::Connection, *};
+    use psibase::services::events::Wrapper as EventsSvc;
     use psibase::*;
+    use serde::{Deserialize, Serialize};
 
     use crate::tables::{Answer, AnswerTable};
+
+    #[derive(SimpleObject, Deserialize)]
+    pub struct AddEvent {
+        a: i32,
+        b: i32,
+        result: i32,
+    }
+
+    #[derive(SimpleObject, Serialize, Deserialize, Pack, Unpack, ToSchema, Debug, Clone)]
+    pub struct ExampleRecord {
+        count: u32,
+        value: i32,
+        message: String,
+    }
+
+    #[action]
+    pub fn init() {
+        EventsSvc::call().setSchema(create_schema::<Wrapper>());
+    }
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
@@ -63,10 +84,26 @@ mod service {
         res
     }
 
+    #[action]
+    pub fn create_record(count: u32, value: i32, message: String) {
+        Wrapper::emit().history().save_record(ExampleRecord {
+            count,
+            value,
+            message,
+        });
+    }
+
     #[event(history)]
     pub fn add(a: i32, b: i32, result: i32) {}
     #[event(history)]
     pub fn multiply(a: i32, b: i32, result: i32) {}
+    #[event(history)]
+    pub fn save_record(record: ExampleRecord) {}
+
+    #[derive(SimpleObject, Serialize, Deserialize)]
+    pub struct ExampleRecordWrapper {
+        record: ExampleRecord,
+    }
 
     struct Query;
 
@@ -94,6 +131,36 @@ mod service {
         /// ```
         async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
             get_event(id)
+        }
+
+        async fn get_add_events(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> Result<Connection<i32, AddEvent>, async_graphql::Error> {
+            EventQuery::new("history.example.add")
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn get_saved_records(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> Result<Connection<i32, ExampleRecordWrapper>, async_graphql::Error> {
+            EventQuery::new("history.example.save_record")
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
         }
     }
 
@@ -139,7 +206,106 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let reply: Value = chain.get(SERVICE, "/action_templates")?.json()?;
     assert_eq!(
         reply,
-        json!({"add":{"a":0, "b": 0}, "multiply": {"a": 0, "b": 0}, "serveSys": {"request": {"body": "", "contentType": "", "headers": [{"name": "", "value": ""}], "host": "", "method": "", "rootHost": "", "target": ""}}})
+        json!({
+            "add": {"a": 0, "b": 0},
+            "multiply": {"a": 0, "b": 0},
+            "init": {},
+            "create_record": {"count": 0, "value": 0, "message": ""},
+            "serveSys": {
+                "request": {
+                    "body": "",
+                    "contentType": "",
+                    "headers": [{"name": "", "value": ""}],
+                    "host": "",
+                    "method": "",
+                    "rootHost": "",
+                    "target": ""
+                }
+            }
+        })
+    );
+
+    Ok(())
+}
+
+#[psibase::test_case(packages("TestContract2"))]
+fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::services::http_server;
+    use serde_json::{json, Value};
+
+    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
+
+    Wrapper::push(&chain).init();
+    Wrapper::push(&chain).add(1, 2);
+    Wrapper::push(&chain).add(3, 4);
+    Wrapper::push(&chain).add(5, 6);
+
+    chain.finish_block();
+
+    // Test pagination of add events
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query {
+            getAddEvents(first: 2) {
+                edges {
+                    node { a b result }
+                }
+            }
+        }"#,
+    )?;
+
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"node": {"a": 1, "b": 2, "result": 3}},
+                        {"node": {"a": 3, "b": 4, "result": 7}}
+                    ]
+                }
+            }
+        })
+    );
+
+    Ok(())
+}
+
+#[psibase::test_case(packages("TestContract2"))]
+fn test_example_records(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    use psibase::services::http_server;
+    use serde_json::{json, Value};
+
+    http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
+
+    Wrapper::push(&chain).init();
+    Wrapper::push(&chain).create_record(1, 42, "first".to_string());
+    Wrapper::push(&chain).create_record(2, -10, "second".to_string());
+
+    chain.finish_block();
+
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query {
+            getSavedRecords(first: 1) {
+                edges {
+                    node { record { count value message } }
+                }
+            }
+        }"#,
+    )?;
+
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getSavedRecords": {
+                    "edges": [
+                        {"node": {"record": {"count": 1, "value": 42, "message": "first"}}}
+                    ]
+                }
+            }
+        })
     );
 
     Ok(())
