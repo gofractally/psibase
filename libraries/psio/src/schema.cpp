@@ -227,12 +227,42 @@ namespace psio::schema_types
       }
    };
 
+   struct MapImpl
+   {
+      static bool match(const CompiledType* type)
+      {
+         if (type->kind == CompiledType::container)
+         {
+            const auto& member = type->children[0];
+            return !member.is_optional && member.type->children.size() == 2 &&
+                   (member.type->kind == CompiledType::object ||
+                    member.type->kind == CompiledType::struct_);
+         }
+         return false;
+      }
+      static bool frac2json(const CompiledType* type, FracStream& in, StreamBase& out)
+      {
+         assert(!"This handler should never be used. map needs integration with the parser");
+         __builtin_unreachable();
+      }
+   };
+
+   bool isCustomMap(const AnyType& ty)
+   {
+      if (auto* custom = std::get_if<Custom>(&ty.value))
+      {
+         return custom->id == "map";
+      }
+      return false;
+   }
+
    CustomTypes standard_types()
    {
       CustomTypes result;
       result.insert<bool>("bool");
       result.insert("string", BlobImpl<StringImpl>());
       result.insert("hex", BlobImpl<OctetStringImpl>());
+      result.insert("map", MapImpl());
       result.insert("TimePointSec", TimePointImpl<0>());
       result.insert("TimePointUSec", TimePointImpl<6>());
       return result;
@@ -638,7 +668,18 @@ namespace psio::schema_types
             if (auto index = this->builtin.find(t->id))
             {
                if (this->builtin.match(*index, &ctype))
-                  ctype.custom_id = *index;
+               {
+                  if (t->id == "map")
+                  {
+                     // Potentially recursive custom types need to
+                     // be handled in the top level loop.
+                     ctype.original_type = type;
+                  }
+                  else
+                  {
+                     ctype.custom_id = *index;
+                  }
+               }
             }
          }
       }
@@ -1477,6 +1518,21 @@ namespace psio::schema_types
          }
       }
       schema = std::move(result);
+   }
+
+   AnyType to_schema(SchemaBuilder& builder, const Object*)
+   {
+      return Custom{.type = builder.insert<std::vector<Member>>(), .id = "map"};
+   }
+
+   AnyType to_schema(SchemaBuilder& builder, const Struct*)
+   {
+      return Custom{.type = builder.insert<std::vector<Member>>(), .id = "map"};
+   }
+
+   AnyType to_schema(SchemaBuilder& builder, const Variant*)
+   {
+      return Custom{.type = builder.insert<std::vector<Member>>(), .id = "map"};
    }
 
    struct SchemaMatch

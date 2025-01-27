@@ -76,7 +76,11 @@ struct test_builder
 
 void to_json(test_builder& t, std::ostream& os)
 {
-   os << "{\"schema\":" << psio::convert_to_json(std::move(t.builder).build()) << ",\"values\":[";
+   auto schema = std::move(t.builder).build();
+   os << "{\"schema\":" << psio::convert_to_json(schema)
+      << ",\"schema_bin\":" << psio::convert_to_json(psio::to_frac(schema)) << ",\"schema_schema\":"
+      << psio::convert_to_json(psio::SchemaBuilder{}.insert<psio::Schema>("schema").build())
+      << ",\"values\":[";
    bool first = true;
    for (const auto& v : t.tests)
    {
@@ -244,6 +248,32 @@ struct EmptyTrailing
 };
 PSIO_REFLECT(EmptyTrailing, v0, v1)
 
+struct Untagged
+{
+   std::string value;
+};
+PSIO_REFLECT_TYPENAME(Untagged)
+auto& clio_unwrap_packable(Untagged& obj)
+{
+   return obj.value;
+}
+auto& clio_unwrap_packable(const Untagged& obj)
+{
+   return obj.value;
+}
+void from_json(Untagged& obj, auto& stream)
+{
+   from_json(obj.value, stream);
+}
+void to_json(const Untagged& obj, auto& stream)
+{
+   to_json(obj.value, stream);
+}
+constexpr bool psio_is_untagged(const Untagged*)
+{
+   return true;
+}
+
 int main()
 {
    test_builder builder;
@@ -297,6 +327,9 @@ int main()
    builder.add<WrongCustom>("WrongCustom", {{3}});
    builder.add<std::tuple<Empty>>("(Empty)", {{Empty{}}});
    builder.add<EmptyMember>("EmptyMember", {{Empty{}}});
+   builder.add<std::map<std::string, std::string>>("string-map",
+                                                   {{}, {{"foo", "x"}, {"bar", "y"}}});
+   builder.add<std::variant<V0, Untagged>>("untagged-alternative", {V0{}, Untagged{"foo"}});
 
    // Compatible serialization
    builder.add_compat("(i32)", std::tuple<std::int32_t, std::optional<std::int32_t>>(42, 43),

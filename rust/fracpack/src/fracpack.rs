@@ -68,6 +68,7 @@ custom_error! {pub Error
     PtrEmptyList        = "A pointer to an empty list must use zero offset",
     HasUnknown          = "Unknown fields not allowed",
     UnknownType         = "Unknown type",
+    ExpectedStringKey   = "Map keys must be strings",
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

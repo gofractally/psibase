@@ -224,3 +224,31 @@ TEST_CASE("schema select")
       CHECK(std::string_view(data.data(), data.size()) == "42");
    }
 }
+
+TEST_CASE("schema schema")
+{
+   SchemaBuilder builder;
+   builder.insert<std::uint8_t>("u8");
+   builder.insert<std::optional<std::uint8_t>>("o");
+   builder.insert<MyType>("s");
+   builder.insert<std::vector<std::int32_t>>("v");
+   builder.insert<std::variant<std::uint32_t>>("var");
+   builder.insert<MyType2>("x");
+   builder.insert<std::tuple<std::int8_t>>("tup");
+   builder.insert<std::array<std::int16_t, 1>>("a");
+   builder.insert<bool>("bool");
+   builder.insert<float>("f32");
+   builder.insert<double>("f64");
+   Schema data   = std::move(builder).build();
+   Schema schema = SchemaBuilder{}.insert<Schema>("schema").build();
+
+   std::cout << psio::format_json(schema) << std::endl;
+   CompiledSchema cschema{schema};
+   auto           bin = psio::to_frac(data);
+
+   FracParser        parser{bin, cschema, "schema"};
+   std::vector<char> json;
+   vector_stream     out{json};
+   to_json(parser, out);
+   CHECK(std::string_view{json.data(), json.size()} == psio::convert_to_json(data));
+}
