@@ -394,8 +394,11 @@ impl<'de> Deserialize<'de> for SqlRow {
 
         let rowid = map
             .remove("rowid")
-            .and_then(|v| v.as_i64())
-            .ok_or_else(|| serde::de::Error::missing_field("rowid"))? as i32;
+            .and_then(|v| match v {
+                Value::String(s) => s.parse::<i32>().ok(),
+                _ => None,
+            })
+            .ok_or_else(|| serde::de::Error::missing_field("rowid"))?;
 
         let data = Value::Object(map.into_iter().collect());
 

@@ -24,17 +24,20 @@ mod tables {
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
+    use crate::tables::{Answer, AnswerTable};
     use async_graphql::{connection::Connection, *};
     use psibase::services::events::Wrapper as EventsSvc;
     use psibase::*;
     use serde::{Deserialize, Serialize};
-
-    use crate::tables::{Answer, AnswerTable};
+    use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         a: i32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         b: i32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         result: i32,
     }
 
