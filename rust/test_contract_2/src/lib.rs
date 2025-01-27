@@ -138,17 +138,23 @@ mod service {
 
         async fn get_add_events(
             &self,
+            condition: Option<String>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> Result<Connection<i32, AddEvent>, async_graphql::Error> {
-            EventQuery::new("history.example.add")
+            let mut q = EventQuery::new("history.example.add")
                 .first(first)
                 .last(last)
                 .before(before)
-                .after(after)
-                .query()
+                .after(after);
+
+            if let Some(condition) = condition {
+                q = q.condition(condition);
+            }
+
+            q.query()
         }
 
         async fn get_saved_records(
@@ -242,34 +248,206 @@ fn test_add_events(chain: psibase::Chain) -> Result<(), psibase::Error> {
     Wrapper::push(&chain).add(1, 2);
     Wrapper::push(&chain).add(3, 4);
     Wrapper::push(&chain).add(5, 6);
+    Wrapper::push(&chain).add(7, 8);
+    Wrapper::push(&chain).add(9, 10);
+    Wrapper::push(&chain).add(11, 12);
+    Wrapper::push(&chain).add(13, 14);
+    Wrapper::push(&chain).add(15, 16);
+    Wrapper::push(&chain).add(17, 18);
+    Wrapper::push(&chain).add(19, 20);
 
     chain.finish_block();
 
-    // Test pagination of add events
-    let reply: Value = chain.graphql(
+    let all_events: Value = chain.graphql(
         SERVICE,
         r#"query {
-            getAddEvents(first: 2) {
+            getAddEvents {
                 edges {
+                    cursor
                     node { a b result }
                 }
             }
         }"#,
     )?;
 
+    // Extract first and last cursors for subsequent tests
+    let edges = all_events["data"]["getAddEvents"]["edges"]
+        .as_array()
+        .unwrap();
+    let cursor_1 = edges[0]["cursor"].as_str().unwrap();
+    let cursor_2 = edges[1]["cursor"].as_str().unwrap();
+    let cursor_4 = edges[3]["cursor"].as_str().unwrap();
+    let cursor_5 = edges[4]["cursor"].as_str().unwrap();
+    let cursor_6 = edges[5]["cursor"].as_str().unwrap();
+    let cursor_9 = edges[8]["cursor"].as_str().unwrap();
+    let cursor_10 = edges[9]["cursor"].as_str().unwrap();
+
+    // first: 2
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query {
+            getAddEvents(first: 2) {
+                edges {
+                    cursor
+                    node { a b result }
+                }
+            }
+        }"#,
+    )?;
     assert_eq!(
         reply,
         json!({
             "data": {
                 "getAddEvents": {
                     "edges": [
-                        {"node": {"a": 1, "b": 2, "result": 3}},
-                        {"node": {"a": 3, "b": 4, "result": 7}}
+                        {"cursor": cursor_1, "node": {"a": 1, "b": 2, "result": 3}},
+                        {"cursor": cursor_2, "node": {"a": 3, "b": 4, "result": 7}}
                     ]
                 }
             }
         })
     );
+    println!("Test passed: first:2");
+
+    // first:1 after first
+    let reply: Value = chain.graphql(
+        SERVICE,
+        &format!(
+            r#"query {{
+            getAddEvents(first: 1, after: "{}") {{
+                edges {{
+                    cursor
+                    node {{ a b result }}
+                }}
+            }}
+        }}"#,
+            cursor_1
+        ),
+    )?;
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"cursor": cursor_2, "node": {"a": 3, "b": 4, "result": 7}}
+                    ]
+                }
+            }
+        })
+    );
+    println!("Test passed: first:1 after first");
+
+    // last:2
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query {
+            getAddEvents(last: 2) {
+                edges {
+                    cursor
+                    node { a b result }
+                }
+            }
+        }"#,
+    )?;
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"cursor": cursor_9, "node": {"a": 17, "b": 18, "result": 35}},
+                        {"cursor": cursor_10, "node": {"a": 19, "b": 20, "result": 39}}
+                    ]
+                }
+            }
+        })
+    );
+    println!("Test passed: last:2");
+
+    // last:1 before last
+    let reply: Value = chain.graphql(
+        SERVICE,
+        &format!(
+            r#"query {{
+            getAddEvents(last: 1, before: "{}") {{
+                edges {{
+                    cursor
+                    node {{ a b result }}
+                }}
+            }}
+        }}"#,
+            cursor_10
+        ),
+    )?;
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"cursor": cursor_9, "node": {"a": 17, "b": 18, "result": 35}}
+                    ]
+                }
+            }
+        })
+    );
+    println!("Test passed: last:1 before last");
+
+    // after:4 before:6
+    let reply: Value = chain.graphql(
+        SERVICE,
+        &format!(
+            r#"query {{
+            getAddEvents(after: "{}", before: "{}") {{
+                edges {{
+                    cursor
+                    node {{ a b result }}
+                }}
+            }}
+        }}"#,
+            cursor_4, cursor_6
+        ),
+    )?;
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"cursor": cursor_5, "node": {"a": 9, "b": 10, "result": 19}}
+                    ]
+                }
+            }
+        })
+    );
+    println!("Test passed: after:4 before:6");
+
+    // condition a = 1
+    let reply: Value = chain.graphql(
+        SERVICE,
+        r#"query {
+            getAddEvents(condition: "a = 1") {
+                edges {
+                    cursor
+                    node { a b result }
+                }
+            }
+        }"#,
+    )?;
+    assert_eq!(
+        reply,
+        json!({
+            "data": {
+                "getAddEvents": {
+                    "edges": [
+                        {"cursor": cursor_1, "node": {"a": 1, "b": 2, "result": 3}}
+                    ]
+                }
+            }
+        })
+    );
+    println!("Test passed: condition a = 1");
 
     Ok(())
 }
