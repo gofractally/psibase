@@ -131,7 +131,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
             <FormItem>
               <FormLabel>App Name</FormLabel>
               <FormControl>
-                <Input placeholder="MonsterApp" {...field} />
+                <Input {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -145,7 +145,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
               <FormItem>
                 <FormLabel>Tagline</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Pets on a blockchain!" />
+                  <Input {...field} />
                 </FormControl>
                 <FormDescription>Brief description of the app.</FormDescription>
                 <FormMessage />
@@ -204,11 +204,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
             <FormItem>
               <FormLabel>Long Description</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Raise, feed and trade your own digital pets!"
-                  className="resize-none"
-                  {...field}
-                />
+                <Textarea className="resize-none" {...field} />
               </FormControl>
 
               <FormMessage />
