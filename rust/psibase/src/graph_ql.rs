@@ -10,7 +10,6 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use std::cmp::{max, min};
-use std::collections::HashMap;
 use std::mem::take;
 use std::ops::RangeBounds;
 
@@ -390,7 +389,7 @@ impl<'de> Deserialize<'de> for SqlRow {
     where
         D: Deserializer<'de>,
     {
-        let mut map: HashMap<String, Value> = HashMap::deserialize(deserializer)?;
+        let mut map: serde_json::Map<String, Value> = serde_json::Map::deserialize(deserializer)?;
 
         let rowid = map
             .remove("rowid")
@@ -400,7 +399,7 @@ impl<'de> Deserialize<'de> for SqlRow {
             })
             .ok_or_else(|| serde::de::Error::missing_field("rowid"))?;
 
-        let data = Value::Object(map.into_iter().collect());
+        let data = Value::Object(map);
 
         Ok(SqlRow { rowid, data })
     }
