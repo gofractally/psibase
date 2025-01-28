@@ -85,23 +85,22 @@ export class Supervisor implements AppInterface {
 
         // Phase 2: Loads plugins needed by the current user
         let user = this.getLoggedInUser();
-        if (!!user) {
-            const account = this.getAccount(user);
-            if (account === undefined) {
-                console.warn(
-                    `Invalid user account '${user}' detected. Automatically logging out.`,
-                );
-                this.logout();
-                // Consider deleting the user from the accounts plugin db
-            } else {
-                // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-                this.loader.trackPlugins([
-                    pluginId(account.authService, "plugin"),
-                ]);
-            }
-            await this.loader.processPlugins();
-            await this.loader.awaitReady();
+        if (!user) return;
+
+        const account = this.getAccount(user);
+        if (account === undefined) {
+            console.warn(
+                `Invalid user account '${user}' detected. Automatically logging out.`,
+            );
+            this.logout();
+            // Consider deleting the user from the accounts plugin db
+            return;
         }
+
+        // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+        this.loader.trackPlugins([pluginId(account.authService, "plugin")]);
+        await this.loader.processPlugins();
+        await this.loader.awaitReady();
     }
 
     private replyToParent(id: string, result: any) {
