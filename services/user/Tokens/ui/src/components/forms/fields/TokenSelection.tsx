@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Token } from "@/hooks/useUi";
+import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { formatThousands } from "@/lib/formatNumber";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
@@ -33,7 +33,11 @@ const TokenSelection: FC<Props> = ({ tokens, form, setNewTokenModalOpen }) => (
     render={({ field }) => (
       <FormItem>
         <FormLabel>Token</FormLabel>
-        <Select value={field.value} onValueChange={field.onChange} defaultValue={field.value}>
+        <Select
+          value={field.value}
+          onValueChange={field.onChange}
+          defaultValue={field.value}
+        >
           <FormControl>
             <div className="w-full grid grid-cols-6">
               <SelectTrigger className="col-span-5">

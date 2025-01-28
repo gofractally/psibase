@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FormSchema } from "@/hooks/useTokenForm";
-import { Token } from "@/hooks/useUi";
+import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 

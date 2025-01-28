@@ -1,5 +1,4 @@
 import App from "./App.tsx";
-import { SupervisorContext } from "./context.tsx";
 import "./index.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,12 +13,10 @@ export const supervisor = new Supervisor();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <SupervisorContext.Provider value={supervisor}>
-        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-          <App />
-          <Toaster toastOptions={{ className: "border border-muted" }} />
-        </ThemeProvider>
-      </SupervisorContext.Provider>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <App />
+        <Toaster toastOptions={{ className: "border border-muted" }} />
+      </ThemeProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

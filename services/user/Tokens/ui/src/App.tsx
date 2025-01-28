@@ -5,16 +5,17 @@ import FormTransfer from "@/components/forms/form-transfer";
 import { ModalCreateToken } from "@/components/modal-create-token";
 import { Mode } from "@/components/transfer-toggle";
 import { m, useMode } from "@/hooks/useMode";
-import { usePluginCall } from "@/hooks/usePluginCall";
 import { useTokenForm } from "@/hooks/useTokenForm";
-import { useUi } from "@/hooks/useUi";
+import { useBalances as useBalances } from "@/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";
-import { tokenPlugin } from "@/plugin";
-import { FunctionCallArgs } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/nav";
-import { useLoggedInUser } from "./hooks/useLoggedInUser";
+import { useLoggedInUser } from "./hooks/network/useLoggedInUser";
 import { AccountSelection } from "./components/account-selection";
+import { useBurn } from "./hooks/tokensPlugin/useBurn";
+import { useCredit } from "./hooks/tokensPlugin/useCredit";
+import { useMint } from "./hooks/tokensPlugin/useMint";
+import { toast } from "sonner";
 
 function App() {
   const { data: currentUser } = useLoggedInUser();
@@ -22,9 +23,13 @@ function App() {
     data: { sharedBalances, tokens },
     refetch,
     isLoading,
-  } = useUi(currentUser);
+  } = useBalances(currentUser);
 
-  const { mutateAsync: pluginCall, isPending } = usePluginCall();
+  const { isPending: isBurnPending, mutateAsync: burn } = useBurn();
+  const { isPending: isCreditPending, mutateAsync: credit } = useCredit();
+  const { isPending: isMintPending, mutateAsync: mint } = useMint();
+
+  const isPending = isBurnPending || isCreditPending || isMintPending;
 
   const form = useTokenForm();
 
@@ -67,28 +72,43 @@ function App() {
       : ""
   }`;
 
+  const onSuccessfulTx = () => {
+    form.setValue("amount", "");
+    setConfirmationModalOpen(false);
+  };
+
   const performTx = async () => {
     const tokenId = form.watch("token");
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
-    let args: FunctionCallArgs;
 
-    if (isTransfer) {
-      const recipient = form.watch("to")!;
-      args = tokenPlugin.transfer.credit(tokenId, recipient, amount, memo);
-    } else if (isBurning) {
-      args = tokenPlugin.intf.burn(tokenId, amount);
-    } else if (isMinting) {
-      args = tokenPlugin.intf.mint(tokenId, amount, memo);
-    } else {
-      throw new Error(`Failed to identify args`);
-    }
     try {
-      await pluginCall(args);
-      form.setValue("amount", "");
-      setConfirmationModalOpen(false);
+      if (isTransfer) {
+        const recipient = form.watch("to")!;
+        await credit({ tokenId, receiver: recipient, amount, memo });
+        toast("Sent", { description: `Sent ${amount} to ${recipient}` });
+        onSuccessfulTx();
+      } else if (isBurning) {
+        const burningFrom = form.watch("from");
+        await burn({ tokenId, amount, account: burningFrom || "", memo });
+        toast("Burned", {
+          description: `Burned ${amount} tokens${
+            burningFrom ? ` from ${burningFrom}` : ""
+          }`,
+        });
+        onSuccessfulTx();
+      } else if (isMinting) {
+        await mint({ tokenId, amount, memo });
+        toast("Minted", { description: `Added ${amount} to your balance.` });
+        onSuccessfulTx();
+      } else {
+        throw new Error(`Failed to identify type of plugin call`);
+      }
     } catch (e) {
-      console.error(e, "caught error");
+      toast("Error", {
+        description:
+          e instanceof Error ? e.message : `Unrecognised error, see logs.`,
+      });
     } finally {
       refetch();
       wait(3000).then(() => {

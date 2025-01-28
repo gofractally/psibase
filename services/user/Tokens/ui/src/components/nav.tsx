@@ -1,7 +1,7 @@
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
 import { SettingsDropdown } from "@/components/settings-dropdown";
 import { siblingUrl } from "@psibase/common-lib";
-import { useBranding } from "@/hooks/useBranding";
+import { useBranding } from "@/hooks/network/useBranding";
 
 function HoverBorderGradientDemo() {
   const { data: networkName } = useBranding();

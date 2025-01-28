@@ -1,3 +1,4 @@
+import { useDebit } from "@/hooks/tokensPlugin/useDebit";
 import { AnimateNumber } from "./AnimateNumber";
 import { Button } from "./ui/button";
 import {
@@ -9,11 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { usePluginCall } from "@/hooks/usePluginCall";
-import { SharedBalance } from "@/hooks/useUi";
-import QueryKey from "@/lib/queryKeys";
+import { SharedBalance } from "@/hooks/tokensPlugin/useBalances";
+import { useUncredit } from "@/hooks/tokensPlugin/useUncredit";
 import { tokenPlugin } from "@/plugin";
-import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 interface Props {
@@ -25,38 +24,27 @@ interface Props {
 const ActionType = z.enum(["Uncredit", "Debit"]);
 
 export function CreditTable({ balances, user, isLoading }: Props) {
-  const queryClient = useQueryClient();
-
-  const { mutate } = usePluginCall({
-    onSuccess: () => {
-      if (user) {
-        const queryKey = QueryKey.tokenBalances(user);
-        queryClient.invalidateQueries({ queryKey });
-        queryClient.refetchQueries({ queryKey });
-      }
-    },
-  });
+  const { mutate: uncredit } = useUncredit();
+  const { mutate: debit } = useDebit();
 
   const handle = (id: string, action: z.infer<typeof ActionType>) => {
     const parsedAction = ActionType.parse(action);
     const balance = balances.find((bal) => bal.id == id);
     if (!balance) throw new Error(`Failed to find balance`);
     if (parsedAction == ActionType.Enum.Uncredit) {
-      mutate(
-        tokenPlugin.transfer.uncredit(
-          balance.tokenId,
-          balance.debitor,
-          balance.amount.toNumber().toString()
-        )
-      );
+      uncredit({
+        amount: balance.amount.toNumber().toString(),
+        tokenId: balance.tokenId.toString(),
+        memo: "",
+        receiver: balance.debitor,
+      });
     } else if (parsedAction == ActionType.Enum.Debit) {
-      mutate(
-        tokenPlugin.transfer.debit(
-          balance.tokenId,
-          balance.debitor,
-          balance.amount.toNumber().toString()
-        )
-      );
+      debit({
+        tokenId: balance.tokenId.toString(),
+        sender: balance.debitor,
+        amount: balance.amount.toNumber().toString(),
+        memo: "",
+      });
     } else throw new Error(`Unhandled action`);
   };
 

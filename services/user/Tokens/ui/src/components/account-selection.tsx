@@ -1,4 +1,4 @@
-import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
+import { useConnectedAccounts } from "@/hooks/network/useConnectedAccounts";
 import {
   Select,
   SelectContent,
@@ -6,9 +6,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { useSelectAccount } from "@/hooks/useSelectAccount";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
+import { useSelectAccount } from "@/hooks/network/useSelectAccount";
+import { useCreateConnectionToken } from "@/hooks/network/useCreateConnectionToken";
+import { useLoggedInUser } from "@/hooks/network/useLoggedInUser";
 import { siblingUrl } from "@psibase/common-lib";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -19,7 +19,12 @@ export const AccountSelection = () => {
   const { mutateAsync: createConnectionToken } = useCreateConnectionToken();
   const { mutateAsync: selectAccount } = useSelectAccount();
 
-  const { data: currentUser, isPending, isFetching } = useLoggedInUser();
+  const {
+    data: currentUser,
+    isFetching,
+    isSuccess,
+    isError,
+  } = useLoggedInUser();
 
   const onAccountSelection = (account: string) => {
     if (account == "-other") {
@@ -29,7 +34,7 @@ export const AccountSelection = () => {
     }
   };
 
-  if (isFetching && (isSuccess || isError)) {
+  if (isFetching && !(isSuccess || isError)) {
     return <Skeleton className="w-full h-[20px] rounded-full" />;
   }
   return (

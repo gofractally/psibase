@@ -2,6 +2,7 @@ import { fetchUi } from "@/lib/graphql/ui";
 import { Quantity } from "@/lib/quantity";
 import QueryKey from "@/lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 export interface Token {
   id: number;
@@ -21,13 +22,13 @@ export interface SharedBalance {
   amount: Quantity;
 }
 
-export const useUi = (username: string | undefined | null) =>
+export const useBalances = (username: string | undefined | null) =>
   useQuery({
     queryKey: QueryKey.ui(username || "undefined"),
     enabled: !!username,
     refetchInterval: 10000,
     queryFn: async () => {
-      const res = await fetchUi(username!);
+      const res = await fetchUi(z.string().parse(username));
 
       const creditBalances = res.userCredits.map((credit): SharedBalance => {
         const amount = new Quantity(

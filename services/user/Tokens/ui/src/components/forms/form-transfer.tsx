@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mode, m } from "@/hooks/useMode";
 import { FormSchema } from "@/hooks/useTokenForm";
-import { Token } from "@/hooks/useUi";
+import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -59,7 +59,6 @@ const FormTransfer: FC<Props> = ({
     },
     ...(isAdmin
       ? [
-       
           {
             label: "Mint",
             value: "mint",
