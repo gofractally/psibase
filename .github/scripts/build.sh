@@ -44,14 +44,17 @@ DOCKER="docker run --rm \
   ${BUILDER_IMAGE}"
 
 docker pull ${BUILDER_IMAGE}
-echo =====
+echo "===== ccache  ====="
 ${DOCKER} ccache -s
-echo =====
+echo "===== sccache ====="
 ${DOCKER} sccache -s
-echo =====
+echo "===== build start ====="
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
 ${DOCKER} bash -c "cd build && make -j $(nproc)"
+echo "===== ccache  ====="
+${DOCKER} ccache -s
+echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
@@ -60,8 +63,6 @@ ${DOCKER} bash -c "cd build && ctest --output-on-failure -j $(nproc)"
 echo =====
 ls -la ${WORKSPACE_ROOT}
 ls -la ${WORKSPACE_ROOT}/build/doc/psidk
-echo =====
-${DOCKER} ccache -s
 echo =====
 ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${UBUNTU_BUILD_VER}"
 echo =====
