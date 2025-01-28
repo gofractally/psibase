@@ -1,19 +1,18 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
-use bindings::exports::accounts::smart_auth::smart_auth::Guest as SmartAuth;
+use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 use bindings::host::common::types as CommonTypes;
 
 struct AuthAny;
 
-impl SmartAuth for AuthAny {
-    fn get_claims(_: String, _: Vec<Action>) -> Result<Vec<Claim>, CommonTypes::Error> {
-        Ok(vec![])
+impl HookUserAuth for AuthAny {
+    fn on_user_auth_claim(_: String) -> Result<Option<Claim>, CommonTypes::Error> {
+        Ok(None)
     }
 
-    fn get_proofs(_: String, _: Vec<u8>) -> Result<Vec<Proof>, CommonTypes::Error> {
-        Ok(vec![])
+    fn on_user_auth_proof(_: String, _: Vec<u8>) -> Result<Option<Proof>, CommonTypes::Error> {
+        Ok(None)
     }
 }
 

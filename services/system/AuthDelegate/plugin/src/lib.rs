@@ -4,26 +4,20 @@ mod errors;
 use errors::ErrorType::*;
 
 // Other plugins
-use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
+use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 use bindings::host::common::types as CommonTypes;
-
-// Exported interfaces
-use bindings::exports::accounts::smart_auth::smart_auth::Guest as SmartAuth;
 
 struct AuthDelegate;
 
-impl SmartAuth for AuthDelegate {
-    fn get_claims(
-        _account_name: String,
-        _actions: Vec<Action>,
-    ) -> Result<Vec<Claim>, CommonTypes::Error> {
+impl HookUserAuth for AuthDelegate {
+    fn on_user_auth_claim(_account_name: String) -> Result<Option<Claim>, CommonTypes::Error> {
         Err(NotYetImplemented("get_claims"))?
     }
 
-    fn get_proofs(
+    fn on_user_auth_proof(
         _account_name: String,
         _transaction_hash: Vec<u8>,
-    ) -> Result<Vec<Proof>, CommonTypes::Error> {
+    ) -> Result<Option<Proof>, CommonTypes::Error> {
         Err(NotYetImplemented("get_proofs"))?
     }
 }
