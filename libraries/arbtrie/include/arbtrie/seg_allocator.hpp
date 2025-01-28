@@ -31,12 +31,46 @@
  *     item's location in the object db is updated and it is unlocked.
  *
  *     No threads need to wait for the copy because the data in the old location and new location
- *     are identical and the reader already has a "lock" on the old location
+ *     are identical and the reader already has a "lock" in the form of object reference counts
+ *     that force it to clone to modify anything with 2+ references. 
  *
  *  5. A garbage-collector (GC) thread finds the most empty segment and moves 
  *     all of the objects that remain to its own segment, then makes the
  *     segment available for reuse by other threads (once all threads have
  *     released the implied write lock)
+ *
+ *
+ *    Segment Recycle Buffer 
+ *
+ *      [==N=R1---R2--A]
+ *
+ *        N = position of next segment to be reused on alloc
+ *        R1..RN = the last position of A observed by each thread
+ *        A = position the next segment to be recycled gets pushed to
+ *
+ *          1. new segment is allocated (mmap) 
+ *          2. data is written until it is full (seg.alloc_p reaches end)
+ *          3. nodes are released marking potential free space
+ *          4. compactor copies remaining data to another new segment 
+ *          5. compactor pushes segment into queue for reallocation and increments A ptr
+ *          6. read threads 'lock' the reallocation queue by observing A the
+ *              position of the last segment pushed to the queue and copying to
+ *              a thread-local variable
+ *          7. when a new segment needs to be allocated it can only recycle
+ *              segments if all threads have observed the updated recycle 
+ *              queue position; therefore, it pulls from N and advances N
+ *              until the last one it pulls is N == R1 and N = R1+1. 
+ *       
+ *       A is really N copies of A, one per thread and shares the same
+ *       64 bit value as NX & RX. The compactor reads RXAX and writes
+ *       RX(AX+1) with memory order release. 
+ *
+ *       Nodes lock by reading RXAX and storing AXAX
+ *
+ *         
+ *
+ *
+ *        
  *  6. the Object ID allocation system can be made thread safe by giving
  *     each "writing session" a "segment" of the object id space. Writers would
  *     only have to synchronize id allocation requests when their segments are full.

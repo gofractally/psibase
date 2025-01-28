@@ -61,7 +61,7 @@ namespace arbtrie
       uint32_t         _prefix_capacity : 10;
       uint32_t         _prefix_size : 10;
       uint32_t         _unused : 11; // TODO: this could be used extend range of _descendants
-      uint32_t         _eof_subtree: 1;
+      uint32_t         _eof_subtree: 1 = false;
       id_address       _eof_value;
 
       void set_eof(fast_meta_address e) { 
@@ -73,7 +73,7 @@ namespace arbtrie
          _eof_subtree = true;
       }
 
-      bool eof_is_subtree()const { return _eof_subtree; }
+      bool is_eof_subtree()const { return _eof_subtree; }
       bool has_eof_value() const { return _eof_value; }
       fast_meta_address get_eof_value()const { return _eof_value; }
 

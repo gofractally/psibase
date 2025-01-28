@@ -129,21 +129,58 @@ namespace arbtrie
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
 
+      /** creates a new handle for address, retains it */
+      node_handle create_handle( fast_meta_address a ) { return node_handle( *this, a ); }
      public:
       seg_allocator::session _segas;
 
       iterator    create_iterator(node_handle h) { return iterator(*this, h); }
-      node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
 
+
+      /**
+       *  This version of get reduces the need to copy to an
+       *  intermediary buffer by allowing the caller to provide
+       *  a callback method with a view on the data. This callback 
+       *  is called while holding the read lock, so make sure it returns
+       *  quickly.
+       *
+       *  If the value is a subtree, this method will return as if the
+       *  key is not found.
+       */
       inline int get(const node_handle&                      r,
                      key_view                                key,
                      std::invocable<bool, value_view> auto&& callback);
+
+      /**
+       * If the key exists and contains a subtree then it will return a node handle
+       * to the subtree. 
+       *
+       * If the key exists but contains data, it will return a null optional
+       */
+      inline std::optional<node_handle> get_subtree(const node_handle& r, key_view key );
 
       /**
        * resizes result to the size of the value and copies the value into result
        * @return -1 if not found, otherwise the size of the value
        */
       inline int get(const node_handle& r, key_view key, std::vector<char>* data = nullptr);
+
+      /**
+       *  Creates a new independent tree with no values on it,
+       *  the tree will be deleted when the last node handle that
+       *  references it goes out of scope. If node handle isn't
+       *  saved via a call to set_root(), or storing it as a value
+       *  associated with a key under the tree saved as set_root()
+       *  it will not survivie the current process and its data will
+       *  be "dead" database data until it is cleaned up.
+       *
+       *  Each node handle is an immutable reference to the
+       *  state of the tree so it is important to keep only
+       *  one copy of it if you are wanting to update effeciently
+       *  in place.
+       */
+      node_handle create_root() { return node_handle(*this); }
+
 
       /**
        * The database supports up to 488 top root nodes that can be 
@@ -158,6 +195,14 @@ namespace arbtrie
        */
       node_handle        get_root(int root_index = 0);
       constexpr uint32_t max_roots()const{ return num_top_roots; }
+
+      /**
+       * Each node handle is associated with a specific read/write session which
+       * impacts where the eventual release() is executed. Node handles can only
+       * be constructed from a read_session; therefore, this allows you to construct
+       * a copy in this read session from a node handle created by another session.
+       */
+      node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
 
 
       void visit_nodes(const node_handle& r, auto&& on_node);
@@ -235,24 +280,11 @@ namespace arbtrie
       // you are about to delete.
       int _old_value_size = -1;
 
+      std::optional<node_handle> _old_handle;
+      std::optional<node_handle> _new_handle;
+
      public:
       ~write_session();
-
-      /**
-       *  Creates a new independent tree with no values on it,
-       *  the tree will be deleted when the last node handle that
-       *  references it goes out of scope. If node handle isn't
-       *  saved via a call to set_root(), or storing it as a value
-       *  associated with a key under the tree saved as set_root()
-       *  it will not survivie the current process and its data will
-       *  be "dead" database data until it is cleaned up.
-       *
-       *  Each node handle is an immutable reference to the
-       *  state of the tree so it is important to keep only
-       *  one copy of it if you are wanting to update effeciently
-       *  in place.
-       */
-      node_handle create_root() { return node_handle(*this); }
 
       // makes the passed node handle the official state of the
       // database and returns the old state so the caller can
@@ -286,8 +318,17 @@ namespace arbtrie
        */
       void insert(node_handle& r, key_view key, node_handle subtree);
 
+      /**
+       * Returns a reference to the prior node handle, if it wasn't a view so that
+       * the caller can control when it is released.
+       */
+      std::optional<node_handle> update(node_handle& r, key_view key, node_handle subtree);
+
+      /**
+       * If the existing value is a subtree, return a reference to it. Otherwise
+       * insert or update the new subtree at this location.
+       */
       std::optional<node_handle> upsert(node_handle& r, key_view key, node_handle subtree);
-      node_handle                update(node_handle& r, key_view key, node_handle subtree);
 
       // return the number of bytes removed, or -1 if nothing was removed
       int remove(node_handle& r, key_view key);
@@ -453,12 +494,43 @@ namespace arbtrie
       if (not r.address()) [[unlikely]]
       {
          callback(false, value_view());
-         return false;
+         return -1;
       }
+      int size = -1;
       auto state = _segas.lock();
       auto ref   = state.get(r.address());
-      return get(ref, key, std::forward<decltype(callback)>(callback));
+      get(ref, key, [&]( bool found, value_type vt ) {
+                 if( found ) {
+                      if( not vt.is_subtree() ) {
+                          callback( true, vt.view() );
+                          size = vt.view().size();
+                          return;
+                      }
+                 }
+                 callback( false, value_view() );
+                 });
+      return size;
    }
+
+   inline std::optional<node_handle> read_session::get_subtree(const node_handle& r, key_view key )
+   {
+      if (not r.address()) [[unlikely]]
+         return {};
+
+      std::optional<node_handle> result;
+
+      auto state = _segas.lock();
+      auto ref   = state.get(r.address());
+      get(ref, key, [&]( bool found, value_type vt ) {
+                 if( found ) {
+                      if( vt.is_subtree() ) {
+                          result = node_handle(*this, vt.id());
+                      }
+                 }
+                 });
+      return result;
+   }
+
 
    inline int read_session::get(const node_handle& r, key_view key, std::vector<char>* data)
    {
@@ -497,14 +569,19 @@ namespace arbtrie
       {
          if (auto val_node_id = inner->get_eof_value())
          {
-            auto vr = root.rlock().get(val_node_id);
-            if (vr.type() == node_type::value)
-            {
-               callback(true, value_type(vr.template as<value_node>()->value()));
+            if( inner->is_eof_subtree() ) {
+               callback( true, value_type(inner->_eof_value) );   
             }
             else
             {
-               callback(true, value_type(val_node_id));
+               auto vr = root.rlock().get(val_node_id);
+               assert( vr.type() == node_type::value );
+               auto vn = vr.template as<value_node>();
+
+               // a value node with a subtree value should have
+               // been embedded at the inner_node::eof field 
+               assert( not vn->is_subtree() );
+               callback(true, value_type(vn->value()));
             }
             return 1;
          }
@@ -541,8 +618,8 @@ namespace arbtrie
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
    {
-      callback(true, vn->value());
-      return 0;
+      callback(true, vn->get_value());
+      return 1;
    }
 
    int read_session::get(object_ref<node_header>&                root,
@@ -554,20 +631,23 @@ namespace arbtrie
       {
          // if( int idx = bn->find_key_idx( key ); idx >= 0 ) {
          auto kvp = bn->get_key_val_ptr(idx);
-         if (bn->is_obj_id(idx))
+         switch( bn->get_value_type(idx) )
          {
-            callback(true, root.rlock()
-                               .get(fast_meta_address(kvp->value_id()))
-                               .template as<value_node>()
-                               ->value());
+            case kv_index::inline_data:
+               callback(true, kvp->value() );
+               return true;
+            case kv_index::obj_id:
+               callback(true, root.rlock()
+                                  .get(fast_meta_address(kvp->value_id()))
+                                  .template as<value_node>()
+                                  ->value());
+               return true;
+            case kv_index::subtree:
+               callback(true, kvp->value_id() );
+               return true;
          }
-         else
-         {
-            callback(true, kvp->value());
-         }
-         return true;
       }
-      callback(false, value_view());
+      callback(false, value_type());
       return 0;
    }
 

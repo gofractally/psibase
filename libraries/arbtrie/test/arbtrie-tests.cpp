@@ -131,6 +131,7 @@ TEST_CASE("binary-node") {
    TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
 }
 
+
 TEST_CASE("update-size") {
    environ env;
    {
@@ -352,10 +353,10 @@ TEST_CASE("insert-words")
          ws.get(root, to_key_view(keys[i]),
                 [&](bool found, const value_type& r)
                 {
-                   REQUIRE(found);
-                   REQUIRE(r.view() == to_value_view(values[i]));
                    if (not found)
                       TRIEDENT_DEBUG("looking for after insert key[", i, "]: ", keys[i]);
+                   REQUIRE(found);
+                   REQUIRE(r.view() == to_value_view(values[i]));
                    assert(found);
                    assert(r.view() == to_value_view(values[i]));
                 });
@@ -632,6 +633,47 @@ TEST_CASE("random-size-updates")
    usleep(1000000 * 2);
    env.db->print_stats(std::cerr);
 }
+
+
+TEST_CASE("subtree2") {
+   environ env;
+   {
+      auto    ws    = env.db->start_write_session();
+      auto    root  = ws.create_root();
+
+      // create test tree
+      std::string big_value;
+      ws.upsert( root, to_key_view("hello"), to_value_view("world") );
+      ws.upsert( root, to_key_view("goodbye"), to_value_view("darkness") );
+
+      // insert subtree into empty tree
+
+      // insert subtree into tree with 1 value node
+
+      // insert subtree into tree with binary node
+      
+      // insert subtree into inner node 
+
+
+
+      auto old_subtree  = ws.upsert( root, to_key_view("version1"), root );
+      ws.upsert( root, to_key_view("goodbye"), to_value_view("evil") );
+      auto v1 = ws.get_subtree( root, to_key_view("version1") );
+      REQUIRE( v1.has_value() );
+      std::vector<char> value;
+      ws.get( *v1, to_key_view("goodbye"), &value );
+      auto itr = ws.create_iterator(root);
+      REQUIRE( itr.lower_bound(to_key_view("version1")) );
+      REQUIRE( itr.is_subtree() );
+      auto v1s = itr.subtree();
+
+      TRIEDENT_DEBUG( "output: ", std::string(value.data(),value.size()));
+      // auto size    = ws.get( root, to_key_view("version1"), v1 );
+
+   env.db->print_stats(std::cerr);
+   }
+}
+
 TEST_CASE("random-size-updates-shared")
 {
    environ env;

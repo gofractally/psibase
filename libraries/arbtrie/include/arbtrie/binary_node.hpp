@@ -341,7 +341,9 @@ namespace arbtrie
       const key_index* key_offsets() const { return (const key_index*)(_key_hashes + _branch_cap); }
 
       int  key_offset_from_tail(int n) const { return key_offsets()[n].pos; }
+      key_index::value_type  get_value_type(uint8_t n)const { return key_offsets()[n].val_type(); }
       bool is_obj_id(uint8_t n) const { return key_offsets()[n].type & key_index::obj_id; }
+      bool is_subtree(uint8_t n) const { return key_offsets()[n].type == key_index::subtree; }
 
       uint8_t*       value_hashes() { return (uint8_t*)(key_offsets() + _branch_cap); }
       const uint8_t* value_hashes() const { return (const uint8_t*)(key_offsets() + _branch_cap); }

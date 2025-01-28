@@ -1,7 +1,54 @@
 #pragma once
 namespace arbtrie
 {
-   int32_t iterator::read_value(auto& buffer)
+
+
+   inline bool iterator::is_subtree()const {
+      if( not valid() )  [[unlikely]]
+         return false;
+
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_path.back().first);
+      switch( rr.type() ) {
+         case node_type::binary:
+            return rr.as<binary_node>()->is_subtree(_path.back().second);
+         case node_type::full:
+            return rr.as<full_node>()->is_eof_subtree();
+         case node_type::setlist:
+            return rr.as<setlist_node>()->is_eof_subtree();
+         case node_type::value:
+            return rr.as<value_node>()->is_subtree();
+         default:
+            throw std::runtime_error( "iterator::is_subtree unhandled type" );
+      }
+   }
+
+   inline node_handle iterator::subtree()const {
+      if( not is_subtree() ) [[unlikely]]
+         throw std::runtime_error( "iterator::subtree: not a subtree" );
+
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_path.back().first);
+      switch( rr.type() ) {
+         case node_type::binary:
+         {
+            auto bn = rr.as<binary_node>();
+            auto idx = _path.back().second;
+            auto kvp = bn->get_key_val_ptr(idx);
+            return _rs.create_handle(kvp->value_id());
+         }
+         case node_type::full:
+            return _rs.create_handle( rr.as<full_node>()->get_eof_value() );
+         case node_type::setlist:
+            return _rs.create_handle( rr.as<setlist_node>()->get_eof_value() );
+         case node_type::value:
+            return _rs.create_handle(  rr.as<value_node>()->subtree() );
+         default:
+            throw std::runtime_error( "iterator::subtree unhandled type" );
+      }
+   }
+
+   inline int32_t iterator::read_value(auto& buffer)
    {
       if (0 == _path.size())
       {
@@ -51,8 +98,7 @@ namespace arbtrie
          }
 
          default:
-            TRIEDENT_WARN("UNHANDLED  TYPE");
-            throw;
+            throw std::runtime_error( "iterator::read_value unhandled type" );
       }
       return -1;
    }

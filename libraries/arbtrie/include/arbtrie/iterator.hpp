@@ -62,14 +62,24 @@ namespace arbtrie
       bool     is_subtree() const;
       bool     is_data() const;
 
+      // @return node_handle of subtree iff is_subtree()
+      // @throw if not is_subtree()
+      node_handle subtree()const;
+
+      // @return a handle to the root of the tree this iterator is traversing 
+      node_handle root_handle()const { return _root; }
+
       // return -1 if no
       int32_t value_size() const { return _size; }
 
       // resizes v to the and copies the value into it
       int32_t read_value(auto& buffer);
 
-      // copies the value into [s,s+s_len) and returns the
-      // number of bytes copied
+      // copies the value into [s,s+s_len) 
+      //
+      // @throw if type is a subtree
+      // @return total bytes copied
+      //
       int32_t read_value(char* s, uint32_t s_len);
 
       std::string value_as_string() const;

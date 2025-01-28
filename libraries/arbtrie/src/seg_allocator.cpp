@@ -398,7 +398,7 @@ namespace arbtrie
    {
       auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
       auto ep  = _header->end_ptr.load(std::memory_order_acquire);
-      auto min = _min_read_ptr.load(std::memory_order_relaxed);
+      auto min = _min_read_ptr.load(std::memory_order_acquire);
 
       if (ap >= min and ep > min)  // then check to see if there is more
       {
@@ -412,7 +412,7 @@ namespace arbtrie
          {
             if (fs & (1ull << i))
             {
-               if (uint32_t p = _session_lock_ptrs[i].load(std::memory_order_relaxed); p < min)
+               if (uint32_t p = _session_lock_ptrs[i].load(std::memory_order_acquire); p < min)
                   min = p;
 
                // we can't find anything lower than this
@@ -459,7 +459,7 @@ namespace arbtrie
 
       if (min > e)  // only possible
          min = e;
-      _min_read_ptr.store(min, std::memory_order_relaxed);
+      _min_read_ptr.store(min, std::memory_order_release);
    }
 
    /**

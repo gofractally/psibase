@@ -305,6 +305,22 @@ namespace arbtrie
       return make<value_node>( reg, state, [](auto) {}, val)
              .address();
    }
+   std::optional<node_handle> write_session::upsert(node_handle& r, key_view key, node_handle sub)
+   {
+      _delta_keys     = 0;
+      auto state = _segas.lock();
+
+      // old handle will be written here, if any is found, reset it to null
+      _old_handle.reset();
+
+      // retain the handle here until its address is safely stored
+      _new_handle = std::move(sub);
+
+      r.give(upsert(state, r.take(), key, _new_handle->address()));
+
+      _new_handle->take(); // it has been stored without exception; therefore we can take it
+      return std::move(_old_handle);
+   }
 
    int write_session::upsert(node_handle& r, key_view key, value_view val)
    {
@@ -1329,8 +1345,9 @@ namespace arbtrie
             // true, especially because we are in the unique path.
             if (bn->can_insert(key, _cur_val)) [[likely]]
             {
-               if (bn->can_inline(_cur_val))
+               if (bn->can_inline(_cur_val)){
                   root.modify().as<binary_node>()->insert(kv_index(lb_idx), key, _cur_val);
+               }
                else
                   root.modify().as<binary_node>()->insert(
                       kv_index(lb_idx,kv_type::obj_id), key, make_value(bn->branch_region(), root.rlock(), _cur_val));
@@ -1354,7 +1371,7 @@ namespace arbtrie
          }
 
          if (binary_node::can_inline(_cur_val))
-            return clone<mode>(root, bn, {}, binary_node::clone_insert(kv_index(lb_idx), key, _cur_val))
+            return clone<mode>(root, bn, {}, binary_node::clone_insert(kv_index(lb_idx,_cur_val.is_subtree()?kv_type::subtree:kv_type::inline_data), key, _cur_val))
                 .address();
          else
             return clone<mode>(
