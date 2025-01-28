@@ -2,12 +2,15 @@ use crate::{Pack, ToKey, ToSchema, Unpack};
 use async_graphql::{scalar, InputObject, SimpleObject};
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{
-    de::{Deserializer, Error as _},
+    de::{Deserializer, Visitor},
     ser::Serializer,
     Deserialize, Serialize,
 };
-use std::ops::{Add, Sub};
-use std::str::FromStr;
+use std::{
+    fmt,
+    ops::{Add, Sub},
+    str::FromStr,
+};
 
 #[derive(
     Debug,
@@ -64,11 +67,26 @@ impl Serialize for TimePointSec {
 
 impl<'de> Deserialize<'de> for TimePointSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <&str>::deserialize(deserializer)?;
-        Ok(DateTime::<FixedOffset>::parse_from_rfc3339(s)
-            .map_err(|e| D::Error::custom(e.to_string()))?
-            .to_utc()
-            .into())
+        deserializer.deserialize_str(TimePointSecVisitor)
+    }
+}
+
+struct TimePointSecVisitor;
+
+impl<'de> Visitor<'de> for TimePointSecVisitor {
+    type Value = TimePointSec;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a valid ISO 8601 timestamp as a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        DateTime::<FixedOffset>::parse_from_rfc3339(v)
+            .map(|dt| dt.to_utc().into())
+            .map_err(|e| E::custom(e.to_string()))
     }
 }
 
@@ -138,8 +156,24 @@ impl Serialize for TimePointUSec {
 
 impl<'de> Deserialize<'de> for TimePointUSec {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = <&str>::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        deserializer.deserialize_str(TimePointUSecVisitor)
+    }
+}
+
+struct TimePointUSecVisitor;
+
+impl<'de> Visitor<'de> for TimePointUSecVisitor {
+    type Value = TimePointUSec;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a valid ISO 8601 timestamp as a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        TimePointUSec::from_str(v).map_err(E::custom)
     }
 }
 
