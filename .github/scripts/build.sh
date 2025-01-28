@@ -28,7 +28,7 @@ export CCACHE_CONFIGPATH=${WORKSPACE_ROOT}/ccache.conf
 echo max_size = 600M >${WORKSPACE_ROOT}/ccache.conf
 echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
 export SCCACHE_IDLE_TIMEOUT=0
-export SCCACHE_CACHE_SIZE=200M
+export SCCACHE_CACHE_SIZE=2G
 export RUSTC_WRAPPER=sccache
 DOCKER="docker run --rm \
   -v ${WORKSPACE_ROOT}:${WORKSPACE_ROOT} \
@@ -51,8 +51,8 @@ ${DOCKER} sccache -s
 echo =====
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
-echo =====
-${DOCKER} bash -c "cd build && make -j $(nproc) && sccache -s"
+${DOCKER} bash -c "cd build && make -j $(nproc)"
+${DOCKER} sccache -s
 echo =====
 ${DOCKER} bash -c "cd rust && cargo build --target-dir ../build/rust --release"
 echo =====
@@ -62,8 +62,6 @@ ls -la ${WORKSPACE_ROOT}
 ls -la ${WORKSPACE_ROOT}/build/doc/psidk
 echo =====
 ${DOCKER} ccache -s
-echo =====
-${DOCKER} sccache -s
 echo =====
 ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${UBUNTU_BUILD_VER}"
 echo =====
