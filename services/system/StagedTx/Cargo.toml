@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "query-service"]
+members = ["service", "query-service", "plugin"]
 
 [workspace.package]
 version = "0.14.0"
@@ -38,3 +38,4 @@ crate-type = ["rlib"]
 [dependencies]
 staged-tx = { path = "service", version = "0.14.0" }
 r-staged-tx = { path = "query-service", version = "0.14.0" }
+plugin = { path = "plugin", version = "0.14.0" }
