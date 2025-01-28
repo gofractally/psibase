@@ -143,7 +143,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<i32, AddEvent>, async_graphql::Error> {
+        ) -> Result<Connection<u64, AddEvent>, async_graphql::Error> {
             let mut q = EventQuery::new("history.example.add")
                 .first(first)
                 .last(last)
@@ -163,7 +163,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<i32, ExampleRecordWrapper>, async_graphql::Error> {
+        ) -> Result<Connection<u64, ExampleRecordWrapper>, async_graphql::Error> {
             EventQuery::new("history.example.save_record")
                 .first(first)
                 .last(last)

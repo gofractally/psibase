@@ -381,7 +381,7 @@ pub trait EventDb {
 
 #[derive(Debug)]
 struct SqlRow {
-    rowid: i32,
+    rowid: u64,
     data: Value,
 }
 
@@ -395,7 +395,7 @@ impl<'de> Deserialize<'de> for SqlRow {
         let rowid = map
             .remove("rowid")
             .and_then(|v| match v {
-                Value::String(s) => s.parse::<i32>().ok(),
+                Value::String(s) => s.parse::<u64>().ok(),
                 _ => None,
             })
             .ok_or_else(|| serde::de::Error::missing_field("rowid"))?;
@@ -563,10 +563,10 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
                 filters.push(cond.clone());
             }
         }
-        if let Some(b) = before.and_then(|s| s.parse::<i32>().ok()) {
+        if let Some(b) = before.and_then(|s| s.parse::<u64>().ok()) {
             filters.push(format!("ROWID < {}", b));
         }
-        if let Some(a) = after.and_then(|s| s.parse::<i32>().ok()) {
+        if let Some(a) = after.and_then(|s| s.parse::<u64>().ok()) {
             filters.push(format!("ROWID > {}", a));
         }
 
@@ -590,7 +590,7 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
     /// Execute the query and return a Connection containing the results
     ///
     /// Returns error if both first and last are specified.
-    pub fn query(&self) -> async_graphql::Result<Connection<i32, T>> {
+    pub fn query(&self) -> async_graphql::Result<Connection<u64, T>> {
         if self.first.is_some() && self.last.is_some() {
             crate::abort_message("Cannot specify both 'first' and 'last'");
         }
