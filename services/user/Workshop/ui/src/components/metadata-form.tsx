@@ -25,9 +25,9 @@ const formSchema = z.object({
   longDescription: z.string(),
   icon: z.string(),
   iconMimeType: z.string(), // MIME type of the icon
-  tosSubpage: z.string().default("/"),
-  privacyPolicySubpage: z.string().default("/"),
-  appHomepageSubpage: z.string().default("/"),
+  tosSubpage: z.string(),
+  privacyPolicySubpage: z.string(),
+  appHomepageSubpage: z.string(),
   redirectUris: z.string().array(), // List of redirect URIs
   tags: z.string().array(), // List of tags
 });
@@ -223,7 +223,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
               <FormItem>
                 <FormLabel>Terms of service</FormLabel>
                 <FormControl>
-                  <Input placeholder="/terms-of-service" {...field} />
+                  <Input required placeholder="/terms-of-service" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -236,7 +236,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
               <FormItem>
                 <FormLabel>Privacy Policy</FormLabel>
                 <FormControl>
-                  <Input placeholder="/privacy-policy" {...field} />
+                  <Input required placeholder="/privacy-policy" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -249,7 +249,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
               <FormItem>
                 <FormLabel>App home subpage</FormLabel>
                 <FormControl>
-                  <Input placeholder="/" {...field} />
+                  <Input required placeholder="/" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
