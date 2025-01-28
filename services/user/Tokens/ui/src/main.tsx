@@ -8,8 +8,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-const queryClient = new QueryClient();
-const supervisor = new Supervisor();
+export const queryClient = new QueryClient();
+export const supervisor = new Supervisor();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

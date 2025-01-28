@@ -18,7 +18,7 @@ import { z } from "zod";
 
 interface Props {
   balances: SharedBalance[];
-  user: string;
+  user: string | undefined | null;
   isLoading: boolean;
 }
 
@@ -29,9 +29,11 @@ export function CreditTable({ balances, user, isLoading }: Props) {
 
   const { mutate } = usePluginCall({
     onSuccess: () => {
-      const queryKey = QueryKey.tokenBalances(user);
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.refetchQueries({ queryKey });
+      if (user) {
+        const queryKey = QueryKey.tokenBalances(user);
+        queryClient.invalidateQueries({ queryKey });
+        queryClient.refetchQueries({ queryKey });
+      }
     },
   });
 

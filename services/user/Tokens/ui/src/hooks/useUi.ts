@@ -21,9 +21,9 @@ export interface SharedBalance {
   amount: Quantity;
 }
 
-export const useUi = (username: string | undefined) =>
+export const useUi = (username: string | undefined | null) =>
   useQuery({
-    queryKey: QueryKey.ui(username),
+    queryKey: QueryKey.ui(username || "undefined"),
     enabled: !!username,
     refetchInterval: 10000,
     queryFn: async () => {
