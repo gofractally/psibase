@@ -94,7 +94,6 @@ export class PluginLoader {
         while (this.currentPlugins.length > 0) {
             // Prune the currentPlugins list
             this.removeHostPlugins();
-            // this.removeDeferredPlugins();
             this.removeAlreadyAddedPlugins();
 
             // Load the plugins
