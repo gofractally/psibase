@@ -4,6 +4,8 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 // import svgr from "vite-plugin-svgr";
 
+// ../../../user/CommonApi/common/packages/common-lib
+
 const psibase = (appletContract: string, isServing?: boolean) => {
   const buildAliases = [
     {
@@ -44,7 +46,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
             port: 8081,
             proxy: {
               "/": {
-                target: "http://psibase.127.0.0.1.sslip.io:8079/",
+                target: "http://psibase.127.0.0.1.sslip.io:8080/",
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 bypass: (req: any) => {
                   const host = req.headers.host || "";
@@ -84,7 +86,7 @@ export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     // svgr({ exportAsDefault: true }),
-    psibase("psibase", command === "serve"),
+    psibase("auth-sig", command === "serve"),
   ],
   resolve: {
     alias: {

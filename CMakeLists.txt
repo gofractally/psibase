@@ -244,6 +244,7 @@ ExternalProject_Add(
 # UIs built with yarn
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
+    services/system/AuthSig/ui:AuthSig_js
     services/user/Homepage/ui:Homepage_js
     services/user/Workshop/ui:Workshop_js
     services/user/Supervisor/ui:Supervisor_js
@@ -446,11 +447,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSig/ui/dist/* /
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
     SERVICE verify-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
+    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"

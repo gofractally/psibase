@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 export const supervisor = new Supervisor();
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

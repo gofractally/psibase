@@ -1,6 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
 import { AccountSelection } from "./AccountSelection";
-import KeyImport from "./KeyImport";
 import Root from "./Root";
 
 const Router = createBrowserRouter([
@@ -11,10 +10,6 @@ const Router = createBrowserRouter([
       {
         path: "/",
         element: <AccountSelection />,
-      },
-      {
-        path: "/key",
-        element: <KeyImport />,
       },
     ],
   },
