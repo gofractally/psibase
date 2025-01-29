@@ -6,7 +6,7 @@ import { ModalCreateToken } from "@/components/modal-create-token";
 import { Mode } from "@/components/transfer-toggle";
 import { m, useMode } from "@/hooks/useMode";
 import { useTokenForm } from "@/hooks/useTokenForm";
-import { useBalances as useBalances } from "@/hooks/tokensPlugin/useBalances";
+import { useBalances } from "@/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/nav";
