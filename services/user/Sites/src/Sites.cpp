@@ -100,7 +100,7 @@ namespace SystemService
           "default-src 'self';"                                            //
           "font-src 'self' https:;"                                        //
           "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https:;"  //
-          "img-src *;"                                                     //
+          "img-src * data:;"                                               //
           "style-src 'self' 'unsafe-inline';"                              //
           "frame-src *;"                                                   //
           "connect-src * blob:;"                                           //

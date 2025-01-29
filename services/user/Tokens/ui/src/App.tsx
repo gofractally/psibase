@@ -156,7 +156,6 @@ function App() {
           <CreditTable
             isLoading={isLoading}
             user={currentUser}
-            // @ts-ignore
             balances={sharedBalances}
           />
         </div>
