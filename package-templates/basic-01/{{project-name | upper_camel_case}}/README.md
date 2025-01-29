@@ -11,7 +11,7 @@ To build the app,
 1. Run `yarn && yarn build` in the app's `ui` directory.
 2. Run `cargo-psibase package` in the app's root directory.
 
-That's it! A package will be generated at `./target/wasm32-wasi/release/packages/{{project-name | upper_camel_case}}.psi`
+That's it! A package will be generated at `./target/wasm32-wasip1/release/packages/{{project-name | upper_camel_case}}.psi`
 
 ## Test
 
