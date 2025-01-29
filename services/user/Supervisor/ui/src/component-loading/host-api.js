@@ -1,6 +1,8 @@
 class PluginRef {
-    constructor(name) {
-        this.name = name;
+    constructor(service, plugin, intf) {
+        this.service = service;
+        this.plugin = plugin;
+        this.intf = intf;
     }
 }
 

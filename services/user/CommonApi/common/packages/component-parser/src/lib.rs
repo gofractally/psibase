@@ -42,7 +42,7 @@ fn extract_wit(resolved_wit: &wit_parser::Resolve) -> Result<String, String> {
             wit.push_str("\n\n");
         }
         match printer.print(resolved_wit, id, &[]) {
-            Ok(s) => wit.push_str(&s),
+            Ok(()) => wit = printer.output.to_string(),
             Err(e) => {
                 // If we can't print the document, just use the error text
                 wit = format!("{e:#}");
@@ -128,14 +128,21 @@ where
 
     let mut funcs = Functions::default();
     let (_, world) = worlds.iter().next().unwrap();
-    for (_, item) in get_world_item(world) {
+    for (world_key, item) in get_world_item(world) {
         match item {
             WorldItem::Interface { id, stability: _ } => {
                 // Todo: consider omitting items based on the stability feature
                 // (https://github.com/WebAssembly/component-model/pull/332)
                 let intf = resolved_wit.interfaces.get(*id).unwrap();
                 let pkg = resolved_wit.packages.get(intf.package.unwrap()).unwrap();
-                let intf_name = intf.name.as_ref().unwrap();
+                let intf_name =
+                    intf.name
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or_else(|| match world_key {
+                            WorldKey::Name(name) => name,
+                            _ => panic!("Interface has no name in interface or world"),
+                        });
                 let mut new_intf = Intf {
                     namespace: pkg.name.namespace.to_owned(),
                     package: pkg.name.name.to_owned(),
@@ -187,3 +194,23 @@ impl Parser for ComponentParser {
 }
 
 bindings::export!(ComponentParser with_types_in bindings);
+
+// Copy a component wasm into the root directory of this project and then this test will work.
+// (Components are in `/build/components/*` )
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::fs;
+
+//     #[test]
+//     fn test_parse_auth_any() {
+//         let wasm_bytes = fs::read("auth-any.wasm").expect("Failed to read auth-any");
+//         let result = ComponentParser::parse("auth-any".to_string(), wasm_bytes);
+
+//         if let Ok(extraction) = result {
+//             println!("WIT: {}", extraction.wit);
+//             println!("DEBUG: {}", extraction.debug);
+//         }
+//     }
+// }
