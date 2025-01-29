@@ -220,9 +220,7 @@ namespace arbtrie
 
       inline void visit_branches( std::invocable<fast_meta_address> auto&& visitor) const
       {
-         const bool has_eof = has_eof_value();
-
-         if (has_eof)
+         if ( has_eof_value() )
             visitor(fast_meta_address(_eof_value));
 
          auto*             ptr = get_branch_ptr();

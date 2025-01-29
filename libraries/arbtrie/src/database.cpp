@@ -308,13 +308,13 @@ namespace arbtrie
    std::optional<node_handle> write_session::upsert(node_handle& r, key_view key, node_handle sub)
    {
       _delta_keys     = 0;
-      auto state = _segas.lock();
 
       // old handle will be written here, if any is found, reset it to null
       _old_handle.reset();
-
       // retain the handle here until its address is safely stored
       _new_handle = std::move(sub);
+
+      auto state = _segas.lock();
 
       r.give(upsert(state, r.take(), key, _new_handle->address()));
 

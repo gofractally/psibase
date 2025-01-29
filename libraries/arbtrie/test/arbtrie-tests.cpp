@@ -686,13 +686,23 @@ TEST_CASE("subtree2") {
       auto r4 = ws.get_subtree( empty, to_key_view("subtree") );
       REQUIRE( root.ref() == 6 ); // r1, r2, r3, r4 and root, and value of subtree key
       
-      // insert subtree into inner node 
+      // split value node into binary tree
       ws.upsert( empty, to_key_view("S"), root );
       REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, and root, and value of "subtree" and "S" key
       auto r5 = ws.get_subtree( empty, to_key_view("S") );
       REQUIRE( root.ref() == 8 ); // r1, r2, r3, r4, r5 and root, and value of "subtree" and "S" key
+                                  
+      // insert into inner eof value
+      ws.upsert( empty, to_key_view(""), root );
+      REQUIRE( root.ref() == 9 ); // r1, r2, r3, r4, and root, and value of "subtree", "", and "S" key
+      auto r6 = ws.get_subtree( empty, to_key_view("") );
+      REQUIRE( root.ref() == 10 ); // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
 
+   //   ws.remove( empty, to_key_view( "S") );
+   //   REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, r5 and root and value of "subtree" 
 
+      empty.reset();
+      REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, r5, r6 and root
 
       auto old_subtree  = ws.upsert( root, to_key_view("version1"), root );
       ws.upsert( root, to_key_view("goodbye"), to_value_view("evil") );
@@ -704,6 +714,7 @@ TEST_CASE("subtree2") {
       REQUIRE( itr.lower_bound(to_key_view("version1")) );
       REQUIRE( itr.is_subtree() );
       auto v1s = itr.subtree();
+
 
       TRIEDENT_DEBUG( "output: ", std::string(value.data(),value.size()));
       // auto size    = ws.get( root, to_key_view("version1"), v1 );

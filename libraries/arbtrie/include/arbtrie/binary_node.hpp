@@ -648,7 +648,7 @@ namespace arbtrie
          const auto end   = start + num_branches();
          while (pos != end)
          {
-            if (pos->type == key_index::obj_id)
+            if (pos->type & key_index::obj_id ) // object_id or subtree
             {
                assert(get_key_val_ptr_offset(pos->pos)->value_size() == sizeof(id_address));
                visitor(fast_meta_address(get_key_val_ptr_offset(pos->pos)->value_id()));
