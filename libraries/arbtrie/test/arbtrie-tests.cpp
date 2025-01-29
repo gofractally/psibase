@@ -647,12 +647,50 @@ TEST_CASE("subtree2") {
       ws.upsert( root, to_key_view("goodbye"), to_value_view("darkness") );
 
       // insert subtree into empty tree
+      auto empty = ws.create_root();
+      ws.upsert( empty, to_key_view("subtree"), root );
+      REQUIRE( root.ref() == 2 ); // root, and value of subtree key
+      auto r1 = ws.get_subtree( empty, to_key_view("subtree") );
+      REQUIRE( root.ref() == 3 ); // r1, root, and value of subtree key
+      ws.remove( empty, to_key_view( "subtree") );
+      REQUIRE( root.ref() == 2 ); // r1 and root
 
-      // insert subtree into tree with 1 value node
+      // insert subtree into tree with 1 value node,
+      // this should split value node into a binary node with the root stored
+      ws.upsert( empty, to_key_view("one"), to_value_view("value") );
+      ws.upsert( empty, to_key_view("subtree"), root );
+      REQUIRE( root.ref() == 3 ); // r1 and root, and value of subtree key
+      auto r2 = ws.get_subtree( empty, to_key_view("subtree") );
+      REQUIRE( root.ref() == 4 ); // r1, r2, and root, and value of subtree key
+      ws.remove( empty, to_key_view( "subtree") );
+      REQUIRE( root.ref() == 3 ); // r1 r2 and root
 
       // insert subtree into tree with binary node
+      big_value.resize(100);
+      ws.upsert( empty, to_key_view("big"), to_value_view(big_value) );
+      ws.upsert( empty, to_key_view("big2"), to_value_view(big_value) );
+      ws.upsert( empty, to_key_view("subtree"), root );
+      auto r3 = ws.get_subtree( empty, to_key_view("subtree") );
+      REQUIRE( root.ref() == 5 ); // r1, r2, r3 and root, and value of subtree key
+      ws.remove( empty, to_key_view( "subtree") );
+      REQUIRE( root.ref() == 4 ); // r1 r2 and root
+                                  
+      // refactor binary tree with subtree into radix node
+      ws.upsert( empty, to_key_view("subtree"), root );
+      big_value.resize(60);
+      std::string key = "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+      for( int i = 0; i < 50; ++i ) {
+         ws.upsert( empty, to_key_view( key ), to_value_view(big_value) );
+         key[0]++;
+      }
+      auto r4 = ws.get_subtree( empty, to_key_view("subtree") );
+      REQUIRE( root.ref() == 6 ); // r1, r2, r3, r4 and root, and value of subtree key
       
       // insert subtree into inner node 
+      ws.upsert( empty, to_key_view("S"), root );
+      REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, and root, and value of "subtree" and "S" key
+      auto r5 = ws.get_subtree( empty, to_key_view("S") );
+      REQUIRE( root.ref() == 8 ); // r1, r2, r3, r4, r5 and root, and value of "subtree" and "S" key
 
 
 

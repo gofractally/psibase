@@ -145,6 +145,11 @@ namespace arbtrie
     *  This function is designed to be thread safe, it will lock a mutex
     *  if it must grab from the free list, but will use atomic inc allocate
     *  until the free list must be consulted
+    *
+    *  There is one free list per region and 2^16 regions, therefore a good
+    *  chance there is no contention. A future allocation scheme will replace
+    *  the free list with a bit-per-slot to optimize placement and eliminate
+    *  locks. (free lists thrash locality)
     */
    inline std::pair<node_meta_type&, fast_meta_address> id_alloc::get_new_id(id_region r)
    {

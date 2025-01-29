@@ -721,7 +721,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-        //TRIEDENT_WARN("REFACTOR! ", r.address());
+   //   TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);
@@ -764,8 +764,11 @@ namespace arbtrie
             new_child = clone_binary_range(bregion, r, root, k.substr(0, cpre.size() + 1), from, to);
          else {
             auto kvp = root->get_key_val_ptr(from);
-            // TODO: handle subtree 
-            if( root->is_obj_id(from) ) {
+            if( root->is_subtree(from) ){
+               new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr( cpre.size() + 1 ), 
+                                            kvp->value_id() ).address();
+            }
+            else if( root->is_obj_id(from) ) {
                // TODO: when mode is unique we may be able to use remake rather than make; however,
                //       we must make sure that the reference count isn't lost and that the 
                //       value node also has a ref count of 1... may have to retain it in that event
@@ -1345,10 +1348,11 @@ namespace arbtrie
             // true, especially because we are in the unique path.
             if (bn->can_insert(key, _cur_val)) [[likely]]
             {
-               if (bn->can_inline(_cur_val)){
-                  root.modify().as<binary_node>()->insert(kv_index(lb_idx), key, _cur_val);
+               if (bn->can_inline(_cur_val)){ // subtree or data
+                  kv_index kvi(lb_idx, _cur_val.is_subtree()?kv_type::subtree:kv_type::inline_data);
+                  root.modify().as<binary_node>()->insert(kvi, key, _cur_val);
                }
-               else
+               else // definite obj_id (aka value node)
                   root.modify().as<binary_node>()->insert(
                       kv_index(lb_idx,kv_type::obj_id), key, make_value(bn->branch_region(), root.rlock(), _cur_val));
                return root.address();
@@ -1404,7 +1408,10 @@ namespace arbtrie
       {
          if (bn->is_obj_id(lb_idx)) {
             auto vn = root.rlock().get(kvp->value_id());
-            _old_value_size = vn.as<value_node>()->value_size();
+            if( bn->is_subtree(lb_idx) )
+               _old_value_size = 4;
+            else
+               _old_value_size = vn.as<value_node>()->value_size();
             release_node(vn);
          }
 
