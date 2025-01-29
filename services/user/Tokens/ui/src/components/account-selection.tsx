@@ -9,22 +9,17 @@ import {
 import { useSelectAccount } from "@/hooks/network/useSelectAccount";
 import { useCreateConnectionToken } from "@/hooks/network/useCreateConnectionToken";
 import { useLoggedInUser } from "@/hooks/network/useLoggedInUser";
-import { siblingUrl } from "@psibase/common-lib";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const AccountSelection = () => {
-  const { data: availableAccounts } = useConnectedAccounts();
+  const { data: availableAccounts, isFetched: isAvailableAccountsFetched } =
+    useConnectedAccounts();
 
-  console.log(siblingUrl(), "sibling url");
+  const { data: currentUser, isFetched: isLoggedInUserFetched } =
+    useLoggedInUser();
+
   const { mutateAsync: createConnectionToken } = useCreateConnectionToken();
   const { mutateAsync: selectAccount } = useSelectAccount();
-
-  const {
-    data: currentUser,
-    isFetching,
-    isSuccess,
-    isError,
-  } = useLoggedInUser();
 
   const onAccountSelection = (account: string) => {
     if (account == "-other") {
@@ -34,8 +29,10 @@ export const AccountSelection = () => {
     }
   };
 
-  if (isFetching && !(isSuccess || isError)) {
-    return <Skeleton className="w-full h-[20px] rounded-full" />;
+  const isLoading = !(isAvailableAccountsFetched && isLoggedInUserFetched);
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-[40px] rounded-full" />;
   }
   return (
     <Select
@@ -45,7 +42,7 @@ export const AccountSelection = () => {
       value={currentUser || "A"}
     >
       <SelectTrigger className="w-full">
-        <SelectValue placeholder={currentUser || ""} />
+        <SelectValue placeholder={currentUser || "No account selected"} />
       </SelectTrigger>
       <SelectContent>
         {availableAccounts.map((account) => (

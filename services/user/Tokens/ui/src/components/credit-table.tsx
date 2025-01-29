@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table";
 import { SharedBalance } from "@/hooks/tokensPlugin/useBalances";
 import { useUncredit } from "@/hooks/tokensPlugin/useUncredit";
-import { tokenPlugin } from "@/plugin";
 import { z } from "zod";
 
 interface Props {
