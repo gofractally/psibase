@@ -95,7 +95,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<i32, Update>> {
+        ) -> async_graphql::Result<Connection<u64, Update>> {
             let actor = ExactAccountNumber::from_str(&actor).unwrap();
             EventQuery::new("history.staged-tx.updated")
                 .condition(format!("actor = '{}'", actor))
@@ -114,7 +114,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<i32, Update>> {
+        ) -> async_graphql::Result<Connection<u64, Update>> {
             EventQuery::new("history.staged-tx.updated")
                 .condition(format!("txid = '{}'", txid))
                 .first(first)
