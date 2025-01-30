@@ -20,6 +20,7 @@ namespace arbtrie
       full      = 4,  // 256 full id_type
       bitset    = 5,  // 1 bit per present branch
       undefined = 6,  // no type has been defined yet
+      unused    = 7
 
       // future, requires taking a bit, or removing undefined/freelist
       //index    = 7,  // 256 index buffer to id_type
@@ -405,7 +406,7 @@ namespace arbtrie
          if (prior.ref() > node_meta::max_ref_count) [[unlikely]]
          {
             _meta.fetch_sub(1, std::memory_order_relaxed);
-            return false;
+            throw std::runtime_error( "reference count exceeded limits" );
          }
          assert( prior.ref() > 0 );
          return true;

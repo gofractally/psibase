@@ -341,7 +341,16 @@ namespace arbtrie
          {
             std::cerr << "msync errorno: " << strerror(errno) << "\n";
          }
-         _header->seg_meta[seg_num]._last_sync_pos.store(start_seg_ptr->_alloc_pos,
+         /**
+          * before any sync can occur we must grab the sync lock which will
+          * block until all modifications on the segment have completed and
+          * then prevent new modifications until after sync is complete.
+          *
+          * There is no need for a global sync lock if each segment has its
+          * own sync lock!
+          */
+         _header->seg_meta[seg_num]._last_sync_pos.store(
+                          start_seg_ptr->_alloc_pos.load(std::memory_order_relaxed),
                                                          std::memory_order_relaxed);
       }
 

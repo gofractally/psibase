@@ -12,7 +12,12 @@ namespace arbtrie
 
   /**
    * Responsible for maintaining reference count for id and
-   * releasing it.
+   * releasing it. 'node_handle', like std::shared_ptr, is
+   * not thread safe when being copied or modified. 
+   *
+   * A node handle has the lifetime of the session that originally
+   * created it unless 
+   *
    */
   class node_handle {
      private:

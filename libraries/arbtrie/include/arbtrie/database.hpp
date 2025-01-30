@@ -442,7 +442,6 @@ namespace arbtrie
       };
       mutable std::mutex _sync_mutex;
       mutable std::mutex _root_change_mutex[num_top_roots];
-      bool               _have_write_session;
 
       seg_allocator    _sega;
       mapping          _dbfile;
@@ -461,7 +460,6 @@ namespace arbtrie
    inline read_session::read_session(database& db) : _db(db), _segas(db._sega.start_session()) {}
    inline write_session::~write_session()
    {
-      _db._have_write_session = false;
    }
 
    template <typename T>

@@ -289,6 +289,10 @@ namespace arbtrie
                }
 
                // returned mutable T is only valid while modify lock is in scope
+               // TODO: compile time optimziation or a state variable can avoid sync_lock
+               // the sync locks and atomic operations if we know for certain that
+               // the process will not want to msync or is willing to risk 
+               // data not making it to disk.
                template <typename T>
                T* as()
                {
@@ -780,6 +784,9 @@ namespace arbtrie
        *  Upper 32 bits represent what compactor has pushed to the session
        *
        *  Allocator takes the min of the lower 32 bits to determine the lock position.
+       *
+       *  TODO: each ptr moved to its own cacheline (64 byte bounds)..
+       *       so that read threads don't contend.
        */
       std::atomic<uint64_t> _session_lock_ptrs[64];
 
