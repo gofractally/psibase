@@ -46,7 +46,7 @@ interface active-app {
 /// This is the typical API intended to be used by third-party plugins or UIs.
 interface api {
     use host:common/types.{error};
-    use types.{account, app-details};
+    use types.{account};
 
     /// Returns true if there is a user logged in to the currently active top-level application.
     /// Unlike get-logged-in-user, this function is callable by any plugin because it does not
