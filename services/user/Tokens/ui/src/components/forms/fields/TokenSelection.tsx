@@ -65,7 +65,7 @@ const TokenSelection: FC<Props> = ({ tokens, form, setNewTokenModalOpen }) => (
                   <div className="text-sm text-muted-foreground">
                     {balance.balance &&
                       `Balance: ${formatThousands(
-                        balance.balance?.toNumber(),
+                        balance.balance?.toDecimal(),
                         balance.balance.getPrecision()
                       )}`}
                   </div>

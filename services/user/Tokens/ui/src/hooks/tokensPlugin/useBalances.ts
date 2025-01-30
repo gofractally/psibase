@@ -42,7 +42,7 @@ export const useBalances = (username: string | undefined | null) =>
           creditor: username || "",
           debitor: credit.creditedTo!,
           id: credit.tokenId.toString() + credit.creditedTo! + username || "",
-          label: amount.label(),
+          label: amount.getDisplayLabel(),
           tokenId: credit.tokenId,
         };
       });
@@ -59,7 +59,7 @@ export const useBalances = (username: string | undefined | null) =>
           creditor: debit.debitableFrom!,
           debitor: username || "",
           id: debit.tokenId.toString() + debit.debitableFrom! + username || "",
-          label: amount.label(),
+          label: amount.getDisplayLabel(),
           tokenId: debit.tokenId,
         };
       });
@@ -83,7 +83,7 @@ export const useBalances = (username: string | undefined | null) =>
             owner: "",
             isAdmin: res.userTokens.some((user) => user.id == balance.tokenId),
             symbol: balance.symbolId,
-            label: quan.label(),
+            label: quan.getDisplayLabel(),
             balance: quan,
           };
         }
@@ -99,7 +99,7 @@ export const useBalances = (username: string | undefined | null) =>
         return {
           id: userToken.id,
           isAdmin: true,
-          label: quan.label(),
+          label: quan.getDisplayLabel(),
           owner: username || "",
           symbol: userToken.symbolId,
         };

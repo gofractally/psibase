@@ -46,7 +46,7 @@ const FormTransfer: FC<Props> = ({
   const isAdmin = selectedToken?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
   const isAmountOperation = isBurning || isMinting || isTransfer;
-  const tokenBalance: number = selectedToken?.balance?.toNumber() || 0;
+  const tokenBalance: number = selectedToken?.balance?.toDecimal() || 0;
 
   const menus: { label: string; value: string }[] = [
     {

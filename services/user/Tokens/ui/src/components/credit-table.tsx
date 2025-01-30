@@ -32,7 +32,7 @@ export function CreditTable({ balances, user, isLoading }: Props) {
     if (!balance) throw new Error(`Failed to find balance`);
     if (parsedAction == ActionType.Enum.Uncredit) {
       uncredit({
-        amount: balance.amount.toNumber().toString(),
+        amount: balance.amount.toDecimal().toString(),
         tokenId: balance.tokenId.toString(),
         memo: "",
         receiver: balance.debitor,
@@ -41,7 +41,7 @@ export function CreditTable({ balances, user, isLoading }: Props) {
       debit({
         tokenId: balance.tokenId.toString(),
         sender: balance.debitor,
-        amount: balance.amount.toNumber().toString(),
+        amount: balance.amount.toDecimal().toString(),
         memo: "",
       });
     } else throw new Error(`Unhandled action`);
@@ -79,7 +79,7 @@ export function CreditTable({ balances, user, isLoading }: Props) {
               <TableCell>
                 {" "}
                 <AnimateNumber
-                  n={balance.amount.toNumber()}
+                  n={balance.amount.toDecimal()}
                   precision={balance.amount.getPrecision()}
                 />
                 {" " + balance.amount.format(true).split(" ")[1]}
