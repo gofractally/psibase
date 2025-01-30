@@ -20,6 +20,10 @@
 namespace arbtrie 
 {
 
+   /**
+    * Responsible for maintaining a growing 
+    * memory mapped file on disk that grows as needed.
+    */
    class block_allocator
    {
      public:

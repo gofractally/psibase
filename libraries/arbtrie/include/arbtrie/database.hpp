@@ -12,12 +12,12 @@
 namespace arbtrie
 {
    using session_rlock = seg_allocator::session::read_lock;
-   using kv_type = binary_node::key_index::value_type;
-   using kv_index = binary_node::key_index;
+   using kv_type       = binary_node::key_index::value_type;
+   using kv_index      = binary_node::key_index;
 
    struct upsert_mode
    {
-      enum type : uint32_t 
+      enum type : uint32_t
       {
          unique             = 1,  // ref count of all parent nodes and this is 1
          insert             = 2,  // fail if key does exist
@@ -129,20 +129,20 @@ namespace arbtrie
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
 
-      inline uint32_t count_keys( object_ref<node_header>& r, key_view from, key_view to )const;
+      inline uint32_t count_keys(object_ref<node_header>& r, key_view from, key_view to) const;
 
       /** creates a new handle for address, retains it */
-      node_handle create_handle( fast_meta_address a ) { return node_handle( *this, a ); }
+      node_handle create_handle(fast_meta_address a) { return node_handle(*this, a); }
+
      public:
       seg_allocator::session _segas;
 
-      iterator    create_iterator(node_handle h) { return iterator(*this, h); }
+      iterator create_iterator(node_handle h) { return iterator(*this, h); }
 
       /**
        * count the keys in the range [from,to)
        */
-      uint32_t count_keys(const node_handle& r, key_view from={}, key_view to = iterator::npos);
-
+      uint32_t count_keys(const node_handle& r, key_view from = {}, key_view to = iterator::npos);
 
       /**
        *  This version of get reduces the need to copy to an
@@ -164,7 +164,7 @@ namespace arbtrie
        *
        * If the key exists but contains data, it will return a null optional
        */
-      inline std::optional<node_handle> get_subtree(const node_handle& r, key_view key );
+      inline std::optional<node_handle> get_subtree(const node_handle& r, key_view key);
 
       /**
        * resizes result to the size of the value and copies the value into result
@@ -188,7 +188,6 @@ namespace arbtrie
        */
       node_handle create_root() { return node_handle(*this); }
 
-
       /**
        * The database supports up to 488 top root nodes that can be 
        * accessed by index. This limit is based upon the minimum disk
@@ -201,7 +200,7 @@ namespace arbtrie
        * write will win.
        */
       node_handle        get_root(int root_index = 0);
-      constexpr uint32_t max_roots()const{ return num_top_roots; }
+      constexpr uint32_t max_roots() const { return num_top_roots; }
 
       /**
        * Each node handle is associated with a specific read/write session which
@@ -210,7 +209,6 @@ namespace arbtrie
        * a copy in this read session from a node handle created by another session.
        */
       node_handle adopt(const node_handle& h) { return node_handle(*this, h.address()); }
-
 
       void visit_nodes(const node_handle& r, auto&& on_node);
 
@@ -343,7 +341,6 @@ namespace arbtrie
       // throws if no key was removed, return the number of bytes removed
       int require_remove(node_handle& r, key_view key);
 
-
       // return the number of keys removed
       // int remove(node_handle& r, key_view from, key_view to);
 
@@ -464,9 +461,7 @@ namespace arbtrie
    void retain_children(session_rlock& state, const NodeType* in);
 
    inline read_session::read_session(database& db) : _db(db), _segas(db._sega.start_session()) {}
-   inline write_session::~write_session()
-   {
-   }
+   inline write_session::~write_session() {}
 
    template <typename T>
    void release_node(object_ref<T>& r)
@@ -491,7 +486,6 @@ namespace arbtrie
       release_node(r);
    }
 
-
    inline int read_session::get(const node_handle&                      r,
                                 key_view                                key,
                                 std::invocable<bool, value_view> auto&& callback)
@@ -501,23 +495,27 @@ namespace arbtrie
          callback(false, value_view());
          return -1;
       }
-      int size = -1;
+      int  size  = -1;
       auto state = _segas.lock();
       auto ref   = state.get(r.address());
-      get(ref, key, [&]( bool found, value_type vt ) {
-                 if( found ) {
-                      if( not vt.is_subtree() ) {
-                          callback( true, vt.view() );
-                          size = vt.view().size();
-                          return;
-                      }
-                 }
-                 callback( false, value_view() );
-                 });
+      get(ref, key,
+          [&](bool found, value_type vt)
+          {
+             if (found)
+             {
+                if (not vt.is_subtree())
+                {
+                   callback(true, vt.view());
+                   size = vt.view().size();
+                   return;
+                }
+             }
+             callback(false, value_view());
+          });
       return size;
    }
 
-   inline std::optional<node_handle> read_session::get_subtree(const node_handle& r, key_view key )
+   inline std::optional<node_handle> read_session::get_subtree(const node_handle& r, key_view key)
    {
       if (not r.address()) [[unlikely]]
          return {};
@@ -526,35 +524,39 @@ namespace arbtrie
 
       auto state = _segas.lock();
       auto ref   = state.get(r.address());
-      get(ref, key, [&]( bool found, value_type vt ) {
-                 if( found ) {
-                      if( vt.is_subtree() ) {
-                          result = node_handle(*this, vt.id());
-                      }
-                 }
-                 });
+      get(ref, key,
+          [&](bool found, value_type vt)
+          {
+             if (found)
+             {
+                if (vt.is_subtree())
+                {
+                   result = node_handle(*this, vt.id());
+                }
+             }
+          });
       return result;
    }
-
 
    inline int read_session::get(const node_handle& r, key_view key, std::vector<char>* data)
    {
       int data_size = -1;
       this->get(r, key,
-          [&](bool found, value_type v)
-          {
-             if (found)
-             {
-                if( v.is_view() ) {
-                   data_size = v.view().size();
-                   if (data)
+                [&](bool found, value_type v)
+                {
+                   if (found)
                    {
-                      data->resize(v.view().size());
-                      memcpy(data->data(), v.view().data(), v.view().size());
+                      if (v.is_view())
+                      {
+                         data_size = v.view().size();
+                         if (data)
+                         {
+                            data->resize(v.view().size());
+                            memcpy(data->data(), v.view().data(), v.view().size());
+                         }
+                      }
                    }
-                }
-             }
-          });
+                });
       return data_size;
    }
 
@@ -574,18 +576,19 @@ namespace arbtrie
       {
          if (auto val_node_id = inner->get_eof_value())
          {
-            if( inner->is_eof_subtree() ) {
-               callback( true, value_type(inner->_eof_value) );   
+            if (inner->is_eof_subtree())
+            {
+               callback(true, value_type(inner->_eof_value));
             }
             else
             {
                auto vr = root.rlock().get(val_node_id);
-               assert( vr.type() == node_type::value );
+               assert(vr.type() == node_type::value);
                auto vn = vr.template as<value_node>();
 
                // a value node with a subtree value should have
-               // been embedded at the inner_node::eof field 
-               assert( not vn->is_subtree() );
+               // been embedded at the inner_node::eof field
+               assert(not vn->is_subtree());
                callback(true, value_type(vn->value()));
             }
             return 1;
@@ -636,10 +639,10 @@ namespace arbtrie
       {
          // if( int idx = bn->find_key_idx( key ); idx >= 0 ) {
          auto kvp = bn->get_key_val_ptr(idx);
-         switch( bn->get_value_type(idx) )
+         switch (bn->get_value_type(idx))
          {
             case kv_index::inline_data:
-               callback(true, kvp->value() );
+               callback(true, kvp->value());
                return true;
             case kv_index::obj_id:
                callback(true, root.rlock()
@@ -648,7 +651,7 @@ namespace arbtrie
                                   ->value());
                return true;
             case kv_index::subtree:
-               callback(true, kvp->value_id() );
+               callback(true, kvp->value_id());
                return true;
          }
       }
@@ -657,7 +660,7 @@ namespace arbtrie
    }
 
    // NOTE This will currently recurse into subtree's which could create
-   // infinite loop or over counting... 
+   // infinite loop or over counting...
    // TODO: fix this so it doesn't recurse through subtrees
    void visit_node(object_ref<node_header>&& n, int depth, auto& on_node)
    {

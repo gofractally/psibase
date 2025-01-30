@@ -2,17 +2,20 @@
 
 namespace arbtrie
 {
-   iterator iterator::subtree_iterator()const {
-      return iterator( _rs, subtree() );
-   }
-   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
+   iterator iterator::subtree_iterator() const
    {
-      pushkey( in->key() );
+      return iterator(_rs, subtree());
+   }
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
+                                           const value_node*        in,
+                                           key_view                 query)
+   {
+      pushkey(in->key());
       return query >= key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
-      pushkey( in->key() );
+      pushkey(in->key());
       return query <= key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
@@ -71,19 +74,21 @@ namespace arbtrie
       return false;
    }
 
-   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
+   bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
+                                           const auto*              in,
+                                           key_view                 query)
    {
       auto node_prefix = in->get_prefix();
       pushkey(node_prefix);
 
       if (query > node_prefix)
       {
-         assert(query.size() > 0 );
+         assert(query.size() > 0);
          branch_index_type qidx = char_to_branch(query[0]);
 
          // go to last branch
          std::pair<branch_index_type, fast_meta_address> idx = in->reverse_lower_bound(qidx);
-         assert( idx.second >= 0 );
+         assert(idx.second >= 0);
 
          if (idx.first == 0)
          {
@@ -127,7 +132,7 @@ namespace arbtrie
          pushkey(branch_to_char(idx.first));
          return reverse_lower_bound_impl(bref, remaining_query.substr(1));
       }
-      popkey(node_prefix.size() + _path.back().second != 0 );
+      popkey(node_prefix.size() + _path.back().second != 0);
       return false;
    }
 
@@ -151,16 +156,16 @@ namespace arbtrie
       return true;
    }
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
-                                   const binary_node*       bn,
-                                   key_view                 query)
+                                           const binary_node*       bn,
+                                           key_view                 query)
    {
       auto lbx            = bn->reverse_lower_bound_idx(query);
       _path.back().second = lbx;
 
-      if (lbx < 0 )
+      if (lbx < 0)
          return false;
 
-      auto kvp            = bn->get_key_val_ptr(lbx);
+      auto kvp = bn->get_key_val_ptr(lbx);
       pushkey(bn->get_key_val_ptr(lbx)->key());
       _size = kvp->value_size();
 
@@ -247,7 +252,7 @@ namespace arbtrie
          else
             pushkey(branch_to_char(lbx.first));
 
-         auto oref   = state.get(lbx.second);
+         auto oref = state.get(lbx.second);
          return lower_bound_impl(oref, {});
       };
 
@@ -258,7 +263,7 @@ namespace arbtrie
          {
             auto bn = oref.as<binary_node>();
 
-            if( current < bn->num_branches() )
+            if (current < bn->num_branches())
                popkey(bn->get_key_val_ptr(current)->key_size());
 
             if (int(bn->num_branches()) - _path.back().second <= 0)
@@ -276,19 +281,20 @@ namespace arbtrie
          case node_type::value:
          {
             auto vn = oref.as<value_node>();
-            popkey( vn->key().size() );
+            popkey(vn->key().size());
             _path.pop_back();
             return next();
          }
          default:
-            TRIEDENT_WARN( "unexpected type: ", oref.type() );
+            TRIEDENT_WARN("unexpected type: ", oref.type());
             throw std::runtime_error("iterator::next unexpected type: ");
       }
       // unreachable
    }
 
-   bool iterator::prev() {
-      if( _path.size() == 0 )
+   bool iterator::prev()
+   {
+      if (_path.size() == 0)
          return end();
 
       auto current = _path.back().second;
@@ -296,50 +302,59 @@ namespace arbtrie
       auto& db    = _rs._db;
       auto  state = _rs._segas.lock();
 
-      auto handle_inner = [&]( const auto* in ) {
-         if( current == 0 ) {
-            popkey( in->get_prefix().size() );
+      auto handle_inner = [&](const auto* in)
+      {
+         if (current == 0)
+         {
+            popkey(in->get_prefix().size());
             _path.pop_back();
             return prev();
          }
-       //  TRIEDENT_DEBUG( "current: ", current );
-         auto lbx = in->reverse_lower_bound( current - 1 );
-      //   TRIEDENT_DEBUG( "rlb prev: ", lbx.first );
+         //  TRIEDENT_DEBUG( "current: ", current );
+         auto lbx = in->reverse_lower_bound(current - 1);
+         //   TRIEDENT_DEBUG( "rlb prev: ", lbx.first );
          _path.back().second = lbx.first;
-         if( not lbx.second ) { 
+         if (not lbx.second)
+         {
             // add 1 because we are not eof because current != 0 at start of call
-            popkey( in->get_prefix().size() + 1 );
+            popkey(in->get_prefix().size() + 1);
             _path.pop_back();
             return prev();
          }
-         if( lbx.first == 0 ) {
-            popkey(current<257);
+         if (lbx.first == 0)
+         {
+            popkey(current < 257);
             return true;
          }
-         if( lbx.first ) {
-       //     TRIEDENT_DEBUG( "branches.back = ", branch_to_char(lbx.first) );
-            _branches.back() = branch_to_char( lbx.first );
+         if (lbx.first)
+         {
+            //     TRIEDENT_DEBUG( "branches.back = ", branch_to_char(lbx.first) );
+            _branches.back() = branch_to_char(lbx.first);
 
-            auto oref   = state.get(lbx.second);
-            return reverse_lower_bound_impl( oref, npos );
+            auto oref = state.get(lbx.second);
+            return reverse_lower_bound_impl(oref, npos);
          }
-         else {
+         else
+         {
             _branches.pop_back();
             _path.pop_back();
          }
          return true;
       };
-      
+
       auto oref = state.get(_path.back().first);
-      switch( oref.type() ) {
+      switch (oref.type())
+      {
          case node_type::binary:
          {
-   //   TRIEDENT_DEBUG( "binary _path.size: ", _path.size(), " idx: ", _path.back().second );
+            //   TRIEDENT_DEBUG( "binary _path.size: ", _path.size(), " idx: ", _path.back().second );
             const auto* bn = oref.as<binary_node>();
-            if( current < bn->num_branches() ) {
-               popkey( bn->get_key_val_ptr(current)->key_size() );
+            if (current < bn->num_branches())
+            {
+               popkey(bn->get_key_val_ptr(current)->key_size());
 
-               if( current == 0 ) {
+               if (current == 0)
+               {
                   _path.pop_back();
                   return prev();
                }
@@ -347,7 +362,9 @@ namespace arbtrie
                current = --_path.back().second;
                pushkey(bn->get_key_val_ptr(current)->key());
                return true;
-            } else {
+            }
+            else
+            {
                current = _path.back().second = bn->num_branches() - 1;
                pushkey(bn->get_key_val_ptr(current)->key());
                return true;
@@ -356,12 +373,12 @@ namespace arbtrie
          case node_type::full:
             return handle_inner(oref.as<full_node>());
          case node_type::setlist:
-    //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
+            //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
             return handle_inner(oref.as<setlist_node>());
          case node_type::value:
          {
             auto vn = oref.as<value_node>();
-            popkey( vn->key().size() );
+            popkey(vn->key().size());
             _path.pop_back();
             return prev();
          }
@@ -370,16 +387,6 @@ namespace arbtrie
       }
       // unreachable
    }
-
-
-
-
-
-
-
-
-
-
 
 #if 0
       key_view iterator::key()

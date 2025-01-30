@@ -25,7 +25,6 @@ void toupper(std::string& s)
       c = std::toupper(c);
 }
 
-
 struct environ
 {
    environ()
@@ -41,7 +40,7 @@ struct environ
 
 std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
 {
-   auto filename = "/usr/share/dict/words";
+   auto                     filename = "/usr/share/dict/words";
    std::vector<std::string> result;
    {
       auto          start = std::chrono::steady_clock::now();
@@ -58,11 +57,11 @@ std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64
       {
          val = key;
          toupper(val);
-         if( result.size() != ws.count_keys(root) )
-            TRIEDENT_WARN( key, " count_keys: ", ws.count_keys(root) );
-         REQUIRE( result.size()  == ws.count_keys(root) );
+         if (result.size() != ws.count_keys(root))
+            TRIEDENT_WARN(key, " count_keys: ", ws.count_keys(root));
+         REQUIRE(result.size() == ws.count_keys(root));
 
-         result.push_back( key );
+         result.push_back(key);
          ws.upsert(root, to_key_view(key), to_value_view(val));
 
          /*
@@ -114,211 +113,216 @@ void validate_refcount(session_rlock& state, fast_meta_address i, int c)
    }
 }
 
-TEST_CASE("binary-node") {
-   alignas(64)char node_buffer[64*16];
-   auto bn = new(node_buffer) binary_node( sizeof(node_buffer), fast_meta_address{}, clone_config{} );
-   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
-   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
-   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
-   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
-   TRIEDENT_WARN( "reserving 8 branches" );
+TEST_CASE("binary-node")
+{
+   alignas(64) char node_buffer[64 * 16];
+   auto             bn =
+       new (node_buffer) binary_node(sizeof(node_buffer), fast_meta_address{}, clone_config{});
+   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
+   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
+   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
+   TRIEDENT_DEBUG("branches: ", bn->num_branches());
+   TRIEDENT_WARN("reserving 8 branches");
    bn->reserve_branch_cap(8);
-   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
-   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
-   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
-   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
+   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
+   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
+   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
+   TRIEDENT_DEBUG("branches: ", bn->num_branches());
 
-   auto idx = bn->lower_bound_idx( to_key_view( "hello" ) );
-   bn->insert( kv_index(idx), to_key_view("hello"), to_value_view("world") );
+   auto idx = bn->lower_bound_idx(to_key_view("hello"));
+   bn->insert(kv_index(idx), to_key_view("hello"), to_value_view("world"));
 
-   TRIEDENT_DEBUG( "capacity: ", bn->data_capacity() );
-   TRIEDENT_DEBUG( "spare capacity: ", bn->spare_capacity() );
-   TRIEDENT_DEBUG( "branch capacity: ", bn->_branch_cap );
-   TRIEDENT_DEBUG( "branches: ", bn->num_branches() );
+   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
+   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
+   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
+   TRIEDENT_DEBUG("branches: ", bn->num_branches());
 }
 
-
-TEST_CASE("update-size") {
+TEST_CASE("update-size")
+{
    environ env;
    {
-      auto    ws    = env.db->start_write_session();
-      auto    root  = ws.create_root();
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
 
       std::string big_value;
 
-      auto old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("world") );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("new world") );
-      REQUIRE( old_key_size == 5 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("the old world") );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("world") );
-      REQUIRE( old_key_size == 13 );
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 5 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 0 );
-      big_value.resize( 10 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      big_value.resize( 0 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 10 );
-      big_value.resize( 1000 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 0 );
-      big_value.resize( 500 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 1000 );
+      auto old_key_size = ws.upsert(root, to_key_view("hello"), to_value_view("world"));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("hello"), to_value_view("new world"));
+      REQUIRE(old_key_size == 5);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view("the old world"));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view("world"));
+      REQUIRE(old_key_size == 13);
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 5);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 0);
+      big_value.resize(10);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      big_value.resize(0);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 10);
+      big_value.resize(1000);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 0);
+      big_value.resize(500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 1000);
       big_value.resize(50);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 500);
       big_value.resize(300);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 50);
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 300 );
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 50);
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 300);
 
       big_value.resize(60);
-      old_key_size = ws.upsert( root, to_key_view("afill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("bfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("cfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("dfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("efill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("ffill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert(root, to_key_view("afill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("bfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("cfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("dfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("efill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("ffill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
       std::string key = "fill";
-      for( int i = 0; i < 22; ++i ) {
-         old_key_size = ws.upsert( root, to_key_view(key), to_value_view(big_value) );
+      for (int i = 0; i < 22; ++i)
+      {
+         old_key_size = ws.upsert(root, to_key_view(key), to_value_view(big_value));
          key += 'a';
       }
 
       big_value.resize(500);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
       big_value.resize(50);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 500);
       big_value.resize(300);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 50);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 50);
       big_value.resize(50);
       /// this will should change a key that is currely a 4 byte ptr to an inline 50 bytes
       /// but the existing binary node is unable to accomodate the extra space
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 300);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 300);
 
       env.db->print_stats(std::cerr);
    }
    env.db->print_stats(std::cerr);
 }
-TEST_CASE("update-size-shared") {
+TEST_CASE("update-size-shared")
+{
    environ env;
    {
-      auto    ws    = env.db->start_write_session();
-      auto    root  = ws.create_root();
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
 
       std::optional<node_handle> tmp;
-      std::string big_value;
+      std::string                big_value;
 
-      auto old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("world") );
-      REQUIRE( old_key_size == -1 );
+      auto old_key_size = ws.upsert(root, to_key_view("hello"), to_value_view("world"));
+      REQUIRE(old_key_size == -1);
+      tmp          = root;
+      old_key_size = ws.upsert(root, to_key_view("hello"), to_value_view("new world"));
+      REQUIRE(old_key_size == 5);
+      tmp          = root;
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view("the old world"));
+      REQUIRE(old_key_size == -1);
+      tmp          = root;
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view("world"));
+      REQUIRE(old_key_size == 13);
+      tmp          = root;
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 5);
+      tmp          = root;
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      tmp          = root;
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 0);
       tmp = root;
-      old_key_size = ws.upsert( root, to_key_view("hello"), to_value_view("new world") );
-      REQUIRE( old_key_size == 5 );
+      big_value.resize(10);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
       tmp = root;
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("the old world") );
-      REQUIRE( old_key_size == -1 );
+      big_value.resize(0);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 10);
       tmp = root;
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view("world") );
-      REQUIRE( old_key_size == 13 );
+      big_value.resize(1000);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 0);
       tmp = root;
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 5 );
-      tmp = root;
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      tmp = root;
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 0 );
-      tmp = root;
-      big_value.resize( 10 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      tmp = root;
-      big_value.resize( 0 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 10 );
-      tmp = root;
-      big_value.resize( 1000 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 0 );
-      tmp = root;
-      big_value.resize( 500 );
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 1000 );
+      big_value.resize(500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 1000);
 
       tmp = root;
       big_value.resize(50);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 500);
       tmp = root;
       big_value.resize(300);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 50);
-      tmp = root;
-      old_key_size = ws.remove( root, to_key_view("goodbye") );
-      REQUIRE( old_key_size == 300 );
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 50);
+      tmp          = root;
+      old_key_size = ws.remove(root, to_key_view("goodbye"));
+      REQUIRE(old_key_size == 300);
       tmp = root;
 
       big_value.resize(60);
-      old_key_size = ws.upsert( root, to_key_view("afill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("bfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("cfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("dfill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("efill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
-      old_key_size = ws.upsert( root, to_key_view("ffill"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1 );
+      old_key_size = ws.upsert(root, to_key_view("afill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("bfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("cfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("dfill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("efill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("ffill"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
       std::string key = "fill";
-      for( int i = 0; i < 22; ++i ) {
-         old_key_size = ws.upsert( root, to_key_view(key), to_value_view(big_value) );
+      for (int i = 0; i < 22; ++i)
+      {
+         old_key_size = ws.upsert(root, to_key_view(key), to_value_view(big_value));
          key += 'a';
-      tmp = root;
+         tmp = root;
       }
 
       big_value.resize(500);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == -1);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == -1);
       tmp = root;
       big_value.resize(50);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 500);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 500);
       tmp = root;
       big_value.resize(300);
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 50);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 50);
       tmp = root;
       big_value.resize(50);
       /// this will should change a key that is currely a 4 byte ptr to an inline 50 bytes
       /// but the existing binary node is unable to accomodate the extra space
-      old_key_size = ws.upsert( root, to_key_view("goodbye"), to_value_view(big_value) );
-      REQUIRE( old_key_size == 300);
+      old_key_size = ws.upsert(root, to_key_view("goodbye"), to_value_view(big_value));
+      REQUIRE(old_key_size == 300);
       tmp = root;
 
       env.db->print_stats(std::cerr);
-      TRIEDENT_WARN( "resetting temp" );
+      TRIEDENT_WARN("resetting temp");
       tmp.reset();
       env.db->print_stats(std::cerr);
    }
@@ -338,10 +342,10 @@ TEST_CASE("insert-words")
    while (file >> key)
    {
       keys.push_back(key);
-   //   values.push_back(key);
-   //   toupper(values.back());
+      //   values.push_back(key);
+      //   toupper(values.back());
    }
-   std::sort( keys.begin(), keys.end() );
+   std::sort(keys.begin(), keys.end());
    values = keys;
 
    auto test_words = [&](bool shared)
@@ -355,10 +359,10 @@ TEST_CASE("insert-words")
       bool inserted = false;
       for (int i = 0; i < keys.size(); ++i)
       {
-         if( i == 2560 )
-            std::cerr<<"break\n";
+         if (i == 2560)
+            std::cerr << "break\n";
 
-         REQUIRE( ws.count_keys(root) == i );
+         REQUIRE(ws.count_keys(root) == i);
          ws.upsert(root, to_key_view(keys[i]), to_value_view(values[i]));
          ws.get(root, to_key_view(keys[i]),
                 [&](bool found, const value_type& r)
@@ -403,7 +407,7 @@ TEST_CASE("insert-words")
 
             std::vector<char> data;
             auto              start = std::chrono::steady_clock::now();
-            auto fkeys = keys.begin();
+            auto              fkeys = keys.begin();
             if (itr.lower_bound())
             {
                itr.read_value(data);
@@ -454,8 +458,8 @@ TEST_CASE("insert-words")
             auto rkeys = keys.rbegin();
             while (itr.valid())
             {
-               REQUIRE( rkeys != keys.rend() );
-         //      TRIEDENT_WARN( "checking ", *rkeys );
+               REQUIRE(rkeys != keys.rend());
+               //      TRIEDENT_WARN( "checking ", *rkeys );
                itr.read_value(data);
                /*
                if( rkeys->size() != data.size() or
@@ -468,8 +472,9 @@ TEST_CASE("insert-words")
 
                //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
                REQUIRE(itr.key().size() == data.size());
-               if( *rkeys == "zuccarino" ) {
-                  TRIEDENT_WARN( "break" );
+               if (*rkeys == "zuccarino")
+               {
+                  TRIEDENT_WARN("break");
                }
                itr.prev();
                ++rcount;
@@ -491,12 +496,12 @@ TEST_CASE("insert-words")
          shared_handle = root;
       TRIEDENT_WARN("removing for keys in order, shared: ", shared);
       auto cnt = ws.count_keys(root);
-      REQUIRE( cnt == keys.size() );
+      REQUIRE(cnt == keys.size());
       for (int i = 0; i < keys.size(); ++i)
       {
-       // TRIEDENT_DEBUG( "check before remove: ", keys[i], " i: ", i, " shared: ", shared );
-       // TRIEDENT_DEBUG( "ws.count: ", ws.count_keys(root), " i: ", i );
-         REQUIRE( cnt - i ==  ws.count_keys(root) );
+         // TRIEDENT_DEBUG( "check before remove: ", keys[i], " i: ", i, " shared: ", shared );
+         // TRIEDENT_DEBUG( "ws.count: ", ws.count_keys(root), " i: ", i );
+         REQUIRE(cnt - i == ws.count_keys(root));
          ws.get(root, to_key_view(keys[i]),
                 [&](bool found, const value_type& r)
                 {
@@ -526,7 +531,7 @@ TEST_CASE("insert-words")
                    assert(not found);
                 });
       }
-      REQUIRE( ws.count_keys(root) == 0 );
+      REQUIRE(ws.count_keys(root) == 0);
       auto itr = ws.create_iterator(root);
       REQUIRE(not itr.valid());
       REQUIRE(not itr.lower_bound());
@@ -617,124 +622,132 @@ TEST_CASE("random-size-updates")
 {
    environ env;
    {
-   auto    ws   = env.db->start_write_session();
-   auto    root = ws.create_root();
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
 
-   auto words = load_words(ws, root);
+      auto words = load_words(ws, root);
 
+      std::optional<node_handle> tmp;
+      std::string                data;
+      std::vector<char>          result;
+      auto                       rng = std::default_random_engine{};
+      for (int i = 0; i < 1000000; ++i)
+      {
+         auto idx = rng() % words.size();
+         data.resize(rng() % 250);
 
-   std::optional<node_handle> tmp;
-   std::string data;
-   std::vector<char> result;
-   auto rng = std::default_random_engine{};
-   for( int i = 0; i < 1000000; ++i ) {
-      auto idx = rng()%words.size();
-      data.resize( rng()%250);
-
-      auto initsize = ws.get( root, to_key_view(words[idx]), nullptr );
-      auto prevsize = ws.upsert( root, to_key_view(words[idx]), to_value_view(data) );
-      assert( initsize == prevsize );
-      REQUIRE( initsize == prevsize );
-      auto postsize = ws.get( root, to_key_view(words[idx]), nullptr );
-      REQUIRE( postsize == data.size() );
-      tmp = root;
-   }
-   env.db->print_stats(std::cerr);
+         auto initsize = ws.get(root, to_key_view(words[idx]), nullptr);
+         auto prevsize = ws.upsert(root, to_key_view(words[idx]), to_value_view(data));
+         assert(initsize == prevsize);
+         REQUIRE(initsize == prevsize);
+         auto postsize = ws.get(root, to_key_view(words[idx]), nullptr);
+         REQUIRE(postsize == data.size());
+         tmp = root;
+      }
+      env.db->print_stats(std::cerr);
    }
    // let the compactor catch up
    usleep(1000000 * 2);
    env.db->print_stats(std::cerr);
 }
 
-TEST_CASE("remove") {
+TEST_CASE("remove")
+{
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto root = ws.create_root();
-   auto words = load_words(ws, root);
+   auto    ws    = env.db->start_write_session();
+   auto    root  = ws.create_root();
+   auto    words = load_words(ws, root);
 
    // remove key that does not exist
-   REQUIRE( ws.get( root, to_key_view("xcvbn"), nullptr ) == -1 );
-   auto r = ws.remove( root, to_key_view("xcvbn") );
-   REQUIRE( r == -1 );
+   REQUIRE(ws.get(root, to_key_view("xcvbn"), nullptr) == -1);
+   auto r = ws.remove(root, to_key_view("xcvbn"));
+   REQUIRE(r == -1);
    auto share = root;
-   r = ws.remove( root, to_key_view("xcvbn") );
-   REQUIRE( r == -1 );
+   r          = ws.remove(root, to_key_view("xcvbn"));
+   REQUIRE(r == -1);
 }
 
-TEST_CASE("subtree2") {
+TEST_CASE("subtree2")
+{
    environ env;
    {
-      auto    ws    = env.db->start_write_session();
-      auto    root  = ws.create_root();
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
 
       // create test tree
       std::string big_value;
-      ws.upsert( root, to_key_view("hello"), to_value_view("world") );
-      ws.upsert( root, to_key_view("goodbye"), to_value_view("darkness") );
+      ws.upsert(root, to_key_view("hello"), to_value_view("world"));
+      ws.upsert(root, to_key_view("goodbye"), to_value_view("darkness"));
 
       // insert subtree into empty tree
       auto empty = ws.create_root();
-      ws.upsert( empty, to_key_view("subtree"), root );
-      REQUIRE( root.ref() == 2 ); // root, and value of subtree key
-      auto r1 = ws.get_subtree( empty, to_key_view("subtree") );
-      REQUIRE( root.ref() == 3 ); // r1, root, and value of subtree key
-      ws.remove( empty, to_key_view( "subtree") );
-      REQUIRE( root.ref() == 2 ); // r1 and root
+      ws.upsert(empty, to_key_view("subtree"), root);
+      REQUIRE(root.ref() == 2);  // root, and value of subtree key
+      auto r1 = ws.get_subtree(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 3);  // r1, root, and value of subtree key
+      ws.remove(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 2);  // r1 and root
 
       // insert subtree into tree with 1 value node,
       // this should split value node into a binary node with the root stored
-      ws.upsert( empty, to_key_view("one"), to_value_view("value") );
-      ws.upsert( empty, to_key_view("subtree"), root );
-      REQUIRE( root.ref() == 3 ); // r1 and root, and value of subtree key
-      auto r2 = ws.get_subtree( empty, to_key_view("subtree") );
-      REQUIRE( root.ref() == 4 ); // r1, r2, and root, and value of subtree key
-      ws.remove( empty, to_key_view( "subtree") );
-      REQUIRE( root.ref() == 3 ); // r1 r2 and root
+      ws.upsert(empty, to_key_view("one"), to_value_view("value"));
+      ws.upsert(empty, to_key_view("subtree"), root);
+      REQUIRE(root.ref() == 3);  // r1 and root, and value of subtree key
+      auto r2 = ws.get_subtree(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 4);  // r1, r2, and root, and value of subtree key
+      ws.remove(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 3);  // r1 r2 and root
 
       // insert subtree into tree with binary node
       big_value.resize(100);
-      ws.upsert( empty, to_key_view("big"), to_value_view(big_value) );
-      ws.upsert( empty, to_key_view("big2"), to_value_view(big_value) );
-      ws.upsert( empty, to_key_view("subtree"), root );
-      auto r3 = ws.get_subtree( empty, to_key_view("subtree") );
-      REQUIRE( root.ref() == 5 ); // r1, r2, r3 and root, and value of subtree key
-      ws.remove( empty, to_key_view( "subtree") );
-      REQUIRE( root.ref() == 4 ); // r1 r2 and root
-                                  
+      ws.upsert(empty, to_key_view("big"), to_value_view(big_value));
+      ws.upsert(empty, to_key_view("big2"), to_value_view(big_value));
+      ws.upsert(empty, to_key_view("subtree"), root);
+      auto r3 = ws.get_subtree(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 5);  // r1, r2, r3 and root, and value of subtree key
+      ws.remove(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 4);  // r1 r2 and root
+
       // refactor binary tree with subtree into radix node
-      ws.upsert( empty, to_key_view("subtree"), root );
+      ws.upsert(empty, to_key_view("subtree"), root);
       big_value.resize(60);
       std::string key = "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-      for( int i = 0; i < 50; ++i ) {
-         ws.upsert( empty, to_key_view( key ), to_value_view(big_value) );
+      for (int i = 0; i < 50; ++i)
+      {
+         ws.upsert(empty, to_key_view(key), to_value_view(big_value));
          key[0]++;
       }
-      auto r4 = ws.get_subtree( empty, to_key_view("subtree") );
-      REQUIRE( root.ref() == 6 ); // r1, r2, r3, r4 and root, and value of subtree key
-      
+      auto r4 = ws.get_subtree(empty, to_key_view("subtree"));
+      REQUIRE(root.ref() == 6);  // r1, r2, r3, r4 and root, and value of subtree key
+
       // split value node into binary tree
-      ws.upsert( empty, to_key_view("S"), root );
-      REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, and root, and value of "subtree" and "S" key
-      auto r5 = ws.get_subtree( empty, to_key_view("S") );
-      REQUIRE( root.ref() == 8 ); // r1, r2, r3, r4, r5 and root, and value of "subtree" and "S" key
-                                  
+      ws.upsert(empty, to_key_view("S"), root);
+      REQUIRE(root.ref() == 7);  // r1, r2, r3, r4, and root, and value of "subtree" and "S" key
+      auto r5 = ws.get_subtree(empty, to_key_view("S"));
+      REQUIRE(root.ref() == 8);  // r1, r2, r3, r4, r5 and root, and value of "subtree" and "S" key
+
       // insert into inner eof value
-      ws.upsert( empty, to_key_view(""), root );
-      REQUIRE( root.ref() == 9 ); // r1, r2, r3, r4, and root, and value of "subtree", "", and "S" key
-      auto r6 = ws.get_subtree( empty, to_key_view("") );
-      REQUIRE( root.ref() == 10 ); // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
-                                   
+      ws.upsert(empty, to_key_view(""), root);
+      REQUIRE(root.ref() ==
+              9);  // r1, r2, r3, r4, and root, and value of "subtree", "", and "S" key
+      auto r6 = ws.get_subtree(empty, to_key_view(""));
+      REQUIRE(root.ref() ==
+              10);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
+
       {
-         auto itr = ws.create_iterator( empty );
+         auto              itr = ws.create_iterator(empty);
          std::vector<char> buf;
          itr.lower_bound();
-         while( itr.valid() ) {
-            std::cerr << '"'<<to_str(itr.key())<<" = " << itr.is_subtree() <<"\n";
-            if( itr.is_subtree() ) {
+         while (itr.valid())
+         {
+            std::cerr << '"' << to_str(itr.key()) << " = " << itr.is_subtree() << "\n";
+            if (itr.is_subtree())
+            {
                auto sitr = itr.subtree_iterator();
                sitr.lower_bound();
-               while( sitr.valid() ) {
-                  std::cerr << "\t\t" <<to_str(sitr.key())<<"\n";
+               while (sitr.valid())
+               {
+                  std::cerr << "\t\t" << to_str(sitr.key()) << "\n";
                   sitr.next();
                }
             }
@@ -742,26 +755,24 @@ TEST_CASE("subtree2") {
          }
       }
 
-
       empty.reset();
-      REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, r5, r6 and root
+      REQUIRE(root.ref() == 7);  // r1, r2, r3, r4, r5, r6 and root
 
-      auto old_subtree  = ws.upsert( root, to_key_view("version1"), root );
-      ws.upsert( root, to_key_view("goodbye"), to_value_view("evil") );
-      auto v1 = ws.get_subtree( root, to_key_view("version1") );
-      REQUIRE( v1.has_value() );
+      auto old_subtree = ws.upsert(root, to_key_view("version1"), root);
+      ws.upsert(root, to_key_view("goodbye"), to_value_view("evil"));
+      auto v1 = ws.get_subtree(root, to_key_view("version1"));
+      REQUIRE(v1.has_value());
       std::vector<char> value;
-      ws.get( *v1, to_key_view("goodbye"), &value );
+      ws.get(*v1, to_key_view("goodbye"), &value);
       auto itr = ws.create_iterator(root);
-      REQUIRE( itr.lower_bound(to_key_view("version1")) );
-      REQUIRE( itr.is_subtree() );
+      REQUIRE(itr.lower_bound(to_key_view("version1")));
+      REQUIRE(itr.is_subtree());
       auto v1s = itr.subtree();
 
-
-      TRIEDENT_DEBUG( "output: ", std::string(value.data(),value.size()));
+      TRIEDENT_DEBUG("output: ", std::string(value.data(), value.size()));
       // auto size    = ws.get( root, to_key_view("version1"), v1 );
 
-   env.db->print_stats(std::cerr);
+      env.db->print_stats(std::cerr);
    }
 }
 
@@ -769,11 +780,13 @@ TEST_CASE("subtree2") {
  * Utilizing CPU ticks as a fast source of randomness
  * to determine whether to record a read or not... 
  */
-TEST_CASE( "rdtsc" ) {
+TEST_CASE("rdtsc")
+{
    int64_t counts[16];
-   memset(counts,0,sizeof(counts));
-   for( int i = 0; i < 1000000; ++i ) {
-      counts[rdtsc()%16]++;
+   memset(counts, 0, sizeof(counts));
+   for (int i = 0; i < 1000000; ++i)
+   {
+      counts[rdtsc() % 16]++;
    }
    /*
    for( int i = 0; i < 16; ++i ) {
@@ -792,27 +805,27 @@ TEST_CASE("random-size-updates-shared")
 {
    environ env;
    {
-   auto    ws   = env.db->start_write_session();
-   auto    root = ws.create_root();
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
 
-   auto words = load_words(ws, root);
+      auto words = load_words(ws, root);
 
+      std::string       data;
+      std::vector<char> result;
+      auto              rng = std::default_random_engine{};
+      for (int i = 0; i < 1000000; ++i)
+      {
+         auto idx = rng() % words.size();
+         data.resize(rng() % 250);
 
-   std::string data;
-   std::vector<char> result;
-   auto rng = std::default_random_engine{};
-   for( int i = 0; i < 1000000; ++i ) {
-      auto idx = rng()%words.size();
-      data.resize( rng()%250);
-
-      auto initsize = ws.get( root, to_key_view(words[idx]), nullptr );
-      auto prevsize = ws.upsert( root, to_key_view(words[idx]), to_value_view(data) );
-      assert( initsize == prevsize );
-      REQUIRE( initsize == prevsize );
-      auto postsize = ws.get( root, to_key_view(words[idx]), nullptr );
-      REQUIRE( postsize == data.size() );
-   }
-   env.db->print_stats(std::cerr);
+         auto initsize = ws.get(root, to_key_view(words[idx]), nullptr);
+         auto prevsize = ws.upsert(root, to_key_view(words[idx]), to_value_view(data));
+         assert(initsize == prevsize);
+         REQUIRE(initsize == prevsize);
+         auto postsize = ws.get(root, to_key_view(words[idx]), nullptr);
+         REQUIRE(postsize == data.size());
+      }
+      env.db->print_stats(std::cerr);
    }
    // let the compactor catch up
    usleep(1000000 * 2);
@@ -826,7 +839,7 @@ TEST_CASE("recover")
    node_stats v3;
    node_stats v4;
    node_stats v5;
-   environ env;
+   environ    env;
    {
       auto ws   = env.db->start_write_session();
       auto root = ws.create_root();
@@ -846,7 +859,7 @@ TEST_CASE("recover")
       auto ws    = env.db->start_write_session();
       auto root  = ws.get_root();
       auto stats = v2 = ws.get_node_stats(root);
-      REQUIRE( v2 == v1 );
+      REQUIRE(v2 == v1);
       TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
       TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
       TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
@@ -866,7 +879,7 @@ TEST_CASE("recover")
       TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
       for (int i = 0; i < num_types; ++i)
          TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
-      REQUIRE( v3 == v1 );
+      REQUIRE(v3 == v1);
    }
    {
       TRIEDENT_WARN("INSERT 1 Million Rows");
@@ -898,7 +911,7 @@ TEST_CASE("recover")
       TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
       for (int i = 0; i < num_types; ++i)
          TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
-      REQUIRE( v5 == v4 );
+      REQUIRE(v5 == v4);
    }
 }
 
@@ -908,15 +921,15 @@ int64_t rand64()
    return (uint64_t(gen()) << 32) | gen();
 }
 
-TEST_CASE("dense-rand-insert" )
+TEST_CASE("dense-rand-insert")
 {
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto r    = ws.create_root();
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
 
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE( ws.count_keys( r )  == i );
+      REQUIRE(ws.count_keys(r) == i);
 
       uint64_t val = rand64();
       key_view kstr((uint8_t*)&val, sizeof(val));
@@ -929,23 +942,23 @@ TEST_CASE("dense-rand-insert" )
                    TRIEDENT_WARN("unable to find key: ", val, " i:", i);
                    assert(!"should have found key!");
                 }
-                REQUIRE( found );
+                REQUIRE(found);
              });
    }
 }
-TEST_CASE("sparse-rand-upsert" )
+TEST_CASE("sparse-rand-upsert")
 {
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto r    = ws.create_root();
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
 
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE( ws.count_keys( r )  == i );
+      REQUIRE(ws.count_keys(r) == i);
 
-      uint64_t val = rand64();
-      std::string str = std::to_string(val);
-      key_view kstr = to_key_view(str);
+      uint64_t    val  = rand64();
+      std::string str  = std::to_string(val);
+      key_view    kstr = to_key_view(str);
       ws.upsert(r, kstr, kstr);
       ws.get(r, kstr,
              [&](bool found, const value_type& r)
@@ -955,19 +968,19 @@ TEST_CASE("sparse-rand-upsert" )
                    TRIEDENT_WARN("unable to find key: ", val, " i:", i);
                    assert(!"should have found key!");
                 }
-                REQUIRE( found );
+                REQUIRE(found);
              });
    }
 }
-TEST_CASE("dense-rand-upsert" )
+TEST_CASE("dense-rand-upsert")
 {
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto r    = ws.create_root();
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
 
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE( ws.count_keys( r )  == i );
+      REQUIRE(ws.count_keys(r) == i);
 
       uint64_t val = rand64();
       key_view kstr((uint8_t*)&val, sizeof(val));
@@ -980,19 +993,19 @@ TEST_CASE("dense-rand-upsert" )
                    TRIEDENT_WARN("unable to find key: ", val, " i:", i);
                    assert(!"should have found key!");
                 }
-                REQUIRE( found );
+                REQUIRE(found);
              });
    }
 }
-TEST_CASE("dense-little-seq-upsert" )
+TEST_CASE("dense-little-seq-upsert")
 {
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto r    = ws.create_root();
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
 
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE( ws.count_keys( r )  == i );
+      REQUIRE(ws.count_keys(r) == i);
 
       uint64_t val = i;
       key_view kstr((uint8_t*)&val, sizeof(val));
@@ -1005,7 +1018,7 @@ TEST_CASE("dense-little-seq-upsert" )
                    TRIEDENT_WARN("unable to find key: ", val, " i:", i);
                    assert(!"should have found key!");
                 }
-                REQUIRE( found );
+                REQUIRE(found);
              });
    }
 }
@@ -1018,15 +1031,15 @@ uint64_t bswap(uint64_t x)
    return x;
 }
 
-TEST_CASE("dense-big-seq-upsert" )
+TEST_CASE("dense-big-seq-upsert")
 {
    environ env;
-   auto ws   = env.db->start_write_session();
-   auto r    = ws.create_root();
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
 
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE( ws.count_keys( r )  == i );
+      REQUIRE(ws.count_keys(r) == i);
 
       uint64_t val = bswap(i);
       key_view kstr((uint8_t*)&val, sizeof(val));
@@ -1039,7 +1052,7 @@ TEST_CASE("dense-big-seq-upsert" )
                    TRIEDENT_WARN("unable to find key: ", val, " i:", i);
                    assert(!"should have found key!");
                 }
-                REQUIRE( found );
+                REQUIRE(found);
              });
    }
 }

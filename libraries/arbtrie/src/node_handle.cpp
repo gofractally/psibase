@@ -20,7 +20,7 @@ namespace arbtrie
       {
          auto state = _session->_segas.lock();
          auto oref  = state.get(_id);
-     //    std::cerr<< "release id: " << oref.address() <<"  init ref: " << oref.ref() <<"\n";
+         //    std::cerr<< "release id: " << oref.address() <<"  init ref: " << oref.ref() <<"\n";
          release_node(oref);
          _id.reset();
       }
@@ -31,14 +31,13 @@ namespace arbtrie
       {
          auto state = _session->_segas.lock();
          auto oref  = state.get(_id);
-    //     std::cerr<< "retain id: " << oref.address() <<"  init ref: " << oref.ref() <<"\n";
-         assert( oref.ref() );
+         //     std::cerr<< "retain id: " << oref.address() <<"  init ref: " << oref.ref() <<"\n";
+         assert(oref.ref());
          if (not state.get(_id).retain())
          {
             throw std::runtime_error("unable to retain object id");
          }
       }
    }
-
 
 }  // namespace arbtrie

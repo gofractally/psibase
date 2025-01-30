@@ -291,7 +291,7 @@ namespace arbtrie
                // returned mutable T is only valid while modify lock is in scope
                // TODO: compile time optimziation or a state variable can avoid sync_lock
                // the sync locks and atomic operations if we know for certain that
-               // the process will not want to msync or is willing to risk 
+               // the process will not want to msync or is willing to risk
                // data not making it to disk.
                template <typename T>
                T* as()
@@ -334,8 +334,9 @@ namespace arbtrie
               private:
                void unlock()
                {
-                  if ( _observed_ptr ) {
-                     if constexpr ( update_checksum_on_modify )
+                  if (_observed_ptr)
+                  {
+                     if constexpr (update_checksum_on_modify)
                         _observed_ptr->update_checksum();
                      else
                         _observed_ptr->checksum = 0;
@@ -882,10 +883,10 @@ namespace arbtrie
       auto [loc, node_ptr] = _session.alloc_data(size, adr);
 
       init(node_ptr);
-      if constexpr ( update_checksum_on_modify )
+      if constexpr (update_checksum_on_modify)
          node_ptr->update_checksum();
 
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0 );
+      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
       assert(node_ptr->_node_id == adr.to_int());
@@ -922,10 +923,10 @@ namespace arbtrie
 
       //init(node_ptr);
       init(node_ptr);
-      if constexpr ( update_checksum_on_modify )
+      if constexpr (update_checksum_on_modify)
          node_ptr->update_checksum();
 
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0 );
+      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
 
       atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
                  std::memory_order_release);
@@ -946,8 +947,8 @@ namespace arbtrie
    inline bool seg_allocator::session::read_lock::is_synced(node_location loc)
    {
       int64_t seg = loc.segment();
-      return _session._sega._header->seg_meta[seg]._last_sync_pos.load(
-                 std::memory_order_relaxed) > loc.abs_index();// - seg * segment_size;
+      return _session._sega._header->seg_meta[seg]._last_sync_pos.load(std::memory_order_relaxed) >
+             loc.abs_index();  // - seg * segment_size;
    }
 
    inline sync_lock& seg_allocator::session::read_lock::get_sync_lock(int seg)

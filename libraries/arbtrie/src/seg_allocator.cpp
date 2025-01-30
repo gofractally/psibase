@@ -70,7 +70,7 @@ namespace arbtrie
             /// don't let the alloc threads starve for want of a free segment
             /// if the free segment queue is getting low, top it up... but
             /// don't top it up just because read threads have things blocked
-            /// because they could "block" for a long time... 
+            /// because they could "block" for a long time...
 
             auto min = get_min_read_ptr();
             auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
@@ -212,7 +212,7 @@ namespace arbtrie
             continue;
          }
 
-         auto obj_size = foo->size();
+         auto obj_size   = foo->size();
          auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
 
          if (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
@@ -225,14 +225,16 @@ namespace arbtrie
             {
                memcpy(ptr, foo, obj_size);
             }
-            if constexpr ( update_checksum_on_compact ) {
-               if( not ptr->has_checksum() )
+            if constexpr (update_checksum_on_compact)
+            {
+               if (not ptr->has_checksum())
                   ptr->update_checksum();
             }
             if constexpr (validate_checksum_on_compact)
             {
-               if constexpr ( update_checksum_on_modify ) {
-                  if( not ptr->has_checksum() )
+               if constexpr (update_checksum_on_modify)
+               {
+                  if (not ptr->has_checksum())
                      TRIEDENT_WARN("missing checksum detected: ", foo_address,
                                    " type: ", node_type_names[ptr->_ntype]);
                }
@@ -350,8 +352,7 @@ namespace arbtrie
           * own sync lock!
           */
          _header->seg_meta[seg_num]._last_sync_pos.store(
-                          start_seg_ptr->_alloc_pos.load(std::memory_order_relaxed),
-                                                         std::memory_order_relaxed);
+             start_seg_ptr->_alloc_pos.load(std::memory_order_relaxed), std::memory_order_relaxed);
       }
 
       //   s->_write_lock.unlock();
@@ -492,7 +493,7 @@ namespace arbtrie
          //    madvise(sp, segment_size, MADV_FREE);  // zero's pages if they happen to be accessed
          madvise(sp, segment_size, MADV_RANDOM);
 
-         // TODO: only do this if not already mlock, to avoid sys call 
+         // TODO: only do this if not already mlock, to avoid sys call
          // - on many systems there must be a all to munlock for each call to mlock
          //   because mlock nests (see man); therefore, we should track this better
          auto r = mlock(sp, segment_size);

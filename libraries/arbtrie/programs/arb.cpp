@@ -88,7 +88,8 @@ void validate_invariant(session_rlock& state, fast_meta_address i, const binary_
 void validate_invariant(session_rlock& state, fast_meta_address i, const value_node* inner) {}
 void validate_invariant(session_rlock& state, fast_meta_address i)
 {
-   if( i ) {
+   if (i)
+   {
       auto ref = state.get(i);
       cast_and_call(ref.header(), [&](const auto* ptr) { validate_invariant(state, i, ptr); });
    }
@@ -217,7 +218,7 @@ void print_pre(session_rlock&           state,
          std::cerr << "VALUE: id: " << i << "\n";
          return;
       default:
-         std::cerr << "UNKNOWN!: id: " << i << "  " << obj.type() <<"\n";
+         std::cerr << "UNKNOWN!: id: " << i << "  " << obj.type() << "\n";
          return;
    }
 }
@@ -256,15 +257,19 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
    }
 }
 
-void print(session_rlock& state, const full_node* sl, int depth = 0) {
-   std::cerr << "FULL r" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
-             << "\" cps: " <<sl->get_prefix().size() << " id: " << sl->address() << " ";
+void print(session_rlock& state, const full_node* sl, int depth = 0)
+{
+   std::cerr << "FULL r" << state.get(sl->address()).ref() << "   cpre\""
+             << to_str(sl->get_prefix()) << "\" cps: " << sl->get_prefix().size()
+             << " id: " << sl->address() << " ";
    if (sl->has_eof_value())
    {
       std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
                 << "' branches: " << std::dec << sl->num_branches() << " \n";
-   } else  {
-      std::cerr <<"\n";
+   }
+   else
+   {
+      std::cerr << "\n";
    }
    sl->visit_branches_with_br(
        [&](int br, fast_meta_address bid)
@@ -279,12 +284,14 @@ void print(session_rlock& state, const full_node* sl, int depth = 0) {
 }
 void print(session_rlock& state, const value_node* sl, int depth = 0)
 {
-   std::cerr << "KSIZE: " << sl->key().size() << " VSIZE: " << sl->value_size() <<" id: "<< sl->address() <<  " key: " << bswap( *(uint64_t*)sl->key().data() ) <<" = " <<bswap( *(uint64_t*)sl->value().data() ) << "\n";
+   std::cerr << "KSIZE: " << sl->key().size() << " VSIZE: " << sl->value_size()
+             << " id: " << sl->address() << " key: " << bswap(*(uint64_t*)sl->key().data()) << " = "
+             << bswap(*(uint64_t*)sl->value().data()) << "\n";
 }
 void print(session_rlock& state, const setlist_node* sl, int depth = 0)
 {
    std::cerr << "SLNr" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
-             << "\" cps: " <<sl->get_prefix().size() << " id: " << sl->address() << " ";
+             << "\" cps: " << sl->get_prefix().size() << " id: " << sl->address() << " ";
    if (sl->has_eof_value())
    {
       std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
@@ -384,7 +391,7 @@ int  main(int argc, char** argv)
    //   test_refactor();
    //   return 0;
    //
-   bool sync_compact = argc > 1;//true;//false;  // false = use threads
+   bool sync_compact = argc > 1;  //true;//false;  // false = use threads
 
    std::cerr << "resetting database\n";
    std::filesystem::remove_all("arbtriedb");
@@ -426,7 +433,8 @@ int  main(int argc, char** argv)
 
          auto iterate_all = [&]()
          {
-            try {
+            try
+            {
                uint64_t item_count = 0;
                auto     itr        = ws.create_iterator(r);
                assert(not itr.valid());
@@ -434,31 +442,32 @@ int  main(int argc, char** argv)
                //{
                //auto l = ws._segas.lock();
                //print(l, r.address());
-              // }
+               // }
 
                std::vector<uint8_t> data;
-               auto              start = std::chrono::steady_clock::now();
+               auto                 start = std::chrono::steady_clock::now();
                if (itr.lower_bound())
                {
                   itr.read_value(data);
                   ++item_count;
-    //              std::cerr << bswap(*((uint64_t*)data.data())) <<" - key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data()) ) <<" \n";
+                  //              std::cerr << bswap(*((uint64_t*)data.data())) <<" - key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data()) ) <<" \n";
                }
                while (itr.next())
                {
                   itr.key();
                   itr.read_value(data);
-     //             std::cerr << bswap(*((uint64_t*)data.data())) <<" + key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data() )) <<" \n";
+                  //             std::cerr << bswap(*((uint64_t*)data.data())) <<" + key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data() )) <<" \n";
                   ++item_count;
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
-               auto kc = ws.count_keys(r);
+               auto kc    = ws.count_keys(r);
                std::cout << "iterated " << std::setw(12)
                          << add_comma(
                                 int64_t(item_count) /
                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000))
-                         << " items/sec  total items: " << add_comma(item_count) << " count: " << kc <<"\n";
+                         << " items/sec  total items: " << add_comma(item_count) << " count: " << kc
+                         << "\n";
             }
             catch (const std::exception& e)
             {
@@ -467,16 +476,16 @@ int  main(int argc, char** argv)
             }
          };
 
-         uint64_t seq3 = 0;
-         auto ttest = temp_meta_type(5).to_bitfield();
+         uint64_t seq3  = 0;
+         auto     ttest = temp_meta_type(5).to_bitfield();
 
          std::cerr << "insert dense rand \n";
          for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count*3; i+=3)
+            for (int i = 0; i < count * 3; i += 3)
             {
-             //  auto l = ws._segas.lock();
+               //  auto l = ws._segas.lock();
                uint64_t val = rand64();
                ++seq;
                key_view kstr((uint8_t*)&val, sizeof(val));
@@ -498,18 +507,19 @@ int  main(int argc, char** argv)
                       });
                       */
 
-               if ((seq % batch_size) == (batch_size-1))
+               if ((seq % batch_size) == (batch_size - 1))
                {
                   ws.set_root<sync_type::sync>(r);
                }
             }
-            TRIEDENT_DEBUG( "set root" );
+            TRIEDENT_DEBUG("set root");
             ws.set_root(r);
-          //  last_root = r;
+            //  last_root = r;
 
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
-         while (sync_compact and db.compact_next_segment());
+            while (sync_compact and db.compact_next_segment())
+               ;
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -571,7 +581,7 @@ int  main(int argc, char** argv)
          }
          */
          auto start_big_end = seq3;
-         std::cerr << "insert big endian seq starting with: "<< seq3 <<"\n";
+         std::cerr << "insert big endian seq starting with: " << seq3 << "\n";
          for (int ro = 0; true and ro < rounds; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
@@ -585,8 +595,7 @@ int  main(int argc, char** argv)
                {
                   ws.set_root<sync_type::sync>(r);
                }
-               
-               
+
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -600,7 +609,6 @@ int  main(int argc, char** argv)
                             assert(r.view() == kstr);
                          }
                       });
-                      
             }
             ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
@@ -612,10 +620,9 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << " insert/sec  total items: " << add_comma(seq) << "\n";
             iterate_all();
-         //   TRIEDENT_WARN( "didn't fail.." );
+            //   TRIEDENT_WARN( "didn't fail.." );
          }
          //print_pre(l, r.address(), "");
-         
 
          uint64_t seq4 = -1;
          std::cerr << "insert big endian rev seq\n";
@@ -632,7 +639,7 @@ int  main(int argc, char** argv)
                {
                   ws.set_root<sync_type::sync>(r);
                }
-               
+
                /*
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
@@ -648,7 +655,6 @@ int  main(int argc, char** argv)
                          }
                       });
                       */
-                      
             }
             ws.set_root<sync_type::sync>(r);
             auto end   = std::chrono::steady_clock::now();
@@ -689,7 +695,7 @@ int  main(int argc, char** argv)
                       << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
          }
          iterate_all();
-         
+
          //validate_invariant( l, r.address() );
          std::cerr << "get known key little endian seq\n";
          uint64_t seq2 = 0;
@@ -850,7 +856,7 @@ int  main(int argc, char** argv)
 
                   auto itr    = rs.create_iterator(*tmp);
                   int  roundc = 100000;
-                  int added = 0;
+                  int  added  = 0;
                   for (int i = 0; i < batch_size; ++i)
                   {
                      ++added;
@@ -866,7 +872,7 @@ int  main(int argc, char** argv)
                      {
                         //  std::cerr << "everything ok "<<val <<"\n";
                      }
-                     if( (i & 0x4ff) == 0 )
+                     if ((i & 0x4ff) == 0)
                      {
                         read_count.fetch_add(added, std::memory_order_relaxed);
                         added = 0;
@@ -878,7 +884,7 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
-         for (int ro = 0; ro < 2000*5; ++ro)
+         for (int ro = 0; ro < 2000 * 5; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -890,7 +896,8 @@ int  main(int argc, char** argv)
                ws.insert(r, kstr, kstr);
                if (not last_root)
                   last_root = r;
-               if( i % batch_size == 0 ) {
+               if (i % batch_size == 0)
+               {
                   {
                      std::unique_lock lock(_lr_mutex);
                      last_root = r;
@@ -919,7 +926,8 @@ int  main(int argc, char** argv)
          for (auto& r : rthreads)
             r->join();
 
-         while (sync_compact and db.compact_next_segment());
+         while (sync_compact and db.compact_next_segment())
+            ;
          //   ws.validate(r);
          TRIEDENT_WARN("ROOT GOING OUT OF SCOPE r.id: ", r.address());
       } while (false);
@@ -1018,41 +1026,42 @@ void test_binary_node()
       auto                       ws = env.db->start_write_session();
       std::optional<node_handle> last_root;
       auto                       cur_root = ws.create_root();
- //     auto                       state    = ws._segas.lock();
+      //     auto                       state    = ws._segas.lock();
       TRIEDENT_DEBUG("upsert hello = world");
 
       ws.upsert(cur_root, to_key_view("hello"), to_value_view("world"));
- //     print(state, cur_root.address(), 1);
-      ws.upsert(cur_root, to_key_view("long"),
-                to_key_view("message                                                          ends"));
+      //     print(state, cur_root.address(), 1);
+      ws.upsert(
+          cur_root, to_key_view("long"),
+          to_key_view("message                                                          ends"));
 
- //     print(state, cur_root.address(), 1);
+      //     print(state, cur_root.address(), 1);
 
       last_root = cur_root;
 
       std::cerr << "root.........\n";
-  //    print(state, cur_root.address(), 1);
+      //    print(state, cur_root.address(), 1);
       std::cerr << "last_root.........\n";
- //     print(state, last_root->address(), 1);
+      //     print(state, last_root->address(), 1);
 
       std::cerr << "\n ========== inserting 'update' = 'world' ==========\n";
       ws.upsert(cur_root, to_key_view("update"),
                 to_value_view("long                                                      world"));
 
       std::cerr << "root.........\n";
-   //   print(state, cur_root.address(), 1);
+      //   print(state, cur_root.address(), 1);
       std::cerr << "last_root.........\n";
-   //   print(state, last_root->address(), 1);
+      //   print(state, last_root->address(), 1);
 
       std::cerr << "\n ========== releasing last_root ==========\n";
       last_root.reset();
 
       std::cerr << "\n ========== inserting 'mayday' = 'help me, somebody' ==========\n";
       ws.upsert(cur_root, to_key_view("mayday"), to_value_view("help me, somebody"));
-  //    print(state, cur_root.address(), 1);
+      //    print(state, cur_root.address(), 1);
 
       std::cerr << "root.........\n";
-    //  print(state, cur_root.address(), 1);
+      //  print(state, cur_root.address(), 1);
    }
    usleep(1000000);
    env.db->print_stats(std::cout);
@@ -1062,8 +1071,8 @@ void test_refactor()
 {
    environ env;
    env.db->start_compact_thread();
-   auto ws    = env.db->start_write_session();
-//   auto state = ws._segas.lock();
+   auto ws = env.db->start_write_session();
+   //   auto state = ws._segas.lock();
 
    {
       std::optional<node_handle> last_root;
