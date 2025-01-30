@@ -108,7 +108,8 @@ namespace arbtrie
       struct bitfield
       {
          uint64_t ref : 14       = 0;
-         uint64_t type : 4       = 0;
+         uint64_t type : 3       = 0;
+         uint64_t read : 1       = 0; // indicates someone read this node since last cleared
          uint64_t copy_flag : 1  = 0;  // set this bit on start of copy, clear it on start of modify
          uint64_t modify_flag : 1 = 0;  // 0 when modifying, 1 when not
          // gives 1024 TB addressable cachelines

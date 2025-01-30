@@ -2,6 +2,9 @@
 
 namespace arbtrie
 {
+   iterator iterator::subtree_iterator()const {
+      return iterator( _rs, subtree() );
+   }
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
       pushkey( in->key() );

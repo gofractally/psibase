@@ -39,7 +39,8 @@ namespace arbtrie
    struct node_header
    {
       uint32_t checksum;
-      uint32_t _ntype : 4;              // node_type
+      uint32_t _ntype : 3;              // node_type
+      uint32_t _read: 1 = 0;            // currently unused
       uint32_t _nsize : 27;             // bytes allocated for this node
       uint64_t _num_branches : 9;       // number of branches that are set
       uint64_t _branch_id_region : 16;  // the ID region branches from this node are allocated to

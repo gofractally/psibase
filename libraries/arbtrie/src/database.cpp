@@ -487,8 +487,10 @@ namespace arbtrie
       auto  new_val_size = _cur_val.size();
 
       if constexpr (mode.is_remove() ) {
-         if( vn->key() == key )
+         if( vn->key() == key ) {
+            _delta_keys = -1;
             return fast_meta_address();
+         }
          if constexpr ( mode.must_remove() )
             throw std::runtime_error( "attempt to remove key that does not exist" );
          return root.address(); 
@@ -525,7 +527,10 @@ namespace arbtrie
          }
       }
       else // add key
-      {  // convert to binary node
+      {  
+         _delta_keys = 1;
+
+         // convert to binary node
          key_view   k1 = vn->key();
          value_type v1 = vn->get_value();
          auto       t1 = vn->is_subtree() ? binary_node::key_index::subtree : binary_node::key_index::inline_data;
@@ -923,61 +928,78 @@ namespace arbtrie
                   if constexpr (mode.is_remove())
                   {
                      if (not new_br)
-                     {
-                        r.modify().as<NodeType>()->remove_branch(bidx);
+                     {  // then something clearly got removed
+                        assert( _delta_keys == -1 );
+                        r.modify().as<NodeType>([=](auto* p){ 
+                                                p->remove_descendant(1);
+                                                p->remove_branch(bidx); 
+                                                } );
                         if (fn->num_branches() + fn->has_eof_value() > 0)
-                        {
-                           //     TRIEDENT_DEBUG( "modify()->remove_branch( ", char(bidx-1), ") " );
                            return r.address();
-                        }
                         else
-                        {
-                           //    TRIEDENT_DEBUG( "return null after removing all" );
                            return fast_meta_address();
-                        }
                      }
-                     if (br != new_br)
-                        r.modify().as<NodeType>()->set_branch(bidx, new_br);
+                     if (br != new_br) 
+                     {
+                        assert( _delta_keys == -1 );
+                        // if key was not found, then br would == new_br
+                        r.modify().as<NodeType>([bidx,new_br,this](auto* p){
+                                                p->remove_descendant(1);
+                                                p->set_branch(bidx, new_br);
+                                                });
+                     }
                      return r.address();
                   }
-                  else
+                  else //  update or insert
                   {
-                     if (br != new_br)
-                        r.modify().as<NodeType>()->set_branch(bidx, new_br);
+                     if (br != new_br) 
+                        r.modify().as<NodeType>([bidx,new_br,this](auto* p){ 
+                                                p->add_descendant(_delta_keys);
+                                                p->set_branch(bidx, new_br);
+                                                });
                      return r.address();
                   }
                }
                else  // shared_node
-               {     // if shared and we inserted then it had better be different!
+               {   
                   if constexpr (mode.is_remove())
                   {
                      //    TRIEDENT_DEBUG( "remove key ", key );
-                     brn.retain();  // because upsert will release() it
+                     brn.retain();  // because upsert might release() it
                      auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
-                     assert(br != new_br);
                      if (not new_br)
                      {
-                        //      TRIEDENT_DEBUG( "not new_br" );
                         if (fn->num_branches() + fn->has_eof_value() > 1)
                         {
-                           //        TRIEDENT_DEBUG( "numbr + hasval " );
+                           assert( _delta_keys == -1 );
                            auto cl = clone<mode>(r, fn, {});
                            release_node(brn);  // because we retained before upsert(),
                                                // and retained again in clone
-                           cl.modify().template as<NodeType>()->remove_branch(bidx);
+                           cl.modify().template as<NodeType>( [bidx](auto* p){
+                                      p->remove_descendant(1);
+                                      p->remove_branch(bidx);}
+                                      );
                            return cl.address();
                         }
                         return fast_meta_address();
                      }
                      else
                      {
-                        //     TRIEDENT_DEBUG( "updated new_br" );
-                        auto cl = clone<mode>(r, fn, {});
-                        release_node(brn);  // because we retained before upsert(),
-                                            // and retained again in clone
-                        assert(br != new_br);
-                        cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
-                        return cl.address();
+                        if( br != new_br ) { // something was removed
+                           assert( _delta_keys == -1 );
+                           auto cl = clone<mode>(r, fn, {});
+                           release_node(brn);  // because we retained before upsert(),
+                                               // and retained again in clone
+                           cl.modify().template as<NodeType>( [bidx,new_br](auto* p){
+                                      p->remove_descendant(1);
+                                      p->set_branch(bidx,new_br);}
+                                      );
+                           return cl.address();
+                        } else { // nothing was removed 
+                           release_node(brn); // because we retained it just in case
+                        }
+                        assert( _delta_keys == 0 );
+                        return r.address();
                      }
                   }
                   else  // update/insert
@@ -1039,11 +1061,15 @@ namespace arbtrie
                //      TRIEDENT_DEBUG( "remove key ends on this node" );
                if (fn->has_eof_value())
                {
+                  _delta_keys = -1;
                   if constexpr (mode.is_unique())
                   {
                      //   TRIEDENT_DEBUG( "mode is unique?" );
                      release_node(state.get(fn->get_eof_value()));
-                     r.modify().as<NodeType>()->set_eof({});
+                     r.modify().as<NodeType>([](auto* p ){
+                                             p->set_eof({});
+                                             p->remove_descendant(1);
+                                             });
 
                      if (fn->num_branches() == 0)
                         return fast_meta_address();
@@ -1063,14 +1089,16 @@ namespace arbtrie
                                            //                                 TRIEDENT_DEBUG("remove eof value from clone");
                                            release_node(state.get(cl->get_eof_value()));
                                            cl->set_eof({});
+                                           cl->remove_descendant(1);
                                         })
                          .address();
                   }
                }
                if constexpr (mode.must_remove())
                   throw std::runtime_error("attempt to remove key that doesn't exist");
-               else
-                  return r.address();
+
+               _delta_keys = 0;
+               return r.address();
             }
             else  // must be insert/update on this node
             {
@@ -1121,44 +1149,42 @@ namespace arbtrie
                }
                else  // there is no value stored here
                {
+                  _delta_keys = 1;
                   if( _cur_val.is_subtree() ) {
                       if constexpr ( mode.is_unique() ) {
-                        r.modify().template as<NodeType>()->set_eof_subtree(_cur_val.id());
+                        r.modify().template as<NodeType>([this](auto p)
+                                                         {
+                                                         p->set_eof_subtree(_cur_val.id());
+                                                         p->add_descendant(1);
+                                                         });
                         return r.address();
                       }
                       else 
                       {
                            return clone<mode>(r, fn, {.branch_cap = 1},
-                                              [&](auto cl) { cl->set_eof_subtree(_cur_val.id()); })
+                                              [&](auto cl) { 
+                                              cl->set_eof_subtree(_cur_val.id()); 
+                                              cl->add_descendant(1);
+                                              })
                                .address();
                       }
                   }
-                  else 
+                  else  // inserting data
                   {
                      fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
                      if constexpr (mode.is_unique())
                      {
-                       // setting eof has nothing to do with adding branches..
-                       // if (fn->can_add_branch())
-                        {
-                           r.modify().template as<NodeType>()->set_eof(new_id);
-                           return r.address();
-                        }
-                       /* else
-                        {
-                           // cloning unique reuses ID and bypasses need to
-                           // retain/release all children
-                           return clone<mode>(r, fn, {.branch_cap = 1},
-                                              [&](auto cl) { cl->set_eof(new_id); })
-                               .address();
-                        }
-                        */
+                        r.modify().template as<NodeType>([new_id](auto* p){ p->set_eof(new_id); 
+                                                         p->add_descendant(1); });
+                        return r.address();
                      }
                      else
                      {
                         TRIEDENT_DEBUG(" clone add new value to branch 0, val =", _cur_val);
                         return clone<mode>(r, fn, {.branch_cap = 16},
-                                           [&](auto cl) { cl->set_eof(new_id); })
+                                           [&](auto cl) { cl->set_eof(new_id);
+                                           cl->add_descendant(1);
+                                           })
                             .address();
                      }
                   }
@@ -1170,10 +1196,14 @@ namespace arbtrie
       {
          if constexpr (mode.is_remove())
          {
+            _delta_keys = 0;
             TRIEDENT_DEBUG("remove key that doesn't share the same prefix");
             if constexpr (mode.must_remove())
                throw std::runtime_error("attempt to remove key that does not exist");
             return r.address();
+         }
+         if constexpr ( mode.must_update() ) {
+            throw std::runtime_error("attempt to update key that does not exist" );
          }
          //   TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(), "  cprelen: ", cpre.size());
          //  TRIEDENT_WARN( "root prefix: ", to_hex( rootpre ) );
@@ -1296,6 +1326,7 @@ namespace arbtrie
       bool         key_found = false;
       if constexpr (mode.must_insert())
       {
+         _delta_keys = 1;
          // no need to test/search for existing node in hash list,
          // the caller already expects this to be an insert
          lb_idx = bn->lower_bound_idx(key);
@@ -1311,11 +1342,12 @@ namespace arbtrie
       }
       else if constexpr (mode.must_update())
       {
+         _delta_keys = 0;
          // there must be a key key to update
          lb_idx    = bn->find_key_idx(key, key_hash);
          key_found = lb_idx != binary_node::key_not_found;
       }
-      else  // we may insert or update
+      else  // we may insert or update or remove
       {
          // optimistically search for key to update
          lb_idx    = bn->find_key_idx(key, key_hash);
@@ -1323,10 +1355,17 @@ namespace arbtrie
 
          // but fall back to the lower bound to insert
          if (not key_found)
+         {
             lb_idx = bn->lower_bound_idx(key);
+            _delta_keys = 0;
+         }
+         else
+            if constexpr ( mode.is_remove() )
+               _delta_keys = -1;
+            else
+               _delta_keys = 1;
       }
 
-      //if (binary_node::key_not_found == key_idx)  // then insert a new value
       if (not key_found)  // then insert a new value
       {
          if constexpr (mode.must_update())

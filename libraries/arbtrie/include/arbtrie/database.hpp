@@ -17,7 +17,7 @@ namespace arbtrie
 
    struct upsert_mode
    {
-      enum type : int
+      enum type : uint32_t 
       {
          unique             = 1,  // ref count of all parent nodes and this is 1
          insert             = 2,  // fail if key does exist
@@ -48,7 +48,7 @@ namespace arbtrie
       constexpr bool        may_insert() const { return flags & insert; }
       constexpr bool        may_update() const { return flags & update; }
       constexpr bool        must_insert() const { return not(flags & (update | remove)); }
-      constexpr bool        must_update() const { return not(flags & insert); }
+      constexpr bool        must_update() const { return not is_remove() and not(flags & insert); }
       constexpr bool        is_insert() const { return (flags & insert); }
       constexpr bool        is_upsert() const { return (flags & insert) and (flags & update); }
       constexpr bool        is_remove() const { return flags & remove; }
@@ -57,8 +57,8 @@ namespace arbtrie
 
       // private: structural types cannot have private members,
       // but the flags field is not meant to be used directly
-      constexpr upsert_mode(int f) : flags(f) {}
-      int flags;
+      constexpr upsert_mode(uint32_t f) : flags(f) {}
+      uint32_t flags;
    };
 
    struct config

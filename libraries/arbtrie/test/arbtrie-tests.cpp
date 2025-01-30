@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <arbtrie/database.hpp>
+#include <arbtrie/rdtsc.hpp>
 
 #include <random>
 
@@ -634,6 +635,20 @@ TEST_CASE("random-size-updates")
    env.db->print_stats(std::cerr);
 }
 
+TEST_CASE("remove") {
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto root = ws.create_root();
+   auto words = load_words(ws, root);
+
+   // remove key that does not exist
+   REQUIRE( ws.get( root, to_key_view("xcvbn"), nullptr ) == -1 );
+   auto r = ws.remove( root, to_key_view("xcvbn") );
+   REQUIRE( r == -1 );
+   auto share = root;
+   r = ws.remove( root, to_key_view("xcvbn") );
+   REQUIRE( r == -1 );
+}
 
 TEST_CASE("subtree2") {
    environ env;
@@ -697,9 +712,25 @@ TEST_CASE("subtree2") {
       REQUIRE( root.ref() == 9 ); // r1, r2, r3, r4, and root, and value of "subtree", "", and "S" key
       auto r6 = ws.get_subtree( empty, to_key_view("") );
       REQUIRE( root.ref() == 10 ); // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
+                                   
+      {
+         auto itr = ws.create_iterator( empty );
+         std::vector<char> buf;
+         itr.lower_bound();
+         while( itr.valid() ) {
+            std::cerr << '"'<<to_str(itr.key())<<" = " << itr.is_subtree() <<"\n";
+            if( itr.is_subtree() ) {
+               auto sitr = itr.subtree_iterator();
+               sitr.lower_bound();
+               while( sitr.valid() ) {
+                  std::cerr << "\t\t" <<to_str(sitr.key())<<"\n";
+                  sitr.next();
+               }
+            }
+            itr.next();
+         }
+      }
 
-   //   ws.remove( empty, to_key_view( "S") );
-   //   REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, r5 and root and value of "subtree" 
 
       empty.reset();
       REQUIRE( root.ref() == 7 ); // r1, r2, r3, r4, r5, r6 and root
@@ -721,6 +752,29 @@ TEST_CASE("subtree2") {
 
    env.db->print_stats(std::cerr);
    }
+}
+
+/**
+ * Utilizing CPU ticks as a fast source of randomness
+ * to determine whether to record a read or not... 
+ */
+TEST_CASE( "rdtsc" ) {
+   int64_t counts[16];
+   memset(counts,0,sizeof(counts));
+   for( int i = 0; i < 1000000; ++i ) {
+      counts[rdtsc()%16]++;
+   }
+   /*
+   for( int i = 0; i < 16; ++i ) {
+      TRIEDENT_WARN( "counts[",i,"] = ", counts[i] );
+   }
+   auto x = rdtsc();
+   auto h = XXH3_64bits(&x,sizeof(x));
+   auto y = rdtsc();
+   TRIEDENT_DEBUG( x );
+   TRIEDENT_DEBUG( y );
+   TRIEDENT_DEBUG( y - x );
+   */
 }
 
 TEST_CASE("random-size-updates-shared")
