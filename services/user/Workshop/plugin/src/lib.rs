@@ -8,6 +8,7 @@ use exports::workshop::plugin::{
     admin::Guest as Admin,
     app::{File, Guest as App},
     mail::Guest as Mail,
+    registry::{AppMetadata, Guest as Registry},
 };
 use host::common::types::Error;
 use staged_tx::plugin::proposer::set_propose_latch;
@@ -93,6 +94,27 @@ impl Mail for WorkshopPlugin {
     fn save(app: String, msg_id: u64) -> Result<(), Error> {
         set_propose_latch(&app)?;
         chainmail::plugin::api::save(msg_id)
+    }
+}
+
+impl Registry for WorkshopPlugin {
+    fn create_app(account: String) -> Result<(), Error> {
+        registry::plugin::developer::create_app(&account)
+    }
+
+    fn set_app_metadata(app: String, metadata: AppMetadata) -> Result<(), Error> {
+        set_propose_latch(&app)?;
+        registry::plugin::developer::set_app_metadata(&metadata)
+    }
+
+    fn publish_app(app: String) -> Result<(), Error> {
+        set_propose_latch(&app)?;
+        registry::plugin::developer::publish_app(&app)
+    }
+
+    fn unpublish_app(app: String) -> Result<(), Error> {
+        set_propose_latch(&app)?;
+        registry::plugin::developer::unpublish_app(&app)
     }
 }
 

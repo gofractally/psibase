@@ -13,6 +13,24 @@ interface admin {
     get-all-managed: func() -> list<string>;
 }
 
+interface registry {
+    use host:common/types.{error};
+    use registry:plugin/types.{app-metadata};
+
+    /// Create a new app with the specified account name, owned by
+    /// the currently logged-in user.
+    create-app: func(account: string) -> result<_, error>;
+
+    /// Set the metadata for the specified app
+    set-app-metadata: func(app: string, metadata: app-metadata) -> result<_, error>;
+
+    /// Publish the specified app
+    publish-app: func(app: string) -> result<_, error>;
+
+    /// Unpublish specified app
+    unpublish-app: func(account: string) -> result<_, error>;
+}
+
 interface app {
     use sites:plugin/types.{file};
     use host:common/types.{error};

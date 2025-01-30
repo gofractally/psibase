@@ -8,8 +8,10 @@ world impl {
     include chainmail:plugin/imports;
     include clientdata:plugin/imports;
     include accounts:plugin/imports;
+    include registry:plugin/imports;
 
     export admin;
     export app;
     export mail;
+    export registry;
 }
