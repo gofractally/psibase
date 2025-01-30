@@ -23,4 +23,9 @@ mod service {
     fn setOwner(owner: AccountNumber) {
         unimplemented!()
     }
+
+    #[action]
+    fn newAccount(name: AccountNumber) {
+        unimplemented!()
+    }
 }
