@@ -10,6 +10,11 @@ mod service {
     }
 
     #[action]
+    fn setMyCode(vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>) {
+        unimplemented!()
+    }
+
+    #[action]
     fn setFlags(service: crate::AccountNumber, flags: u64) {
         unimplemented!()
     }

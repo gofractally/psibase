@@ -28,10 +28,15 @@ namespace SystemService
                    uint8_t                vmVersion,
                    std::vector<char>      code);
 
+      /// Same as setCode, but always uses the sender account as the service account
+      /// whose code is being set.
+      void setMyCode(uint8_t vmType, uint8_t vmVersion, std::vector<char> code);
+
       /// Sets the flags that a particular service must be run with
       void setFlags(psibase::AccountNumber service, uint64_t flags);
    };
    PSIO_REFLECT(SetCode,
                 method(setCode, service, vmType, vmVersion, code),
+                method(setMyCode, vmType, vmVersion, code),
                 method(setFlags, service, flags))
 }  // namespace SystemService
