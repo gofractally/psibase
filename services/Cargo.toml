@@ -1,5 +1,4 @@
 [workspace]
-resolver = "2"
 members = [
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/account_tokens/",
@@ -14,6 +13,7 @@ members = [
     "user/Sites/plugin",
     "user/Supervisor/plugin",
     "user/Tokens/plugin",
+    "user/Workshop/plugin",
 ]
 resolver = "2"
 
