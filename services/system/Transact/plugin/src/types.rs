@@ -1,11 +1,11 @@
-use crate::bindings::accounts::smart_auth::smart_auth as SmartAuth;
 use crate::bindings::host::common as Host;
+use crate::bindings::transact::plugin::types::*;
 use psibase::{AccountNumber, Hex, Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-impl From<SmartAuth::Claim> for psibase::Claim {
-    fn from(claim: SmartAuth::Claim) -> Self {
+impl From<Claim> for psibase::Claim {
+    fn from(claim: Claim) -> Self {
         psibase::Claim {
             service: AccountNumber::from(claim.verify_service.as_str()),
             rawData: Hex::from(claim.raw_data.clone()),

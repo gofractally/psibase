@@ -67,7 +67,7 @@ namespace SystemService
          if (auto result = serveGraphQL(request, AuthQuery{}))
             return result;
 
-         if (auto result = serveSimpleUI<AuthSig, true>(request))
+         if (auto result = serveSimpleUI<AuthSig, false>(request))
             return result;
 
          return std::nullopt;

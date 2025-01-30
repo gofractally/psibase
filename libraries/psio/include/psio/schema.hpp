@@ -332,6 +332,10 @@ namespace psio
          std::string type;
       };
       PSIO_REFLECT_TYPENAME(Type)
+      constexpr bool psio_is_untagged(const Type*)
+      {
+         return true;
+      }
 
       void to_json(const Type& type, auto& stream)
       {
@@ -381,18 +385,11 @@ namespace psio
          const AnyType*         resolve(const Schema& schema) const;
       };
       PSIO_REFLECT_TYPENAME(AnyType)
+
       void to_json(const AnyType& type, auto& stream)
       {
-         if (auto* alias = std::get_if<Type>(&type.value))
-         {
-            to_json(*alias, stream);
-         }
-         else
-         {
-            to_json(type.value, stream);
-         }
+         to_json(type.value, stream);
       }
-
       inline auto& clio_unwrap_packable(AnyType& type)
       {
          return type.value;
@@ -638,11 +635,25 @@ namespace psio
       struct OpenToken
       {
          char operator()(const Object&) const { return '{'; }
-         char operator()(const Variant&) const { return '{'; }
+         // We need to see the contents of the variant to
+         // know whether we need a '{', because the alternative
+         // might be untagged
+         char operator()(const Variant&) const { return 0; }
          char operator()(const Struct&) const { return '{'; }
          char operator()(const FracPack&) const { return 0; };
          char operator()(const Option&) const { return 0; };
          char operator()(const auto&) const { return '['; }
+         char operator()(const Custom& custom) const
+         {
+            if (custom.id == "map")
+            {
+               return '{';
+            }
+            else
+            {
+               return '[';
+            }
+         }
       };
 
       struct CloseToken
@@ -652,16 +663,23 @@ namespace psio
          char operator()(const Struct&) const { return '}'; }
          char operator()(const FracPack&) const { return 0; };
          char operator()(const Option&) const { return 0; };
+         char operator()(const Custom& custom) const
+         {
+            if (custom.id == "map")
+            {
+               return '}';
+            }
+            else
+            {
+               return ']';
+            }
+         }
          char operator()(const auto&) const { return ']'; }
       };
 
       struct MemberName
       {
          const std::string* operator()(const Object& type) const
-         {
-            return &type.members[index].name;
-         }
-         const std::string* operator()(const Variant& type) const
          {
             return &type.members[index].name;
          }
@@ -752,19 +770,76 @@ namespace psio
 
       void scalar_to_json(const auto&, std::span<const char> in, auto& stream) {}
 
+      struct SeparatedList
+      {
+         static constexpr unsigned comma       = 0;
+         static constexpr unsigned colon       = 1;
+         static constexpr unsigned single      = 1;
+         unsigned char             first : 1   = 1;
+         unsigned char             kind : 1    = comma;
+         unsigned char             flatten : 1 = 0;
+         void                      next(auto& stream)
+         {
+            if (first)
+               increase_indent(stream);
+            else if (kind == comma)
+               stream.write(',');
+            else
+               stream.write(':');
+            write_newline(stream);
+            first = false;
+         }
+         void end(auto& stream)
+         {
+            if (!first)
+            {
+               decrease_indent(stream);
+               write_newline(stream);
+            }
+         }
+      };
+
+      bool isCustomMap(const AnyType&);
+
       void to_json(FracParser& parser, auto& stream)
       {
-         std::vector<CommaList> groups;
-         auto                   start_member = [&](const auto& item)
+         std::vector<SeparatedList> groups;
+         auto                       start_member = [&](const auto& item)
          {
             if (!groups.empty())
             {
-               groups.back().next(stream);
-               if (auto* name =
-                       std::visit(MemberName{item.index}, item.parent->original_type->value))
+               if (groups.back().kind != SeparatedList::colon)
                {
-                  to_json(*name, stream);
-                  write_colon(stream);
+                  if (const auto* variant =
+                          std::get_if<Variant>(&item.parent->original_type->value))
+                  {
+                     const auto& name = variant->members[item.index].name;
+                     if (name.starts_with('@'))
+                     {
+                        groups.back().kind = SeparatedList::single;
+                     }
+                     else
+                     {
+                        stream.write('{');
+                        groups.back().next(stream);
+                        to_json(name, stream);
+                        write_colon(stream);
+                     }
+                  }
+                  else
+                  {
+                     groups.back().next(stream);
+                     if (auto* name =
+                             std::visit(MemberName{item.index}, item.parent->original_type->value))
+                     {
+                        to_json(*name, stream);
+                        write_colon(stream);
+                     }
+                  }
+               }
+               else
+               {
+                  groups.back().next(stream);
                }
             }
          };
@@ -778,13 +853,24 @@ namespace psio
             switch (item.kind)
             {
                case FracParser::start:
+               {
                   start_member(item);
-                  write_bracket(item, OpenToken{});
-                  groups.emplace_back();
+                  SeparatedList list = {};
+                  if (!groups.empty() && groups.back().flatten)
+                     list.kind = SeparatedList::colon;
+                  else if (isCustomMap(*item.type->original_type))
+                     list.flatten = true;
+                  groups.push_back(list);
+                  if (list.kind == SeparatedList::comma)
+                     write_bracket(item, OpenToken{});
                   break;
+               }
                case FracParser::end:
-                  groups.back().end(stream);
-                  write_bracket(item, CloseToken{});
+                  if (groups.back().kind == SeparatedList::comma)
+                  {
+                     groups.back().end(stream);
+                     write_bracket(item, CloseToken{});
+                  }
                   groups.pop_back();
                   break;
                case FracParser::scalar:
@@ -989,12 +1075,29 @@ namespace psio
       template <typename Clock, typename Duration>
       constexpr bool is_time_point_v<std::chrono::time_point<Clock, Duration>> = true;
 
+      template <typename T>
+      std::string get_alternative_name(const T*)
+      {
+         using psio::get_type_name;
+         using psio::psio_is_untagged;
+         if constexpr (psio_is_untagged(static_cast<const T*>(nullptr)))
+         {
+            std::string result("@");
+            result += get_type_name(static_cast<const T*>(nullptr));
+            return result;
+         }
+         else
+         {
+            return get_type_name(static_cast<const T*>(nullptr));
+         }
+      }
+
       template <typename S, typename... T>
       std::vector<Member> insert_variant_alternatives(S& schema, std::variant<T...>*)
       {
          using psio::get_type_name;
-         return {
-             Member{.name = get_type_name((T*)nullptr), .type = schema.template insert<T>()}...};
+         return {Member{.name = get_alternative_name((T*)nullptr),
+                        .type = schema.template insert<T>()}...};
       }
 
       template <typename T, typename S, std::size_t... I>
@@ -1013,6 +1116,21 @@ namespace psio
          }
          return result;
       }
+
+      template <typename T>
+      concept JsonMapType = requires {
+         typename T::key_type;
+         typename T::mapped_type;
+         typename T::value_type;
+         requires std::convertible_to<typename T::key_type, std::string_view>;
+      };
+
+      class SchemaBuilder;
+
+      template <typename T>
+      concept HasToSchema = requires(SchemaBuilder& builder, const T* t) {
+         { to_schema(builder, t) } -> std::convertible_to<AnyType>;
+      };
 
       template <typename T>
       char type_id;
@@ -1049,7 +1167,11 @@ namespace psio
             std::string name     = "@" + std::to_string(pos->second);
             if (inserted)
             {
-               if constexpr (PackableWrapper<T>)
+               if constexpr (HasToSchema<T>)
+               {
+                  schema.insert(name, to_schema(*this, static_cast<const T*>(nullptr)));
+               }
+               else if constexpr (PackableWrapper<T>)
                {
                   schema.insert(name, insert<std::remove_cvref_t<decltype(clio_unwrap_packable(
                                           std::declval<T&>()))>>());
@@ -1159,6 +1281,11 @@ namespace psio
                      schema.insert(name, Object{std::move(members)});
                   }
                }
+               else if constexpr (JsonMapType<T>)
+               {
+                  schema.insert(
+                      name, Custom{.type = List{insert<typename T::value_type>()}, .id = "map"});
+               }
                else if constexpr (requires { std::tuple_size<T>::value; })
                {
                   schema.insert(name,
@@ -1191,6 +1318,10 @@ namespace psio
          Schema                             schema;
          std::map<const void*, std::size_t> ids;
       };
+
+      AnyType to_schema(SchemaBuilder& builder, const Object*);
+      AnyType to_schema(SchemaBuilder& builder, const Struct*);
+      AnyType to_schema(SchemaBuilder& builder, const Variant*);
 
       void to_json_members(const std::vector<Member>& members, auto& stream)
       {
