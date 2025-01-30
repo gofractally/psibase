@@ -453,11 +453,12 @@ int  main(int argc, char** argv)
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
+               auto kc = ws.count_keys(r);
                std::cout << "iterated " << std::setw(12)
                          << add_comma(
                                 int64_t(item_count) /
                                 (std::chrono::duration<double, std::milli>(delta).count() / 1000))
-                         << " items/sec  total items: " << add_comma(item_count) << "\n";
+                         << " items/sec  total items: " << add_comma(item_count) << " count: " << kc <<"\n";
             }
             catch (const std::exception& e)
             {

@@ -58,8 +58,13 @@ std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64
       {
          val = key;
          toupper(val);
+         if( result.size() != ws.count_keys(root) )
+            TRIEDENT_WARN( key, " count_keys: ", ws.count_keys(root) );
+         REQUIRE( result.size()  == ws.count_keys(root) );
+
          result.push_back( key );
          ws.upsert(root, to_key_view(key), to_value_view(val));
+
          /*
          ws.get(root, key,
                 [&](bool found, const value_type& r)
@@ -350,6 +355,10 @@ TEST_CASE("insert-words")
       bool inserted = false;
       for (int i = 0; i < keys.size(); ++i)
       {
+         if( i == 2560 )
+            std::cerr<<"break\n";
+
+         REQUIRE( ws.count_keys(root) == i );
          ws.upsert(root, to_key_view(keys[i]), to_value_view(values[i]));
          ws.get(root, to_key_view(keys[i]),
                 [&](bool found, const value_type& r)
@@ -480,10 +489,14 @@ TEST_CASE("insert-words")
       std::optional<node_handle> shared_handle;
       if (shared)
          shared_handle = root;
-      TRIEDENT_WARN("removing for keys in order");
+      TRIEDENT_WARN("removing for keys in order, shared: ", shared);
+      auto cnt = ws.count_keys(root);
+      REQUIRE( cnt == keys.size() );
       for (int i = 0; i < keys.size(); ++i)
       {
-         // TRIEDENT_DEBUG( "check before remove: ", keys[i] );
+       // TRIEDENT_DEBUG( "check before remove: ", keys[i], " i: ", i, " shared: ", shared );
+       // TRIEDENT_DEBUG( "ws.count: ", ws.count_keys(root), " i: ", i );
+         REQUIRE( cnt - i ==  ws.count_keys(root) );
          ws.get(root, to_key_view(keys[i]),
                 [&](bool found, const value_type& r)
                 {
@@ -497,9 +510,6 @@ TEST_CASE("insert-words")
                 });
 
          //TRIEDENT_DEBUG( "before remove: ", keys[i] );
-         if( "Aclemon" == keys[i] ) {
-            TRIEDENT_WARN( "break" );
-         }
          ws.remove(root, to_key_view(keys[i]));
          //TRIEDENT_DEBUG( "after remove: ", keys[i] );
          /*{
@@ -516,16 +526,17 @@ TEST_CASE("insert-words")
                    assert(not found);
                 });
       }
+      REQUIRE( ws.count_keys(root) == 0 );
       auto itr = ws.create_iterator(root);
       REQUIRE(not itr.valid());
       REQUIRE(not itr.lower_bound());
       env.db->print_stats(std::cerr);
    };
    // TRIEDENT_DEBUG( "load in file order" );
-   TRIEDENT_DEBUG("forward file order shared");
-   test_words(true);
    TRIEDENT_DEBUG("forward file order unique");
    test_words(false);
+   TRIEDENT_DEBUG("forward file order shared");
+   test_words(true);
    TRIEDENT_DEBUG("load in reverse file order");
    std::reverse(keys.begin(), keys.end());
    std::reverse(values.begin(), values.end());
@@ -888,6 +899,148 @@ TEST_CASE("recover")
       for (int i = 0; i < num_types; ++i)
          TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
       REQUIRE( v5 == v4 );
+   }
+}
+
+int64_t rand64()
+{
+   thread_local static std::mt19937 gen(rand());
+   return (uint64_t(gen()) << 32) | gen();
+}
+
+TEST_CASE("dense-rand-insert" )
+{
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto r    = ws.create_root();
+
+   for (int i = 0; i < 100000; i++)
+   {
+      REQUIRE( ws.count_keys( r )  == i );
+
+      uint64_t val = rand64();
+      key_view kstr((uint8_t*)&val, sizeof(val));
+      ws.insert(r, kstr, kstr);
+      ws.get(r, kstr,
+             [&](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                   assert(!"should have found key!");
+                }
+                REQUIRE( found );
+             });
+   }
+}
+TEST_CASE("sparse-rand-upsert" )
+{
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto r    = ws.create_root();
+
+   for (int i = 0; i < 100000; i++)
+   {
+      REQUIRE( ws.count_keys( r )  == i );
+
+      uint64_t val = rand64();
+      std::string str = std::to_string(val);
+      key_view kstr = to_key_view(str);
+      ws.upsert(r, kstr, kstr);
+      ws.get(r, kstr,
+             [&](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                   assert(!"should have found key!");
+                }
+                REQUIRE( found );
+             });
+   }
+}
+TEST_CASE("dense-rand-upsert" )
+{
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto r    = ws.create_root();
+
+   for (int i = 0; i < 100000; i++)
+   {
+      REQUIRE( ws.count_keys( r )  == i );
+
+      uint64_t val = rand64();
+      key_view kstr((uint8_t*)&val, sizeof(val));
+      ws.upsert(r, kstr, kstr);
+      ws.get(r, kstr,
+             [&](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                   assert(!"should have found key!");
+                }
+                REQUIRE( found );
+             });
+   }
+}
+TEST_CASE("dense-little-seq-upsert" )
+{
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto r    = ws.create_root();
+
+   for (int i = 0; i < 100000; i++)
+   {
+      REQUIRE( ws.count_keys( r )  == i );
+
+      uint64_t val = i;
+      key_view kstr((uint8_t*)&val, sizeof(val));
+      ws.upsert(r, kstr, kstr);
+      ws.get(r, kstr,
+             [&](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                   assert(!"should have found key!");
+                }
+                REQUIRE( found );
+             });
+   }
+}
+
+uint64_t bswap(uint64_t x)
+{
+   x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
+   x = (x & 0x0000FFFF0000FFFF) << 16 | (x & 0xFFFF0000FFFF0000) >> 16;
+   x = (x & 0x00FF00FF00FF00FF) << 8 | (x & 0xFF00FF00FF00FF00) >> 8;
+   return x;
+}
+
+TEST_CASE("dense-big-seq-upsert" )
+{
+   environ env;
+   auto ws   = env.db->start_write_session();
+   auto r    = ws.create_root();
+
+   for (int i = 0; i < 100000; i++)
+   {
+      REQUIRE( ws.count_keys( r )  == i );
+
+      uint64_t val = bswap(i);
+      key_view kstr((uint8_t*)&val, sizeof(val));
+      ws.upsert(r, kstr, kstr);
+      ws.get(r, kstr,
+             [&](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                   assert(!"should have found key!");
+                }
+                REQUIRE( found );
+             });
    }
 }
 

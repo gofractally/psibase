@@ -129,12 +129,19 @@ namespace arbtrie
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
 
+      inline uint32_t count_keys( object_ref<node_header>& r, key_view from, key_view to )const;
+
       /** creates a new handle for address, retains it */
       node_handle create_handle( fast_meta_address a ) { return node_handle( *this, a ); }
      public:
       seg_allocator::session _segas;
 
       iterator    create_iterator(node_handle h) { return iterator(*this, h); }
+
+      /**
+       * count the keys in the range [from,to)
+       */
+      uint32_t count_keys(const node_handle& r, key_view from={}, key_view to = iterator::npos);
 
 
       /**
@@ -336,7 +343,6 @@ namespace arbtrie
       // throws if no key was removed, return the number of bytes removed
       int require_remove(node_handle& r, key_view key);
 
-      uint32_t count_keys(node_handle& r, key_view from, key_view to);
 
       // return the number of keys removed
       // int remove(node_handle& r, key_view from, key_view to);
@@ -484,6 +490,7 @@ namespace arbtrie
    {
       release_node(r);
    }
+
 
    inline int read_session::get(const node_handle&                      r,
                                 key_view                                key,

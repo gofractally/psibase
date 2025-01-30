@@ -56,6 +56,7 @@ namespace arbtrie
       inner_node& set_descendants( int c )   { _descendants = c ; return *this; }
       inner_node& add_descendant( int c )    { _descendants += c ; return *this; }
       inner_node& remove_descendant( int c ) { _descendants -= c ; return *this; }
+      uint32_t    descendants()const { return _descendants; }
 
       saturated_uint32 _descendants = 0;
       uint32_t         _prefix_capacity : 10;

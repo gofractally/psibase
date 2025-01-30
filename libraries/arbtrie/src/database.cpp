@@ -397,6 +397,46 @@ namespace arbtrie
       return upsert<upsert_mode::unique_remove>(state.get(root), key);
    }
 
+   uint32_t read_session::count_keys( const node_handle& r, key_view from, key_view to )
+   {
+      if( not r.address() ) [[unlikely]]
+         return 0;
+
+      auto state = _segas.lock();
+      auto ref   = state.get(r.address());
+
+      return count_keys( ref, from, to );
+   }
+   uint32_t read_session::count_keys( object_ref<node_header>& r, key_view from, key_view to )const {
+      switch( r.type() ) {
+         case node_type::value: {
+            auto n = r.as<value_node>();
+            auto k = n->key();
+            if( k >= from and k < to )
+               return 1;
+            return  0;
+         }
+         case node_type::binary: {
+            auto n = r.as<binary_node>();
+            // TODO: filter by from-to range
+            return n->num_branches();
+         }
+         case node_type::full: {
+            auto n = r.as<full_node>();
+            // TODO: filter by from-to range
+            return n->descendants();
+                               }
+         case node_type::setlist: 
+         {
+            auto n = r.as<setlist_node>();
+            // TODO: filter by from-to range
+            return n->descendants();
+         }
+         default:
+         throw std::runtime_error( "unknown node type" );
+      }
+   }
+
    template <upsert_mode mode, typename NodeType>
    fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
    {
@@ -437,9 +477,9 @@ namespace arbtrie
          case node_type::setlist:
             result = upsert_inner<mode, setlist_node>(root, key);
             break;
-            //     case node_type::bitset:
-            //       result = upsert_inner<mode, bitset_node>(root, key, val);
-            //      break;
+//     case node_type::bitset:
+//       result = upsert_inner<mode, bitset_node>(root, key, val);
+//      break;
          case node_type::full:
             result = upsert_inner<mode, full_node>(root, key);
             break;
@@ -724,7 +764,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-   //   TRIEDENT_WARN("REFACTOR! ", r.address());
+      //TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);
@@ -795,12 +835,15 @@ namespace arbtrie
       }
       //TRIEDENT_WARN( "next - start: ", next_branch - branches, "  nb: ", nbranch );
 
+      // this branch requires many small keys and small values
       if (nbranch > 128)
       {
          auto init_full = [&](full_node* fn)
          {
             fn->set_branch_region(bregion);
             fn->set_eof(eof_val);
+            fn->set_descendants( root->_num_branches );
+            //TRIEDENT_DEBUG( "num_br: ", root->_num_branches, " desc: ", fn->descendants() );
             for (auto& p : branches)
                fn->add_branch(branch_index_type(p.first) + 1, fast_meta_address(bregion, p.second));
          };
@@ -823,6 +866,7 @@ namespace arbtrie
 
          sl->_num_branches = nbranch - has_eof_value;
          sl->set_eof(eof_val);
+         sl->set_descendants( root->_num_branches );
 
          int nb = sl->_num_branches;
          for (int i = 0; i < nb; ++i)
@@ -835,13 +879,13 @@ namespace arbtrie
 
       if constexpr (mode.is_unique())
       {
-        // TRIEDENT_DEBUG( "remake setlist" );
+//         TRIEDENT_DEBUG( "remake setlist" );
          return remake<setlist_node>(r, init_setlist,
                                      clone_config{.branch_cap = nbranch, .set_prefix = cpre});
       }
       else
       {
-        // TRIEDENT_DEBUG( "make setlist" );
+ //        TRIEDENT_DEBUG( "make setlist" );
          retain_children(r.rlock(), root);
          return make<setlist_node>(r.address().region, r.rlock(),
                                    {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
@@ -855,6 +899,7 @@ namespace arbtrie
       auto init_fn = [&](full_node* fn)
       {
          fn->set_branch_region(src->branch_region());
+         fn->set_descendants( src->descendants() );
          src->visit_branches_with_br(
              [&](short br, fast_meta_address oid)
              {
@@ -947,7 +992,16 @@ namespace arbtrie
                                                 p->remove_descendant(1);
                                                 p->set_branch(bidx, new_br);
                                                 });
+                        return r.address();
                      }
+
+                     if( _delta_keys ) {
+                        assert( _delta_keys == -1 );
+                        r.modify().as<NodeType>([this](auto* p){ 
+                                                p->add_descendant(-1);
+                                                });
+                     }
+
                      return r.address();
                   }
                   else //  update or insert
@@ -957,6 +1011,11 @@ namespace arbtrie
                                                 p->add_descendant(_delta_keys);
                                                 p->set_branch(bidx, new_br);
                                                 });
+                     else if( _delta_keys ) {
+                        r.modify().as<NodeType>([this](auto* p){ 
+                                                p->add_descendant(_delta_keys);
+                                                });
+                     }
                      return r.address();
                   }
                }
@@ -1010,7 +1069,9 @@ namespace arbtrie
                      auto cl     = clone<mode>(r, fn, {});
                      auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
                      assert(br != new_br);
-                     cl.modify().template as<NodeType>()->set_branch(bidx, new_br);
+                     cl.modify().template as<NodeType>(
+                           [bidx,new_br,this](auto p){p->set_branch(bidx, new_br); 
+                           p->add_descendant( _delta_keys ); });
                      //    TRIEDENT_DEBUG( "returning clone: ", cl.address() );
                      return cl.address();
                   }
@@ -1030,11 +1091,16 @@ namespace arbtrie
                   // as making a value node
                   auto new_bin = make_binary(fn->branch_region(), state,
                                              key.substr(cpre.size() + 1), _cur_val);
+                  _delta_keys = 1;
                   if constexpr (mode.is_unique())
                   {
                      if (fn->can_add_branch())
                      {
-                        r.modify().template as<NodeType>()->add_branch(bidx, new_bin);
+                        r.modify().template as<NodeType>(
+                             [bidx,new_bin](auto p ){
+                             p->add_branch(bidx, new_bin);
+                             p->add_descendant(1);
+                             });
                         return r.address();
                      }
                   }
@@ -1043,13 +1109,19 @@ namespace arbtrie
                      if (fn->num_branches() + 1 >= full_node_threshold)
                      {
                         return refactor_to_full<mode>(
-                                   r, fn, [&](auto fptr) { fptr->add_branch(bidx, new_bin); })
+                                   r, fn, [&](auto fptr) { 
+                                   fptr->add_branch(bidx, new_bin); 
+                                   fptr->add_descendant(1);
+                                   })
                             .address();
                      }
                   }
 
                   return clone<mode>(r, fn, {.branch_cap = fn->num_branches() + 1},
-                                     [&](auto cptr) { cptr->add_branch(bidx, new_bin); })
+                                     [&](auto cptr) { 
+                                     cptr->add_branch(bidx, new_bin); 
+                                     cptr->add_descendant(1);
+                                     })
                       .address();
                }
             }
@@ -1196,8 +1268,6 @@ namespace arbtrie
       {
          if constexpr (mode.is_remove())
          {
-            _delta_keys = 0;
-            TRIEDENT_DEBUG("remove key that doesn't share the same prefix");
             if constexpr (mode.must_remove())
                throw std::runtime_error("attempt to remove key that does not exist");
             return r.address();
@@ -1225,7 +1295,7 @@ namespace arbtrie
          //     [r] -> "efix" [0-N] branches
          //           - if unique, reassign ID to R2 but don't move object
          //           - if shared, clone into R2
-         //     [o] -> binarynode   (in R2) because cannot be same as parent)
+         //     [o] -> value_node (in R2) because cannot be same as parent)
          //           "stfix" = "value"
          //
          assert(cpre.size() < rootpre.size());
@@ -1276,6 +1346,7 @@ namespace arbtrie
          if (key.size() == cpre.size())
          {  // eof
             TRIEDENT_DEBUG("  value is on the node (EOF)");
+            _delta_keys = 1;
             auto v = make_value(child_id.region, state, _cur_val);
             // must be same region as r because we can't cange the region our parent
             // put this node in.
@@ -1287,6 +1358,7 @@ namespace arbtrie
                                          sln->set_branch_region(child_id.region);
                                          sln->set_eof(v);
                                          sln->add_branch(char_to_branch(root_prebranch), child_id);
+                                         sln->set_descendants(1 + fn->descendants() );
                                       })
                 .address();
          }
@@ -1294,14 +1366,17 @@ namespace arbtrie
          {  // branch node
             //       TRIEDENT_DEBUG("  two branch child, cpre: ", to_hex(cpre), "  key: ", to_hex(key),
             //                     " rpre: ", to_hex(rootpre));
+            //         
+            // NOTE: make_binary with 1 key currently makes a value_node.. TODO: rename
             auto abx = make_binary(child_id.region, state, key.substr(cpre.size() + 1), _cur_val);
+            _delta_keys = 1;
             return make<setlist_node>(
                        r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
                        [&](setlist_node* sln)
                        {
                           sln->set_branch_region(new_reg);
-
                           std::pair<branch_index_type, fast_meta_address> brs[2];
+                          sln->set_descendants(1 + fn->descendants());
 
                           auto order  = key[cpre.size()] < root_prebranch;  //rootpre[cpre.size()];
                           brs[order]  = {char_to_branch(key[cpre.size()]), abx};
@@ -1357,13 +1432,14 @@ namespace arbtrie
          if (not key_found)
          {
             lb_idx = bn->lower_bound_idx(key);
-            _delta_keys = 0;
-         }
-         else
             if constexpr ( mode.is_remove() )
-               _delta_keys = -1;
+               _delta_keys = 0;
             else
                _delta_keys = 1;
+         }
+         else // key found
+            if constexpr ( mode.is_remove() )
+               _delta_keys = -1;
       }
 
       if (not key_found)  // then insert a new value
