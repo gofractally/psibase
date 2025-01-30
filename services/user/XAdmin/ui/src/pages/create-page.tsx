@@ -114,6 +114,7 @@ export const CreatePage = () => {
 
     const isDev = chainTypeForm.watch("type") == "dev";
     const bpName = blockProducerForm.watch("name");
+    const keyDevice = keyDeviceForm.watch("id");
 
     const suggestedSelection = getDefaultSelectedPackages(
         {
@@ -179,7 +180,7 @@ export const CreatePage = () => {
             try {
                 let keyPair: CryptoKeyPair | undefined;
                 if (!isDev) {
-                    keyPair = await createAndSetKey();
+                    keyPair = await createAndSetKey(keyDevice);
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
