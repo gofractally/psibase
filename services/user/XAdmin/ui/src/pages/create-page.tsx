@@ -19,6 +19,7 @@ import {
     chainTypeSchema,
 } from "@/components/forms/chain-mode-form";
 import { BlockProducerForm } from "@/components/forms/block-producer";
+import { KeyDeviceForm } from "@/components/forms/key-device-form";
 import { ConfirmationForm } from "@/components/forms/confirmation-form";
 import { MultiStepLoader } from "@/components/multi-step-loader";
 import { PrevNextButtons } from "@/components/PrevNextButtons";
@@ -40,7 +41,7 @@ import {
 } from "../types";
 
 // hooks
-import { useAddServerKey } from "../hooks/useAddServerKey";
+import { useAddServerKey } from "../hooks/useKeyDevices";
 import { useConfig } from "../hooks/useConfig";
 import { useImportAccount } from "../hooks/useImportAccount";
 import { usePackages } from "../hooks/usePackages";
@@ -52,8 +53,13 @@ import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 import { SetupWrapper } from "./setup-wrapper";
 import { DependencyDialog } from "./dependency-dialog";
 
-const BlockProducerSchema = z.object({
+export const BlockProducerSchema = z.object({
     name: z.string().min(1),
+});
+
+export const KeyDeviceSchema = z.object({
+    id: z.string().min(1),
+    pin: z.string().optional(),
 });
 
 interface DependencyState {
@@ -69,7 +75,7 @@ interface Props {
     value: string;
 }
 
-const Card = ({ label, value }: Props) => (
+const Chip = ({ label, value }: Props) => (
     <div className="w-60 rounded-md border p-2 text-right">
         <div className="text-sm text-muted-foreground">{label}</div>
         {value}
@@ -99,8 +105,10 @@ export const CreatePage = () => {
         resolver: zodResolver(chainTypeSchema),
     });
 
+    const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
+
     const { canNext, canPrev, next, previous, currentStep, maxSteps } =
-        useStepper(4, [chainTypeForm, blockProducerForm, "a"]);
+        useStepper(5, [chainTypeForm, blockProducerForm, keyDeviceForm, "a"]);
 
     const { data: packages } = usePackages();
 
@@ -140,7 +148,7 @@ export const CreatePage = () => {
     );
 
     useEffect(() => {
-        if (currentStep == 3) {
+        if (currentStep == 4) {
             const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
@@ -228,11 +236,11 @@ export const CreatePage = () => {
             }
         };
 
-        if (currentStep == 4 && !installRan.current && config) {
+        if (currentStep == 5 && !installRan.current && config) {
             setLoading(true);
             installRan.current = true;
             setKeysAndBoot();
-        } else if (currentStep == 3) {
+        } else if (currentStep == 4) {
             // This case allows the user to retry after a failed step 4.
             if (installRan.current) {
                 installRan.current = false;
@@ -288,6 +296,11 @@ export const CreatePage = () => {
                         </div>
                     )}
                     {currentStep == 3 && (
+                        <div className="flex justify-center">
+                            <KeyDeviceForm form={keyDeviceForm} next={next} />
+                        </div>
+                    )}
+                    {currentStep == 4 && (
                         <div className="px-4">
                             <div className="grid grid-cols-2 py-6">
                                 <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
@@ -295,7 +308,7 @@ export const CreatePage = () => {
                                 </h1>{" "}
                                 <div className="flex flex-row-reverse ">
                                     <div className="flex flex-col gap-3  ">
-                                        <Card
+                                        <Chip
                                             label="Template"
                                             value={
                                                 isDev
@@ -304,7 +317,7 @@ export const CreatePage = () => {
                                             }
                                         />
 
-                                        <Card
+                                        <Chip
                                             label="Block Producer Name"
                                             value={bpName}
                                         />
@@ -329,7 +342,7 @@ export const CreatePage = () => {
                             </div>
                         </div>
                     )}
-                    {currentStep == 4 && <div>{errorMessage}</div>}
+                    {currentStep == 5 && <div>{errorMessage}</div>}
                 </div>
                 <div className="py-4">
                     <PrevNextButtons
