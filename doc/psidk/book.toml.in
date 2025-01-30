@@ -14,6 +14,8 @@ after = ["links","index"]
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
 
+[preprocessor.tabs]
+
 [preprocessor.pagetoc]
 [output.html]
 default-theme = "ayu"
@@ -23,13 +25,16 @@ git-repository-url = "https://github.com/gofractally/psibase"
 edit-url-template = "https://github.com/gofractally/psibase/edit/main/{path}"
 additional-css = [
     "theme/css/pagetoc.css", 
-    "theme/css/pagetoc-tock.css"
+    "theme/css/pagetoc-tock.css",
+    "theme/css/tabs.css"
 ]
 additional-js = [
+    "theme/js/mermaid.min.js",
     "theme/js/mermaid-load.js", 
     "theme/js/app-init.js", 
     "theme/js/fix-github-edit-link.js", 
-    "theme/js/pagetoc.js"
+    "theme/js/pagetoc.js",
+    "theme/js/tabs.js"
 ]
 
 [output.html.print]
