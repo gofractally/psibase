@@ -1,38 +1,48 @@
-import { ConfirmationModal } from "@/components/alert-modal";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import { CreditTable } from "@/components/credit-table";
 import { FormCreate } from "@/components/forms/form-create";
 import FormTransfer from "@/components/forms/form-transfer";
 import { ModalCreateToken } from "@/components/modal-create-token";
 import { Mode } from "@/components/transfer-toggle";
 import { m, useMode } from "@/hooks/useMode";
-import { usePluginCall } from "@/hooks/usePluginCall";
 import { useTokenForm } from "@/hooks/useTokenForm";
-import { useUi } from "@/hooks/useUi";
-import { useUser } from "@/hooks/useUser";
+import { useBalances } from "@/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";
-import { tokenPlugin } from "@/plugin";
-import { FunctionCallArgs } from "@psibase/common-lib";
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/nav";
+import { useLoggedInUser } from "./hooks/network/useLoggedInUser";
+import { useBurn } from "./hooks/tokensPlugin/useBurn";
+import { useCredit } from "./hooks/tokensPlugin/useCredit";
+import { useMint } from "./hooks/tokensPlugin/useMint";
+import { toast } from "sonner";
+import { TransferModal } from "./components/transfer-modal";
 
 function App() {
-  const currentUser = useUser();
+  const { data: currentUser } = useLoggedInUser();
   const {
     data: { sharedBalances, tokens },
-    refetch,
+    refetch: refetchUserBalances,
     isLoading,
-  } = useUi(currentUser);
+  } = useBalances(currentUser);
 
-  const { mutateAsync: pluginCall, isPending } = usePluginCall();
+  const { isPending: isBurnPending, mutateAsync: burn } = useBurn();
+  const { isPending: isCreditPending, mutateAsync: credit } = useCredit();
+  const { isPending: isMintPending, mutateAsync: mint } = useMint();
+
+  const isPending = isBurnPending || isCreditPending || isMintPending;
 
   const form = useTokenForm();
 
   function onSubmit() {
-    setConfirmationModalOpen(true);
+    if (mode == Mode.Transfer) {
+      setTransferModal(true);
+    } else {
+      setConfirmationModalOpen(true);
+    }
   }
 
   const { setMode, mode } = useMode();
-  const { isBurning, isMinting, isTransfer } = m(mode);
+  const { isBurning, isMinting } = m(mode);
 
   const selectedTokenId = form.watch("token");
   const selectedToken = tokens.find(
@@ -55,6 +65,7 @@ function App() {
 
   const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
+  const [isTransferModalOpen, setTransferModal] = useState(false);
 
   const isAdmin = selectedToken?.isAdmin || false;
 
@@ -66,32 +77,68 @@ function App() {
       : ""
   }`;
 
+  const onSuccessfulTx = () => {
+    form.setValue("amount", "");
+    form.setValue("memo", "");
+  };
+
+  const performTransfer = async () => {
+    const tokenId = form.watch("token");
+    const amount = form.watch("amount");
+    const memo = form.watch("memo")!;
+    const recipient = form.watch("to")!;
+
+    try {
+      await credit({ tokenId, receiver: recipient, amount, memo });
+      toast("Sent", { description: `Sent ${amount} to ${recipient}` });
+      onSuccessfulTx();
+      setTransferModal(false);
+    } catch (e) {
+      toast("Error", {
+        description:
+          e instanceof Error ? e.message : `Unrecognised error, see logs.`,
+      });
+    } finally {
+      refetchUserBalances();
+      wait(3000).then(() => {
+        refetchUserBalances();
+      });
+    }
+  };
+
   const performTx = async () => {
     const tokenId = form.watch("token");
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
-    let args: FunctionCallArgs;
 
-    if (isTransfer) {
-      const recipient = form.watch("to")!;
-      args = tokenPlugin.transfer.credit(tokenId, recipient, amount, memo);
-    } else if (isBurning) {
-      args = tokenPlugin.intf.burn(tokenId, amount);
-    } else if (isMinting) {
-      args = tokenPlugin.intf.mint(tokenId, amount, memo);
-    } else {
-      throw new Error(`Failed to identify args`);
-    }
     try {
-      await pluginCall(args);
-      form.setValue("amount", "");
-      setConfirmationModalOpen(false);
+      if (isBurning) {
+        const burningFrom = form.watch("from");
+        await burn({ tokenId, amount, account: burningFrom || "", memo });
+        toast("Burned", {
+          description: `Burned ${amount} tokens${
+            burningFrom ? ` from ${burningFrom}` : ""
+          }`,
+        });
+        setConfirmationModalOpen(false);
+        onSuccessfulTx();
+      } else if (isMinting) {
+        await mint({ tokenId, amount, memo });
+        toast("Minted", { description: `Added ${amount} to your balance.` });
+        onSuccessfulTx();
+        setConfirmationModalOpen(false);
+      } else {
+        throw new Error(`Failed to identify type of plugin call`);
+      }
     } catch (e) {
-      console.error(e, "caught error");
+      toast("Error", {
+        description:
+          e instanceof Error ? e.message : `Unrecognised error, see logs.`,
+      });
     } finally {
-      refetch();
+      refetchUserBalances();
       wait(3000).then(() => {
-        refetch();
+        refetchUserBalances();
       });
     }
   };
@@ -99,6 +146,7 @@ function App() {
   return (
     <div className="mx-auto h-screen w-screen max-w-screen-lg">
       <Nav title="Tokens" />
+
       <div className="max-w-screen-lg mx-auto p-4 flex flex-col gap-3">
         <ModalCreateToken
           open={isNewTokenModalOpen}
@@ -107,13 +155,12 @@ function App() {
           <FormCreate
             onClose={() => {
               wait(3000).then(() => {
-                refetch();
+                refetchUserBalances();
               });
               setNewTokenModalOpen(false);
             }}
           />
         </ModalCreateToken>
-
         <ConfirmationModal
           descriptions={[modalWarning]}
           isPending={isPending}
@@ -121,7 +168,16 @@ function App() {
           onContinue={() => performTx()}
           open={isConfirmationModalOpen}
         />
-
+        <TransferModal
+          isPending={isPending}
+          onClose={() => setTransferModal(false)}
+          open={isTransferModalOpen}
+          from={currentUser}
+          to={form.watch("to")}
+          onContinue={() => {
+            performTransfer();
+          }}
+        />
         <FormTransfer
           form={form}
           tokens={tokens}
@@ -131,7 +187,6 @@ function App() {
           setNewTokenModalOpen={setNewTokenModalOpen}
           onSubmit={onSubmit}
         />
-
         <div className="my-4">
           <CreditTable
             isLoading={isLoading}

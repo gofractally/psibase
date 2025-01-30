@@ -1,12 +1,13 @@
-import { useSupervisor } from "./useSupervisor";
+import { Account } from "@/lib/types";
 import { FunctionCallArgs } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { functionCall } from "@/lib/functionCall";
 
 const CreditBalance = z.object({
   balance: z.string(),
-  creditor: z.string(),
-  debitor: z.string(),
+  creditor: Account,
+  debitor: Account,
   tokenId: z.number(),
 });
 
@@ -22,14 +23,12 @@ const usePluginQuery = <T extends z.ZodTypeAny, Y>(
   schema: T,
   initialData?: Y
 ) => {
-  const supervisor = useSupervisor();
   const queryKey = callArgsToQueryKey(query);
 
   return useQuery<unknown, unknown, z.infer<T>>({
     queryKey,
     queryFn: async () => {
-      await supervisor.onLoaded();
-      const rawData = await supervisor.functionCall(query);
+      const rawData = await functionCall(query);
       return schema.parse(rawData);
     },
     initialData,

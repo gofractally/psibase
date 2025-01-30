@@ -1,5 +1,9 @@
-export const formatThousands = (num: number, precision: number, full = false) =>
+export const formatThousands = (
+  num: number,
+  precision: number,
+  fullPrecision = false
+) =>
   new Intl.NumberFormat("en-US", {
     maximumFractionDigits: precision,
-    ...(full && { minimumFractionDigits: precision }),
+    ...(fullPrecision && { minimumFractionDigits: precision }),
   }).format(Number.isNaN(num) ? 0 : num);

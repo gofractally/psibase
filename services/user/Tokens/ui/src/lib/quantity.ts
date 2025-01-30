@@ -11,25 +11,27 @@ export class Quantity {
       throw new Error(`Expected integer, e.g. 10000 not 1.0000`);
   }
 
-  public containsSymbol(): boolean {
+  public hasTokenSymbol(): boolean {
     return !!this.tokenSymbol;
   }
 
-  public toNumber(): number {
+  public toDecimal(): number {
     return Number(this.amount) / Math.pow(10, this.precision);
   }
 
-  public label(): string {
+  public getDisplayLabel(): string {
     return this.tokenSymbol?.toUpperCase() || `#${this.tokenNumber}`;
   }
 
-  public format(includeLabel = true, full = false): string {
-    return `${formatThousands(this.toNumber(), this.precision, full)}${
-      includeLabel ? ` ${this.label()}` : ""
-    }`;
+  public format(includeLabel = true, fullPrecision = false): string {
+    return `${formatThousands(
+      this.toDecimal(),
+      this.precision,
+      fullPrecision
+    )}${includeLabel ? ` ${this.getDisplayLabel()}` : ""}`;
   }
 
-  public toRawNumber(): string {
+  public getRawAmount(): string {
     return this.amount;
   }
 
