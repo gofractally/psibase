@@ -53,7 +53,7 @@ struct StagedTxData {
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StagedTxDetailsInner {
-    txid: String,
+    txid: Checksum256,
     propose_block: u32,
     propose_date: String,
     proposer: String,
@@ -97,17 +97,7 @@ fn get_staged_txid(id: u32) -> Result<Checksum256, Error> {
 
     let details = Server::post_graphql_get_json(&query).unwrap();
     let details = serde_json::from_str::<StagedTxDetails>(&details).unwrap();
-    let txid = details.data.details.txid;
-    if txid.len() % 2 != 0 {
-        return Err(ErrorType::InvalidTxId.into());
-    }
-    let txid: Vec<u8> = (0..txid.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&txid[i..i + 2], 16).unwrap())
-        .collect();
-    let txid: [u8; 32] = txid.try_into().map_err(|_| ErrorType::InvalidTxId)?;
-
-    Ok(txid.into())
+    Ok(details.data.details.txid)
 }
 
 struct StagedTxPlugin;

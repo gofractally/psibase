@@ -185,7 +185,7 @@ pub mod service {
 
     fn emit_update(txid: Checksum256, event_type: u8) {
         Wrapper::emit().history().updated(
-            txid.to_string(),
+            txid,
             get_sender(),
             Transact::call().currentBlock().time,
             StagedTxEvent::from(event_type).to_string(),
@@ -194,7 +194,7 @@ pub mod service {
 
     #[event(history)]
     pub fn updated(
-        txid: String,            // The txid of the staged transaction
+        txid: Checksum256,       // The txid of the staged transaction
         actor: AccountNumber,    // The sender of the action causing the event
         datetime: TimePointUSec, // The time of the event emission
         event_type: String,      // The type of event
