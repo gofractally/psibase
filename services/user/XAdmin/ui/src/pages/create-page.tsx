@@ -5,12 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 // ShadCN UI Imports
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/use-toast";
 
 // components
@@ -19,10 +13,11 @@ import {
     chainTypeSchema,
 } from "@/components/forms/chain-mode-form";
 import { BlockProducerForm } from "@/components/forms/block-producer";
-import { ConfirmationForm } from "@/components/forms/confirmation-form";
+import { KeyDeviceForm } from "@/components/forms/key-device-form";
 import { MultiStepLoader } from "@/components/multi-step-loader";
 import { PrevNextButtons } from "@/components/PrevNextButtons";
 import { Steps } from "@/components/steps";
+import { InstallationSummary } from "@/components/installation-summary";
 
 // lib
 import { bootChain } from "@/lib/bootChain";
@@ -40,7 +35,7 @@ import {
 } from "../types";
 
 // hooks
-import { useAddServerKey } from "../hooks/useAddServerKey";
+import { useAddServerKey } from "../hooks/useKeyDevices";
 import { useConfig } from "../hooks/useConfig";
 import { useImportAccount } from "../hooks/useImportAccount";
 import { usePackages } from "../hooks/usePackages";
@@ -52,8 +47,13 @@ import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 import { SetupWrapper } from "./setup-wrapper";
 import { DependencyDialog } from "./dependency-dialog";
 
-const BlockProducerSchema = z.object({
+export const BlockProducerSchema = z.object({
     name: z.string().min(1),
+});
+
+export const KeyDeviceSchema = z.object({
+    id: z.string().min(1),
+    pin: z.string().optional(),
 });
 
 interface DependencyState {
@@ -63,18 +63,6 @@ interface DependencyState {
 }
 
 let prom: (value: boolean) => void;
-
-interface Props {
-    label: string;
-    value: string;
-}
-
-const Card = ({ label, value }: Props) => (
-    <div className="w-60 rounded-md border p-2 text-right">
-        <div className="text-sm text-muted-foreground">{label}</div>
-        {value}
-    </div>
-);
 
 const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
     RequestUpdateSchema.safeParse(data).success;
@@ -99,13 +87,38 @@ export const CreatePage = () => {
         resolver: zodResolver(chainTypeSchema),
     });
 
-    const { canNext, canPrev, next, previous, currentStep, maxSteps } =
-        useStepper(4, [chainTypeForm, blockProducerForm, "a"]);
-
-    const { data: packages } = usePackages();
+    const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
     const isDev = chainTypeForm.watch("type") == "dev";
     const bpName = blockProducerForm.watch("name");
+    const keyDevice = keyDeviceForm.watch("id");
+
+    const Step = {
+        ChainType: "CHAIN_TYPE",
+        BlockProducer: "BLOCK_PRODUCER",
+        KeyDevice: "KEY_DEVICE",
+        Confirmation: "CONFIRMATION",
+        Completion: "COMPLETION",
+    } as const;
+
+    type StepKey = (typeof Step)[keyof typeof Step];
+
+    const {
+        canNext,
+        canPrev,
+        next,
+        previous,
+        currentStepNum,
+        currentStep,
+        maxSteps,
+    } = useStepper<StepKey>([
+        { step: Step.ChainType, form: chainTypeForm },
+        { step: Step.BlockProducer, form: blockProducerForm },
+        { step: Step.KeyDevice, form: keyDeviceForm, skip: isDev },
+        { step: Step.Confirmation },
+    ]);
+
+    const { data: packages } = usePackages();
 
     const suggestedSelection = getDefaultSelectedPackages(
         {
@@ -140,7 +153,7 @@ export const CreatePage = () => {
     );
 
     useEffect(() => {
-        if (currentStep == 3) {
+        if (currentStep === Step.Confirmation) {
             const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
@@ -171,7 +184,7 @@ export const CreatePage = () => {
             try {
                 let keyPair: CryptoKeyPair | undefined;
                 if (!isDev) {
-                    keyPair = await createAndSetKey();
+                    keyPair = await createAndSetKey(keyDevice);
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -228,11 +241,11 @@ export const CreatePage = () => {
             }
         };
 
-        if (currentStep == 4 && !installRan.current && config) {
+        if (currentStep === Step.Completion && !installRan.current && config) {
             setLoading(true);
             installRan.current = true;
             setKeysAndBoot();
-        } else if (currentStep == 3) {
+        } else if (currentStep === Step.Confirmation) {
             // This case allows the user to retry after a failed step 4.
             if (installRan.current) {
                 installRan.current = false;
@@ -264,72 +277,47 @@ export const CreatePage = () => {
                 <div className="flex flex-col">
                     <div className="pb-20">
                         <Steps
-                            currentStep={currentStep}
+                            currentStep={currentStepNum}
                             numberOfSteps={maxSteps}
                         />
                     </div>
-                    {currentStep == 1 && (
+                    {currentStep === Step.ChainType && (
                         <div>
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Boot template
-                            </h1>{" "}
+                            </h1>
                             <ChainTypeForm form={chainTypeForm} next={next} />
                         </div>
                     )}
-                    {currentStep == 2 && (
+                    {currentStep === Step.BlockProducer && (
                         <div>
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Name yourself
-                            </h1>{" "}
+                            </h1>
                             <BlockProducerForm
                                 form={blockProducerForm}
                                 next={next}
                             />
                         </div>
                     )}
-                    {currentStep == 3 && (
-                        <div className="px-4">
-                            <div className="grid grid-cols-2 py-6">
-                                <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                    Installation summary
-                                </h1>{" "}
-                                <div className="flex flex-row-reverse ">
-                                    <div className="flex flex-col gap-3  ">
-                                        <Card
-                                            label="Template"
-                                            value={
-                                                isDev
-                                                    ? "Developer"
-                                                    : "Production"
-                                            }
-                                        />
-
-                                        <Card
-                                            label="Block Producer Name"
-                                            value={bpName}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="max-h-full ">
-                                <Accordion type="single" collapsible>
-                                    <AccordionItem value="item-1">
-                                        <AccordionTrigger className="w-60">
-                                            Advanced
-                                        </AccordionTrigger>
-                                        <AccordionContent>
-                                            <ConfirmationForm
-                                                rowSelection={rows}
-                                                onRowSelectionChange={setRows}
-                                                packages={packages}
-                                            />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
-                            </div>
+                    {currentStep === Step.KeyDevice && (
+                        <div className="flex justify-center">
+                            <KeyDeviceForm form={keyDeviceForm} next={next} />
                         </div>
                     )}
-                    {currentStep == 4 && <div>{errorMessage}</div>}
+                    {currentStep === Step.Confirmation && (
+                        <InstallationSummary
+                            isDev={isDev}
+                            bpName={bpName}
+                            keyDevice={keyDevice}
+                            rows={rows}
+                            setRows={setRows}
+                            packages={packages}
+                        />
+                    )}
+                    {currentStep === Step.Completion && (
+                        <div>{errorMessage}</div>
+                    )}
                 </div>
                 <div className="py-4">
                     <PrevNextButtons

@@ -1,33 +1,47 @@
 import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 
-export const useStepper = (
-    numberOfSteps: number,
-    formsOrFunctions: (UseFormReturn<any> | string)[]
-) => {
-    const [currentStep, setStep] = useState(1);
-    const canNext = currentStep < numberOfSteps;
-    const canPrev = currentStep > 1;
+type Step<T> = {
+    step: T | "COMPLETION";
+    form?: UseFormReturn<any>;
+    skip?: boolean;
+};
+
+/**
+ *
+ * @param steps - Include all steps except final COMPLETION step, which is included implicitly
+ */
+export const useStepper = <T>(steps: Step<T>[]) => {
+    const [currentStepNum, setStepNum] = useState(1);
+    const availableSteps = steps.filter((f) => !f.skip);
+
+    const numberOfSteps = availableSteps.length + 1;
+
+    const canNext = currentStepNum < numberOfSteps;
+    const canPrev = currentStepNum > 1;
 
     const next = async () => {
         if (canNext) {
-            const currentChecker = formsOrFunctions[currentStep - 1];
+            const currentChecker = availableSteps[currentStepNum - 1].form;
             const isPassable =
-                typeof currentChecker == "string"
-                    ? !!currentChecker
-                    : await currentChecker.trigger();
+                !currentChecker || (await currentChecker?.trigger());
             if (isPassable) {
-                setStep((step) => (canNext ? step + 1 : step));
+                setStepNum((step) => (canNext ? step + 1 : step));
             }
         }
     };
 
     const previous = () => {
-        setStep((step) => (canPrev ? step - 1 : step));
+        setStepNum((step) => (canPrev ? step - 1 : step));
     };
 
+    const isComplete = currentStepNum == numberOfSteps;
+
     return {
-        currentStep,
+        currentStepNum,
+        currentStep: isComplete
+            ? "COMPLETION"
+            : availableSteps[currentStepNum - 1].step,
         maxSteps: numberOfSteps,
         next,
         previous,
