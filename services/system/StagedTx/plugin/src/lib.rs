@@ -51,14 +51,12 @@ struct StagedTxData {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StagedTxDetailsInner {
     txid: String,
-    #[serde(rename = "proposeBlock")]
     propose_block: u32,
-    #[serde(rename = "proposeDate")]
     propose_date: String,
     proposer: String,
-    #[serde(rename = "actionList")]
     action_list: ActionList,
 }
 
@@ -172,9 +170,6 @@ impl HookTxTransform for StagedTxPlugin {
         let Some(label) = label else {
             return Ok(None);
         };
-
-        println!("label: {:?}", label);
-        println!("actions: {:?}", actions);
 
         let transact = psibase::services::transact::SERVICE.to_string();
         get_assert_caller("on_tx_transform", &[&transact])?;
