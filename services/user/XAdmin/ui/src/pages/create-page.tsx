@@ -107,14 +107,36 @@ export const CreatePage = () => {
 
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
-    const { canNext, canPrev, next, previous, currentStep, maxSteps } =
-        useStepper(5, [chainTypeForm, blockProducerForm, keyDeviceForm, "a"]);
-
-    const { data: packages } = usePackages();
-
     const isDev = chainTypeForm.watch("type") == "dev";
     const bpName = blockProducerForm.watch("name");
     const keyDevice = keyDeviceForm.watch("id");
+
+    const Step = {
+        ChainType: "CHAIN_TYPE",
+        BlockProducer: "BLOCK_PRODUCER",
+        KeyDevice: "KEY_DEVICE",
+        Confirmation: "CONFIRMATION",
+        Completion: "COMPLETION",
+    } as const;
+
+    type StepKey = (typeof Step)[keyof typeof Step];
+
+    const {
+        canNext,
+        canPrev,
+        next,
+        previous,
+        currentStepNum,
+        currentStep,
+        maxSteps,
+    } = useStepper<StepKey>([
+        { step: Step.ChainType, form: chainTypeForm },
+        { step: Step.BlockProducer, form: blockProducerForm },
+        { step: Step.KeyDevice, form: keyDeviceForm, skip: isDev },
+        { step: Step.Confirmation },
+    ]);
+
+    const { data: packages } = usePackages();
 
     const suggestedSelection = getDefaultSelectedPackages(
         {
@@ -149,7 +171,7 @@ export const CreatePage = () => {
     );
 
     useEffect(() => {
-        if (currentStep == 4) {
+        if (currentStep === Step.Confirmation) {
             const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {}
@@ -237,11 +259,11 @@ export const CreatePage = () => {
             }
         };
 
-        if (currentStep == 5 && !installRan.current && config) {
+        if (currentStep === Step.Completion && !installRan.current && config) {
             setLoading(true);
             installRan.current = true;
             setKeysAndBoot();
-        } else if (currentStep == 4) {
+        } else if (currentStep === Step.Confirmation) {
             // This case allows the user to retry after a failed step 4.
             if (installRan.current) {
                 installRan.current = false;
@@ -273,40 +295,40 @@ export const CreatePage = () => {
                 <div className="flex flex-col">
                     <div className="pb-20">
                         <Steps
-                            currentStep={currentStep}
+                            currentStep={currentStepNum}
                             numberOfSteps={maxSteps}
                         />
                     </div>
-                    {currentStep == 1 && (
+                    {currentStep === Step.ChainType && (
                         <div>
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Boot template
-                            </h1>{" "}
+                            </h1>
                             <ChainTypeForm form={chainTypeForm} next={next} />
                         </div>
                     )}
-                    {currentStep == 2 && (
+                    {currentStep === Step.BlockProducer && (
                         <div>
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Name yourself
-                            </h1>{" "}
+                            </h1>
                             <BlockProducerForm
                                 form={blockProducerForm}
                                 next={next}
                             />
                         </div>
                     )}
-                    {currentStep == 3 && (
+                    {currentStep === Step.KeyDevice && (
                         <div className="flex justify-center">
                             <KeyDeviceForm form={keyDeviceForm} next={next} />
                         </div>
                     )}
-                    {currentStep == 4 && (
+                    {currentStep === Step.Confirmation && (
                         <div className="px-4">
                             <div className="grid grid-cols-2 py-6">
                                 <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                     Installation summary
-                                </h1>{" "}
+                                </h1>
                                 <div className="flex flex-row-reverse ">
                                     <div className="flex flex-col gap-3  ">
                                         <Chip
@@ -343,7 +365,9 @@ export const CreatePage = () => {
                             </div>
                         </div>
                     )}
-                    {currentStep == 5 && <div>{errorMessage}</div>}
+                    {currentStep === Step.Completion && (
+                        <div>{errorMessage}</div>
+                    )}
                 </div>
                 <div className="py-4">
                     <PrevNextButtons
