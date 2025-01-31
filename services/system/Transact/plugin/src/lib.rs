@@ -33,7 +33,7 @@ use serde_json::from_str;
 // 1. start-tx
 //
 // 2. add-action-to-transaction
-// 3.   on-action-sender           - the hooked plugin can set the sender of the action, otherwise the logged-in user is used by default
+// 3.   on-actions-sender           - the hooked plugin can set the sender of the action, otherwise the logged-in user is used by default
 // 4.   on-action-auth-claims      - the hooked plugin can add claims for this action
 // 5.   save action details
 //
@@ -53,9 +53,11 @@ impl Hooks for TransactPlugin {
         ActionAuthPlugins::set(get_sender_app());
     }
 
-    fn hook_action_sender() {
-        if ActionSenderHook::has() {
-            panic!("Action sender hook already set");
+    fn hook_actions_sender() {
+        if let Some(sender) = ActionSenderHook::get() {
+            if sender != get_sender_app() {
+                panic!("Action sender hook already set");
+            }
         }
         ActionSenderHook::set(get_sender_app());
     }
@@ -133,6 +135,7 @@ impl Admin for TransactPlugin {
 
     fn finish_tx() -> Result<(), CommonTypes::Error> {
         assert_from_supervisor();
+        ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
         if actions.len() == 0 {

@@ -1,5 +1,5 @@
-use crate::bindings::accounts::plugin::active_app::get_logged_in_user;
 use crate::bindings::accounts::plugin::api::get_account;
+use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::host::common as Host;
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;
@@ -33,16 +33,15 @@ pub fn get_sender_app() -> String {
 
 pub fn get_action_sender(service: &str, method: &str) -> Result<String, Host::types::Error> {
     if let Some(plugin) = ActionSenderHook::get() {
-        ActionSenderHook::clear();
-        if let Some(s) = on_action_sender(
-            PluginRef::new(plugin.as_str(), "plugin", "transact-hook-action-sender"),
+        if let Some(s) = on_actions_sender(
+            PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
             service,
             method,
         )? {
             return Ok(s);
         }
     }
-    if let Some(sender) = get_logged_in_user()? {
+    if let Some(sender) = get_current_user()? {
         return Ok(sender);
     }
 
@@ -113,7 +112,7 @@ fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, Host::types::Error> {
     let mut claims = vec![];
 
     // Add claims for the logged-in user if there are any
-    if let Some(user) = get_logged_in_user()? {
+    if let Some(user) = get_current_user()? {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref =
             Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
@@ -131,7 +130,7 @@ fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, Host::types::Error> {
 pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
     let mut proofs = vec![];
 
-    if let Some(user) = get_logged_in_user()? {
+    if let Some(user) = get_current_user()? {
         let auth_service_acc = get_account(&user)?.unwrap().auth_service;
         let plugin_ref =
             Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
