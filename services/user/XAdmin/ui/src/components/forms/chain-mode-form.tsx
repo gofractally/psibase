@@ -20,8 +20,6 @@ interface Props {
 }
 
 export const ChainTypeForm = ({ form, next }: Props) => {
-    const isSecure = window.location.protocol === "https:";
-    const isLocalhost = window.location.hostname.endsWith("localhost");
     return (
         <Form {...form}>
             <form className="space-y-6">
@@ -76,14 +74,14 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                                     field.value === "prod",
                                             }
                                         )}
-                                        disabled={!isSecure && !isLocalhost}
+                                        disabled={!window.isSecureContext}
                                     >
                                         <h2 className="text-2xl">Production</h2>
                                         <p className="text-center text-sm text-muted-foreground">
                                             Create a secure production
                                             blockchain
                                         </p>
-                                        {!isSecure && !isLocalhost ? (
+                                        {!window.isSecureContext ? (
                                             <p className="text-center text-sm text-muted-foreground">
                                                 ⚠️ Only available via HTTPS or
                                                 localhost
