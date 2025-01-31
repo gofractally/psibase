@@ -5,12 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 // ShadCN UI Imports
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/use-toast";
 
 // components
@@ -20,10 +14,10 @@ import {
 } from "@/components/forms/chain-mode-form";
 import { BlockProducerForm } from "@/components/forms/block-producer";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
-import { ConfirmationForm } from "@/components/forms/confirmation-form";
 import { MultiStepLoader } from "@/components/multi-step-loader";
 import { PrevNextButtons } from "@/components/PrevNextButtons";
 import { Steps } from "@/components/steps";
+import { InstallationSummary } from "@/components/installation-summary";
 
 // lib
 import { bootChain } from "@/lib/bootChain";
@@ -69,18 +63,6 @@ interface DependencyState {
 }
 
 let prom: (value: boolean) => void;
-
-interface Props {
-    label: string;
-    value: string;
-}
-
-const Chip = ({ label, value }: Props) => (
-    <div className="w-60 rounded-md border p-2 text-right">
-        <div className="text-sm text-muted-foreground">{label}</div>
-        {value}
-    </div>
-);
 
 const isRequestingUpdate = (data: unknown): data is RequestUpdate =>
     RequestUpdateSchema.safeParse(data).success;
@@ -324,46 +306,14 @@ export const CreatePage = () => {
                         </div>
                     )}
                     {currentStep === Step.Confirmation && (
-                        <div className="px-4">
-                            <div className="grid grid-cols-2 py-6">
-                                <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
-                                    Installation summary
-                                </h1>
-                                <div className="flex flex-row-reverse ">
-                                    <div className="flex flex-col gap-3  ">
-                                        <Chip
-                                            label="Template"
-                                            value={
-                                                isDev
-                                                    ? "Developer"
-                                                    : "Production"
-                                            }
-                                        />
-
-                                        <Chip
-                                            label="Block Producer Name"
-                                            value={bpName}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="max-h-full ">
-                                <Accordion type="single" collapsible>
-                                    <AccordionItem value="item-1">
-                                        <AccordionTrigger className="w-60">
-                                            Advanced
-                                        </AccordionTrigger>
-                                        <AccordionContent>
-                                            <ConfirmationForm
-                                                rowSelection={rows}
-                                                onRowSelectionChange={setRows}
-                                                packages={packages}
-                                            />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
-                            </div>
-                        </div>
+                        <InstallationSummary
+                            isDev={isDev}
+                            bpName={bpName}
+                            keyDevice={keyDevice}
+                            rows={rows}
+                            setRows={setRows}
+                            packages={packages}
+                        />
                     )}
                     {currentStep === Step.Completion && (
                         <div>{errorMessage}</div>
