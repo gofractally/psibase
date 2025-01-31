@@ -122,6 +122,7 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
                                             <Input
                                                 placeholder="Device PIN"
                                                 id="pin"
+                                                type="password"
                                                 {...field}
                                             />
                                         </FormControl>
