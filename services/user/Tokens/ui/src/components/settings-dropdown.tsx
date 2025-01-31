@@ -19,7 +19,6 @@ import {
   LogIn,
   PlusCircle,
   Settings,
-  PawPrint,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -30,60 +29,24 @@ import { useSelectAccount } from "@/hooks/network/useSelectAccount";
 import { cn } from "@/lib/utils";
 
 import { createAvatar } from "@dicebear/core";
-import { thumbs, identicon } from "@dicebear/collection";
+import { identicon } from "@dicebear/collection";
 import { useChainId } from "@/hooks/network/useChainId";
 import { useLogout } from "@/hooks/network/useLogout";
 import { useCreateConnectionToken } from "@/hooks/network/useCreateConnectionToken";
 import { Button } from "./ui/button";
-import { z } from "zod";
-import { useLocalStorage } from "usehooks-ts";
 
-const now = new Date();
-const randomSalt =
-  `5b3fb229-d4ec-4fee-a36d-b949bc5e6fab5` +
-  now.getMonth().toString() +
-  now.getDate().toString();
-
-console.log({ randomSalt });
-
-const Style = z.enum(["thumbs", "identicon"]);
-
-const createIdenticon = (
-  seed: string,
-  style: z.infer<typeof Style>
-): string => {
-  const avatar = createAvatar(style == Style.Enum.thumbs ? thumbs : identicon, {
+const createIdenticon = (seed: string): string => {
+  const avatar = createAvatar(identicon, {
     seed,
     size: 40,
     backgroundColor: ["black"],
     scale: 110,
-    ...(style == Style.Enum.thumbs && {
-      eyesColor: ["020202"],
-      radius: 50,
-      mouthColor: ["020202"],
-      shapeColor: [
-        "ea0276",
-        "89ea02",
-        "ead702",
-        "15ea02",
-        "025bea",
-        "8902ea",
-        "e602ea",
-        "ea0219",
-        "8502ea",
-      ],
-    }),
   });
   return avatar.toDataUri();
 };
 
 export const SettingsDropdown = () => {
   const { setTheme } = useTheme();
-
-  const [style, setStyle] = useLocalStorage<z.infer<typeof Style>>(
-    "style",
-    Style.Enum.thumbs
-  );
 
   const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
     useConnectedAccounts();
@@ -116,15 +79,9 @@ export const SettingsDropdown = () => {
       <DropdownMenuTrigger asChild>
         {currentUser ? (
           <button className="h-10">
-            <Avatar
-              className={cn("hover:opacity-25 h-10", {
-                "rounded-none": style == Style.Enum.identicon,
-              })}
-            >
+            <Avatar className={cn("hover:opacity-25 h-10 rounded-none")}>
               {currentUser ? (
-                <AvatarImage
-                  src={createIdenticon(chainId + currentUser, style)}
-                />
+                <AvatarImage src={createIdenticon(chainId + currentUser)} />
               ) : (
                 <div>Loading..</div>
               )}
@@ -169,8 +126,8 @@ export const SettingsDropdown = () => {
                       onClick={() => connectToAccount(connectedAccount)}
                     >
                       <img
-                        className="mr-2 h-4 w-4 rounded-full"
-                        src={createIdenticon(chainId + connectedAccount, style)}
+                        className="mr-2 h-4 w-4 rounded-none"
+                        src={createIdenticon(chainId + connectedAccount)}
                       />
                       <span>{connectedAccount}</span>
                     </DropdownMenuItem>
@@ -215,26 +172,6 @@ export const SettingsDropdown = () => {
           </DropdownMenuSub>
         </DropdownMenuGroup>
 
-        <DropdownMenuGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <PawPrint className="mr-2 h-4 w-4" />
-              <span>Icons</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem
-                  onClick={() => setStyle(Style.Enum.identicon)}
-                >
-                  Identicon
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStyle(Style.Enum.thumbs)}>
-                  <span>Thumbs</span>
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
         <DropdownMenuSeparator />
 
         <DropdownMenuItem

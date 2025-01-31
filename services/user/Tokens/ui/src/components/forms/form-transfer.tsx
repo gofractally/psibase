@@ -15,62 +15,68 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mode, m } from "@/hooks/useMode";
+import { Tab, TabType } from "@/hooks/useMode";
 import { FormSchema } from "@/hooks/useTokenForm";
 import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { useLoggedInUser } from "@/hooks/network/useLoggedInUser";
+import { cn } from "@/lib/utils";
 
 interface Props {
   form: UseFormReturn<FormSchema>;
   tokens: Token[];
-  mode: Mode;
-  setMode: (mode: Mode) => void;
+  tab: TabType;
+  setMode: (mode: TabType) => void;
   selectedToken: Token | undefined;
   setNewTokenModalOpen: (open: boolean) => void;
   onSubmit: () => void;
+  isLoading: boolean;
 }
 
 const FormTransfer: FC<Props> = ({
   form,
   tokens,
-  mode,
+  tab,
   setMode,
   selectedToken,
   setNewTokenModalOpen,
   onSubmit,
+  isLoading,
 }) => {
-  const { isTransfer, isBurning, isMinting } = m(mode);
+  const isTransfer = tab == Tab.Values.Transfer;
+  const isBurning = tab == Tab.Values.Burn;
+  const isMinting = tab == Tab.Values.Mint;
 
   const isAdmin = selectedToken?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
   const isAmountOperation = isBurning || isMinting || isTransfer;
   const tokenBalance: number = selectedToken?.balance?.toDecimal() || 0;
 
-  const menus: { label: string; value: string }[] = [
+  const { data: currentUser } = useLoggedInUser();
+  const isLoggedIn = !!currentUser;
+
+  const menus: { label: string; value: TabType }[] = [
     {
       label: "Transfer",
-      value: "transfer",
+      value: Tab.Values.Transfer,
     },
     {
       label: "Burn",
-      value: "burn",
+      value: Tab.Values.Burn,
     },
-    ...(isAdmin
-      ? [
-          {
-            label: "Mint",
-            value: "mint",
-          },
-        ]
-      : []),
+    {
+      label: "Mint",
+      value: Tab.Values.Mint,
+    },
   ];
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <TokenSelection
+          isLoading={isLoading}
           tokens={tokens}
           form={form}
           setNewTokenModalOpen={setNewTokenModalOpen}
@@ -78,13 +84,26 @@ const FormTransfer: FC<Props> = ({
         {menus.length > 1 && (
           <div className="w-full flex justify-between">
             <Tabs
-              value={mode}
-              onValueChange={(tab) => setMode(tab as Mode)}
+              value={tab}
+              onValueChange={(tab) => setMode(Tab.parse(tab))}
               className="w-[400px]"
             >
               <TabsList>
                 {menus.map((menu) => (
-                  <TabsTrigger key={menu.value} value={menu.value}>
+                  <TabsTrigger
+                    disabled={
+                      !isLoggedIn || (menu.value == Tab.Values.Mint && !isAdmin)
+                    }
+                    key={menu.value}
+                    value={menu.value}
+                  >
+                    {menu.value == Tab.Values.Mint ? (
+                      <Plus className="w-4 h-4 mr-2" />
+                    ) : menu.value == Tab.Values.Burn ? (
+                      <Flame className="w-4 h-4 mr-2" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                    )}{" "}
                     {menu.label}
                   </TabsTrigger>
                 ))}
@@ -92,15 +111,18 @@ const FormTransfer: FC<Props> = ({
             </Tabs>
           </div>
         )}
-        {isTransfer && <RecipientInput form={form} disableTo={disableTo} />}
-        {isBurning && isAdmin && <FromInput form={form} />}
-        {isAmountOperation && (
-          <AmountInput
-            form={form}
-            selectedToken={selectedToken}
-            tokenBalance={tokenBalance}
-          />
-        )}
+        <div className={cn("grid-cols-2  sm:grid gap-2")}>
+          {isTransfer && <RecipientInput form={form} disableTo={disableTo} />}
+          {isBurning && isAdmin && <FromInput form={form} />}
+          {isAmountOperation && (
+            <AmountInput
+              form={form}
+              selectedToken={selectedToken}
+              tokenBalance={tokenBalance}
+            />
+          )}
+        </div>
+
         {isTransfer && (
           <FormField
             control={form.control}
@@ -108,7 +130,12 @@ const FormTransfer: FC<Props> = ({
             disabled={isBurning}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Memo</FormLabel>
+                <div className="flex gap-2">
+                  <FormLabel>Memo</FormLabel>
+                  <FormLabel className="text-muted-foreground">
+                    (Optional)
+                  </FormLabel>
+                </div>
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
@@ -119,9 +146,9 @@ const FormTransfer: FC<Props> = ({
         )}
         <Button
           variant={
-            mode == Mode.Burn
+            tab == Tab.Values.Burn
               ? "destructive"
-              : mode == Mode.Mint
+              : tab == Tab.Values.Mint
               ? "secondary"
               : "default"
           }

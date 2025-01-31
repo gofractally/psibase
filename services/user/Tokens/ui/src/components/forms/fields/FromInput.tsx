@@ -3,7 +3,6 @@ import {
   FormItem,
   FormLabel,
   FormControl,
-  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -21,13 +20,12 @@ const FromInput: FC<Props> = ({ form }) => (
     name="from"
     render={({ field }) => (
       <FormItem>
-        <FormLabel>From</FormLabel>
+        <div className="flex justify-between">
+          <FormLabel>From</FormLabel>
+        </div>
         <FormControl>
-          <Input {...field} />
+          <Input {...field} placeholder="Account" />
         </FormControl>
-        <FormDescription>
-          Account to decrease in balance, leave blank to burn your own balance.
-        </FormDescription>
         <FormMessage />
       </FormItem>
     )}

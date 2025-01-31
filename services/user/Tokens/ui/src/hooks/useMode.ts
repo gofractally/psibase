@@ -1,30 +1,22 @@
 import { useState } from "react";
+import { z } from "zod";
 
-export enum Mode {
-  Transfer = "transfer",
-  Burn = "burn",
-  Mint = "mint",
-}
+export const Tab = z.enum(["Transfer", "Burn", "Mint"]);
 
-interface Return {
-  isBurning: boolean;
-  isMinting: boolean;
-  isTransfer: boolean;
-}
+export type TabType = z.infer<typeof Tab>;
 
-export const m = (mode: Mode): Return => {
-  const isBurning = mode === Mode.Burn;
-  const isMinting = mode === Mode.Mint;
-  const isTransfer = mode === Mode.Transfer;
+export const useTab = () => {
+  const [tab, setTab] = useState<TabType>(Tab.Enum.Transfer);
 
-  return { isBurning, isMinting, isTransfer };
-};
-
-export const useMode = () => {
-  const [mode, setMode] = useState<Mode>(Mode.Transfer);
+  const isBurning = tab === Tab.Enum.Burn;
+  const isMinting = tab === Tab.Enum.Mint;
+  const isTransfer = tab === Tab.Enum.Transfer;
 
   return {
-    mode,
-    setMode,
+    tab,
+    setTab,
+    isBurning,
+    isMinting,
+    isTransfer,
   };
 };

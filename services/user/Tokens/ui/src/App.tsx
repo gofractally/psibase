@@ -3,8 +3,7 @@ import { CreditTable } from "@/components/credit-table";
 import { FormCreate } from "@/components/forms/form-create";
 import FormTransfer from "@/components/forms/form-transfer";
 import { ModalCreateToken } from "@/components/modal-create-token";
-import { Mode } from "@/components/transfer-toggle";
-import { m, useMode } from "@/hooks/useMode";
+import { Tab, useTab } from "@/hooks/useMode";
 import { useTokenForm } from "@/hooks/useTokenForm";
 import { useBalances } from "@/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";
@@ -34,15 +33,14 @@ function App() {
   const form = useTokenForm();
 
   function onSubmit() {
-    if (mode == Mode.Transfer) {
+    if (isTransfer) {
       setTransferModal(true);
     } else {
       setConfirmationModalOpen(true);
     }
   }
 
-  const { setMode, mode } = useMode();
-  const { isBurning, isMinting } = m(mode);
+  const { isBurning, isMinting, isTransfer, setTab, tab } = useTab();
 
   const selectedTokenId = form.watch("token");
   const selectedToken = tokens.find(
@@ -55,13 +53,13 @@ function App() {
       return;
     }
     if (!selectedToken) {
-      setMode(Mode.Transfer);
+      setTab(Tab.Enum.Transfer);
       return;
     }
     if (!selectedToken.isAdmin && isMinting) {
-      setMode(Mode.Transfer);
+      setTab(Tab.Enum.Transfer);
     }
-  }, [selectedTokenId, selectedToken, mode, tokens]);
+  }, [selectedTokenId, selectedToken, tab, tokens]);
 
   const [isConfirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [isNewTokenModalOpen, setNewTokenModalOpen] = useState(false);
@@ -179,11 +177,12 @@ function App() {
           }}
         />
         <FormTransfer
+          isLoading={isLoading}
           form={form}
           tokens={tokens}
-          mode={mode}
+          tab={tab}
           selectedToken={selectedToken}
-          setMode={setMode}
+          setMode={setTab}
           setNewTokenModalOpen={setNewTokenModalOpen}
           onSubmit={onSubmit}
         />
