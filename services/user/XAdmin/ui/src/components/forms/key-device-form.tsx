@@ -47,6 +47,11 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
         }
     };
 
+    const onSubmit = (e: React.SyntheticEvent) => {
+        e.preventDefault();
+        next();
+    };
+
     return (
         <Card className="min-w-[350px]">
             <CardHeader>
@@ -58,10 +63,7 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form
-                        className="space-y-6"
-                        onSubmit={form.handleSubmit(next)}
-                    >
+                    <form className="space-y-6" onSubmit={onSubmit}>
                         <FormField
                             control={form.control}
                             name="id"
