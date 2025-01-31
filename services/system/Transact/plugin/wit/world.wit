@@ -40,6 +40,10 @@ interface hooks {
     /// transaction.
     hook-actions-sender: func();
 
+    /// Allows the caller plugin to opt-out of managing the sender of any subsequent actions added
+    /// to this transaction.
+    unhook-actions-sender: func();
+
     /// Allows the caller plugin to transform the actions in a transaction before it is published.
     /// Adding a label allows the transformation to happen in batches (grouped by label)
     /// 

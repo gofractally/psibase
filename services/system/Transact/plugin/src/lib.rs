@@ -62,14 +62,23 @@ impl Hooks for TransactPlugin {
         ActionSenderHook::set(get_sender_app());
     }
 
+    fn unhook_actions_sender() {
+        if let Some(sender) = ActionSenderHook::get() {
+            if sender == get_sender_app() {
+                ActionSenderHook::clear();
+            }
+        }
+    }
+
     fn hook_tx_transform_label(label: Option<String>) {
         let transformer = get_sender_app();
-        if TxTransformLabel::get_transformer_plugin().is_some() {
-            panic!(
-                "Error [{}]: Only one plugin can transform the transaction",
-                transformer
-            );
+
+        if let Some(existing) = TxTransformLabel::get_transformer_plugin() {
+            if existing != transformer {
+                panic!("Error: Only one plugin can transform the transaction");
+            }
         }
+
         TxTransformLabel::set(transformer, label);
     }
 }

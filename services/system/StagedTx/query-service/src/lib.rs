@@ -109,14 +109,14 @@ mod service {
         /// This query gets the historical updates for the staged tx with the specified txid
         async fn txid_history(
             &self,
-            txid: Checksum256,
+            txid: String,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, Update>> {
             EventQuery::new("history.staged-tx.updated")
-                .condition(format!("txid = X'{}'", txid.to_string()))
+                .condition(format!("txid = X'{}'", txid))
                 .first(first)
                 .last(last)
                 .before(before)

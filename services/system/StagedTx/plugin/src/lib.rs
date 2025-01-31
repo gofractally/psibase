@@ -12,9 +12,7 @@ use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
 use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};
 use staged_tx::action_structs::*;
-use transact::plugin::{
-    hooks::hook_actions_sender, hooks::hook_tx_transform_label, intf::add_action_to_transaction,
-};
+use transact::plugin::{hooks::*, intf::add_action_to_transaction};
 mod db;
 use db::*;
 
@@ -102,17 +100,25 @@ fn get_staged_txid(id: u32) -> Result<Checksum256, Error> {
 
 struct StagedTxPlugin;
 
+/* TODO
+ * Currently, to correctly use the propose latch requires that the user should call `set_propose_latch(None)`
+ *   when they are finished.
+ * To simplify usage, it would be better to return an owned resource that sets the propose latch on construction,
+ *   and clears it on drop.
+ * This depends on general support for passing wasm component resources.
+*/
+
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
-        if let Some(ref acc) = account {
+        if let Some(acc) = &account {
             validate_account(acc)?;
+            hook_actions_sender();
+        } else {
+            unhook_actions_sender();
         }
 
         hook_tx_transform_label(account.as_deref());
-
         CurrentSender::set(account);
-        hook_actions_sender();
-
         Ok(())
     }
 
