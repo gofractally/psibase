@@ -30,7 +30,7 @@ interface Props {
 }
 
 export const KeyDeviceForm = ({ form, next }: Props) => {
-    const { data: keyDevices } = useKeyDevices();
+    const { data: keyDevices, isError, isSuccess } = useKeyDevices();
     const { mutateAsync: unlock } = useUnlockKeyDevice();
 
     const keyDeviceId = form.watch("id");
@@ -57,11 +57,30 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
             <CardHeader>
                 <CardTitle>Select key device</CardTitle>
                 <CardDescription>
-                    Where do you want your block producer server key and signing
-                    key to be stored?
+                    Where do you want your block producer server key to be
+                    stored?
                 </CardDescription>
             </CardHeader>
             <CardContent>
+                {isSuccess && !keyDevices.length ? (
+                    <div className="mb-4 flex max-w-[450px] items-center gap-3">
+                        <p className="text-2xl">⚠️</p>
+                        <p>
+                            No key devices were found. Please ensure one is
+                            available. If you'd like to boot without a key
+                            device, go back and select the "Development" option.
+                        </p>
+                    </div>
+                ) : null}
+                {isError ? (
+                    <div className="mb-4 flex max-w-[450px] items-center gap-3">
+                        <p className="text-2xl">⚠️</p>
+                        <p>
+                            There was an error fetching key devices. See the
+                            console for more information.
+                        </p>
+                    </div>
+                ) : null}
                 <Form {...form}>
                     <form className="space-y-6" onSubmit={onSubmit}>
                         <FormField
@@ -106,7 +125,7 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
                                 </FormItem>
                             )}
                         />
-                        {selectedDevice && !selectedDevice.unlocked ? (
+                        {selectedDevice && !selectedDevice?.unlocked ? (
                             <FormField
                                 control={form.control}
                                 name="pin"
