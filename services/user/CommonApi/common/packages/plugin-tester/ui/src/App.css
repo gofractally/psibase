@@ -28,6 +28,8 @@
   background-color: #2f2f2f;
   color: #ddd;
   font-family: sans-serif;
+  width: 600px;
+  margin: 0 auto;
 }
 
 .tab {
@@ -130,6 +132,7 @@
   word-break: break-word;
   white-space: normal;
   display: inline-block;
+  max-width: 100%;
 }
 
 .base64-status {
@@ -222,4 +225,22 @@
   max-height: none;
   opacity: 1;
   padding-top: 8px;
+}
+
+.flags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1rem;
+}
+
+.optional-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.optional-header.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }

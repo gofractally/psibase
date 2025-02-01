@@ -52,6 +52,11 @@ export interface TypeDefinition {
         name: string;
       }>;
     };
+    flags?: {
+      flags: Array<{
+        name: string;
+      }>;
+    };
   };
 }
 

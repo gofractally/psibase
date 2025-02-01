@@ -9,6 +9,7 @@ import { CharInput } from "./CharInput";
 import { TupleInput } from "./TupleInput";
 import { VariantInput, VariantValue } from "./VariantInput";
 import { EnumInput } from "./EnumInput";
+import { FlagsInput } from "./FlagsInput";
 import { getTypeInfo } from "../../utils";
 import { useMemo } from "react";
 import { RecordInput } from "./RecordInput";
@@ -177,6 +178,19 @@ export const TypeBasedInput = ({
           {...commonProps}
           cases={enumType.cases}
           value={actualValue as string}
+        />
+      );
+    }
+
+    if (inputType === "flags" && "flags" in typeObj) {
+      const flagsType = typeObj.flags as { flags: { name: string }[] };
+      const flagsValue = typeof actualValue === "object" ? actualValue : {};
+      return (
+        <FlagsInput
+          flags={flagsType.flags}
+          value={flagsValue as Record<string, boolean>}
+          onChange={onChange}
+          label={typeLabel}
         />
       );
     }

@@ -7,9 +7,13 @@ interface BooleanInputProps {
 }
 
 export const BooleanInput = ({ value, onChange, label }: BooleanInputProps) => {
+  const handleClick = () => {
+    onChange(!value);
+  };
+
   return (
     <div className="input-field">
-      <div className="optional-header">
+      <div className="optional-header clickable" onClick={handleClick}>
         <input
           type="checkbox"
           checked={value}

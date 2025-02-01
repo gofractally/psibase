@@ -18,6 +18,7 @@ export type InputComponentType =
   | "variant"
   | "enum"
   | "record"
+  | "flags"
   | "unsupported";
 
 export const isPrimitiveType = (type: string): type is PrimitiveType =>
@@ -54,6 +55,7 @@ interface TypeHandler<T> {
   variant: (cases: TypeCase[], schema: Schema) => T;
   enum: (cases: { name: string }[]) => T;
   record: (fields: TypeField[], schema: Schema) => T;
+  flags: (flags: { name: string }[]) => T;
   unsupported: () => T;
 }
 
@@ -83,6 +85,7 @@ const handleType = <T>(
     if (typeObj.variant) return handler.variant(typeObj.variant.cases, schema);
     if (typeObj.enum) return handler.enum(typeObj.enum.cases);
     if (typeObj.record) return handler.record(typeObj.record.fields, schema);
+    if (typeObj.flags) return handler.flags(typeObj.flags.flags);
     if (typeObj.type) return handleType(typeObj.type, schema, handler);
   }
 
@@ -104,6 +107,7 @@ const inputTypeHandler: TypeHandler<InputComponentType> = {
   variant: () => "variant",
   enum: () => "enum",
   record: () => "record",
+  flags: () => "flags",
   unsupported: () => "unsupported",
 };
 
@@ -130,6 +134,7 @@ const typeNameHandler: TypeHandler<string> = {
     `record<${fields
       .map((f) => `${f.name}: ${handleType(f.type, schema, typeNameHandler)}`)
       .join(", ")}>`,
+  flags: (flags) => `flags<${flags.map((f) => f.name).join(", ")}>`,
   unsupported: () => "unknown",
 };
 
@@ -155,6 +160,8 @@ const initialValueHandler: TypeHandler<unknown> = {
       }),
       {}
     ),
+  flags: (flags) =>
+    flags.reduce((acc, flag) => ({ ...acc, [flag.name]: false }), {}),
   unsupported: () => null,
 };
 
