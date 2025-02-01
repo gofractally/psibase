@@ -88,29 +88,21 @@ export function ExecutionTabs({
 
       {executionTab === "Execution" ? (
         <>
-          <div style={{ marginBottom: "1rem", textAlign: "left" }}>
+          <div className="execution-container">
             <button onClick={handleExecute} className="common-button">
               Execute
             </button>
           </div>
-          <h3 style={{ marginBottom: "0.5rem" }}>Response</h3>
+          <h3 className="response-title">Response</h3>
           <textarea className="common-textarea" readOnly value={responseText} />
         </>
       ) : (
-        <div
-          style={{
-            marginTop: "1rem",
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-            textAlign: "left",
-          }}
-        >
-          <p style={{ marginBottom: "0.5rem" }}>
+        <div className="embed-container">
+          <p className="embed-description">
             To call this plugin function from your own application, use:
           </p>
           <textarea
-            className="common-textarea"
-            style={{ height: "200px" }}
+            className="common-textarea embed-textarea"
             readOnly
             value={generateEmbedCode()}
           />

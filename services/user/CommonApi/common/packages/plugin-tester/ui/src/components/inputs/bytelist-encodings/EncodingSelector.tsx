@@ -13,8 +13,7 @@ export const EncodingSelector = ({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as Encoding)}
-      className="common-input"
-      style={{ width: "auto", minWidth: "100px" }}
+      className="common-input encoding-selector"
     >
       <option value="hex">Hex</option>
       <option value="base64">Base64</option>

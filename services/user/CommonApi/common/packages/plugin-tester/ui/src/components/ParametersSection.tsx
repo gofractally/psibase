@@ -20,7 +20,7 @@ export const ParametersSection = ({
 
   return (
     <>
-      <h3 style={{ marginBottom: "0.5rem" }}>Parameters</h3>
+      <h3 className="parameters-title">Parameters</h3>
       <ParameterEditor
         values={values}
         onChange={onParamValuesChange}

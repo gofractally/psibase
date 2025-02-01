@@ -20,16 +20,16 @@ export function ServiceInput({
   };
 
   return (
-    <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+    <div className="service-input-container">
       <input
-        style={{ padding: "0.5rem" }}
+        className="service-input"
         placeholder="Service name"
         value={service}
         onChange={(e) => onServiceChange(e.target.value)}
         onKeyDown={handleKeyDown}
       />
       <input
-        style={{ padding: "0.5rem" }}
+        className="service-input"
         placeholder="Plugin name"
         value={plugin}
         onChange={(e) => onPluginChange(e.target.value)}

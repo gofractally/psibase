@@ -70,7 +70,7 @@ export const Base64Input = ({ onChange, rawInput }: Base64InputProps) => {
         onBlur={handleBlur}
         placeholder="Enter base64 string"
       />
-      <div className={`base64-status ${isValid ? "valid" : "invalid"}`}>
+      <div className={`status-message ${isValid ? "success" : "invalid"}`}>
         {isValid ? "valid base64" : "invalid base64"}
       </div>
     </div>

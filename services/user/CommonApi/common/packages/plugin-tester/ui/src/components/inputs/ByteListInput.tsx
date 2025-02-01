@@ -148,18 +148,11 @@ export const ByteListInput = ({
 
   return (
     <div className="input-field">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          marginBottom: "0.5rem",
-        }}
-      >
+      <div className="bytelist-header">
         <EncodingSelector value={encoding} onChange={handleEncodingChange} />
-        {label && <label style={{ margin: 0 }}>{label}</label>}
+        {label && <label>{label}</label>}
       </div>
-      <div style={{ marginTop: "0.5rem" }}>{renderInput()}</div>
+      <div className="bytelist-input">{renderInput()}</div>
     </div>
   );
 };

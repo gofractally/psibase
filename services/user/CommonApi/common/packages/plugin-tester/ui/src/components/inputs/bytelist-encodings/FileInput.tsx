@@ -30,12 +30,11 @@ export const FileInput = ({ onChange, rawInput }: FileInputProps) => {
     <div>
       <input
         type="file"
-        className="common-input"
+        className="common-input file-input"
         onChange={handleFileChange}
-        style={{ width: "100%" }}
       />
       {status === "success" && (
-        <div className="file-status success">
+        <div className="status-message success">
           File <code>{rawInput}</code> successfully loaded
         </div>
       )}

@@ -17,11 +17,10 @@ export const CharInput = ({ value, onChange, label }: CharInputProps) => {
       {label && <label>{label}</label>}
       <input
         type="text"
-        className="common-input"
+        className="common-input char-input"
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         maxLength={1}
-        style={{ width: "3rem" }}
       />
     </div>
   );

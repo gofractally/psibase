@@ -64,21 +64,14 @@ export function FunctionSelector({
 
   return (
     <div>
-      <h3 style={{ marginBottom: "0.5rem" }}>Functions</h3>
+      <h3 className="functions-title">Functions</h3>
       <TabControl
         selectedTab={selectedInterfaceName || ""}
         onTabChange={handleInterfaceSelect}
         tabs={Object.keys(exportedMethods)}
       />
       {selectedInterfaceName && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-            marginBottom: "1rem",
-          }}
-        >
+        <div className="functions-grid">
           {exportedMethods[selectedInterfaceName]?.map((fn, i) => (
             <button
               key={i}

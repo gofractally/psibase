@@ -11,14 +11,7 @@ export const TabControl = ({
   onTabChange,
   tabs,
 }: TabControlProps) => (
-  <div
-    className="tab-controls"
-    style={{
-      display: "flex",
-      marginBottom: "1rem",
-      borderBottom: "1px solid #555",
-    }}
-  >
+  <div className="tab-controls">
     {tabs.map((tab) => (
       <TabButton
         key={tab}

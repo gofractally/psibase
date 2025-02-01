@@ -135,33 +135,22 @@
   max-width: 100%;
 }
 
-.base64-status {
+.status-message {
   font-size: 0.8em;
   margin-top: 0.25rem;
 }
 
-.base64-status.valid {
+.status-message.success {
   color: #22cc22;
 }
 
-.base64-status.invalid {
+.status-message.invalid {
   color: #cc2222;
 }
 
-.file-status {
-  font-size: 0.8em;
-  margin-top: 0.25rem;
-}
-
-.file-status.success {
-  color: #22cc22;
-}
-
-.tuple-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+.nested-content {
+  padding-left: 1rem;
+  border-left: 2px solid #555;
 }
 
 .tuple-item {
@@ -170,9 +159,9 @@
 }
 
 .variant-content {
-  margin-top: 0.5rem;
   padding-left: 1rem;
   border-left: 2px solid #555;
+  margin-top: 0.5rem;
 }
 
 /* Record Input */
@@ -243,4 +232,97 @@
 
 .optional-header.clickable:hover {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+.service-input-container {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.service-input {
+  padding: 0.5rem;
+}
+
+.execution-container {
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.response-title {
+  margin-bottom: 0.5rem;
+}
+
+.embed-container {
+  margin-top: 1rem;
+  white-space: pre-wrap;
+  font-family: monospace;
+  text-align: left;
+}
+
+.embed-description {
+  margin-bottom: 0.5rem;
+}
+
+.embed-textarea {
+  height: 200px;
+}
+
+.functions-title {
+  margin-bottom: 0.5rem;
+}
+
+.functions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-controls {
+  display: flex;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #555;
+}
+
+.bytelist-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.bytelist-header label {
+  margin: 0;
+}
+
+.bytelist-input {
+  margin-top: 0.5rem;
+}
+
+.file-input {
+  width: 100%;
+}
+
+.encoding-selector {
+  width: auto;
+  min-width: 100px;
+}
+
+.char-input {
+  width: 3rem;
+}
+
+.login-bar {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.parameter-editor {
+  margin-bottom: 1rem;
+}
+
+.parameters-title {
+  margin-bottom: 0.5rem;
 }

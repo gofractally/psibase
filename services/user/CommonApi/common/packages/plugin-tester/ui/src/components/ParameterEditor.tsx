@@ -20,7 +20,7 @@ export const ParameterEditor = ({
   const [mode, setMode] = useState<"Raw" | "Rich">("Rich");
 
   return (
-    <div style={{ marginBottom: "1rem" }}>
+    <div className="parameter-editor">
       <TabControl
         selectedTab={mode}
         onTabChange={(tab) => setMode(tab as "Raw" | "Rich")}
