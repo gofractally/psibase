@@ -23,7 +23,7 @@ interface hook-handlers {
     on-action-auth-claims: func(plugin: plugin-ref, action: action) -> result<list<claim>, error>;
     on-action-auth-proofs: func(plugin: plugin-ref, claims: list<claim>, transaction-hash: list<u8>) -> result<list<proof>, error>;
 
-    on-action-sender: func(plugin: plugin-ref, service: string, method: string) -> result<option<string>, error>;
+    on-actions-sender: func(plugin: plugin-ref, service: string, method: string) -> result<option<string>, error>;
 
     on-tx-transform: func(plugin: plugin-ref, label: option<string>, actions: list<action>) -> result<option<list<action>>, error>;
 }

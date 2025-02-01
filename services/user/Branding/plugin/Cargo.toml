@@ -20,12 +20,14 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 package = "branding:plugin"
 
-[package.metadata.component.dependencies]
+[package.metadata.component.target]
+world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 
 [dev-dependencies]
 branding-pkg = { path = "..", version = "0.14.0" }

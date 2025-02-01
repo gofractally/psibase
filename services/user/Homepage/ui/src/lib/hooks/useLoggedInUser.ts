@@ -9,10 +9,10 @@ export const useLoggedInUser = (enabled: boolean) =>
         initialData: null,
         queryFn: async () => {
             const res = await supervisor.functionCall({
-                method: "getLoggedInUser",
+                method: "getCurrentUser",
                 params: [],
                 service: "accounts",
-                intf: "activeApp",
+                intf: "api",
             });
             if (res) {
                 return z.string().parse(res);

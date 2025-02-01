@@ -32,13 +32,17 @@ interface types {
 /// Hooks allow plugins to hook into the transact plugin and customize its behavior 
 /// during transaction construction and authorization.
 interface hooks {
-    /// Allows the caller plugin to manage the sender of the next action added to the
-    /// transaction.
-    hook-action-sender: func();
-
     /// Allows the the caller plugin to add transaction authorization claims and proofs 
-    /// based on the next action added to the transaction.
+    /// based on the next action added to this transaction.
     hook-action-auth: func();
+
+    /// Allows the caller plugin to manage the sender of any subsequent actions added to this
+    /// transaction.
+    hook-actions-sender: func();
+
+    /// Allows the caller plugin to opt-out of managing the sender of any subsequent actions added
+    /// to this transaction.
+    unhook-actions-sender: func();
 
     /// Allows the caller plugin to transform the actions in a transaction before it is published.
     /// Adding a label allows the transformation to happen in batches (grouped by label)
@@ -115,14 +119,14 @@ world hook-action-auth {
     }
 }
 
-world hook-action-sender {
+world hook-actions-sender {
     import hooks;
-    export transact-hook-action-sender: interface {
+    export transact-hook-actions-sender: interface {
         use host:common/types.{error};
     
-        /// Gets the sender of the next action added to the transaction.
+        /// Sets the sender of the specified action when added to this transaction.
         /// Return `None` if the default sender should be used.
-        on-action-sender: func(service: string, method: string) -> result<option<string>, error>;
+        on-actions-sender: func(service: string, method: string) -> result<option<string>, error>;
     }
 }
 

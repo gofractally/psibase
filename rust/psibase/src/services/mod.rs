@@ -19,6 +19,7 @@ pub mod psi_brotli;
 pub mod r_events;
 pub mod setcode;
 pub mod sites;
+pub mod staged_tx;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;

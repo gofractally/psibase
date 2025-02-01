@@ -92,11 +92,6 @@ interface client {
     /// Gets details about the app responsible for the call
     get-sender-app: func() -> origination-data;
 
-    /// Gets the account name of the user logged into the current top-level application
-    /// 
-    /// Only callable by the top-level application or its plugins
-    get-logged-in-user: func() -> result<option<string>, error>;
-
     /// Gets the account name of the service from which the currently running
     /// plugin was fetched.
     my-service-account: func() -> string;

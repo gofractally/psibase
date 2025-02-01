@@ -1,0 +1,11 @@
+package branding:plugin;
+
+world impl {
+    import host:common/server;
+    import transact:plugin/intf;
+    include staged-tx:plugin/imports;
+    include sites:plugin/imports;
+
+    export api;
+    export queries;
+}

@@ -71,4 +71,9 @@ impl API for AccountsPlugin {
         )?;
         Ok(())
     }
+
+    fn get_current_user() -> Result<Option<String>, Error> {
+        let app = Privileged::get_active_app();
+        Ok(AppsTable::new(&app).get_logged_in_user())
+    }
 }

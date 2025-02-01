@@ -10,11 +10,7 @@ interface queries {
     get-network-name: func() -> result<string, error>;
 }
 
-world psibase-plugin {
-    import host:common/server;
-    import transact:plugin/intf;
-    include sites:plugin/imports;
-
-    export api;
-    export queries;
+world imports {
+    import api;
+    import queries;
 }

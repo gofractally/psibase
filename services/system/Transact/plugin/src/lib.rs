@@ -33,7 +33,7 @@ use serde_json::from_str;
 // 1. start-tx
 //
 // 2. add-action-to-transaction
-// 3.   on-action-sender           - the hooked plugin can set the sender of the action, otherwise the logged-in user is used by default
+// 3.   on-actions-sender           - the hooked plugin can set the sender of the action, otherwise the logged-in user is used by default
 // 4.   on-action-auth-claims      - the hooked plugin can add claims for this action
 // 5.   save action details
 //
@@ -53,21 +53,32 @@ impl Hooks for TransactPlugin {
         ActionAuthPlugins::set(get_sender_app());
     }
 
-    fn hook_action_sender() {
-        if ActionSenderHook::has() {
-            panic!("Action sender hook already set");
+    fn hook_actions_sender() {
+        if let Some(sender) = ActionSenderHook::get() {
+            if sender != get_sender_app() {
+                panic!("Action sender hook already set");
+            }
         }
         ActionSenderHook::set(get_sender_app());
     }
 
+    fn unhook_actions_sender() {
+        if let Some(sender) = ActionSenderHook::get() {
+            if sender == get_sender_app() {
+                ActionSenderHook::clear();
+            }
+        }
+    }
+
     fn hook_tx_transform_label(label: Option<String>) {
         let transformer = get_sender_app();
-        if TxTransformLabel::get_transformer_plugin().is_some() {
-            panic!(
-                "Error [{}]: Only one plugin can transform the transaction",
-                transformer
-            );
+
+        if let Some(existing) = TxTransformLabel::get_transformer_plugin() {
+            if existing != transformer {
+                panic!("Error: Only one plugin can transform the transaction");
+            }
         }
+
         TxTransformLabel::set(transformer, label);
     }
 }
@@ -133,6 +144,7 @@ impl Admin for TransactPlugin {
 
     fn finish_tx() -> Result<(), CommonTypes::Error> {
         assert_from_supervisor();
+        ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
         if actions.len() == 0 {
