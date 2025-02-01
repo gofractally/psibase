@@ -43,6 +43,8 @@ namespace SystemService
    struct HttpServer : psibase::Service
    {
       static constexpr auto service = psibase::proxyServiceNum;
+      static constexpr auto commonApiService = psibase::AccountNumber("common-api");
+      static constexpr auto homepageService = psibase::AccountNumber("homepage");
       using Tables                  = psibase::ServiceTables<RegServTable>;
 
       using Subjective = psibase::SubjectiveTables<PendingRequestTable>;

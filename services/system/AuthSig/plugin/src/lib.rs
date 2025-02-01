@@ -10,14 +10,13 @@ mod types;
 use types::*;
 
 // Other plugins
-use bindings::accounts::smart_auth::types::{Action, Claim, Proof};
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::host::common::types as CommonTypes;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
-use bindings::exports::accounts::smart_auth::smart_auth::Guest as SmartAuth;
 use bindings::exports::auth_sig::plugin::{actions::Guest as Actions, keyvault::Guest as KeyVault};
+use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
@@ -30,30 +29,27 @@ use rand_core::OsRng;
 
 struct AuthSig;
 
-impl SmartAuth for AuthSig {
-    fn get_claims(
-        account_name: String,
-        _actions: Vec<Action>,
-    ) -> Result<Vec<Claim>, CommonTypes::Error> {
+impl HookUserAuth for AuthSig {
+    fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
         if !from_transact() {
-            return Err(Unauthorized("get_claims").into());
+            return Err(Unauthorized("on_user_auth_claim").into());
         }
 
         let pubkey = get_pubkey(&account_name)?;
         if !ManagedKeys::has(&pubkey) {
-            return Err(KeyNotFound("get_claims").into());
+            return Err(KeyNotFound("on_user_auth_claim").into());
         }
 
-        Ok(vec![Claim {
+        Ok(Some(Claim {
             verify_service: psibase::services::verify_sig::SERVICE.to_string(),
             raw_data: AuthSig::to_der(pubkey)?,
-        }])
+        }))
     }
 
-    fn get_proofs(
+    fn on_user_auth_proof(
         account_name: String,
         transaction_hash: Vec<u8>,
-    ) -> Result<Vec<Proof>, CommonTypes::Error> {
+    ) -> Result<Option<Proof>, Error> {
         if !from_transact() {
             return Err(Unauthorized("get_proofs").into());
         }
@@ -61,7 +57,7 @@ impl SmartAuth for AuthSig {
         let pubkey = get_pubkey(&account_name)?;
         let private_key = ManagedKeys::get(&pubkey);
         let signature = AuthSig::sign(transaction_hash, private_key)?;
-        Ok(vec![Proof { signature }])
+        Ok(Some(Proof { signature }))
     }
 }
 

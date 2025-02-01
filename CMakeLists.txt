@@ -244,7 +244,9 @@ ExternalProject_Add(
 # UIs built with yarn
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
+    services/system/AuthSig/ui:AuthSig_js
     services/user/Homepage/ui:Homepage_js
+    services/user/Workshop/ui:Workshop_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Explorer/ui:Explorer_js
     services/user/Tokens/ui:Tokens_js
@@ -371,7 +373,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
-        FLAGS allowWriteSubjective
+        FLAGS allowWriteSubjective allowNativeSubjective
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Transact/src/postinstall.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
@@ -445,11 +447,13 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/AuthSig/ui/dist/* /
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
     SERVICE verify-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         FLAGS isAuthService
+    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -731,6 +735,17 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Workshop.psi
+    NAME Workshop
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "A dashboard for developers to create and manage apps"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Registry(^${PSIBASE_VERSION})"
+    SERVICE workshop
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
+    DEPENDS ${Workshop_js_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Fractal.psi
     NAME Fractal
     VERSION ${PSIBASE_VERSION}
@@ -773,7 +788,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -783,7 +798,7 @@ psibase_package(
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage
+                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
 
@@ -820,7 +835,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers TestDefault HttpServer
-    Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage)
+    Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -850,6 +865,7 @@ install(
           ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Registry.psi
+          ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/StagedTx.psi

@@ -18,11 +18,17 @@ export type ListenConfig = {
     text?: string;
 };
 
+export type HostConfig = {
+    host: string;
+    // auto-generated
+    key: string;
+};
+
 export type PsinodeConfigUI = {
     p2p: boolean;
     peers: string[];
     producer: string;
-    host: string;
+    hosts: HostConfig[];
     port?: number;
     listen: ListenConfig[];
     services: ServiceConfig[];
@@ -72,7 +78,7 @@ export const psinodeConfigSchema = z
             trustfiles: path.array(),
         }),
         producer: z.string(),
-        host: z.string(),
+        hosts: z.string().array(),
         port: z.number().optional(),
         admin_authz: z
             .object({

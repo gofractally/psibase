@@ -479,10 +479,14 @@ class Node(API):
         Raise TimeoutError if the timeout expires first
         '''
         for i in range(timeout):
-            if cond(self):
-                return
+            try:
+                if cond(self):
+                    return
+            except:
+                pass
             time.sleep(1)
-        raise TimeoutError()
+        if not cond(self):
+            raise TimeoutError()
     def connect(self, other):
         '''Connect to a peer. other can be a URL or a Node object'''
         if isinstance(other, Node):

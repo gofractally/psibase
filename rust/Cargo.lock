@@ -1047,6 +1047,7 @@ dependencies = [
  "psibase",
  "psibase_macros",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 
@@ -2521,6 +2522,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hmac",
+ "hyper",
  "include_dir",
  "indexmap 2.2.6",
  "indicatif",
@@ -3088,9 +3090,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.132"
+version = "1.0.137"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
+checksum = "930cfb6e6abf99298aaad7d29abbef7a9999a9a8806a40088f55f0dcec03146b"
 dependencies = [
  "indexmap 2.2.6",
  "itoa 1.0.11",

@@ -392,6 +392,29 @@ async fn build_plugin(
     Ok(files?)
 }
 
+async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .arg("rustc")
+        .args(&["-p", package])
+        .arg("--release")
+        .arg("--lib")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--color=always")
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+
+    let status = command.wait().await?;
+
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    Ok(())
+}
+
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
     if let Some(platform) = &dep.target {
         if platform.matches("wasm32-wasip1", &[]) {

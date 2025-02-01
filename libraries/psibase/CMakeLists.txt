@@ -18,7 +18,7 @@ function(add suffix)
 
     if(DEFINED IS_WASM)
         target_link_libraries(psibase${suffix} PUBLIC wasm-base${suffix})
-        target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-wasi)
+        target_mapped_include_directories(psibase${suffix} PUBLIC common/include wasm32-wasip1)
 
         add_library(simple-malloc-objects${suffix} OBJECT service/src/simple_malloc.cpp)
         target_link_libraries(simple-malloc-objects${suffix} PUBLIC wasm-base${suffix})
@@ -188,6 +188,7 @@ function(add suffix)
             native/src/BlockContext.cpp
             native/src/ConfigFile.cpp
             native/src/ExecutionContext.cpp
+            native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/NativeFunctions.cpp
             native/src/OpenSSLProver.cpp
@@ -216,7 +217,7 @@ endif()
 if(IS_WASM)
     install(DIRECTORY common/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY tester/include/psibase TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.hpp")
-    install(DIRECTORY wasm32-wasi TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
+    install(DIRECTORY wasm32-wasip1 TYPE INCLUDE COMPONENT libpsibase FILES_MATCHING PATTERN "*.h")
     install(PROGRAMS sdk/psidk-cmake-args TYPE BIN COMPONENT libpsibase)
     install(FILES sdk/psibase-config.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/psibase COMPONENT libpsibase)
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements.a ${CMAKE_CURRENT_BINARY_DIR}/libc++abi-replacements-debug.a TYPE LIB COMPONENT libpsibase)

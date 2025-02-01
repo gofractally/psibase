@@ -170,6 +170,8 @@ namespace psibase
    {
       std::shared_ptr<triedent::database> trie;
 
+      DatabaseCallbacks* callbacks = nullptr;
+
       std::mutex                      topMutex;
       std::shared_ptr<triedent::root> topRoot;
 
@@ -435,6 +437,11 @@ namespace psibase
       return {result.begin(), result.end()};
    }
 
+   void SharedDatabase::setCallbacks(DatabaseCallbacks* callbacks)
+   {
+      impl->callbacks = callbacks;
+   }
+
    struct SubjectiveRevision
    {
       std::array<std::size_t, numIndependentDatabases> changeSetPos;
@@ -468,6 +475,7 @@ namespace psibase
       std::vector<SocketChange>       socketChanges;
       std::vector<SubjectiveRevision> subjectiveRevisions;
       std::size_t                     subjectiveLimit;
+      DatabaseCallbacks::Flags        callbackFlags = {};
 
       auto db(auto& revision, DbId db) -> decltype((revision.roots[(int)db]))
       {
@@ -585,6 +593,7 @@ namespace psibase
          if (subjectiveRevisions.empty())
          {
             subjectiveRevisions.push_back({{}, 0, shared.getSubjective()});
+            callbackFlags = 0;
          }
          subjectiveRevisions.push_back({getChangeSetPos(subjectiveChanges), socketChanges.size(),
                                         subjectiveRevisions.back().db});
@@ -618,6 +627,10 @@ namespace psibase
                      change.ranges.clear();
                   socketChanges.clear();
                   return false;
+               }
+               if (callbackFlags && shared.impl->callbacks)
+               {
+                  shared.impl->callbacks->run(callbackFlags);
                }
             }
             subjectiveRevisions.clear();
@@ -929,5 +942,10 @@ namespace psibase
              return {{{impl->keyBuffer}, {impl->valueBuffer}}};
           });
    }  // Database::kvMaxRaw
+
+   void Database::setCallbackFlags(DatabaseCallbacks::Flags flags)
+   {
+      impl->callbackFlags |= flags;
+   }
 
 }  // namespace psibase

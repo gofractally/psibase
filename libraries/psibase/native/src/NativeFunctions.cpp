@@ -52,6 +52,12 @@ namespace psibase
          }
          if (db == uint32_t(DbId::blockLog) && self.allowDbReadSubjective)
             return (DbId)db;
+         if (db == uint32_t(DbId::nativeSubjective))
+         {
+            if ((self.code.flags & CodeRow::allowNativeSubjective) &&
+                ((self.code.flags & CodeRow::isSubjective) || self.allowDbReadSubjective))
+               return (DbId)db;
+         }
          throw std::runtime_error("service may not read this db, or must use another intrinsic");
       }
 
@@ -98,6 +104,11 @@ namespace psibase
              (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
+            return {(DbId)db, false, false};
+
+         if (db == uint32_t(DbId::nativeSubjective) &&
+             (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
+             (self.code.flags & CodeRow::allowNativeSubjective))
             return {(DbId)db, false, false};
 
          check(self.allowDbRead,
@@ -256,6 +267,22 @@ namespace psibase
          // The notifyTable is only processed subjectively
       }
 
+      void verifySubjectiveNotifyTableRow(Database&          db,
+                                          psio::input_stream key,
+                                          psio::input_stream value)
+      {
+         // The notifyTable is only processed subjectively
+         if (psio::fracpack_validate<NotifyRow>({value.pos, value.end}))
+         {
+            auto row =
+                psio::view<const NotifyRow>(psio::prevalidated{std::span{value.pos, value.end}});
+            if (row.type() == NotifyType::nextTransaction)
+            {
+               db.setCallbackFlags(DatabaseCallbacks::nextTransactionFlag);
+            }
+         }
+      }
+
       void verifyScheduledSnapshotRow(psio::input_stream key, psio::input_stream value)
       {
          check(psio::fracpack_validate_strict<ScheduledSnapshotRow>({value.pos, value.end}),
@@ -293,6 +320,18 @@ namespace psibase
             verifyScheduledSnapshotRow(key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeConstrained");
+      }
+
+      void verifyWriteSubjective(Database& db, psio::input_stream key, psio::input_stream value)
+      {
+         NativeTableNum table;
+         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
+         memcpy(&table, key.pos, sizeof(table));
+         std::reverse((char*)&table, (char*)(&table + 1));
+         if (table == notifyTable)
+            verifySubjectiveNotifyTableRow(db, key, value);
+         else
+            throw std::runtime_error("Unrecognized key in nativeSubjective");
       }
 
       void verifyRemoveConstrained(TransactionContext& context,
@@ -512,6 +551,11 @@ namespace psibase
                                              {value.data(), value.size()}, existing);
                    }
                 }
+             }
+             else if (db == uint32_t(DbId::nativeSubjective))
+             {
+                verifyWriteSubjective(database, {key.data(), key.size()},
+                                      {value.data(), value.size()});
              }
              database.kvPutRaw(w.db, {key.data(), key.size()}, {value.data(), value.size()});
           });

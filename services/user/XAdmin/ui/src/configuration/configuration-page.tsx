@@ -67,6 +67,11 @@ export const ConfigurationForm = ({
         name: "services",
     });
 
+    const hosts = useFieldArray({
+        control: configForm.control,
+        name: "hosts",
+    });
+
     const onConfig = async (input: PsinodeConfigUI) => {
         for (let service of input.services) {
             if (service.host == "") {
@@ -139,7 +144,11 @@ export const ConfigurationForm = ({
     const loggers = configForm.watch("loggers");
 
     const onAddNewListenerClick = () => {
-        listeners.append({ key: newId(), text: "", protocol: "http" });
+        listeners.append({ key: newId(), port: undefined, protocol: "http" });
+    };
+
+    const onAddNewHostClick = () => {
+        hosts.append({ key: newId(), host: "" });
     };
 
     return (
@@ -185,10 +194,54 @@ export const ConfigurationForm = ({
                                         {...configForm.register("producer")}
                                     />
                                 </div>
-                                <div className="grid w-full items-center gap-1.5">
-                                    <Label>Host</Label>
-                                    <Input {...configForm.register("host")} />
-                                </div>
+                            </div>
+                            <div>
+                                <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">
+                                    Hosts
+                                </h4>
+
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th className="flex flex-row-reverse ">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        onAddNewHostClick();
+                                                    }}
+                                                >
+                                                    +
+                                                </Button>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {hosts.fields.map((h, idx: number) => (
+                                            <tr key={h.key}>
+                                                <td>
+                                                    <Input
+                                                        type="text"
+                                                        {...configForm.register(
+                                                            `hosts.${idx}.host`
+                                                        )}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={() =>
+                                                            hosts.remove(idx)
+                                                        }
+                                                    >
+                                                        <Trash size={16} />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                             <div>
                                 <h4 className="my-4 scroll-m-20 text-xl font-semibold tracking-tight">

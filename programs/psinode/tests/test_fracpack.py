@@ -131,6 +131,13 @@ class TestFracpack(unittest.TestCase):
                         self.assertEqual(pack(v['json'], ty).hex().upper(), expected)
                         json2 = unpack(bytes.fromhex(v['fracpack']), ty)
                         self.assertEqual(pack(json2, ty).hex().upper(), expected)
+            with self.subTest("schema schema"):
+                schema_schema = Schema(t['schema_schema'])
+                ty = schema_schema['schema']
+                expected = t['schema_bin']
+                self.assertEqual(pack(t['schema'], ty).hex().upper(), expected)
+                json2 = unpack(bytes.fromhex(t['schema_bin']), ty)
+                self.assertEqual(pack(json2, ty).hex().upper(), expected)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

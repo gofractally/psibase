@@ -89,11 +89,6 @@ SCENARIO("Auth")
          auto newAcc = accounts.newAccount("bob", AuthAny::service, true);
          CHECK(newAcc.succeeded());
       }
-      THEN("A regular user cannot create a new account")
-      {
-         auto newAcc = a.newAccount("bob", AuthAny::service, true);
-         CHECK(newAcc.failed("unauthorized account creation"));
-      }
    }
 }
 

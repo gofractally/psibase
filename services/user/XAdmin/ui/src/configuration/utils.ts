@@ -1,24 +1,10 @@
-import { UseFormReturn } from "react-hook-form";
 import { LogConfig } from "../log/interfaces";
-import { readLoggers } from "../log/utils";
 import {
     PsinodeConfigUI,
     ServiceConfig,
     ListenConfig,
-    PsinodeConfigSelect,
     PsinodeConfigUpdate,
 } from "./interfaces";
-
-export const initialConfigForm = (): PsinodeConfigUI => ({
-    p2p: false,
-    producer: "",
-    host: "",
-    peers: [],
-    listen: [],
-    services: [{ host: "", root: "", key: "x" }],
-    admin: "",
-    loggers: {},
-});
 
 export const emptyService = (s: ServiceConfig) => {
     return s.host == "" && s.root == "";
@@ -258,7 +244,7 @@ function writeListen(listen: ListenConfig): any {
         return {
             protocol: listen.protocol,
             address: "0.0.0.0",
-            port: Number(listen.text),
+            port: Number(listen.port),
         };
     } else if (listen.protocol == "local") {
         return { protocol: listen.protocol, path: listen.text };
@@ -276,7 +262,7 @@ export const mergeConfig = (
         ...updated,
         p2p: mergeSimple(prev.p2p, updated.p2p, user.p2p),
         producer: mergeSimple(prev.producer, updated.producer, user.producer),
-        host: mergeSimple(prev.host, updated.host, user.host),
+        hosts: mergeList(prev.hosts, updated.hosts, user.hosts),
         listen: mergeList(prev.listen, updated.listen, user.listen),
         services: mergeList(
             prev.services.filter((item) => !emptyService(item)),
@@ -297,6 +283,7 @@ export const writeConfig = (input: PsinodeConfigUI): PsinodeConfigUpdate => ({
             host: s.host,
             root: s.root,
         })),
+    hosts: input.hosts.map((h) => h.host),
     admin: input.admin != "" ? input.admin : null,
     loggers: writeLoggers(input.loggers),
 });

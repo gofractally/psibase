@@ -42,6 +42,8 @@ namespace psibase
                result |= (1 << 7);
             else if (flag == "allowSocket")
                result |= (1 << 8);
+            else if (flag == "allowNativeSubjective")
+               result |= (1 << 9);
             else
                check(false, "Invalid service flags");
          }

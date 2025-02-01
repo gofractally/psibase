@@ -1,4 +1,4 @@
-use crate::{build, build_plugin, Args, SERVICE_POLYFILL};
+use crate::{build, build_package_root, build_plugin, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -343,6 +343,15 @@ pub async fn build_package(
         accounts,
     };
 
+    let need_to_build_root = services
+        .iter()
+        .find(|(_, _, id)| id.as_str() == service.unwrap())
+        .is_none()
+        && plugins
+            .iter()
+            .find(|(_, _, _, id)| id.as_str() == service.unwrap())
+            .is_none();
+
     let mut service_wasms = Vec::new();
     for (service, info, id) in services {
         let mut paths = build(
@@ -371,6 +380,11 @@ pub async fn build_package(
             ))?
         };
         data_files.push((service, path.to_string(), paths.pop().unwrap()))
+    }
+
+    if need_to_build_root {
+        // Run cargo build at the root to pick up any build scripts
+        build_package_root(args, service.unwrap()).await?;
     }
 
     for (service, src, dest) in data_sources {
