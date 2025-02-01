@@ -27,7 +27,6 @@ export function ExecutionTabs({
   );
 
   const getCleanValues = () => {
-    // Filter out rawInput fields for bytelists
     return Object.fromEntries(
       Object.entries(paramValues).filter(([key]) => !key.endsWith("RawInput"))
     );

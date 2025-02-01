@@ -23,14 +23,12 @@ interface TypeBasedInputProps {
   label?: ReactNode;
 }
 
-// Convert to Uint8Array if needed
 const getByteArray = (val: unknown): Uint8Array => {
   if (val instanceof Uint8Array) return val;
   if (Array.isArray(val)) return new Uint8Array(val);
   return new Uint8Array();
 };
 
-// Helper to resolve type references
 const resolveTypeRef = (type: unknown, schema: Schema): unknown => {
   if (typeof type === "number") return schema.types[type].kind;
   if (typeof type === "object" && type !== null && "type" in type) {
@@ -39,7 +37,6 @@ const resolveTypeRef = (type: unknown, schema: Schema): unknown => {
   return type;
 };
 
-// Common props shared by all input components
 interface CommonInputProps {
   value: unknown;
   onChange: (value: unknown) => void;
@@ -77,7 +74,6 @@ export const TypeBasedInput = ({
     label: typeLabel,
   };
 
-  // Handle primitive types
   if (inputType === "string")
     return <StringInput {...commonProps} value={actualValue as string} />;
   if (inputType === "char")
@@ -93,7 +89,6 @@ export const TypeBasedInput = ({
   if (inputType === "boolean")
     return <BooleanInput {...commonProps} value={actualValue as boolean} />;
 
-  // Handle complex types
   if (typeof resolvedType === "object" && resolvedType !== null) {
     const typeObj = resolvedType as Record<string, unknown>;
 

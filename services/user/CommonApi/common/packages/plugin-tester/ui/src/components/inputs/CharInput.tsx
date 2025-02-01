@@ -8,7 +8,6 @@ interface CharInputProps {
 
 export const CharInput = ({ value, onChange, label }: CharInputProps) => {
   const handleChange = (newValue: string) => {
-    // Take only the first character if multiple are entered
     onChange(newValue.charAt(0));
   };
 

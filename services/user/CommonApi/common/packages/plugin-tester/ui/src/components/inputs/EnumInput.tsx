@@ -17,7 +17,6 @@ export const EnumInput = ({
   onChange,
   label,
 }: EnumInputProps) => {
-  // Default to first case if no value is selected
   const selectedCase = value ?? cases[0].name;
 
   return (
