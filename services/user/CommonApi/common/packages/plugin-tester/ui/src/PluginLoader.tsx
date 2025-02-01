@@ -11,7 +11,7 @@ import { getTypeInfo } from "./utils";
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [service, setService] = useState("");
   const [plugin, setPlugin] = useState("plugin");
-  const { schema, loadSchema } = usePluginSchema(supervisor);
+  const { schema, loadSchema, clearSchema } = usePluginSchema(supervisor);
   const [selectedFunction, setSelectedFunction] =
     useState<SchemaFunction | null>(null);
   const [paramValues, setParamValues] = useState<Record<string, unknown>>({});
@@ -65,7 +65,12 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
         plugin={plugin}
         onServiceChange={setService}
         onPluginChange={setPlugin}
-        onLoad={() => loadSchema(service, plugin)}
+        onLoad={() => {
+          clearSchema();
+          setSelectedFunction(null);
+          setParamValues({});
+          loadSchema(service, plugin);
+        }}
       />
 
       {schema && (
