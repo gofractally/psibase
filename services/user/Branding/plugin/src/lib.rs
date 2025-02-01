@@ -40,7 +40,7 @@ impl Api for BrandingPlugin {
         add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
     }
     fn set_logo(logo: Vec<u8>) {
-        let _ = Latch::new();
+        let _latch = Latch::new();
 
         upload(
             &File {
