@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { Schema, SchemaFunction, ExportedMethodsByInterface } from "../types";
-import { InterfaceTabs } from "./InterfaceTabs";
+import { TabControl } from "./TabControl";
 
 interface FunctionSelectorProps {
   schema: Schema;
@@ -39,7 +39,7 @@ export function FunctionSelector({
         }
       });
       return result;
-    }, [getExportedInterfaceIds]);
+    }, [getExportedInterfaceIds, schema.interfaces]);
 
   const exportedMethods = useMemo(getExportedMethodsByInterface, [
     getExportedMethodsByInterface,
@@ -64,20 +64,14 @@ export function FunctionSelector({
 
   return (
     <div>
-      <InterfaceTabs
-        interfaces={Object.keys(exportedMethods)}
-        selectedInterface={selectedInterfaceName}
-        onSelect={handleInterfaceSelect}
+      <h3 className="functions-title">Functions</h3>
+      <TabControl
+        selectedTab={selectedInterfaceName || ""}
+        onTabChange={handleInterfaceSelect}
+        tabs={Object.keys(exportedMethods)}
       />
       {selectedInterfaceName && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-            marginBottom: "1rem",
-          }}
-        >
+        <div className="functions-grid">
           {exportedMethods[selectedInterfaceName]?.map((fn, i) => (
             <button
               key={i}

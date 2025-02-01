@@ -28,13 +28,14 @@ mod tables {
 #[psibase::service(name = "branding")]
 mod service {
     use async_graphql::Object;
-    use psibase::{serve_graphql, HttpReply, HttpRequest, SingletonKey, Table};
+    use psibase::{check, serve_graphql, HttpReply, HttpRequest, SingletonKey, Table};
 
     use crate::tables::{NetworkName, NetworkNameTable};
 
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
+        check(psibase::get_sender() == Wrapper::SERVICE, "Unauthorized");
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();

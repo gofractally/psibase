@@ -17,7 +17,7 @@ impl ActiveApp for AccountsPlugin {
 
         let app = get_assert_top_level_app("login", &vec![])?;
 
-        let _app_name = match &app.app {
+        let app_name = match &app.app {
             Some(name) => name,
             None => {
                 let msg = format!("Unrecognized app: {}", app.origin);
@@ -25,16 +25,10 @@ impl ActiveApp for AccountsPlugin {
             }
         };
 
-        // Note: Uncomment this after we deliver the front-end for connecting
-        //       users to apps. If we delivered it now, it would basically prevent
-        //       usage from all apps since there's no way to connect a user yet.
-        // let connected_apps = UserTable::new(&user).get_connected_apps();
-        // if !connected_apps.contains(app_name) {
-        //     return Err(NotConnected(user).into());
-        // }
-
-        // Note: Delete this after we uncomment the above
-        UserTable::new(&user).add_connected_app(&app);
+        let connected_apps = UserTable::new(&user).get_connected_apps();
+        if !connected_apps.contains(app_name) {
+            return Err(NotConnected(user).into());
+        }
 
         AppsTable::new(&app).login(&user);
         Ok(())
