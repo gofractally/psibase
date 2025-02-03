@@ -35,15 +35,24 @@ namespace arbtrie
       bool prev();  // moves to the prv key, return valid()
 
       // lower_bound(search) + next()
-      bool upper_bound(key_view search);
+      // similar to std::map::upper_bound
+      bool upper_bound(key_view search) {
+         if( lower_bound(search) )
+            if( key() == search )
+               return next();
+         return false;
+      }
 
       // moves to the first key >= prefix from the begin, return valid()
+      // similar to std::map::lower_bound
       bool lower_bound(key_view prefix = {});
 
       // moves to the first key <= prefix from the end, return valid()
+      // similar to std::map<greater>::lower_bound
       bool reverse_lower_bound(key_view prefix = npos);
 
       // reverse_lower_bound(prefix) + prev()
+      // similar to std::map<greater>::upper_bound
       bool reverse_upper_bound(key_view prefix = {});
 
       // moves to the last key with prefix, return valid()

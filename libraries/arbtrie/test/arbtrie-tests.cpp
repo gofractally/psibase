@@ -946,20 +946,195 @@ TEST_CASE("dense-rand-insert")
              });
    }
 }
+TEST_CASE("lower-bound")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+
+   std::map<std::string, int> reference;
+   for (int i = 0; i < 100000; ++i)
+   {
+      auto itr = ws.create_iterator(r);
+
+      uint64_t query = uint64_t(rand64());
+      auto     qv    = to_kv(query);
+
+      auto rritr = reference.lower_bound(std::string(to_str(qv)));
+      itr.lower_bound(qv);
+
+      if (rritr == reference.end())
+         REQUIRE(not itr.valid());
+      if (rritr != reference.end())
+      {
+         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
+                        " =? itr: ", to_hex(itr.key()));
+         REQUIRE(rritr->first == to_str(itr.key()));
+      }
+
+      uint64_t val                         = uint64_t(rand64());
+      key_view kstr                        = to_kv(val);
+      reference[std::string(to_str(kstr))] = 0;
+      int result                           = ws.upsert(r, kstr, kstr);
+      //TRIEDENT_DEBUG( "upsert: ", to_hex(kstr) );
+      REQUIRE(reference.size() == ws.count_keys(r));
+   }
+}
+TEST_CASE("upper-bound")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+
+   std::map<std::string, int> reference;
+   for (int i = 0; i < 100000; ++i)
+   {
+      auto itr = ws.create_iterator(r);
+
+      uint64_t query = uint64_t(rand64());
+      auto     qv    = to_kv(query);
+
+      auto rritr = reference.upper_bound(std::string(to_str(qv)));
+      itr.upper_bound(qv);
+
+      if (rritr == reference.end())
+         REQUIRE(not itr.valid());
+      if (rritr != reference.end())
+      {
+         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
+                        " =? itr: ", to_hex(itr.key()));
+         REQUIRE(rritr->first == to_str(itr.key()));
+      }
+
+      uint64_t val                         = uint64_t(rand64());
+      key_view kstr                        = to_kv(val);
+      reference[std::string(to_str(kstr))] = 0;
+      int result                           = ws.upsert(r, kstr, kstr);
+      //TRIEDENT_DEBUG( "upsert: ", to_hex(kstr) );
+      REQUIRE(reference.size() == ws.count_keys(r));
+   }
+}
+TEST_CASE("rev-lower-bound")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+
+   std::map<std::string, int, std::greater<std::string>> reference;
+   for (int i = 0; i < 100000; ++i)
+   {
+      auto itr = ws.create_iterator(r);
+
+      uint64_t query = uint64_t(rand64());
+      auto     qv    = to_kv(query);
+
+      TRIEDENT_DEBUG(i, "  query: ", to_hex(qv));
+      auto rritr = reference.lower_bound(std::string(to_str(qv)));
+      itr.reverse_lower_bound(qv);
+
+      if (rritr == reference.end())
+         REQUIRE(not itr.valid());
+      if (rritr != reference.end())
+      {
+         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
+                        " =? itr: ", to_hex(itr.key()));
+         REQUIRE(rritr->first == to_str(itr.key()));
+      }
+
+      uint64_t val                         = uint64_t(rand64());
+      key_view kstr                        = to_kv(val);
+      reference[std::string(to_str(kstr))] = 0;
+      int result                           = ws.upsert(r, kstr, kstr);
+      TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      REQUIRE(reference.size() == ws.count_keys(r));
+   }
+}
+
+TEST_CASE("reverse-lower")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   auto itr = ws.create_iterator(r);
+
+   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, sizeof(k)); };
+
+   std::map<std::string, int, std::greater<std::string>> reference;
+   for (int i = 0; i < 100000; ++i)
+   {
+      uint64_t query = uint64_t(rand64());
+      auto     qv    = to_kv(query);
+
+      auto rritr = reference.lower_bound(std::string(to_str(qv)));
+      itr.reverse_lower_bound(qv);
+      if (rritr == reference.end())
+         REQUIRE(not itr.valid());
+      if (rritr != reference.end())
+      {
+         REQUIRE(rritr->first == to_str(itr.key()));
+      }
+
+      uint64_t val                         = uint64_t(rand64());
+      key_view kstr                        = to_kv(val);
+      reference[std::string(to_str(kstr))] = 0;
+      ws.upsert(r, kstr, kstr);
+      REQUIRE(reference.size() == ws.count_keys(r));
+   }
+}
+
 TEST_CASE("sparse-rand-upsert")
 {
    environ env;
    auto    ws = env.db->start_write_session();
    auto    r  = ws.create_root();
 
+   auto test_count = [&](auto n)
+   {
+      auto from = std::to_string(rand64() & 0xfffffff);
+      auto to   = std::to_string(rand64() & 0xfffffff);
+      while (to == from)
+         to = std::to_string(rand64());
+      if (to < from)
+         std::swap(to, from);
+
+      //TRIEDENT_DEBUG( from , " -> ", to );
+      auto itr = ws.create_iterator(n);
+      itr.lower_bound(to_key_view(from));
+      uint32_t count = 0;
+      while (itr.valid())
+      {
+         assert(itr.key() >= to_key_view(from));
+         if (itr.key() < to_key_view(to))
+         {
+            ++count;
+            //    TRIEDENT_DEBUG( count, " itrkey: ", to_str(itr.key()) );
+            itr.next();
+         }
+         else
+            break;
+      }
+      //TRIEDENT_DEBUG( from , " -> ", to , " = ", count);
+      REQUIRE(ws.count_keys(n, to_key_view(from), to_key_view(to)) == count);
+   };
+
+   int total = 0;
    for (int i = 0; i < 100000; i++)
    {
-      REQUIRE(ws.count_keys(r) == i);
+      REQUIRE(ws.count_keys(r) == total);
+      if ((i % 10) == 0)
+         test_count(r);
 
-      uint64_t    val  = rand64();
+      uint64_t    val  = uint32_t(rand64() & 0xfffffff);
       std::string str  = std::to_string(val);
       key_view    kstr = to_key_view(str);
-      ws.upsert(r, kstr, kstr);
+      total += -1 == ws.upsert(r, kstr, kstr);
       ws.get(r, kstr,
              [&](bool found, const value_type& r)
              {
@@ -978,13 +1153,89 @@ TEST_CASE("dense-rand-upsert")
    auto    ws = env.db->start_write_session();
    auto    r  = ws.create_root();
 
+   std::map<std::string, int> reference;
+
+   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, sizeof(k)); };
+
+   auto test_count = [&](auto n, bool print_dbg)
+   {
+      uint64_t from = rand64();
+      uint64_t to   = rand64();
+      while (to == from)
+         to = rand64();
+      auto kfrom = to_kv(from);
+      auto kto   = to_kv(to);
+
+      if (kto < kfrom)
+         std::swap(kto, kfrom);
+
+      if (print_dbg)
+         TRIEDENT_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
+      auto itr = ws.create_iterator(n);
+      itr.lower_bound(kfrom);
+      auto     ref_count = 0;
+      uint32_t count     = 0;
+
+      auto ref_itr = reference.lower_bound(std::string(to_str(kfrom)));
+      if (ref_itr != reference.end())
+      {
+         REQUIRE(itr.valid());
+         if (to_key_view(ref_itr->first) != itr.key())
+         {
+            TRIEDENT_WARN("ref: ", to_hex(to_key_view(ref_itr->first)));
+            TRIEDENT_WARN("tri: ", to_hex(itr.key()));
+
+            itr.lower_bound(kfrom);
+         }
+         REQUIRE(to_key_view(ref_itr->first) == itr.key());
+      }
+
+      while (itr.valid())
+      {
+         REQUIRE(ref_itr != reference.end());
+         if (to_key_view(ref_itr->first) != itr.key())
+         {
+            TRIEDENT_DEBUG("count: ", count);
+         }
+         REQUIRE(to_key_view(ref_itr->first) == itr.key());
+
+         if (itr.key() < kto)
+         {
+            ++count;
+            if (print_dbg)
+               TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()));
+            itr.next();
+            ++ref_itr;
+            if (ref_itr != reference.end())
+               REQUIRE(itr.valid());
+         }
+         else
+         {
+            break;
+         }
+      }
+      if (print_dbg)
+      {
+         TRIEDENT_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
+         TRIEDENT_DEBUG("count: ", count);
+      }
+
+      REQUIRE(ws.count_keys(n, kfrom, kto) == count);
+   };
+
    for (int i = 0; i < 100000; i++)
    {
       REQUIRE(ws.count_keys(r) == i);
+      if (i % 10 == 0)
+      {
+         //TRIEDENT_DEBUG( "i: ", i );
+         test_count(r, false);
+      }
 
       uint64_t val = rand64();
       key_view kstr((uint8_t*)&val, sizeof(val));
       ws.upsert(r, kstr, kstr);
+      reference[std::string(to_str(kstr))] = 0;
       ws.get(r, kstr,
              [&](bool found, const value_type& r)
              {

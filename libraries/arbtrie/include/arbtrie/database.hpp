@@ -130,6 +130,11 @@ namespace arbtrie
               std::invocable<bool, value_type> auto&& callback);
 
       inline uint32_t count_keys(object_ref<node_header>& r, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref<node_header>& r, const full_node* n, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref<node_header>& r, const bitset_node* n, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref<node_header>& r, const setlist_node* n, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref<node_header>& r, const binary_node* n, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref<node_header>& r, const value_node* n, key_view from, key_view to) const;
 
       /** creates a new handle for address, retains it */
       node_handle create_handle(fast_meta_address a) { return node_handle(*this, a); }
@@ -142,7 +147,7 @@ namespace arbtrie
       /**
        * count the keys in the range [from,to)
        */
-      uint32_t count_keys(const node_handle& r, key_view from = {}, key_view to = iterator::npos);
+      uint32_t count_keys(const node_handle& r, key_view from = {}, key_view to = {}); //iterator::npos);
 
       /**
        *  This version of get reduces the need to copy to an

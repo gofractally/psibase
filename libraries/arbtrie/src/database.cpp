@@ -399,48 +399,341 @@ namespace arbtrie
 
    uint32_t read_session::count_keys(const node_handle& r, key_view from, key_view to)
    {
+      if (from > to)
+         throw std::runtime_error("count_keys: 'from' key must be less than 'to' key");
+
       if (not r.address()) [[unlikely]]
          return 0;
 
       auto state = _segas.lock();
-      auto ref   = state.get(r.address());
-
-      return count_keys(ref, from, to);
+      auto root  = state.get(r.address());
+      return count_keys(root, from, to);
    }
+   uint32_t read_session::count_keys(object_ref<node_header>& r,
+                                     const value_node*        v,
+                                     key_view                 from,
+                                     key_view                 to) const
+   {
+      assert(to == key_view() or from < to);
+      auto k = v->key();
+      return k >= from and (to == key_view() or k < to);
+   }
+
+   uint32_t read_session::count_keys(object_ref<node_header>& r,
+                                     const binary_node*       n,
+                                     key_view                 from,
+                                     key_view                 to) const
+   {
+      //    TRIEDENT_DEBUG( "binary from: ", to_hex(from), " to: ", to_hex(to), " numb: ", n->num_branches() );
+      assert(to == key_view() or from < to);
+      auto start = n->lower_bound_idx(from);
+      //    TRIEDENT_DEBUG ( "start idx: ", start );
+      assert(start >= 0);
+      if (start == n->num_branches())
+         return 0;
+      if (to == key_view())
+      {
+         //   TRIEDENT_WARN( "numb - start: ", n->num_branches() - start );
+         return n->num_branches() - start;
+      }
+      // TRIEDENT_DEBUG( "end: ", n->lower_bound_idx(to), " start: ", start, "  delta: ", n->lower_bound_idx(to) - start );
+
+      // TRIEDENT_DEBUG ( "end idx: ", n->lower_bound_idx(to), " numb: ", n->num_branches() );
+      return n->lower_bound_idx(to) - start;
+   }
+   uint32_t read_session::count_keys(object_ref<node_header>& r,
+                                     const setlist_node*      n,
+                                     key_view                 from,
+                                     key_view                 to) const
+   {
+      // TRIEDENT_DEBUG( "setlist from: ", to_str(from), " to: ", to_str(to), "  pre: ", to_str(n->get_prefix()) );
+      assert(to == key_view() or from < to);
+      auto pre = n->get_prefix();
+      if (to.size() and to < pre)
+         return 0;
+
+      auto slp = n->get_setlist_ptr();
+
+      auto count_range = [&](const id_index* pos, const id_index* end)
+      {
+         uint32_t count = 0;
+         while (pos < end)
+         {
+            auto bref = r.rlock().get(fast_meta_address(n->branch_region(), *pos));
+            count += count_keys(bref, key_view(), key_view());
+            ++pos;
+         }
+         return count;
+      };
+
+      if (from <= pre)
+      {
+         // the start is at or before before this node
+         if (to.size() <= pre.size())
+         {
+            // and the end is after all keys in this node
+            return n->descendants();
+         }
+         // TRIEDENT_DEBUG( "begging to middle" );
+
+         // else the end is within this node
+         auto begin    = n->get_branch_ptr();
+         auto end_idx  = n->lower_bound_idx(char_to_branch(to[pre.size()]));
+         auto end_byte = slp[end_idx];
+         auto end      = begin + end_idx;
+         auto abs_end  = begin + n->num_branches();
+         auto delta    = end - begin;
+         auto to_tail  = to.substr(pre.size() + 1);
+
+         //   TODO: optimize by subtracting from descendants
+         //   if( delta > n->num_branches()/2 ) // subtract tail from n->desendants()
+         //      return n->descendants() - count_range( end, begin + n->num_branches() );
+         //   else // sum everything to this point
+         uint64_t count = n->has_eof_value() + count_range(begin, end);
+         if (end != abs_end and end_byte == to[pre.size()])
+         {
+            auto sref = r.rlock().get(fast_meta_address(n->branch_region(), *end));
+            count += count_keys(sref, key_view(), to.substr(pre.size() + 1));
+         }
+
+         return count;
+      }
+      else
+      {
+         // the start is in the middle of this node
+         auto begin   = n->get_branch_ptr();
+         auto abs_end = begin + n->num_branches();
+
+         auto start_idx  = n->lower_bound_idx(char_to_branch(from[pre.size()]));
+         auto start_byte = slp[start_idx];
+         // TRIEDENT_DEBUG( "start branch: ", start_byte );
+         auto start = begin + start_idx;
+
+         if (to.size() > pre.size())
+         {
+            // end is in the middle of this node
+            auto end_idx = n->lower_bound_idx(char_to_branch(to[pre.size()]));
+            assert(end_idx < n->num_branches());
+
+            auto end_byte = slp[end_idx];
+            auto end      = begin + end_idx;
+
+            uint32_t count            = 0;
+            bool     counted_end_byte = false;
+            if (start_byte == from[pre.size()])
+            {
+               counted_end_byte = start_byte == end_byte;
+               //      TRIEDENT_WARN( "start_byte == from[pre.size()]" );
+               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
+               auto btail = from.substr(pre.size() + 1);
+               auto etail = (end_byte == start_byte) ? to.substr(pre.size() + 1) : key_view();
+               count      = count_keys(sref, btail, etail);
+               ++start;
+            }
+            count += count_range(start, end);
+            //  TRIEDENT_DEBUG( "after count_range(...): ", count,  " end byte: ", end_byte, " to[pre.size()] = ", to[pre.size()] );
+            assert(end < abs_end);
+
+            // TRIEDENT_WARN( "end byte: ", end_byte, " start: ", start_byte, " to[pre.size]: ", to[pre.size()] );
+            if (!counted_end_byte and end_byte == to[pre.size()])
+            {
+               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *end));
+               auto etail = to.substr(pre.size() + 1);
+               //   TRIEDENT_WARN( "END BYTE == to[pre.size()] aka: ", to[pre.size()], " init count: ", count, " etail: '", to_str(etail), "'" );
+               count += count_keys(sref, key_view(), etail);
+            }
+            // TRIEDENT_DEBUG( "final count: ", count );
+            return count;
+         }
+         else
+         {  // begin in middle and end is beyond the end of this node
+            // TRIEDENT_WARN( "begin in middle, end beyond this node" );
+            // TODO: optimize by counting from abs begin to begin and subtracting from
+            // descendants()
+            uint32_t count = 0;
+            if (start_byte == from[pre.size()])
+            {
+               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
+               auto btail = from.substr(pre.size() + 1);
+               count += count_keys(sref, btail, key_view());
+               ++start;
+            }
+            return count + count_range(start, abs_end);
+         }
+      }
+   }
+   uint32_t read_session::count_keys(object_ref<node_header>& r,
+                                     const full_node*         n,
+                                     key_view                 from,
+                                     key_view                 to) const
+   {
+      assert(to == key_view() or from < to);
+      auto pre = n->get_prefix();
+      if (to.size() and to < pre)
+         return 0;
+
+      uint64_t count = 0;
+
+      //TRIEDENT_WARN( "full from ", to_hex( from ), " -> ", to_hex(to) );
+
+      auto count_range = [&](branch_index_type pos, branch_index_type end)
+      {
+         uint64_t c    = 0;
+         auto     opos = pos;
+         while (pos < end)
+         {
+            auto adr = n->get_branch(pos);
+            if (adr)
+            {
+               auto bref = r.rlock().get(adr);
+               auto bc   = count_keys(bref, key_view(), key_view());
+               c += bc;
+               //          TRIEDENT_DEBUG( "   ", to_hex( pos-1), " => ", bc, " total: ", c );
+            }
+            ++pos;
+         }
+         //    TRIEDENT_DEBUG( "count_range ", to_hex(opos-1), " -> ", to_hex( end-1), " count: ", c );
+         return c;
+      };
+
+      if (from <= pre)
+      {
+         // the start is at or before this node
+         if (to.size() <= pre.size())
+            return n->descendants();  // end is after this node
+
+         // else the end is within this node
+
+         auto end_byte = char_to_branch(to[pre.size()]);
+         auto end_idx  = n->lower_bound(end_byte);
+
+         //   TRIEDENT_WARN( "begin to middle" );
+         //   note that branch_id 1 is byte 0 because eof value is branch 0
+         count = n->has_eof_value() + count_range(char_to_branch(0), end_idx.first);
+         if (end_idx.first != max_branch_count and end_byte == end_idx.first)
+         {
+            auto sref = r.rlock().get(end_idx.second);
+            count += count_keys(sref, key_view(), to.substr(pre.size() + 1));
+         }
+         return count;
+      }
+      else
+      {
+         // the start is in the middle of this node
+         auto start_byte = char_to_branch(from[pre.size()]);
+         auto start_idx  = n->lower_bound(start_byte);
+
+         if (to.size() > pre.size())
+         {
+            //   TRIEDENT_WARN( "middle to middle" );
+            // begin and end are in the middle of this node
+            auto end_byte = char_to_branch(to[pre.size()]);
+            auto end_idx  = n->lower_bound(end_byte);
+
+            bool counted_end_byte = false;
+            if (start_byte == start_idx.first)
+            {
+               counted_end_byte = start_byte == end_byte;
+               auto sref        = r.rlock().get(start_idx.second);
+               auto btail       = from.substr(pre.size() + 1);
+               auto etail       = (end_byte == start_byte) ? to.substr(pre.size() + 1) : key_view();
+               count            = count_keys(sref, btail, etail);
+               //        TRIEDENT_WARN( "count first: ", to_hex( start_idx.first-1), " cnt: ", count,
+               //                      " node: ", start_idx.second );
+               start_idx.first++;
+            }
+            count += count_range(start_idx.first, end_idx.first);
+
+            if (not counted_end_byte and end_byte == end_idx.first)
+            {
+               //      TRIEDENT_WARN( "count end: ", to_hex(end_idx.first-1) );
+               auto sref  = r.rlock().get(end_idx.second);
+               auto etail = to.substr(pre.size() + 1);
+               auto ce    = count_keys(sref, key_view(), etail);
+               count += ce;
+               //     TRIEDENT_WARN( "CE:  ", ce, " count: ", count );
+            }
+            return count;
+         }
+         else
+         {
+            // TRIEDENT_WARN( "middle to end" );
+            // begin in the middle and end is beyond the end of this node
+            uint64_t count = 0;
+            if (start_idx.first == start_byte)
+            {
+               auto sref  = r.rlock().get(start_idx.second);
+               auto btail = from.substr(pre.size() + 1);
+               count += count_keys(sref, btail, key_view());
+               ++start_idx.first;
+            }
+            return count + count_range(start_idx.first, max_branch_count);
+         }
+      }
+   }
+
    uint32_t read_session::count_keys(object_ref<node_header>& r, key_view from, key_view to) const
    {
-      switch (r.type())
-      {
-         case node_type::value:
-         {
-            auto n = r.as<value_node>();
-            auto k = n->key();
-            if (k >= from and k < to)
-               return 1;
-            return 0;
-         }
-         case node_type::binary:
-         {
-            auto n = r.as<binary_node>();
-            // TODO: filter by from-to range
-            return n->num_branches();
-         }
+      return cast_and_call(r.header(),
+                           [&](const auto* n) { return this->count_keys(r, n, from, to); });
+   }
+
+   /*
          case node_type::full:
          {
             auto n = r.as<full_node>();
-            // TODO: filter by from-to range
-            return n->descendants();
-         }
-         case node_type::setlist:
-         {
-            auto n = r.as<setlist_node>();
-            // TODO: filter by from-to range
-            return n->descendants();
-         }
-         default:
-            throw std::runtime_error("unknown node type");
-      }
+            auto pre   = n->get_prefix();
+            auto cfrom = common_prefix(pre, from);
+            auto cto   = common_prefix(pre, to);
+            TRIEDENT_DEBUG( "from: ", from.size(), " to: ", to.size(), " cto: ", cto.size(), " cfrom: ", cfrom.size() );
+
+            // the start is at or before this nodes eof
+            if( from <= pre ) {
+               // then we start with the eof on this node
+               if( pre < to )  {
+                  // the end is another node above us because to > from
+                  return n->descendants();
+               }
+               assert( to.size() > cto.size() );
+               
+               auto to_br = char_to_branch(to[cto.size()]);
+               auto tidx_adr = n->lower_bound(to_br);
+               TRIEDENT_DEBUG( "tidx_adr.first: ", tidx_adr.first, " nbranch: ", n->num_branches() );
+
+               auto from_br = 0;
+               auto range = to_br - from_br;
+               if( range < max_branch_count/2 ) {
+                  // majority excluded
+                  uint32_t total = n->has_eof_value();
+                  for( branch_index_type i = 0; i < to_br; ++i ) {
+                     if( auto a = fast_meta_address( n->branch_region(), n->branch(i) ) ) {
+                        auto oref = r.rlock().get(a);
+                        total += count_keys( oref, from.substr(cfrom.size()+1), to.substr(cto.size()) );
+                     }
+                  }
+                  return n->descendants() - total;
+                  // Count desendants of every branch from eof until but not including to_br
+               }
+               else
+               {
+                  TRIEDENT_WARN( "majority included" );
+                  uint32_t total = n->has_eof_value() & -uint32_t(from_br == 0);
+                  for( branch_index_type i = to_br; i < 257; ++i ) {
+                     if( auto a = fast_meta_address( n->branch_region(), n->branch(i) ) ) {
+                        auto oref = r.rlock().get(a);
+                        total += count_keys( oref, from.substr(cfrom.size()+1), to.substr(cto.size()) );
+                     }
+                  }
+                  return total;
+                  // count descendants of every branch from and including to_br until the end
+                  // and subtract from total descendants. 
+               }
+            } else {
+               assert( from.size() > cfrom.size() );
+               auto from_br = char_to_branch(from[cfrom.size()]);
+            }
    }
+   */
 
    template <upsert_mode mode, typename NodeType>
    fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
@@ -770,7 +1063,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-      //TRIEDENT_WARN("REFACTOR! ", r.address());
+      //   TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);

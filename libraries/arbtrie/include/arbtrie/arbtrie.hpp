@@ -30,8 +30,8 @@ namespace arbtrie {
          // always predicted extremely unlikely.
          [[likely]] case node_type::setlist:
             return func(static_cast<transcribe_const_t<T, setlist_node>*>(h));
-         [[likely]] case node_type::bitset:
-            return func(static_cast<transcribe_const_t<T, bitset_node>*>(h));
+       //  [[likely]] case node_type::bitset:
+       //     return func(static_cast<transcribe_const_t<T, bitset_node>*>(h));
          [[likely]] case node_type::full:
             return func(static_cast<transcribe_const_t<T, full_node>*>(h));
          case node_type::binary:

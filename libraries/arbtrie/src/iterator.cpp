@@ -10,21 +10,35 @@ namespace arbtrie
                                            const value_node*        in,
                                            key_view                 query)
    {
-      pushkey(in->key());
+      auto ikey = in->key();
+      if (ikey <= query)
+      {
+         pushkey(ikey);
+         return true;
+      }
+      _path.pop_back();
       return query >= key_view();
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
    {
-      pushkey(in->key());
-      return query <= key_view();
+      auto ikey = in->key();
+      if (query <= ikey)
+      {
+         pushkey(ikey);
+         return true;
+      }
+      _path.pop_back();
+      return false;
    }
    bool iterator::lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
    {
       auto node_prefix = in->get_prefix();
+      //   TRIEDENT_DEBUG( "prefix: ", to_hex(node_prefix) );
       pushkey(node_prefix);
 
       if (query <= node_prefix)
       {
+         //  TRIEDENT_DEBUG( "query: ", to_hex(query) , " <= pre: ", to_hex(node_prefix) );
          // go to first branch
          std::pair<branch_index_type, fast_meta_address> idx = in->lower_bound(0);
          if (idx.first == 0)
@@ -48,17 +62,23 @@ namespace arbtrie
       }
 
       auto cpre = common_prefix(node_prefix, query);
+      // TRIEDENT_DEBUG( "query: ", to_hex(query) , " > pre: ",
+      //                to_hex(node_prefix), " cpre: ", to_hex(cpre));
       if (cpre != node_prefix)
       {
          popkey(node_prefix.size());
+         _path.pop_back();
          return false;
       }
 
       auto remaining_query = query.substr(cpre.size());
+      // TRIEDENT_DEBUG( "remaining query: ", to_hex(remaining_query) );
       assert(remaining_query.size() > 0);
 
       std::pair<branch_index_type, fast_meta_address> idx =
           in->lower_bound(char_to_branch(remaining_query.front()));
+
+      // TRIEDENT_WARN( "lower bound: ", to_hex(branch_to_char(idx.first) ) );
 
       if (idx.second)
       {
@@ -68,9 +88,15 @@ namespace arbtrie
 
          auto bref = r.rlock().get(idx.second);
          pushkey(branch_to_char(idx.first));
-         return lower_bound_impl(bref, remaining_query.substr(1));
+
+         if (idx.first == char_to_branch(query.front()))
+            return lower_bound_impl(bref, remaining_query.substr(1));
+         else  // if the lower bound of the first byte is beyond the first byte of query,
+               // then we start at the beginning of the next level
+            return lower_bound_impl(bref, key_view());
       }
-      popkey(node_prefix.size() + 1);
+      popkey(node_prefix.size());
+      _path.pop_back();
       return false;
    }
 
@@ -113,6 +139,8 @@ namespace arbtrie
       if (cpre != node_prefix)
       {
          popkey(node_prefix.size() + _path.back().second != 0);
+         // TODO: _path.pop_back?
+         _path.pop_back();
          return false;
       }
 
@@ -130,9 +158,13 @@ namespace arbtrie
 
          auto bref = r.rlock().get(idx.second);
          pushkey(branch_to_char(idx.first));
-         return reverse_lower_bound_impl(bref, remaining_query.substr(1));
+         if (idx.first == char_to_branch(query.front()))
+            return reverse_lower_bound_impl(bref, remaining_query.substr(1));
+         else
+            return reverse_lower_bound_impl(bref, npos);
       }
-      popkey(node_prefix.size() + _path.back().second != 0);
+      popkey(node_prefix.size());
+      _path.pop_back();
       return false;
    }
 
@@ -145,25 +177,38 @@ namespace arbtrie
 
       if (lbx >= bn->num_branches())
       {
+         // TODO: path.pop_back?
+         //TRIEDENT_WARN( "it happened" );
+         _path.pop_back();
          return false;
       }
 
       _path.back().second = lbx;
       auto kvp            = bn->get_key_val_ptr(lbx);
-      pushkey(bn->get_key_val_ptr(lbx)->key());
+      pushkey(kvp->key());
       _size = kvp->value_size();
 
+      //  TRIEDENT_WARN( "lbx: ", lbx,  " query: ", to_hex(query), " key: ", to_hex(kvp->key())  );
+      //  if( lbx > 0 ) {
+      //    auto pk = bn->get_key_val_ptr(lbx-1)->key();
+      //    TRIEDENT_WARN( "prev key: ",to_hex( pk)  );
+      //    assert( pk < query );
+      //  }
       return true;
    }
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
                                            const binary_node*       bn,
                                            key_view                 query)
    {
-      auto lbx            = bn->reverse_lower_bound_idx(query);
+      auto lbx = bn->reverse_lower_bound_idx(query);
+      TRIEDENT_DEBUG("lbx: ", lbx);
       _path.back().second = lbx;
 
       if (lbx < 0)
+      {
+         _path.pop_back();
          return false;
+      }
 
       auto kvp = bn->get_key_val_ptr(lbx);
       pushkey(bn->get_key_val_ptr(lbx)->key());
