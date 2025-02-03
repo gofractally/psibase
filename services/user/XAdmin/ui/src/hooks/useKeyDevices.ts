@@ -9,10 +9,10 @@ export const useKeyDevices = () =>
         queryKey: queryKeys.keyDevices,
         queryFn: async () => {
             try {
-                return chain.getKeyDevices();
+                return await chain.getKeyDevices();
             } catch (e) {
                 console.error("Failed to fetch security devices", e);
-                throw "Failed to fetch security devices";
+                throw new Error("Failed to fetch security devices");
             }
         },
     });

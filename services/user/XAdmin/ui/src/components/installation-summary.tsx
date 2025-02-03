@@ -1,4 +1,5 @@
 import { RowSelectionState } from "@tanstack/react-table";
+import { Info } from "lucide-react";
 
 import {
     Accordion,
@@ -26,13 +27,17 @@ interface ChipProps {
 const Chip = ({ label, value, hint }: ChipProps) => (
     <div className="w-60 truncate rounded-md border p-2 text-right">
         <div className="text-sm text-muted-foreground">{label}</div>
-        {value}{" "}
-        {hint ? (
-            <Popover>
-                <PopoverTrigger>ℹ️</PopoverTrigger>
-                <PopoverContent>{hint}</PopoverContent>
-            </Popover>
-        ) : null}
+        <div className="flex items-center justify-end space-x-1">
+            <div>{value}</div>
+            {hint ? (
+                <Popover>
+                    <PopoverTrigger>
+                        <Info size={16} />
+                    </PopoverTrigger>
+                    <PopoverContent>{hint}</PopoverContent>
+                </Popover>
+            ) : null}
+        </div>
     </div>
 );
 
