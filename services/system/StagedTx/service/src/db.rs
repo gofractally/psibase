@@ -155,8 +155,6 @@ pub mod impls {
                 action_list: ActionList { actions },
             };
 
-            psibase::write_console("Adding staged tx to db\n");
-
             StagedTxTable::new().put(&new_tx).unwrap();
 
             new_tx

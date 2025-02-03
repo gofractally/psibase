@@ -32,7 +32,7 @@ pub mod service {
     use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
 
-    const ENABLE_PRINT: bool = true;
+    const ENABLE_PRINT: bool = false;
 
     fn debug_print(msg: &str) {
         if ENABLE_PRINT {
