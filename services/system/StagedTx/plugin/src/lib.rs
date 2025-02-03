@@ -8,6 +8,7 @@ use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest 
 use exports::transact_hook_actions_sender::Guest as HookActionsSender;
 use exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
 use host::common::{client as Client, server as Server, types::Error};
+use host::privileged::intf::get_active_app;
 use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
 use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};
@@ -110,6 +111,18 @@ struct StagedTxPlugin;
 
 impl Proposer for StagedTxPlugin {
     fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
+        let sender = Client::get_sender_app()
+            .app
+            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
+
+        let active_app = get_active_app()
+            .app
+            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
+
+        if sender != active_app {
+            return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
+        }
+
         if let Some(acc) = &account {
             validate_account(acc)?;
             hook_actions_sender();

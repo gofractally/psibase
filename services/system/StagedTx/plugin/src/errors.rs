@@ -7,4 +7,6 @@ plugin_error! {
     InvalidTxId => "Invalid txid",
     InvalidSender(sender: String) => "Invalid sender: {sender}",
     NoCurrentUser => "User must be logged in",
+    NetworkAppsOnly(context: String) => "[{context}] only callable from network apps or their plugins",
+    ActiveAppOnly(context: String) => "[{context}] only callable from the currently active app",
 }

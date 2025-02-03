@@ -183,11 +183,11 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - only callable by privileged plugins",
         );
         assert(
-            sender.app === "accounts",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by Accounts plugin",
+            sender.app === "accounts" || sender.app === "staged-tx",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by privileged plugins",
         );
 
         return this.parentOrigination;
