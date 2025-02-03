@@ -56,8 +56,8 @@ impl Hooks for TransactPlugin {
     fn hook_actions_sender() {
         let sender_app = get_sender_app();
 
-        if let Some(hooker) = ActionSenderHook::get() {
-            if hooker != sender_app {
+        if let Some(hooked) = ActionSenderHook::get() {
+            if hooked != sender_app {
                 panic!("Action sender hook already set");
             }
         }
