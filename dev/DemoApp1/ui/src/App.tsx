@@ -22,6 +22,14 @@ function App() {
     init();
   }, []);
 
+  const requestPrivateInfo = async () => {
+    await supervisor.functionCall({
+      service: "demoapp2",
+      intf: "perms-imports",
+      method: "getPrviateData",
+      params: [],
+    });
+  };
   const login = async () => {
     await supervisor.functionCall({
       service: "accounts",
@@ -121,6 +129,12 @@ function App() {
       <div className="card">
         <input type="text" onChange={(e) => setUser(e.target.value)} />
         <button onClick={() => login()}>{"Login"}</button>
+      </div>
+
+      <div className="card">
+        <button onClick={() => requestPrivateInfo()}>
+          {"Request private info from DemoApp2"}
+        </button>
       </div>
 
       {/* 
