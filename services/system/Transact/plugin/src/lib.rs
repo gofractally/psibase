@@ -54,11 +54,19 @@ impl Hooks for TransactPlugin {
     }
 
     fn hook_actions_sender() {
-        if let Some(sender) = ActionSenderHook::get() {
-            if sender != get_sender_app() {
+        let sender_app = get_sender_app();
+
+        if let Some(hooker) = ActionSenderHook::get() {
+            if hooker != sender_app {
                 panic!("Action sender hook already set");
             }
         }
+
+        // Temporary whitelist until we have oauth
+        if sender_app != "staged-tx" && sender_app != "invite" {
+            panic!("hook_actions_sender: {} is not whitelisted", sender_app);
+        }
+
         ActionSenderHook::set(get_sender_app());
     }
 
@@ -77,6 +85,14 @@ impl Hooks for TransactPlugin {
             if existing != transformer {
                 panic!("Error: Only one plugin can transform the transaction");
             }
+        }
+
+        // Temporary whitelist until we have oauth
+        if transformer != "staged-tx" {
+            panic!(
+                "hook_tx_transform_label: {} is not whitelisted",
+                transformer
+            );
         }
 
         TxTransformLabel::set(transformer, label);
