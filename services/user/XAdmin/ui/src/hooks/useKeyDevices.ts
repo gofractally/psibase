@@ -11,8 +11,8 @@ export const useKeyDevices = () =>
             try {
                 return chain.getKeyDevices();
             } catch (e) {
-                console.error("Failed to fetch key devices", e);
-                throw "Failed to fetch key devices";
+                console.error("Failed to fetch security devices", e);
+                throw "Failed to fetch security devices";
             }
         },
     });
@@ -51,6 +51,6 @@ export const useUnlockKeyDevice = () =>
             await chain.unlockKeyDevice(device, pin);
         },
         onError: (err) => {
-            console.log("Error unlocking key device:", err);
+            console.log("Error unlocking security device:", err);
         },
     });

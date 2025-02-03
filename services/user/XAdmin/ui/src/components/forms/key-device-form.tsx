@@ -55,7 +55,7 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
     return (
         <Card className="min-w-[350px]">
             <CardHeader>
-                <CardTitle>Select key device</CardTitle>
+                <CardTitle>Select security device</CardTitle>
                 <CardDescription>
                     Where do you want your block producer server key to be
                     stored?
@@ -66,9 +66,10 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
                     <div className="mb-4 flex max-w-[450px] items-center gap-3">
                         <p className="text-2xl">⚠️</p>
                         <p>
-                            No key devices were found. Please ensure one is
-                            available. If you'd like to boot without a key
-                            device, go back and select the "Development" option.
+                            No security devices were found. Please ensure one is
+                            available. Alternatively, you may boot in an
+                            insecure keyless mode by going back and selecting
+                            the Development boot template.
                         </p>
                     </div>
                 ) : null}
@@ -76,8 +77,8 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
                     <div className="mb-4 flex max-w-[450px] items-center gap-3">
                         <p className="text-2xl">⚠️</p>
                         <p>
-                            There was an error fetching key devices. See the
-                            console for more information.
+                            There was an error fetching security devices. See
+                            the console for more information.
                         </p>
                     </div>
                 ) : null}
@@ -92,7 +93,7 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel htmlFor="key-device">
-                                        Key device
+                                        Security device
                                     </FormLabel>
                                     <FormControl>
                                         <RadioGroup

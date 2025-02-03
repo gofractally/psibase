@@ -7,7 +7,7 @@ export const queryKeys = {
     peers: ["peers"] as const,
     statuses: ["statuses"] as const,
 
-    // key devices
+    // security devices
     addServerKey: ["addServerKey"] as const,
     keyDevices: ["keyDevices"] as const,
     unlockKeyDevice: ["unlockKeyDevice"] as const,
