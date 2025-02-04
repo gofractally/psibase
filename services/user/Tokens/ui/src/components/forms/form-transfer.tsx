@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tab, TabType } from "@/hooks/useMode";
+import { Tab, TabType } from "@/hooks/useTab";
 import { FormSchema } from "@/hooks/useTokenForm";
 import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { ArrowRight, Flame, Plus } from "lucide-react";

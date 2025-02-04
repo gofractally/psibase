@@ -1,14 +1,14 @@
 import { siblingUrl } from "@psibase/common-lib";
 import { z } from "zod";
-import { supervisor } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { modifyUrlParams } from "@/lib/modifyUrlParams";
+import { functionCall } from "@/lib/functionCall";
 
 export const useCreateConnectionToken = () =>
   useMutation<string, Error>({
     mutationFn: async () =>
       z.string().parse(
-        await supervisor.functionCall({
+        await functionCall({
           method: "createConnectionToken",
           params: [],
           service: "accounts",

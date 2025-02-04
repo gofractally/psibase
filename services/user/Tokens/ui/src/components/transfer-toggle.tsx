@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tab, TabType } from "@/hooks/useMode";
+import { Tab, TabType } from "@/hooks/useTab";
 import { ArrowRight, Flame, Plus } from "lucide-react";
 
 interface TransferProps {

@@ -3,7 +3,7 @@ import { CreditTable } from "@/components/credit-table";
 import { FormCreate } from "@/components/forms/form-create";
 import FormTransfer from "@/components/forms/form-transfer";
 import { ModalCreateToken } from "@/components/modal-create-token";
-import { Tab, useTab } from "@/hooks/useMode";
+import { Tab, useTab } from "@/hooks/useTab";
 import { useTokenForm } from "@/hooks/useTokenForm";
 import { useBalances } from "@/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";

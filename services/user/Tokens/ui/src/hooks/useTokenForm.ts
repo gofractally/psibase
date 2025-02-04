@@ -1,14 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { TabType } from "./useMode";
-
-const Amount = z.string().refine((amount) => amount.length > 0);
-const Account = z
-  .string()
-  .min(1, { message: "Account must be at least 1 character." })
-  .max(50);
-const TokenId = z.string();
+import { TabType } from "./useTab";
+import { Account, Amount, TokenId } from "@/lib/types";
 
 const creditSchema = z.object({
   token: TokenId,
