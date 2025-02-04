@@ -37,7 +37,7 @@ const AmountInput: FC<Props> = ({
             {selectedToken && (
               <button
                 type="button"
-                className="text-muted-foreground hover:underline"
+                className="hover:underline"
                 onClick={() => {
                   form.setValue("amount", tokenBalance.toString());
                 }}

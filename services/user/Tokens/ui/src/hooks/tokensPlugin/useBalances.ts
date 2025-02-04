@@ -38,7 +38,7 @@ export const useBalances = (username: string | undefined | null) =>
     refetchInterval: 10000,
     queryFn: async () => {
       if (!toasted) {
-        toast("Fetching token balances...");
+        toast.loading("Fetching token balances...");
       }
       const res = await fetchUi(z.string().parse(username));
 

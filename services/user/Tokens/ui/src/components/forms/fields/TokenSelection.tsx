@@ -73,12 +73,20 @@ const TokenSelection: FC<Props> = ({
                   value={balance.id.toString()}
                   // @ts-ignore
                   right={
-                    <div className="text-sm text-muted-foreground">
-                      {balance.balance &&
-                        `Balance: ${formatThousands(
-                          balance.balance?.toDecimal(),
-                          balance.balance.getPrecision()
-                        )}`}
+                    <div className="text-sm">
+                      {balance.balance && (
+                        <div>
+                          <span className="text-muted-foreground">
+                            Balance:{" "}
+                          </span>
+                          <span className="text-white">
+                            {formatThousands(
+                              balance.balance?.toDecimal(),
+                              balance.balance.getPrecision()
+                            )}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   }
                 >
