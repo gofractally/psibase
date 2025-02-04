@@ -1,24 +1,14 @@
 #[allow(warnings)]
 mod bindings;
 
-<<<<<<< HEAD
-use bindings::exports::branding::plugin::api::Guest as Api;
-use bindings::exports::branding::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
-use bindings::host::common::types::Error;
-use bindings::sites::plugin::api::{upload, File};
-use bindings::staged_tx::plugin::proposer::*;
-use bindings::transact::plugin::intf::add_action_to_transaction;
-=======
 use bindings::*;
 use exports::branding::plugin::api::Guest as Api;
 use exports::branding::plugin::queries::Guest as Queries;
 use host::common::server as CommonServer;
 use host::common::types::Error;
-use sites::plugin::sites::{upload, File};
+use sites::plugin::api::{upload, File};
 use staged_tx::plugin::proposer::*;
 use transact::plugin::intf::add_action_to_transaction;
->>>>>>> origin/main
 
 use psibase::fracpack::Pack;
 
