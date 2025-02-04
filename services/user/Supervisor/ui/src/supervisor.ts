@@ -84,7 +84,7 @@ export class Supervisor implements AppInterface {
         await this.loader.awaitReady();
 
         // Phase 2: Loads plugins needed by the current user
-        let user = this.getLoggedInUser();
+        let user = this.getCurrentUser();
         if (!user) return;
 
         const account = this.getAccount(user);
@@ -130,17 +130,17 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    private getLoggedInUser(): string | undefined {
+    private getCurrentUser(): string | undefined {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
 
-        let getLoggedInUser = getCallArgs(
+        let getCurrentUser = getCallArgs(
             "accounts",
             "plugin",
-            "activeApp",
-            "getLoggedInUser",
+            "api",
+            "getCurrentUser",
             [],
         );
-        return this.supervisorCall(getLoggedInUser);
+        return this.supervisorCall(getCurrentUser);
     }
 
     private getAccount(user: string): Account | undefined {
@@ -183,11 +183,11 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - only callable by privileged plugins",
         );
         assert(
-            sender.app === "accounts",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by Accounts plugin",
+            sender.app === "accounts" || sender.app === "staged-tx",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by privileged plugins",
         );
 
         return this.parentOrigination;

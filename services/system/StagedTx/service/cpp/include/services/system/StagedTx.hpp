@@ -52,8 +52,6 @@ namespace SystemService
       /// Proposes a new staged transaction containing the specified actions.
       /// Returns the ID of the database record containing the staged transaction.
       ///
-      /// All actions must have the same sender.
-      ///
       /// * `actions` - The actions to be staged
       uint32_t propose(const std::vector<psibase::Action>& actions);
 
