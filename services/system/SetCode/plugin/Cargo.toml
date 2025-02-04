@@ -1,0 +1,24 @@
+[package]
+name = "setcode"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
+wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "setcode:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/CommonApi/common/packages/wit/host-common.wit" }
+"transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }

@@ -305,12 +305,14 @@ add_rs_component_workspace(services/:Plugins
     auth-delegate
     auth-invite
     auth-sig
+    setcode
     clientdata
     invite
     sites
     test
     tokens
     transact
+    workshop
 )
 
 set(WASM_PSIBASE_BYPRODUCTS

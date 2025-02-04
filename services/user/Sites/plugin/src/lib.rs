@@ -1,7 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::sites::plugin::sites::Guest as Sites;
+use bindings::exports::sites::plugin::api::Guest as Sites;
 use bindings::host::common::types::Error;
 use bindings::sites::plugin::types::File;
 use bindings::transact::plugin::intf as Transact;
@@ -120,7 +120,7 @@ impl Sites for SitesPlugin {
         Ok(())
     }
 
-    fn enable_cache(enable: bool) -> Result<(), Error> {
+    fn set_cache_mode(enable: bool) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "enableCache",
             &SitesService::action_structs::enableCache { enable }.packed(),

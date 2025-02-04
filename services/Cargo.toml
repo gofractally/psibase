@@ -1,5 +1,4 @@
 [workspace]
-resolver = "2"
 members = [
     "system/Accounts/plugin/accounts/",
     "system/Accounts/plugin/account_tokens/",
@@ -7,13 +6,16 @@ members = [
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
     "system/Transact/plugin/",
+    "system/SetCode/plugin/",
     "user/ClientData/plugin",
     "user/Invite/plugin",
     "user/Invite/plugin_AuthInvite",
     "user/Sites/plugin",
     "user/Supervisor/plugin",
     "user/Tokens/plugin",
+    "user/Workshop/plugin",
 ]
+resolver = "2"
 
 exclude = [
     "user/CommonApi/common/packages/component-parser",
@@ -33,3 +35,4 @@ edition = "2021"
 rust-version = "1.64"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
+publish = false

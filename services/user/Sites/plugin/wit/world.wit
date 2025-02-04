@@ -8,7 +8,7 @@ interface types {
     }
 }
 
-interface sites {
+interface api {
     use types.{file};
     use host:common/types.{error};
 
@@ -65,9 +65,9 @@ interface sites {
     /// - The hash is stored in the `ETag` header
     /// - If the hash matches, a 304 Not Modified response is returned
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
-    enable-cache: func(enable: bool) -> result<_, error>;
+    set-cache-mode: func(enable: bool) -> result<_, error>;
 }
 
 world imports {
-    import sites;
+    import api;
 }

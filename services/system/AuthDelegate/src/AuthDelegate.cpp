@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/StagedTx.hpp>
 
 using namespace psibase;
@@ -91,6 +92,29 @@ namespace SystemService
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)
    {
       return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
+   }
+
+   void AuthDelegate::newAccount(psibase::AccountNumber name)
+   {
+      to<Accounts>().newAccount(name, AuthAny::service, true);
+
+      Action setOwner{
+          .sender  = name,
+          .service = service,
+          .method  = "setOwner"_m,
+          .rawData = psio::convert_to_frac(std::make_tuple(getSender()))  //
+      };
+
+      Action setAuth{
+          .sender  = name,
+          .service = Accounts::service,
+          .method  = "setAuthServ"_m,
+          .rawData = psio::convert_to_frac(std::make_tuple(service))  //
+      };
+
+      auto _ = recurse();
+      to<Transact>().runAs(std::move(setOwner), std::vector<ServiceMethod>{});
+      to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
    }
 
 }  // namespace SystemService
