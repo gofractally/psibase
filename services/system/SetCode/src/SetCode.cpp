@@ -69,11 +69,6 @@ namespace SystemService
       }
    }  // setCode
 
-   void SetCode::setMyCode(uint8_t vmType, uint8_t vmVersion, std::vector<char> code)
-   {
-      setCode(getSender(), vmType, vmVersion, code);
-   }
-
    void SetCode::setFlags(psibase::AccountNumber service, uint64_t flags)
    {
       check(getSender() == getReceiver(), "incorrect sender");
