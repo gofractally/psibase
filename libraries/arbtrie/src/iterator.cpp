@@ -92,7 +92,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-               // then we start at the beginning of the next level
+             // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());
@@ -139,7 +139,6 @@ namespace arbtrie
       if (cpre != node_prefix)
       {
          popkey(node_prefix.size() + _path.back().second != 0);
-         // TODO: _path.pop_back?
          _path.pop_back();
          return false;
       }
@@ -196,12 +195,49 @@ namespace arbtrie
       //  }
       return true;
    }
+   bool iterator::first(key_view prefix)
+   {
+      if (lower_bound(prefix))
+      {
+         if (common_prefix(prefix, key()) == prefix)
+            return true;
+         return end();
+      }
+      return false;
+   }
+   bool iterator::last(key_view prefix)
+   {
+      if (not _root.address()) [[unlikely]]
+         return end();
+
+      if (prefix.size() > max_key_length)
+         throw std::runtime_error("invalid key length");
+      std::array<uint8_t, max_key_length> lastkey;
+      memcpy(lastkey.data(), prefix.data(), prefix.size());
+      memset(lastkey.data() + prefix.size(), 0xff, max_key_length - prefix.size());
+      if (lower_bound(key_view(lastkey.data(), lastkey.size())))
+      {
+         if (key().substr(0, prefix.size()) == prefix)
+            return true;
+         if (prev())
+         {
+            if (key().substr(0, prefix.size()) == prefix)
+               return true;
+            return end();
+         }
+      }
+      end();
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_root.address());
+      if (not reverse_lower_bound_impl(rr, npos))
+         return end();
+      return true;
+   }
    bool iterator::reverse_lower_bound_impl(object_ref<node_header>& r,
                                            const binary_node*       bn,
                                            key_view                 query)
    {
-      auto lbx = bn->reverse_lower_bound_idx(query);
-      TRIEDENT_DEBUG("lbx: ", lbx);
+      auto lbx            = bn->reverse_lower_bound_idx(query);
       _path.back().second = lbx;
 
       if (lbx < 0)
@@ -239,17 +275,57 @@ namespace arbtrie
       if (not _root.address())
          return end();
 
-      auto& db    = _rs._db;
-      auto  state = _rs._segas.lock();
       _branches.clear();
       _branches.reserve(prefix.size());
       _path.clear();
 
-      auto rr = state.get(_root.address());
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_root.address());
       if (not lower_bound_impl(rr, prefix))
          return end();
       return true;
    }
+   bool iterator::reverse_lower_bound(key_view prefix)
+   {
+      if (lower_bound(prefix))
+      {
+         if (key() > prefix)
+            return prev();
+         if (key() == prefix)
+            return true;
+         else
+            return end();
+      }
+      if (last())
+      {
+         if (key() <= prefix)
+            return true;
+         return end();
+      }
+      return false;
+   }
+   bool iterator::upper_bound(key_view search)
+   {
+      if (lower_bound(search))
+      {
+         if (key() == search)
+            return next();
+         return true;
+      }
+      return false;
+   }
+   bool iterator::reverse_upper_bound(key_view search)
+   {
+      if (reverse_lower_bound(search))
+      {
+         if (key() == search)
+            return prev();
+         return true;
+      }
+      return false;
+   }
+
+   /*
    bool iterator::reverse_lower_bound(key_view prefix)
    {
       if (not _root.address())
@@ -266,6 +342,7 @@ namespace arbtrie
          return end();
       return true;
    }
+   */
 
    //void print_hex( key_view v );
 

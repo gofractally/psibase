@@ -969,8 +969,8 @@ TEST_CASE("lower-bound")
          REQUIRE(not itr.valid());
       if (rritr != reference.end())
       {
-         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
-                        " =? itr: ", to_hex(itr.key()));
+         //      TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
+         //                     " =? itr: ", to_hex(itr.key()));
          REQUIRE(rritr->first == to_str(itr.key()));
       }
 
@@ -1005,8 +1005,8 @@ TEST_CASE("upper-bound")
          REQUIRE(not itr.valid());
       if (rritr != reference.end())
       {
-         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
-                        " =? itr: ", to_hex(itr.key()));
+         //         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
+         //                        " =? itr: ", to_hex(itr.key()));
          REQUIRE(rritr->first == to_str(itr.key()));
       }
 
@@ -1018,6 +1018,7 @@ TEST_CASE("upper-bound")
       REQUIRE(reference.size() == ws.count_keys(r));
    }
 }
+
 TEST_CASE("rev-lower-bound")
 {
    environ env;
@@ -1026,65 +1027,58 @@ TEST_CASE("rev-lower-bound")
 
    auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
 
-   std::map<std::string, int, std::greater<std::string>> reference;
+   std::map<std::string, int> reference;
+
+   auto map_valid = [](const auto& m, auto i) { return m.end() != i; };
+
+   auto map_rlb = [](const std::map<std::string, int>& m, key_view k)
+   {
+      auto itr = m.lower_bound(std::string(to_str(k)));
+      if (itr == m.end())
+      {
+         if (m.size())
+            --itr;
+         return itr;
+      }
+      if (to_key_view(itr->first) == k)
+         return itr;
+
+      if (itr != m.begin())
+      {
+         return --itr;
+      }
+      return m.end();
+   };
+
    for (int i = 0; i < 100000; ++i)
    {
-      auto itr = ws.create_iterator(r);
-
+      auto     itr   = ws.create_iterator(r);
       uint64_t query = uint64_t(rand64());
       auto     qv    = to_kv(query);
 
-      TRIEDENT_DEBUG(i, "  query: ", to_hex(qv));
-      auto rritr = reference.lower_bound(std::string(to_str(qv)));
+      //  TRIEDENT_DEBUG(i, "  query: ", to_hex(qv));
       itr.reverse_lower_bound(qv);
-
-      if (rritr == reference.end())
-         REQUIRE(not itr.valid());
+      auto rritr = map_rlb(reference, qv);
       if (rritr != reference.end())
       {
-         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
-                        " =? itr: ", to_hex(itr.key()));
-         REQUIRE(rritr->first == to_str(itr.key()));
+         REQUIRE(to_key_view(rritr->first) <= qv);
+         // TRIEDENT_DEBUG( "rlb: ", to_hex(to_key_view(rritr->first) ) );
+         // TRIEDENT_DEBUG( "qv:  ", to_hex(qv) );
       }
+
+      if (itr.valid())
+      {
+         REQUIRE(itr.key() <= qv);
+         REQUIRE(itr.key() == to_key_view(rritr->first));
+      }
+
+      REQUIRE(itr.valid() == map_valid(reference, rritr));
 
       uint64_t val                         = uint64_t(rand64());
       key_view kstr                        = to_kv(val);
       reference[std::string(to_str(kstr))] = 0;
       int result                           = ws.upsert(r, kstr, kstr);
-      TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
-      REQUIRE(reference.size() == ws.count_keys(r));
-   }
-}
-
-TEST_CASE("reverse-lower")
-{
-   environ env;
-   auto    ws = env.db->start_write_session();
-   auto    r  = ws.create_root();
-
-   auto itr = ws.create_iterator(r);
-
-   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, sizeof(k)); };
-
-   std::map<std::string, int, std::greater<std::string>> reference;
-   for (int i = 0; i < 100000; ++i)
-   {
-      uint64_t query = uint64_t(rand64());
-      auto     qv    = to_kv(query);
-
-      auto rritr = reference.lower_bound(std::string(to_str(qv)));
-      itr.reverse_lower_bound(qv);
-      if (rritr == reference.end())
-         REQUIRE(not itr.valid());
-      if (rritr != reference.end())
-      {
-         REQUIRE(rritr->first == to_str(itr.key()));
-      }
-
-      uint64_t val                         = uint64_t(rand64());
-      key_view kstr                        = to_kv(val);
-      reference[std::string(to_str(kstr))] = 0;
-      ws.upsert(r, kstr, kstr);
+      //  TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
       REQUIRE(reference.size() == ws.count_keys(r));
    }
 }

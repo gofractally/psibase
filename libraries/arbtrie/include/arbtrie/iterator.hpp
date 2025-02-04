@@ -9,6 +9,7 @@ namespace arbtrie
    /**
     *   An iterator grabs a read-only snapshot of the database
     *   and provides a consistent view.
+    *
     */
    class iterator
    {
@@ -17,54 +18,58 @@ namespace arbtrie
 
      public:
       // TODO: npos size == 1024 / max key length
-      static constexpr const std::array<uint8_t,128> nposa = [](){
-         std::array<uint8_t,128> ar; ar.fill(0xff);
-      return ar; }();
-      static constexpr const key_view npos = key_view( nposa.data(), nposa.size() );
-      static_assert( npos > key_view() );
+      static constexpr const std::array<uint8_t, max_key_length> nposa = []()
+      {
+         std::array<uint8_t, max_key_length> ar;
+         ar.fill(0xff);
+         return ar;
+      }();
+
+      static constexpr const key_view npos = key_view(nposa.data(), nposa.size());
+      static_assert(npos > key_view());
 
       // return the root this iterator is based on
       node_handle get_root() const { return _root; }
       // the key the iterator is currently pointing to
-      key_view key()const
-      {
-         return key_view(_branches.data(), _branches.size());
-      }
+      key_view key() const { return key_view(_branches.data(), _branches.size()); }
 
       bool next();  // moves to next key, return valid()
       bool prev();  // moves to the prv key, return valid()
 
       // lower_bound(search) + next()
       // similar to std::map::upper_bound
-      bool upper_bound(key_view search) {
-         if( lower_bound(search) )
-            if( key() == search )
-               return next();
-         return false;
-      }
+      bool upper_bound(key_view search);
 
       // moves to the first key >= prefix from the begin, return valid()
       // similar to std::map::lower_bound
       bool lower_bound(key_view prefix = {});
 
-      // moves to the first key <= prefix from the end, return valid()
-      // similar to std::map<greater>::lower_bound
+      // moves to the last key <= prefix from the end, return valid()
+      //  reverse_lower_bound(key) == lower_bound(key) when key exists
+      //  otherwise it equals the key before lower_bound(key)
       bool reverse_lower_bound(key_view prefix = npos);
 
-      // reverse_lower_bound(prefix) + prev()
-      // similar to std::map<greater>::upper_bound
-      bool reverse_upper_bound(key_view prefix = {});
+      // if reverse_lower_bound(key) == key,
+      // this returns the prior key, othewise equal to
+      // reverse_lower_bound(key)
+      bool reverse_upper_bound(key_view prefix = npos);
 
-      // moves to the last key with prefix, return valid()
-      //   = reverse_lower_bound(prefix)
+      // moves to the last key with prefix
+      // if no keys contain prefix, return false
+      // valid() will return false if this returns false
       bool last(key_view prefix = {});
 
+      // moves to the first key with prefix
+      // if no keys contain prefix, return false
+      // valid() will return false if this returns false
+      bool first(key_view prefix = {});
+
       // moves to the key(), return valid()
+      // returns false if not found
       bool get(key_view key);
 
       // true if the iterator points to a key/value pair
       bool valid() const { return _path.size() > 0; }
-
 
       // if the value is a subtree, return an iterator into that subtree
       iterator subtree_iterator() const;
@@ -73,10 +78,10 @@ namespace arbtrie
 
       // @return node_handle of subtree iff is_subtree()
       // @throw if not is_subtree()
-      node_handle subtree()const;
+      node_handle subtree() const;
 
-      // @return a handle to the root of the tree this iterator is traversing 
-      node_handle root_handle()const { return _root; }
+      // @return a handle to the root of the tree this iterator is traversing
+      node_handle root_handle() const { return _root; }
 
       // return -1 if no
       int32_t value_size() const { return _size; }
@@ -84,7 +89,7 @@ namespace arbtrie
       // resizes v to the and copies the value into it
       int32_t read_value(auto& buffer);
 
-      // copies the value into [s,s+s_len) 
+      // copies the value into [s,s+s_len)
       //
       // @throw if type is a subtree
       // @return total bytes copied
@@ -106,18 +111,16 @@ namespace arbtrie
          _path.clear();
       }
 
-      //auto brs() { return key_view((char*)_branches.data(),_branches.size() ); }
       void pushkey(key_view k)
       {
          _branches.resize(_branches.size() + k.size());
          memcpy(_branches.data() + _branches.size() - k.size(), k.data(), k.size());
       }
-      void pushkey(uint8_t c) { 
-         _branches.push_back(c); 
-      }
-      void popkey(int s) { 
-         assert( s >= 0 );
-         _branches.resize(_branches.size() - s); 
+      void pushkey(uint8_t c) { _branches.push_back(c); }
+      void popkey(int s)
+      {
+         assert(s >= 0);
+         _branches.resize(_branches.size() - s);
       }
 
       std::vector<uint8_t>                                          _branches;
@@ -134,8 +137,12 @@ namespace arbtrie
       bool lower_bound_impl(object_ref<node_header>& r, key_view prefix);
 
       bool reverse_lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view prefix);
-      bool reverse_lower_bound_impl(object_ref<node_header>& r, const binary_node* bn, key_view prefix);
-      bool reverse_lower_bound_impl(object_ref<node_header>& r, const value_node* bn, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref<node_header>& r,
+                                    const binary_node*       bn,
+                                    key_view                 prefix);
+      bool reverse_lower_bound_impl(object_ref<node_header>& r,
+                                    const value_node*        bn,
+                                    key_view                 prefix);
       bool reverse_lower_bound_impl(object_ref<node_header>& r, key_view prefix);
    };
 
