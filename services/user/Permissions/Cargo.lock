@@ -1581,9 +1581,7 @@ dependencies = [
 name = "permissions-pkg"
 version = "0.14.0"
 dependencies = [
- "permissions",
  "plugin",
- "r-permissions",
 ]
 
 [[package]]
@@ -1816,17 +1814,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "r-permissions"
-version = "0.14.0"
-dependencies = [
- "async-graphql",
- "permissions",
- "psibase",
- "serde",
- "serde_json",
 ]
 
 [[package]]

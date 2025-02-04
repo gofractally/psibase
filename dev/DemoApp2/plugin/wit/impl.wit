@@ -1,6 +1,0 @@
-package component:demoapp2;
-
-world impl {
-    export perms-imports;
-    export basic-imports;
-}

@@ -3,6 +3,7 @@ mod bindings;
 
 use bindings::exports::permissions::plugin::api::Guest as Api;
 use bindings::exports::permissions::plugin::queries::Guest as Queries;
+use bindings::host::common::client::get_sender_app;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -22,6 +23,7 @@ impl Api for PermissionsPlugin {
     }
     fn save_permission(caller: String, callee: String, remember: bool) {
         // verify caller == permissions.psibase.io
+
         // save to local storage
     }
 }
@@ -52,6 +54,8 @@ impl Queries for PermissionsPlugin {
     }
     fn is_permitted(caller: String) -> Result<bool, Error> {
         // access_to == get_sender_app()
+        let callee = get_sender_app().app.unwrap();
+        println!("Permissions.get_sender_app() = {}", callee);
         // check to local storage
         // show dialog if not in local storage
         return Ok(true);

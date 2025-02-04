@@ -1,0 +1,14 @@
+package callee:plugin;
+
+interface api {
+}
+
+interface queries {
+    use host:common/types.{error};
+    get-private-data: func() -> result<string, error>;
+}
+
+world imports {
+    import api;
+    import queries;
+}

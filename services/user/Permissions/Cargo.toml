@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "plugin"]
+members = ["plugin"]
 
 [workspace.package]
 version = "0.14.0"
@@ -25,7 +25,7 @@ lto = true
 
 [package.metadata.psibase]
 package-name = "Permissions"
-services = ["permissions"]
+#services = ["permissions"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.14.0"
@@ -35,6 +35,6 @@ Sites = "0.14.0"
 crate-type = ["rlib"]
 
 [dependencies]
-permissions = { path = "service", version = "0.14.0" }
-r-permissions = { path = "query-service", version = "0.14.0" }
+#permissions = { path = "service", version = "0.14.0" }
+#r-permissions = { path = "query-service", version = "0.14.0" }
 plugin = { path = "plugin", version = "0.14.0" }
