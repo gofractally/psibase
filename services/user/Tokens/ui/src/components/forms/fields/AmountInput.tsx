@@ -16,13 +16,20 @@ interface Props {
   form: UseFormReturn<FormSchema>;
   selectedToken: Token | undefined;
   tokenBalance: number;
+  disable?: boolean;
 }
 
-const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
+const AmountInput: FC<Props> = ({
+  form,
+  selectedToken,
+  tokenBalance,
+  disable,
+}) => {
   return (
     <FormField
       control={form.control}
       name="amount"
+      disabled={disable}
       render={({ field }) => (
         <FormItem>
           <FormLabel className="flex justify-between w-full">
@@ -35,7 +42,7 @@ const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
                   form.setValue("amount", tokenBalance.toString());
                 }}
               >
-                Balance:{" "}
+                <span className="text-muted-foreground">Balance: </span>
                 <AnimateNumber
                   n={tokenBalance}
                   precision={selectedToken.balance?.getPrecision() ?? 0}

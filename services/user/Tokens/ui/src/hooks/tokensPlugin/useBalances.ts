@@ -2,6 +2,7 @@ import { fetchUi } from "@/lib/graphql/ui";
 import { Quantity } from "@/lib/quantity";
 import QueryKey from "@/lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 
 export interface Token {
@@ -11,6 +12,7 @@ export interface Token {
   isAdmin: boolean;
   symbol: string;
   label: string;
+  precision: number;
 }
 
 export interface SharedBalance {
@@ -22,12 +24,22 @@ export interface SharedBalance {
   amount: Quantity;
 }
 
+export interface BalanceRes {
+  tokens: Token[];
+  sharedBalances: SharedBalance[];
+}
+
+let toasted = false;
+
 export const useBalances = (username: string | undefined | null) =>
-  useQuery({
+  useQuery<BalanceRes>({
     queryKey: QueryKey.ui(username || "undefined"),
     enabled: !!username,
     refetchInterval: 10000,
     queryFn: async () => {
+      if (!toasted) {
+        toast("Fetching token balances...");
+      }
       const res = await fetchUi(z.string().parse(username));
 
       const creditBalances = res.userCredits.map((credit): SharedBalance => {
@@ -83,6 +95,7 @@ export const useBalances = (username: string | undefined | null) =>
             owner: "",
             isAdmin: res.userTokens.some((user) => user.id == balance.tokenId),
             symbol: balance.symbolId,
+            precision: quan.getPrecision(),
             label: quan.getDisplayLabel(),
             balance: quan,
           };
@@ -100,6 +113,7 @@ export const useBalances = (username: string | undefined | null) =>
           id: userToken.id,
           isAdmin: true,
           label: quan.getDisplayLabel(),
+          precision: userToken.precision.value,
           owner: username || "",
           symbol: userToken.symbolId,
         };
@@ -108,10 +122,10 @@ export const useBalances = (username: string | undefined | null) =>
         (token, index, arr) => arr.findIndex((t) => t.id == token.id) == index
       );
 
+      if (!toasted) {
+        toasted = true;
+        toast.success("Fetched token balances");
+      }
       return { tokens, sharedBalances };
-    },
-    initialData: {
-      sharedBalances: [],
-      tokens: [],
     },
   });

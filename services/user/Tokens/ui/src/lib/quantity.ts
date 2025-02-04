@@ -1,5 +1,11 @@
+import { z } from "zod";
 import { formatThousands } from "./formatNumber";
 
+const BigInteger = z.string().refine((int) => {
+  return !int.includes(".");
+});
+
+const Decimal = z.number().or(z.string());
 export class Quantity {
   constructor(
     private amount: string,
@@ -7,8 +13,7 @@ export class Quantity {
     private tokenNumber: number,
     private tokenSymbol?: string
   ) {
-    if (amount.includes("."))
-      throw new Error(`Expected integer, e.g. 10000 not 1.0000`);
+    BigInteger.parse(amount);
   }
 
   public hasTokenSymbol(): boolean {
@@ -17,6 +22,10 @@ export class Quantity {
 
   public toDecimal(): number {
     return Number(this.amount) / Math.pow(10, this.precision);
+  }
+
+  private fromDecimal(amount: number | string): string {
+    return (Number(amount) * Math.pow(10, this.precision)).toString();
   }
 
   public getDisplayLabel(): string {
@@ -37,5 +46,27 @@ export class Quantity {
 
   public getPrecision() {
     return this.precision;
+  }
+
+  public subtract(decimalAmount: string | number): Quantity {
+    Decimal.parse(decimalAmount);
+    const newAmount = Number(this.toDecimal()) - Number(decimalAmount);
+    return new Quantity(
+      this.fromDecimal(newAmount),
+      this.precision,
+      this.tokenNumber,
+      this.tokenSymbol
+    );
+  }
+
+  public add(amount: string | number): Quantity {
+    Decimal.parse(amount);
+    const newAmount = Number(this.toDecimal()) + Number(amount);
+    return new Quantity(
+      this.fromDecimal(newAmount),
+      this.precision,
+      this.tokenNumber,
+      this.tokenSymbol
+    );
   }
 }

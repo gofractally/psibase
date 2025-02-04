@@ -12,12 +12,14 @@ import { UseFormReturn } from "react-hook-form";
 
 interface Props {
   form: UseFormReturn<FormSchema>;
+  disable?: boolean;
 }
 
-const FromInput: FC<Props> = ({ form }) => (
+const FromInput: FC<Props> = ({ form, disable }) => (
   <FormField
     control={form.control}
     name="from"
+    disabled={disable}
     render={({ field }) => (
       <FormItem>
         <div className="flex justify-between">

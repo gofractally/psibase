@@ -15,22 +15,33 @@ import { useCredit } from "./hooks/tokensPlugin/useCredit";
 import { useMint } from "./hooks/tokensPlugin/useMint";
 import { toast } from "sonner";
 import { TransferModal } from "./components/transfer-modal";
+import { NoTokensWarning } from "./components/no-tokens-warning";
+import { NotLoggedIn } from "./components/not-logged-in";
+import { updateBalanceCache } from "./lib/updateBalanceCache";
+import { z } from "zod";
 
 function App() {
-  const { data: currentUser } = useLoggedInUser();
+  const { data: currentUserData, isSuccess } = useLoggedInUser();
   const {
-    data: { sharedBalances, tokens },
+    data,
     refetch: refetchUserBalances,
-    isLoading,
-  } = useBalances(currentUser);
+    isLoading: isLoadingBalances,
+  } = useBalances(currentUserData);
+
+  const currentUser = isSuccess ? currentUserData : null;
+
+  const sharedBalances = data ? data.sharedBalances : [];
+  const tokens = data ? data.tokens : [];
+  const isLoading = !isSuccess || isLoadingBalances;
 
   const { isPending: isBurnPending, mutateAsync: burn } = useBurn();
   const { isPending: isCreditPending, mutateAsync: credit } = useCredit();
   const { isPending: isMintPending, mutateAsync: mint } = useMint();
 
   const isPending = isBurnPending || isCreditPending || isMintPending;
+  const { isBurning, isMinting, isTransfer, setTab, tab } = useTab();
 
-  const form = useTokenForm();
+  const form = useTokenForm(tab);
 
   function onSubmit() {
     if (isTransfer) {
@@ -39,8 +50,6 @@ function App() {
       setConfirmationModalOpen(true);
     }
   }
-
-  const { isBurning, isMinting, isTransfer, setTab, tab } = useTab();
 
   const selectedTokenId = form.watch("token");
   const selectedToken = tokens.find(
@@ -78,6 +87,8 @@ function App() {
   const onSuccessfulTx = () => {
     form.setValue("amount", "");
     form.setValue("memo", "");
+    form.setValue("to", "");
+    form.setValue("from", "");
   };
 
   const performTransfer = async () => {
@@ -88,16 +99,25 @@ function App() {
 
     try {
       await credit({ tokenId, receiver: recipient, amount, memo });
-      toast("Sent", { description: `Sent ${amount} to ${recipient}` });
+      toast("Sent", {
+        description: `Sent ${amount} ${
+          selectedToken?.label || selectedToken?.symbol
+        } to ${recipient}`,
+      });
       onSuccessfulTx();
       setTransferModal(false);
+      updateBalanceCache(
+        z.string().parse(currentUser),
+        tokenId,
+        amount,
+        "Subtract"
+      );
     } catch (e) {
       toast("Error", {
         description:
           e instanceof Error ? e.message : `Unrecognised error, see logs.`,
       });
     } finally {
-      refetchUserBalances();
       wait(3000).then(() => {
         refetchUserBalances();
       });
@@ -105,26 +125,38 @@ function App() {
   };
 
   const performTx = async () => {
+    if (!currentUser) throw new Error("Expected current user");
     const tokenId = form.watch("token");
     const amount = form.watch("amount");
     const memo = form.watch("memo")!;
 
     try {
+      const token = tokens.find((token) => token.id.toString() === tokenId);
+      if (!token) throw new Error("Failed to find token");
+
       if (isBurning) {
         const burningFrom = form.watch("from");
         await burn({ tokenId, amount, account: burningFrom || "", memo });
         toast("Burned", {
-          description: `Burned ${amount} tokens${
-            burningFrom ? ` from ${burningFrom}` : ""
-          }`,
+          description: `Burned ${amount} ${
+            token.balance?.getDisplayLabel() || ""
+          } tokens${burningFrom ? ` from ${burningFrom}` : ""}`,
         });
+        if (!burningFrom) {
+          updateBalanceCache(currentUser, tokenId, amount, "Subtract");
+        }
         setConfirmationModalOpen(false);
         onSuccessfulTx();
       } else if (isMinting) {
         await mint({ tokenId, amount, memo });
-        toast("Minted", { description: `Added ${amount} to your balance.` });
+        toast("Minted", {
+          description: `Added ${amount} ${
+            token.balance?.getDisplayLabel() || token.symbol
+          } to your balance.`,
+        });
         onSuccessfulTx();
         setConfirmationModalOpen(false);
+        updateBalanceCache(currentUser, tokenId, amount, "Add");
       } else {
         throw new Error(`Failed to identify type of plugin call`);
       }
@@ -134,18 +166,28 @@ function App() {
           e instanceof Error ? e.message : `Unrecognised error, see logs.`,
       });
     } finally {
-      refetchUserBalances();
       wait(3000).then(() => {
         refetchUserBalances();
       });
     }
   };
 
+  const isNoTokens = currentUser && !isLoading && tokens.length == 0;
+  const isNotLoggedIn = !currentUser && !isLoading;
+
   return (
     <div className="mx-auto h-screen w-screen max-w-screen-lg">
       <Nav title="Tokens" />
 
       <div className="max-w-screen-lg mx-auto p-4 flex flex-col gap-3">
+        {isNoTokens && (
+          <NoTokensWarning
+            onContinue={() => {
+              setNewTokenModalOpen(true);
+            }}
+          />
+        )}
+        {isNotLoggedIn && <NotLoggedIn />}
         <ModalCreateToken
           open={isNewTokenModalOpen}
           onOpenChange={(e) => setNewTokenModalOpen(e)}
@@ -171,6 +213,8 @@ function App() {
           onClose={() => setTransferModal(false)}
           open={isTransferModalOpen}
           from={currentUser}
+          amount={form.watch("amount")}
+          tokenId={selectedToken?.id}
           to={form.watch("to")}
           onContinue={() => {
             performTransfer();

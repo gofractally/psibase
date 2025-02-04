@@ -49,6 +49,8 @@ const FormTransfer: FC<Props> = ({
   const isBurning = tab == Tab.Values.Burn;
   const isMinting = tab == Tab.Values.Mint;
 
+  const disableForm = tokens.length == 0;
+
   const isAdmin = selectedToken?.isAdmin || false;
   const disableTo = !isAdmin && isBurning;
   const isAmountOperation = isBurning || isMinting || isTransfer;
@@ -75,12 +77,14 @@ const FormTransfer: FC<Props> = ({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <TokenSelection
-          isLoading={isLoading}
-          tokens={tokens}
-          form={form}
-          setNewTokenModalOpen={setNewTokenModalOpen}
-        />
+        {(tokens.length > 0 || isLoading) && (
+          <TokenSelection
+            isLoading={isLoading}
+            tokens={tokens}
+            form={form}
+            setNewTokenModalOpen={setNewTokenModalOpen}
+          />
+        )}
         {menus.length > 1 && (
           <div className="w-full flex justify-between">
             <Tabs
@@ -92,7 +96,9 @@ const FormTransfer: FC<Props> = ({
                 {menus.map((menu) => (
                   <TabsTrigger
                     disabled={
-                      !isLoggedIn || (menu.value == Tab.Values.Mint && !isAdmin)
+                      !isLoggedIn ||
+                      (menu.value == Tab.Values.Mint && !isAdmin) ||
+                      disableForm
                     }
                     key={menu.value}
                     value={menu.value}
@@ -112,22 +118,26 @@ const FormTransfer: FC<Props> = ({
           </div>
         )}
         <div className={cn("grid-cols-2  sm:grid gap-2")}>
-          {isTransfer && <RecipientInput form={form} disableTo={disableTo} />}
-          {isBurning && isAdmin && <FromInput form={form} />}
+          {isTransfer && (
+            <RecipientInput form={form} disableTo={disableTo || disableForm} />
+          )}
+          {isBurning && isAdmin && (
+            <FromInput form={form} disable={disableForm} />
+          )}
           {isAmountOperation && (
             <AmountInput
               form={form}
+              disable={disableForm}
               selectedToken={selectedToken}
               tokenBalance={tokenBalance}
             />
           )}
         </div>
-
         {isTransfer && (
           <FormField
             control={form.control}
             name="memo"
-            disabled={isBurning}
+            disabled={isBurning || disableForm}
             render={({ field }) => (
               <FormItem>
                 <div className="flex gap-2">
@@ -154,6 +164,7 @@ const FormTransfer: FC<Props> = ({
           }
           type="submit"
           className="flex gap-2"
+          disabled={disableForm}
         >
           {isTransfer ? "Transfer" : isMinting ? "Mint" : "Burn"}
           {isTransfer && <ArrowRight className="h-[1.2rem] w-[1.2rem]" />}

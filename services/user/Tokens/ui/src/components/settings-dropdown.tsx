@@ -28,22 +28,11 @@ import { useLoggedInUser } from "@/hooks/network/useLoggedInUser";
 import { useSelectAccount } from "@/hooks/network/useSelectAccount";
 import { cn } from "@/lib/utils";
 
-import { createAvatar } from "@dicebear/core";
-import { identicon } from "@dicebear/collection";
 import { useChainId } from "@/hooks/network/useChainId";
 import { useLogout } from "@/hooks/network/useLogout";
 import { useCreateConnectionToken } from "@/hooks/network/useCreateConnectionToken";
 import { Button } from "./ui/button";
-
-const createIdenticon = (seed: string): string => {
-  const avatar = createAvatar(identicon, {
-    seed,
-    size: 40,
-    backgroundColor: ["black"],
-    scale: 110,
-  });
-  return avatar.toDataUri();
-};
+import { createIdenticon } from "@/lib/createIdenticon";
 
 export const SettingsDropdown = () => {
   const { setTheme } = useTheme();

@@ -22,7 +22,7 @@ interface Props {
 
 const ActionType = z.enum(["Uncredit", "Debit"]);
 
-export function CreditTable({ balances, user, isLoading }: Props) {
+export function CreditTable({ balances, user }: Props) {
   const { mutate: uncredit } = useUncredit();
   const { mutate: debit } = useDebit();
 
@@ -48,11 +48,7 @@ export function CreditTable({ balances, user, isLoading }: Props) {
   };
 
   if (balances.length == 0) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        {isLoading ? "Loading..." : "No credits or debits found."}
-      </div>
-    );
+    return null;
   }
   return (
     <Table>
