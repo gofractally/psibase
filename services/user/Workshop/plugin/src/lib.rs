@@ -2,21 +2,13 @@
 mod bindings;
 use bindings::*;
 
-use accounts::plugin::api::get_current_user;
 use exports::workshop::plugin::{
-    admin::Guest as Admin,
     app::{File, Guest as App},
     mail::Guest as Mail,
     registry::{AppMetadata, Guest as Registry},
 };
 use host::common::types::Error;
 use staged_tx::plugin::proposer::set_propose_latch;
-
-mod tables;
-use tables::user_table::UserTables;
-
-mod errors;
-use errors::ErrorType;
 
 struct ProposeLatch;
 
@@ -34,35 +26,6 @@ impl Drop for ProposeLatch {
 }
 
 struct WorkshopPlugin;
-
-impl Admin for WorkshopPlugin {
-    fn add_managed(app: String) -> Result<(), Error> {
-        let Some(user) = get_current_user()? else {
-            return Err(ErrorType::LoginRequired.into());
-        };
-
-        UserTables::new(&user).add_managed_app(&app);
-        Ok(())
-    }
-
-    fn remove_managed(app: String) -> Result<(), Error> {
-        let Some(user) = get_current_user()? else {
-            return Err(ErrorType::LoginRequired.into());
-        };
-
-        UserTables::new(&user).remove_managed_app(&app);
-        Ok(())
-    }
-
-    fn get_all_managed() -> Vec<String> {
-        let user = match get_current_user() {
-            Ok(Some(user)) => user,
-            Ok(None) | Err(_) => return vec![],
-        };
-
-        UserTables::new(&user).get_managed_apps().apps
-    }
-}
 
 impl App for WorkshopPlugin {
     fn upload(app: String, file: File, compression_quality: u8) -> Result<(), Error> {
@@ -118,8 +81,8 @@ impl Mail for WorkshopPlugin {
 }
 
 impl Registry for WorkshopPlugin {
-    fn create_app(account: String) -> Result<(), Error> {
-        registry::plugin::developer::create_app(&account)
+    fn create_app(app: String) -> Result<(), Error> {
+        registry::plugin::developer::create_app(&app)
     }
 
     fn set_app_metadata(app: String, metadata: AppMetadata) -> Result<(), Error> {

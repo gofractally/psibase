@@ -1,25 +1,12 @@
 package workshop:plugin;
 
-interface admin {
-    use host:common/types.{error};
-
-    /// Add the specified app to the logged-in user's list of managed apps
-    add-managed: func(app: string) -> result<_, error>;
-    
-    /// Remove the specified app from the logged-in user's list of managed apps
-    remove-managed: func(app: string) -> result<_, error>;
-
-    /// Get the list of the logged-in user's managed apps
-    get-all-managed: func() -> list<string>;
-}
-
 interface registry {
     use host:common/types.{error};
     use registry:plugin/types.{app-metadata};
 
-    /// Create a new app with the specified account name, owned by
-    /// the currently logged-in user.
-    create-app: func(account: string) -> result<_, error>;
+    /// Create a new app owned by the currently logged-in user.
+    /// `app` - The account name for the app
+    create-app: func(app: string) -> result<_, error>;
 
     /// Set the metadata for the specified app
     set-app-metadata: func(app: string, metadata: app-metadata) -> result<_, error>;
@@ -28,7 +15,7 @@ interface registry {
     publish-app: func(app: string) -> result<_, error>;
 
     /// Unpublish specified app
-    unpublish-app: func(account: string) -> result<_, error>;
+    unpublish-app: func(app: string) -> result<_, error>;
 }
 
 interface app {
@@ -93,7 +80,6 @@ interface mail {
 }
 
 world imports {
-    import admin;
     import app;
     import mail;
 }
