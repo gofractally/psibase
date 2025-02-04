@@ -550,20 +550,6 @@ namespace psibase
    }  // namespace pkcs11
 }  // namespace psibase
 
-struct transaction_queue
-{
-   struct entry
-   {
-      bool                            is_boot = false;
-      std::vector<char>               packed_signed_trx;
-      http::push_transaction_callback boot_callback;
-      http::push_transaction_callback callback;
-   };
-
-   std::mutex         mutex;
-   std::vector<entry> entries;
-};
-
 #define RETHROW_BAD_ALLOC  \
    catch (std::bad_alloc&) \
    {                       \
@@ -588,128 +574,6 @@ void loop(Timer& timer, F&& f)
           }
        });
 }
-
-bool pushTransaction(psibase::SharedState&                  sharedState,
-                     const std::shared_ptr<const Revision>& revisionAtBlockStart,
-                     BlockContext&                          bc,
-                     SystemContext&                         proofSystem,
-                     transaction_queue::entry&              entry,
-                     std::chrono::microseconds              proofWatchdogLimit)
-{
-   try
-   {
-      // TODO: verify no extra data
-      // TODO: view
-      auto             trx = psio::from_frac<SignedTransaction>(entry.packed_signed_trx);
-      TransactionTrace trace;
-
-      try
-      {
-         if (bc.needGenesisAction)
-            trace.error = "Node is not connected to any psibase network.";
-         else
-         {
-            check(trx.proofs.size() == trx.transaction->claims().size(),
-                  "proofs and claims must have same size");
-            // All proofs execute as of the state at block begin. This will allow
-            // consistent parallel execution of all proofs within a block during
-            // replay. Proofs don't have direct database access, but they do rely
-            // on the set of services stored within the database. They may call
-            // other services; e.g. to call crypto functions.
-            //
-            // TODO: move proof execution to background threads
-            // TODO: track CPU usage of proofs and pass it somehow to the main
-            //       execution for charging
-            // TODO: If by the time the transaction executes it's on a different
-            //       block than the proofs were verified on, then either the proofs
-            //       need to be rerun, or the hashes of the services which ran
-            //       during the proofs need to be compared against the current
-            //       service hashes. This will prevent a poison block.
-            // TODO: If the first proof and the first auth pass, but the transaction
-            //       fails (including other proof failures), then charge the first
-            //       authorizer
-            BlockContext proofBC{proofSystem, revisionAtBlockStart};
-            proofBC.start(bc.current.header.time);
-            for (size_t i = 0; i < trx.proofs.size(); ++i)
-            {
-               proofBC.verifyProof(trx, trace, i, proofWatchdogLimit, &bc);
-            }
-
-            // TODO: in another thread: check first auth and first proof. After
-            //       they pass, schedule the remaining proofs. After they pass,
-            //       schedule the transaction for execution in the main thread.
-            //
-            // The first auth check is a prefiltering measure and is mostly redundant
-            // with main execution. Unlike the proofs, the first auth check is allowed
-            // to run with any state on any fork. This is OK since the main execution
-            // checks all auths including the first; the worst that could happen is
-            // the transaction being rejected because it passes on one fork but not
-            // another, potentially charging the user for the failed transaction. The
-            // first auth check, when not part of the main execution, runs in read-only
-            // mode. Transact lets the account's auth service know it's in a
-            // read-only mode so it doesn't fail the transaction trying to update its
-            // tables.
-            //
-            // Replay doesn't run the first auth check separately. This separate
-            // execution is a subjective measure; it's possible, but not advisable,
-            // for a modified node to skip it during production. This won't hurt
-            // consensus since replay never uses read-only mode for auth checks.
-            auto saveTrace = trace;
-            proofBC.checkFirstAuth(trx, trace, std::nullopt, &bc);
-            trace = std::move(saveTrace);
-
-            // TODO: RPC: don't forward failed transactions to P2P; this gives users
-            //       feedback.
-            // TODO: P2P: do forward failed transactions; this enables producers to
-            //       bill failed transactions which have tied up P2P nodes.
-            // TODO: If the first authorizer doesn't have enough to bill for failure,
-            //       then drop before running any other checks. Don't propagate.
-            // TODO: Don't propagate failed transactions which have
-            //       do_not_broadcast_flag.
-            // TODO: Revisit all of this. It doesn't appear to eliminate the need to
-            //       shadow bill, and once shadow billing is in place, failed
-            //       transaction billing seems unnecessary.
-
-            bc.pushTransaction(std::move(trx), trace, std::nullopt);
-         }
-      }
-      RETHROW_BAD_ALLOC
-      catch (...)
-      {
-         // Don't give a false positive
-         if (!trace.error)
-            throw;
-      }
-
-      try
-      {
-         entry.callback(std::move(trace));
-         return !trace.error;
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   RETHROW_BAD_ALLOC
-   catch (std::exception& e)
-   {
-      try
-      {
-         entry.callback(e.what());
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   catch (...)
-   {
-      try
-      {
-         entry.callback("unknown error");
-      }
-      RETHROW_BAD_ALLOC
-      CATCH_IGNORE
-   }
-   return false;
-}  // pushTransaction
 
 std::vector<std::string> translate_endpoints(std::vector<std::string> urls)
 {
@@ -1574,7 +1438,6 @@ void run(const std::string&              db_path,
 
    boost::asio::io_context chainContext;
 
-   auto queue       = std::make_shared<transaction_queue>();
    auto server_work = boost::asio::make_work_guard(chainContext);
 
 #ifdef PSIBASE_ENABLE_SSL
@@ -1669,19 +1532,6 @@ void run(const std::string&              db_path,
                               }
                               callback(std::move(trace));
                            });
-      };
-
-      http_config->push_transaction_async =
-          [queue, &transactionStats, &transactionStatsMutex](
-              std::vector<char> packed_signed_trx, http::push_transaction_callback callback)
-      {
-         {
-            std::lock_guard l{transactionStatsMutex};
-            ++transactionStats.total;
-            ++transactionStats.unprocessed;
-         }
-         std::scoped_lock lock{queue->mutex};
-         queue->entries.push_back({false, std::move(packed_signed_trx), {}, std::move(callback)});
       };
 
       http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
@@ -2203,16 +2053,11 @@ void run(const std::string&              db_path,
                         });
    }
 
-   auto remove_http_handlers = psio::finally{[&http_config, &queue, &system]
+   auto remove_http_handlers = psio::finally{[&http_config, &system]
                                              {
                                                 {
                                                    std::lock_guard l{http_config->mutex};
-                                                   http_config->push_boot_async        = nullptr;
-                                                   http_config->push_transaction_async = nullptr;
-                                                }
-                                                {
-                                                   std::scoped_lock lock{queue->mutex};
-                                                   queue->entries.clear();
+                                                   http_config->push_boot_async = nullptr;
                                                 }
                                                 {
                                                    system->sockets->shutdown();
@@ -2278,71 +2123,6 @@ void run(const std::string&              db_path,
 
       PSIBASE_LOG(node.chain().getLogger(), notice) << message;
    }
-
-   // TODO: post the transactions to chainContext rather than batching them at fixed intervals.
-   auto process_transactions = [&](const std::error_code& ec)
-   {
-      auto fail_all = [&](const std::string& message)
-      {
-         std::vector<transaction_queue::entry> entries;
-         {
-            std::scoped_lock lock{queue->mutex};
-            std::swap(entries, queue->entries);
-         }
-         {
-            std::lock_guard lock{transactionStatsMutex};
-            transactionStats.unprocessed -= entries.size();
-            transactionStats.skipped += entries.size();
-         }
-         for (auto& entry : entries)
-         {
-            if (entry.callback)
-            {
-               entry.callback(message);
-            }
-            else if (entry.boot_callback)
-            {
-               entry.boot_callback(message);
-            }
-         }
-      };
-      if (ec)
-      {
-         // TODO: 503
-         fail_all("The server is shutting down");
-      }
-      else if (auto bc = node.chain().getBlockContext())
-      {
-         std::vector<transaction_queue::entry> entries;
-         {
-            std::scoped_lock lock{queue->mutex};
-            std::swap(entries, queue->entries);
-         }
-         auto revisionAtBlockStart = node.chain().getHeadRevision();
-         for (auto& entry : entries)
-         {
-            bool res = pushTransaction(*sharedState, revisionAtBlockStart, *bc, *proofSystem, entry,
-                                       std::chrono::microseconds(leeway_us));
-            {
-               std::lock_guard lock{transactionStatsMutex};
-               --transactionStats.unprocessed;
-               if (res)
-               {
-                  ++transactionStats.succeeded;
-               }
-               else
-               {
-                  ++transactionStats.failed;
-               }
-            }
-         }
-      }
-      else
-      {
-         fail_all("Only the current leader accepts transactions");
-      }
-   };
-   loop(timer, process_transactions);
 
    chainContext.run();
 }
