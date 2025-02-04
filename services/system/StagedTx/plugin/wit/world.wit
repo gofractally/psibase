@@ -18,7 +18,7 @@ interface proposer {
     /// 
     /// `account` - The account on behalf of which the currently logged-in user is 
     ///             proposing transactions.
-    set-propose-latch: func(account: string) -> result<_, error>;
+    set-propose-latch: func(account: option<string>) -> result<_, error>;
 
     /// Removes (deletes) the specified staged transaction
     ///

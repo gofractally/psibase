@@ -1,18 +1,21 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::accounts::plugin::api::get_account;
-use bindings::exports::staged_tx::plugin::{
-    proposer::Guest as Proposer, respondent::Guest as Respondent,
-};
-use bindings::exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
-use bindings::host::common::{client as Client, server as Server, types::Error};
-use bindings::transact::plugin::{hooks::hook_tx_transform_label, intf::add_action_to_transaction};
+use bindings::*;
+
+use accounts::plugin::api::get_account;
+use exports::staged_tx::plugin::{proposer::Guest as Proposer, respondent::Guest as Respondent};
+use exports::transact_hook_actions_sender::Guest as HookActionsSender;
+use exports::transact_hook_tx_transform::{Guest as HookTxTransform, *};
+use host::common::{client as Client, server as Server, types::Error};
+use host::privileged::intf::get_active_app;
 use psibase::fracpack::Pack;
 use psibase::services::staged_tx::action_structs::propose;
 use psibase::{AccountNumber, Checksum256, Hex, MethodNumber};
 use staged_tx::action_structs::*;
-use std::collections::HashMap;
+use transact::plugin::{hooks::*, intf::add_action_to_transaction};
+mod db;
+use db::*;
 
 use serde::{Deserialize, Serialize};
 
@@ -47,14 +50,12 @@ struct StagedTxData {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StagedTxDetailsInner {
-    txid: String,
-    #[serde(rename = "proposeBlock")]
+    txid: Checksum256,
     propose_block: u32,
-    #[serde(rename = "proposeDate")]
     propose_date: String,
     proposer: String,
-    #[serde(rename = "actionList")]
     action_list: ActionList,
 }
 
@@ -95,25 +96,42 @@ fn get_staged_txid(id: u32) -> Result<Checksum256, Error> {
 
     let details = Server::post_graphql_get_json(&query).unwrap();
     let details = serde_json::from_str::<StagedTxDetails>(&details).unwrap();
-    let txid = details.data.details.txid;
-    if txid.len() % 2 != 0 {
-        return Err(ErrorType::InvalidTxId.into());
-    }
-    let txid: Vec<u8> = (0..txid.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&txid[i..i + 2], 16).unwrap())
-        .collect();
-    let txid: [u8; 32] = txid.try_into().map_err(|_| ErrorType::InvalidTxId)?;
-
-    Ok(txid.into())
+    Ok(details.data.details.txid)
 }
 
 struct StagedTxPlugin;
 
+/* TODO
+ * Currently, to correctly use the propose latch requires that the user should call `set_propose_latch(None)`
+ *   when they are finished.
+ * To simplify usage, it would be better to return an owned resource that sets the propose latch on construction,
+ *   and clears it on drop.
+ * This depends on general support for passing wasm component resources.
+*/
+
 impl Proposer for StagedTxPlugin {
-    fn set_propose_latch(account: String) -> Result<(), Error> {
-        validate_account(&account)?;
-        hook_tx_transform_label(Some(account.as_str()));
+    fn set_propose_latch(account: Option<String>) -> Result<(), Error> {
+        let sender = Client::get_sender_app()
+            .app
+            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
+
+        let active_app = get_active_app()
+            .app
+            .ok_or_else(|| ErrorType::NetworkAppsOnly("set_propose_latch".to_string()))?;
+
+        if sender != active_app {
+            return Err(ErrorType::ActiveAppOnly("set_propose_latch".to_string()).into());
+        }
+
+        if let Some(acc) = &account {
+            validate_account(acc)?;
+            hook_actions_sender();
+        } else {
+            unhook_actions_sender();
+        }
+
+        hook_tx_transform_label(account.as_deref());
+        CurrentSender::set(account);
         Ok(())
     }
 
@@ -165,30 +183,22 @@ impl HookTxTransform for StagedTxPlugin {
         let transact = psibase::services::transact::SERVICE.to_string();
         get_assert_caller("on_tx_transform", &[&transact])?;
 
-        // There is typically only one sender for a set of actions, but in rare cases where
-        // hooks were used to simultaneously execute actions from multiple users *and* a propose
-        // latch was set, the result is:
-        // 1. Multiple staged transactions are proposed, one for each sender.
-        // 2. The actions contained in a staged transaction correspond to the actions originally executed by sender.
-        // 3. The new sender of the staged actions correspond to the latch that was set at the time the action was scheduled.
+        for action in &actions {
+            if action.sender != label {
+                return Err(ErrorType::InvalidSender(action.sender.clone()).into());
+            }
+        }
 
-        let action_groups = group_by_sender(actions);
-        let actions = action_groups
-            .into_iter()
-            .map(|group| propose_wrap(group, &label))
-            .collect();
+        let Ok(Some(sender)) = accounts::plugin::api::get_current_user() else {
+            return Err(ErrorType::NoCurrentUser.into());
+        };
 
+        let actions = vec![propose_wrap(sender, actions)];
         Ok(Some(actions))
     }
 }
 
-fn propose_wrap(mut actions: Vec<Action>, label: &str) -> Action {
-    let sender = actions[0].sender.clone();
-
-    for action in &mut actions {
-        action.sender = label.to_string();
-    }
-
+fn propose_wrap(sender: String, actions: Vec<Action>) -> Action {
     let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
 
     Action {
@@ -210,17 +220,13 @@ impl From<Action> for psibase::Action {
     }
 }
 
-fn group_by_sender(actions: Vec<Action>) -> Vec<Vec<Action>> {
-    let mut sender_groups: HashMap<String, Vec<Action>> = HashMap::new();
+impl HookActionsSender for StagedTxPlugin {
+    fn on_actions_sender(_: String, _: String) -> Result<Option<String>, Error> {
+        let transact = psibase::services::transact::SERVICE.to_string();
+        get_assert_caller("on_actions_sender", &[&transact])?;
 
-    for action in actions {
-        sender_groups
-            .entry(action.sender.clone())
-            .or_default()
-            .push(action);
+        Ok(CurrentSender::get())
     }
-
-    sender_groups.into_values().collect()
 }
 
 bindings::export!(StagedTxPlugin with_types_in bindings);

@@ -2155,7 +2155,11 @@ void run(const std::string&              db_path,
                                     const auto& [lib, sessions] = v;
                                     for (const auto& slot : lib->GetSlotList(true))
                                     {
-                                       auto             tinfo = lib->GetTokenInfo(slot);
+                                       auto tinfo = lib->GetTokenInfo(slot);
+                                       // We don't provide initialization, so skip uninitialized
+                                       // tokens.
+                                       if (!(tinfo.flags & pkcs11::token_initialized))
+                                          continue;
                                        std::string_view label = pkcs11::getString(tinfo.label);
                                        std::string      id    = pkcs11::makeURI(tinfo);
                                        auto             session_pos = sessions.find(slot);

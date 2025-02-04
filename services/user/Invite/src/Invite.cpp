@@ -74,14 +74,14 @@ void Invite::createInvite(Spki inviteKey)
 
    if (settings.whitelist.size() > 0)
    {
-      bool whitelisted = find(settings.whitelist.begin(), settings.whitelist.end(), inviter) !=
-                         settings.whitelist.end();
+      bool whitelisted = find(settings.whitelist.begin(), settings.whitelist.end(), inviter)
+                         != settings.whitelist.end();
       check(whitelisted, onlyWhitelisted.data());
    }
    else if (settings.blacklist.size() > 0)
    {
-      bool blacklisted = find(settings.blacklist.begin(), settings.blacklist.end(), inviter) !=
-                         settings.blacklist.end();
+      bool blacklisted = find(settings.blacklist.begin(), settings.blacklist.end(), inviter)
+                         != settings.blacklist.end();
       check(not blacklisted, noBlacklisted.data());
    }
 
@@ -90,8 +90,8 @@ void Invite::createInvite(Spki inviteKey)
    InviteRecord newInvite{
        .pubkey  = inviteKey,
        .inviter = inviter,
-       .expiry  = std::chrono::time_point_cast<Seconds>(to<Transact>().currentBlock().time) +
-                 secondsInWeek,
+       .expiry  = std::chrono::time_point_cast<Seconds>(to<Transact>().currentBlock().time)
+                 + secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
    };
@@ -147,19 +147,7 @@ void Invite::acceptCreate(Spki inviteKey, AccountNumber acceptedBy, Spki newAcco
    invite->newAccountToken = false;
 
    // Create new account, and set key & auth
-   to<Accounts>().newAccount(acceptedBy, AuthAny::service, true);
-   std::tuple<Spki> params{newAccountKey};
-   Action           setKey{.sender  = acceptedBy,
-                           .service = AuthSig::AuthSig::service,
-                           .method  = "setKey"_m,
-                           .rawData = psio::convert_to_frac(params)};
-   to<Transact>().runAs(std::move(setKey), vector<ServiceMethod>{});
-   std::tuple<AccountNumber> params2{AuthSig::AuthSig::service};
-   Action                    setAuth{.sender  = acceptedBy,
-                                     .service = Accounts::service,
-                                     .method  = "setAuthServ"_m,
-                                     .rawData = psio::convert_to_frac(params2)};
-   to<Transact>().runAs(std::move(setAuth), vector<ServiceMethod>{});
+   to<AuthSig::AuthSig>().newAccount(acceptedBy, newAccountKey);
 
    invite->state = InviteStates::accepted;
    invite->actor = acceptedBy;

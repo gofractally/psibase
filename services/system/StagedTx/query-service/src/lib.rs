@@ -9,7 +9,7 @@ mod service {
 
     #[derive(SimpleObject, Deserialize, Debug)]
     struct Update {
-        txid: String,
+        txid: Checksum256,
         actor: AccountNumber,
         datetime: TimePointUSec,
         event_type: String,
@@ -116,7 +116,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, Update>> {
             EventQuery::new("history.staged-tx.updated")
-                .condition(format!("txid = '{}'", txid))
+                .condition(format!("txid = X'{}'", txid))
                 .first(first)
                 .last(last)
                 .before(before)

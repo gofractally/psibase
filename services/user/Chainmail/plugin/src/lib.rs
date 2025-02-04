@@ -97,9 +97,7 @@ impl Query for ChainmailPlugin {
     fn get_saved_msgs(receiver: Option<String>) -> Result<Vec<Message>, Error> {
         let rcvr = match receiver {
             Some(r) => r,
-            None => {
-                AccountPlugin::active_app::get_logged_in_user()?.expect("No receiver specified")
-            }
+            None => AccountPlugin::api::get_current_user()?.expect("No receiver specified"),
         };
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it
