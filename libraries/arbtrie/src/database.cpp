@@ -316,7 +316,8 @@ namespace arbtrie
 
       r.give(upsert(state, r.take(), key, _new_handle->address()));
 
-      _new_handle->take();  // it has been stored without exception; therefore we can take it
+      // it has been stored without exception; therefore we can take it
+      _new_handle->take();  
       return std::move(_old_handle);
    }
 
@@ -326,8 +327,13 @@ namespace arbtrie
       _old_value_size = -1;
       auto state      = _segas.lock();
 
-      r.give(upsert(state, r.take(), key, val));
-
+      fast_meta_address adr = r.take();
+      try {
+         r.give( upsert( state, adr, key, val ) );
+      } catch ( ... ) {
+         r.give( adr );
+         throw;
+      }
       return _old_value_size;
    }
 
@@ -1337,7 +1343,8 @@ namespace arbtrie
                   if constexpr (mode.is_remove())
                   {
                      //    TRIEDENT_DEBUG( "remove key ", key );
-                     brn.retain();  // because upsert might release() it
+                    // brn.retain();  // because upsert might release() it
+                     node_handle temp_retain( *this, brn.address() );
                      auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
                      if (not new_br)
                      {
@@ -1345,7 +1352,9 @@ namespace arbtrie
                         {
                            assert(_delta_keys == -1);
                            auto cl = clone<mode>(r, fn, {});
-                           release_node(brn);  // because we retained before upsert(),
+
+                      // replace with temp_retain() going out of scope
+                      //     release_node(brn);  // because we retained before upsert(),
                                                // and retained again in clone
                            cl.modify().template as<NodeType>(
                                [bidx](auto* p)
@@ -1355,6 +1364,9 @@ namespace arbtrie
                                });
                            return cl.address();
                         }
+                        // because we didn't use to release it...
+                        temp_retain.take(); // make it perm
+
                         return fast_meta_address();
                      }
                      else
@@ -1363,7 +1375,7 @@ namespace arbtrie
                         {  // something was removed
                            assert(_delta_keys == -1);
                            auto cl = clone<mode>(r, fn, {});
-                           release_node(brn);  // because we retained before upsert(),
+                     //      release_node(brn);  // because we retained before upsert(),
                                                // and retained again in clone
                            cl.modify().template as<NodeType>(
                                [bidx, new_br](auto* p)
@@ -1375,7 +1387,7 @@ namespace arbtrie
                         }
                         else
                         {                      // nothing was removed
-                           release_node(brn);  // because we retained it just in case
+                    //       release_node(brn);  // because we retained it just in case
                         }
                         assert(_delta_keys == 0);
                         return r.address();

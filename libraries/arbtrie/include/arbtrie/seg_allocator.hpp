@@ -256,6 +256,7 @@ namespace arbtrie
 
       void dump();
       void print_region_stats() { _id_alloc.print_region_stats(); }
+      uint64_t count_ids_with_refs() { return _id_alloc.count_ids_with_refs(); }
       void sync(sync_type st = sync_type::sync);
       void start_compact_thread();
       void stop_compact_thread();
@@ -553,6 +554,7 @@ namespace arbtrie
             mv._session_num = -1;
          }
 
+         uint64_t count_ids_with_refs() { return _sega.count_ids_with_refs(); }
         private:
          friend class lock;
          friend class seg_allocator;

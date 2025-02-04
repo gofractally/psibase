@@ -70,6 +70,8 @@ namespace arbtrie
          * Give this handle the responsiblity of releasing the given_id
          */
         node_handle& give( fast_meta_address given_id ) {
+           if( given_id == _id ) 
+              return *this;
            release();
            _id = given_id;
            return *this;

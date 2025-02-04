@@ -142,6 +142,8 @@ namespace arbtrie
      public:
       seg_allocator::session _segas;
 
+      uint64_t count_ids_with_refs() { return _segas.count_ids_with_refs(); }
+
       iterator create_iterator(node_handle h) { return iterator(*this, h); }
 
       /**

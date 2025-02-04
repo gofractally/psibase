@@ -55,6 +55,8 @@ namespace arbtrie
       // set all refs > 1 to 1, leave 0 alone
       void reset_all_refs();
 
+      uint64_t count_ids_with_refs();
+
       // return the number of modify bits that were set
       int64_t clear_lock_bits();
       // @}

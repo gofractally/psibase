@@ -233,6 +233,19 @@ namespace arbtrie
                   meta.set_ref(1);
             }
    }
+   uint64_t id_alloc::count_ids_with_refs() {
+      uint64_t count = 0;
+      const auto num_block = _block_alloc.num_blocks();
+      for (int block = 0; block < num_block; ++block)
+         for (int region = 0; region < 0xffff; ++region)
+            for (int index = block ? 0 : 8; index < ids_per_page; ++index)
+            {
+               fast_meta_address fma  = {region, ids_per_page * block + index};
+               auto&             meta = get(fma);
+               count += meta.ref() > 0;
+            }
+      return count;
+   }
 
    void id_alloc::release_unreachable()
    {
