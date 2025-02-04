@@ -2,8 +2,7 @@
 mod bindings;
 use bindings::*;
 
-mod db;
-use db::user_table::UserTables;
+use accounts::plugin::api::get_current_user;
 use exports::workshop::plugin::{
     admin::Guest as Admin,
     app::{File, Guest as App},
@@ -13,6 +12,9 @@ use exports::workshop::plugin::{
 use host::common::types::Error;
 use staged_tx::plugin::proposer::set_propose_latch;
 
+mod tables;
+use tables::user_table::UserTables;
+
 mod errors;
 use errors::ErrorType;
 
@@ -20,15 +22,14 @@ struct ProposeLatch;
 
 impl ProposeLatch {
     fn new(app: &str) -> Self {
-        set_propose_latch(app).unwrap();
+        set_propose_latch(Some(app)).unwrap();
         Self
     }
 }
 
 impl Drop for ProposeLatch {
     fn drop(&mut self) {
-        // TODO - once I merge with main, uncomment this
-        //set_propose_latch(None).unwrap();
+        set_propose_latch(None).unwrap();
     }
 }
 
@@ -36,7 +37,7 @@ struct WorkshopPlugin;
 
 impl Admin for WorkshopPlugin {
     fn add_managed(app: String) -> Result<(), Error> {
-        let Some(user) = accounts::plugin::active_app::get_logged_in_user()? else {
+        let Some(user) = get_current_user()? else {
             return Err(ErrorType::LoginRequired.into());
         };
 
@@ -45,7 +46,7 @@ impl Admin for WorkshopPlugin {
     }
 
     fn remove_managed(app: String) -> Result<(), Error> {
-        let Some(user) = accounts::plugin::active_app::get_logged_in_user()? else {
+        let Some(user) = get_current_user()? else {
             return Err(ErrorType::LoginRequired.into());
         };
 
@@ -54,7 +55,7 @@ impl Admin for WorkshopPlugin {
     }
 
     fn get_all_managed() -> Vec<String> {
-        let user = match accounts::plugin::active_app::get_logged_in_user() {
+        let user = match get_current_user() {
             Ok(Some(user)) => user,
             Ok(None) | Err(_) => return vec![],
         };
