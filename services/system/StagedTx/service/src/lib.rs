@@ -1,6 +1,7 @@
 use sha2::{Digest, Sha256};
 
 mod db;
+mod event;
 mod policy;
 
 pub fn sha256(data: &[u8]) -> [u8; 32] {
@@ -25,14 +26,13 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 #[psibase::service(recursive = true)]
 pub mod service {
     pub use crate::db::tables::*;
+    pub use crate::event::StagedTxEvent;
     use crate::policy::StagedTxPolicy;
-    use async_graphql::SimpleObject;
     use fracpack::Pack;
     use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
-    const ENABLE_PRINT: bool = true;
+    const ENABLE_PRINT: bool = false;
 
     fn debug_print(msg: &str) {
         if ENABLE_PRINT {
@@ -66,16 +66,12 @@ pub mod service {
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
     ///
-    /// All actions must have the same sender.
-    ///
     /// * `actions` - The actions to be staged
     #[action]
     fn propose(actions: Vec<Action>) -> u32 {
-        let new_tx = StagedTx::new(actions);
+        let new_tx = StagedTx::add(actions);
 
-        StagedTxTable::new().put(&new_tx).unwrap();
-
-        emit_update(new_tx.txid, StagedTxEvent::PROPOSED);
+        emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);
 
         // A proposal is also an implicit accept
         accept(new_tx.id, new_tx.txid);
@@ -91,12 +87,12 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn accept(id: u32, txid: [u8; 32]) {
+    fn accept(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         staged_tx.accept();
 
-        emit_update(staged_tx.txid, StagedTxEvent::ACCEPTED);
+        emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
         let authorized = staged_tx
             .action_list
@@ -116,12 +112,12 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn reject(id: u32, txid: [u8; 32]) {
+    fn reject(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         staged_tx.reject();
 
-        emit_update(staged_tx.txid, StagedTxEvent::REJECTED);
+        emit_update(staged_tx.txid.clone(), StagedTxEvent::REJECTED);
 
         let rejected =
             staged_tx.action_list.actions.iter().any(|action| {
@@ -141,7 +137,7 @@ pub mod service {
     /// * `id`: The ID of the database record containing the staged transaction
     /// * `txid`: The unique txid of the staged transaction
     #[action]
-    fn remove(id: u32, txid: [u8; 32]) {
+    fn remove(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
 
         check(
@@ -173,7 +169,7 @@ pub mod service {
                 unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
             });
 
-        emit_update(staged_tx.txid, StagedTxEvent::EXECUTED);
+        emit_update(staged_tx.txid.clone(), StagedTxEvent::EXECUTED);
         emit_update(staged_tx.txid, StagedTxEvent::DELETED);
     }
 
@@ -187,41 +183,21 @@ pub mod service {
         staged_tx.unwrap()
     }
 
-    #[derive(Debug, Fracpack, Serialize, Deserialize, ToSchema, SimpleObject, Clone)]
-    struct StagedTxEvent {
-        ty: u8,
-    }
-
-    impl StagedTxEvent {
-        const PROPOSED: u8 = 0;
-        const ACCEPTED: u8 = 1;
-        const REJECTED: u8 = 2;
-        const DELETED: u8 = 3;
-        const EXECUTED: u8 = 4;
-    }
-
-    impl From<u8> for StagedTxEvent {
-        fn from(value: u8) -> Self {
-            check(value <= 4, "Invalid staged tx event type");
-            StagedTxEvent { ty: value }
-        }
-    }
-
-    fn emit_update(txid: [u8; 32], event_type: u8) {
+    fn emit_update(txid: Checksum256, event_type: u8) {
         Wrapper::emit().history().updated(
             txid,
             get_sender(),
             Transact::call().currentBlock().time,
-            event_type.into(),
+            StagedTxEvent::from(event_type).to_string(),
         );
     }
 
     #[event(history)]
     pub fn updated(
-        txid: [u8; 32],            // The txid of the staged transaction
-        actor: AccountNumber,      // The sender of the action causing the event
-        datetime: TimePointUSec,   // The time of the event emission
-        event_type: StagedTxEvent, // The type of event
+        txid: Checksum256,       // The txid of the staged transaction
+        actor: AccountNumber,    // The sender of the action causing the event
+        datetime: TimePointUSec, // The time of the event emission
+        event_type: String,      // The type of event
     ) {
     }
 }

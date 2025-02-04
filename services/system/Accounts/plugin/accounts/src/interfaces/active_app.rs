@@ -25,9 +25,11 @@ impl ActiveApp for AccountsPlugin {
             }
         };
 
-        let connected_apps = UserTable::new(&user).get_connected_apps();
-        if !connected_apps.contains(app_name) {
-            return Err(NotConnected(user).into());
+        if *app_name != psibase::services::accounts::SERVICE.to_string() {
+            let connected_apps = UserTable::new(&user).get_connected_apps();
+            if !connected_apps.contains(app_name) {
+                return Err(NotConnected(user).into());
+            }
         }
 
         AppsTable::new(&app).login(&user);
@@ -38,11 +40,6 @@ impl ActiveApp for AccountsPlugin {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
         AppsTable::new(&app).logout();
         Ok(())
-    }
-
-    fn get_logged_in_user() -> Result<Option<String>, Error> {
-        let app = get_assert_top_level_app("get_logged_in_user", &vec!["supervisor", "transact"])?;
-        Ok(AppsTable::new(&app).get_logged_in_user())
     }
 
     fn get_connected_accounts() -> Result<Vec<String>, Error> {

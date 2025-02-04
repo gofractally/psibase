@@ -11,7 +11,7 @@ use bindings::auth_sig::plugin::{keyvault, types::Pem};
 use bindings::exports::invite;
 use bindings::exports::invite::plugin::advanced::Guest as Advanced;
 use bindings::exports::invite::plugin::advanced::InvKeys as InviteKeys;
-use bindings::exports::transact_hook_action_sender::Guest as HookActionSender;
+use bindings::exports::transact_hook_actions_sender::Guest as HookActionsSender;
 use bindings::host::common::{client as Client, server as Server, types as CommonTypes};
 use bindings::invite::plugin::types::{Invite, InviteState};
 use bindings::transact::plugin::hooks::*;
@@ -43,7 +43,7 @@ impl Invitee for InvitePlugin {
             return Err(AccountExists("accept_with_new_account").into());
         }
 
-        hook_action_sender();
+        hook_actions_sender();
 
         AuthInvite::notify(&token)?;
 
@@ -85,7 +85,7 @@ impl Invitee for InvitePlugin {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite_pubkey: Pem = keyvault::pub_from_priv(&invite_token.pk)?;
 
-        hook_action_sender();
+        hook_actions_sender();
 
         AuthInvite::notify(&token)?;
 
@@ -190,8 +190,8 @@ impl Advanced for InvitePlugin {
     }
 }
 
-impl HookActionSender for InvitePlugin {
-    fn on_action_sender(
+impl HookActionsSender for InvitePlugin {
+    fn on_actions_sender(
         service: String,
         method: String,
     ) -> Result<Option<String>, CommonTypes::Error> {

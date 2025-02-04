@@ -208,10 +208,10 @@ fn format_transaction_error_stack<T: std::fmt::Write>(
 ) -> fmt::Result {
     for a in &ttrace.action_traces {
         format_error_stack(a, f)?;
-        if let Some(message) = &ttrace.error {
-            writeln!(f, "{}", message)?;
-        }
         break;
+    }
+    if let Some(message) = &ttrace.error {
+        writeln!(f, "{}", message)?;
     }
     Ok(())
 }
