@@ -27,7 +27,7 @@ fn normalize_path(path: &String) -> String {
     result
 }
 
-const TX_SIZE_LIMIT: usize = 1 * 1024 * 1024; // 1mb
+const TX_SIZE_LIMIT: usize = 3 * 1024 * 1024; // 3mb
 
 fn validate_compression_quality(quality: u8) -> Result<(), Error> {
     if quality > 11 {
