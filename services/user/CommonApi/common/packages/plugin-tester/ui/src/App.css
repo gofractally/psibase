@@ -28,6 +28,8 @@
   background-color: #2f2f2f;
   color: #ddd;
   font-family: sans-serif;
+  width: 600px;
+  margin: 0 auto;
 }
 
 .tab {
@@ -52,4 +54,275 @@
 
 .function-button.selected {
   background-color: #666;
+}
+
+.input-field {
+  margin-bottom: 1rem;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input-field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ddd;
+}
+
+.common-input {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: #1f1f1f;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.common-checkbox {
+  margin-right: 0.5rem;
+}
+
+.rich-editor {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.optional-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.optional-content {
+  margin-left: 1.5rem;  /* indent the inner content */
+}
+
+.list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.list-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.list-item .input-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.remove-item {
+  background-color: #662222;
+}
+
+.add-item {
+  background-color: #226622;
+  width: 100%;
+}
+
+.type-label {
+  font-family: monospace;
+  color: #888;
+  word-break: break-word;
+  white-space: normal;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.status-message {
+  font-size: 0.8em;
+  margin-top: 0.25rem;
+}
+
+.status-message.success {
+  color: #22cc22;
+}
+
+.status-message.invalid {
+  color: #cc2222;
+}
+
+.nested-content {
+  padding-left: 1rem;
+  border-left: 2px solid #555;
+}
+
+.tuple-item {
+  padding-left: 1rem;
+  border-left: 2px solid #555;
+}
+
+.variant-content {
+  padding-left: 1rem;
+  border-left: 2px solid #555;
+  margin-top: 0.5rem;
+}
+
+/* Record Input */
+.record-input {
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.record-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.record-header .expand-icon {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #226622;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  transform: rotate(0);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.record-header.expanded .expand-icon {
+  transform: rotate(90deg);
+}
+
+.record-header-content {
+  flex: 1;
+  min-width: 0;  /* allows content to shrink below flex item's min-content width */
+}
+
+.record-fields {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.2s ease;
+  padding-left: 20px;
+}
+
+.record-fields.expanded {
+  max-height: none;
+  opacity: 1;
+  padding-top: 8px;
+}
+
+.flags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 1rem;
+}
+
+.optional-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.optional-header.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.service-input-container {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.service-input {
+  padding: 0.5rem;
+}
+
+.execution-container {
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.response-title {
+  margin-bottom: 0.5rem;
+}
+
+.embed-container {
+  margin-top: 1rem;
+  white-space: pre-wrap;
+  font-family: monospace;
+  text-align: left;
+}
+
+.embed-description {
+  margin-bottom: 0.5rem;
+}
+
+.embed-textarea {
+  height: 200px;
+}
+
+.functions-title {
+  margin-bottom: 0.5rem;
+}
+
+.functions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-controls {
+  display: flex;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #555;
+}
+
+.bytelist-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.bytelist-header label {
+  margin: 0;
+}
+
+.bytelist-input {
+  margin-top: 0.5rem;
+}
+
+.file-input {
+  width: 100%;
+}
+
+.encoding-selector {
+  width: auto;
+  min-width: 100px;
+}
+
+.char-input {
+  width: 3rem;
+}
+
+.login-bar {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.parameter-editor {
+  margin-bottom: 1rem;
+}
+
+.parameters-title {
+  margin-bottom: 0.5rem;
 }

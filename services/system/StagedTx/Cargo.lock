@@ -1627,6 +1627,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugin"
+version = "0.14.0"
+dependencies = [
+ "psibase",
+ "serde",
+ "serde_json",
+ "staged-tx",
+ "staged-tx-pkg",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1786,6 +1798,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "serde",
+ "serde_json",
  "staged-tx",
 ]
 
@@ -2220,6 +2233,7 @@ dependencies = [
 name = "staged-tx-pkg"
 version = "0.14.0"
 dependencies = [
+ "plugin",
  "r-staged-tx",
  "staged-tx",
 ]
@@ -2986,6 +3000,15 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.36.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7947d0131c7c9da3f01dfde0ab8bd4c4cf3c5bd49b6dba0ae640f1fa752572ea"
+dependencies = [
+ "bitflags 2.6.0",
 ]
 
 [[package]]

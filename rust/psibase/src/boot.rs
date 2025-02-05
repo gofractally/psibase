@@ -77,8 +77,8 @@ fn genesis_transaction<R: Read + Seek>(
 ///
 /// This returns all actions that need to be packed into the boot block.
 fn genesis_block_actions<R: Read + Seek>(
-    _initial_key: &Option<AnyPublicKey>,
-    _initial_producer: AccountNumber,
+    initial_key: &Option<AnyPublicKey>,
+    initial_producer: AccountNumber,
     service_packages: &mut [PackagedService<R>],
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
@@ -89,6 +89,13 @@ fn genesis_block_actions<R: Read + Seek>(
             s.postinstall(&mut actions)?;
         }
     }
+
+    // Set the producers
+    let claim = initial_key
+        .as_ref()
+        .map_or_else(|| Default::default(), |key| to_claim(key));
+    actions.push(set_producers_action(initial_producer, claim));
+
     Ok(actions)
 }
 
@@ -124,19 +131,11 @@ pub fn get_initial_actions<R: Read + Seek>(
     // Create producer account
     actions.push(new_account_action(accounts::SERVICE, initial_producer));
 
-    let mut claim = Claim {
-        service: AccountNumber::new(0),
-        rawData: Default::default(),
-    };
     if let Some(key) = initial_key {
         // Set transaction signing key for producer
         actions.push(set_key_action(initial_producer, &key));
         actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
-        claim = to_claim(&key);
     }
-
-    // Set the producers
-    actions.push(set_producers_action(initial_producer, claim));
 
     actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
     actions.push(

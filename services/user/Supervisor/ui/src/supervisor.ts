@@ -79,12 +79,27 @@ export class Supervisor implements AppInterface {
         //   loading happens in two phases: Load all regular plugins, then load
         //   all dynamic plugins.
 
-        // Phase 1: Loads all regular plugins
+        // Phase 1: Loads plugins requested by an app
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Loads all dynamic plugins
-        await this.loader.processDeferred();
+        // Phase 2: Loads plugins needed by the current user
+        let user = this.getCurrentUser();
+        if (!user) return;
+
+        const account = this.getAccount(user);
+        if (account === undefined) {
+            console.warn(
+                `Invalid user account '${user}' detected. Automatically logging out.`,
+            );
+            this.logout();
+            // Consider deleting the user from the accounts plugin db
+            return;
+        }
+
+        // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+        this.loader.trackPlugins([pluginId(account.authService, "plugin")]);
+        await this.loader.processPlugins();
         await this.loader.awaitReady();
     }
 
@@ -115,17 +130,17 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    private getLoggedInUser(): string | undefined {
+    private getCurrentUser(): string | undefined {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
 
-        let getLoggedInUser = getCallArgs(
+        let getCurrentUser = getCallArgs(
             "accounts",
             "plugin",
-            "activeApp",
-            "getLoggedInUser",
+            "api",
+            "getCurrentUser",
             [],
         );
-        return this.supervisorCall(getLoggedInUser);
+        return this.supervisorCall(getCurrentUser);
     }
 
     private getAccount(user: string): Account | undefined {
@@ -162,35 +177,17 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
-        this.loader.registerDynamic(pluginId("accounts", "smart-auth"), () => {
-            let user = this.getLoggedInUser();
-            if (user === undefined) {
-                return pluginId("auth-invite", "plugin");
-            }
-            const account = this.getAccount(user);
-            if (account === undefined) {
-                console.warn(
-                    `Invalid user account '${user}' detected. Automatically logging out.`,
-                );
-                this.logout();
-                return pluginId("auth-invite", "plugin");
-            }
-            // Temporary limitation: the auth service plugin must be called "plugin" ("<namespace>:plugin")
-            // Or, we could just eliminate the possiblity of storing multiple plugins per namespace (and *everything*
-            //   would have to be named "plugin")
-            return pluginId(account.authService, "plugin");
-        });
     }
 
     getActiveApp(sender: OriginationData): OriginationData {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(
             sender.app,
-            "[supervisor:getActiveApp] Unauthorized - only callable by Accounts plugin",
+            "[supervisor:getActiveApp] Unauthorized - only callable by privileged plugins",
         );
         assert(
-            sender.app === "accounts",
-            "[supervisor:getActiveApp] Unauthorized - Only callable by Accounts plugin",
+            sender.app === "accounts" || sender.app === "staged-tx",
+            "[supervisor:getActiveApp] Unauthorized - Only callable by privileged plugins",
         );
 
         return this.parentOrigination;
@@ -253,11 +250,7 @@ export class Supervisor implements AppInterface {
     }
 
     // This is an entrypoint that returns the JSON interface for a plugin.
-    async getJson(
-        callerOrigin: string,
-        id: string,
-        plugin: QualifiedPluginId,
-    ) {
+    async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);

@@ -54,9 +54,6 @@ namespace SystemService
       auto status = statusIndex.get(std::tuple{});
       check(status.has_value(), "not started");
 
-      auto sender = getSender();
-      check(sender == service || sender == inviteService, "unauthorized account creation");
-
       std::string strName = name.str();
       if (enable_print)
       {
@@ -68,7 +65,7 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (sender != service)
+      if (getSender() != service)
       {
          check(!strName.starts_with("x-"),
                "The 'x-' account prefix is reserved for infrastructure providers");
