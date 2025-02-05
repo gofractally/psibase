@@ -1,13 +1,15 @@
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <psibase/check.hpp>
+#include <psibase/crypto.hpp>
 #include <psibase/jwt.hpp>
-
-#include <psio/from_json.hpp>
-#include <psio/to_json.hpp>
-
+#include <psio/reflect.hpp>
 #include <ranges>
+#include <string>
+#include <string_view>
 
-#include <openssl/hmac.h>
-
-namespace psibase::http
+namespace psibase
 {
    namespace
    {
@@ -15,13 +17,16 @@ namespace psibase::http
       {
          std::array<char, 64> result = {};
          auto                 pos    = result.begin();
-         pos    = std::ranges::copy(std::ranges::views::iota('A', static_cast<char>('Z' + 1)), pos).out;
-         pos    = std::ranges::copy(std::ranges::views::iota('a', static_cast<char>('z' + 1)), pos).out;
-         pos    = std::ranges::copy(std::ranges::views::iota('0', static_cast<char>('9' + 1)), pos).out;
+         pos =
+             std::ranges::copy(std::ranges::views::iota('A', static_cast<char>('Z' + 1)), pos).out;
+         pos =
+             std::ranges::copy(std::ranges::views::iota('a', static_cast<char>('z' + 1)), pos).out;
+         pos =
+             std::ranges::copy(std::ranges::views::iota('0', static_cast<char>('9' + 1)), pos).out;
          *pos++ = '-';
          *pos++ = '_';
          if (pos != result.end())
-            throw std::runtime_error("Size mismatch");
+            abortMessage("Size mismatch");
          return result;
       }
       constexpr auto                         base64url_tab = make_base64url_tab();
@@ -100,12 +105,48 @@ namespace psibase::http
                      }
                      else
                      {
-                        throw std::runtime_error("Invalid base64 char");
+                        abortMessage("Invalid base64 char");
                      }
                   }),
           [&](unsigned ch) { result.push_back(static_cast<char>(ch)); });
       return result;
    }
+
+   // RFC 2104
+   Checksum256 hmacSha256(const char* key,
+                          std::size_t keyLen,
+                          const char* data,
+                          std::size_t dataLen)
+   {
+      constexpr std::size_t B = 64;
+      std::vector<char>     buf(B + dataLen);
+      // pad or hash key
+      if (keyLen < B)
+      {
+         std::memcpy(buf.data(), key, keyLen);
+      }
+      else
+      {
+         Checksum256 hashedKey = sha256(key, keyLen);
+         std::memcpy(buf.data(), hashedKey.data(), hashedKey.size());
+      }
+      // K ^ ipad
+      for (std::size_t i = 0; i < B; ++i)
+      {
+         buf[i] ^= 0x36;
+      }
+      std::memcpy(buf.data() + B, data, dataLen);
+      Checksum256 h1 = sha256(buf.data(), buf.size());
+      buf.resize(B + h1.size());
+      std::memcpy(buf.data() + B, h1.data(), h1.size());
+      // K ^ opad
+      for (std::size_t i = 0; i < B; ++i)
+      {
+         buf[i] ^= 0x36 ^ 0x5c;
+      }
+      return sha256(buf.data(), buf.size());
+   }
+
    struct token_header
    {
       std::string typ{"JWT"};
@@ -113,7 +154,7 @@ namespace psibase::http
       friend bool operator==(const token_header&, const token_header&) = default;
    };
    PSIO_REFLECT(token_header, typ, alg);
-   token_data decode_jwt(const token_key& key, std::string_view token)
+   std::string decodeJWT(const JWTKey& key, std::string_view token)
    {
       auto end_header = token.find('.');
       psibase::check(end_header != std::string_view::npos, "Invalid JWT");
@@ -124,29 +165,23 @@ namespace psibase::http
       std::string_view encoded_signature = token.substr(end_payload + 1, std::string::npos);
       std::string_view signing_input     = token.substr(0, end_payload);
 
-      unsigned char mac[EVP_MAX_MD_SIZE];
-      unsigned      mac_size;
-      HMAC(EVP_sha256(), key.data(), key.size(),
-           reinterpret_cast<const unsigned char*>(signing_input.data()), signing_input.size(), mac,
-           &mac_size);
+      Checksum256 mac =
+          hmacSha256(key.data(), key.size(), signing_input.data(), signing_input.size());
       auto signature = from_base64url(encoded_signature);
-      psibase::check(
-          signature.size() == mac_size && std::memcmp(mac, signature.data(), mac_size) == 0,
-          "Bad signature");
+      psibase::check(signature.size() == mac.size() &&
+                         std::memcmp(signature.data(), mac.data(), mac.size()) == 0,
+                     "Bad signature");
 
       auto header = psio::convert_from_json<token_header>(from_base64url(encoded_header));
       psibase::check(header == token_header{}, "Wrong header");
 
-      return psio::convert_from_json<token_data>(from_base64url(encoded_payload));
+      return from_base64url(encoded_payload);
    }
-   std::string encode_jwt(const token_key& key, const token_data& token)
+   std::string encodeJWT(const JWTKey& key, std::string_view token)
    {
-      std::string result = to_base64url(psio::convert_to_json(token_header{})) + "." +
-                           to_base64url(psio::convert_to_json(token));
-      unsigned char mac[EVP_MAX_MD_SIZE];
-      unsigned      mac_size;
-      HMAC(EVP_sha256(), key.data(), key.size(),
-           reinterpret_cast<const unsigned char*>(result.data()), result.size(), mac, &mac_size);
-      return result + "." + to_base64url(mac, mac_size);
+      std::string result =
+          to_base64url(psio::convert_to_json(token_header{})) + "." + to_base64url(token);
+      auto mac = hmacSha256(key.data(), key.size(), result.data(), result.size());
+      return result + "." + to_base64url(mac.data(), mac.size());
    }
-}  // namespace psibase::http
+}  // namespace psibase
