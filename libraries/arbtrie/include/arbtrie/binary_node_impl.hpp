@@ -369,9 +369,9 @@ namespace arbtrie
             key_hashes()[lb]   = key_header_hash(key_hash(ins.key));
 
             ko[idx].pos  = _alloc_pos;
-            if ( ins.val.is_subtree() )
+            if ( ins.val.is_subtree() /* or id*/ )
             {
-               TRIEDENT_DEBUG( "insert type: ", ins.lb_idx.val_type() );
+              // TRIEDENT_DEBUG( "clone insert type: ", ins.lb_idx.val_type() );
                ko[idx].type = ins.lb_idx.val_type();//key_index::obj_id;
                kvp->_val_size  = sizeof(id_address);
                kvp->value_id() = ins.val.id().to_address();

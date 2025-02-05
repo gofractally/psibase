@@ -863,10 +863,12 @@ namespace arbtrie
                }
                return root.address();
             }
+            //TRIEDENT_DEBUG( "remake value node" );
             return remake<value_node>(root, key, _cur_val).address();
          }
          else  // shared
          {
+            //TRIEDENT_WARN( "make value node" );
             return make<value_node>(root.address().region, state, key, _cur_val).address();
          }
       }
@@ -887,11 +889,15 @@ namespace arbtrie
 
          if constexpr (use_binary_nodes)
          {
-            if (not binary_node::can_inline(vn->value_size()))
+            if (not binary_node::can_inline(vn->value_size())) {
                v1 = make<value_node>(new_reg, state, v1).address();
+               t1 = binary_node::key_index::obj_id;
+            }
 
-            if (not binary_node::can_inline(v2.size()))
+            if (not binary_node::can_inline(v2.size())) {
                v2 = make<value_node>(new_reg, state, v2).address();
+               t2 = binary_node::key_index::obj_id;
+            }
 
             // if unique, reuse id of value node
             if constexpr (mode.is_unique())
@@ -1024,6 +1030,7 @@ namespace arbtrie
       }
    }
 
+   template <upsert_mode mode>
    fast_meta_address clone_binary_range(id_region                reg,
                                         object_ref<node_header>& r,
                                         const binary_node*       src,
@@ -1045,11 +1052,21 @@ namespace arbtrie
       auto  init_binary = [&](binary_node* bn)
       {
          bn->_branch_id_region = state.get_new_region().region;
+
+
          for (int i = from; i < to; ++i)
          {
             auto kvp  = src->get_key_val_ptr(i);
             auto nkey = kvp->key().substr(minus_prefix.size());
             auto nkh  = binary_node::key_header_hash(binary_node::key_hash(nkey));
+
+            // if shared we need to retain any obj_ids/subtrees we migrate
+            if constexpr ( mode.is_shared() ) {
+               if( src->is_obj_id(i) ) {
+                  state.get(kvp->value_id() ).retain();
+               }
+            }
+
 
             bn->append(kvp, minus_prefix.size(), nkh, src->value_hashes()[i],
                        src->key_offsets()[i].val_type());
@@ -1069,7 +1086,7 @@ namespace arbtrie
    template <upsert_mode mode>
    object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
    {
-      //   TRIEDENT_WARN("REFACTOR! ", r.address());
+      //TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
       auto first_key     = root->get_key(0);
       auto last_key      = root->get_key(root->num_branches() - 1);
@@ -1110,7 +1127,7 @@ namespace arbtrie
          fast_meta_address new_child;
          if (to - from > 1)
             new_child =
-                clone_binary_range(bregion, r, root, k.substr(0, cpre.size() + 1), from, to);
+                clone_binary_range<mode>(bregion, r, root, k.substr(0, cpre.size() + 1), from, to);
          else
          {
             auto kvp = root->get_key_val_ptr(from);
@@ -1119,6 +1136,11 @@ namespace arbtrie
                new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr(cpre.size() + 1),
                                             kvp->value_id())
                                .address();
+               //auto cval = r.rlock().get(kvp->value_id());
+               if constexpr ( mode.is_shared() ) {
+                  // TODO: is this tested?
+                  r.rlock().get(kvp->value_id()).retain();
+               }
             }
             else if (root->is_obj_id(from))
             {
@@ -1132,9 +1154,12 @@ namespace arbtrie
                new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr(cpre.size() + 1),
                                             cval.as<value_node>()->value())
                                .address();
+               if constexpr ( mode.is_unique() )
+                  release_node(cval);
             }
             else
             {
+            //   TRIEDENT_WARN( ".... make new value node" );
                new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr(cpre.size() + 1),
                                             root->get_value(from))
                                .address();
@@ -1167,7 +1192,6 @@ namespace arbtrie
          }
          else
          {
-            retain_children(r.rlock(), root);
             return make<full_node>(r.address().region, r.rlock(), {.set_prefix = cpre}, init_full);
          }
       }
@@ -1199,8 +1223,8 @@ namespace arbtrie
       }
       else
       {
-         //        TRIEDENT_DEBUG( "make setlist" );
-         retain_children(r.rlock(), root);
+         TRIEDENT_DEBUG( "refactor shared to setlist, retain children... here?" );
+         //retain_children(r.rlock(), root);
          return make<setlist_node>(r.address().region, r.rlock(),
                                    {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
       }
@@ -1352,8 +1376,6 @@ namespace arbtrie
                         {
                            assert(_delta_keys == -1);
                            auto cl = clone<mode>(r, fn, {});
-
-                      // replace with temp_retain() going out of scope
                       //     release_node(brn);  // because we retained before upsert(),
                                                // and retained again in clone
                            cl.modify().template as<NodeType>(
@@ -1365,7 +1387,7 @@ namespace arbtrie
                            return cl.address();
                         }
                         // because we didn't use to release it...
-                        temp_retain.take(); // make it perm
+                        temp_retain.take();
 
                         return fast_meta_address();
                      }
@@ -1397,13 +1419,15 @@ namespace arbtrie
                   {
                      // clone before upsert because upsert will release the branch when
                      // it returns the new one
-                     //     TRIEDENT_DEBUG( "clone: ", r.address(), " before upsert into branch: ", brn.address() );
+                     //TRIEDENT_DEBUG( "clone: ", r.address(), " before upsert into branch: ", brn.address() );
                      auto cl     = clone<mode>(r, fn, {});
                      auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
                      assert(br != new_br);
                      cl.modify().template as<NodeType>(
                          [bidx, new_br, this](auto p)
                          {
+                           // upsert releases brn... which is why we 
+                           // don't have to retain new_brn when we modify
                             p->set_branch(bidx, new_br);
                             p->add_descendant(_delta_keys);
                          });
@@ -1530,10 +1554,10 @@ namespace arbtrie
                      {
                         //TRIEDENT_DEBUG("... upsert_value<mode>\n");
                         fast_meta_address new_id = upsert_eof_value<mode>(old_val);
-                        //TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
                         if (new_id != val_nid)
                         {
-                           //  TRIEDENT_WARN( "replacing.." );
+                           TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
+                           TRIEDENT_WARN( "replacing.." );
                            r.modify().as<NodeType>()->set_eof(new_id);
                            release_node(old_val);
                         }
@@ -1832,8 +1856,8 @@ namespace arbtrie
          // worst case keys are 1kb and this misses 25% of the time
          // best case keys are small and this misses <1% of the time
          if (bn->insert_requires_refactor(key, _cur_val)) [[unlikely]]
-         {
-            auto rid = refactor<mode>(root, bn);
+         { 
+            auto rid = refactor<mode>(root, bn); 
 
             assert((mode.is_unique() and (rid.address() == root.address())) or
                    ((mode.is_shared()) and (rid.address() != root.address())));
@@ -1954,9 +1978,11 @@ namespace arbtrie
       // this handles the case where the would be forced to grow
       // beyond the maximum size of a binary node
       if (not bn->can_update_with_compaction(delta_s))
-      {
+      {  
          // reclaims free space within the node...
          auto rid = refactor<mode>(root, bn);
+
+         // refactor in shared mode produces a new unique node...
          return upsert<mode.make_unique()>(rid, key);
       }
 
@@ -1977,6 +2003,7 @@ namespace arbtrie
                // value node -> smaller inline (or subtree)
                if (new_value_size <= sizeof(id_address))
                {
+               //   TRIEDENT_WARN("value node -> smaller inline" );
                   auto kvt = _cur_val.is_subtree() ? kv_type::subtree : kv_type::inline_data;
                   root.modify().as<binary_node>()->set_value(kv_index(lb_idx, kvt), _cur_val);
                   return root.address();
@@ -1987,6 +2014,7 @@ namespace arbtrie
                   // inplace
                   if (bn->can_reinsert(key, _cur_val))
                   {
+                //     TRIEDENT_WARN("value node -> larger inline" );
                      root.modify().as<binary_node>()->reinsert(kv_index(lb_idx), key,
                                                                _cur_val.view());
                      return root.address();
@@ -2003,6 +2031,8 @@ namespace arbtrie
                auto nv = upsert_value<mode>(cval, {});
                if (nv != kvp->value_id())
                {
+                  TRIEDENT_WARN( "release old value...?" );
+                  //release_node(cval);
                   root.modify().as<binary_node>()->set_value(kv_index(lb_idx, kv_type::obj_id),
                                                              nv);  //_cur_val.view() );
                }
@@ -2074,6 +2104,22 @@ namespace arbtrie
          {
             auto cval       = root.rlock().get(kvp->value_id());
             _old_value_size = cval->as<value_node>()->value_size();
+            // TODO.... what if clone fails because not enough space
+            if( bn->can_inline( _cur_val.view() ) ) {
+               auto r = clone<mode>(root, bn, {},
+                                  binary_node::clone_update(kv_index(lb_idx), _cur_val));
+               release_node(cval); // because clone retained a copy
+               return r.address();
+            }
+            else
+            {
+               auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
+               auto r = clone<mode>(
+                          root, bn, {},
+                          binary_node::clone_update(kv_index(lb_idx, kv_type::obj_id), nval));
+               release_node(cval); // because clone retained a copy
+               return r.address();
+            }
          }
          else
          {
@@ -2084,9 +2130,9 @@ namespace arbtrie
          {
             if (bn->can_inline(_cur_val.view()))
             {
-               return clone<mode>(root, bn, {},
-                                  binary_node::clone_update(kv_index(lb_idx), _cur_val))
-                   .address();
+               auto r = clone<mode>(root, bn, {},
+                                  binary_node::clone_update(kv_index(lb_idx), _cur_val));
+               return r.address();
             }
             else
             {

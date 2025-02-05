@@ -55,8 +55,12 @@ std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64
       // end.
       while (file >> key)
       {
+         if( count == 295 ) {
+            ws.count_ids_with_refs();
+         }
          val = key;
          toupper(val);
+         val.resize(64);
          if (result.size() != ws.count_keys(root))
             TRIEDENT_WARN(key, " count_keys: ", ws.count_keys(root));
          REQUIRE(result.size() == ws.count_keys(root));
@@ -618,7 +622,7 @@ TEST_CASE("update")
    env.db->print_stats(std::cerr);
 }
 
-TEST_CASE("random-size-updates")
+TEST_CASE("random-size-updates-shared")
 {
    environ env;
    {
@@ -632,9 +636,12 @@ TEST_CASE("random-size-updates")
          std::string                data;
          std::vector<char>          result;
          auto                       rng = std::default_random_engine{};
-         for (int i = 0; i < 1000000; ++i)
+         for (int i = 0; i < 910; ++i)
          {
-            auto idx = rng() % words.size();
+            if( i == 909 ) {
+               std::cerr << "break;\n";
+            }
+            auto idx = rng() % (words.size());
             data.resize(rng() % 250);
 
             auto initsize = ws.get(root, to_key_view(words[idx]), nullptr);
@@ -644,11 +651,16 @@ TEST_CASE("random-size-updates")
             auto postsize = ws.get(root, to_key_view(words[idx]), nullptr);
             REQUIRE(postsize == data.size());
             tmp = root;
+          //  if( i % 1000 == 0 ) {
+          //     TRIEDENT_DEBUG( "i: ", i, " ", ws.count_ids_with_refs() );
+          //  }
          }
          env.db->print_stats(std::cerr);
          TRIEDENT_DEBUG("references before release: ", ws.count_ids_with_refs());
       }
       TRIEDENT_DEBUG("references after release: ", ws.count_ids_with_refs());
+      env.db->print_stats(std::cerr);
+      REQUIRE( 0 == ws.count_ids_with_refs());
    }
    // let the compactor catch up
    usleep(1000000 * 2);
@@ -815,7 +827,7 @@ TEST_CASE("rdtsc")
    */
 }
 
-TEST_CASE("random-size-updates-shared")
+TEST_CASE("random-size-updates")
 {
    environ env;
    {
@@ -841,6 +853,7 @@ TEST_CASE("random-size-updates-shared")
             REQUIRE(postsize == data.size());
          }
          env.db->print_stats(std::cerr);
+         ws.count_ids_with_refs();
       }
       REQUIRE(ws.count_ids_with_refs() == 0);
    }

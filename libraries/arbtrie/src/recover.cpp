@@ -236,14 +236,26 @@ namespace arbtrie
    uint64_t id_alloc::count_ids_with_refs() {
       uint64_t count = 0;
       const auto num_block = _block_alloc.num_blocks();
+      uint64_t by_type[8];
+      memset( by_type, 0, sizeof(by_type) );
       for (int block = 0; block < num_block; ++block)
          for (int region = 0; region < 0xffff; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
                fast_meta_address fma  = {region, ids_per_page * block + index};
                auto&             meta = get(fma);
+               by_type[meta.type()]++;
+               //if( meta.ref() )
+               //   TRIEDENT_DEBUG( "id: ", fma );
                count += meta.ref() > 0;
             }
+      std::cerr << "------------------------------\n";
+      for( int i = 0 ; i < node_type::undefined; ++i ) {
+         std::cerr << node_type_names[i] <<": " << by_type[i] <<"\n";
+      }
+      std::cerr << "total: " << count <<"\n";
+      std::cerr << "------------------------------\n";
+
       return count;
    }
 
