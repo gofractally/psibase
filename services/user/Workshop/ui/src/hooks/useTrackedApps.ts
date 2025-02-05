@@ -5,7 +5,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 type AccountType = z.infer<typeof Account>;
 
 const AppItem = z.object({
-  appName: Account,
+  account: Account,
   owner: Account,
 });
 
@@ -18,22 +18,22 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
   );
 
   const addApp = (newApp: AccountType): void => {
-    const isAlreadyExisting = apps.some((app) => app.appName == newApp);
+    const isAlreadyExisting = apps.some((app) => app.account == newApp);
     if (isAlreadyExisting) {
       console.warn("Tried adding an app already tracked in local storage");
       return;
     }
     setApps((apps) => [
-      { appName: newApp, owner: Account.parse(currentUser) },
+      { account: newApp, owner: Account.parse(currentUser) },
       ...apps,
     ]);
   };
 
   const removeApp = (appBeingRemoved: AccountType) => {
-    const isExisting = apps.some((app) => app.appName == appBeingRemoved);
+    const isExisting = apps.some((app) => app.account == appBeingRemoved);
 
     if (isExisting) {
-      setApps((apps) => apps.filter((app) => app.appName !== appBeingRemoved));
+      setApps((apps) => apps.filter((app) => app.account !== appBeingRemoved));
     } else {
       throw new Error(
         `Failed to remove app ${appBeingRemoved}, does not exist.`
@@ -44,6 +44,6 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
   return {
     addApp,
     removeApp,
-    apps,
+    apps: apps.filter((app) => app.owner == currentUser),
   };
 };
