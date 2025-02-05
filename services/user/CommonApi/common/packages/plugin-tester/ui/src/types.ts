@@ -25,9 +25,45 @@ export interface World {
   exports?: Record<string, ExportedInterface>;
 }
 
+export interface VariantCase {
+  name: string;
+  type?: unknown;
+}
+
+export interface TypeDefinition {
+  kind: {
+    record?: {
+      fields: Array<{
+        name: string;
+        type: unknown;
+      }>;
+    };
+    list?: unknown;
+    type?: string;
+    option?: unknown;
+    tuple?: {
+      types: unknown[];
+    };
+    variant?: {
+      cases: VariantCase[];
+    };
+    enum?: {
+      cases: Array<{
+        name: string;
+      }>;
+    };
+    flags?: {
+      flags: Array<{
+        name: string;
+      }>;
+    };
+  };
+}
+
 export interface Schema {
   worlds: World[];
   interfaces: SchemaInterface[];
+  types: TypeDefinition[];
 }
 
 export interface ExportedMethodsByInterface {
