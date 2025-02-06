@@ -13,10 +13,10 @@ export const useLoggedInUser = () =>
         toast("Fetching account...");
       }
       const res = await supervisor.functionCall({
-        method: "getLoggedInUser",
+        method: "getCurrentUser",
         params: [],
         service: "accounts",
-        intf: "activeApp",
+        intf: "api",
       });
       if (!toasted) {
         toast.success("Fetched account status");

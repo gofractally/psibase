@@ -59,39 +59,35 @@ export const TransferModal = ({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Token transfer</AlertDialogTitle>
-          <div className="w-full  flex justify-around">
-            <div className="flex flex-col gap-1">
-              <div className="text-center text-muted-foreground">From</div>
-              <div>
-                <img
-                  className="h-20 w-20 rounded-none"
-                  src={createIdenticon(chainId + from)}
-                />
+          <div className="w-full grid grid-cols-2 gap-2">
+            {[
+              { label: "From", address: from },
+              { label: "To", address: to },
+            ].map(({ label, address }) => (
+              <div key={label} className="flex flex-col items-center gap-1 ">
+                <div className="text-center text-muted-foreground">{label}</div>
+                <div>
+                  <img
+                    className="h-20 w-20   border"
+                    src={createIdenticon(chainId + address)}
+                  />
+                </div>
+                <div className="text-center text-lg truncate">{address}</div>
               </div>
-              <div className="text-center text-lg">{from}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-center text-muted-foreground">To</div>
-              <div className="w-full justify-center">
-                <img
-                  className="h-20 w-20 rounded-none"
-                  src={createIdenticon(chainId + to)}
-                />
-              </div>
-              <div className="text-center text-lg">{to}</div>
-            </div>
+            ))}
           </div>
           <div className="text-xl font-semibold text-center w-full flex gap-2 justify-center">
-            <span>{amountFormatted} </span>
-            <span className="text-muted-foreground">{symbol} </span>
-          </div>{" "}
+            <span>Sending </span>
+            <span>{amountFormatted}</span>
+            <span className="text-muted-foreground">{symbol}</span>
+          </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => onClose()}>
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction disabled={isPending} onClick={() => onContinue()}>
-            {isPending ? "Loading" : "Continue"}
+            {isPending ? "Sending" : "Send"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

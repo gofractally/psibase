@@ -5,7 +5,7 @@ export const createIdenticon = (seed: string): string => {
   const avatar = createAvatar(identicon, {
     seed,
     size: 40,
-    backgroundColor: ["black"],
+    backgroundColor: ["27272a"],
     scale: 110,
   });
   return avatar.toDataUri();
