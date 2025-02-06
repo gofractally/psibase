@@ -183,10 +183,11 @@ export const CreatePage = () => {
     useEffect(() => {
         const setKeysAndBoot = async () => {
             try {
-                let keyPair: CryptoKeyPair | undefined;
+                let blockSigningPubKey: CryptoKey | undefined; // server block signing pubkey
+                let txSigningKeyPair: CryptoKeyPair | undefined; // bp account tx signing key
                 if (!isDev) {
-                    await createAndSetKey(keyDevice); // create and set server block signing key
-                    keyPair = await generateP256Key(); // bp account tx signing key
+                    blockSigningPubKey = await createAndSetKey(keyDevice);
+                    txSigningKeyPair = await generateP256Key();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -199,7 +200,8 @@ export const CreatePage = () => {
                 bootChain({
                     packages: requiredPackages,
                     producerName: bpName,
-                    publicKey: keyPair?.publicKey,
+                    blockSigningPubKey,
+                    txSigningPubKey: txSigningKeyPair?.publicKey,
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
@@ -220,7 +222,7 @@ export const CreatePage = () => {
                                 });
 
                                 importAccount({
-                                    privateKey: keyPair?.privateKey,
+                                    privateKey: txSigningKeyPair?.privateKey,
                                     account: bpName,
                                 });
                             } else {
