@@ -77,6 +77,7 @@ impl Chain {
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
+            &None,
             AccountNumber::new(account_raw!("prod")),
             false,
             TimePointSec { seconds: 10 },
