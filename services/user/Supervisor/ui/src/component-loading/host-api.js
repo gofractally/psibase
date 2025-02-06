@@ -35,3 +35,9 @@ export const client = {
         return host.myServiceOrigin();
     },
 };
+
+export const web = {
+    openSubpage(url_path) {
+        return host.openSubpage(url_path)
+    }
+}

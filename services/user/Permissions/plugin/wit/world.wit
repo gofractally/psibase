@@ -1,13 +1,12 @@
 package permissions:plugin;
 
 interface api {
-    set-example-thing: func(thing: string);
-    save-permission: func(caller: string, callee: string, remember: bool); // only option in v1 is fullAccess
+    use host:common/types.{error};
+    save-permission: func(caller: string, callee: string, remember: bool) -> result<_, error>; // only option in v1 is fullAccess
 }
 
 interface queries {
     use host:common/types.{error};
-    get-example-thing: func() -> result<string, error>;
     is-permitted: func(caller: string) -> result<bool, error>;
 }
 

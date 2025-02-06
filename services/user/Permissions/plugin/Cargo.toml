@@ -6,7 +6,6 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-permissions = { path = "../service/", version = "0.14.0" }
 psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
@@ -25,6 +24,7 @@ world = "impl"
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 
 [dev-dependencies]
 permissions-pkg = { path = "..", version = "0.14.0" }

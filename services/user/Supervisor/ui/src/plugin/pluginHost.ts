@@ -2,7 +2,7 @@ import { assertTruthy, QualifiedFunctionCallArgs } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
-import { RecoverableErrorPayload } from "./errors";
+import { InvalidUrl, RecoverableErrorPayload } from "./errors";
 
 interface HttpRequest {
     uri: string;
@@ -205,5 +205,11 @@ export class PluginHost implements HostInterface {
 
     myServiceOrigin(): string {
         return this.self.origin;
+    }
+
+    // Web interface
+    openSubpage(url_path: string): Result<void, InvalidUrl> {
+        let url = this.self.origin + url_path;
+        window.open(url, "_blank");
     }
 }

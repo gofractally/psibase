@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import path, { resolve } from "path";
 import * as fs from "fs";
 import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
@@ -17,7 +17,7 @@ const psibase = (service: string, isServing?: boolean) => {
         {
             find: "@",
             replacement: path.resolve(__dirname, "./src"),
-        }
+        },
     ];
 
     // if we're in dev mode, we need to alias the common-lib to the local source
@@ -141,4 +141,12 @@ export default defineConfig(({ command }) => ({
         topLevelAwait(),
         tsconfigPaths(),
     ],
+    build: {
+        rollupOptions: {
+            input: {
+                main: resolve(__dirname, "index.html"),
+                perms: resolve(__dirname, "permissions.html"),
+            },
+        },
+    },
 }));

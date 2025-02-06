@@ -20,11 +20,10 @@ struct CalleePlugin;
 impl Queries for CalleePlugin {
     fn get_private_data() -> Result<String, Error> {
         // ask Permissions if this caller can call this callee
-        println!(
-            "Callee.get_sender_app() = {}",
-            get_sender_app().app.unwrap()
-        );
-        let is_permitted = is_permitted(&get_sender_app().app.unwrap())?;
+        let caller = get_sender_app().app.unwrap();
+        println!("Callee.get_sender_app() = {}", caller);
+        let is_permitted = is_permitted(&caller)?;
+        println!("Callee.is_permitted = {}", is_permitted);
         // return data or error if no permitted
         if !is_permitted {
             return Err(ErrorType::QueryNotPermittedError().into());
