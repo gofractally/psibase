@@ -1566,18 +1566,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
-name = "permissions"
-version = "0.14.0"
-dependencies = [
- "async-graphql",
- "permissions-pkg",
- "psibase",
- "psibase_macros",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "permissions-pkg"
 version = "0.14.0"
 dependencies = [
@@ -1655,7 +1643,6 @@ dependencies = [
 name = "plugin"
 version = "0.14.0"
 dependencies = [
- "permissions",
  "permissions-pkg",
  "psibase",
  "serde",
