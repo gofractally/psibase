@@ -46,6 +46,7 @@ import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 // relative imports
 import { SetupWrapper } from "./setup-wrapper";
 import { DependencyDialog } from "./dependency-dialog";
+import { generateP256Key } from "@/lib/keys";
 
 export const BlockProducerSchema = z.object({
     name: z.string().min(1),
@@ -184,7 +185,8 @@ export const CreatePage = () => {
             try {
                 let keyPair: CryptoKeyPair | undefined;
                 if (!isDev) {
-                    keyPair = await createAndSetKey(keyDevice);
+                    await createAndSetKey(keyDevice); // create and set server block signing key
+                    keyPair = await generateP256Key(); // bp account tx signing key
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>

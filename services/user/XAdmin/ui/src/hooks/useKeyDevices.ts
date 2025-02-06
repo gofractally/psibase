@@ -18,20 +18,19 @@ export const useKeyDevices = () =>
     });
 
 export const useAddServerKey = () =>
-    useMutation<CryptoKeyPair, string, string>({
+    useMutation<void, string, string>({
         mutationKey: queryKeys.addServerKey,
         mutationFn: async (device?: string) => {
-            const keyPair = await generateP256Key();
-            const privateDER = await exportKeyToDER(
-                keyPair.privateKey,
-                "PRIVATE KEY"
-            );
+            // const keyPair = await generateP256Key();
+            // const privateDER = await exportKeyToDER(
+            //     keyPair.privateKey,
+            //     "PRIVATE KEY"
+            // );
 
             chain.addServerKey({
-                key: privateDER,
+                // key: privateDER,
                 device,
             });
-            return keyPair;
         },
         onError: (err) => {
             console.log("Error adding server key:", err);
