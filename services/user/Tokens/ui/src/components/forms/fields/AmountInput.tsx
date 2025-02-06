@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { FormSchema } from "@/hooks/useTokenForm";
-import { Token } from "@/hooks/useUi";
+import { Token } from "@/hooks/tokensPlugin/useBalances";
 import { FC } from "react";
 import { UseFormReturn } from "react-hook-form";
 
@@ -16,13 +16,20 @@ interface Props {
   form: UseFormReturn<FormSchema>;
   selectedToken: Token | undefined;
   tokenBalance: number;
+  disable?: boolean;
 }
 
-const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
+const AmountInput: FC<Props> = ({
+  form,
+  selectedToken,
+  tokenBalance,
+  disable,
+}) => {
   return (
     <FormField
       control={form.control}
       name="amount"
+      disabled={disable}
       render={({ field }) => (
         <FormItem>
           <FormLabel className="flex justify-between w-full">
@@ -30,12 +37,12 @@ const AmountInput: FC<Props> = ({ form, selectedToken, tokenBalance }) => {
             {selectedToken && (
               <button
                 type="button"
-                className="text-muted-foreground hover:underline"
+                className="hover:underline"
                 onClick={() => {
                   form.setValue("amount", tokenBalance.toString());
                 }}
               >
-                Balance:{" "}
+                <span className="text-muted-foreground">Balance: </span>
                 <AnimateNumber
                   n={tokenBalance}
                   precision={selectedToken.balance?.getPrecision() ?? 0}

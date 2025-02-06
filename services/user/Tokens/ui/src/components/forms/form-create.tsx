@@ -11,7 +11,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useSupervisor } from "@/hooks/useSupervisor";
+import { functionCall } from "@/lib/functionCall";
 import { Quantity } from "@/lib/quantity";
 import { tokenPlugin } from "@/plugin";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,14 +53,6 @@ export function FormCreate({ onClose }: Props) {
     mode: "onChange",
   });
 
-  const supervisor = useSupervisor({
-    preloadPlugins: [
-      {
-        service: "tokens",
-      },
-    ],
-  });
-
   const { mutateAsync: createToken, isPending } = useMutation<
     { name: string },
     any,
@@ -68,7 +60,7 @@ export function FormCreate({ onClose }: Props) {
   >({
     mutationFn: async ({ maxSupply, precision }) => {
       try {
-        const res = await supervisor.functionCall(
+        const res = await functionCall(
           tokenPlugin.intf.create(precision, maxSupply)
         );
 
@@ -88,10 +80,9 @@ export function FormCreate({ onClose }: Props) {
       }),
       {
         loading: "Creating token...",
-        description: "Sending transaction",
         dismissible: false,
         finally: () => {
-          toast.success("Transaction successful.");
+          toast.success("Created token.");
           onClose();
         },
       }
