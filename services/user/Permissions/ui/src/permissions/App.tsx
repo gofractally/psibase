@@ -11,10 +11,14 @@ import { Nav } from "@components/nav";
 import { useCreateConnectionToken } from "@hooks";
 
 import { supervisor } from "./perms_main";
+import { CallTracker } from "assert";
+import { CancelledError } from "@tanstack/react-query";
+import { boolean } from "zod";
 
 export const App = () => {
     const [permissions, setPermissions] = useState<string>("");
     const thisServiceName = "Permissions";
+    const [remember, setRemember] = useState<boolean>(true);
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
@@ -26,13 +30,28 @@ export const App = () => {
         init();
     }, []);
 
-    const accept = () => {
+    const accept = async () => {
         // accept perms
         console.info("perms_index accept");
+        try {
+            let res = await supervisor.functionCall({
+                service: "permissions",
+                intf: "api",
+                method: "savePermission",
+                /* TODO: WORKAROUND: logs in as boot account (assuming "myproducer" as boot account). Update this with token actual login. */
+                // params: ["myproducer"],
+                params: [params.caller, params.callee, remember],
+            });
+            console.info("savePermissions() --> ", res);
+        } catch (e) {
+            console.error("error saving permission: ", e);
+        }
+        window.close();
     };
     const deny = () => {
         // deny perms
         console.info("perms_index deny");
+        window.close();
     };
     const getQueryParams = () => {
         const queryString = window.location.search;
