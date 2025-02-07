@@ -7,14 +7,26 @@
 
 struct Query
 {
-   auto blocks() const
+   /// Retrieve blocks
+   /// gt/ge/lt/le take block numbers
+   /// first/last take that number of items from that page of results
+   /// before/after use cursor based pagination
+   auto blocks(std::optional<psibase::BlockNum> gt,
+               std::optional<psibase::BlockNum> ge,
+               std::optional<psibase::BlockNum> lt,
+               std::optional<psibase::BlockNum> le,
+               std::optional<uint32_t>          first,
+               std::optional<uint32_t>          last,
+               std::optional<std::string>       before,
+               std::optional<std::string>       after) const
    {
-      return psibase::TableIndex<psibase::Block, uint32_t>{psibase::DbId::blockLog, {}, false};
+      auto blockIdx =
+          psibase::TableIndex<psibase::Block, uint32_t>{psibase::DbId::blockLog, {}, false};
+
+      return psibase::makeConnection(blockIdx, gt, ge, lt, le, first, last, before, after);
    }
 };
-PSIO_REFLECT(  //
-    Query,
-    method(blocks))
+PSIO_REFLECT(Query, method(blocks, gt, ge, lt, le, first, last, before, after))
 
 namespace SystemService
 {
