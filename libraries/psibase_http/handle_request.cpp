@@ -23,7 +23,7 @@ namespace psibase::http
 {
 
    // Private HTTP headers that are not forwarded to wasm
-   const std::unordered_set<std::string> private_headers = {"authorization", "proxy-authorization"};
+   const std::unordered_set<std::string> private_headers = {"proxy-authorization"};
 
    bool is_private_header(const std::string& name)
    {

@@ -216,12 +216,20 @@ namespace SystemService
 
    extern "C" [[clang::export_name("serve")]] void serve()
    {
-      auto act   = getCurrentAction();
-      auto iface = [&](AccountNumber server)
-      { return psibase::Actor<ServerInterface>(act.service, server); };
+      auto act = getCurrentAction();
 
       // TODO: use a view
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
+
+      Actor<RTransact> rtransact(act.service, RTransact::service);
+      auto             user = rtransact.getUser(req);
+
+      auto iface = [&](AccountNumber server)
+      { return psibase::Actor<ServerInterface>(act.service, server); };
+
+      // Remove sensitive headers
+      req.removeCookie("__HOST-SESSION");
+      std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
 
       // First we check the registered server
       auto                     service    = getTargetService(req);
@@ -233,7 +241,7 @@ namespace SystemService
       {
          server         = srv;
          currentRequest = {.socket = sock, .owner = server};
-         return iface(server).serveSys(req, std::optional{sock});
+         return iface(server).serveSys(req, std::optional{sock}, user);
       };
 
       if (registered)
