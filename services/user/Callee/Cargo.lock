@@ -387,25 +387,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "callee"
-version = "0.14.0"
-dependencies = [
- "async-graphql",
- "callee-pkg",
- "psibase",
- "psibase_macros",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "callee-pkg"
 version = "0.14.0"
-dependencies = [
- "callee",
- "plugin",
- "r-callee",
-]
 
 [[package]]
 name = "cc"
@@ -1657,7 +1640,6 @@ dependencies = [
 name = "plugin"
 version = "0.14.0"
 dependencies = [
- "callee",
  "callee-pkg",
  "psibase",
  "serde",
@@ -1816,17 +1798,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "r-callee"
-version = "0.14.0"
-dependencies = [
- "async-graphql",
- "callee",
- "psibase",
- "serde",
- "serde_json",
 ]
 
 [[package]]

@@ -209,8 +209,12 @@ export class PluginHost implements HostInterface {
 
     // Web interface
     openSubpage(url_path: string): Result<void, InvalidUrl> {
-        let url = this.self.origin + url_path;
-        if (!url.startsWith("/")) url = "/" + url;
+        console.info("pluginHost.ts::url_path: ", url_path);
+        console.info("pluginHost.ts::this.self.origin: ", this.self.origin);
+        let url = this.self.origin;
+        if (!url_path.startsWith("/")) url_path = "/" + url_path;
+        url = url + url_path;
+        console.info("pluginHost.ts::url: ", url);
         window.open(url, "_blank");
     }
 }

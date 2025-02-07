@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["service", "plugin"]
+members = ["plugin"]
 
 [workspace.package]
 version = "0.14.0"
@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "callee-pkg"   # Crate name
+name = "callee-pkg"           # Crate name
 description = "plugin callee"
 version.workspace = true
 rust-version.workspace = true
@@ -25,7 +25,6 @@ lto = true
 
 [package.metadata.psibase]
 package-name = "Callee"
-services = ["callee"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.14.0"
@@ -35,6 +34,3 @@ Sites = "0.14.0"
 crate-type = ["rlib"]
 
 [dependencies]
-callee = { path = "service", version = "0.14.0" }
-r-callee = { path = "query-service", version = "0.14.0" }
-plugin = { path = "plugin", version = "0.14.0" }

@@ -23,22 +23,12 @@ export const App = () => {
 
     const init = async () => {
         await supervisor.onLoaded();
-        await getExampleThing();
     };
 
     useEffect(() => {
         init();
     }, []);
 
-    const getExampleThing = async () => {
-        const queriedExampleThing = (await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "queries",
-            method: "getExampleThing",
-            params: [],
-        })) as string;
-        setPermissions(queriedExampleThing);
-    };
     const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
         e,
     ) => {
@@ -93,15 +83,6 @@ export const App = () => {
                         }}
                         value={permissions}
                     />
-                </div>
-                <div className="col-span-6 mt-6 font-medium">
-                    <Button
-                        type="submit"
-                        disabled={!changesMade}
-                        onClick={updateAssets}
-                    >
-                        Save
-                    </Button>
                 </div>
             </form>
         </div>
