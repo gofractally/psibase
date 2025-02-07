@@ -317,7 +317,7 @@ namespace arbtrie
       r.give(upsert(state, r.take(), key, _new_handle->address()));
 
       // it has been stored without exception; therefore we can take it
-      _new_handle->take();  
+      _new_handle->take();
       return std::move(_old_handle);
    }
 
@@ -328,10 +328,13 @@ namespace arbtrie
       auto state      = _segas.lock();
 
       fast_meta_address adr = r.take();
-      try {
-         r.give( upsert( state, adr, key, val ) );
-      } catch ( ... ) {
-         r.give( adr );
+      try
+      {
+         r.give(upsert(state, adr, key, val));
+      }
+      catch (...)
+      {
+         r.give(adr);
          throw;
       }
       return _old_value_size;
@@ -483,20 +486,20 @@ namespace arbtrie
          // TRIEDENT_DEBUG( "begging to middle" );
 
          // else the end is within this node
-         auto begin    = n->get_branch_ptr();
-         auto end_idx  = n->lower_bound_idx(char_to_branch(to[pre.size()]));
+         auto    begin    = n->get_branch_ptr();
+         auto    end_idx  = n->lower_bound_idx(char_to_branch(to[pre.size()]));
          uint8_t end_byte = slp[end_idx];
-         auto end      = begin + end_idx;
-         auto abs_end  = begin + n->num_branches();
-         auto delta    = end - begin;
-         auto to_tail  = to.substr(pre.size() + 1);
+         auto    end      = begin + end_idx;
+         auto    abs_end  = begin + n->num_branches();
+         auto    delta    = end - begin;
+         auto    to_tail  = to.substr(pre.size() + 1);
 
          //   TODO: optimize by subtracting from descendants
          //   if( delta > n->num_branches()/2 ) // subtract tail from n->desendants()
          //      return n->descendants() - count_range( end, begin + n->num_branches() );
          //   else // sum everything to this point
          uint64_t count = n->has_eof_value() + count_range(begin, end);
-         if (end != abs_end and end_byte == uint8_t(to[pre.size()]) )
+         if (end != abs_end and end_byte == uint8_t(to[pre.size()]))
          {
             auto sref = r.rlock().get(fast_meta_address(n->branch_region(), *end));
             count += count_keys(sref, key_view(), to.substr(pre.size() + 1));
@@ -510,7 +513,7 @@ namespace arbtrie
          auto begin   = n->get_branch_ptr();
          auto abs_end = begin + n->num_branches();
 
-         auto start_idx  = n->lower_bound_idx(char_to_branch(from[pre.size()]));
+         auto    start_idx  = n->lower_bound_idx(char_to_branch(from[pre.size()]));
          uint8_t start_byte = slp[start_idx];
          // TRIEDENT_DEBUG( "start branch: ", start_byte );
          auto start = begin + start_idx;
@@ -522,11 +525,11 @@ namespace arbtrie
             assert(end_idx < n->num_branches());
 
             uint8_t end_byte = slp[end_idx];
-            auto end      = begin + end_idx;
+            auto    end      = begin + end_idx;
 
             uint32_t count            = 0;
             bool     counted_end_byte = false;
-            if (start_byte == uint8_t(from[pre.size()]) )
+            if (start_byte == uint8_t(from[pre.size()]))
             {
                counted_end_byte = start_byte == end_byte;
                //      TRIEDENT_WARN( "start_byte == from[pre.size()]" );
@@ -557,7 +560,7 @@ namespace arbtrie
             // TODO: optimize by counting from abs begin to begin and subtracting from
             // descendants()
             uint32_t count = 0;
-            if (start_byte == uint8_t(from[pre.size()]) )
+            if (start_byte == uint8_t(from[pre.size()]))
             {
                auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
                auto btail = from.substr(pre.size() + 1);
@@ -683,7 +686,6 @@ namespace arbtrie
       return cast_and_call(r.header(),
                            [&](const auto* n) { return this->count_keys(r, n, from, to); });
    }
-
 
    template <upsert_mode mode, typename NodeType>
    fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
@@ -833,12 +835,14 @@ namespace arbtrie
 
          if constexpr (use_binary_nodes)
          {
-            if (not binary_node::can_inline(vn->value_size())) {
+            if (not binary_node::can_inline(vn->value_size()))
+            {
                v1 = make<value_node>(new_reg, state, v1).address();
                t1 = binary_node::key_index::obj_id;
             }
 
-            if (not binary_node::can_inline(v2.size())) {
+            if (not binary_node::can_inline(v2.size()))
+            {
                v2 = make<value_node>(new_reg, state, v2).address();
                t2 = binary_node::key_index::obj_id;
             }
@@ -997,7 +1001,6 @@ namespace arbtrie
       {
          bn->_branch_id_region = state.get_new_region().region;
 
-
          for (int i = from; i < to; ++i)
          {
             auto kvp  = src->get_key_val_ptr(i);
@@ -1005,12 +1008,13 @@ namespace arbtrie
             auto nkh  = binary_node::key_header_hash(binary_node::key_hash(nkey));
 
             // if shared we need to retain any obj_ids/subtrees we migrate
-            if constexpr ( mode.is_shared() ) {
-               if( src->is_obj_id(i) ) {
-                  state.get(kvp->value_id() ).retain();
+            if constexpr (mode.is_shared())
+            {
+               if (src->is_obj_id(i))
+               {
+                  state.get(kvp->value_id()).retain();
                }
             }
-
 
             bn->append(kvp, minus_prefix.size(), nkh, src->value_hashes()[i],
                        src->key_offsets()[i].val_type());
@@ -1081,7 +1085,8 @@ namespace arbtrie
                                             kvp->value_id())
                                .address();
                //auto cval = r.rlock().get(kvp->value_id());
-               if constexpr ( mode.is_shared() ) {
+               if constexpr (mode.is_shared())
+               {
                   // TODO: is this tested?
                   r.rlock().get(kvp->value_id()).retain();
                }
@@ -1098,12 +1103,12 @@ namespace arbtrie
                new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr(cpre.size() + 1),
                                             cval.as<value_node>()->value())
                                .address();
-               if constexpr ( mode.is_unique() )
+               if constexpr (mode.is_unique())
                   release_node(cval);
             }
             else
             {
-            //   TRIEDENT_WARN( ".... make new value node" );
+               //   TRIEDENT_WARN( ".... make new value node" );
                new_child = make<value_node>(bregion, r.rlock(), kvp->key().substr(cpre.size() + 1),
                                             root->get_value(from))
                                .address();
@@ -1197,6 +1202,504 @@ namespace arbtrie
                                 init_fn);
    }
 
+   // Example Transformation:
+   //
+   //  "prefix" ->  (in region R1 because parent needs it to be)
+   //     (children in R3 because it must be different than R1)
+   //     [1] ->
+   //     [2] ->
+   //     [3] ->
+   //     [N] ->
+   //
+   //  insert "postfix" = "value"
+   //
+   //  "p" (setlist) (in R1 because it's parent needs it to be)
+   //      (branches can be any region but R1 or R3)
+   //     [r] -> "efix" [0-N] branches
+   //           - if unique, reassign ID to R2 but don't move object
+   //           - if shared, clone into R2
+   //     [o] -> value_node (in R2) because cannot be same as parent)
+   //           "stfix" = "value"
+   //
+
+   template <upsert_mode mode, typename NodeType>
+   fast_meta_address write_session::upsert_prefix(object_ref<node_header>& r,
+                                                  key_view                 key,
+                                                  key_view                 cpre,
+                                                  const NodeType*          fn,
+                                                  key_view                 rootpre)
+   {
+      auto& state = r.rlock();
+      if constexpr (mode.is_remove())
+      {
+         if constexpr (mode.must_remove())
+            throw std::runtime_error("attempt to remove key that does not exist");
+         return r.address();
+      }
+      if constexpr (mode.must_update())
+      {
+         throw std::runtime_error("attempt to update key that does not exist");
+      }
+      //   TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(), "  cprelen: ", cpre.size());
+      //  TRIEDENT_WARN( "root prefix: ", to_hex( rootpre ) );
+      //  TRIEDENT_WARN( "insert: ", to_hex(key) );
+
+      assert(cpre.size() < rootpre.size());
+
+      auto new_reg = state.get_new_region();
+      // TRIEDENT_DEBUG( "New Region: ", new_reg );
+      while (new_reg == r.address().region or new_reg == fn->branch_region()) [[unlikely]]
+         new_reg = state.get_new_region();
+
+      // there is a chance that r.modify() will rewrite the data
+      // pointed at by rootpre... so we should read what we need first
+      char root_prebranch = rootpre[cpre.size()];
+
+      fast_meta_address child_id;
+
+      // the compactor needs to be smart enough to detect
+      // when the node's address has changed before we can take
+      // this path
+      if constexpr (false and mode.is_unique())
+      {
+         // because the new setlist root must have a different branch region,
+         // we need to reassign the meta_address for the current root, this is
+         // safe because ref count is 1
+         auto [meta, new_addr] = state.get_new_meta_node(new_reg);
+         r.modify().as<NodeType>(
+             [&](auto* n)
+             {
+                meta.store(r.meta_data(), std::memory_order_relaxed);
+                n->set_prefix(rootpre.substr(cpre.size() + 1));
+                n->set_address(new_addr);
+             });
+         state.free_meta_node(r.address());
+         child_id = new_addr;
+      }
+      else  // shared state
+      {
+         //     TRIEDENT_DEBUG(" moving root to child shared ");
+         auto new_prefix = rootpre.substr(cpre.size() + 1);
+         auto cl         = clone<mode.make_shared()>(new_reg, r, fn, {.set_prefix = new_prefix});
+         child_id        = cl.address();
+         if constexpr (mode.is_unique())
+         {
+            // release old root if unique because it doesn't happen automatically for unique;
+            release_node(r);
+         }
+      }
+
+      if (key.size() == cpre.size())
+      {  // eof
+         //   TRIEDENT_DEBUG("  value is on the node (EOF)");
+         _delta_keys = 1;
+         auto v      = make_value(child_id.region, state, _cur_val);
+         // must be same region as r because we can't cange the region our parent
+         // put this node in.
+         return make<setlist_node>(r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
+                                   [&](setlist_node* sln)
+                                   {
+                                      //                                TRIEDENT_WARN("CHILD ID REGION INSTEAD OF NEW?");
+                                      sln->set_branch_region(child_id.region);
+                                      sln->set_eof(v);
+                                      sln->add_branch(char_to_branch(root_prebranch), child_id);
+                                      sln->set_descendants(1 + fn->descendants());
+                                   })
+             .address();
+      }
+      else
+      {  // branch node
+         //       TRIEDENT_DEBUG("  two branch child, cpre: ", to_hex(cpre), "  key: ", to_hex(key),
+         //                     " rpre: ", to_hex(rootpre));
+         //
+         // NOTE: make_binary with 1 key currently makes a value_node.. TODO: rename
+         auto abx    = make_binary(child_id.region, state, key.substr(cpre.size() + 1), _cur_val);
+         _delta_keys = 1;
+         return make<setlist_node>(
+                    r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
+                    [&](setlist_node* sln)
+                    {
+                       sln->set_branch_region(new_reg);
+                       std::pair<branch_index_type, fast_meta_address> brs[2];
+                       sln->set_descendants(1 + fn->descendants());
+
+                       auto order  = key[cpre.size()] < root_prebranch;  //rootpre[cpre.size()];
+                       brs[order]  = {char_to_branch(key[cpre.size()]), abx};
+                       brs[!order] = {char_to_branch(root_prebranch), child_id};
+                       //                TRIEDENT_DEBUG( "abx: ", abx);
+                       //               TRIEDENT_DEBUG( "child_id: ", child_id, " on branch: ", root_prebranch);
+                       sln->add_branch(brs[0].first, brs[0].second);
+                       sln->add_branch(brs[1].first, brs[1].second);
+                    })
+             .address();
+      }
+   }  // upsert_prefix
+
+   /**
+    * NodeType should be an inner_node and the current value should be inserted at
+    * the eof position on this node.
+    */
+   template <upsert_mode mode, typename NodeType>
+   fast_meta_address write_session::upsert_eof(object_ref<node_header>& r, const NodeType* fn)
+   {
+      if constexpr (mode.is_remove())
+         return remove_eof<mode, NodeType>(r, fn);
+
+      auto& state = r.rlock();
+
+      //  TRIEDENT_WARN("upsert value node on inner node");
+      if (fn->has_eof_value())  //val_nid)
+      {
+         fast_meta_address val_nid = fn->get_eof_value();
+         auto              old_val = state.get(val_nid);
+         if constexpr (mode.is_unique())
+         {
+            if (_cur_val.is_subtree())
+            {
+               r.modify().as<NodeType>()->set_eof_subtree(_cur_val.id());
+               release_node(old_val);
+            }
+            else
+            {
+               //TRIEDENT_DEBUG("... upsert_value<mode>\n");
+               fast_meta_address new_id = upsert_eof_value<mode>(old_val);
+               if (new_id != val_nid)
+               {
+                  TRIEDENT_WARN("new id: ", new_id, " old val: ", val_nid);
+                  TRIEDENT_WARN("replacing..");
+                  r.modify().as<NodeType>()->set_eof(new_id);
+                  release_node(old_val);
+               }
+            }
+            return r.address();
+         }
+         else  // shared node
+         {
+            if (_cur_val.is_subtree())
+            {
+               auto cref = clone<mode>(r, fn, {.branch_cap = 16},
+                                       [&](auto cl) { cl->set_eof_subtree(_cur_val.id()); });
+               release_node(old_val);
+               return cref.address();
+            }
+            else
+            {
+               //  TRIEDENT_WARN("upsert value node on inner node");
+               auto new_id = upsert_eof_value<mode>(old_val);
+               assert(new_id != val_nid);  // because shared state
+               auto cref =
+                   clone<mode>(r, fn, {.branch_cap = 16}, [&](auto cl) { cl->set_eof(new_id); });
+               release_node(old_val);
+               return cref.address();
+            }
+         }
+      }
+      else  // there is no value stored here
+      {
+         _delta_keys = 1;
+         if (_cur_val.is_subtree())
+         {
+            if constexpr (mode.is_unique())
+            {
+               r.modify().template as<NodeType>(
+                   [this](auto p)
+                   {
+                      p->set_eof_subtree(_cur_val.id());
+                      p->add_descendant(1);
+                   });
+               return r.address();
+            }
+            else
+            {
+               return clone<mode>(r, fn, {.branch_cap = 1},
+                                  [&](auto cl)
+                                  {
+                                     cl->set_eof_subtree(_cur_val.id());
+                                     cl->add_descendant(1);
+                                  })
+                   .address();
+            }
+         }
+         else  // inserting data
+         {
+            fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
+            if constexpr (mode.is_unique())
+            {
+               r.modify().template as<NodeType>(
+                   [new_id](auto* p)
+                   {
+                      p->set_eof(new_id);
+                      p->add_descendant(1);
+                   });
+               return r.address();
+            }
+            else
+            {
+               TRIEDENT_DEBUG(" clone add new value to branch 0, val =", _cur_val);
+               return clone<mode>(r, fn, {.branch_cap = 16},
+                                  [&](auto cl)
+                                  {
+                                     cl->set_eof(new_id);
+                                     cl->add_descendant(1);
+                                  })
+                   .address();
+            }
+         }
+      }
+   }
+
+   template <upsert_mode mode, typename NodeType>
+   fast_meta_address write_session::remove_eof(object_ref<node_header>& r, const NodeType* fn)
+   {
+      auto& state = r.rlock();
+      //      TRIEDENT_DEBUG( "remove key ends on this node" );
+      if (fn->has_eof_value())
+      {
+         _delta_keys = -1;
+         if constexpr (mode.is_unique())
+         {
+            //   TRIEDENT_DEBUG( "mode is unique?" );
+            release_node(state.get(fn->get_eof_value()));
+            r.modify().as<NodeType>(
+                [](auto* p)
+                {
+                   p->set_eof({});
+                   p->remove_descendant(1);
+                });
+
+            if (fn->num_branches() == 0)
+               return fast_meta_address();
+            return r.address();
+         }
+         else  // mode.is_shared()
+         {
+            //TRIEDENT_WARN("release eof value (shared)");
+            if (fn->num_branches() == 0)
+            {
+               //  TRIEDENT_DEBUG("  num_branch == 0, return null");
+               return fast_meta_address();
+            }
+            return clone<mode>(r, fn, {},
+                               [&](auto cl)
+                               {
+                                  //                                 TRIEDENT_DEBUG("remove eof value from clone");
+                                  release_node(state.get(cl->get_eof_value()));
+                                  cl->set_eof({});
+                                  cl->remove_descendant(1);
+                               })
+                .address();
+         }
+      }
+      if constexpr (mode.must_remove())
+         throw std::runtime_error("attempt to remove key that doesn't exist");
+
+      _delta_keys = 0;
+      return r.address();
+   }
+   template <upsert_mode mode, typename NodeType>
+   fast_meta_address write_session::upsert_inner_existing_br(object_ref<node_header>& r,
+                                                             key_view                 key,
+                                                             const NodeType*          fn,
+                                                             key_view                 cpre,
+                                                             branch_index_type        bidx,
+                                                             fast_meta_address        br)
+   {
+      auto& state = r.rlock();
+
+      // existing branch
+      //      TRIEDENT_WARN( "upserting into existing branch: ", br, " with ref: ",
+      //                    state.get(br).ref() );
+      auto brn = state.get(br);
+      if constexpr (mode.is_unique())
+      {
+         auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
+         if constexpr (mode.is_remove())
+         {
+            if (not new_br)
+            {  // then something clearly got removed
+               assert(_delta_keys == -1);
+               r.modify().as<NodeType>(
+                   [=](auto* p)
+                   {
+                      p->remove_descendant(1);
+                      p->remove_branch(bidx);
+                   });
+               if (fn->num_branches() + fn->has_eof_value() > 0)
+                  return r.address();
+               else
+                  return fast_meta_address();
+            }
+            if (br != new_br)
+            {
+               assert(_delta_keys == -1);
+               // if key was not found, then br would == new_br
+               r.modify().as<NodeType>(
+                   [bidx, new_br, this](auto* p)
+                   {
+                      p->remove_descendant(1);
+                      p->set_branch(bidx, new_br);
+                   });
+               return r.address();
+            }
+
+            if (_delta_keys)
+            {
+               assert(_delta_keys == -1);
+               r.modify().as<NodeType>([this](auto* p) { p->add_descendant(-1); });
+            }
+
+            return r.address();
+         }
+         else  //  update or insert
+         {
+            if (br != new_br)
+               r.modify().as<NodeType>(
+                   [bidx, new_br, this](auto* p)
+                   {
+                      p->add_descendant(_delta_keys);
+                      p->set_branch(bidx, new_br);
+                   });
+            else if (_delta_keys)
+            {
+               r.modify().as<NodeType>([this](auto* p) { p->add_descendant(_delta_keys); });
+            }
+            return r.address();
+         }
+      }
+      else  // shared_node
+      {
+         if constexpr (mode.is_remove())
+         {
+            //    TRIEDENT_DEBUG( "remove key ", key );
+            // brn.retain();  // because upsert might release() it
+            node_handle temp_retain(*this, brn.address());
+            auto        new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
+            if (not new_br)
+            {
+               if (fn->num_branches() + fn->has_eof_value() > 1)
+               {
+                  assert(_delta_keys == -1);
+                  auto cl = clone<mode>(r, fn, {});
+                  //     release_node(brn);  // because we retained before upsert(),
+                  // and retained again in clone
+                  cl.modify().template as<NodeType>(
+                      [bidx](auto* p)
+                      {
+                         p->remove_descendant(1);
+                         p->remove_branch(bidx);
+                      });
+                  return cl.address();
+               }
+               // because we didn't use to release it...
+               temp_retain.take();
+
+               return fast_meta_address();
+            }
+            else
+            {
+               if (br != new_br)
+               {  // something was removed
+                  assert(_delta_keys == -1);
+                  auto cl = clone<mode>(r, fn, {});
+                  //      release_node(brn);  // because we retained before upsert(),
+                  // and retained again in clone
+                  cl.modify().template as<NodeType>(
+                      [bidx, new_br](auto* p)
+                      {
+                         p->remove_descendant(1);
+                         p->set_branch(bidx, new_br);
+                      });
+                  return cl.address();
+               }
+               else
+               {  // nothing was removed
+                  //       release_node(brn);  // because we retained it just in case
+               }
+               assert(_delta_keys == 0);
+               return r.address();
+            }
+         }
+         else  // update/insert
+         {
+            // clone before upsert because upsert will release the branch when
+            // it returns the new one
+            //TRIEDENT_DEBUG( "clone: ", r.address(), " before upsert into branch: ", brn.address() );
+            auto cl     = clone<mode>(r, fn, {});
+            auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
+            assert(br != new_br);
+            cl.modify().template as<NodeType>(
+                [bidx, new_br, this](auto p)
+                {
+                   // upsert releases brn... which is why we
+                   // don't have to retain new_brn when we modify
+                   p->set_branch(bidx, new_br);
+                   p->add_descendant(_delta_keys);
+                });
+            //    TRIEDENT_DEBUG( "returning clone: ", cl.address() );
+            return cl.address();
+         }
+      }
+   }
+
+   template <upsert_mode mode, typename NodeType>
+   fast_meta_address write_session::upsert_inner_new_br(object_ref<node_header>& r,
+                                                        key_view                 key,
+                                                        const NodeType*          fn,
+                                                        key_view                 cpre,
+                                                        branch_index_type        bidx,
+                                                        fast_meta_address        br)
+   {
+      auto& state = r.rlock();
+      if constexpr (mode.must_remove())
+         throw std::runtime_error("unable to find key to remove it");
+      else if constexpr (mode.is_remove())
+         return r.address();
+      else if constexpr (mode.must_update())
+         throw std::runtime_error("unable to find key to update value");
+      else
+      {
+         // NOTE: make_binary with one key is currently implimented
+         // as making a value node
+         auto new_bin =
+             make_binary(fn->branch_region(), state, key.substr(cpre.size() + 1), _cur_val);
+         _delta_keys = 1;
+         if constexpr (mode.is_unique())
+         {
+            if (fn->can_add_branch())
+            {
+               r.modify().template as<NodeType>(
+                   [bidx, new_bin](auto p)
+                   {
+                      p->add_branch(bidx, new_bin);
+                      p->add_descendant(1);
+                   });
+               return r.address();
+            }
+         }
+         if constexpr (not std::is_same_v<full_node, NodeType>)
+         {
+            if (fn->num_branches() + 1 >= full_node_threshold)
+            {
+               return refactor_to_full<mode>(r, fn,
+                                             [&](auto fptr)
+                                             {
+                                                fptr->add_branch(bidx, new_bin);
+                                                fptr->add_descendant(1);
+                                             })
+                   .address();
+            }
+         }
+
+         return clone<mode>(r, fn, {.branch_cap = fn->num_branches() + 1},
+                            [&](auto cptr)
+                            {
+                               cptr->add_branch(bidx, new_bin);
+                               cptr->add_descendant(1);
+                            })
+             .address();
+      }
+   }
+
    //=======================================
    // upsert
    //  - a templated upsert that works for all inner node types, but
@@ -1228,483 +1731,27 @@ namespace arbtrie
       auto rootpre = fn->get_prefix();
       auto cpre    = common_prefix(rootpre, key);
 
-      if (cpre.size() == rootpre.size()) [[likely]]
-      {  // then recurse into this node
+      // key does not share the same prefix, insert above this node
+      if (cpre.size() != rootpre.size()) [[unlikely]]
+         return upsert_prefix<mode>(r, key, cpre, fn, rootpre);
 
-         // on any given node there is a 256/257 chance this is true
-         // on any given path this will be true for all parent nodes
-         if (cpre.size() < key.size()) [[likely]]
-         {
-            const auto bidx = char_to_branch(key[cpre.size()]);
-            auto       br   = fn->get_branch(bidx);
-            if (br)
-            {  // existing branch
-               //      TRIEDENT_WARN( "upserting into existing branch: ", br, " with ref: ",
-               //                    state.get(br).ref() );
-               auto brn = state.get(br);
-               if constexpr (mode.is_unique())
-               {
-                  auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
-                  if constexpr (mode.is_remove())
-                  {
-                     if (not new_br)
-                     {  // then something clearly got removed
-                        assert(_delta_keys == -1);
-                        r.modify().as<NodeType>(
-                            [=](auto* p)
-                            {
-                               p->remove_descendant(1);
-                               p->remove_branch(bidx);
-                            });
-                        if (fn->num_branches() + fn->has_eof_value() > 0)
-                           return r.address();
-                        else
-                           return fast_meta_address();
-                     }
-                     if (br != new_br)
-                     {
-                        assert(_delta_keys == -1);
-                        // if key was not found, then br would == new_br
-                        r.modify().as<NodeType>(
-                            [bidx, new_br, this](auto* p)
-                            {
-                               p->remove_descendant(1);
-                               p->set_branch(bidx, new_br);
-                            });
-                        return r.address();
-                     }
+      // else recurse into this node
 
-                     if (_delta_keys)
-                     {
-                        assert(_delta_keys == -1);
-                        r.modify().as<NodeType>([this](auto* p) { p->add_descendant(-1); });
-                     }
-
-                     return r.address();
-                  }
-                  else  //  update or insert
-                  {
-                     if (br != new_br)
-                        r.modify().as<NodeType>(
-                            [bidx, new_br, this](auto* p)
-                            {
-                               p->add_descendant(_delta_keys);
-                               p->set_branch(bidx, new_br);
-                            });
-                     else if (_delta_keys)
-                     {
-                        r.modify().as<NodeType>([this](auto* p)
-                                                { p->add_descendant(_delta_keys); });
-                     }
-                     return r.address();
-                  }
-               }
-               else  // shared_node
-               {
-                  if constexpr (mode.is_remove())
-                  {
-                     //    TRIEDENT_DEBUG( "remove key ", key );
-                    // brn.retain();  // because upsert might release() it
-                     node_handle temp_retain( *this, brn.address() );
-                     auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
-                     if (not new_br)
-                     {
-                        if (fn->num_branches() + fn->has_eof_value() > 1)
-                        {
-                           assert(_delta_keys == -1);
-                           auto cl = clone<mode>(r, fn, {});
-                      //     release_node(brn);  // because we retained before upsert(),
-                                               // and retained again in clone
-                           cl.modify().template as<NodeType>(
-                               [bidx](auto* p)
-                               {
-                                  p->remove_descendant(1);
-                                  p->remove_branch(bidx);
-                               });
-                           return cl.address();
-                        }
-                        // because we didn't use to release it...
-                        temp_retain.take();
-
-                        return fast_meta_address();
-                     }
-                     else
-                     {
-                        if (br != new_br)
-                        {  // something was removed
-                           assert(_delta_keys == -1);
-                           auto cl = clone<mode>(r, fn, {});
-                     //      release_node(brn);  // because we retained before upsert(),
-                                               // and retained again in clone
-                           cl.modify().template as<NodeType>(
-                               [bidx, new_br](auto* p)
-                               {
-                                  p->remove_descendant(1);
-                                  p->set_branch(bidx, new_br);
-                               });
-                           return cl.address();
-                        }
-                        else
-                        {                      // nothing was removed
-                    //       release_node(brn);  // because we retained it just in case
-                        }
-                        assert(_delta_keys == 0);
-                        return r.address();
-                     }
-                  }
-                  else  // update/insert
-                  {
-                     // clone before upsert because upsert will release the branch when
-                     // it returns the new one
-                     //TRIEDENT_DEBUG( "clone: ", r.address(), " before upsert into branch: ", brn.address() );
-                     auto cl     = clone<mode>(r, fn, {});
-                     auto new_br = upsert<mode>(brn, key.substr(cpre.size() + 1));
-                     assert(br != new_br);
-                     cl.modify().template as<NodeType>(
-                         [bidx, new_br, this](auto p)
-                         {
-                           // upsert releases brn... which is why we 
-                           // don't have to retain new_brn when we modify
-                            p->set_branch(bidx, new_br);
-                            p->add_descendant(_delta_keys);
-                         });
-                     //    TRIEDENT_DEBUG( "returning clone: ", cl.address() );
-                     return cl.address();
-                  }
-               }
-            }
-            else  // new branch
-            {
-               if constexpr (mode.must_remove())
-                  throw std::runtime_error("unable to find key to remove it");
-               else if constexpr (mode.is_remove())
-                  return r.address();
-               else if constexpr (mode.must_update())
-                  throw std::runtime_error("unable to find key to update value");
-               else
-               {
-                  // NOTE: make_binary with one key is currently implimented
-                  // as making a value node
-                  auto new_bin = make_binary(fn->branch_region(), state,
-                                             key.substr(cpre.size() + 1), _cur_val);
-                  _delta_keys  = 1;
-                  if constexpr (mode.is_unique())
-                  {
-                     if (fn->can_add_branch())
-                     {
-                        r.modify().template as<NodeType>(
-                            [bidx, new_bin](auto p)
-                            {
-                               p->add_branch(bidx, new_bin);
-                               p->add_descendant(1);
-                            });
-                        return r.address();
-                     }
-                  }
-                  if constexpr (not std::is_same_v<full_node, NodeType>)
-                  {
-                     if (fn->num_branches() + 1 >= full_node_threshold)
-                     {
-                        return refactor_to_full<mode>(r, fn,
-                                                      [&](auto fptr)
-                                                      {
-                                                         fptr->add_branch(bidx, new_bin);
-                                                         fptr->add_descendant(1);
-                                                      })
-                            .address();
-                     }
-                  }
-
-                  return clone<mode>(r, fn, {.branch_cap = fn->num_branches() + 1},
-                                     [&](auto cptr)
-                                     {
-                                        cptr->add_branch(bidx, new_bin);
-                                        cptr->add_descendant(1);
-                                     })
-                      .address();
-               }
-            }
-         }
-         else  // the key ends on this node, store value here
-         {
-            if constexpr (mode.is_remove())
-            {
-               //      TRIEDENT_DEBUG( "remove key ends on this node" );
-               if (fn->has_eof_value())
-               {
-                  _delta_keys = -1;
-                  if constexpr (mode.is_unique())
-                  {
-                     //   TRIEDENT_DEBUG( "mode is unique?" );
-                     release_node(state.get(fn->get_eof_value()));
-                     r.modify().as<NodeType>(
-                         [](auto* p)
-                         {
-                            p->set_eof({});
-                            p->remove_descendant(1);
-                         });
-
-                     if (fn->num_branches() == 0)
-                        return fast_meta_address();
-                     return r.address();
-                  }
-                  else  // mode.is_shared()
-                  {
-                     //TRIEDENT_WARN("release eof value (shared)");
-                     if (fn->num_branches() == 0)
-                     {
-                        //  TRIEDENT_DEBUG("  num_branch == 0, return null");
-                        return fast_meta_address();
-                     }
-                     return clone<mode>(r, fn, {},
-                                        [&](auto cl)
-                                        {
-                                           //                                 TRIEDENT_DEBUG("remove eof value from clone");
-                                           release_node(state.get(cl->get_eof_value()));
-                                           cl->set_eof({});
-                                           cl->remove_descendant(1);
-                                        })
-                         .address();
-                  }
-               }
-               if constexpr (mode.must_remove())
-                  throw std::runtime_error("attempt to remove key that doesn't exist");
-
-               _delta_keys = 0;
-               return r.address();
-            }
-            else  // must be insert/update on this node
-            {
-               //  TRIEDENT_WARN("upsert value node on inner node");
-               if (fn->has_eof_value())  //val_nid)
-               {
-                  fast_meta_address val_nid = fn->get_eof_value();
-                  auto              old_val = state.get(val_nid);
-                  if constexpr (mode.is_unique())
-                  {
-                     if (_cur_val.is_subtree())
-                     {
-                        r.modify().as<NodeType>()->set_eof_subtree(_cur_val.id());
-                        release_node(old_val);
-                     }
-                     else
-                     {
-                        //TRIEDENT_DEBUG("... upsert_value<mode>\n");
-                        fast_meta_address new_id = upsert_eof_value<mode>(old_val);
-                        if (new_id != val_nid)
-                        {
-                           TRIEDENT_WARN( "new id: ", new_id, " old val: ", val_nid );
-                           TRIEDENT_WARN( "replacing.." );
-                           r.modify().as<NodeType>()->set_eof(new_id);
-                           release_node(old_val);
-                        }
-                     }
-                     return r.address();
-                  }
-                  else  // shared node
-                  {
-                     if (_cur_val.is_subtree())
-                     {
-                        auto cref =
-                            clone<mode>(r, fn, {.branch_cap = 16},
-                                        [&](auto cl) { cl->set_eof_subtree(_cur_val.id()); });
-                        release_node(old_val);
-                        return cref.address();
-                     }
-                     else
-                     {
-                        //  TRIEDENT_WARN("upsert value node on inner node");
-                        auto new_id = upsert_eof_value<mode>(old_val);
-                        assert(new_id != val_nid);  // because shared state
-                        auto cref = clone<mode>(r, fn, {.branch_cap = 16},
-                                                [&](auto cl) { cl->set_eof(new_id); });
-                        release_node(old_val);
-                        return cref.address();
-                     }
-                  }
-               }
-               else  // there is no value stored here
-               {
-                  _delta_keys = 1;
-                  if (_cur_val.is_subtree())
-                  {
-                     if constexpr (mode.is_unique())
-                     {
-                        r.modify().template as<NodeType>(
-                            [this](auto p)
-                            {
-                               p->set_eof_subtree(_cur_val.id());
-                               p->add_descendant(1);
-                            });
-                        return r.address();
-                     }
-                     else
-                     {
-                        return clone<mode>(r, fn, {.branch_cap = 1},
-                                           [&](auto cl)
-                                           {
-                                              cl->set_eof_subtree(_cur_val.id());
-                                              cl->add_descendant(1);
-                                           })
-                            .address();
-                     }
-                  }
-                  else  // inserting data
-                  {
-                     fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
-                     if constexpr (mode.is_unique())
-                     {
-                        r.modify().template as<NodeType>(
-                            [new_id](auto* p)
-                            {
-                               p->set_eof(new_id);
-                               p->add_descendant(1);
-                            });
-                        return r.address();
-                     }
-                     else
-                     {
-                        TRIEDENT_DEBUG(" clone add new value to branch 0, val =", _cur_val);
-                        return clone<mode>(r, fn, {.branch_cap = 16},
-                                           [&](auto cl)
-                                           {
-                                              cl->set_eof(new_id);
-                                              cl->add_descendant(1);
-                                           })
-                            .address();
-                     }
-                  }
-               }
-            }
-         }
-      }
-      else  // key does not share the same prefix!
+      // on any given node there is a 256/257 chance this is true
+      // on any given path this will be true for all parent nodes
+      if (cpre.size() < key.size()) [[likely]]
       {
-         if constexpr (mode.is_remove())
-         {
-            if constexpr (mode.must_remove())
-               throw std::runtime_error("attempt to remove key that does not exist");
-            return r.address();
-         }
-         if constexpr (mode.must_update())
-         {
-            throw std::runtime_error("attempt to update key that does not exist");
-         }
-         //   TRIEDENT_DEBUG("KEY DOESN'T SHARE PREFIX  node prelen: ", rootpre.size(), "  cprelen: ", cpre.size());
-         //  TRIEDENT_WARN( "root prefix: ", to_hex( rootpre ) );
-         //  TRIEDENT_WARN( "insert: ", to_hex(key) );
-
-         // Example Transformation:
-         //
-         //  "prefix" ->  (in region R1 because parent needs it to be)
-         //     (children in R3 because it must be different than R1)
-         //     [1] ->
-         //     [2] ->
-         //     [3] ->
-         //     [N] ->
-         //
-         //  insert "postfix" = "value"
-         //
-         //  "p" (setlist) (in R1 because it's parent needs it to be)
-         //      (branches can be any region but R1 or R3)
-         //     [r] -> "efix" [0-N] branches
-         //           - if unique, reassign ID to R2 but don't move object
-         //           - if shared, clone into R2
-         //     [o] -> value_node (in R2) because cannot be same as parent)
-         //           "stfix" = "value"
-         //
-         assert(cpre.size() < rootpre.size());
-
-         auto new_reg = state.get_new_region();
-         // TRIEDENT_DEBUG( "New Region: ", new_reg );
-         while (new_reg == r.address().region or new_reg == fn->branch_region()) [[unlikely]]
-            new_reg = state.get_new_region();
-
-         // there is a chance that r.modify() will rewrite the data
-         // pointed at by rootpre... so we should read what we need first
-         char root_prebranch = rootpre[cpre.size()];
-
-         fast_meta_address child_id;
-
-         // the compactor needs to be smart enough to detect
-         // when the node's address has changed before we can take
-         // this path
-         if constexpr (false and mode.is_unique())
-         {
-            // because the new setlist root must have a different branch region,
-            // we need to reassign the meta_address for the current root, this is
-            // safe because ref count is 1
-            auto [meta, new_addr] = state.get_new_meta_node(new_reg);
-            r.modify().as<NodeType>(
-                [&](auto* n)
-                {
-                   meta.store(r.meta_data(), std::memory_order_relaxed);
-                   n->set_prefix(rootpre.substr(cpre.size() + 1));
-                   n->set_address(new_addr);
-                });
-            state.free_meta_node(r.address());
-            child_id = new_addr;
-         }
-         else  // shared state
-         {
-            //     TRIEDENT_DEBUG(" moving root to child shared ");
-            auto new_prefix = rootpre.substr(cpre.size() + 1);
-            auto cl         = clone<mode.make_shared()>(new_reg, r, fn, {.set_prefix = new_prefix});
-            child_id        = cl.address();
-            if constexpr (mode.is_unique())
-            {
-               // release old root if unique because it doesn't happen automatically for unique;
-               release_node(r);
-            }
-         }
-
-         if (key.size() == cpre.size())
-         {  // eof
-            TRIEDENT_DEBUG("  value is on the node (EOF)");
-            _delta_keys = 1;
-            auto v      = make_value(child_id.region, state, _cur_val);
-            // must be same region as r because we can't cange the region our parent
-            // put this node in.
-            return make<setlist_node>(r.address().region, state,
-                                      {.branch_cap = 2, .set_prefix = cpre},
-                                      [&](setlist_node* sln)
-                                      {
-                                         TRIEDENT_WARN("CHILD ID REGION INSTEAD OF NEW?");
-                                         sln->set_branch_region(child_id.region);
-                                         sln->set_eof(v);
-                                         sln->add_branch(char_to_branch(root_prebranch), child_id);
-                                         sln->set_descendants(1 + fn->descendants());
-                                      })
-                .address();
-         }
-         else
-         {  // branch node
-            //       TRIEDENT_DEBUG("  two branch child, cpre: ", to_hex(cpre), "  key: ", to_hex(key),
-            //                     " rpre: ", to_hex(rootpre));
-            //
-            // NOTE: make_binary with 1 key currently makes a value_node.. TODO: rename
-            auto abx = make_binary(child_id.region, state, key.substr(cpre.size() + 1), _cur_val);
-            _delta_keys = 1;
-            return make<setlist_node>(
-                       r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
-                       [&](setlist_node* sln)
-                       {
-                          sln->set_branch_region(new_reg);
-                          std::pair<branch_index_type, fast_meta_address> brs[2];
-                          sln->set_descendants(1 + fn->descendants());
-
-                          auto order  = key[cpre.size()] < root_prebranch;  //rootpre[cpre.size()];
-                          brs[order]  = {char_to_branch(key[cpre.size()]), abx};
-                          brs[!order] = {char_to_branch(root_prebranch), child_id};
-                          //                TRIEDENT_DEBUG( "abx: ", abx);
-                          //               TRIEDENT_DEBUG( "child_id: ", child_id, " on branch: ", root_prebranch);
-                          sln->add_branch(brs[0].first, brs[0].second);
-                          sln->add_branch(brs[1].first, brs[1].second);
-                       })
-                .address();
-         }
+         const auto bidx = char_to_branch(key[cpre.size()]);
+         auto       br   = fn->get_branch(bidx);
+         if (br) [[likely]]  // for the top of the tree
+            return upsert_inner_existing_br<mode>(r, key, fn, cpre, bidx, br);
+         // else create a new branch
+         return upsert_inner_new_br<mode>(r, key, fn, cpre, bidx, br);
       }
-   }  // end upsert<T>
+
+      // the key ends on this node, store value here
+      return upsert_eof<mode, NodeType>(r, fn);
+   }  // end upsert_inner<T>
 
    template <upsert_mode mode>
    fast_meta_address write_session::upsert_binary(object_ref<node_header>& root, key_view key)
@@ -1727,7 +1774,7 @@ namespace arbtrie
          // to perform an insert and not an update and we assume the
          // caller would call "upsert" if they didn't know if the key
          // existed or not.
-         if (key_found)  
+         if (key_found)
             throw std::runtime_error("insert failed because key exists");
       }
       else if constexpr (mode.must_update())
@@ -1793,8 +1840,8 @@ namespace arbtrie
          // worst case keys are 1kb and this misses 25% of the time
          // best case keys are small and this misses <1% of the time
          if (bn->insert_requires_refactor(key, _cur_val)) [[unlikely]]
-         { 
-            auto rid = refactor<mode>(root, bn); 
+         {
+            auto rid = refactor<mode>(root, bn);
 
             assert((mode.is_unique() and (rid.address() == root.address())) or
                    ((mode.is_shared()) and (rid.address() != root.address())));
@@ -1915,7 +1962,7 @@ namespace arbtrie
       // this handles the case where the would be forced to grow
       // beyond the maximum size of a binary node
       if (not bn->can_update_with_compaction(delta_s))
-      {  
+      {
          // reclaims free space within the node...
          auto rid = refactor<mode>(root, bn);
 
@@ -1928,14 +1975,14 @@ namespace arbtrie
          // current value is value node or subtree
          if (bn->is_obj_id(lb_idx))
          {
-            auto cval       = root.rlock().get(kvp->value_id());
-            if( bn->is_subtree(lb_idx) )
+            auto cval = root.rlock().get(kvp->value_id());
+            if (bn->is_subtree(lb_idx))
                _old_value_size = sizeof(fast_meta_address);
             else
                _old_value_size = cval.as<value_node>()->value_size();
 
             uint64_t new_value_size = sizeof(id_address);
-            if( not _cur_val.is_subtree() )
+            if (not _cur_val.is_subtree())
                new_value_size = _cur_val.view().size();
 
             if (bn->can_inline(_cur_val))
@@ -1945,7 +1992,7 @@ namespace arbtrie
                // value node -> smaller inline (or subtree)
                if (new_value_size <= sizeof(id_address))
                {
-               //   TRIEDENT_WARN("value node -> smaller inline" );
+                  //   TRIEDENT_WARN("value node -> smaller inline" );
                   auto kvt = _cur_val.is_subtree() ? kv_type::subtree : kv_type::inline_data;
                   root.modify().as<binary_node>()->set_value(kv_index(lb_idx, kvt), _cur_val);
                   return root.address();
@@ -1956,7 +2003,7 @@ namespace arbtrie
                   // inplace
                   if (bn->can_reinsert(key, _cur_val))
                   {
-                //     TRIEDENT_WARN("value node -> larger inline" );
+                     //     TRIEDENT_WARN("value node -> larger inline" );
                      root.modify().as<binary_node>()->reinsert(kv_index(lb_idx), key,
                                                                _cur_val.view());
                      return root.address();
@@ -1973,7 +2020,7 @@ namespace arbtrie
                auto nv = upsert_value<mode>(cval, {});
                if (nv != kvp->value_id())
                {
-                  TRIEDENT_WARN( "release old value...?" );
+                  TRIEDENT_WARN("release old value...?");
                   //release_node(cval);
                   root.modify().as<binary_node>()->set_value(kv_index(lb_idx, kv_type::obj_id),
                                                              nv);  //_cur_val.view() );
@@ -1984,7 +2031,7 @@ namespace arbtrie
          else  // stored value is inline data
          {
             _old_value_size = kvp->value_size();
-            if (_cur_val.is_view()) // new value is data
+            if (_cur_val.is_view())  // new value is data
             {
                auto new_value_size = _cur_val.view().size();
                // inline -> eq or smaller inline
@@ -2033,23 +2080,24 @@ namespace arbtrie
                   }
                }
             }
-            else // replace inline data with subtree
+            else  // replace inline data with subtree
             {
                kv_index kidx(lb_idx, kv_type::subtree);
 
-               if( sizeof(fast_meta_address) >= _old_value_size ) {
+               if (sizeof(fast_meta_address) >= _old_value_size)
+               {
                   // we can update in place
                   root.modify().as<binary_node>()->set_value(kidx, _cur_val);
                   return root.address();
                }
-               else 
+               else
                {
                   if (bn->can_reinsert(key, _cur_val))
                   {
                      root.modify().as<binary_node>()->reinsert(kidx, key, _cur_val);
                      return root.address();
                   }
-                  else 
+                  else
                   {
                      // TODO: this could fail if the required size is beyond the
                      // maximum size for a binary node
@@ -2069,19 +2117,20 @@ namespace arbtrie
             auto cval       = root.rlock().get(kvp->value_id());
             _old_value_size = cval->as<value_node>()->value_size();
             // TODO.... what if clone fails because not enough space
-            if( bn->can_inline( _cur_val.view() ) ) {
-               auto r = clone<mode>(root, bn, {},
-                                  binary_node::clone_update(kv_index(lb_idx), _cur_val));
-               release_node(cval); // because clone retained a copy
+            if (bn->can_inline(_cur_val.view()))
+            {
+               auto r =
+                   clone<mode>(root, bn, {}, binary_node::clone_update(kv_index(lb_idx), _cur_val));
+               release_node(cval);  // because clone retained a copy
                return r.address();
             }
             else
             {
                auto nval = make_value(bn->branch_region(), root.rlock(), _cur_val);
-               auto r = clone<mode>(
-                          root, bn, {},
-                          binary_node::clone_update(kv_index(lb_idx, kv_type::obj_id), nval));
-               release_node(cval); // because clone retained a copy
+               auto r =
+                   clone<mode>(root, bn, {},
+                               binary_node::clone_update(kv_index(lb_idx, kv_type::obj_id), nval));
+               release_node(cval);  // because clone retained a copy
                return r.address();
             }
          }
@@ -2094,8 +2143,8 @@ namespace arbtrie
          {
             if (bn->can_inline(_cur_val.view()))
             {
-               auto r = clone<mode>(root, bn, {},
-                                  binary_node::clone_update(kv_index(lb_idx), _cur_val));
+               auto r =
+                   clone<mode>(root, bn, {}, binary_node::clone_update(kv_index(lb_idx), _cur_val));
                return r.address();
             }
             else
