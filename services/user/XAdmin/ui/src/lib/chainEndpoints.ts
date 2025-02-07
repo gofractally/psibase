@@ -200,12 +200,19 @@ class Chain {
         return schem.parse(await getJson("/native/admin/perf"));
     }
 
-    public addServerKey({ key, device }: { key?: string; device?: string }) {
-        return postJson("/native/admin/keys", {
+    public async addServerKey({
+        key,
+        device,
+    }: {
+        key?: string;
+        device?: string;
+    }): Promise<{ rawData: string; service: string }[]> {
+        const res = await postJson("/native/admin/keys", {
             service: "verify-sig",
             rawData: key,
             device,
         });
+        return await res.json();
     }
 
     public getKeyDevices(): Promise<KeyDevice[]> {
