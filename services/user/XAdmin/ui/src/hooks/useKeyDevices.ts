@@ -24,6 +24,12 @@ export const useAddServerKey = () =>
             const result = await chain.addServerKey({
                 device,
             });
+
+            const service = result[0].service;
+            if (service !== "verify-sig") {
+                throw new Error(`Unexpected service: ${service}"`);
+            }
+
             const der = result[0].rawData;
             const publicKey = await hexDERPublicKeyToCryptoKey(der);
             return publicKey;
