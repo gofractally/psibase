@@ -3,6 +3,8 @@
 #include <psibase/ActionContext.hpp>
 #include <psibase/Socket.hpp>
 
+#include <random>
+
 namespace psibase
 {
    namespace
@@ -436,6 +438,14 @@ namespace psibase
       }
       *time = result.count();
       return 0;
+   }
+
+   void NativeFunctions::getRandom(eosio::vm::span<char> dest)
+   {
+      check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
+            "only subjective services may call getRandom");
+      std::random_device rng;
+      std::ranges::generate(dest, [&] { return rng(); });
    }
 
    void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
