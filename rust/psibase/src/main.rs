@@ -101,7 +101,7 @@ struct BootArgs {
     tx_args: TxArgs,
 
     /// Sets the producer account to use this key for transaction authentication
-    #[clap(short = 'k', long, value_name = "ACCOUNT_KEY")]
+    #[clap(short = 'k', long, value_name = "KEY")]
     account_key: Option<AnyPublicKey>,
 
     /// Sets the producer's block signing key
