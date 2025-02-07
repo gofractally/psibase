@@ -39,7 +39,7 @@ extern "C" [[clang::export_name("prestart")]] void prestart()
 
 extern "C" void called(AccountNumber thisService, AccountNumber sender)
 {
-   abortMessage("this service has no actions");
+   verify();
 }
 
 // Caution! Don't replace with version in dispatcher!
