@@ -37,7 +37,7 @@ namespace psibase
          auto result = psio::gql_query(queryRoot, query, {});
          return HttpReply{
              .contentType = "application/json",
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .body        = std::move(result),
          };
       };
 
@@ -51,8 +51,8 @@ namespace psibase
       {
          auto result = psio::get_gql_schema<std::remove_cvref_t<QueryRoot>>();
          return HttpReply{
-             .contentType = "text",                                          // TODO
-             .body        = {result.data(), result.data() + result.size()},  // TODO: avoid copy
+             .contentType = "text/graphql",
+             .body        = std::move(result),
          };
       }
       else if (request.method == "POST")
