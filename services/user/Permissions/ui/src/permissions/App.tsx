@@ -26,8 +26,6 @@ export const App = () => {
         init();
     }, []);
 
-    const app1 = "App #1";
-    const app2 = "App #2";
     const accept = () => {
         // accept perms
         console.info("perms_index accept");
@@ -36,14 +34,25 @@ export const App = () => {
         // deny perms
         console.info("perms_index deny");
     };
+    const getQueryParams = () => {
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        return Object.fromEntries(urlParams.entries());
+    };
+
+    // Get query parameters as an object
+    const params = getQueryParams();
+    if (!params.caller || !params.callee) {
+        console.error("Malformed query params: ", window.location.href);
+    }
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Permissions Admin Page" />
+            <Nav title="Grant access?" />
             <p>
-                {app1} is requesting full access to {app2}.
+                {`"${params.caller}" is requesting full access to "${params.callee}".`}
             </p>
             <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
+                <Checkbox id="remember" checked={true} />
                 <label
                     htmlFor="remember"
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"

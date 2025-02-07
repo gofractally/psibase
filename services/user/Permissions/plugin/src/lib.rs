@@ -70,8 +70,8 @@ impl Queries for PermissionsPlugin {
 
         // temporarily save a value
         // TASK: remove this for the real functionality once the dialog has been added
-        let perms_res = save_permission_pref(caller.clone(), callee, true);
-        CommonWeb::open_subpage("permissions.html")?;
+        let perms_res = save_permission_pref(caller.clone(), callee.clone(), true);
+        CommonWeb::open_subpage(&format!("permissions.html?caller={caller}&callee={callee}"))?;
 
         if perms_res.is_err() {
             println!("error saving permissions");
