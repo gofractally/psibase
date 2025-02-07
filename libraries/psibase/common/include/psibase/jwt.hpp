@@ -18,6 +18,7 @@ namespace psibase
    }
 
    template <typename T>
+      requires psio::Reflected<T>
    std::string encodeJWT(const JWTKey& key, const T& token)
    {
       return encodeJWT(key, psio::convert_to_json(token));
