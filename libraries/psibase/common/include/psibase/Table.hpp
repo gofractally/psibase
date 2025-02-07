@@ -257,6 +257,16 @@ namespace psibase
       /// each time it's used.
       T operator*() const { return psio::from_frac<T>(psio::prevalidated{*base}); }
 
+      /// get object view
+      ///
+      /// This returns a view of the object in the database. It does not cache; it returns a view of the
+      /// fresh object each time it's used.
+      psio::view<T> view() const
+      {
+         auto buffer = *base;
+         return psio::view<T>{psio::prevalidated{buffer.data()}};
+      }
+
       /// Comparisons
       std::weak_ordering operator<=>(const KvIterator& rhs) const = default;
 
