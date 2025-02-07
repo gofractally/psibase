@@ -758,6 +758,20 @@ TEST_CASE("subtree2")
          REQUIRE(root.ref() ==
                  10);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
 
+         ws.upsert(empty, to_key_view("start-with-data"), to_value_view("data"));
+         ws.upsert(empty, to_key_view("start-with-data"), root );
+
+         REQUIRE(root.ref() ==
+                 11);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", "start-with-data", and "S" key
+         ws.upsert(empty, to_key_view("start-with-data"), to_value_view("release test") );
+         REQUIRE(root.ref() ==
+                 10);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", ", and "S" key
+         ws.upsert(empty, to_key_view("start-with-data"), root );
+         ws.upsert(empty, to_key_view("start-with-data"), root );
+         ws.upsert(empty, to_key_view("start-with-data"), root );
+         REQUIRE(root.ref() ==
+                 11);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", ", and "S" key
+
          {
             auto              itr = ws.create_iterator(empty);
             std::vector<char> buf;
@@ -917,7 +931,7 @@ TEST_CASE("recover")
       auto root = ws.get_root();
       for (uint64_t i = 0; i < 1000'000; ++i)
       {
-         key_view kstr((uint8_t*)&i, sizeof(i));
+         key_view kstr((char*)&i, sizeof(i));
          ws.insert(root, kstr, kstr);
       }
       ws.set_root<sync_type::sync>(root);
@@ -963,7 +977,7 @@ TEST_CASE("dense-rand-insert")
          REQUIRE(ws.count_keys(r) == i);
 
          uint64_t val = rand64();
-         key_view kstr((uint8_t*)&val, sizeof(val));
+         key_view kstr((char*)&val, sizeof(val));
          ws.insert(r, kstr, kstr);
          ws.get(r, kstr,
                 [&](bool found, const value_type& r)
@@ -986,7 +1000,7 @@ TEST_CASE("lower-bound")
    {
       auto r = ws.create_root();
 
-      auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+      auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
 
       std::map<std::string, int> reference;
       for (int i = 0; i < 100000; ++i)
@@ -1024,7 +1038,7 @@ TEST_CASE("upper-bound")
    auto    ws = env.db->start_write_session();
    auto    r  = ws.create_root();
 
-   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+   auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
 
    std::map<std::string, int> reference;
    for (int i = 0; i < 100000; ++i)
@@ -1061,7 +1075,7 @@ TEST_CASE("rev-lower-bound")
    auto    ws = env.db->start_write_session();
    auto    r  = ws.create_root();
 
-   auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, ((uint8_t*)&k)[7] % 9); };
+   auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
 
    std::map<std::string, int> reference;
 
@@ -1189,7 +1203,7 @@ TEST_CASE("dense-rand-upsert")
 
       std::map<std::string, int> reference;
 
-      auto to_kv = [&](uint64_t& k) { return key_view((unsigned char*)&k, sizeof(k)); };
+      auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, sizeof(k)); };
 
       auto test_count = [&](auto n, bool print_dbg)
       {
@@ -1237,7 +1251,7 @@ TEST_CASE("dense-rand-upsert")
             {
                ++count;
                if (print_dbg)
-                  TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()));
+                  TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first) );
                itr.next();
                ++ref_itr;
                if (ref_itr != reference.end())
@@ -1245,6 +1259,8 @@ TEST_CASE("dense-rand-upsert")
             }
             else
             {
+                  if( print_dbg and itr.valid() )
+                     TRIEDENT_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first) );
                break;
             }
          }
@@ -1262,12 +1278,11 @@ TEST_CASE("dense-rand-upsert")
          REQUIRE(ws.count_keys(r) == i);
          if (i % 10 == 0)
          {
-            //TRIEDENT_DEBUG( "i: ", i );
             test_count(r, false);
          }
 
          uint64_t val = rand64();
-         key_view kstr((uint8_t*)&val, sizeof(val));
+         key_view kstr((char*)&val, sizeof(val));
          ws.upsert(r, kstr, kstr);
          reference[std::string(to_str(kstr))] = 0;
          ws.get(r, kstr,
@@ -1296,7 +1311,7 @@ TEST_CASE("dense-little-seq-upsert")
          REQUIRE(ws.count_keys(r) == i);
 
          uint64_t val = i;
-         key_view kstr((uint8_t*)&val, sizeof(val));
+         key_view kstr((char*)&val, sizeof(val));
          ws.upsert(r, kstr, kstr);
          ws.get(r, kstr,
                 [&](bool found, const value_type& r)
@@ -1321,6 +1336,67 @@ uint64_t bswap(uint64_t x)
    return x;
 }
 
+TEST_CASE( "thread-write" ) {
+   environ env;
+   const uint64_t per_thread = 10'000'000;
+   const int rounds = 2;
+   auto run_thread = [&](int num) {
+      TRIEDENT_WARN( "start thread ", num );
+      auto    ws = env.db->start_write_session();
+      auto r = ws.create_root();
+
+      for (int x = 0; x < rounds; ++x ) {
+      for (int64_t i = 0; i < per_thread; i++)
+      {
+         uint64_t val = rand64();//bswap(i);
+         key_view kstr((char*)&val, sizeof(val));
+         ws.upsert(r, kstr, kstr);
+         ws.get(r, kstr,
+                [&](bool found, const value_type& r)
+                {
+                   if (not found)
+                   {
+                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      assert(!"should have found key!");
+                   }
+                   REQUIRE(found);
+                });
+      }
+      TRIEDENT_WARN( "Thread ", num, " round: ", x );
+      }
+   };
+   auto          start = std::chrono::steady_clock::now();
+   std::thread t1(run_thread,1);
+   std::thread t2(run_thread,2);
+   /*
+   std::thread t3(run_thread,3);
+   std::thread t4(run_thread,4);
+   std::thread t5(run_thread,5);
+   std::thread t6(run_thread,6);
+   std::thread t7(run_thread,7);
+   std::thread t8(run_thread,8);
+   */
+   t1.join();
+   t2.join();
+   /*
+   t3.join();
+   t4.join();
+   t5.join();
+   t6.join();
+   t7.join();
+   t8.join();
+   */
+   auto    ws = env.db->start_write_session();
+      auto end   = std::chrono::steady_clock::now();
+      auto delta = end - start;
+
+      std::cout << "db loaded " << std::setw(12)
+                << add_comma(int64_t(
+                       (per_thread*2*rounds) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                << " random upserts/sec  total items: " << add_comma(per_thread*2*rounds) << " \n";
+   REQUIRE(ws.count_ids_with_refs() == 0);
+}
+
 TEST_CASE("dense-big-seq-upsert")
 {
    environ env;
@@ -1333,7 +1409,7 @@ TEST_CASE("dense-big-seq-upsert")
          REQUIRE(ws.count_keys(r) == i);
 
          uint64_t val = bswap(i);
-         key_view kstr((uint8_t*)&val, sizeof(val));
+         key_view kstr((char*)&val, sizeof(val));
          ws.upsert(r, kstr, kstr);
          ws.get(r, kstr,
                 [&](bool found, const value_type& r)

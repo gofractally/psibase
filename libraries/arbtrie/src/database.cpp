@@ -485,7 +485,7 @@ namespace arbtrie
          // else the end is within this node
          auto begin    = n->get_branch_ptr();
          auto end_idx  = n->lower_bound_idx(char_to_branch(to[pre.size()]));
-         auto end_byte = slp[end_idx];
+         uint8_t end_byte = slp[end_idx];
          auto end      = begin + end_idx;
          auto abs_end  = begin + n->num_branches();
          auto delta    = end - begin;
@@ -496,7 +496,7 @@ namespace arbtrie
          //      return n->descendants() - count_range( end, begin + n->num_branches() );
          //   else // sum everything to this point
          uint64_t count = n->has_eof_value() + count_range(begin, end);
-         if (end != abs_end and end_byte == to[pre.size()])
+         if (end != abs_end and end_byte == uint8_t(to[pre.size()]) )
          {
             auto sref = r.rlock().get(fast_meta_address(n->branch_region(), *end));
             count += count_keys(sref, key_view(), to.substr(pre.size() + 1));
@@ -511,7 +511,7 @@ namespace arbtrie
          auto abs_end = begin + n->num_branches();
 
          auto start_idx  = n->lower_bound_idx(char_to_branch(from[pre.size()]));
-         auto start_byte = slp[start_idx];
+         uint8_t start_byte = slp[start_idx];
          // TRIEDENT_DEBUG( "start branch: ", start_byte );
          auto start = begin + start_idx;
 
@@ -521,12 +521,12 @@ namespace arbtrie
             auto end_idx = n->lower_bound_idx(char_to_branch(to[pre.size()]));
             assert(end_idx < n->num_branches());
 
-            auto end_byte = slp[end_idx];
+            uint8_t end_byte = slp[end_idx];
             auto end      = begin + end_idx;
 
             uint32_t count            = 0;
             bool     counted_end_byte = false;
-            if (start_byte == from[pre.size()])
+            if (start_byte == uint8_t(from[pre.size()]) )
             {
                counted_end_byte = start_byte == end_byte;
                //      TRIEDENT_WARN( "start_byte == from[pre.size()]" );
@@ -557,7 +557,7 @@ namespace arbtrie
             // TODO: optimize by counting from abs begin to begin and subtracting from
             // descendants()
             uint32_t count = 0;
-            if (start_byte == from[pre.size()])
+            if (start_byte == uint8_t(from[pre.size()]) )
             {
                auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
                auto btail = from.substr(pre.size() + 1);
@@ -684,62 +684,6 @@ namespace arbtrie
                            [&](const auto* n) { return this->count_keys(r, n, from, to); });
    }
 
-   /*
-         case node_type::full:
-         {
-            auto n = r.as<full_node>();
-            auto pre   = n->get_prefix();
-            auto cfrom = common_prefix(pre, from);
-            auto cto   = common_prefix(pre, to);
-            TRIEDENT_DEBUG( "from: ", from.size(), " to: ", to.size(), " cto: ", cto.size(), " cfrom: ", cfrom.size() );
-
-            // the start is at or before this nodes eof
-            if( from <= pre ) {
-               // then we start with the eof on this node
-               if( pre < to )  {
-                  // the end is another node above us because to > from
-                  return n->descendants();
-               }
-               assert( to.size() > cto.size() );
-               
-               auto to_br = char_to_branch(to[cto.size()]);
-               auto tidx_adr = n->lower_bound(to_br);
-               TRIEDENT_DEBUG( "tidx_adr.first: ", tidx_adr.first, " nbranch: ", n->num_branches() );
-
-               auto from_br = 0;
-               auto range = to_br - from_br;
-               if( range < max_branch_count/2 ) {
-                  // majority excluded
-                  uint32_t total = n->has_eof_value();
-                  for( branch_index_type i = 0; i < to_br; ++i ) {
-                     if( auto a = fast_meta_address( n->branch_region(), n->branch(i) ) ) {
-                        auto oref = r.rlock().get(a);
-                        total += count_keys( oref, from.substr(cfrom.size()+1), to.substr(cto.size()) );
-                     }
-                  }
-                  return n->descendants() - total;
-                  // Count desendants of every branch from eof until but not including to_br
-               }
-               else
-               {
-                  TRIEDENT_WARN( "majority included" );
-                  uint32_t total = n->has_eof_value() & -uint32_t(from_br == 0);
-                  for( branch_index_type i = to_br; i < 257; ++i ) {
-                     if( auto a = fast_meta_address( n->branch_region(), n->branch(i) ) ) {
-                        auto oref = r.rlock().get(a);
-                        total += count_keys( oref, from.substr(cfrom.size()+1), to.substr(cto.size()) );
-                     }
-                  }
-                  return total;
-                  // count descendants of every branch from and including to_br until the end
-                  // and subtract from total descendants. 
-               }
-            } else {
-               assert( from.size() > cfrom.size() );
-               auto from_br = char_to_branch(from[cfrom.size()]);
-            }
-   }
-   */
 
    template <upsert_mode mode, typename NodeType>
    fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
@@ -1216,18 +1160,11 @@ namespace arbtrie
       };
 
       if constexpr (mode.is_unique())
-      {
-         //         TRIEDENT_DEBUG( "remake setlist" );
          return remake<setlist_node>(r, init_setlist,
                                      clone_config{.branch_cap = nbranch, .set_prefix = cpre});
-      }
       else
-      {
-         TRIEDENT_DEBUG( "refactor shared to setlist, retain children... here?" );
-         //retain_children(r.rlock(), root);
          return make<setlist_node>(r.address().region, r.rlock(),
                                    {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
-      }
    }
    template <upsert_mode mode, typename NodeType>
    object_ref<full_node> refactor_to_full(object_ref<node_header>& r,
@@ -1790,7 +1727,7 @@ namespace arbtrie
          // to perform an insert and not an update and we assume the
          // caller would call "upsert" if they didn't know if the key
          // existed or not.
-         if (key_found)  //binary_node::key_not_found != key_idx)
+         if (key_found)  
             throw std::runtime_error("insert failed because key exists");
       }
       else if constexpr (mode.must_update())
@@ -1988,13 +1925,18 @@ namespace arbtrie
 
       if constexpr (mode.is_unique())
       {
-         // current value is value node
+         // current value is value node or subtree
          if (bn->is_obj_id(lb_idx))
          {
             auto cval       = root.rlock().get(kvp->value_id());
-            _old_value_size = cval.as<value_node>()->value_size();
+            if( bn->is_subtree(lb_idx) )
+               _old_value_size = sizeof(fast_meta_address);
+            else
+               _old_value_size = cval.as<value_node>()->value_size();
 
-            auto new_value_size = _cur_val.view().size();
+            uint64_t new_value_size = sizeof(id_address);
+            if( not _cur_val.is_subtree() )
+               new_value_size = _cur_val.view().size();
 
             if (bn->can_inline(_cur_val))
             {
@@ -2039,10 +1981,10 @@ namespace arbtrie
                return root.address();
             }
          }
-         else  // current value is inline
+         else  // stored value is inline data
          {
             _old_value_size = kvp->value_size();
-            if (_cur_val.is_view())
+            if (_cur_val.is_view()) // new value is data
             {
                auto new_value_size = _cur_val.view().size();
                // inline -> eq or smaller inline
@@ -2091,10 +2033,32 @@ namespace arbtrie
                   }
                }
             }
-            else
+            else // replace inline data with subtree
             {
-               TRIEDENT_WARN("subtree case not implimented yet");
-               throw std::runtime_error("subtree not implimented");
+               kv_index kidx(lb_idx, kv_type::subtree);
+
+               if( sizeof(fast_meta_address) >= _old_value_size ) {
+                  // we can update in place
+                  root.modify().as<binary_node>()->set_value(kidx, _cur_val);
+                  return root.address();
+               }
+               else 
+               {
+                  if (bn->can_reinsert(key, _cur_val))
+                  {
+                     root.modify().as<binary_node>()->reinsert(kidx, key, _cur_val);
+                     return root.address();
+                  }
+                  else 
+                  {
+                     // TODO: this could fail if the required size is beyond the
+                     // maximum size for a binary node
+                     return remake<binary_node>(root, bn, clone_config{},
+                                                binary_node::clone_update(kidx, _cur_val))
+                         .address();
+                  }
+                  // we may have to reinsert and/or refactor...
+               }
             }
          }
       }

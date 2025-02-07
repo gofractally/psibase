@@ -60,7 +60,7 @@ namespace arbtrie
       int            get_setlist_size() const { return num_branches(); }
       key_view       get_setlist() const
       {
-         return key_view(get_setlist_ptr(), get_setlist_size());
+         return to_key(get_setlist_ptr(), get_setlist_size());
       }
 
       id_index*       get_branch_ptr() { return ((id_index*)tail()) - branch_capacity(); }
@@ -154,7 +154,7 @@ namespace arbtrie
          }
 
          uint8_t        b = br - 1;
-         const uint8_t* s = get_setlist_ptr();
+         const uint8_t *    s = (uint8_t*)get_setlist_ptr();
          const auto*    e = s + get_setlist_size();
 
          const uint8_t* p = s;
@@ -176,7 +176,7 @@ namespace arbtrie
          }
 
          uint8_t        b = br - 1;
-         const uint8_t* s = get_setlist_ptr();
+         const uint8_t* s = (uint8_t*)get_setlist_ptr();
          const auto*    e = s + get_setlist_size() -1;
 
          const uint8_t* p = e;

@@ -47,11 +47,11 @@ namespace arbtrie
    }
    inline key_view to_key_view(const std::string& str)
    {
-      return key_view((uint8_t*)str.data(), str.size());
+      return key_view((const byte_type*)str.data(), str.size());
    }
    inline value_view to_value_view(const std::string& str)
    {
-      return value_view((uint8_t*)str.data(), str.size());
+      return value_view((const byte_type*)str.data(), str.size());
    }
 
    inline std::string add_comma(uint64_t v)
@@ -66,4 +66,11 @@ namespace arbtrie
       }
       return s;
    };
+
+   inline constexpr key_view   to_key( const char* c, size_t len ) { return key_view( (const byte_type*) c, len); }
+   inline constexpr key_view   to_key( const uint8_t* c, size_t len ) { return key_view( (const byte_type*) c, len); }
+   inline constexpr key_view   to_key( const char* c ) { return key_view( (const byte_type*) c, strnlen(c, max_key_length ) ); }
+   inline constexpr key_view   to_value( const char* c, size_t len ) { return key_view( (const byte_type*) c, len); }
+   inline constexpr key_view   to_value( const uint8_t* c, size_t len ) { return key_view( (const byte_type*) c, len); }
+   inline constexpr value_view to_value( const char* c ) { return value_view( (const byte_type*) c, strnlen(c, max_value_size ) ); }
 }  // namespace arbtrie

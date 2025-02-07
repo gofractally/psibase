@@ -18,9 +18,9 @@ namespace arbtrie
 
      public:
       // TODO: npos size == 1024 / max key length
-      static constexpr const std::array<uint8_t, max_key_length> nposa = []()
+      static constexpr const std::array<char, max_key_length> nposa = []()
       {
-         std::array<uint8_t, max_key_length> ar;
+         std::array<char, max_key_length> ar;
          ar.fill(0xff);
          return ar;
       }();
@@ -31,7 +31,7 @@ namespace arbtrie
       // return the root this iterator is based on
       node_handle get_root() const { return _root; }
       // the key the iterator is currently pointing to
-      key_view key() const { return key_view(_branches.data(), _branches.size()); }
+      key_view key() const { return to_key(_branches.data(), _branches.size()); }
 
       bool next();  // moves to next key, return valid()
       bool prev();  // moves to the prv key, return valid()

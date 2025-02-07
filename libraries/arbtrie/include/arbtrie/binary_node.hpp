@@ -263,8 +263,8 @@ namespace arbtrie
          inline const uint8_t* key_ptr() const { return _key; }
          inline uint8_t*       val_ptr() { return _key + _key_size; }
          inline const uint8_t* val_ptr() const { return _key + _key_size; }
-         inline key_view       key() const { return key_view(_key, _key_size); }
-         inline value_view     value() const { return value_view(_key + _key_size, value_size()); }
+         inline key_view       key() const { return to_key(_key, _key_size); }
+         inline value_view     value() const { return to_value(_key + _key_size, value_size()); }
 
          inline const fast_meta_address value_id() const
          {
@@ -536,7 +536,7 @@ namespace arbtrie
 
       int find_key_idx(key_view key, uint64_t khash) const
       {
-         key_view hashes(key_hashes(), num_branches());
+         key_view hashes = to_key(key_hashes(), num_branches());
          auto     khh = key_header_hash(khash);
          //  TRIEDENT_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
 

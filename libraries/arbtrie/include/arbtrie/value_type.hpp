@@ -11,8 +11,8 @@ namespace arbtrie {
    struct value_type {
       struct remove{};
 
-      value_type( const char* str ):data(key_view((uint8_t*)str)){}
-      value_type( const std::string& vv ):data(key_view((uint8_t*)vv.data(), vv.size())){}
+      value_type( const char* str ):data(to_key(str)){}
+      value_type( const std::string& vv ):data(to_key(vv.data(), vv.size())){}
       value_type( value_view vv ):data(vv){}
       value_type( remove vv ):data(vv){}
       value_type( fast_meta_address i ):data(i){}

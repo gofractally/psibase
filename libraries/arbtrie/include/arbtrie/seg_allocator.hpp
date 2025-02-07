@@ -791,7 +791,11 @@ namespace arbtrie
        *  TODO: each ptr moved to its own cacheline (64 byte bounds)..
        *       so that read threads don't contend.
        */
-      std::atomic<uint64_t> _session_lock_ptrs[64];
+      struct aligned_atomic64 : public std::atomic<uint64_t> {
+         uint64_t padding[7];
+      } __attribute__((__aligned__(8)));
+      aligned_atomic64 _session_lock_ptrs[64];
+      static_assert( sizeof(_session_lock_ptrs) == 64*64 );
 
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,

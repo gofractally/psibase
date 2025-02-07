@@ -212,7 +212,7 @@ namespace arbtrie
 
       if (prefix.size() > max_key_length)
          throw std::runtime_error("invalid key length");
-      std::array<uint8_t, max_key_length> lastkey;
+      std::array<char, max_key_length> lastkey;
       memcpy(lastkey.data(), prefix.data(), prefix.size());
       memset(lastkey.data() + prefix.size(), 0xff, max_key_length - prefix.size());
       if (lower_bound(key_view(lastkey.data(), lastkey.size())))

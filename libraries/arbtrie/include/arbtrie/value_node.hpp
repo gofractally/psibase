@@ -46,7 +46,7 @@ namespace arbtrie {
       }
 
       const uint8_t* key_ptr()const { return ((const uint8_t*)(this+1)); }
-      key_view key()const { return { key_ptr(), _ksize }; }
+      key_view key()const { return to_key( key_ptr(), _ksize ); }
       const uint8_t* data()const { return ((const uint8_t*)(this+1)) + _ksize; }
       uint8_t* data(){ return ((uint8_t*)(this+1))+_ksize; }
 
@@ -93,7 +93,7 @@ namespace arbtrie {
       value_view value() const
       {
          assert(_nsize >= sizeof(node_header));
-         return value_view(data(), value_size());
+         return to_value(data(), value_size());
       }
 
       uint32_t calculate_checksum()const {

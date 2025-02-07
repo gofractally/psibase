@@ -1,4 +1,5 @@
 #pragma once
+#include <span>
 #include <string_view>
 
 namespace arbtrie {
@@ -37,9 +38,10 @@ namespace arbtrie {
 
 
    /**
-    *  Certain 
+    *  Certain parameters depend upon reserving space for eventual growth
+    *  of the database. 
     */
-   static constexpr const uint64_t max_database_size = 64 * TB; 
+   static constexpr const uint64_t max_database_size = 8 * TB; 
 
    /**
     * This impacts the number of reference count bits that are reserved in case
@@ -48,7 +50,7 @@ namespace arbtrie {
     * the same instant before any core can realize the overshoot and subtract out.
     *
     * The session allocation algo uses a 64 bit atomic to alloc session numbers,
-    * so going beyond 64 would require a refactor of thatcode.
+    * so going beyond 64 would require a refactor of that code.
     */
    static constexpr const uint32_t max_threads = 64;
 
@@ -74,6 +76,10 @@ namespace arbtrie {
    // must be a power of 2
    // size of the data segments file grows
    //
+   // the segment size impacts the largest possible value
+   // to be stored, which can be no larger than 50% of the
+   // segment size.
+   //
    // the smaller this value, the more overhead there is in
    // searching for segments to compact and the pending 
    // free queue. 
@@ -84,13 +90,15 @@ namespace arbtrie {
    // free space in an allocating segment cannot be reclaimed until
    // the allocations reach the end.  TODO: should the allocator 
    // consider abandoing a segment early if much of what has been
-   // allocated has already been freed? This may improve cache-locality
-   // by not needing to load in the rest of the segment.
+   // allocated has already been freed? 
    //
    // each thread will have a segment this size, so larger values
    // may use more memory than necessary for idle threads
    // max value: 4 GB due to type of segment_offset
-   static constexpr const uint64_t segment_size = 128*MB;
+   static constexpr const uint64_t segment_size = 32*MB;
+
+   static_assert( segment_size < 4*GB, "size must be less than 4GB" );
+   static_assert( std::popcount(segment_size) == 1, "size must be power of 2" );
 
    // the number of empty bytes allowed in a segment before it gets
    // compacted
@@ -99,34 +107,50 @@ namespace arbtrie {
                                                             
    // the maximum value a node may have
    static constexpr const uint64_t max_value_size = segment_size / 2;
+   static_assert( max_value_size <= segment_size/2 );
 
    // more than 1024 and the bit fields in nodes need adjustment
    static constexpr const uint16_t max_key_length = 1024; 
    static_assert( max_key_length <= 1024 );
                                                             
    // the number of branches at which an inner node is automatically
-   // upgraded to a full node
+   // upgraded to a full node, a full node has 2 bytes per branch,
+   // and a setlist node has 1 byte over head per branch present.
+   //
+   // At 128 branches, a full node would be 128 bytes larger, but
+   // a full node is able to dispatch faster by not having to
+   // scane the setlist. 128 represents 2 cachelines in the setlist
+   // that must be scanned. Since cacheline loading is one of the
+   // major bottlenecks, this number should be a multiple of the
+   // cacheline size so no loaded memory is wasted. 
+   //
+   // In practice 128 was found to be a good speed/space tradeoff. 
    static constexpr const int full_node_threshold = 128;
 
    static constexpr const uint64_t binary_refactor_threshold = 4096;
-   static constexpr const uint64_t binary_node_max_size  = 4096;
+   static constexpr const uint64_t binary_node_max_size  = 4096; // 1 page
    static constexpr const int      binary_node_max_keys  = 254; /// must be less than 255
+   static_assert( binary_refactor_threshold <= binary_node_max_size );
+
+   // initial space reserved for growth in place, larger values
+   // support faster insertion, but have much wasted space if your
+   // keys are not dense.
    static constexpr const int      binary_node_initial_size = 2048;
+
+   // extra space reserved for growth in place
    static constexpr const int      binary_node_initial_branch_cap = 64;
 
    static_assert( binary_node_max_keys < 255);
 
-   using key_view       = std::basic_string_view<uint8_t>;
-   using value_view     = std::basic_string_view<uint8_t>;
+   using byte_type      = char;
+   using key_view       = std::string_view;
+   using value_view     = std::string_view;
    using segment_offset = uint32_t;
    using segment_number = uint64_t;
 
-   inline key_view   to_key( const char* c ) { return key_view( (const unsigned char*) c ); }
-   inline value_view to_value( const char* c ) { return value_view( (const unsigned char*) c ); }
 
    struct recover_args
    {
-   //   recover_args() noexcept : validate_checksum(false), recover_unsync(false){};
       bool validate_checksum = false;
       bool recover_unsync    = false;
    };

@@ -2,6 +2,8 @@ enable_testing()
 
 find_package(Threads REQUIRED)
 
+#set(compile_flags -coverage)
+#set(link_flags -coverage)
 add_library(arbtrie
     src/node_handle.cpp
     src/database.cpp
