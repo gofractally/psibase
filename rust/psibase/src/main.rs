@@ -7,16 +7,16 @@ use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites};
+use psibase::services::{accounts, auth_delegate, sites, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry,
-    JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry,
-    ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
-    TransactionBuilder, TransactionTrace,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
+    method, new_account_action, push_transaction, push_transactions, reg_server,
+    set_auth_service_action, set_code_action, set_key_action, sign_transaction, AccountNumber,
+    Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry,
+    ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
+    PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo, SignedTransaction, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -353,6 +353,21 @@ struct CreateTokenArgs {
     mode: String,
 }
 
+#[derive(Args, Debug)]
+struct LoginArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    /// The account logging in
+    user: ExactAccountNumber,
+
+    /// The app to log in to
+    app: ExactAccountNumber,
+}
+
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Boot a development chain
@@ -384,6 +399,9 @@ enum Command {
 
     /// Create a bearer token that can be used to access a node
     CreateToken(CreateTokenArgs),
+
+    /// Get a bearer token that can be used to access an app
+    Login(LoginArgs),
 
     /// Setup the psibase local config file
     #[command(subcommand)]
@@ -1323,6 +1341,47 @@ fn create_token(expires_after: Duration, mode: &str) -> Result<(), anyhow::Error
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct LoginReply {
+    access_token: String,
+    token_type: String,
+}
+
+async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    let root_host = args
+        .node_args
+        .api
+        .domain()
+        .expect("api must use a domain name");
+    let actions = vec![login_action(args.user.into(), args.app.into(), root_host)];
+
+    let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+    let tapos = Tapos {
+        expiration: expiration,
+        refBlockSuffix: 0,
+        flags: Tapos::DO_NOT_BROADCAST_FLAG,
+        refBlockIndex: 0,
+    };
+    let trx = Transaction {
+        tapos: tapos,
+        actions,
+        claims: vec![],
+    };
+
+    let reply: LoginReply = as_json(
+        client
+            .post(transact::SERVICE.url(&args.node_args.api)?.join("/login")?)
+            .header("Content-Type", "application/octet-stream")
+            .header("Accept", "application/json")
+            .body(sign_transaction(trx, &args.sig_args.sign)?.packed()),
+    )
+    .await?;
+    println!("{} {}", reply.token_type, reply.access_token);
+    Ok(())
+}
+
 fn get_external(name: &OsString) -> Option<&str> {
     name.to_str()?
         .strip_prefix("psibase-")?
@@ -1514,6 +1573,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Command::CreateToken(args) => {
             create_token(Duration::seconds(args.expires_after), &args.mode)?
         }
+        Command::Login(args) => handle_login(args).await?,
         Command::Config(config) => handle_cli_config_cmd(config)?,
         Command::Help { command } => print_help(command)?,
         Command::External(argv) => handle_external(argv)?,
