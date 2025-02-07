@@ -34,12 +34,12 @@ int64_t rand_from_seq(uint64_t seq)
    return XXH3_64bits((char*)&seq, sizeof(seq));
 }
 
-void to_key(uint64_t val, std::vector<uint8_t>& v)
+void to_key(uint64_t val, std::vector<char>& v)
 {
    v.resize(sizeof(val));
    memcpy(v.data(), &val, sizeof(val));
 }
-void to_key(std::string val, std::vector<uint8_t>& v)
+void to_key(std::string val, std::vector<char>& v)
 {
    v.resize(val.size());
    memcpy(v.data(), val.data(), val.size());
@@ -81,7 +81,7 @@ int64_t get_test(benchmark_config   cfg,
              << " batch: " << format_comma(cfg.batch_size) << "\n";
    std::cerr << "-----------------------------------------------------------------------\n";
 
-   std::vector<uint8_t> key;
+   std::vector<char> key;
    auto                 root  = ws.get_root();
    auto                 start = std::chrono::steady_clock::now();
    for (uint64_t i = 0; i < cfg.items; ++i)
@@ -130,8 +130,8 @@ std::vector<int> insert_test(benchmark_config   cfg,
       root = ws.get_root();
 
    uint64_t             seq = 0;
-   std::vector<uint8_t> key;
-   std::vector<uint8_t> value;
+   std::vector<char> key;
+   std::vector<char> value;
    value.resize(cfg.value_size);
    value_view vv(value.data(), value.size());
 

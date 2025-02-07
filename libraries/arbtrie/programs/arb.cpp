@@ -148,7 +148,7 @@ void print_pre(session_rlock&           state,
              return;
           }
           auto c = branch_to_char(br);
-          path.push_back("-" + to_hex(key_view(&c, 1)));
+          path.push_back("-" + to_hex(key_view((char*)&c, 1)));
           print_pre(state, bid, prefix + char(branch_to_char(br)), path, depth + 1);
           path.pop_back();
        });
@@ -444,7 +444,7 @@ int  main(int argc, char** argv)
                //print(l, r.address());
                // }
 
-               std::vector<uint8_t> data;
+               std::vector<char> data;
                auto                 start = std::chrono::steady_clock::now();
                if (itr.lower_bound())
                {
@@ -488,7 +488,7 @@ int  main(int argc, char** argv)
                //  auto l = ws._segas.lock();
                uint64_t val = rand64();
                ++seq;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                /*
                ws.get(r, kstr,
@@ -543,7 +543,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = ++seq3;
                seq++;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                /*
                ws.get(r, kstr,
@@ -589,7 +589,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(seq3++);
                ++seq;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
@@ -633,7 +633,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(seq4--);
                ++seq;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if ((i % batch_size) == 0)
                {
@@ -705,7 +705,7 @@ int  main(int argc, char** argv)
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = ++seq2;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -739,7 +739,7 @@ int  main(int argc, char** argv)
                uint64_t val  = (rnd % (seq2 - 1)) + 1;
                uint64_t val2 = val;
                //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -773,7 +773,7 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(start_big_end++);
                //TRIEDENT_WARN( "find ", start_big_end );
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
                       {
@@ -807,7 +807,7 @@ int  main(int argc, char** argv)
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = rand64();  //bswap(++seq2);
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                itr.lower_bound(kstr);
             }
             auto end   = std::chrono::steady_clock::now();
@@ -825,7 +825,7 @@ int  main(int argc, char** argv)
          auto read_thread = [&]() {};
 
          std::vector<std::unique_ptr<std::thread>> rthreads;
-         rthreads.reserve(8);
+         rthreads.reserve(14);
          std::atomic<bool>    done = false;
          std::atomic<int64_t> read_count;
          std::mutex           _lr_mutex;
@@ -862,7 +862,7 @@ int  main(int argc, char** argv)
                      ++added;
                      uint64_t val = rand64();  //bswap(++seq2);
                      //auto str = std::to_string(val);
-                     key_view kstr((uint8_t*)&val, sizeof(val));
+                     key_view kstr((char*)&val, sizeof(val));
                      //key_view kstr(str);
                      if (not itr.lower_bound(kstr))
                      {
@@ -892,7 +892,7 @@ int  main(int argc, char** argv)
                uint64_t val = rand64();
                auto     str = std::to_string(val);
                ++seq;
-               key_view kstr((uint8_t*)&val, sizeof(val));
+               key_view kstr((char*)&val, sizeof(val));
                ws.insert(r, kstr, kstr);
                if (not last_root)
                   last_root = r;

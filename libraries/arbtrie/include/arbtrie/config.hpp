@@ -1,6 +1,6 @@
 #pragma once
-#include <span>
 #include <string_view>
+#include <arbtrie/xxh32.hpp>
 
 namespace arbtrie {
 
@@ -34,7 +34,7 @@ namespace arbtrie {
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
 
-   static constexpr const int cacheline_size = 64;
+   static constexpr const uint32_t cacheline_size = 64;
 
 
    /**
@@ -154,4 +154,19 @@ namespace arbtrie {
       bool validate_checksum = false;
       bool recover_unsync    = false;
    };
+
+   struct config_state {
+        int64_t  max_database_size = arbtrie::max_database_size;
+        uint32_t max_threads = arbtrie::max_threads;
+        uint32_t cacheline_size = arbtrie::cacheline_size;
+        uint32_t id_page_size = arbtrie::id_page_size;
+        uint32_t segment_size = arbtrie::segment_size;
+        uint32_t max_key_length = arbtrie::max_key_length;
+   };
+   inline const std::uint32_t file_magic = ([](){
+      static constexpr const config_state state;
+      char buffer[sizeof(state)];
+      std::memcpy( buffer, &state, sizeof(state) );
+      return xxh32::hash( buffer, sizeof(state), 0 );
+   })();
 }
