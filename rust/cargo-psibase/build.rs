@@ -36,7 +36,7 @@ fn main() {
         if !Command::new(&cargo)
             .args(["rustc"])
             .args(["--color", "always"])
-            .args(["--target", "wasm32-wasi"])
+            .args(["--target", "wasm32-wasip1"])
             .args(["--target-dir", &target_dir])
             .args(["--manifest-path", &(package_dir + "/Cargo.toml")])
             .args(["--release"])
@@ -48,7 +48,7 @@ fn main() {
             exit(1);
         }
 
-        let infile = PathBuf::from(target_dir + "/wasm32-wasi/release/" + name + ".wasm");
+        let infile = PathBuf::from(target_dir + "/wasm32-wasip1/release/" + name + ".wasm");
         let outfile = PathBuf::from(out_dir.clone() + "/" + name + ".wasm");
         let debug_build = false;
         OptimizationOptions::new_opt_level_2()

@@ -1,3 +1,4 @@
+import { useDebit } from "@/hooks/tokensPlugin/useDebit";
 import { AnimateNumber } from "./AnimateNumber";
 import { Button } from "./ui/button";
 import {
@@ -9,61 +10,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { usePluginCall } from "@/hooks/usePluginCall";
-import { SharedBalance } from "@/hooks/useUi";
-import QueryKey from "@/lib/queryKeys";
-import { tokenPlugin } from "@/plugin";
-import { useQueryClient } from "@tanstack/react-query";
+import { SharedBalance } from "@/hooks/tokensPlugin/useBalances";
+import { useUncredit } from "@/hooks/tokensPlugin/useUncredit";
 import { z } from "zod";
 
 interface Props {
   balances: SharedBalance[];
-  user: string;
+  user: string | undefined | null;
   isLoading: boolean;
 }
 
 const ActionType = z.enum(["Uncredit", "Debit"]);
 
-export function CreditTable({ balances, user, isLoading }: Props) {
-  const queryClient = useQueryClient();
-
-  const { mutate } = usePluginCall({
-    onSuccess: () => {
-      const queryKey = QueryKey.tokenBalances(user);
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.refetchQueries({ queryKey });
-    },
-  });
+export function CreditTable({ balances, user }: Props) {
+  const { mutate: uncredit } = useUncredit();
+  const { mutate: debit } = useDebit();
 
   const handle = (id: string, action: z.infer<typeof ActionType>) => {
     const parsedAction = ActionType.parse(action);
     const balance = balances.find((bal) => bal.id == id);
     if (!balance) throw new Error(`Failed to find balance`);
     if (parsedAction == ActionType.Enum.Uncredit) {
-      mutate(
-        tokenPlugin.transfer.uncredit(
-          balance.tokenId,
-          balance.debitor,
-          balance.amount.toNumber().toString()
-        )
-      );
+      uncredit({
+        amount: balance.amount.toDecimal().toString(),
+        tokenId: balance.tokenId.toString(),
+        memo: "",
+        receiver: balance.debitor,
+      });
     } else if (parsedAction == ActionType.Enum.Debit) {
-      mutate(
-        tokenPlugin.transfer.debit(
-          balance.tokenId,
-          balance.debitor,
-          balance.amount.toNumber().toString()
-        )
-      );
+      debit({
+        tokenId: balance.tokenId.toString(),
+        sender: balance.debitor,
+        amount: balance.amount.toDecimal().toString(),
+        memo: "",
+      });
     } else throw new Error(`Unhandled action`);
   };
 
   if (balances.length == 0) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        {isLoading ? "Loading..." : "No credits or debits found."}
-      </div>
-    );
+    return null;
   }
   return (
     <Table>
@@ -90,7 +75,7 @@ export function CreditTable({ balances, user, isLoading }: Props) {
               <TableCell>
                 {" "}
                 <AnimateNumber
-                  n={balance.amount.toNumber()}
+                  n={balance.amount.toDecimal()}
                   precision={balance.amount.getPrecision()}
                 />
                 {" " + balance.amount.format(true).split(" ")[1]}

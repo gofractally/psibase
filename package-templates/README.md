@@ -24,7 +24,7 @@ This will run a CLI wizard to set up the new app in the `./services/user/` direc
 ## Building the app
 
 1. From the app's `ui/` subdirectory, run `yarn` and `yarn build` to generate the UI.
-2. From the app's root directory, run `cargo-psibase package` to create a package file for the new app (`./target/wasm32-wasi/release/packages/AppName.psi`).
+2. From the app's root directory, run `cargo-psibase package` to create a package file for the new app (`./target/wasm32-wasip1/release/packages/AppName.psi`).
 3. Use `cargo-psibase install` to install the new app package to a network.
 
 # Additional resources

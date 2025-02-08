@@ -889,33 +889,6 @@ namespace psibase::http
 
             run_native_handler_json(server.http_config->push_boot_async);
          }  // push_boot
-         else if (req_target == "/native/push_transaction" &&
-                  server.http_config->push_transaction_async)
-         {
-            if (!server.http_config->enable_transactions)
-               return send(not_found(req.target()));
-
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(method_not_allowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (auto content_type = req.find(bhttp::field::content_type); content_type != req.end())
-            {
-               if (content_type->value() != "application/octet-stream")
-               {
-                  return send(error(bhttp::status::unsupported_media_type,
-                                    "Content-Type must be application/octet-stream\n"));
-               }
-            }
-
-            if (forbid_cross_origin())
-            {
-               return;
-            }
-
-            run_native_handler_json(server.http_config->push_transaction_async);
-         }  // push_transaction
          else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
                   !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket) &&
                   server.http_config->enable_p2p)

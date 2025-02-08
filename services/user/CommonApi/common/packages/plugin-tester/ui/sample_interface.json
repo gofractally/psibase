@@ -1,0 +1,1535 @@
+{
+    "worlds": [
+        {
+            "name": "root",
+            "imports": {
+                "interface-0": {
+                    "interface": {
+                        "id": 0
+                    }
+                },
+                "interface-1": {
+                    "interface": {
+                        "id": 1
+                    }
+                },
+                "interface-2": {
+                    "interface": {
+                        "id": 2
+                    }
+                },
+                "interface-3": {
+                    "interface": {
+                        "id": 3
+                    }
+                },
+                "interface-4": {
+                    "interface": {
+                        "id": 4
+                    }
+                },
+                "interface-5": {
+                    "interface": {
+                        "id": 5
+                    }
+                },
+                "interface-6": {
+                    "interface": {
+                        "id": 6
+                    }
+                },
+                "interface-7": {
+                    "interface": {
+                        "id": 7
+                    }
+                },
+                "interface-8": {
+                    "interface": {
+                        "id": 8
+                    }
+                },
+                "interface-9": {
+                    "interface": {
+                        "id": 9
+                    }
+                },
+                "interface-10": {
+                    "interface": {
+                        "id": 10
+                    }
+                },
+                "interface-11": {
+                    "interface": {
+                        "id": 11
+                    }
+                },
+                "interface-12": {
+                    "interface": {
+                        "id": 12
+                    }
+                },
+                "interface-13": {
+                    "interface": {
+                        "id": 13
+                    }
+                }
+            },
+            "exports": {
+                "interface-14": {
+                    "interface": {
+                        "id": 14
+                    }
+                },
+                "interface-15": {
+                    "interface": {
+                        "id": 15
+                    }
+                }
+            },
+            "package": 7
+        }
+    ],
+    "interfaces": [
+        {
+            "name": "types",
+            "types": {
+                "plugin-id": 0,
+                "error": 1
+            },
+            "functions": {},
+            "package": 0
+        },
+        {
+            "name": "types",
+            "types": {
+                "account-id": 2,
+                "base64-str": 3,
+                "app-metadata": 6,
+                "app-status": 7,
+                "extra-metadata": 8,
+                "full-app-metadata": 9
+            },
+            "functions": {},
+            "package": 1
+        },
+        {
+            "name": "server",
+            "types": {
+                "error": 10
+            },
+            "functions": {
+                "post-graphql-get-json": {
+                    "name": "post-graphql-get-json",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "graphql",
+                            "type": "string"
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 11
+                        }
+                    ]
+                }
+            },
+            "package": 0
+        },
+        {
+            "name": "intf",
+            "types": {
+                "error": 12
+            },
+            "functions": {
+                "add-action-to-transaction": {
+                    "name": "add-action-to-transaction",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "method-name",
+                            "type": "string"
+                        },
+                        {
+                            "name": "packed-args",
+                            "type": 13
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 14
+                        }
+                    ]
+                }
+            },
+            "package": 2
+        },
+        {
+            "name": "environment",
+            "types": {},
+            "functions": {
+                "get-environment": {
+                    "name": "get-environment",
+                    "kind": "freestanding",
+                    "params": [],
+                    "results": [
+                        {
+                            "type": 16
+                        }
+                    ]
+                }
+            },
+            "package": 4
+        },
+        {
+            "name": "exit",
+            "types": {},
+            "functions": {
+                "exit": {
+                    "name": "exit",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "status",
+                            "type": 17
+                        }
+                    ],
+                    "results": []
+                }
+            },
+            "package": 4
+        },
+        {
+            "name": "error",
+            "types": {
+                "error": 18
+            },
+            "functions": {},
+            "package": 3
+        },
+        {
+            "name": "streams",
+            "types": {
+                "output-stream": 19,
+                "error": 20,
+                "stream-error": 22,
+                "input-stream": 23
+            },
+            "functions": {
+                "[method]output-stream.check-write": {
+                    "name": "[method]output-stream.check-write",
+                    "kind": {
+                        "method": 19
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 24
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 25
+                        }
+                    ]
+                },
+                "[method]output-stream.write": {
+                    "name": "[method]output-stream.write",
+                    "kind": {
+                        "method": 19
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 24
+                        },
+                        {
+                            "name": "contents",
+                            "type": 26
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 27
+                        }
+                    ]
+                },
+                "[method]output-stream.blocking-write-and-flush": {
+                    "name": "[method]output-stream.blocking-write-and-flush",
+                    "kind": {
+                        "method": 19
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 24
+                        },
+                        {
+                            "name": "contents",
+                            "type": 26
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 27
+                        }
+                    ]
+                },
+                "[method]output-stream.blocking-flush": {
+                    "name": "[method]output-stream.blocking-flush",
+                    "kind": {
+                        "method": 19
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 24
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 27
+                        }
+                    ]
+                }
+            },
+            "package": 3
+        },
+        {
+            "name": "stdin",
+            "types": {
+                "input-stream": 28
+            },
+            "functions": {
+                "get-stdin": {
+                    "name": "get-stdin",
+                    "kind": "freestanding",
+                    "params": [],
+                    "results": [
+                        {
+                            "type": 29
+                        }
+                    ]
+                }
+            },
+            "package": 4
+        },
+        {
+            "name": "stdout",
+            "types": {
+                "output-stream": 30
+            },
+            "functions": {
+                "get-stdout": {
+                    "name": "get-stdout",
+                    "kind": "freestanding",
+                    "params": [],
+                    "results": [
+                        {
+                            "type": 31
+                        }
+                    ]
+                }
+            },
+            "package": 4
+        },
+        {
+            "name": "stderr",
+            "types": {
+                "output-stream": 32
+            },
+            "functions": {
+                "get-stderr": {
+                    "name": "get-stderr",
+                    "kind": "freestanding",
+                    "params": [],
+                    "results": [
+                        {
+                            "type": 33
+                        }
+                    ]
+                }
+            },
+            "package": 4
+        },
+        {
+            "name": "wall-clock",
+            "types": {
+                "datetime": 34
+            },
+            "functions": {},
+            "package": 5
+        },
+        {
+            "name": "types",
+            "types": {
+                "descriptor": 35,
+                "filesize": 36,
+                "output-stream": 37,
+                "error-code": 38,
+                "descriptor-type": 39,
+                "link-count": 40,
+                "datetime": 41,
+                "descriptor-stat": 43,
+                "error": 44
+            },
+            "functions": {
+                "[method]descriptor.write-via-stream": {
+                    "name": "[method]descriptor.write-via-stream",
+                    "kind": {
+                        "method": 35
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 45
+                        },
+                        {
+                            "name": "offset",
+                            "type": 36
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 47
+                        }
+                    ]
+                },
+                "[method]descriptor.append-via-stream": {
+                    "name": "[method]descriptor.append-via-stream",
+                    "kind": {
+                        "method": 35
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 45
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 47
+                        }
+                    ]
+                },
+                "[method]descriptor.get-type": {
+                    "name": "[method]descriptor.get-type",
+                    "kind": {
+                        "method": 35
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 45
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 48
+                        }
+                    ]
+                },
+                "[method]descriptor.stat": {
+                    "name": "[method]descriptor.stat",
+                    "kind": {
+                        "method": 35
+                    },
+                    "params": [
+                        {
+                            "name": "self",
+                            "type": 45
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 49
+                        }
+                    ]
+                },
+                "filesystem-error-code": {
+                    "name": "filesystem-error-code",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "err",
+                            "type": 50
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 51
+                        }
+                    ]
+                }
+            },
+            "package": 6
+        },
+        {
+            "name": "preopens",
+            "types": {
+                "descriptor": 52
+            },
+            "functions": {
+                "get-directories": {
+                    "name": "get-directories",
+                    "kind": "freestanding",
+                    "params": [],
+                    "results": [
+                        {
+                            "type": 55
+                        }
+                    ]
+                }
+            },
+            "package": 6
+        },
+        {
+            "name": "developer",
+            "types": {
+                "error": 56,
+                "account-id": 57,
+                "app-metadata": 58
+            },
+            "functions": {
+                "set-app-metadata": {
+                    "name": "set-app-metadata",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "metadata",
+                            "type": 58
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 59
+                        }
+                    ]
+                },
+                "publish-app": {
+                    "name": "publish-app",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "account",
+                            "type": 57
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 59
+                        }
+                    ]
+                },
+                "unpublish-app": {
+                    "name": "unpublish-app",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "account",
+                            "type": 57
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 59
+                        }
+                    ]
+                }
+            },
+            "package": 1
+        },
+        {
+            "name": "consumer",
+            "types": {
+                "error": 60,
+                "account-id": 61,
+                "full-app-metadata": 62
+            },
+            "functions": {
+                "get-app-metadata": {
+                    "name": "get-app-metadata",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "account",
+                            "type": 61
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 63
+                        }
+                    ]
+                },
+                "get-related-tags": {
+                    "name": "get-related-tags",
+                    "kind": "freestanding",
+                    "params": [
+                        {
+                            "name": "tag-substr",
+                            "type": "string"
+                        }
+                    ],
+                    "results": [
+                        {
+                            "type": 65
+                        }
+                    ]
+                }
+            },
+            "package": 1
+        }
+    ],
+    "types": [
+        {
+            "name": "plugin-id",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "service",
+                            "type": "string"
+                        },
+                        {
+                            "name": "plugin",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 0
+            }
+        },
+        {
+            "name": "error",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "code",
+                            "type": "u32"
+                        },
+                        {
+                            "name": "producer",
+                            "type": 0
+                        },
+                        {
+                            "name": "message",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 0
+            }
+        },
+        {
+            "name": "account-id",
+            "kind": {
+                "type": "string"
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": "base64-str",
+            "kind": {
+                "type": "string"
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": "string"
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": 2
+            },
+            "owner": null
+        },
+        {
+            "name": "app-metadata",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "name",
+                            "type": "string"
+                        },
+                        {
+                            "name": "short-description",
+                            "type": "string"
+                        },
+                        {
+                            "name": "long-description",
+                            "type": "string"
+                        },
+                        {
+                            "name": "icon",
+                            "type": 3
+                        },
+                        {
+                            "name": "icon-mime-type",
+                            "type": "string"
+                        },
+                        {
+                            "name": "tos-subpage",
+                            "type": "string"
+                        },
+                        {
+                            "name": "privacy-policy-subpage",
+                            "type": "string"
+                        },
+                        {
+                            "name": "app-homepage-subpage",
+                            "type": "string"
+                        },
+                        {
+                            "name": "redirect-uris",
+                            "type": 4
+                        },
+                        {
+                            "name": "owners",
+                            "type": 5
+                        },
+                        {
+                            "name": "tags",
+                            "type": 4
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": "app-status",
+            "kind": {
+                "enum": {
+                    "cases": [
+                        {
+                            "name": "draft"
+                        },
+                        {
+                            "name": "published"
+                        },
+                        {
+                            "name": "unpublished"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": "extra-metadata",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "status",
+                            "type": 7
+                        },
+                        {
+                            "name": "created-at",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": "full-app-metadata",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "app-metadata",
+                            "type": 6
+                        },
+                        {
+                            "name": "extra-metadata",
+                            "type": 8
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 1
+            }
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 1
+            },
+            "owner": {
+                "interface": 2
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": "string",
+                    "err": 10
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 1
+            },
+            "owner": {
+                "interface": 3
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": "u8"
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": null,
+                    "err": 12
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "tuple": {
+                    "types": [
+                        "string",
+                        "string"
+                    ]
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": 15
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": null,
+                    "err": null
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "error",
+            "kind": "resource",
+            "owner": {
+                "interface": 6
+            }
+        },
+        {
+            "name": "output-stream",
+            "kind": "resource",
+            "owner": {
+                "interface": 7
+            }
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 18
+            },
+            "owner": {
+                "interface": 7
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 20
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "stream-error",
+            "kind": {
+                "variant": {
+                    "cases": [
+                        {
+                            "name": "last-operation-failed",
+                            "type": 21
+                        },
+                        {
+                            "name": "closed",
+                            "type": null
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 7
+            }
+        },
+        {
+            "name": "input-stream",
+            "kind": "resource",
+            "owner": {
+                "interface": 7
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "borrow": 19
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": "u64",
+                    "err": 22
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": "u8"
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": null,
+                    "err": 22
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "input-stream",
+            "kind": {
+                "type": 23
+            },
+            "owner": {
+                "interface": 8
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 28
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "output-stream",
+            "kind": {
+                "type": 19
+            },
+            "owner": {
+                "interface": 9
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 30
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "output-stream",
+            "kind": {
+                "type": 19
+            },
+            "owner": {
+                "interface": 10
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 32
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "datetime",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "seconds",
+                            "type": "u64"
+                        },
+                        {
+                            "name": "nanoseconds",
+                            "type": "u32"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 11
+            }
+        },
+        {
+            "name": "descriptor",
+            "kind": "resource",
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "filesize",
+            "kind": {
+                "type": "u64"
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "output-stream",
+            "kind": {
+                "type": 19
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "error-code",
+            "kind": {
+                "enum": {
+                    "cases": [
+                        {
+                            "name": "access"
+                        },
+                        {
+                            "name": "would-block"
+                        },
+                        {
+                            "name": "already"
+                        },
+                        {
+                            "name": "bad-descriptor"
+                        },
+                        {
+                            "name": "busy"
+                        },
+                        {
+                            "name": "deadlock"
+                        },
+                        {
+                            "name": "quota"
+                        },
+                        {
+                            "name": "exist"
+                        },
+                        {
+                            "name": "file-too-large"
+                        },
+                        {
+                            "name": "illegal-byte-sequence"
+                        },
+                        {
+                            "name": "in-progress"
+                        },
+                        {
+                            "name": "interrupted"
+                        },
+                        {
+                            "name": "invalid"
+                        },
+                        {
+                            "name": "io"
+                        },
+                        {
+                            "name": "is-directory"
+                        },
+                        {
+                            "name": "loop"
+                        },
+                        {
+                            "name": "too-many-links"
+                        },
+                        {
+                            "name": "message-size"
+                        },
+                        {
+                            "name": "name-too-long"
+                        },
+                        {
+                            "name": "no-device"
+                        },
+                        {
+                            "name": "no-entry"
+                        },
+                        {
+                            "name": "no-lock"
+                        },
+                        {
+                            "name": "insufficient-memory"
+                        },
+                        {
+                            "name": "insufficient-space"
+                        },
+                        {
+                            "name": "not-directory"
+                        },
+                        {
+                            "name": "not-empty"
+                        },
+                        {
+                            "name": "not-recoverable"
+                        },
+                        {
+                            "name": "unsupported"
+                        },
+                        {
+                            "name": "no-tty"
+                        },
+                        {
+                            "name": "no-such-device"
+                        },
+                        {
+                            "name": "overflow"
+                        },
+                        {
+                            "name": "not-permitted"
+                        },
+                        {
+                            "name": "pipe"
+                        },
+                        {
+                            "name": "read-only"
+                        },
+                        {
+                            "name": "invalid-seek"
+                        },
+                        {
+                            "name": "text-file-busy"
+                        },
+                        {
+                            "name": "cross-device"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "descriptor-type",
+            "kind": {
+                "enum": {
+                    "cases": [
+                        {
+                            "name": "unknown"
+                        },
+                        {
+                            "name": "block-device"
+                        },
+                        {
+                            "name": "character-device"
+                        },
+                        {
+                            "name": "directory"
+                        },
+                        {
+                            "name": "fifo"
+                        },
+                        {
+                            "name": "symbolic-link"
+                        },
+                        {
+                            "name": "regular-file"
+                        },
+                        {
+                            "name": "socket"
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "link-count",
+            "kind": {
+                "type": "u64"
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "datetime",
+            "kind": {
+                "type": 34
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "option": 41
+            },
+            "owner": null
+        },
+        {
+            "name": "descriptor-stat",
+            "kind": {
+                "record": {
+                    "fields": [
+                        {
+                            "name": "type",
+                            "type": 39
+                        },
+                        {
+                            "name": "link-count",
+                            "type": 40
+                        },
+                        {
+                            "name": "size",
+                            "type": 36
+                        },
+                        {
+                            "name": "data-access-timestamp",
+                            "type": 42
+                        },
+                        {
+                            "name": "data-modification-timestamp",
+                            "type": 42
+                        },
+                        {
+                            "name": "status-change-timestamp",
+                            "type": 42
+                        }
+                    ]
+                }
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 20
+            },
+            "owner": {
+                "interface": 12
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "borrow": 35
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 37
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": 46,
+                    "err": 38
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": 39,
+                    "err": 38
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": 43,
+                    "err": 38
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "borrow": 44
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "option": 38
+            },
+            "owner": null
+        },
+        {
+            "name": "descriptor",
+            "kind": {
+                "type": 35
+            },
+            "owner": {
+                "interface": 13
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "handle": {
+                    "own": 52
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "tuple": {
+                    "types": [
+                        53,
+                        "string"
+                    ]
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": 54
+            },
+            "owner": null
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 1
+            },
+            "owner": {
+                "interface": 14
+            }
+        },
+        {
+            "name": "account-id",
+            "kind": {
+                "type": 2
+            },
+            "owner": {
+                "interface": 14
+            }
+        },
+        {
+            "name": "app-metadata",
+            "kind": {
+                "type": 6
+            },
+            "owner": {
+                "interface": 14
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": null,
+                    "err": 56
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": "error",
+            "kind": {
+                "type": 1
+            },
+            "owner": {
+                "interface": 15
+            }
+        },
+        {
+            "name": "account-id",
+            "kind": {
+                "type": 2
+            },
+            "owner": {
+                "interface": 15
+            }
+        },
+        {
+            "name": "full-app-metadata",
+            "kind": {
+                "type": 9
+            },
+            "owner": {
+                "interface": 15
+            }
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": 62,
+                    "err": 60
+                }
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "list": "string"
+            },
+            "owner": null
+        },
+        {
+            "name": null,
+            "kind": {
+                "result": {
+                    "ok": 64,
+                    "err": 60
+                }
+            },
+            "owner": null
+        }
+    ],
+    "packages": [
+        {
+            "name": "host:common",
+            "interfaces": {
+                "types": 0,
+                "server": 2
+            },
+            "worlds": {}
+        },
+        {
+            "name": "registry:plugin",
+            "interfaces": {
+                "types": 1,
+                "developer": 14,
+                "consumer": 15
+            },
+            "worlds": {}
+        },
+        {
+            "name": "transact:plugin",
+            "interfaces": {
+                "intf": 3
+            },
+            "worlds": {}
+        },
+        {
+            "name": "wasi:io@0.2.0",
+            "interfaces": {
+                "error": 6,
+                "streams": 7
+            },
+            "worlds": {}
+        },
+        {
+            "name": "wasi:cli@0.2.0",
+            "interfaces": {
+                "environment": 4,
+                "exit": 5,
+                "stdin": 8,
+                "stdout": 9,
+                "stderr": 10
+            },
+            "worlds": {}
+        },
+        {
+            "name": "wasi:clocks@0.2.0",
+            "interfaces": {
+                "wall-clock": 11
+            },
+            "worlds": {}
+        },
+        {
+            "name": "wasi:filesystem@0.2.0",
+            "interfaces": {
+                "types": 12,
+                "preopens": 13
+            },
+            "worlds": {}
+        },
+        {
+            "name": "root:component",
+            "interfaces": {},
+            "worlds": {
+                "root": 0
+            }
+        }
+    ]
+}

@@ -58,9 +58,15 @@ The boot command deploys a set of system services and web interfaces suitable fo
 
   Packages to install to the chain. If not specifed, a default set will be installed.
 
-- `-k`, `--key` *public-key*
+- `-k`, `--account-key` *public-key*
 
-  Set all accounts to authenticate using this key. The key will also be used for block production. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
+  Set the producer account to use this key for transaction authentication. The public key can be any of the following:
+  - A file containing a PEM or DER encoded public key
+  - A PKCS #11 URI
+
+- `--block-key` *public-key*
+
+  Set the producer's block signing key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 

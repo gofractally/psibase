@@ -7,6 +7,7 @@ world impl {
     include accounts:plugin/imports;
     include accounts:account-tokens/imports;
     include auth-invite:plugin/imports;
+    include transact:plugin/hook-actions-sender;
 
     export inviter;
     export invitee;

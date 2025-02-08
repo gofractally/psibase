@@ -3,7 +3,6 @@ import {
   FormItem,
   FormLabel,
   FormControl,
-  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -13,21 +12,22 @@ import { UseFormReturn } from "react-hook-form";
 
 interface Props {
   form: UseFormReturn<FormSchema>;
+  disable?: boolean;
 }
 
-const FromInput: FC<Props> = ({ form }) => (
+const FromInput: FC<Props> = ({ form, disable }) => (
   <FormField
     control={form.control}
     name="from"
+    disabled={disable}
     render={({ field }) => (
       <FormItem>
-        <FormLabel>From</FormLabel>
+        <div className="flex justify-between">
+          <FormLabel>From</FormLabel>
+        </div>
         <FormControl>
-          <Input {...field} />
+          <Input {...field} placeholder="Account" />
         </FormControl>
-        <FormDescription>
-          Account to decrease in balance, leave blank to burn your own balance.
-        </FormDescription>
         <FormMessage />
       </FormItem>
     )}

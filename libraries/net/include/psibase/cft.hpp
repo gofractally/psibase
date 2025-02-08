@@ -194,7 +194,7 @@ namespace psibase::net
                _state = producer_state::follower;
                randomize_timer();
             }
-            else if (_state == producer_state::follower && start_cft)
+            else if (start_cft)
             {
                randomize_timer();
             }
@@ -304,6 +304,7 @@ namespace psibase::net
          }
          if (chain().commit(jointCommitIndex))
          {
+            _election_timer.restart();
             consensus().set_producers(chain().getProducers());
          }
       }
@@ -372,12 +373,9 @@ namespace psibase::net
       void randomize_timer()
       {
          // Don't bother waiting if we're the only producer
-         if (this->is_sole_producer())
+         if (this->is_sole_producer() && _state == producer_state::follower)
          {
-            if (_state == producer_state::follower)
-            {
-               request_vote();
-            }
+            request_vote();
          }
          else if (!active_producers[1] ||
                   active_producers[1]->algorithm == ConsensusAlgorithm::cft ||
@@ -387,8 +385,14 @@ namespace psibase::net
             _election_timer.async_wait(
                 [this](const std::error_code& ec)
                 {
-                   if (!ec && is_cft() &&
-                       (_state == producer_state::follower || _state == producer_state::candidate))
+                   if (ec || !is_cft())
+                      return;
+                   if (_state == producer_state::leader)
+                   {
+                      stop_leader();
+                      _state = producer_state::candidate;
+                   }
+                   if (_state == producer_state::follower || _state == producer_state::candidate)
                    {
                       PSIBASE_LOG(logger, info)
                           << "Timeout: Starting leader election for term " << (current_term + 1);

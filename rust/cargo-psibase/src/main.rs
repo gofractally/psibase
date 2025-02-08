@@ -398,7 +398,7 @@ async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
         .args(&["-p", package])
         .arg("--release")
         .arg("--lib")
-        .arg("--target=wasm32-wasi")
+        .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
         .arg("--color=always")

@@ -1,5 +1,4 @@
 export const queryKeys = {
-    addServerKey: ["addServerKey"] as const,
     config: ["config"] as const,
     configUpdate: ["configUpdate"] as const,
     connect: ["connect"] as const,
@@ -7,4 +6,9 @@ export const queryKeys = {
     packages: ["packages"] as const,
     peers: ["peers"] as const,
     statuses: ["statuses"] as const,
+
+    // security devices
+    addServerKey: ["addServerKey"] as const,
+    keyDevices: ["keyDevices"] as const,
+    unlockKeyDevice: ["unlockKeyDevice"] as const,
 };

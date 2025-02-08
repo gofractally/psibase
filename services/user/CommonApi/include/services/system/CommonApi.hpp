@@ -2,6 +2,7 @@
 
 #include <psibase/Service.hpp>
 #include <psibase/serviceEntry.hpp>
+#include <services/system/HttpServer.hpp>
 
 namespace SystemService
 {
@@ -12,7 +13,7 @@ namespace SystemService
    struct CommonApi : psibase::Service
    {
       /// "common-api"
-      static constexpr auto service = psibase::AccountNumber("common-api");
+      static constexpr auto service = HttpServer::commonApiService;
 
       /// This is a standard action that allows common-api to serve http requests.
       ///

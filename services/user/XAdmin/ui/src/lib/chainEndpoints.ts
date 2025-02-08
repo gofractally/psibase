@@ -1,17 +1,23 @@
-import {
-    PsinodeConfigSelect,
-    PsinodeConfigUpdate,
-    psinodeConfigSchema,
-} from "../configuration/interfaces";
+import { z } from "zod";
+
 import {
     postJson,
     getJson,
     postArrayBufferGetJson,
     getArrayBuffer,
+    siblingUrl,
+    throwIfError,
 } from "@psibase/common-lib";
-import { putJson } from "../helpers";
-import { z } from "zod";
+
 import { recursiveFetch } from "./recursiveFetch";
+import {
+    type KeyDevice,
+    type PsinodeConfigSelect,
+    type PsinodeConfigUpdate,
+    psinodeConfigSchema,
+} from "../configuration/interfaces";
+import { putJson } from "../helpers";
+import * as wasm from "wasm-psibase";
 
 type Buffer = number[];
 
@@ -69,7 +75,7 @@ class Chain {
         return Peers.parse(await getJson("/native/admin/peers"));
     }
 
-    public async getStatus() {
+    public async getStatus(): Promise<string[]> {
         return getJson("/native/admin/status");
     }
 
@@ -161,15 +167,19 @@ class Chain {
         return postArrayBufferGetJson("/native/push_boot", buffer);
     }
 
-    public pushArrayBufferTransaction(buffer: Buffer) {
-        return postArrayBufferGetJson("/native/push_transaction", buffer);
-    }
-
-    public addServerKey(key: string) {
-        return postJson("/native/admin/keys", {
-            service: "verify-sig",
-            rawData: key,
-        });
+    public async pushArrayBufferTransaction(buffer: Buffer) {
+        let url = siblingUrl(null, "transact", "/push_transaction");
+        let res = await throwIfError(
+            await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                    Accept: "application/octet-stream",
+                },
+                body: buffer as any,
+            })
+        );
+        return wasm.js_deserialize_trace(await res.arrayBuffer());
     }
 
     public async restart(): Promise<void> {
@@ -188,6 +198,32 @@ class Chain {
 
     public async performance() {
         return schem.parse(await getJson("/native/admin/perf"));
+    }
+
+    public async addServerKey({
+        key,
+        device,
+    }: {
+        key?: string;
+        device?: string;
+    }): Promise<{ rawData: string; service: string }[]> {
+        const res = await postJson("/native/admin/keys", {
+            service: "verify-sig",
+            rawData: key,
+            device,
+        });
+        return await res.json();
+    }
+
+    public getKeyDevices(): Promise<KeyDevice[]> {
+        return getJson("/native/admin/keys/devices");
+    }
+
+    public unlockKeyDevice(device: string, pin?: string) {
+        return postJson("/native/admin/keys/unlock", {
+            device,
+            pin,
+        });
     }
 }
 

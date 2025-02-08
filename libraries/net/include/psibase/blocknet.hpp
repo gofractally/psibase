@@ -781,6 +781,11 @@ namespace psibase::net
       bool push_boot(std::vector<SignedTransaction>&& transactions, TransactionTrace& trace)
       {
          bool result = false;
+         if (self == null_producer)
+         {
+            trace.error = "no producer name set";
+            return result;
+         }
          if (chain().getBlockContext())
          {
             trace.error = "chain is already booted";

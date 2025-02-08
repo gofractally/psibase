@@ -1,9 +1,23 @@
 import { createBrowserRouter } from "react-router-dom";
-import App from "./App";
+import { AccountSelection } from "./AccountSelection";
+import KeyImport from "./KeyImport";
+import Root from "./Root";
 
-export default createBrowserRouter([
+const Router = createBrowserRouter([
   {
     path: "/",
-    element: <App />,
+    element: <Root />,
+    children: [
+      {
+        path: "/",
+        element: <AccountSelection />,
+      },
+      {
+        path: "/key",
+        element: <KeyImport />,
+      },
+    ],
   },
 ]);
+
+export default Router;

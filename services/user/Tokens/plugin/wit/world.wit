@@ -44,6 +44,8 @@ interface transfer {
 
     uncredit: func(token-id: token-id, debitor: account-number, amount: quantity, memo: string) -> result<_, error>;
     credit: func(token-id: token-id, receiver: account-number, amount: quantity, memo: string) -> result<_, error>;
+    debit: func(token-id: token-id, creditor: account-number, amount: quantity, memo: string) -> result<_, error>;
+
 }
 
 world imports {

@@ -24,16 +24,6 @@ interface active-app {
     /// Logs out the currently logged-in user.
     logout: func() -> result<_, error>;
 
-    /// Gets the account name of the user logged into the currently active application.
-    /// May also return None if no user is logged in.
-    /// 
-    /// Note: In most cases, this should only be called from a UI. A plugin should typically 
-    ///  only care about the calling *app*, not the user currently logged in to the calling app.
-    ///  If you're looking for the calling app, use `host:common/client.get-sender-app()`. If 
-    ///  your plugin must use get-logged-in-user, carefully consider how it will affect a 
-    ///  third-party integration with your plugin.
-    get-logged-in-user: func() -> result<option<string>, error>;
-
     /// Retrieves a list of accounts that the user has connected to this app.
     /// The user may only log in to accounts that have been connected.
     get-connected-accounts: func() -> result<list<string>, error>;
@@ -49,8 +39,6 @@ interface api {
     use types.{account, app-details};
 
     /// Returns true if there is a user logged in to the currently active top-level application.
-    /// Unlike get-logged-in-user, this function is callable by any plugin because it does not
-    /// leak any private information, and only notifies the caller whether there is a user logged in.
     is-logged-in: func() -> bool;
 
     /// Gets the account details for the specified account name.
@@ -63,6 +51,10 @@ interface api {
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted to the homepage app.
     set-auth-service: func(service-name: string) -> result<_, error>; 
+
+    /// Gets the account name of the user logged into the active application.
+    /// May also return None if no user is logged in.
+    get-current-user: func() -> result<option<string>, error>;
 }
 
 world imports {

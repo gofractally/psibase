@@ -24,100 +24,23 @@ on:
         description: "The generated changelog"
         value: ${{ jobs.auto-generate-changelog.outputs.changelog }}
 
-env:
-  CONFIG_JSON: |
-            {
-              "template": "# Changelog\n#{{CHANGELOG}}\n\n## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n",
-              "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
-              "ignore_labels": ["no-log"],
-              "categories": [
-                {
-                    "title": "## 💻 Development experience",
-                    "labels": ["Dev Experience", "Plugin Infra"],
-                    "exclude_labels": ["documentation", "bug"]
-                },
-                {
-                    "title": "### Bugfixes",
-                    "labels": ["Dev Experience", "bug"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Plugin bugfixes",
-                    "labels": ["Plugin Infra", "bug"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Docs",
-                    "labels": ["Dev Experience", "documentation"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Plugin-related docs",
-                    "labels": ["Plugin Infra", "documentation"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "## 🚀 Default apps",
-                    "labels": ["System app"],
-                    "exclude_labels": ["documentation", "bug"]
-                },
-                {
-                    "title": "### Bugfixes",
-                    "labels": ["System app", "bug"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Docs",
-                    "labels": ["System app", "documentation"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "## ⚖️ Governance",
-                    "labels": ["Governance"],
-                    "exclude_labels": ["documentation", "bug"]
-                },
-                {
-                    "title": "### Bugfixes",
-                    "labels": ["Governance", "bug"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Docs",
-                    "labels": ["Governance", "documentation"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "## 🏗️ Infrastructure Providers",
-                    "labels": ["Node infra"],
-                    "exclude_labels": ["documentation", "bug"]
-                },
-                {
-                    "title": "### Bugfixes",
-                    "labels": ["Node infra", "bug"],
-                    "exhaustive": true
-                },
-                {
-                    "title": "### Docs",
-                    "labels": ["Node infra", "documentation"],
-                    "exhaustive": true
-                }
-              ]
-            }
-
 jobs:
   generate-custom-changelog:
     if: github.event_name == 'workflow_dispatch'
     name: Gen notes ${{ github.event.inputs.starttag }} - ${{ github.event.inputs.endtag }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - id: read_config
+        run: echo "config=$(jq -c . .github/workflows/changelog-template.json)" >> $GITHUB_OUTPUT
       - name: Build Changelog
         id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: mikepenz/release-changelog-builder-action@v5.1.0
         with:
           failOnError: true
           fromTag: ${{ github.event.inputs.starttag }}
           toTag: ${{ github.event.inputs.endtag }}
-          configurationJson: ${{ env.CONFIG_JSON }}
+          configurationJson: ${{ steps.read_config.outputs.config }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write to file
@@ -130,7 +53,6 @@ jobs:
           name: changelog.md
           path: changelog.md
 
-
   auto-generate-changelog:
     if: ${{ inputs.externalCall }}
     name: Gen ${{ inputs.endtag }} notes
@@ -138,13 +60,16 @@ jobs:
     outputs:
       changelog: ${{ steps.build_changelog.outputs.changelog }}
     steps:
+      - uses: actions/checkout@v4
+      - id: read_config
+        run: echo "config=$(jq -c . .github/workflows/changelog-template.json)" >> $GITHUB_OUTPUT
       - name: Build Changelog
         id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: mikepenz/release-changelog-builder-action@v5.1.0
         with:
           failOnError: true
           toTag: ${{ github.event.inputs.endtag }}
-          configurationJson: ${{ env.CONFIG_JSON }}
+          configurationJson: ${{ steps.read_config.outputs.config }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Write to file

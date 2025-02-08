@@ -16,18 +16,13 @@ class Intf extends Interface {
   public burn(
     tokenId: string | number,
     amount: string,
-    memo?: string,
-    account?: string
+    memo: string,
+    account: string
   ) {
     return this.addIntf({
       method: "burn",
       params: z
-        .tuple([
-          z.string(),
-          z.string(),
-          z.string().default(""),
-          z.string().default(""),
-        ])
+        .tuple([z.string(), z.string(), z.string(), z.string()])
         .parse([tokenId.toString(), amount, memo, account]),
     });
   }

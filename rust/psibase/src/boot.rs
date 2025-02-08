@@ -77,8 +77,8 @@ fn genesis_transaction<R: Read + Seek>(
 ///
 /// This returns all actions that need to be packed into the boot block.
 fn genesis_block_actions<R: Read + Seek>(
-    _initial_key: &Option<AnyPublicKey>,
-    _initial_producer: AccountNumber,
+    block_signing_key: &Option<AnyPublicKey>,
+    initial_producer: AccountNumber,
     service_packages: &mut [PackagedService<R>],
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
@@ -89,6 +89,13 @@ fn genesis_block_actions<R: Read + Seek>(
             s.postinstall(&mut actions)?;
         }
     }
+
+    // Set the producers
+    let claim = block_signing_key
+        .as_ref()
+        .map_or_else(|| Default::default(), |key| to_claim(key));
+    actions.push(set_producers_action(initial_producer, claim));
+
     Ok(actions)
 }
 
@@ -97,7 +104,7 @@ fn genesis_block_actions<R: Read + Seek>(
 /// This returns all actions that need to be packed into the transactions pushed after the
 /// boot block.
 pub fn get_initial_actions<R: Read + Seek>(
-    initial_key: &Option<AnyPublicKey>,
+    tx_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
@@ -124,19 +131,11 @@ pub fn get_initial_actions<R: Read + Seek>(
     // Create producer account
     actions.push(new_account_action(accounts::SERVICE, initial_producer));
 
-    let mut claim = Claim {
-        service: AccountNumber::new(0),
-        rawData: Default::default(),
-    };
-    if let Some(key) = initial_key {
+    if let Some(key) = tx_signing_key {
         // Set transaction signing key for producer
         actions.push(set_key_action(initial_producer, &key));
         actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
-        claim = to_claim(&key);
     }
-
-    // Set the producers
-    actions.push(set_producers_action(initial_producer, claim));
 
     actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
     actions.push(
@@ -194,7 +193,8 @@ pub fn get_initial_actions<R: Read + Seek>(
 /// `auth-any` (no keys required) and sets it up so producers
 /// don't need to sign blocks.
 pub fn create_boot_transactions<R: Read + Seek>(
-    initial_key: &Option<AnyPublicKey>,
+    block_signing_key: &Option<AnyPublicKey>,
+    tx_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     expiration: TimePointSec,
@@ -204,7 +204,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
     let mut actions = get_initial_actions(
-        initial_key,
+        tx_signing_key,
         initial_producer,
         install_ui,
         service_packages,
@@ -228,7 +228,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
 
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
-            genesis_block_actions(initial_key, initial_producer, service_packages)?,
+            genesis_block_actions(block_signing_key, initial_producer, service_packages)?,
             expiration,
         )
         .packed()
@@ -258,30 +258,8 @@ fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
     result.map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-/// Creates boot transactions.
-/// This function reuses the same boot transaction construction as the psibase CLI, and
-/// is used to generate a wasm that may be called from the browser to construct the boot
-/// transactions when booting the chain from the GUI.
-///
-/// If specified, `public_key_pem` is used to set the initial key for the producer account authorization.
-/// Compression level is used for brotli compression, must be between 1 and 11 inclusive.
-#[wasm_bindgen]
-pub fn js_create_boot_transactions(
-    producer: String,
-    js_services: JsValue,
-    public_key_pem: Option<String>,
-    compression_level: u32,
-) -> Result<JsValue, JsValue> {
-    let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-    let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
-    for s in &deserialized_services[..] {
-        services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
-    }
-    let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
-    let prod = js_err(ExactAccountNumber::from_str(&producer))?;
-
-    let initial_key = public_key_pem
+fn parse_public_key_pem(public_key_pem: Option<String>) -> Result<Option<AnyPublicKey>, JsValue> {
+    public_key_pem
         .map(|k| -> Result<AnyPublicKey, JsValue> {
             let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
@@ -299,10 +277,39 @@ pub fn js_create_boot_transactions(
                 },
             })
         })
-        .transpose()?;
+        .transpose()
+}
+
+/// Creates boot transactions.
+/// This function reuses the same boot transaction construction as the psibase CLI, and
+/// is used to generate a wasm that may be called from the browser to construct the boot
+/// transactions when booting the chain from the GUI.
+///
+/// If specified, `public_key_pem` is used to set the initial key for the producer account authorization.
+/// Compression level is used for brotli compression, must be between 1 and 11 inclusive.
+#[wasm_bindgen]
+pub fn js_create_boot_transactions(
+    producer: String,
+    js_services: JsValue,
+    block_signing_key_pem: Option<String>,
+    tx_signing_key_pem: Option<String>,
+    compression_level: u32,
+) -> Result<JsValue, JsValue> {
+    let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
+    let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
+    for s in &deserialized_services[..] {
+        services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
+    }
+    let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
+    let expiration = TimePointSec::from(now_plus_120secs);
+    let prod = js_err(ExactAccountNumber::from_str(&producer))?;
+
+    let initial_key = parse_public_key_pem(block_signing_key_pem)?;
+    let tx_key = parse_public_key_pem(tx_signing_key_pem)?;
 
     let (boot_transactions, transactions) = js_err(create_boot_transactions(
         &initial_key,
+        &tx_key,
         prod.into(),
         true,
         expiration,

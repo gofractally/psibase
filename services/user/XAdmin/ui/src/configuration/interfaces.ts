@@ -36,6 +36,12 @@ export type PsinodeConfigUI = {
     loggers: { [index: string]: LogConfig };
 };
 
+export type KeyDevice = {
+    id: string;
+    name: string;
+    unlocked: boolean;
+};
+
 const port = z.coerce.number();
 
 const LogConfigSchema = z.object({

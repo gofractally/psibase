@@ -40,13 +40,6 @@ export const App = () => {
     ) => {
         e.preventDefault();
         try {
-            await supervisor.functionCall({
-                service: "accounts",
-                intf: "activeApp",
-                method: "login",
-                params: ["branding"],
-            });
-
             if (networkName) {
                 await supervisor.functionCall({
                     service: "branding",

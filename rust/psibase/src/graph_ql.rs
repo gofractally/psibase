@@ -6,6 +6,9 @@ use anyhow::anyhow;
 use async_graphql::connection::{query_with, Connection, Edge};
 use async_graphql::OutputType;
 use fracpack::{Unpack, UnpackOwned};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer};
+use serde_json::Value;
 use std::cmp::{max, min};
 use std::mem::take;
 use std::ops::RangeBounds;
@@ -373,4 +376,288 @@ pub trait NamedEvent {
 
 pub trait EventDb {
     fn db() -> DbId;
+}
+
+#[derive(Debug)]
+struct SqlRow {
+    rowid: u64,
+    data: Value,
+}
+
+impl<'de> Deserialize<'de> for SqlRow {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut map: serde_json::Map<String, Value> = serde_json::Map::deserialize(deserializer)?;
+
+        let rowid = map
+            .remove("rowid")
+            .and_then(|v| match v {
+                Value::String(s) => s.parse::<u64>().ok(),
+                _ => None,
+            })
+            .ok_or_else(|| serde::de::Error::missing_field("rowid"))?;
+
+        let data = Value::Object(map);
+
+        Ok(SqlRow { rowid, data })
+    }
+}
+
+/// GraphQL Pagination through Event tables
+///
+/// Event tables are stored in an SQLite database in a service.
+///
+/// This interface allows you to query the event tables using the
+/// [GraphQL Pagination Spec](https://relay.dev/graphql/connections.htm).
+///
+/// [condition](Self::condition) defines a SQL WHERE clause filter.
+/// [first](Self::first), [last](Self::last), [before](Self::before),
+/// and [after](Self::after) page through the results.
+///
+/// They conform to the Pagination Spec, except that simultaneous `first`
+/// and `last` arguments are forbidden, rather than simply discouraged.
+pub struct EventQuery<T: DeserializeOwned + OutputType> {
+    table_name: String,
+    condition: Option<String>,
+    first: Option<i32>,
+    last: Option<i32>,
+    before: Option<String>,
+    after: Option<String>,
+    debug: bool,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: DeserializeOwned + OutputType> EventQuery<T> {
+    /// Create a new query for the given table
+    pub fn new(table_name: impl Into<String>) -> Self {
+        Self {
+            table_name: format!("\"{}\"", table_name.into()),
+            condition: None,
+            first: None,
+            last: None,
+            before: None,
+            after: None,
+            debug: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Enable debug output printing
+    pub fn with_debug_output(mut self) -> Self {
+        self.debug = true;
+        self
+    }
+
+    /// Add a SQL WHERE clause condition to filter results
+    ///
+    /// This replaces the current condition if one exists.
+    pub fn condition(mut self, condition: impl Into<String>) -> Self {
+        self.condition = Some(condition.into());
+        self
+    }
+
+    /// Limit the result to the first `n` (if Some) matching records.
+    ///
+    /// This replaces the current value. Returns error if n is negative.
+    pub fn first(mut self, first: Option<i32>) -> Self {
+        if let Some(n) = first {
+            if n < 0 {
+                crate::abort_message("'first' cannot be negative");
+            }
+        }
+        self.first = first;
+        self
+    }
+
+    /// Limit the result to the last `n` (if Some) matching records.
+    ///
+    /// This replaces the current value. Returns error if n is negative.
+    pub fn last(mut self, last: Option<i32>) -> Self {
+        if let Some(n) = last {
+            if n < 0 {
+                crate::abort_message("'last' cannot be negative");
+            }
+        }
+        self.last = last;
+        self
+    }
+
+    /// Resume paging. Limits the result to records before `cursor`
+    /// (if Some). `cursor` is opaque; get it from a
+    /// previously-returned
+    /// [Connection](async_graphql::connection::Connection).
+    ///
+    /// This replaces the current value.
+    pub fn before(mut self, before: Option<String>) -> Self {
+        self.before = before;
+        self
+    }
+
+    /// Resume paging. Limits the result to records after `cursor`
+    /// (if Some). `cursor` is opaque; get it from a
+    /// previously-returned
+    /// [Connection](async_graphql::connection::Connection).
+    ///
+    /// This replaces the current value.
+    pub fn after(mut self, after: Option<String>) -> Self {
+        self.after = after;
+        self
+    }
+
+    fn has_row_after(&self, cursor: &str) -> bool {
+        let next_query = self.generate_sql_query(Some(1), false, None, Some(cursor.to_string()));
+        Self::has_rows(next_query)
+    }
+
+    fn has_row_before(&self, cursor: &str) -> bool {
+        let prev_query = self.generate_sql_query(Some(1), false, Some(cursor.to_string()), None);
+        Self::has_rows(prev_query)
+    }
+
+    fn has_rows(query: String) -> bool {
+        let json = crate::services::r_events::Wrapper::call().sqlQuery(query);
+        let rows: Vec<SqlRow> = serde_json::from_str(&json).unwrap_or_default();
+        !rows.is_empty()
+    }
+
+    fn has_next(
+        &self,
+        rows: &[SqlRow],
+        before: Option<&String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> bool {
+        if let Some(before_cursor) = before {
+            self.has_row_after(before_cursor)
+        } else {
+            match first.or(last) {
+                Some(n) => rows.len() > n as usize,
+                None => false,
+            }
+        }
+    }
+
+    fn has_previous(&self, rows: &[SqlRow], after: Option<&String>) -> bool {
+        if let Some(after_cursor) = after {
+            self.has_row_before(after_cursor)
+        } else if let Some(first_row) = rows.first() {
+            self.has_row_before(&first_row.rowid.to_string())
+        } else {
+            false
+        }
+    }
+
+    fn generate_sql_query(
+        &self,
+        limit: Option<i32>,
+        descending: bool,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> String {
+        let mut filters = vec![];
+        if let Some(cond) = &self.condition {
+            if !cond.trim().is_empty() {
+                filters.push(cond.clone());
+            }
+        }
+        if let Some(b) = before.and_then(|s| s.parse::<u64>().ok()) {
+            filters.push(format!("ROWID < {}", b));
+        }
+        if let Some(a) = after.and_then(|s| s.parse::<u64>().ok()) {
+            filters.push(format!("ROWID > {}", a));
+        }
+
+        let order = if descending { "DESC" } else { "ASC" };
+        let mut query = format!("SELECT ROWID, * FROM {}", self.table_name);
+
+        if !filters.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(&filters.join(" AND "));
+        }
+
+        query.push_str(&format!(" ORDER BY ROWID {order}"));
+
+        if let Some(l) = limit {
+            query.push_str(&format!(" LIMIT {l}"));
+        }
+
+        query
+    }
+
+    /// Execute the query and return a Connection containing the results
+    ///
+    /// Returns error if both first and last are specified.
+    pub fn query(&self) -> async_graphql::Result<Connection<u64, T>> {
+        if self.first.is_some() && self.last.is_some() {
+            crate::abort_message("Cannot specify both 'first' and 'last'");
+        }
+
+        let (limit_plus_one, descending) = match (self.first, self.last) {
+            (Some(n), None) => (Some(n + 1), false),
+            (None, Some(n)) => (Some(n + 1), true),
+            (None, None) => (None, false),
+            _ => unreachable!(),
+        };
+
+        let query = self.generate_sql_query(
+            limit_plus_one,
+            descending,
+            self.before.clone(),
+            self.after.clone(),
+        );
+
+        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query);
+        if self.debug {
+            println!("Raw JSON string: {}", json_str);
+        }
+        let mut rows: Vec<SqlRow> = serde_json::from_str(&json_str).unwrap_or_else(|e| {
+            if self.debug {
+                println!("Failed to deserialize rows: {}", e);
+            }
+            crate::abort_message(&format!("Failed to deserialize rows: {}", e))
+        });
+
+        let has_next = self.has_next(&rows, self.before.as_ref(), self.first, self.last);
+        let has_previous = self.has_previous(&rows, self.after.as_ref());
+
+        if let Some(user_limit) = self.first.or(self.last) {
+            if rows.len() > user_limit as usize {
+                rows.truncate(user_limit as usize);
+            }
+        }
+
+        if self.last.is_some() {
+            rows.reverse();
+        }
+
+        let mut connection = Connection::new(has_previous, has_next);
+        for row in rows {
+            if self.debug {
+                println!("Row data: {}", row.data);
+            }
+            match serde_json::from_value(row.data) {
+                Ok(data) => {
+                    connection.edges.push(Edge::new(row.rowid, data));
+                }
+                Err(e) => {
+                    if self.debug {
+                        println!("Failed to deserialize row {}: {}", row.rowid, e);
+                    }
+                    crate::abort_message(&format!(
+                        "Failed to deserialize row {}: {}",
+                        row.rowid, e
+                    ));
+                }
+            }
+        }
+
+        if !connection.edges.is_empty() {
+            connection.has_previous_page = has_previous;
+            connection.has_next_page = has_next;
+        }
+
+        Ok(connection)
+    }
 }

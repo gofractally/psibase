@@ -37,16 +37,18 @@ class Func {
     private proxy = (): string => {
         let service = `"${this.service}"`;
         let plugin = `"${this.plugin}"`;
-
+        let intf = `"${this.intfName}"`;
         if (this.isDynamic) {
-            service = `plugin_ref.name`;
-            plugin = `"plugin"`;
+            service = `plugin_ref.service`;
+            plugin = `plugin_ref.plugin`;
+            intf = `plugin_ref.intf`;
         }
+
         return [
             `${col(2)}return host.syncCall({`,
             `${col(3)}service: ${service},`,
             `${col(3)}plugin: ${plugin},`,
-            `${col(3)}intf: "${this.intfName}",`,
+            `${col(3)}intf: ${intf},`,
             `${col(3)}method: "${this.name}",`,
             `${col(3)}params: args`,
             `${col(2)}});`,

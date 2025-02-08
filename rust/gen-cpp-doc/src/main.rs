@@ -787,7 +787,7 @@ fn get_clang_include_dir(wasi_sdk_prefix: &str) -> String {
 
 fn get_wasi_include_dir(wasi_sdk_prefix: &str) -> String {
     let dir = wasi_sdk_prefix.to_owned() + "/share/wasi-sysroot/include";
-    let wasm32_wasi_dir = dir.clone() + "/wasm32-wasi";
+    let wasm32_wasi_dir = dir.clone() + "/wasm32-wasip1";
     if Path::new(&wasm32_wasi_dir).exists() {
         wasm32_wasi_dir
     } else {
@@ -808,7 +808,7 @@ fn parse<'tu>(
         "-fcolor-diagnostics",
         "-std=c++23",
         "-c",
-        "--target=wasm32-wasi",
+        "--target=wasm32-wasip1",
         "-fno-exceptions",
         "-nostdlib",
         "-nostdinc",

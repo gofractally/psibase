@@ -2,7 +2,5 @@ package auth-any:plugin;
 
 world impl {
     include host:common/imports;
-
-    import accounts:smart-auth/types;
-    export accounts:smart-auth/smart-auth;
+    include transact:plugin/hook-user-auth;
 }

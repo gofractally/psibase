@@ -35,7 +35,7 @@ namespace SystemService
 
          // Path reserved across all subdomains
          if (req.target.starts_with("/common"))
-            serviceName = "common-api";
+            serviceName = HttpServer::commonApiService.str();
 
          // subdomain
          else if (isSubdomain(req))
@@ -43,7 +43,7 @@ namespace SystemService
 
          // root domain
          else
-            serviceName = "homepage";
+            serviceName = HttpServer::homepageService.str();
 
          return AccountNumber(serviceName);
       }
@@ -224,13 +224,14 @@ namespace SystemService
       auto [sock, req] = psio::from_frac<std::tuple<std::int32_t, HttpRequest>>(act.rawData);
 
       // First we check the registered server
-      auto service    = getTargetService(req);
-      auto registered = getServer(service);
+      auto                     service    = getTargetService(req);
+      auto                     registered = getServer(service);
       std::optional<HttpReply> result;
-      psibase::AccountNumber server;
+      psibase::AccountNumber   server;
 
-      auto checkServer = [&](psibase::AccountNumber srv) {
-         server = srv;
+      auto checkServer = [&](psibase::AccountNumber srv)
+      {
+         server         = srv;
          currentRequest = {.socket = sock, .owner = server};
          return iface(server).serveSys(req, std::optional{sock});
       };

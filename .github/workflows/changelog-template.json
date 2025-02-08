@@ -1,0 +1,90 @@
+{
+    "template": "# Changelog\n#{{CHANGELOG}}## 📦 Uncategorized\n\n#{{UNCATEGORIZED}}\n\n# Associated docker images\n\nDocker images for this release of the psinode and psibase tools are available in GitHub container registry.\n  * [psinode](https://github.com/orgs/gofractally/packages/container/package/psinode)\n  * [psibase](https://github.com/orgs/gofractally/packages/container/package/psibase)\n\n# Contributors\n\n#{{CONTRIBUTORS}}",
+    "pr_template": "- [(PR ##{{NUMBER}})](#{{URL}})  |  #{{TITLE}}",
+    "ignore_labels": [
+        "no-log"
+    ],
+    "categories": [
+        {
+            "title": "## 🚀 Applications",
+            "labels": [
+                "System app"
+            ],
+            "consume": true,
+            "categories": [
+                {
+                    "title": "### 🐛 Bugfixes",
+                    "labels": [
+                        "bug"
+                    ]
+                },
+                {
+                    "title": "### 📚 Documentation",
+                    "labels": [
+                        "documentation"
+                    ]
+                },
+                {
+                    "title": "### 🔧 Refactoring",
+                    "labels": [
+                        "refactoring"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "## 💻 Development experience",
+            "labels": [
+                "Dev Experience"
+            ],
+            "consume": true,
+            "categories": [
+                {
+                    "title": "### 🐛 Bugfixes",
+                    "labels": [
+                        "bug"
+                    ]
+                },
+                {
+                    "title": "### 📚 Documentation",
+                    "labels": [
+                        "documentation"
+                    ]
+                },
+                {
+                    "title": "### 🔧 Refactoring",
+                    "labels": [
+                        "refactoring"
+                    ]
+                }
+            ]
+        },
+        {
+            "title": "## 🏗️ Infrastructure Providers",
+            "labels": [
+                "Node infra"
+            ],
+            "consume": true,
+            "categories": [
+                {
+                    "title": "### 🐛 Bugfixes",
+                    "labels": [
+                        "bug"
+                    ]
+                },
+                {
+                    "title": "### 📚 Documentation",
+                    "labels": [
+                        "documentation"
+                    ]
+                },
+                {
+                    "title": "### 🔧 Refactoring",
+                    "labels": [
+                        "refactoring"
+                    ]
+                }
+            ]
+        }
+    ]
+}

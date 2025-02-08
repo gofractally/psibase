@@ -1,6 +1,8 @@
-"use client";
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
+
+import { type BlockProducerSchema } from "@/pages/create-page";
+
 import {
     Form,
     FormControl,
@@ -10,10 +12,6 @@ import {
     FormMessage,
 } from "../ui/form";
 import { Input } from "../ui/input";
-
-const BlockProducerSchema = z.object({
-    name: z.string().min(1),
-});
 
 interface Props {
     form: UseFormReturn<z.infer<typeof BlockProducerSchema>>;

@@ -1,5 +1,8 @@
 import { siblingUrl } from "./rpc";
-import { buildFunctionCallRequest } from "./messaging/FunctionCallRequest";
+import {
+    buildFunctionCallRequest,
+    toString,
+} from "./messaging/FunctionCallRequest";
 import {
     PluginId,
     pluginString,
@@ -180,7 +183,7 @@ export class Supervisor {
 
     public functionCall(args: FunctionCallArgs) {
         const request = buildFunctionCallRequest(args);
-        return this.sendRequest(args.toString(), request);
+        return this.sendRequest(toString(args), request);
     }
 
     public getJson(plugin: QualifiedPluginId) {

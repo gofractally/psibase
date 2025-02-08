@@ -2,6 +2,7 @@ import {
     siblingUrl,
     QualifiedPluginId,
     assertTruthy,
+    pluginString,
 } from "@psibase/common-lib";
 
 import { HostInterface } from "../hostInterface";
@@ -63,7 +64,13 @@ export class Plugin {
     private async doParse(): Promise<ComponentAPI> {
         const bin = await this.fetched;
         const p = await parser();
-        this.componentAPI = p.parse("comp", bin) as ComponentAPI;
+        try {
+            this.componentAPI = p.parse("comp", bin) as ComponentAPI;
+        } catch (e) {
+            console.error(`Error parsing plugin: ${pluginString(this.id)}`);
+            throw e;
+        }
+
         return this.componentAPI;
     }
 

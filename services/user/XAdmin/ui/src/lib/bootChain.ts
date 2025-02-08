@@ -10,7 +10,8 @@ import { queryClient } from "../main";
 type BootChainParams = {
     packages: PackageInfo[];
     producerName: string;
-    publicKey: CryptoKey | undefined;
+    blockSigningPubKey: CryptoKey | undefined;
+    txSigningPubKey: CryptoKey | undefined;
     compression: number;
     onProgressUpdate: (state: BootState) => void;
 };
@@ -18,7 +19,8 @@ type BootChainParams = {
 export const bootChain = async ({
     packages,
     producerName,
-    publicKey,
+    blockSigningPubKey,
+    txSigningPubKey,
     compression,
     onProgressUpdate,
 }: BootChainParams): Promise<void> => {
@@ -37,13 +39,25 @@ export const bootChain = async ({
             packages.map((pack) => pack.file)
         );
 
-        let publicKeyPem: string | undefined;
+        let blockSigningPubKeyPem: string | undefined;
+        let txSigningPubKeyPem: string | undefined;
         try {
-            if (publicKey) {
-                publicKeyPem = await exportKeyToPEM(publicKey, "PUBLIC KEY");
+            if (blockSigningPubKey) {
+                blockSigningPubKeyPem = await exportKeyToPEM(
+                    blockSigningPubKey,
+                    "PUBLIC KEY"
+                );
+            }
+            if (txSigningPubKey) {
+                txSigningPubKeyPem = await exportKeyToPEM(
+                    txSigningPubKey,
+                    "PUBLIC KEY"
+                );
             }
         } catch (e) {
-            onProgressUpdate("Failed to export publicKey to PEM format");
+            onProgressUpdate(
+                "Failed to export public key to PEM format during boot"
+            );
             return;
         }
 
@@ -54,7 +68,8 @@ export const bootChain = async ({
             wasm.js_create_boot_transactions(
                 producerName,
                 fetchedPackages,
-                publicKeyPem,
+                blockSigningPubKeyPem,
+                txSigningPubKeyPem,
                 compression
             );
 

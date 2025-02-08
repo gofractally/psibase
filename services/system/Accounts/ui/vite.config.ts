@@ -4,8 +4,6 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 // import svgr from "vite-plugin-svgr";
 
-// ../../../user/CommonApi/common/packages/common-lib
-
 const psibase = (appletContract: string, isServing?: boolean) => {
   const buildAliases = [
     {
