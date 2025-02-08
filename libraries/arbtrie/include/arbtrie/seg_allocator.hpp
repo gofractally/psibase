@@ -1,5 +1,5 @@
 #pragma once
-#include <arbtrie/config.hpp>
+#include <arbtrie/mapped_memory.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/id_alloc.hpp>
 #include <arbtrie/mapping.hpp>
@@ -10,7 +10,7 @@
 /**
  *  @file seg_allocator.hpp
  *
- *  Responsible for allocating large segments of memory (segment_size = 128 MB), each
+ *  Responsible for allocating large segments of memory (multiple MB power of 2), each
  *  segment in turn stores objects pointed to from the id_allocator.
  *
  *  1. Each thread has its own session and allocates to its own
@@ -119,123 +119,6 @@
  */
 namespace arbtrie
 {
-   /// index into meta[free_segment_index]._free_segment_number
-   using free_segment_index = uint64_t;
-
-   /// object pointers can only address 48 bits
-   /// 128 TB limit on database size with 47 bits, this saves us
-   /// 8MB of memory relative to 48 bits in cases with less than 128 TB
-   static constexpr const uint64_t max_segment_count = max_database_size / segment_size;
-
-   // types that are memory mapped
-   namespace mapped_memory
-   {
-
-      // meta data about each segment,
-      // stored in an array in allocator_header indexed by segment number
-      struct segment_meta
-      {
-         // returns the free space in bytes, and number of objects freed
-         std::pair<uint32_t, uint32_t> get_free_space_and_objs() const
-         {
-            uint64_t v = _free_space_and_obj.load(std::memory_order_relaxed);
-            return std::make_pair(v >> 32, v & 0xffffffff);
-         }
-
-         // notes that an object of size was freed
-         void free_object(uint32_t size)
-         {
-            uint64_t so = size;
-            so <<= 32;
-            so += 1;
-            _free_space_and_obj.fetch_add(so, std::memory_order_relaxed);
-         }
-
-         // doesn't increment object count
-         void free(uint32_t size)
-         {
-            uint64_t so = size;
-            so <<= 32;
-            _free_space_and_obj.fetch_add(so, std::memory_order_relaxed);
-         }
-
-         void clear()
-         {
-            _free_space_and_obj.store(0, std::memory_order_relaxed);
-            _last_sync_pos.store(segment_size, std::memory_order_relaxed);
-         }
-
-         /// the total number of bytes freed by swap
-         /// or by being moved to other segments.
-         std::atomic<uint64_t> _free_space_and_obj;
-         std::atomic<uint64_t> _last_sync_pos;  // position of alloc pointer when last synced
-      };
-
-      /// should align on a page boundary
-      struct segment_header
-      {
-         // the next position to allocate data, only
-         // used by the thread that owns this segment and
-         // set to uint64_t max when this segment is ready
-         // to be marked read only to the seg_allocator
-         std::atomic<uint32_t> _alloc_pos = 64;  // sizeof(segment_header)
-         uint32_t              _age;  // every time a segment is allocated it is assigned an age
-                                      // which aids in reconstruction
-
-         // used to calculate object density of segment header,
-         // to establish madvise
-         // uint32_t _num_objects = 0;  // inc on alloc
-         uint32_t _checksum = 0;  // TODO
-      };
-      static_assert(sizeof(segment_header) <= 64);
-
-      /**
-        * The data stored in the alloc header is not written to disk on sync
-        * and may be in a corrupt state after a hard crash. Aall values contained
-        * within the allocator_header must be reconstructed from the segments
-       */
-      struct allocator_header
-      {
-         // when no segments are available for reuse, advance by segment_size
-         alignas(64) std::atomic<segment_offset> alloc_ptr;    // A below
-         alignas(64) std::atomic<free_segment_index> end_ptr;  // E below
-
-         // set to 0 just before exit, set to 1 when opening database
-         std::atomic<bool>     clean_exit_flag;
-         std::atomic<uint32_t> next_alloc_age = 0;
-
-         // meta data associated with each segment, indexed by segment number
-         segment_meta seg_meta[max_segment_count];
-
-         // circular buffer described, big enough to hold every
-         // potentially allocated segment which is subseuently freed.
-         //
-         // |-------A----R1--R2---E-------------| max_segment_count
-         //
-         // A = alloc_ptr where recycled segments are used
-         // R* = session_ptrs last known recycled segment by each session
-         // E = end_ptr where the next freed segment is posted to be recycled
-         // Initial condition A = R* = E = 0
-         // Invariant A <= R* <= E unless R* == -1
-         //
-         // If A == min(R*) then we must ask block_alloc to create a new segment
-         //
-         // A, R*, and E are 64 bit numbers that count to infinity, the
-         // index in the buffer is A % max_segment_count which should be
-         // a simple bitwise & operation if max_segment_count is a power of 2.
-         // The values between [A-E) point to recyclable segments assuming no R*
-         // is present. Values before A or E and after point to no valid segments
-         segment_number free_seg_buffer[max_segment_count];
-      };
-
-      /// crash recovery:
-      /// 1. scan all segments to find those that were mid-allocation:
-      ///    if a lot of free space, then swap them and push to free seg buffer
-      /// 2. Update reference counts on all objects in database
-      /// 3. ? pray ?
-
-   }  // namespace mapped_memory
-
    class seg_allocator
    {
      protected:
@@ -254,13 +137,13 @@ namespace arbtrie
       seg_allocator(std::filesystem::path dir);
       ~seg_allocator();
 
-      void dump();
-      void print_region_stats() { _id_alloc.print_region_stats(); }
+      void     dump();
+      void     print_region_stats() { _id_alloc.print_region_stats(); }
       uint64_t count_ids_with_refs() { return _id_alloc.count_ids_with_refs(); }
-      void sync(sync_type st = sync_type::sync);
-      void start_compact_thread();
-      void stop_compact_thread();
-      bool compact_next_segment();
+      void     sync(sync_type st = sync_type::sync);
+      void     start_compact_thread();
+      void     stop_compact_thread();
+      bool     compact_next_segment();
 
       class session
       {
@@ -277,77 +160,20 @@ namespace arbtrie
             class modify_lock
             {
               public:
-               modify_lock(node_meta_type& m, read_lock& rl)
-                   : _meta(m), _rlock(rl), _sync_lock(nullptr)
-               {
-                  _locked_val = _meta.start_modify();
-               }
-
-               ~modify_lock()
-               {
-                  if (not _released)
-                     unlock();
-               }
+               modify_lock(node_meta_type& m, read_lock& rl);
+               ~modify_lock();
 
                // returned mutable T is only valid while modify lock is in scope
-               // TODO: compile time optimziation or a state variable can avoid sync_lock
-               // the sync locks and atomic operations if we know for certain that
-               // the process will not want to msync or is willing to risk
-               // data not making it to disk.
                template <typename T>
-               T* as()
-               {
-                  if (_observed_ptr)
-                     return (T*)_observed_ptr;
-                  assert(_locked_val.ref());
-
-                  auto loc   = _locked_val.loc();
-                  auto lseg  = loc.segment();
-                  _sync_lock = &_rlock.get_sync_lock(lseg);
-                  if (_sync_lock->try_modify())
-                  {
-                     if (not _rlock.is_synced(loc))
-                        return (T*)(_observed_ptr = _rlock.get_node_pointer(loc));
-                     _sync_lock->end_modify();
-                  }
-                  _sync_lock    = nullptr;
-                  auto cur_ptr  = _rlock.get_node_pointer(loc);
-                  auto old_oref = _rlock.get(cur_ptr->address());
-                  auto oref =
-                      _rlock.realloc(old_oref, cur_ptr->_nsize, cur_ptr->get_type(),
-                                     [&](auto ptr) { memcpy(ptr, cur_ptr, cur_ptr->_nsize); });
-                  return (T*)(_observed_ptr = _rlock.get_node_pointer(oref.loc()));
-               }
+               T* as();
 
                template <typename T>
-               void as(std::invocable<T*> auto&& call_with_tptr)
-               {
-                  assert(_locked_val.ref());
-                  call_with_tptr(as<T>());
-               }
-
-               void release()
-               {
-                  _released = true;
-                  unlock();
-               }
+               void as(std::invocable<T*> auto&& call_with_tptr);
+               void release();
 
               private:
-               void unlock()
-               {
-                  if (_observed_ptr)
-                  {
-                     if constexpr (update_checksum_on_modify)
-                        _observed_ptr->update_checksum();
-                     else
-                        _observed_ptr->checksum = 0;
-                  }
-                  // allow msync to continue
-                  if (_sync_lock)
-                     _sync_lock->end_modify();
-                  // allow compactor to copy
-                  _meta.end_modify();
-               }
+               void unlock();
+
                bool            _released = false;
                temp_meta_type  _locked_val;
                node_meta_type& _meta;
@@ -364,10 +190,7 @@ namespace arbtrie
                friend class object_ref;
 
                template <typename Other>
-               object_ref(object_ref<Other> p)
-                   : _rlock(p._rlock), _address(p._address), _meta(p._meta), _cached(p._cached)
-               {
-               }
+               object_ref(object_ref<Other> p);
 
                inline fast_meta_address address() const { return _address; }
                inline uint32_t          ref() const { return _cached.ref(); }
@@ -383,53 +206,20 @@ namespace arbtrie
 
                modify_lock modify() { return modify_lock(_meta, _rlock); }
                bool        try_start_move(node_location loc) { return _meta.try_start_move(loc); }
-               auto        try_move(node_location expected_prior_loc, node_location move_to_loc)
-               {
-                  return _meta.try_move(expected_prior_loc, move_to_loc);
-               }
+               auto        try_move(node_location expected_prior_loc, node_location move_to_loc);
 
+               template <bool SetReadBit = false>
                const T* header() const;
-               const T* operator->() const { return header(); }
+
                template <typename Type>
-               const Type* as() const
-               {
-                  assert(header()->validate_checksum());
-                  assert(Type::type == header()->get_type());
-                  return reinterpret_cast<const Type*>(header());
-               };
-               void store(temp_meta_type tmt, auto memory_order)
-               {
-                  if constexpr (not debug_memory)
-                  {
-                     _meta.store(_cached = tmt, memory_order);
-                  }
-                  else
-                  {
-                     auto clok = _cached.loc();
-                     auto old  = _meta.exchange(_cached = tmt, memory_order);
-                     if (old.loc() != clok)
-                     {
-                        TRIEDENT_WARN(
-                            "stomping on location that changed from cache,"
-                            " this may result in memory leak until compacted");
-                     }
-                  }
-               }
+               const Type* as() const;
 
-               //explicit inline operator bool() const { return bool(id()); }
-
-               //auto& get_mutex() const { return _rlock._session._sega._id_alloc.get_mutex(_id); }
-
-               // return false if object is released or moved while atempting to move
-
-               //bool cache_object();
+               void store(temp_meta_type tmt, auto memory_order);
 
                void refresh(auto memory_order) { _cached = _meta.load(memory_order); }
 
                auto& rlock() { return _rlock; }
                auto& rlock() const { return _rlock; }
-
-               //object_ref clone(const T* v) const { return rlock().clone(v); }
 
                temp_meta_type meta_data() { return _cached; }
 
@@ -442,25 +232,13 @@ namespace arbtrie
 
                object_ref(seg_allocator::session::read_lock& rlock,
                           fast_meta_address                  adr,
-                          node_meta_type&                    met)
-                   : _rlock(rlock),
-                     _meta(met),
-                     _cached(_meta.load(std::memory_order_relaxed)),
-                     _address(adr)
-               {
-                  //    assert(_ptr == nullptr or (_ptr and (_ptr->id == _id.id)));
-               }
+                          node_meta_type&                    met);
 
                seg_allocator::session::read_lock& _rlock;
                node_meta_type&                    _meta;
                temp_meta_type                     _cached;  // cached read of atomic _atom_loc
                fast_meta_address                  _address;
             };  // object_ref
-
-            //template <typename T>
-            //inline object_ref<T>    clone(const T* n);
-            //template <typename T>
-            //object_ref<T> clone(T* n);
 
             object_ref<node_header> alloc(id_region reg,
                                           uint32_t  size,
@@ -486,9 +264,6 @@ namespace arbtrie
             {
                return object_ref<T>(*this, adr, _session._sega._id_alloc.get(adr));
             }
-
-            // this is for help in lldb
-            //object_ref<node_header> get_by_id(object_id id) { return get(id); }
 
             inline object_ref<node_header> get(node_header*);
 
@@ -520,162 +295,26 @@ namespace arbtrie
          // could be read while the return value of this method is in scope can
          // be reused (overwritten)
          read_lock lock() { return read_lock(*this); }
-         void      sync(sync_type st)
-         {
-            _sega.push_dirty_segment(_alloc_seg_num);
-            _sega.sync(st);
-         }
+         void      sync(sync_type st);
 
-         ~session()
-         {
-            if (_session_num == -1)
-               return;
-            if (_alloc_seg_ptr)  // not moved
-            {
-               if (segment_size - _alloc_seg_ptr->_alloc_pos >= sizeof(node_header))
-               {
-                  memset(((char*)_alloc_seg_ptr) + _alloc_seg_ptr->_alloc_pos, 0,
-                         sizeof(node_header));  // mark last object
-               }
-               _sega._header->seg_meta[_alloc_seg_num].free(segment_size -
-                                                            _alloc_seg_ptr->_alloc_pos);
-               _alloc_seg_ptr->_alloc_pos = uint32_t(-1);
-               _alloc_seg_num             = -1ull;
-            }
-            _sega.release_session_num(_session_num);
-         }
+         ~session();
+         session(session&& mv);
 
-         session(session&& mv)
-             : _sega(mv._sega),
-               _session_num(mv._session_num),
-               _alloc_seg_num(mv._alloc_seg_num),
-               _alloc_seg_ptr(mv._alloc_seg_ptr)
-         {
-            mv._session_num = -1;
-         }
+         uint64_t count_ids_with_refs();
 
-         uint64_t count_ids_with_refs() { return _sega.count_ids_with_refs(); }
         private:
          friend class lock;
          friend class seg_allocator;
 
-         // copy E to R*
-         void retain_read_lock()
-         {
-            ++_nested_read_lock;
-            if (_nested_read_lock == 1)
-            {
-               uint64_t cur =
-                   _sega._session_lock_ptrs[_session_num].load(std::memory_order_acquire);
-               //cur.locked_end = cur.view_of_end;
-               uint32_t view_of_end = cur >> 32;
-               uint32_t cur_end     = uint32_t(cur);
-               // it should be unlocked which signaled by max
-               assert(cur_end == uint32_t(-1));
-               auto diff = cur_end - view_of_end;
+         void retain_read_lock();
+         void release_read_lock();
 
-               // an atomic sub should leave the higher-order bits in place where the view
-               // from the compactor is being updated.
-               _sega._session_lock_ptrs[_session_num].fetch_sub(diff, std::memory_order_release);
-            }
-         }
-
-         // R* goes to inifinity and beyond
-         void release_read_lock()
-         {
-            --_nested_read_lock;
-            assert(_nested_read_lock >= 0);
-            if (not _nested_read_lock)
-            {
-               //  assert(_sega._session_ptrs[_session_num] != -1ull);
-               //_sega._session_ptrs[_session_num] = -1ull;
-               //  _sega._session_lock_ptrs[_session_num].fetch_or( , std::memory_order_release );
-
-               // set it to max uint32_t
-               _sega._session_lock_ptrs[_session_num].fetch_or(uint32_t(-1));
-            }
-         }
-
-         session(seg_allocator& a, uint32_t ses_num)
-             : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr), _sega(a)
-         {
-         }
-
+         session(seg_allocator& a, uint32_t ses_num);
          session()               = delete;
          session(const session&) = delete;
 
-         void unalloc(uint32_t size)
-         {
-            auto rounded_size = round_up_multiple<64>(size);
-            if (_alloc_seg_ptr) [[likely]]
-            {
-               auto cap = _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed);
-               if (cap and cap < segment_size) [[likely]]
-               {
-                  auto cur_apos =
-                      _alloc_seg_ptr->_alloc_pos.fetch_sub(rounded_size, std::memory_order_relaxed);
-                  cur_apos -= rounded_size;
-                  memset(((char*)_alloc_seg_ptr) + cur_apos, 0, sizeof(node_header));
-               }
-               //_alloc_seg_ptr->_num_objects--;
-            }
-         }
-         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr)
-         {
-            assert(size <
-                   segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
-            // A - if no segment get a new segment
-            if (not _alloc_seg_ptr or _alloc_seg_ptr->_alloc_pos.load(std::memory_order_relaxed) >
-                                          segment_size) [[unlikely]]
-            {
-               auto [num, ptr] = _sega.get_new_segment();
-               _alloc_seg_num  = num;
-               _alloc_seg_ptr  = ptr;
-               //  if (not _alloc_seg_ptr->_write_lock.try_lock())
-               //  {
-               //     TRIEDENT_WARN("unable to get write lock on segment");
-               //  }
-               _sega._header->seg_meta[_alloc_seg_num]._last_sync_pos.store(
-                   0, std::memory_order_relaxed);
-            }
-
-            auto* sh           = _alloc_seg_ptr;
-            auto  rounded_size = round_up_multiple<64>(size);
-
-            auto cur_apos = sh->_alloc_pos.load(std::memory_order_relaxed);
-
-            auto spec_pos   = uint64_t(cur_apos) + rounded_size;
-            auto free_space = segment_size - cur_apos;
-
-            // B - if there isn't enough space, notify compactor go to A
-            if (spec_pos > (segment_size - sizeof(node_header))) [[unlikely]]
-            {
-               if (free_space >= sizeof(node_header))
-               {
-                  assert(cur_apos + sizeof(uint64_t) <= segment_size);
-                  memset(((char*)sh) + cur_apos, 0, sizeof(node_header));
-               }
-               _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
-               sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
-               _sega.push_dirty_segment(_alloc_seg_num);
-               _alloc_seg_ptr = nullptr;
-               _alloc_seg_num = -1ull;
-
-               return alloc_data(size, adr);  // recurse
-            }
-
-            auto obj  = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
-            auto head = (node_header*)obj;
-            head      = new (head) node_header(size, adr);
-
-            auto new_alloc_pos =
-                rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
-            //sh->_num_objects++;
-
-            auto loc = _alloc_seg_num * segment_size + cur_apos;
-
-            return {node_location::from_absolute(loc), head};
-         }
+         void                                   unalloc(uint32_t size);
+         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr);
 
          uint32_t _session_num;  // index into _sega's active sessions list
 
@@ -697,31 +336,8 @@ namespace arbtrie
          return static_cast<mapped_memory::segment_header*>(_block_alloc.get(seg));
       }
 
-      uint32_t alloc_session_num()
-      {
-         auto fs_bits = _free_sessions.load(std::memory_order_relaxed);
-         if (fs_bits == 0)
-         {
-            throw std::runtime_error("max of 64 sessions can be in use");
-         }
-         auto fs          = std::countr_zero(fs_bits);
-         auto new_fs_bits = fs_bits & ~(1 << fs);
-
-         while (not _free_sessions.compare_exchange_weak(fs_bits, new_fs_bits))
-         {
-            if (fs_bits == 0)
-            {
-               throw std::runtime_error("max of 64 sessions can be in use");
-            }
-            fs          = std::countr_zero(fs_bits);
-            new_fs_bits = fs_bits & ~(1 << fs);
-         }
-         //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
-         //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
-         //    _free_sessions.store(new_fs_bits);
-         return fs;
-      }
-      void release_session_num(uint32_t sn) { _free_sessions.fetch_or(uint64_t(1) << sn); }
+      uint32_t alloc_session_num();
+      void     release_session_num(uint32_t sn);
 
       std::pair<segment_number, mapped_memory::segment_header*> get_new_segment();
 
@@ -791,11 +407,12 @@ namespace arbtrie
        *  TODO: each ptr moved to its own cacheline (64 byte bounds)..
        *       so that read threads don't contend.
        */
-      struct aligned_atomic64 : public std::atomic<uint64_t> {
+      struct aligned_atomic64 : public std::atomic<uint64_t>
+      {
          uint64_t padding[7];
       } __attribute__((__aligned__(8)));
       aligned_atomic64 _session_lock_ptrs[64];
-      static_assert( sizeof(_session_lock_ptrs) == 64*64 );
+      static_assert(sizeof(_session_lock_ptrs) == 64 * 64);
 
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,
@@ -829,196 +446,53 @@ namespace arbtrie
       }
    };  // seg_allocator
 
-   /*
-   template <typename T>
-   inline T* seg_allocator::session::read_lock::object_ref<T>::obj()
-   {
-      object_meta val(_atom_loc.load(std::memory_order_acquire));
-
-      assert(0 != val.ref());
-      //  if (not val.ref()) [[unlikely]]
-      //     return nullptr;
-      //  else
-      return (T*)_rlock.get_object_pointer(val.loc());
-   }
-   */
-
-   template <typename T>
-   inline const T* seg_allocator::session::read_lock::object_ref<T>::header() const
-   {
-      assert(_meta.load(std::memory_order_relaxed).ref());
-      auto r = (const T*)_rlock.get_node_pointer(_meta.load(std::memory_order_acquire).loc());
-      if constexpr (debug_memory)
-      {
-         if (not r->validate_checksum())
-         {
-            TRIEDENT_WARN("checksum: ", r->checksum);
-            abort();
-         }
-         assert(r->validate_checksum());
-      }
-      // TODO: determine if we need to set read bit on node
-      return r;
-   }
-
    template <typename T>
    using object_ref = seg_allocator::session::read_lock::object_ref<T>;
 
-   /// @pre refcount of id is 1
-   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(
-       object_ref<node_header>& oref,
-       uint32_t                 size,
-       node_type                type,
-       auto                     init)
+
+   // copy E to R*
+   inline void seg_allocator::session::retain_read_lock()
    {
-      auto adr = oref.address();
-      assert(oref.meta().is_changing());
+      if (++_nested_read_lock != 1)
+         return;
 
-      auto l       = oref.loc();
-      auto seg     = l.segment();
-      auto obj_ptr = (node_header*)((char*)_session._sega._block_alloc.get(seg) + l.abs_index());
+      uint64_t cur = _sega._session_lock_ptrs[_session_num].load(std::memory_order_acquire);
+      //cur.locked_end = cur.view_of_end;
+      uint32_t view_of_end = cur >> 32;
+      uint32_t cur_end     = uint32_t(cur);
+      // it should be unlocked which signaled by max
+      assert(cur_end == uint32_t(-1));
+      auto diff = cur_end - view_of_end;
 
-      _session._sega._header->seg_meta[seg].free_object(obj_ptr->object_capacity());
-
-      //   std::cerr << "realloc " << id <<" size: " << size <<" \n";
-      // TODO: mark the free space associated with the current location of id
-      assert(size >= sizeof(node_header));
-      assert(type != node_type::undefined);
-
-      //auto& atom           = _session._sega._id_alloc.get(id);
-      auto [loc, node_ptr] = _session.alloc_data(size, adr);
-
-      init(node_ptr);
-      if constexpr (update_checksum_on_modify)
-         node_ptr->update_checksum();
-
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
-      assert(node_ptr->_nsize == size);
-      assert(node_ptr->_ntype == type);
-      assert(node_ptr->_node_id == adr.to_int());
-
-      oref.meta().set_location_and_type(loc, type, std::memory_order_release);
-      oref.refresh(std::memory_order_relaxed);
-      return oref;
+      // an atomic sub should leave the higher-order bits in place where the view
+      // from the compactor is being updated.
+      _sega._session_lock_ptrs[_session_num].fetch_sub(diff, std::memory_order_release);
    }
 
-   inline std::pair<node_meta_type&, fast_meta_address>
-   seg_allocator::session::read_lock::get_new_meta_node(id_region reg)
+   // R* goes to inifinity and beyond
+   inline void seg_allocator::session::release_read_lock()
    {
-      return _session._sega._id_alloc.get_new_id(reg);
-      //auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
+      // set it to max uint32_t
+      if (not --_nested_read_lock)
+         _sega._session_lock_ptrs[_session_num].fetch_or(uint32_t(-1));
+      assert(_nested_read_lock >= 0);
    }
 
-   inline object_ref<node_header> seg_allocator::session::read_lock::alloc(id_region reg,
-                                                                           uint32_t  size,
-                                                                           node_type type,
-                                                                           auto      init)
+   inline seg_allocator::session::read_lock::modify_lock::modify_lock(node_meta_type& m,
+                                                                      read_lock&      rl)
+       : _meta(m), _rlock(rl), _sync_lock(nullptr)
    {
-      if constexpr (debug_memory)
-      {
-         assert(not _session._sega._in_alloc);
-         _session._sega._in_alloc = true;
-      }
-
-      assert(size >= sizeof(node_header));
-      assert(type != node_type::undefined);
-
-      auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
-      auto [loc, node_ptr] = _session.alloc_data(size, id);
-      //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
-
-      //init(node_ptr);
-      init(node_ptr);
-      if constexpr (update_checksum_on_modify)
-         node_ptr->update_checksum();
-
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
-
-      atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
-                 std::memory_order_release);
-
-      assert(node_ptr->_nsize == size);
-      assert(node_ptr->_ntype == type);
-      assert(node_ptr->_node_id == id.to_int());
-      assert(object_ref(*this, id, atom).type() != node_type::undefined);
-
-      if constexpr (debug_memory)
-      {
-         _session._sega._in_alloc = false;
-      }
-
-      return object_ref(*this, id, atom);
+      _locked_val = _meta.start_modify();
    }
 
-   inline bool seg_allocator::session::read_lock::is_synced(node_location loc)
+   inline seg_allocator::session::read_lock::modify_lock::~modify_lock()
    {
-      int64_t seg = loc.segment();
-      return _session._sega._header->seg_meta[seg]._last_sync_pos.load(std::memory_order_relaxed) >
-             loc.abs_index();  // - seg * segment_size;
+      if (not _released)
+         unlock();
    }
 
-   inline sync_lock& seg_allocator::session::read_lock::get_sync_lock(int seg)
-   {
-      return _session._sega._seg_sync_locks[seg];
-   }
-   inline node_header* seg_allocator::session::read_lock::get_node_pointer(node_location loc)
-   {
-      auto segment = (mapped_memory::segment_header*)_session._sega._block_alloc.get(loc.segment());
-      // 0 means we are accessing a swapped object on a segment that hasn't started new allocs
-      // if alloc_pos > loc.index() then we haven't overwriten this object yet, we are accessing
-      // data behind the alloc pointer which should be safe
-      // to access data we had to get the location from obj id database and we should read
-      // with memory_order_acquire, when updating an object_info we need to write with
-      // memory_order_release otherwise the data written may not be visible yet to the reader coming
-      // along behind
 
-      // only check this in release if this flag is set
-      if constexpr (debug_memory)
-      {
-         auto ap = segment->_alloc_pos.load(std::memory_order_relaxed);
-         if (not(ap == 0 or ap > loc.abs_index()))
-         {
-            TRIEDENT_WARN("ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(),
-                          "loc.segment: ", loc.segment());
-            abort();
-         }
-      }
-      else  // always check in debug builds
-         assert(segment->_alloc_pos == 0 or segment->_alloc_pos > loc.abs_index());
-
-      return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) +
-                            loc.abs_index());
-   }
-
-   inline void seg_allocator::session::read_lock::free_meta_node(fast_meta_address a)
-   {
-      _session._sega._id_alloc.free_id(a);
-   }
-
-   /**
-    *  Returns the last value of the node pointer prior to release so that
-    *  its children may be released, or null if the children shouldn't be released.
-    */
-   template <typename T>
-   const node_header* seg_allocator::session::read_lock::object_ref<T>::release()
-   {
-      //      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
-      auto prior = _meta.release();
-      if (prior.ref() > 1)
-         return nullptr;
-
-      auto result = _rlock.get_node_pointer(prior.loc());
-
-      //     TRIEDENT_DEBUG( "  free ", address() );
-
-      auto ploc    = prior.loc();
-      auto obj_ptr = _rlock.get_node_pointer(ploc);
-      //    (node_header*)((char*)_rlock._session._sega._block_alloc.get(seg) + loc.abs_index());
-
-      _rlock.free_meta_node(_address);
-      _rlock._session._sega._header->seg_meta[ploc.segment()].free_object(
-          obj_ptr->object_capacity());
-      return result;
-   }
 
 }  // namespace arbtrie
+#include <arbtrie/seg_allocator_object_ref.hpp>
+#include <arbtrie/seg_allocator_read_lock.hpp>

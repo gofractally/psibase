@@ -2115,7 +2115,7 @@ namespace arbtrie
          if (bn->is_obj_id(lb_idx))  // current address (subtree/value_node)
          {
             auto cval       = root.rlock().get(kvp->value_id());
-            _old_value_size = cval->as<value_node>()->value_size();
+            _old_value_size = cval.as<value_node>()->value_size();
             // TODO.... what if clone fails because not enough space
             if (bn->can_inline(_cur_val.view()))
             {

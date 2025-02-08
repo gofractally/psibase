@@ -148,7 +148,8 @@ namespace arbtrie
 
       static constexpr const int     location_offset = 20;
       static constexpr const uint64_t ref_mask      = make_mask<0, 14>();
-      static constexpr const uint64_t type_mask     = make_mask<14, 4>();
+      static constexpr const uint64_t type_mask     = make_mask<14, 3>();
+      static constexpr const uint64_t read_mask     = make_mask<17, 1>();
       static constexpr const uint64_t copy_mask     = make_mask<18, 1>();
       static constexpr const uint64_t modify_mask   = make_mask<19, 1>();
       static constexpr const uint64_t location_mask = make_mask<location_offset, 44>();
@@ -185,15 +186,32 @@ namespace arbtrie
       bool          is_changing() const { return to_int() & modify_mask; }
       bool          is_const() const { return not is_changing(); }
       bool          is_copying() const { return to_int() & copy_mask; }
+      bool          is_read() const { return to_int() & read_mask; }
       uint16_t      ref() const { return bitfield(to_int()).ref; }
       node_location loc() const { return node_location::from_aligned(bitfield(to_int()).location); }
       node_type     type() const { return node_type(bitfield(to_int()).type); }
+
+      auto& set_read() {
+         _meta |= read_mask;
+         return *this;
+      }
+
+      bool try_set_read( temp_type expect ) {
+         auto e = expect.to_int();
+         auto next = e | read_mask;
+         if constexpr (std::is_same_v<Storage, uint64_t>) {
+            _meta = next;
+            return true;
+         }
+         else 
+            return _meta.compare_exchange_weak( e, next, std::memory_order_relaxed, std::memory_order_relaxed );
+      }
 
       auto& set_ref(uint16_t ref)
       {
          assert(ref < max_ref_count);
          if constexpr (std::is_same_v<Storage, uint64_t>)
-         _meta = bitfield(to_int()).set_ref(ref).to_int();
+            _meta = bitfield(to_int()).set_ref(ref).to_int();
          else { 
 
             bitfield bf(0);

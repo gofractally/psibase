@@ -9,6 +9,7 @@ add_library(arbtrie
     src/database.cpp
     src/mapping.cpp
     src/seg_allocator.cpp
+    src/seg_allocator_session.cpp
     src/id_alloc.cpp
     src/recover.cpp
             )

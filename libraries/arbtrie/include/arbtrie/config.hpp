@@ -43,6 +43,35 @@ namespace arbtrie {
     */
    static constexpr const uint64_t max_database_size = 8 * TB; 
 
+   // must be a power of 2
+   // size of the data segments file grows
+   //
+   // the segment size impacts the largest possible value
+   // to be stored, which can be no larger than 50% of the
+   // segment size.
+   //
+   // the smaller this value, the more overhead there is in
+   // searching for segments to compact and the pending 
+   // free queue. 
+   //
+   // the larger this value the longer the stall when things
+   // need to grow, but stalls happen less frequently. Larger
+   // values also mean it takes longer to reclaim free space because
+   // free space in an allocating segment cannot be reclaimed until
+   // the allocations reach the end.  TODO: should the allocator 
+   // consider abandoing a segment early if much of what has been
+   // allocated has already been freed? 
+   //
+   // each thread will have a segment this size, so larger values
+   // may use more memory than necessary for idle threads
+   // max value: 4 GB due to type of segment_offset
+   static constexpr const uint64_t segment_size = 32*MB;
+
+   /// object pointers can only address 48 bits
+   /// 128 TB limit on database size with 47 bits, this saves us
+   /// 8MB of memory relative to 48 bits in cases with less than 128 TB
+   static constexpr const uint64_t max_segment_count = max_database_size / segment_size;
+
    /**
     * This impacts the number of reference count bits that are reserved in case
     * all threads attempt to increment one atomic variable at the same time and
@@ -73,29 +102,6 @@ namespace arbtrie {
     */
    static constexpr const uint32_t id_page_size = 4096;
 
-   // must be a power of 2
-   // size of the data segments file grows
-   //
-   // the segment size impacts the largest possible value
-   // to be stored, which can be no larger than 50% of the
-   // segment size.
-   //
-   // the smaller this value, the more overhead there is in
-   // searching for segments to compact and the pending 
-   // free queue. 
-   //
-   // the larger this value the longer the stall when things
-   // need to grow, but stalls happen less frequently. Larger
-   // values also mean it takes longer to reclaim free space because
-   // free space in an allocating segment cannot be reclaimed until
-   // the allocations reach the end.  TODO: should the allocator 
-   // consider abandoing a segment early if much of what has been
-   // allocated has already been freed? 
-   //
-   // each thread will have a segment this size, so larger values
-   // may use more memory than necessary for idle threads
-   // max value: 4 GB due to type of segment_offset
-   static constexpr const uint64_t segment_size = 32*MB;
 
    static_assert( segment_size < 4*GB, "size must be less than 4GB" );
    static_assert( std::popcount(segment_size) == 1, "size must be power of 2" );
