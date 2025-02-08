@@ -105,6 +105,7 @@ namespace arbtrie
    class read_session
    {
      protected:
+      template<iterator_caching_mode>
       friend class iterator;
       friend class database;
       friend class root_data;
@@ -159,7 +160,8 @@ namespace arbtrie
 
       uint64_t count_ids_with_refs() { return _segas.count_ids_with_refs(); }
 
-      iterator create_iterator(node_handle h) { return iterator(*this, h); }
+      template<iterator_caching_mode CacheMode = noncaching>
+      auto create_iterator(node_handle h) { return iterator<CacheMode>(*this, h); }
 
       /**
        * count the keys in the range [from,to)

@@ -1804,76 +1804,77 @@ namespace arbtrie
                _delta_keys = -1;
       }
 
-      if (not key_found)  // then insert a new value
+      if (key_found)
       {
-         if constexpr (mode.must_update())
-            throw std::runtime_error("update failed because key doesn't exist");
-
          if constexpr (mode.is_remove())
-         {
-            if constexpr (mode.must_remove())
-               throw std::runtime_error("remove failed because key doesn't exist");
-            return root.address();
-         }
-
-         if constexpr (mode.is_unique())
-         {
-            // assuming we allocate binary nodes with space and grow them
-            // every time we have to clone them anyway, then this should be
-            // true, especially because we are in the unique path.
-            if (bn->can_insert(key, _cur_val)) [[likely]]
-            {
-               if (bn->can_inline(_cur_val))
-               {  // subtree or data
-                  kv_index kvi(lb_idx,
-                               _cur_val.is_subtree() ? kv_type::subtree : kv_type::inline_data);
-                  root.modify().as<binary_node>()->insert(kvi, key, _cur_val);
-               }
-               else  // definite obj_id (aka value node)
-                  root.modify().as<binary_node>()->insert(
-                      kv_index(lb_idx, kv_type::obj_id), key,
-                      make_value(bn->branch_region(), root.rlock(), _cur_val));
-               return root.address();
-            }
-         }
-
-         // worst case keys are 1kb and this misses 25% of the time
-         // best case keys are small and this misses <1% of the time
-         if (bn->insert_requires_refactor(key, _cur_val)) [[unlikely]]
-         {
-            auto rid = refactor<mode>(root, bn);
-
-            assert((mode.is_unique() and (rid.address() == root.address())) or
-                   ((mode.is_shared()) and (rid.address() != root.address())));
-
-            // if it wasn't unique before and the id changed then
-            // it has become unique. If it was unique before, then
-            // it remains unique now.
-            return upsert<mode.make_unique()>(rid, key);
-         }
-
-         if (binary_node::can_inline(_cur_val))
-            return clone<mode>(root, bn, {},
-                               binary_node::clone_insert(
-                                   kv_index(lb_idx, _cur_val.is_subtree() ? kv_type::subtree
-                                                                          : kv_type::inline_data),
-                                   key, _cur_val))
-                .address();
-         else
-            return clone<mode>(root, bn, {},
-                               binary_node::clone_insert(
-                                   kv_index(lb_idx, kv_type::obj_id), key,
-                                   make_value(bn->branch_region(), root.rlock(), _cur_val)))
-                .address();
-      }
-      if constexpr (mode.is_remove())
-      {
-         return remove_binary_key<mode>(root, bn, lb_idx, key);
-      }
-      else
-      {
+            return remove_binary_key<mode>(root, bn, lb_idx, key);
          return update_binary_key<mode>(root, bn, lb_idx, key);
       }
+      // else key not found, insert a new value
+      
+      if constexpr (mode.must_update())
+         throw std::runtime_error("update failed because key doesn't exist");
+
+      if constexpr (mode.is_remove())
+      {
+         if constexpr (mode.must_remove())
+            throw std::runtime_error("remove failed because key doesn't exist");
+         else 
+            return root.address();
+      }
+
+      if constexpr (mode.is_unique())
+      {
+         // assuming we allocate binary nodes with space and grow them
+         // every time we have to clone them anyway, then this should be
+         // true, especially because we are in the unique path.
+         if (bn->can_insert(key, _cur_val)) [[likely]]
+         {
+            if (bn->can_inline(_cur_val))
+            {  // subtree or data
+               kv_index kvi(lb_idx,
+                            _cur_val.is_subtree() ? kv_type::subtree : kv_type::inline_data);
+               root.modify().as<binary_node>()->insert(kvi, key, _cur_val);
+            }
+            else  // definite obj_id (aka value node)
+               root.modify().as<binary_node>()->insert(
+                   kv_index(lb_idx, kv_type::obj_id), key,
+                   make_value(bn->branch_region(), root.rlock(), _cur_val));
+            return root.address();
+         }
+         // else we have to refactor...
+      }
+      // else mode is shared or unique and we cannot insert into existing
+      // space.
+
+      // worst case keys are 1kb and this misses 25% of the time
+      // best case keys are small and this misses <1% of the time
+      if (bn->insert_requires_refactor(key, _cur_val)) [[unlikely]]
+      {
+         auto rid = refactor<mode>(root, bn);
+
+         assert((mode.is_unique() and (rid.address() == root.address())) or
+                ((mode.is_shared()) and (rid.address() != root.address())));
+
+         // if it wasn't unique before and the id changed then
+         // it has become unique. If it was unique before, then
+         // it remains unique now.
+         return upsert<mode.make_unique()>(rid, key);
+      }
+
+      if (binary_node::can_inline(_cur_val))
+         return clone<mode>(root, bn, {},
+                            binary_node::clone_insert(
+                                kv_index(lb_idx, _cur_val.is_subtree() ? kv_type::subtree
+                                                                       : kv_type::inline_data),
+                                key, _cur_val))
+             .address();
+
+      return clone<mode>(root, bn, {},
+                         binary_node::clone_insert(
+                             kv_index(lb_idx, kv_type::obj_id), key,
+                             make_value(bn->branch_region(), root.rlock(), _cur_val)))
+          .address();
    }  // upsert_binary
 
    template <upsert_mode mode>

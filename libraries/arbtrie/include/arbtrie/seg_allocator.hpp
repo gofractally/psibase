@@ -5,6 +5,7 @@
 #include <arbtrie/mapping.hpp>
 #include <arbtrie/node_header.hpp>
 #include <arbtrie/sync_lock.hpp>
+#include <arbtrie/segment_read_stats.hpp>
 #include <thread>
 
 /**
@@ -321,6 +322,7 @@ namespace arbtrie
          segment_number                 _alloc_seg_num = -1ull;
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
 
+         std::atomic<uint64_t>& _session_lock_ptr;
          seg_allocator& _sega;
          int            _nested_read_lock = 0;
       };
@@ -385,6 +387,9 @@ namespace arbtrie
 
       // allocates new segments
       block_allocator _block_alloc;
+
+      // keeps track of the segments that are mlocked.... 
+      // TODO: this needs to get refactored
       alignas(64) std::atomic<uint32_t> _total_mlocked = 0;
       alignas(64) std::array<std::atomic<int32_t>, 256> _mlocked;
 
@@ -398,21 +403,30 @@ namespace arbtrie
       uint64_t              get_min_read_ptr();
       void                  set_session_end_ptrs(uint32_t e);
 
+      struct aligned_atomic64 : public std::atomic<uint64_t>
+      {
+         uint64_t padding[7];
+      } __attribute__((__aligned__(8)));
+
       /**
        *  Lower 32 bits represent R* above
        *  Upper 32 bits represent what compactor has pushed to the session
        *
        *  Allocator takes the min of the lower 32 bits to determine the lock position.
-       *
-       *  TODO: each ptr moved to its own cacheline (64 byte bounds)..
-       *       so that read threads don't contend.
        */
-      struct aligned_atomic64 : public std::atomic<uint64_t>
-      {
-         uint64_t padding[7];
-      } __attribute__((__aligned__(8)));
       aligned_atomic64 _session_lock_ptrs[64];
       static_assert(sizeof(_session_lock_ptrs) == 64 * 64);
+
+      /**
+       * As sessions are allocated, they are given memory to track the
+       * number of bytes read. The compactor thread sums the results from
+       * the individual threads and updates the segment meta data it uses
+       * to prioritize compaction. Each session is given its own on the
+       * assumption that each session belongs to its own thread and we
+       * do not want write contention on read access.
+       */
+      std::array<std::unique_ptr<segment_read_stat>, 64> _session_read_stats;
+
 
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,
@@ -456,7 +470,8 @@ namespace arbtrie
       if (++_nested_read_lock != 1)
          return;
 
-      uint64_t cur = _sega._session_lock_ptrs[_session_num].load(std::memory_order_acquire);
+      uint64_t cur = _session_lock_ptr.load(std::memory_order_acquire);
+
       //cur.locked_end = cur.view_of_end;
       uint32_t view_of_end = cur >> 32;
       uint32_t cur_end     = uint32_t(cur);
@@ -466,7 +481,7 @@ namespace arbtrie
 
       // an atomic sub should leave the higher-order bits in place where the view
       // from the compactor is being updated.
-      _sega._session_lock_ptrs[_session_num].fetch_sub(diff, std::memory_order_release);
+      _session_lock_ptr.fetch_sub(diff, std::memory_order_release);
    }
 
    // R* goes to inifinity and beyond
@@ -474,7 +489,7 @@ namespace arbtrie
    {
       // set it to max uint32_t
       if (not --_nested_read_lock)
-         _sega._session_lock_ptrs[_session_num].fetch_or(uint32_t(-1));
+         _session_lock_ptr.fetch_or(uint32_t(-1));
       assert(_nested_read_lock >= 0);
    }
 

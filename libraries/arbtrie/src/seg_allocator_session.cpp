@@ -6,13 +6,15 @@ namespace arbtrie
        : _sega(mv._sega),
          _session_num(mv._session_num),
          _alloc_seg_num(mv._alloc_seg_num),
-         _alloc_seg_ptr(mv._alloc_seg_ptr)
+         _alloc_seg_ptr(mv._alloc_seg_ptr),
+         _session_lock_ptr(mv._session_lock_ptr)
    {
       mv._session_num = -1;
    }
 
    seg_allocator::session::session(seg_allocator& a, uint32_t ses_num)
-       : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr), _sega(a)
+       : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr),
+       _session_lock_ptr(a._session_lock_ptrs[ses_num]),_sega(a)
    {
    }
 

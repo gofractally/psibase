@@ -7,10 +7,19 @@
 namespace arbtrie
 {
    /**
+    * In caching mode, every node that is visited is marked as
+    * read so that the compactor can better sort the most frequently
+    * used items.
+    */
+   enum iterator_caching_mode {
+      noncaching = 0,
+      caching = 1
+   };
+   /**
     *   An iterator grabs a read-only snapshot of the database
     *   and provides a consistent view.
-    *
     */
+   template<iterator_caching_mode CacheMode = noncaching>
    class iterator
    {
       friend class read_session;

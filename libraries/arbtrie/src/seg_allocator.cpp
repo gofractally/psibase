@@ -25,7 +25,6 @@ namespace arbtrie
          sptr.store(uint32_t(-1ull));
       _done.store(false);
 
-      //_mlocked.resize(256);
       for (auto& i : _mlocked)
          i.store(-1, std::memory_order_relaxed);
       ;
@@ -36,31 +35,35 @@ namespace arbtrie
       stop_compact_thread();
       cses.reset();
    }
-      uint32_t seg_allocator::alloc_session_num()
-      {
-         auto fs_bits = _free_sessions.load(std::memory_order_relaxed);
-         if (fs_bits == 0)
-         {
-            throw std::runtime_error("max of 64 sessions can be in use");
-         }
-         auto fs          = std::countr_zero(fs_bits);
-         auto new_fs_bits = fs_bits & ~(1 << fs);
+   uint32_t seg_allocator::alloc_session_num()
+   {
+      auto fs_bits = _free_sessions.load(std::memory_order_relaxed);
+      if (fs_bits == 0)
+         throw std::runtime_error("max of 64 sessions can be in use");
 
-         while (not _free_sessions.compare_exchange_weak(fs_bits, new_fs_bits))
-         {
-            if (fs_bits == 0)
-            {
-               throw std::runtime_error("max of 64 sessions can be in use");
-            }
-            fs          = std::countr_zero(fs_bits);
-            new_fs_bits = fs_bits & ~(1 << fs);
-         }
-         //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
-         //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
-         //    _free_sessions.store(new_fs_bits);
-         return fs;
+      auto fs          = std::countr_zero(fs_bits);
+      auto new_fs_bits = fs_bits & ~(1 << fs);
+
+      while (not _free_sessions.compare_exchange_strong(fs_bits, new_fs_bits))
+      {
+         if (fs_bits == 0)
+            throw std::runtime_error("max of 64 sessions can be in use");
+
+         fs          = std::countr_zero(fs_bits);
+         new_fs_bits = fs_bits & ~(1 << fs);
       }
-      void seg_allocator::release_session_num(uint32_t sn) { _free_sessions.fetch_or(uint64_t(1) << sn); }
+      if( not _session_read_stats[fs] )
+         _session_read_stats[fs].reset( new segment_read_stat );
+      //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
+      //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
+      //    _free_sessions.store(new_fs_bits);
+      return fs;
+   }
+
+   void seg_allocator::release_session_num(uint32_t sn)
+   {
+      _free_sessions.fetch_or(uint64_t(1) << sn);
+   }
 
    void seg_allocator::start_compact_thread()
    {
