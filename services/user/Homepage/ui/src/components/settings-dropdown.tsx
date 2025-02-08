@@ -13,6 +13,8 @@ import {
 import { toast } from "sonner";
 import { type UseMutationResult } from "@tanstack/react-query";
 
+import { siblingUrl } from "@psibase/common-lib";
+
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -50,6 +52,7 @@ import { useCreateConnectionToken } from "@/lib/hooks/useCreateConnectionToken";
 import { ModeToggle } from "./mode-toggle";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import { useCanExportAccount } from "@/lib/hooks/useCanExportAccount";
 
 export const SettingsDropdown = () => {
     const generateInvite = useGenerateInvite();
@@ -71,6 +74,8 @@ export const SettingsDropdown = () => {
     const otherConnectedAccounts = currentAccounts.filter(
         (account) => account !== loggedInUser,
     );
+
+    const { data: canExportAccount } = useCanExportAccount(loggedInUser);
 
     return (
         <Dialog>
@@ -169,11 +174,24 @@ export const SettingsDropdown = () => {
                             }}
                         >
                             <User className="mr-2 h-4 w-4" />
-                            {isLoggedIn
-                                ? "Create invite"
-                                : "Log in to create invites"}
+                            Create invite
                         </DropdownMenuItem>
                     </DialogTrigger>
+                    {canExportAccount ? (
+                        <a
+                            href={siblingUrl(
+                                undefined,
+                                "auth-sig",
+                                undefined,
+                                false,
+                            )}
+                        >
+                            <DropdownMenuItem>
+                                <User className="mr-2 h-4 w-4" />
+                                Export account
+                            </DropdownMenuItem>
+                        </a>
+                    ) : null}
                     <DropdownMenuSeparator />
 
                     <ModeToggle />
