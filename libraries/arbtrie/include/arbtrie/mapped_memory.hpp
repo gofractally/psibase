@@ -1,5 +1,7 @@
 #pragma once 
 #include <arbtrie/config.hpp>
+#include <arbtrie/rdtsc.hpp>
+#include <arbtrie/size_weighted_age.hpp>
 
 namespace arbtrie {
 
@@ -48,7 +50,10 @@ namespace arbtrie {
          /// the total number of bytes freed by swap
          /// or by being moved to other segments.
          std::atomic<uint64_t> _free_space_and_obj;
-         std::atomic<uint64_t> _last_sync_pos;  // position of alloc pointer when last synced
+         std::atomic<uint64_t> _last_sync_pos;       // position of alloc pointer when last synced
+                                                     
+         // average us since the last read of the data without read bit set
+         std::atomic<uint64_t> _avg_alloc_time_us;  
       };
 
       /// should align on a page boundary
@@ -58,20 +63,31 @@ namespace arbtrie {
          // used by the thread that owns this segment and
          // set to uint64_t max when this segment is ready
          // to be marked read only to the seg_allocator
-         std::atomic<uint32_t> _alloc_pos = 64;  // sizeof(segment_header)
-         uint32_t              _age;  // every time a segment is allocated it is assigned an age
-             // which aids in reconstruction, newer values take priority over
-             // older ones
+         std::atomic<uint32_t> _alloc_pos = 64;  // aka sizeof(segment_header)
+                                                 
+         // every time a segment is allocated it is assigned an age
+         // which aids in reconstruction, newer values take priority over older ones
+         uint32_t              _age;  
 
          /**
-          *  This determines the sort-order of the segment in cache based upon
-          *  an approximation of the time the data was last read. 
+          *   As data is written, this tracks the data-weighted
+          *   average of time since data without read-bit set
+          *   was written. By default this is the average allocation
+          *   time, but when compacting data the incoming data may
+          *   provide an alternative time to be averaged int. 
+          *
+          *   - written by allocator thread
+          *   - read by compactor after allocator thread is done with segment
           */
-         uint32_t _cache_time;
+         size_weighted_age _base_time;
+
          // used to calculate object density of segment header,
          // to establish madvise
          // uint32_t _num_objects = 0;  // inc on alloc
          uint32_t _checksum = 0;
+
+         // the avg time in ms between reads
+         uint64_t read_frequency( uint64_t now = size_weighted_age::now() ) { return now - _base_time.time_ms; }
       };
       static_assert(sizeof(segment_header) <= 64);
 

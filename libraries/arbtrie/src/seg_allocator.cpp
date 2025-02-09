@@ -52,8 +52,8 @@ namespace arbtrie
          fs          = std::countr_zero(fs_bits);
          new_fs_bits = fs_bits & ~(1 << fs);
       }
-      if( not _session_read_stats[fs] )
-         _session_read_stats[fs].reset( new segment_read_stat );
+      if( not _session_seg_read_stats[fs] )
+         _session_seg_read_stats[fs].reset( new segment_read_stat );
       //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
       //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
       //    _free_sessions.store(new_fs_bits);
@@ -180,9 +180,10 @@ namespace arbtrie
       //     TRIEDENT_WARN( "unable to get write lock while compacting!" );
       //     abort();
       //  }
+      auto*        shead = (mapped_memory::segment_header*)s;
       auto         send = (node_header*)((char*)s + segment_size);
-      char*        foc  = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
-      node_header* foo  = (node_header*)(foc);
+      char*        foc       = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
+      node_header* foo       = (node_header*)(foc);
 
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
@@ -241,7 +242,7 @@ namespace arbtrie
          }
 
          auto obj_size   = foo->size();
-         auto [loc, ptr] = ses.alloc_data(obj_size, foo_address);
+         auto [loc, ptr] = ses.alloc_data(obj_size, foo_address, shead->_base_time.time_ms);
 
          if (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
          {

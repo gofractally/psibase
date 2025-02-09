@@ -8,7 +8,7 @@
 namespace arbtrie
 {
    template <typename NodeType, typename... CArgs>
-   object_ref<NodeType> make(id_region                        reg,
+   object_ref make(id_region                        reg,
                              session_rlock&                   state,
                              std::invocable<NodeType*> auto&& uinit,
                              CArgs&&... cargs)
@@ -22,16 +22,16 @@ namespace arbtrie
       return state.alloc(reg, asize, NodeType::type, make_init);
    }
    template <typename NodeType, typename... CArgs>
-   object_ref<NodeType> make(id_region reg, session_rlock& state, CArgs&&... cargs)
+   object_ref make(id_region reg, session_rlock& state, CArgs&&... cargs)
    {
       return make<NodeType>(
           reg, state, [](auto&&) {}, std::forward<CArgs>(cargs)...);
    }
 
    template <typename NodeType, typename... CArgs>
-   object_ref<NodeType> remake(object_ref<node_header>&         r,
-                               std::invocable<NodeType*> auto&& uinit,
-                               CArgs&&... cargs)
+   object_ref remake(object_ref&         r,
+                     std::invocable<NodeType*> auto&& uinit,
+                     CArgs&&... cargs)
    {
       auto asize     = NodeType::alloc_size(cargs...);
       auto make_init = [&](node_header* cl)
@@ -41,14 +41,14 @@ namespace arbtrie
       return r.rlock().realloc(r, asize, NodeType::type, make_init);
    }
    template <typename NodeType, typename... CArgs>
-   object_ref<NodeType> remake(object_ref<node_header>& r, CArgs&&... cargs)
+   object_ref remake(object_ref& r, CArgs&&... cargs)
    {
       return remake<NodeType>(
           r, [](auto&&) {}, std::forward<CArgs>(cargs)...);
    }
 
    template <typename NodeType>
-   object_ref<NodeType> make(id_region           reg,
+   object_ref make(id_region           reg,
                              session_rlock&      state,
                              const clone_config& cfg,
                              auto&&              uinit)
@@ -82,9 +82,9 @@ namespace arbtrie
    //  uinit( new (alloc(NodeType::alloc_size(src,cfg,cargs...))) NodeType( src,cfg,cargs ) );
    //
    //===============================================
-   template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone_impl(id_region                        reg,
-                                   object_ref<ORefType>&            r,
+   template <upsert_mode mode, typename NodeType, typename... CArgs>
+   object_ref clone_impl(id_region                        reg,
+                                   object_ref&            r,
                                    const NodeType*                  src,
                                    const clone_config&              cfg,
                                    std::invocable<NodeType*> auto&& uinit,
@@ -109,9 +109,9 @@ namespace arbtrie
       return r.rlock().alloc(reg, asize, src->get_type(), copy_init);
    }
 
-   template <upsert_mode mode, typename ORefType, typename NodeType>
-   object_ref<NodeType> clone(
-       object_ref<ORefType>&            r,
+   template <upsert_mode mode, typename NodeType>
+   object_ref clone(
+       object_ref&            r,
        const NodeType*                  src,
        const clone_config&              cfg   = {},
        std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
@@ -120,10 +120,10 @@ namespace arbtrie
                                                  std::forward<decltype(uinit)>(uinit));
    }
 
-   template <upsert_mode mode, typename ORefType, typename NodeType>
-   object_ref<NodeType> clone(
+   template <upsert_mode mode, typename NodeType>
+   object_ref clone(
        id_region                        reg,
-       object_ref<ORefType>&            r,
+       object_ref&            r,
        const NodeType*                  src,
        const clone_config&              cfg   = {},
        std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
@@ -131,20 +131,20 @@ namespace arbtrie
       return clone_impl<mode>(reg, r, src, cfg, std::forward<decltype(uinit)>(uinit));
    }
 
-   template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(object_ref<ORefType>&            r,
+   template <upsert_mode mode, typename NodeType, typename... CArgs>
+   object_ref clone(object_ref&            r,
                               const NodeType*                  src,
                               const clone_config&              cfg,
                               std::invocable<NodeType*> auto&& uinit,
                               CArgs&&... cargs)
    {
-      return clone_impl<mode.make_same_region()>(r.address()._region, r, src, cfg,
+      return clone_impl<mode.make_same_region()>(r.address().region, r, src, cfg,
                                                  std::forward<decltype(uinit)>(uinit),
                                                  std::forward<CArgs>(cargs)...);
    }
-   template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(id_region                        reg,
-                              object_ref<ORefType>&            r,
+   template <upsert_mode mode, typename NodeType, typename... CArgs>
+   object_ref clone(id_region                        reg,
+                              object_ref&            r,
                               const NodeType*                  src,
                               const clone_config&              cfg,
                               std::invocable<NodeType*> auto&& uinit,
@@ -154,8 +154,8 @@ namespace arbtrie
                               std::forward<CArgs>(cargs)...);
    }
 
-   template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(object_ref<ORefType>& r,
+   template <upsert_mode mode, typename NodeType, typename... CArgs>
+   object_ref clone(object_ref& r,
                               const NodeType*       src,
                               const clone_config&   cfg,
                               CArgs&&... cargs)
@@ -164,9 +164,9 @@ namespace arbtrie
           r.address().region, r, src, cfg, [](auto) {}, std::forward<CArgs>(cargs)...);
    }
 
-   template <upsert_mode mode, typename ORefType, typename NodeType, typename... CArgs>
-   object_ref<NodeType> clone(id_region             reg,
-                              object_ref<ORefType>& r,
+   template <upsert_mode mode,  typename NodeType, typename... CArgs>
+   object_ref clone(id_region             reg,
+                              object_ref& r,
                               const NodeType*       src,
                               const clone_config&   cfg,
                               CArgs&&... cargs)
@@ -418,7 +418,7 @@ namespace arbtrie
       auto root  = state.get(r.address());
       return count_keys(root, from, to);
    }
-   uint32_t read_session::count_keys(object_ref<node_header>& r,
+   uint32_t read_session::count_keys(object_ref& r,
                                      const value_node*        v,
                                      key_view                 from,
                                      key_view                 to) const
@@ -428,7 +428,7 @@ namespace arbtrie
       return k >= from and (to == key_view() or k < to);
    }
 
-   uint32_t read_session::count_keys(object_ref<node_header>& r,
+   uint32_t read_session::count_keys(object_ref& r,
                                      const binary_node*       n,
                                      key_view                 from,
                                      key_view                 to) const
@@ -450,7 +450,7 @@ namespace arbtrie
       // TRIEDENT_DEBUG ( "end idx: ", n->lower_bound_idx(to), " numb: ", n->num_branches() );
       return n->lower_bound_idx(to) - start;
    }
-   uint32_t read_session::count_keys(object_ref<node_header>& r,
+   uint32_t read_session::count_keys(object_ref& r,
                                      const setlist_node*      n,
                                      key_view                 from,
                                      key_view                 to) const
@@ -571,7 +571,7 @@ namespace arbtrie
          }
       }
    }
-   uint32_t read_session::count_keys(object_ref<node_header>& r,
+   uint32_t read_session::count_keys(object_ref& r,
                                      const full_node*         n,
                                      key_view                 from,
                                      key_view                 to) const
@@ -681,22 +681,22 @@ namespace arbtrie
       }
    }
 
-   uint32_t read_session::count_keys(object_ref<node_header>& r, key_view from, key_view to) const
+   uint32_t read_session::count_keys(object_ref& r, key_view from, key_view to) const
    {
       return cast_and_call(r.header(),
                            [&](const auto* n) { return this->count_keys(r, n, from, to); });
    }
 
-   template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert(object_ref<NodeType>&& root, key_view key)
+   template <upsert_mode mode>
+   fast_meta_address write_session::upsert(object_ref&& root, key_view key)
    {
       return upsert<mode>(root, key);
    }
    /**
     *  Inserts key under root, if necessary 
     */
-   template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert(object_ref<NodeType>& root, key_view key)
+   template <upsert_mode mode>
+   fast_meta_address write_session::upsert(object_ref& root, key_view key)
    {
       if constexpr (mode.is_unique())
       {
@@ -713,7 +713,6 @@ namespace arbtrie
             return upsert<mode.make_shared()>(root, key);
          }
       }
-      static_assert(std::is_same_v<NodeType, node_header>);
 
       fast_meta_address result;
       switch (root.type())
@@ -756,8 +755,8 @@ namespace arbtrie
       return result;
    }
 
-   template <upsert_mode mode, typename NodeType>
-   fast_meta_address upsert(object_ref<NodeType>&& root, key_view key)
+   template <upsert_mode mode>
+   fast_meta_address upsert(object_ref&& root, key_view key)
    {
       return upsert<mode>(root, key);
    }
@@ -770,7 +769,7 @@ namespace arbtrie
    //  split into a binary node containing both keys
    //================================
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_value(object_ref<node_header>& root, key_view key)
+   fast_meta_address write_session::upsert_value(object_ref& root, key_view key)
    {
       auto& state        = root.rlock();
       auto  vn           = root.as<value_node>();
@@ -925,7 +924,7 @@ namespace arbtrie
     * tree is a value node with a key.  
     */
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_eof_value(object_ref<node_header>& root)
+   fast_meta_address write_session::upsert_eof_value(object_ref& root)
    {
       if constexpr (mode.is_unique())
       {
@@ -980,7 +979,7 @@ namespace arbtrie
 
    template <upsert_mode mode>
    fast_meta_address clone_binary_range(id_region                reg,
-                                        object_ref<node_header>& r,
+                                        object_ref& r,
                                         const binary_node*       src,
                                         key_view                 minus_prefix,
                                         int                      from,
@@ -1032,7 +1031,7 @@ namespace arbtrie
    //  else return a clone
    //=================================================
    template <upsert_mode mode>
-   object_ref<node_header> refactor(object_ref<node_header>& r, const binary_node* root)
+   object_ref refactor(object_ref& r, const binary_node* root)
    {
       //TRIEDENT_WARN("REFACTOR! ", r.address());
       assert(root->num_branches() > 1);
@@ -1172,7 +1171,7 @@ namespace arbtrie
                                    {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
    }
    template <upsert_mode mode, typename NodeType>
-   object_ref<full_node> refactor_to_full(object_ref<node_header>& r,
+   object_ref refactor_to_full(object_ref& r,
                                           const NodeType*          src,
                                           auto                     init)
    {
@@ -1223,7 +1222,7 @@ namespace arbtrie
    //
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_prefix(object_ref<node_header>& r,
+   fast_meta_address write_session::upsert_prefix(object_ref& r,
                                                   key_view                 key,
                                                   key_view                 cpre,
                                                   const NodeType*          fn,
@@ -1340,7 +1339,7 @@ namespace arbtrie
     * the eof position on this node.
     */
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_eof(object_ref<node_header>& r, const NodeType* fn)
+   fast_meta_address write_session::upsert_eof(object_ref& r, const NodeType* fn)
    {
       if constexpr (mode.is_remove())
          return remove_eof<mode, NodeType>(r, fn);
@@ -1449,7 +1448,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::remove_eof(object_ref<node_header>& r, const NodeType* fn)
+   fast_meta_address write_session::remove_eof(object_ref& r, const NodeType* fn)
    {
       auto& state = r.rlock();
       //      TRIEDENT_DEBUG( "remove key ends on this node" );
@@ -1497,7 +1496,7 @@ namespace arbtrie
       return r.address();
    }
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner_existing_br(object_ref<node_header>& r,
+   fast_meta_address write_session::upsert_inner_existing_br(object_ref& r,
                                                              key_view                 key,
                                                              const NodeType*          fn,
                                                              key_view                 cpre,
@@ -1642,7 +1641,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner_new_br(object_ref<node_header>& r,
+   fast_meta_address write_session::upsert_inner_new_br(object_ref& r,
                                                         key_view                 key,
                                                         const NodeType*          fn,
                                                         key_view                 cpre,
@@ -1723,7 +1722,7 @@ namespace arbtrie
    //
    //========================================
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner(object_ref<node_header>& r, key_view key)
+   fast_meta_address write_session::upsert_inner(object_ref& r, key_view key)
    {
       auto& state = r.rlock();
       auto  fn    = r.as<NodeType>();
@@ -1754,7 +1753,7 @@ namespace arbtrie
    }  // end upsert_inner<T>
 
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_binary(object_ref<node_header>& root, key_view key)
+   fast_meta_address write_session::upsert_binary(object_ref& root, key_view key)
    {
       auto bn = root.as<binary_node>();
 
@@ -1878,7 +1877,7 @@ namespace arbtrie
    }  // upsert_binary
 
    template <upsert_mode mode>
-   fast_meta_address write_session::remove_binary_key(object_ref<node_header>& root,
+   fast_meta_address write_session::remove_binary_key(object_ref& root,
                                                       const binary_node*       bn,
                                                       uint16_t                 lb_idx,
                                                       key_view                 key)
@@ -1947,7 +1946,7 @@ namespace arbtrie
     *     subtree    -> value node
     */
    template <upsert_mode mode>
-   fast_meta_address write_session::update_binary_key(object_ref<node_header>& root,
+   fast_meta_address write_session::update_binary_key(object_ref& root,
                                                       const binary_node*       bn,
                                                       uint16_t                 lb_idx,
                                                       key_view                 key)

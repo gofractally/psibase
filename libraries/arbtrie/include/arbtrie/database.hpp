@@ -114,40 +114,40 @@ namespace arbtrie
       read_session(database& db);
       database& _db;
 
-      int get(object_ref<node_header>&                root,
+      int get(object_ref&                root,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
-      int get(object_ref<node_header>&                root,
+      int get(object_ref&                root,
               const auto*                             inner,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
-      int get(object_ref<node_header>& root,
+      int get(object_ref& root,
               const binary_node*,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
-      int get(object_ref<node_header>& root,
+      int get(object_ref& root,
               const value_node*,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
 
-      inline uint32_t count_keys(object_ref<node_header>& r, key_view from, key_view to) const;
-      inline uint32_t count_keys(object_ref<node_header>& r,
+      inline uint32_t count_keys(object_ref& r, key_view from, key_view to) const;
+      inline uint32_t count_keys(object_ref& r,
                                  const full_node*         n,
                                  key_view                 from,
                                  key_view                 to) const;
-      inline uint32_t count_keys(object_ref<node_header>& r,
+      inline uint32_t count_keys(object_ref& r,
                                  const bitset_node*       n,
                                  key_view                 from,
                                  key_view                 to) const;
-      inline uint32_t count_keys(object_ref<node_header>& r,
+      inline uint32_t count_keys(object_ref& r,
                                  const setlist_node*      n,
                                  key_view                 from,
                                  key_view                 to) const;
-      inline uint32_t count_keys(object_ref<node_header>& r,
+      inline uint32_t count_keys(object_ref& r,
                                  const binary_node*       n,
                                  key_view                 from,
                                  key_view                 to) const;
-      inline uint32_t count_keys(object_ref<node_header>& r,
+      inline uint32_t count_keys(object_ref& r,
                                  const value_node*        n,
                                  key_view                 from,
                                  key_view                 to) const;
@@ -371,50 +371,50 @@ namespace arbtrie
       // int remove(node_handle& r, key_view from, key_view to);
 
      private:
-      template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert(object_ref<NodeType>& root, key_view key);
-      template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert(object_ref<NodeType>&& root, key_view key);
+      template <upsert_mode mode>
+      fast_meta_address upsert(object_ref& root, key_view key);
+      template <upsert_mode mode>
+      fast_meta_address upsert(object_ref&& root, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_existing_br(object_ref<node_header>& r, key_view key, 
+      fast_meta_address upsert_inner_existing_br(object_ref& r, key_view key, 
                                                                 const NodeType* fn,
                                                                 key_view cpre,
                                                                 branch_index_type bidx,
                                                                 fast_meta_address br );
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_new_br(object_ref<node_header>& r, key_view key, 
+      fast_meta_address upsert_inner_new_br(object_ref& r, key_view key, 
                                                                 const NodeType* fn,
                                                                 key_view cpre,
                                                                 branch_index_type bidx,
                                                                 fast_meta_address br );
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_prefix(object_ref<node_header>& r,
+      fast_meta_address upsert_prefix(object_ref& r,
                                       key_view                 key,
                                       key_view                 cpre,
                                       const NodeType*          fn,
                                       key_view                 rootpre);
 
       template<upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_eof( object_ref<node_header>& r, const NodeType* fn );
+      fast_meta_address upsert_eof( object_ref& r, const NodeType* fn );
 
       template<upsert_mode mode, typename NodeType>
-      fast_meta_address remove_eof( object_ref<node_header>& r, const NodeType* fn );
+      fast_meta_address remove_eof( object_ref& r, const NodeType* fn );
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref<node_header>& r, key_view key);
+      fast_meta_address upsert_inner(object_ref& r, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref<node_header>&& r, key_view key)
+      fast_meta_address upsert_inner(object_ref&& r, key_view key)
       {
          return upsert_inner<mode>(r, key);
       }
 
       template <upsert_mode mode>
-      fast_meta_address upsert_eof_value(object_ref<node_header>& root);
+      fast_meta_address upsert_eof_value(object_ref& root);
 
       template <upsert_mode mode>
-      fast_meta_address upsert_value(object_ref<node_header>& root, key_view key);
+      fast_meta_address upsert_value(object_ref& root, key_view key);
 
       //=======================
       // binary_node operations
@@ -425,15 +425,15 @@ namespace arbtrie
                                     const value_type& val);
 
       template <upsert_mode mode>
-      fast_meta_address upsert_binary(object_ref<node_header>& root, key_view key);
+      fast_meta_address upsert_binary(object_ref& root, key_view key);
 
       template <upsert_mode mode>
-      fast_meta_address update_binary_key(object_ref<node_header>& root,
+      fast_meta_address update_binary_key(object_ref& root,
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
                                           key_view                 key);
       template <upsert_mode mode>
-      fast_meta_address remove_binary_key(object_ref<node_header>& root,
+      fast_meta_address remove_binary_key(object_ref& root,
                                           const binary_node*       bn,
                                           uint16_t                 lb_idx,
                                           key_view                 key);
@@ -514,25 +514,18 @@ namespace arbtrie
    inline read_session::read_session(database& db) : _db(db), _segas(db._sega.start_session()) {}
    inline write_session::~write_session() {}
 
-   template <typename T>
-   void release_node(object_ref<T>& r)
+   inline void release_node(object_ref&& r);
+   inline void release_node(object_ref& r)
    {
       auto& state = r.rlock();
 
       auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
 
       if (auto n = r.release())
-      {
-         // if we don't know the type, dynamic dispatch
-         if constexpr (std::is_same_v<T, node_header>)
-            cast_and_call(r.type(), n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
-         else  // we already know the type, yay!
-            n->visit_branches(release_id);
-      }
+         cast_and_call(r.type(), n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
    }
 
-   template <typename T>
-   void release_node(object_ref<T>&& r)
+   inline void release_node(object_ref&& r)
    {
       release_node(r);
    }
@@ -611,14 +604,14 @@ namespace arbtrie
       return data_size;
    }
 
-   int read_session::get(object_ref<node_header>&                root,
+   int read_session::get(object_ref&                root,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
    {
       return cast_and_call(root.header(),
                            [&](const auto* n) { return get(root, n, key, callback); });
    }
-   int read_session::get(object_ref<node_header>&                root,
+   int read_session::get(object_ref&                root,
                          const auto*                             inner,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
@@ -672,7 +665,7 @@ namespace arbtrie
       callback(false, value_type());
       return 0;
    }
-   int read_session::get(object_ref<node_header>&                root,
+   int read_session::get(object_ref&                root,
                          const value_node*                       vn,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
@@ -681,7 +674,7 @@ namespace arbtrie
       return 1;
    }
 
-   int read_session::get(object_ref<node_header>&                root,
+   int read_session::get(object_ref&                root,
                          const binary_node*                      bn,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
@@ -713,7 +706,7 @@ namespace arbtrie
    // NOTE This will currently recurse into subtree's which could create
    // infinite loop or over counting...
    // TODO: fix this so it doesn't recurse through subtrees
-   void visit_node(object_ref<node_header>&& n, int depth, auto& on_node)
+   void visit_node(object_ref&& n, int depth, auto& on_node)
    {
       assert(n.type() == n.header()->get_type());
       assert(n.ref() > 0);

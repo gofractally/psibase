@@ -854,7 +854,7 @@ int  main(int argc, char** argv)
                   tmp = lr;
                   lr.reset();
 
-                  auto itr    = rs.create_iterator(*tmp);
+                  auto itr    = rs.create_iterator<arbtrie::caching>(*tmp);
                   int  roundc = 100000;
                   int  added  = 0;
                   for (int i = 0; i < batch_size; ++i)

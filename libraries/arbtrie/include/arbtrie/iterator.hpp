@@ -75,7 +75,8 @@ namespace arbtrie
 
       // moves to the key(), return valid()
       // returns false if not found
-      bool get(key_view key);
+      // TODO: forward to session::get
+   //   bool get(key_view key);
 
       // true if the iterator points to a key/value pair
       bool valid() const { return _path.size() > 0; }
@@ -140,19 +141,19 @@ namespace arbtrie
       read_session& _rs;
       node_handle   _root;
 
-      bool lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view prefix);
-      bool lower_bound_impl(object_ref<node_header>& r, const binary_node* bn, key_view prefix);
-      bool lower_bound_impl(object_ref<node_header>& r, const value_node* bn, key_view prefix);
-      bool lower_bound_impl(object_ref<node_header>& r, key_view prefix);
+      bool lower_bound_impl(object_ref& r, const auto* in, key_view prefix);
+      bool lower_bound_impl(object_ref& r, const binary_node* bn, key_view prefix);
+      bool lower_bound_impl(object_ref& r, const value_node* bn, key_view prefix);
+      bool lower_bound_impl(object_ref& r, key_view prefix);
 
-      bool reverse_lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view prefix);
-      bool reverse_lower_bound_impl(object_ref<node_header>& r,
+      bool reverse_lower_bound_impl(object_ref& r, const auto* in, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref& r,
                                     const binary_node*       bn,
                                     key_view                 prefix);
-      bool reverse_lower_bound_impl(object_ref<node_header>& r,
+      bool reverse_lower_bound_impl(object_ref& r,
                                     const value_node*        bn,
                                     key_view                 prefix);
-      bool reverse_lower_bound_impl(object_ref<node_header>& r, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref& r, key_view prefix);
    };
 
 }  // namespace arbtrie

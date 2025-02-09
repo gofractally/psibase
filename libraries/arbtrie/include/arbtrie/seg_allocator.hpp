@@ -183,15 +183,10 @@ namespace arbtrie
                sync_lock*      _sync_lock    = nullptr;
             };
 
-            template <typename T = node_header>
             class object_ref
             {
               public:
-               template <typename Other>
-               friend class object_ref;
-
-               template <typename Other>
-               object_ref(object_ref<Other> p);
+               object_ref(const object_ref& p);
 
                inline fast_meta_address address() const { return _address; }
                inline uint32_t          ref() const { return _cached.ref(); }
@@ -209,10 +204,10 @@ namespace arbtrie
                bool        try_start_move(node_location loc) { return _meta.try_start_move(loc); }
                auto        try_move(node_location expected_prior_loc, node_location move_to_loc);
 
-               template <bool SetReadBit = false>
+               template <typename T = node_header, bool SetReadBit = false>
                const T* header() const;
 
-               template <typename Type>
+               template <typename Type, bool SetReadBit=false>
                const Type* as() const;
 
                void store(temp_meta_type tmt, auto memory_order);
@@ -241,12 +236,13 @@ namespace arbtrie
                fast_meta_address                  _address;
             };  // object_ref
 
-            object_ref<node_header> alloc(id_region reg,
+            object_ref alloc(id_region reg,
                                           uint32_t  size,
                                           node_type type,
                                           auto      initfunc);
-            object_ref<node_header> realloc(object_ref<node_header>& r,
-                                            // fast_meta_address reuse,
+
+            // fast_meta_address reuse,
+            object_ref realloc(object_ref& r,
                                             uint32_t  size,
                                             node_type type,
                                             auto      initfunc);
@@ -260,25 +256,23 @@ namespace arbtrie
             std::pair<node_meta_type&, fast_meta_address> get_new_meta_node(id_region);
             /// @}
 
-            template <typename T = node_header>
-            inline object_ref<T> get(fast_meta_address adr)
+            inline object_ref get(fast_meta_address adr)
             {
-               return object_ref<T>(*this, adr, _session._sega._id_alloc.get(adr));
+               return object_ref(*this, adr, _session._sega._id_alloc.get(adr));
             }
 
-            inline object_ref<node_header> get(node_header*);
+            inline object_ref get(node_header*);
 
             ~read_lock() { _session.release_read_lock(); }
 
             node_header* get_node_pointer(node_location);
+            void  update_read_stats(node_location, uint32_t node_size, uint64_t time);
 
             bool       is_synced(node_location);
             sync_lock& get_sync_lock(int seg);
 
            private:
             friend class session;
-            template <typename T>
-            friend class object_ref;
 
             read_lock(session& s) : _session(s) { _session.retain_read_lock(); }
             read_lock(const session&) = delete;
@@ -315,14 +309,15 @@ namespace arbtrie
          session(const session&) = delete;
 
          void                                   unalloc(uint32_t size);
-         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr);
+         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr, uint64_t time = size_weighted_age::now());
 
          uint32_t _session_num;  // index into _sega's active sessions list
 
          segment_number                 _alloc_seg_num = -1ull;
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
 
-         std::atomic<uint64_t>& _session_lock_ptr;
+         std::atomic<uint64_t>&              _session_lock_ptr;
+         std::unique_ptr<segment_read_stat>& _segment_read_stat;
          seg_allocator& _sega;
          int            _nested_read_lock = 0;
       };
@@ -425,7 +420,7 @@ namespace arbtrie
        * assumption that each session belongs to its own thread and we
        * do not want write contention on read access.
        */
-      std::array<std::unique_ptr<segment_read_stat>, 64> _session_read_stats;
+      std::array<std::unique_ptr<segment_read_stat>, 64> _session_seg_read_stats;
 
 
       // to allocate a new session in thread-safe way you
@@ -460,8 +455,7 @@ namespace arbtrie
       }
    };  // seg_allocator
 
-   template <typename T>
-   using object_ref = seg_allocator::session::read_lock::object_ref<T>;
+   using object_ref = seg_allocator::session::read_lock::object_ref;
 
 
    // copy E to R*

@@ -112,7 +112,7 @@ namespace arbtrie
       return iterator<CacheMode>(_rs, subtree());
    }
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref<node_header>& r,
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
                                            const value_node*        in,
                                            key_view                 query)
    {
@@ -126,7 +126,7 @@ namespace arbtrie
       return query >= key_view();
    }
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref<node_header>& r, const value_node* in, key_view query)
+   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const value_node* in, key_view query)
    {
       auto ikey = in->key();
       if (query <= ikey)
@@ -138,7 +138,7 @@ namespace arbtrie
       return false;
    }
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref<node_header>& r, const auto* in, key_view query)
+   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const auto* in, key_view query)
    {
       auto node_prefix = in->get_prefix();
       //   TRIEDENT_DEBUG( "prefix: ", to_hex(node_prefix) );
@@ -209,7 +209,7 @@ namespace arbtrie
    }
 
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref<node_header>& r,
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
                                            const auto*              in,
                                            key_view                 query)
    {
@@ -277,7 +277,7 @@ namespace arbtrie
    }
 
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref<node_header>& r,
+   bool iterator<CacheMode>::lower_bound_impl(object_ref& r,
                                    const binary_node*       bn,
                                    key_view                 query)
    {
@@ -347,7 +347,7 @@ namespace arbtrie
    }
 
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref<node_header>& r,
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
                                            const binary_node*       bn,
                                            key_view                 query)
    {
@@ -368,19 +368,19 @@ namespace arbtrie
    }
 
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref<node_header>& r, key_view query)
+   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, key_view query)
    {
       _path.push_back({r.address(), 0});
-      if (not cast_and_call(r.header(),
+      if (not cast_and_call(r.header<node_header,CacheMode>(),
                             [&](const auto* n) { return lower_bound_impl(r, n, query); }))
          return next();
       return true;
    }
    template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref<node_header>& r, key_view query)
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r, key_view query)
    {
       _path.push_back({r.address(), 257});
-      if (not cast_and_call(r.header(),
+      if (not cast_and_call(r.header<node_header,CacheMode>(),
                             [&](const auto* n) { return reverse_lower_bound_impl(r, n, query); }))
          return prev();
       return true;
@@ -482,7 +482,7 @@ namespace arbtrie
       {
          case node_type::binary:
          {
-            auto bn = oref.as<binary_node>();
+            auto bn = oref.as<binary_node,CacheMode>();
 
             if (current < bn->num_branches())
                popkey(bn->get_key_val_ptr(current)->key_size());
@@ -496,12 +496,12 @@ namespace arbtrie
             return true;
          }
          case node_type::full:
-            return handle_inner(oref.as<full_node>());
+            return handle_inner(oref.as<full_node,CacheMode>());
          case node_type::setlist:
-            return handle_inner(oref.as<setlist_node>());
+            return handle_inner(oref.as<setlist_node,CacheMode>());
          case node_type::value:
          {
-            auto vn = oref.as<value_node>();
+            auto vn = oref.as<value_node,CacheMode>();
             popkey(vn->key().size());
             _path.pop_back();
             return next();
@@ -569,7 +569,7 @@ namespace arbtrie
          case node_type::binary:
          {
             //   TRIEDENT_DEBUG( "binary _path.size: ", _path.size(), " idx: ", _path.back().second );
-            const auto* bn = oref.as<binary_node>();
+            const auto* bn = oref.as<binary_node,CacheMode>();
             if (current < bn->num_branches())
             {
                popkey(bn->get_key_val_ptr(current)->key_size());
@@ -592,13 +592,13 @@ namespace arbtrie
             }
          }
          case node_type::full:
-            return handle_inner(oref.as<full_node>());
+            return handle_inner(oref.as<full_node,CacheMode>());
          case node_type::setlist:
             //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
-            return handle_inner(oref.as<setlist_node>());
+            return handle_inner(oref.as<setlist_node,CacheMode>());
          case node_type::value:
          {
-            auto vn = oref.as<value_node>();
+            auto vn = oref.as<value_node,CacheMode>();
             popkey(vn->key().size());
             _path.pop_back();
             return prev();

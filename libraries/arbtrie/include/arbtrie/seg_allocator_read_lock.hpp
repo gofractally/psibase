@@ -2,8 +2,8 @@ namespace arbtrie
 {
 
    /// @pre refcount of id is 1
-   inline object_ref<node_header> seg_allocator::session::read_lock::realloc(
-       object_ref<node_header>& oref,
+   inline object_ref seg_allocator::session::read_lock::realloc(
+       object_ref& oref,
        uint32_t                 size,
        node_type                type,
        auto                     init)
@@ -46,7 +46,7 @@ namespace arbtrie
       //auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
    }
 
-   inline object_ref<node_header> seg_allocator::session::read_lock::alloc(id_region reg,
+   inline object_ref seg_allocator::session::read_lock::alloc(id_region reg,
                                                                            uint32_t  size,
                                                                            node_type type,
                                                                            auto      init)
@@ -125,6 +125,11 @@ namespace arbtrie
 
       return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) +
                             loc.abs_index());
+   }
+   inline void seg_allocator::session::read_lock::update_read_stats(node_location loc, 
+                                                                    uint32_t size, 
+                                                                    uint64_t time ) {
+      _session._segment_read_stat->read_bytes( loc.segment(), size, time );
    }
 
    inline void seg_allocator::session::read_lock::free_meta_node(fast_meta_address a)

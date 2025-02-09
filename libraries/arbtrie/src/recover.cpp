@@ -2,11 +2,7 @@
 
 namespace arbtrie
 {
-   /**
- *
- *
- */
-
+   // TODO: implement this function
    bool database::validate()
    {
       // make sure all nodes are reachable
@@ -14,7 +10,7 @@ namespace arbtrie
       return false;
    }
 
-   void recusive_retain_all(object_ref<node_header>&& r)
+   void recusive_retain_all(object_ref&& r)
    {
       r.retain();
       auto retain_id = [&](fast_meta_address b) { recusive_retain_all(r.rlock().get(b)); };

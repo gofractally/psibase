@@ -7,14 +7,16 @@ namespace arbtrie
          _session_num(mv._session_num),
          _alloc_seg_num(mv._alloc_seg_num),
          _alloc_seg_ptr(mv._alloc_seg_ptr),
-         _session_lock_ptr(mv._session_lock_ptr)
+         _session_lock_ptr(mv._session_lock_ptr),
+         _segment_read_stat(mv._segment_read_stat)
    {
       mv._session_num = -1;
    }
 
    seg_allocator::session::session(seg_allocator& a, uint32_t ses_num)
        : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr),
-       _session_lock_ptr(a._session_lock_ptrs[ses_num]),_sega(a)
+       _session_lock_ptr(a._session_lock_ptrs[ses_num]),
+       _segment_read_stat(a._session_seg_read_stats[ses_num]),_sega(a)
    {
    }
 
@@ -37,7 +39,8 @@ namespace arbtrie
    }
 
    std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t          size,
-                                                                             fast_meta_address adr)
+                                                                             fast_meta_address adr,
+                                                                             uint64_t          time )
    {
       assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
       // A - if no segment get a new segment
@@ -76,12 +79,14 @@ namespace arbtrie
          _alloc_seg_ptr = nullptr;
          _alloc_seg_num = -1ull;
 
-         return alloc_data(size, adr);  // recurse
+         return alloc_data(size, adr, time);  // recurse
       }
 
       auto obj  = ((char*)sh) + sh->_alloc_pos.load(std::memory_order_relaxed);
       auto head = (node_header*)obj;
       head      = new (head) node_header(size, adr);
+
+      sh->_base_time.update( round_up_multiple<64>(size)/64, time );
 
       auto new_alloc_pos =
           rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
