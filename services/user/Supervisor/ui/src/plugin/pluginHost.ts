@@ -231,6 +231,10 @@ export class PluginHost implements HostInterface {
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
         url = url + url_path;
         console.info("pluginHost.ts::url: ", url);
-        window.open(url, "_blank");
+        window.open(
+            url,
+            "_blank",
+            "popup=true,menubar=false,width=640,height=480,left=100,top=100,location=false,toolbar=false",
+        );
     }
 }
