@@ -1,0 +1,32 @@
+package producers:plugin;
+
+interface types {
+
+    variant claim-type {
+        pubkey-pem(string),
+        generic(claim), // generic
+    }
+
+    record producer {
+        name: string,
+        auth-claim: claim-type,
+    }
+
+    record claim {
+        verify-service: string,
+        raw-data: list<u8>,
+    }
+}
+
+interface api {
+    use types.{producer, claim};
+    use host:common/types.{error};
+
+    set-cft-consensus: func(prods: list<producer>) -> result<_, error>;
+    set-bft-consensus: func(prods: list<producer>) -> result<_, error>;
+    set-producers: func(prods: list<producer>) -> result<_, error>;
+}
+
+world imports {
+    import api;
+}
