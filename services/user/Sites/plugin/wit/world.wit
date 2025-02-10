@@ -21,7 +21,7 @@ interface api {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     upload: func(file: file, compression-quality: u8) -> result<_, error>;
@@ -35,7 +35,7 @@ interface api {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     /// 

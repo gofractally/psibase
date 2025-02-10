@@ -17,14 +17,14 @@ import { Settings, LogOut, Sun, Moon, UserPlus, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./theme-provider";
 import { useLogout } from "@/hooks/useLogout";
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 
 export const SettingsDropdown = () => {
   const { setTheme } = useTheme();
 
   const { mutate: logout } = useLogout();
-  const { data: currentUser } = useLoggedInUser();
+  const { data: currentUser } = useCurrentUser();
   const { mutateAsync: login } = useCreateConnectionToken();
 
   const isLoggedIn = !!currentUser;

@@ -1,6 +1,5 @@
+import { supervisor } from "@/supervisor";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-
-import { supervisor } from "@/main";
 
 export const useLogout = () => {
   const queryClient = useQueryClient();

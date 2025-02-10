@@ -1,4 +1,4 @@
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
