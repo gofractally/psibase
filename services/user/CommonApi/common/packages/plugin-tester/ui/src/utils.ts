@@ -156,7 +156,11 @@ const initialValueHandler: TypeHandler<unknown> = {
     fields.reduce(
       (acc, field) => ({
         ...acc,
-        [field.name]: handleType(field.type, schema, initialValueHandler),
+        [camelCase(field.name)]: handleType(
+          field.type,
+          schema,
+          initialValueHandler
+        ),
       }),
       {}
     ),
