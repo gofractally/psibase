@@ -473,7 +473,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
             return result;
       }
    }
-   if (auto token = request.getCookie("__HOST-SESSION"))
+   if (auto token = request.getCookie("__Host-SESSION"))
    {
       auto decoded = decodeJWT<LoginTokenData>(key, *token);
       if (decoded.aud == request.host && checkExp(decoded.exp))
