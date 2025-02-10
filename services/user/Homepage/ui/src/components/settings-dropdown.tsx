@@ -9,6 +9,7 @@ import {
     Copy,
     RefreshCcw,
     LogIn,
+    Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { type UseMutationResult } from "@tanstack/react-query";
@@ -187,7 +188,7 @@ export const SettingsDropdown = () => {
                             )}
                         >
                             <DropdownMenuItem>
-                                <User className="mr-2 h-4 w-4" />
+                                <Download className="mr-2 h-4 w-4" />
                                 Export account
                             </DropdownMenuItem>
                         </a>
