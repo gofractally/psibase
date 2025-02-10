@@ -213,24 +213,17 @@ export class PluginHost implements HostInterface {
 
     // Web interface
     openSubpage(url_path: string): Result<void, PluginError> {
-        console.info("pluginHost.ts::url_path: ", url_path);
         let qMarkPos = url_path.indexOf("?");
         let qps = "";
         if (qMarkPos >= 0) {
             qps = url_path.substring(qMarkPos + 1);
         }
-        console.info("qps: ", qps);
-        console.info(qps.indexOf("caller"));
-        console.info(qps.indexOf("callee"));
         if (qps.indexOf("caller") == -1 || qps.indexOf("callee") == -1) {
             throw new InvalidQueryParams(url_path);
         }
-        // console.info("pluginHost.ts::url_path qps stripped: ", url_path);
-        console.info("pluginHost.ts::this.self.origin: ", this.self.origin);
         let url = this.self.origin;
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
         url = url + url_path;
-        console.info("pluginHost.ts::url: ", url);
         window.open(
             url,
             "_blank",

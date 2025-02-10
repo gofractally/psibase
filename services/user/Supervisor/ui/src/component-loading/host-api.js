@@ -38,7 +38,6 @@ export const client = {
 
 export const web = {
     openSubpage(url_path) {
-        console.info("host-api.js::url_path: ", url_path);
         return host.openSubpage(url_path)
     }
 }
