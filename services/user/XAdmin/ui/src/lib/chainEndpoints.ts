@@ -5,6 +5,8 @@ import {
     getJson,
     postArrayBufferGetJson,
     getArrayBuffer,
+    siblingUrl,
+    throwIfError,
 } from "@psibase/common-lib";
 
 import { recursiveFetch } from "./recursiveFetch";
@@ -15,6 +17,7 @@ import {
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
+import * as wasm from "wasm-psibase";
 
 type Buffer = number[];
 
@@ -164,8 +167,19 @@ class Chain {
         return postArrayBufferGetJson("/native/push_boot", buffer);
     }
 
-    public pushArrayBufferTransaction(buffer: Buffer) {
-        return postArrayBufferGetJson("/native/push_transaction", buffer);
+    public async pushArrayBufferTransaction(buffer: Buffer) {
+        let url = siblingUrl(null, "transact", "/push_transaction");
+        let res = await throwIfError(
+            await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/octet-stream",
+                    Accept: "application/octet-stream",
+                },
+                body: buffer as any,
+            })
+        );
+        return wasm.js_deserialize_trace(await res.arrayBuffer());
     }
 
     public async restart(): Promise<void> {
@@ -186,12 +200,19 @@ class Chain {
         return schem.parse(await getJson("/native/admin/perf"));
     }
 
-    public addServerKey({ key, device }: { key?: string; device?: string }) {
-        return postJson("/native/admin/keys", {
+    public async addServerKey({
+        key,
+        device,
+    }: {
+        key?: string;
+        device?: string;
+    }): Promise<{ rawData: string; service: string }[]> {
+        const res = await postJson("/native/admin/keys", {
             service: "verify-sig",
             rawData: key,
             device,
         });
+        return await res.json();
     }
 
     public getKeyDevices(): Promise<KeyDevice[]> {

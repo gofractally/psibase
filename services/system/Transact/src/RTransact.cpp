@@ -352,7 +352,8 @@ namespace
       AcceptParser parser;
       for (const auto& header : headers)
       {
-         if (header.name == "accept")
+         if (std::ranges::equal(header.name | std::views::transform(::tolower),
+                                std::string_view("accept")))
          {
             parseHeader(header.value, parser);
          }

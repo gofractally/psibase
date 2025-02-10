@@ -2,6 +2,8 @@ import { fetchUi } from "@/lib/graphql/ui";
 import { Quantity } from "@/lib/quantity";
 import QueryKey from "@/lib/queryKeys";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { z } from "zod";
 
 export interface Token {
   id: number;
@@ -10,6 +12,7 @@ export interface Token {
   isAdmin: boolean;
   symbol: string;
   label: string;
+  precision: number;
 }
 
 export interface SharedBalance {
@@ -21,13 +24,23 @@ export interface SharedBalance {
   amount: Quantity;
 }
 
-export const useUi = (username: string | undefined) =>
-  useQuery({
-    queryKey: QueryKey.ui(username),
+export interface BalanceRes {
+  tokens: Token[];
+  sharedBalances: SharedBalance[];
+}
+
+let toasted = false;
+
+export const useBalances = (username: string | undefined | null) =>
+  useQuery<BalanceRes>({
+    queryKey: QueryKey.ui(username || "undefined"),
     enabled: !!username,
     refetchInterval: 10000,
     queryFn: async () => {
-      const res = await fetchUi(username!);
+      if (!toasted) {
+        toast("Fetching token balances...");
+      }
+      const res = await fetchUi(z.string().parse(username));
 
       const creditBalances = res.userCredits.map((credit): SharedBalance => {
         const amount = new Quantity(
@@ -41,7 +54,7 @@ export const useUi = (username: string | undefined) =>
           creditor: username || "",
           debitor: credit.creditedTo!,
           id: credit.tokenId.toString() + credit.creditedTo! + username || "",
-          label: amount.label(),
+          label: amount.getDisplayLabel(),
           tokenId: credit.tokenId,
         };
       });
@@ -58,7 +71,7 @@ export const useUi = (username: string | undefined) =>
           creditor: debit.debitableFrom!,
           debitor: username || "",
           id: debit.tokenId.toString() + debit.debitableFrom! + username || "",
-          label: amount.label(),
+          label: amount.getDisplayLabel(),
           tokenId: debit.tokenId,
         };
       });
@@ -82,7 +95,8 @@ export const useUi = (username: string | undefined) =>
             owner: "",
             isAdmin: res.userTokens.some((user) => user.id == balance.tokenId),
             symbol: balance.symbolId,
-            label: quan.label(),
+            precision: quan.getPrecision(),
+            label: quan.getDisplayLabel(),
             balance: quan,
           };
         }
@@ -98,7 +112,8 @@ export const useUi = (username: string | undefined) =>
         return {
           id: userToken.id,
           isAdmin: true,
-          label: quan.label(),
+          label: quan.getDisplayLabel(),
+          precision: userToken.precision.value,
           owner: username || "",
           symbol: userToken.symbolId,
         };
@@ -107,10 +122,10 @@ export const useUi = (username: string | undefined) =>
         (token, index, arr) => arr.findIndex((t) => t.id == token.id) == index
       );
 
+      if (!toasted) {
+        toasted = true;
+        toast.success("Fetched token balances");
+      }
       return { tokens, sharedBalances };
-    },
-    initialData: {
-      sharedBalances: [],
-      tokens: [],
     },
   });
