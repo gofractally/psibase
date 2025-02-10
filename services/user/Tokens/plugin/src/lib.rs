@@ -178,6 +178,26 @@ impl Transfer for Component {
             .packed(),
         )
     }
+
+    fn debit(
+        token_id: Wit::TokenId,
+        creditor: Wit::AccountNumber,
+        amount: Wit::Quantity,
+        memo: String,
+    ) -> Result<(), CommonTypes::Error> {
+        let fetched_token = fetch_token(token_id_to_number(token_id)?)?;
+
+        Transact::add_action_to_transaction(
+            "debit",
+            &Wrapper::action_structs::debit {
+                amount: Wrapper::Quantity::new(amount.as_str(), fetched_token.precision),
+                sender: AccountNumber::from(creditor.as_str()),
+                tokenId: fetched_token.id,
+                memo,
+            }
+            .packed(),
+        )
+    }
 }
 
 bindings::export!(Component with_types_in bindings);
