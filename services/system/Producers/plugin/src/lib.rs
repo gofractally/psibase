@@ -2,16 +2,13 @@
 mod bindings;
 use bindings::*;
 
-// Other plugins
 use auth_sig::plugin::keyvault::to_der;
 use host::common::types::Error;
 use transact::plugin::intf::add_action_to_transaction;
 
-// Exported interfaces
 use exports::producers::plugin::api::Guest as Api;
 use producers::plugin::types::*;
 
-// psibase deps
 use psibase::fracpack::Pack;
 use psibase::services;
 use psibase::AccountNumber;

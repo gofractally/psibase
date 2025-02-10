@@ -5,13 +5,7 @@ edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
-# p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }
-# rand_core = { version = "0.6", features = ["getrandom"] }
 psibase = { version = "0.14.0", path = "../../../../rust/psibase" }
-# pem = "3"
-# seahash = "4.1"
-# serde = { version = "1.0", features = ["derive"] }
-# serde_json = "1.0"
 
 [lib]
 crate-type = ["cdylib"]
