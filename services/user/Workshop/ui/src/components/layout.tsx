@@ -13,8 +13,15 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import React from "react";
+import { Await, Outlet, useLoaderData, useNavigation } from "react-router-dom";
 
-export default function Page() {
+export const Layout = () => {
+  const navigation = useNavigation();
+
+  const data: any = useLoaderData();
+  console.log({ navigation, data });
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -26,9 +33,7 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    Building Your Application
-                  </BreadcrumbLink>
+                  <BreadcrumbLink href="#">path name here</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
@@ -38,15 +43,12 @@ export default function Page() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 border border-red-500">
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
-          </div>
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
-        </div>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <Await resolve={data.userStatus}>
+            <Outlet />
+          </Await>
+        </React.Suspense>
       </SidebarInset>
     </SidebarProvider>
   );
-}
+};

@@ -23,6 +23,11 @@ const App = () => {
                 description="Review technical documentation."
                 service="docs"
             />
+            <AppItem
+                name="Workshop"
+                description="Create, administer and deploy apps."
+                service="workshop"
+            />
         </div>
     );
 };

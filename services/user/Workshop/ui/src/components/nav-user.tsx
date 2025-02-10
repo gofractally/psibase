@@ -23,14 +23,14 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
 
-  const { data: currentUser } = useLoggedInUser();
+  const { data: currentUser } = useCurrentUser();
 
   const { data: chainId } = useChainId();
 

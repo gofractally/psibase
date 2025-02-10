@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Account } from "@/lib/zodTypes";
 import { useLocalStorage } from "@uidotdev/usehooks";
+import { useLocation } from "react-router-dom";
 
 type AccountType = z.infer<typeof Account>;
 
@@ -16,6 +17,10 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
     "trackedApps",
     []
   );
+
+  const location = useLocation();
+
+  console.log(location, "is the location");
 
   const addApp = (newApp: AccountType): void => {
     const isAlreadyExisting = apps.some((app) => app.account == newApp);

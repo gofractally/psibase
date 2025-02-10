@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 // import { useParams } from "react-router-dom";
 import { useChainId } from "@/hooks/use-chain-id";
@@ -27,7 +27,7 @@ export function AppSwitcher() {
     "currentApp",
     ""
   );
-  const { data: currentUser } = useLoggedInUser();
+  const { data: currentUser } = useCurrentUser();
   const { apps, addApp } = useTrackedApps(currentUser);
   const { data: chainId } = useChainId();
 

@@ -1,4 +1,4 @@
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Button } from "./ui/button";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
@@ -11,14 +11,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { MetaDataForm } from "./metadata-form";
 import { usePublishApp } from "@/hooks/usePublishApp";
-import { queryClient } from "@/main";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Label } from "./ui/label";
 import { Spinner } from "./ui/spinner";
-import { useBranding } from "@/hooks/useBranding";
 import { ErrorCard } from "./error-card";
-import { IntroCard } from "./intro-card";
+import { queryClient } from "@/queryClient";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -44,14 +42,13 @@ export const Workshop = () => {
     data: currentUser,
     isFetched: isFetchedUser,
     error: loggedInUserError,
-  } = useLoggedInUser();
+  } = useCurrentUser();
+
   const {
     data: metadata,
     isSuccess,
     error: metadataError,
   } = useAppMetadata(currentUser);
-
-  const { data: networkName } = useBranding();
 
   const { mutateAsync: login } = useCreateConnectionToken();
   const { mutateAsync: updateMetadata } = useSetMetadata();
@@ -84,19 +81,9 @@ export const Workshop = () => {
 
   const error = loggedInUserError || metadataError;
   const isLoading = !isSuccess;
-  const isNotLoggedIn = currentUser === null && isFetchedUser;
 
   if (error) {
     return <ErrorCard error={error} />;
-  } else if (isNotLoggedIn) {
-    return (
-      <IntroCard
-        networkName={networkName}
-        onLogin={() => {
-          login();
-        }}
-      />
-    );
   } else if (isLoading) {
     return (
       <div className="h-dvh w-full flex justify-center">
