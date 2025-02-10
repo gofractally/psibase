@@ -412,17 +412,6 @@ namespace psibase
          impl->transactionContext.subjectiveData.push_back(actionContext.actionTrace.rawRetval);
    }
 
-   void ExecutionContext::execVerify(ActionContext& actionContext)
-   {
-      impl->exec(actionContext, [&] {  //
-         // auto startTime = std::chrono::steady_clock::now();
-         (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "verify");
-         // auto us = std::chrono::duration_cast<std::chrono::microseconds>(
-         //     std::chrono::steady_clock::now() - startTime);
-         // std::cout << "verify: " << us.count() << " us\n";
-      });
-   }
-
    void ExecutionContext::execServe(ActionContext& actionContext)
    {
       impl->exec(actionContext, [&] {  //
