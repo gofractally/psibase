@@ -95,6 +95,13 @@ namespace SystemService
 
    using JWTKeyTable = psibase::Table<JWTKeyRecord, &JWTKeyRecord::primaryKey>;
 
+   struct LoginReply
+   {
+      std::string access_token;
+      std::string token_type = "bearer";
+   };
+   PSIO_REFLECT(LoginReply, access_token, token_type)
+
    class RTransact : psibase::Service
    {
      public:
