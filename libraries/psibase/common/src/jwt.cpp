@@ -112,41 +112,6 @@ namespace psibase
       return result;
    }
 
-   // RFC 2104
-   Checksum256 hmacSha256(const char* key,
-                          std::size_t keyLen,
-                          const char* data,
-                          std::size_t dataLen)
-   {
-      constexpr std::size_t B = 64;
-      std::vector<char>     buf(B + dataLen);
-      // pad or hash key
-      if (keyLen < B)
-      {
-         std::memcpy(buf.data(), key, keyLen);
-      }
-      else
-      {
-         Checksum256 hashedKey = sha256(key, keyLen);
-         std::memcpy(buf.data(), hashedKey.data(), hashedKey.size());
-      }
-      // K ^ ipad
-      for (std::size_t i = 0; i < B; ++i)
-      {
-         buf[i] ^= 0x36;
-      }
-      std::memcpy(buf.data() + B, data, dataLen);
-      Checksum256 h1 = sha256(buf.data(), buf.size());
-      buf.resize(B + h1.size());
-      std::memcpy(buf.data() + B, h1.data(), h1.size());
-      // K ^ opad
-      for (std::size_t i = 0; i < B; ++i)
-      {
-         buf[i] ^= 0x36 ^ 0x5c;
-      }
-      return sha256(buf.data(), buf.size());
-   }
-
    struct token_header
    {
       std::string typ{"JWT"};
@@ -165,9 +130,8 @@ namespace psibase
       std::string_view encoded_signature = token.substr(end_payload + 1, std::string::npos);
       std::string_view signing_input     = token.substr(0, end_payload);
 
-      Checksum256 mac =
-          hmacSha256(key.data(), key.size(), signing_input.data(), signing_input.size());
-      auto signature = from_base64url(encoded_signature);
+      Checksum256 mac       = hmacSha256(key, signing_input);
+      auto        signature = from_base64url(encoded_signature);
       psibase::check(signature.size() == mac.size() &&
                          std::memcmp(signature.data(), mac.data(), mac.size()) == 0,
                      "Bad signature");
@@ -181,7 +145,7 @@ namespace psibase
    {
       std::string result =
           to_base64url(psio::convert_to_json(token_header{})) + "." + to_base64url(token);
-      auto mac = hmacSha256(key.data(), key.size(), result.data(), result.size());
+      auto mac = hmacSha256(key, result);
       return result + "." + to_base64url(mac.data(), mac.size());
    }
 }  // namespace psibase
