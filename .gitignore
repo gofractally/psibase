@@ -4,6 +4,9 @@
 .nyc_output
 .vscode
 .trunk
+.cursor
+.cursorignore
+.cursorrules
 *.a
 *.log
 *.o
