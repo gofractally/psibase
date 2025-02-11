@@ -5,12 +5,12 @@ interface api {
     save-permission: func(caller: string, callee: string, remember: bool) -> result<_, error>; // only option in v1 is fullAccess
 }
 
-interface queries {
+interface users {
     use host:common/types.{error};
     is-permitted: func(caller: string) -> result<bool, error>;
 }
 
 world imports {
     import api;
-    import queries;
+    import users;
 }

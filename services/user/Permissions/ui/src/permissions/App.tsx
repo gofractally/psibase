@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@shadcn/button";
 import { Checkbox } from "@shadcn/checkbox";
-import { Label } from "@shadcn/label";
-import { Input } from "@shadcn/input";
 
 import { siblingUrl } from "@psibase/common-lib";
 import { Nav } from "@components/nav";
@@ -11,19 +9,42 @@ import { Nav } from "@components/nav";
 import { useCreateConnectionToken } from "@hooks";
 
 import { supervisor } from "./perms_main";
-import { CallTracker } from "assert";
-import { CancelledError } from "@tanstack/react-query";
-import { boolean } from "zod";
+
+interface PermRequest {
+    caller: string;
+    callee: string;
+    expiry_timestamp: number;
+}
+
+const PERM_REQUEST_TIMEOUT = 2 * 60;
 
 export const App = () => {
-    const [permissions, setPermissions] = useState<string>("");
     const thisServiceName = "Permissions";
     const [remember, setRemember] = useState<boolean>(true);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMsg, setErrorMsg] = useState<string>("");
+    const [params, setParams] = useState<any>({});
+    const [isValidPermRequest, setIsValidPermRequest] = useState<any>({});
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
     const init = async () => {
         await supervisor.onLoaded();
+        // Get query parameters as an object
+        const qps = getQueryParams();
+        console.info("info().qps: ", qps);
+        setParams(qps);
+        console.info("calling isValidRequest()");
+        const isValidRequest = await supervisor.functionCall({
+            service: "permissions",
+            intf: "admin",
+            method: "isValidRequest",
+            params: [qps.caller, qps.callee],
+        });
+        console.info("isValidRequest:", isValidRequest);
+        setIsValidPermRequest(isValidRequest);
+        console.info("setting isLoading to false");
+        setIsLoading(false);
     };
 
     useEffect(() => {
@@ -31,8 +52,6 @@ export const App = () => {
     }, []);
 
     const accept = async () => {
-        // accept perms
-        console.info("perms_index accept");
         try {
             let res = await supervisor.functionCall({
                 service: "permissions",
@@ -42,15 +61,12 @@ export const App = () => {
                 // params: ["myproducer"],
                 params: [params.caller, params.callee, remember],
             });
-            console.info("savePermissions() --> ", res);
         } catch (e) {
             console.error("error saving permission: ", e);
         }
         window.close();
     };
     const deny = () => {
-        // deny perms
-        console.info("perms_index deny");
         window.close();
     };
     const getQueryParams = () => {
@@ -59,10 +75,19 @@ export const App = () => {
         return Object.fromEntries(urlParams.entries());
     };
 
-    // Get query parameters as an object
-    const params = getQueryParams();
+    if (isLoading) {
+        return <div>Loading...</div>;
+    }
+
     if (!params.caller || !params.callee) {
         console.error("Malformed query params: ", window.location.href);
+    }
+
+    console.info("isValidPermRequest: ", isValidPermRequest);
+    if (!isValidPermRequest) {
+        console.error("Forged request detected.");
+        setErrorMsg("Forged request detected.");
+        return <div>Forged request detected.</div>;
     }
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">

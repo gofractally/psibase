@@ -4,7 +4,7 @@ mod bindings;
 // use bindings::exports::callee::plugin::api::Guest as Api;
 use bindings::exports::callee::plugin::queries::Guest as Queries;
 use bindings::host::common::client::get_sender_app;
-use bindings::permissions::plugin::queries::is_permitted;
+use bindings::permissions::plugin::users::is_permitted;
 use errors::ErrorType;
 // use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;

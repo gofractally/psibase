@@ -212,6 +212,8 @@ export class PluginHost implements HostInterface {
     }
 
     // Web interface
+    // TODO: This is no longer properly named. perhaps `openPopup()`?
+    // TODO: this checking of query params needs to be in a perms setting, not a general method like this in Supervisor
     openSubpage(url_path: string): Result<void, PluginError> {
         let qMarkPos = url_path.indexOf("?");
         let qps = "";

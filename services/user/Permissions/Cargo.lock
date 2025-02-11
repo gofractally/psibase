@@ -1643,6 +1643,7 @@ dependencies = [
 name = "plugin"
 version = "0.14.0"
 dependencies = [
+ "chrono",
  "permissions-pkg",
  "psibase",
  "serde",
