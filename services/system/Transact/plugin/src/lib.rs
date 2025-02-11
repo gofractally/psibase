@@ -9,23 +9,25 @@ mod db;
 mod types;
 use db::*;
 
+use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::transact::plugin::hook_handlers::*;
 
 // Other plugins
 // Other plugins
 use bindings::host::common::{
-    self as Host,
+    self as Host, server as Server,
     types::{self as CommonTypes},
 };
 
 // Exported interfaces/types
 use bindings::exports::transact::plugin::{
-    admin::Guest as Admin, hooks::Guest as Hooks, intf::Guest as Intf,
+    admin::Guest as Admin, hooks::Guest as Hooks, intf::Guest as Intf, login::Guest as Login,
 };
 
 // Third-party crates
 use psibase::fracpack::Pack;
-use psibase::{Hex, SignedTransaction, TransactionTrace};
+use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
+use serde::Deserialize;
 use serde_json::from_str;
 
 // The transaction construction cycle, including hooks, is as follows:
@@ -174,7 +176,7 @@ impl Admin for TransactPlugin {
 
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()))?,
+            proofs: get_proofs(&sha256(&tx.packed()), true)?,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
@@ -196,6 +198,66 @@ impl Admin for TransactPlugin {
                 Ok(())
             }
         }
+    }
+}
+
+#[derive(Deserialize)]
+struct LoginReply {
+    access_token: String,
+    #[allow(dead_code)]
+    token_type: String,
+}
+
+impl Login for TransactPlugin {
+    fn login(app: String) -> Result<String, CommonTypes::Error> {
+        assert_from_supervisor();
+        let Some(user) = get_current_user()? else {
+            return Err(NotLoggedIn("login").into());
+        };
+
+        let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
+            .expect("Failed to deserialize rootdomain");
+        let actions = vec![Action {
+            sender: user,
+            service: app,
+            method: "loginSys".to_string(),
+            raw_data: (root_host,).packed(),
+        }];
+
+        let claims =
+            get_claims(&actions, false).expect("Failed to retrieve claims from auth plugin");
+
+        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
+        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+
+        let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
+        let tapos = Tapos {
+            expiration: expiration,
+            refBlockSuffix: 0,
+            flags: Tapos::DO_NOT_BROADCAST_FLAG,
+            refBlockIndex: 0,
+        };
+
+        let tx = Transaction {
+            tapos,
+            actions,
+            claims,
+        };
+        let signed_tx = SignedTransaction {
+            transaction: Hex::from(tx.packed()),
+            proofs: get_proofs(&sha256(&tx.packed()), false)?,
+        };
+        if signed_tx.proofs.len() != tx.claims.len() {
+            return Err(ClaimProofMismatch.into());
+        }
+
+        let response = Server::post(&Host::types::PostRequest {
+            endpoint: "/login".to_string(),
+            body: Host::types::BodyTypes::Bytes(signed_tx.packed()),
+        })?;
+        let body: LoginReply =
+            serde_json::from_str(&response).expect("Failed to deserialize response");
+        Ok(body.access_token)
     }
 }
 
