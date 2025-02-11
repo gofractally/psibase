@@ -1,12 +1,12 @@
+import { Metadata } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
-import { Params } from "./useSetMetadata";
 import { z } from "zod";
 
 export const Status = z.enum(["draft", "published", "unpublished"]);
 
 export const MetadataResponse = z.object({
-  appMetadata: Params,
+  appMetadata: Metadata,
   extraMetadata: z.object({
     createdAt: z.string(),
     status: Status,

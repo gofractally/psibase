@@ -14,13 +14,17 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Outlet, useLocation } from "react-router-dom";
+import { appMenus } from "./nav-main";
 
 export const Layout = () => {
   const location = useLocation();
 
-  console.log(location, "is the location");
   const appName = location.pathname.split("/")[2];
-  const pageName = "Settings";
+
+  const selectedPage = appMenus.find(
+    (menu) => location.pathname.split("/")[3] == menu.path
+  );
+  const pageName = selectedPage?.title || "Settings?";
 
   return (
     <SidebarProvider>

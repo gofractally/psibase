@@ -50,7 +50,7 @@ export const CreateAppForm = ({ onSubmit }: Props) => {
                 <Input {...field} />
               </FormControl>
               <FormDescription>
-                This is your apps unique username.
+                This is your app's unique identifier.
               </FormDescription>
               <FormMessage />
             </FormItem>

@@ -21,10 +21,11 @@ import { createIdenticon } from "@/lib/createIdenticon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { CreateAppModal } from "./create-app-modal";
+import { useAppMetadata } from "@/hooks/useAppMetadata";
+import { useCurrentApp } from "@/hooks/useCurrentApp";
 
 export function AppSwitcher() {
   const { isMobile } = useSidebar();
-
   const location = useLocation();
 
   const navigate = useNavigate();
@@ -37,10 +38,10 @@ export function AppSwitcher() {
 
   const [showCreateAppModal, setShowCreateAppModal] = useState(false);
 
-  const onAddApp = () => {
-    // use the mutation new
-    setShowCreateAppModal(true);
-  };
+  const currentApp = useCurrentApp();
+  const { data: app } = useAppMetadata(currentApp);
+
+  console.log({ app });
 
   return (
     <SidebarMenu>
@@ -63,9 +64,11 @@ export function AppSwitcher() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {selectedAppName}
+                  {app ? app.appMetadata.name : selectedAppName}
                 </span>
-                {/* <span className="truncate text-xs">{"test"}</span> */}
+                {app && (
+                  <span className="truncate text-xs">{selectedAppName}</span>
+                )}
               </div>
               <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
@@ -95,7 +98,7 @@ export function AppSwitcher() {
             <DropdownMenuItem
               className="gap-2 p-2"
               onClick={() => {
-                onAddApp();
+                setShowCreateAppModal(true);
               }}
             >
               <div className="flex size-6 items-center justify-center rounded-md border bg-background">

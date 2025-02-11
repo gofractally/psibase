@@ -6,6 +6,9 @@ import {
 } from "@/components/ui/dialog";
 import { CreateAppForm } from "./create-app-form";
 import { useCreateApp } from "@/hooks/use-create-app";
+import { useTrackedApps } from "@/hooks/useTrackedApps";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useNavigate } from "react-router-dom";
 
 export const CreateAppModal = ({
   show,
@@ -16,6 +19,11 @@ export const CreateAppModal = ({
 }) => {
   const { mutateAsync: createApp } = useCreateApp();
 
+  const { data: currentUser } = useCurrentUser();
+  const { addApp } = useTrackedApps(currentUser);
+
+  const navigate = useNavigate();
+
   return (
     <Dialog open={show} onOpenChange={openChange}>
       <DialogContent>
@@ -24,6 +32,9 @@ export const CreateAppModal = ({
           <CreateAppForm
             onSubmit={async (data) => {
               await createApp(data.appName);
+              addApp(data.appName);
+              openChange(false);
+              navigate(`/app/${data.appName}`);
               return data;
             }}
           />

@@ -15,6 +15,7 @@ import { Label } from "./ui/label";
 import { Spinner } from "./ui/spinner";
 import { ErrorCard } from "./error-card";
 import { queryClient } from "@/queryClient";
+import { useCurrentApp } from "@/hooks/useCurrentApp";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -42,11 +43,13 @@ export const Workshop = () => {
     error: loggedInUserError,
   } = useCurrentUser();
 
+  const currentApp = useCurrentApp();
+
   const {
     data: metadata,
     isSuccess,
     error: metadataError,
-  } = useAppMetadata(currentUser);
+  } = useAppMetadata(currentApp);
 
   const { mutateAsync: updateMetadata } = useSetMetadata();
   const { mutateAsync: publishApp } = usePublishApp();
@@ -102,7 +105,7 @@ export const Workshop = () => {
         <div className="flex flex-col gap-4">
           <div className="flex justify-between">
             <div className="text-lg font-semibold text-center">
-              {currentUser}
+              {currentApp}
             </div>
             {isSuccess && (
               <div className="flex gap-2">
@@ -111,7 +114,7 @@ export const Workshop = () => {
                 </div>
                 <Switch
                   checked={isAppPublished}
-                  disabled={!currentUser}
+                  disabled={!(currentUser && currentApp)}
                   onCheckedChange={(checked) =>
                     handleChecked(checked, z.string().parse(currentUser))
                   }
@@ -125,8 +128,11 @@ export const Workshop = () => {
               existingValues={metadata ? metadata.appMetadata : undefined}
               onSubmit={async (x) => {
                 await updateMetadata({
-                  ...x,
-                  owners: [],
+                  metadata: {
+                    ...x,
+                    owners: [],
+                  },
+                  account: currentApp,
                 });
                 return x;
               }}

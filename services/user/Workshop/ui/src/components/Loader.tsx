@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { IntroCard } from "./intro-card";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useBranding } from "@/hooks/useBranding";
-import { useEffect } from "react";
 import { Spinner } from "./ui/spinner";
 
 export const Loader = () => {
@@ -29,10 +28,6 @@ export const Loader = () => {
     isLoggedInWithNoApps,
     isNotLoggedIn,
   });
-
-  useEffect(() => {
-    navigate("/app/monsters");
-  }, []);
 
   // Display loader
   // If logged in, no apps, prompt to create a new app or look one up

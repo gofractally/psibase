@@ -6,20 +6,20 @@ const AccountId = z.string();
 
 const Params = z.object({
   account: AccountId,
-  publish: z.boolean(),
+  enableCache: z.boolean(),
 });
 
-export const usePublishApp = () =>
+export const useSpa = () =>
   useMutation<null, Error, z.infer<typeof Params>>({
-    mutationKey: ["publishApp"],
+    mutationKey: ["spa"],
     mutationFn: async (params) => {
-      const { account, publish } = Params.parse(params);
+      const { account, enableCache } = Params.parse(params);
 
       await supervisor.functionCall({
-        method: publish ? "publishApp" : "unpublishApp",
-        params: [account],
+        method: "setCacheMode",
+        params: [account, enableCache],
         service: "workshop",
-        intf: "registry",
+        intf: "app",
       });
 
       return null;

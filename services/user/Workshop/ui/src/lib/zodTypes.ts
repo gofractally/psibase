@@ -17,3 +17,23 @@ export const Account = z
   .refine((val) => !val.startsWith("x-"), {
     message: "Account may not start with 'x-'.",
   });
+
+export const Metadata = z.object({
+  name: z.string().max(30),
+  shortDescription: z.string().max(100),
+  longDescription: z.string().max(1000),
+  icon: z.string(), // Base64 string
+  iconMimeType: z.string(), // MIME type of the icon
+  tosSubpage: z
+    .string()
+    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
+  privacyPolicySubpage: z
+    .string()
+    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
+  appHomepageSubpage: z
+    .string()
+    .refine((val) => val.startsWith("/"), { message: "Must start with /" }),
+  redirectUris: z.string().array(),
+  owners: Account.array().default([]),
+  tags: z.string().array().max(3),
+});

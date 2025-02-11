@@ -6,26 +6,34 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useNavigation } from "react-router-dom";
+import { useLocation, useNavigation, NavLink } from "react-router-dom";
+
+export const appMenus = [
+  {
+    title: "Settings",
+    icon: Settings,
+    isActive: true,
+    path: "",
+  },
+  {
+    title: "Support",
+    icon: LifeBuoy,
+    isActive: false,
+    path: "support",
+  },
+  {
+    title: "Pending requests",
+    icon: LayoutList,
+    isActive: false,
+    path: "pending-requests",
+  },
+];
 
 export function NavMain() {
-  const items = [
-    {
-      title: "Settings",
-      icon: Settings,
-      isActive: true,
-    },
-    {
-      title: "Support",
-      icon: LifeBuoy,
-      isActive: false,
-    },
-    {
-      title: "Pending requests",
-      icon: LayoutList,
-      isActive: false,
-    },
-  ];
+  const location = useLocation();
+
+  const appName = location.pathname.split("/")[2];
+  console.log("current path", location);
 
   const navigation = useNavigation();
 
@@ -35,13 +43,15 @@ export function NavMain() {
     <SidebarGroup>
       <SidebarGroupLabel>App configuration</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => (
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip={item.title}>
-              {item.icon && <item.icon />}
-              <span>{item.title}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+        {appMenus.map((item) => (
+          <NavLink to={`/app/${appName}/${item.path}`}>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip={item.title}>
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </NavLink>
         ))}
       </SidebarMenu>
     </SidebarGroup>
