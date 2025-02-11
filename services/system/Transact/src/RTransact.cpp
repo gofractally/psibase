@@ -532,10 +532,11 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
                              trx.proofs[i]);
          }
          // check auth
-         auto                 accountsTables = Accounts::Tables(Accounts::service);
-         auto                 accountTable   = accountsTables.open<AccountTable>();
-         auto                 accountIndex   = accountTable.getIndex<0>();
-         auto                 account        = accountIndex.get(sender);
+         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountTable   = accountsTables.open<AccountTable>();
+         auto accountIndex   = accountTable.getIndex<0>();
+         auto account        = accountIndex.get(sender);
+         check(!!account, "Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
          auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
          auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
