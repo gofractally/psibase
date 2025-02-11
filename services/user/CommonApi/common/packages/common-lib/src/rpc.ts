@@ -246,7 +246,7 @@ export async function pushPackedSignedTransaction(
     packed: any,
 ) {
     const trace = await postArrayBufferGetJson(
-        baseUrl.replace(/\/+$/, "") + "/native/push_transaction",
+        siblingUrl(baseUrl, "transact", "/push_transaction"),
         packed,
     );
     if (trace.error) throw new RPCError(trace.error, trace);

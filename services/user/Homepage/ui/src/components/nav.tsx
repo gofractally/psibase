@@ -3,7 +3,7 @@ import { SettingsDropdown } from "@/components/settings-dropdown";
 
 function HoverBorderGradientDemo() {
     return (
-        <div className=" flex justify-center text-center">
+        <div className="flex justify-center text-center select-none">
             <HoverBorderGradient
                 as="div"
                 containerClassName="rounded-full"
@@ -17,13 +17,10 @@ function HoverBorderGradientDemo() {
 
 export const Nav = () => {
     return (
-        <div className="mt-4 flex w-full justify-between">
-            <div>
-                <HoverBorderGradientDemo />
-            </div>
-            <div>
-                <SettingsDropdown />
-            </div>
+        <div className="container mx-auto flex p-6 justify-between items-center">
+        {/* <div className="mt-4 flex w-full justify-between"> */}
+            <HoverBorderGradientDemo />
+            <SettingsDropdown />
         </div>
     );
 };
