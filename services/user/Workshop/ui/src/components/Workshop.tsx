@@ -16,6 +16,8 @@ import { Spinner } from "./ui/spinner";
 import { ErrorCard } from "./error-card";
 import { queryClient } from "@/queryClient";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { useAccountStatus } from "@/hooks/useAccountStatus";
+import { CreateAppAccountCard } from "./create-app-account-card";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -51,6 +53,10 @@ export const Workshop = () => {
     error: metadataError,
   } = useAppMetadata(currentApp);
 
+  const { data: accountStatus } = useAccountStatus(currentApp);
+  const invalidAccountError =
+    accountStatus == "Invalid" ? new Error(`Invalid account name`) : undefined;
+
   const { mutateAsync: updateMetadata } = useSetMetadata();
   const { mutateAsync: publishApp } = usePublishApp();
 
@@ -79,7 +85,7 @@ export const Workshop = () => {
     ? metadata.extraMetadata.status == Status.Enum.published
     : false;
 
-  const error = loggedInUserError || metadataError;
+  const error = loggedInUserError || metadataError || invalidAccountError;
   const isLoading = !isSuccess;
 
   if (error) {
@@ -97,6 +103,12 @@ export const Workshop = () => {
               : "Fetching account status..."}
           </div>
         </div>
+      </div>
+    );
+  } else if (accountStatus == "Available") {
+    return (
+      <div className="mx-auto p-4 max-w-screen-md">
+        <CreateAppAccountCard />
       </div>
     );
   } else
