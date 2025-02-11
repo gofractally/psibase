@@ -617,12 +617,14 @@ psibase_package(
     DESCRIPTION "All compiled code is uploaded to the chain through this service"
     SERVICE setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
+        DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-setcode
     SERVICE r-setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
 )
 
 psibase_package(
@@ -741,10 +743,22 @@ psibase_package(
     NAME Workshop
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "A dashboard for developers to create and manage apps"
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Registry(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS 
+        "HttpServer(^${PSIBASE_VERSION})" 
+        "Sites(^${PSIBASE_VERSION})" 
+        "Accounts(^${PSIBASE_VERSION})" 
+        "CommonApi(^${PSIBASE_VERSION})" 
+        "Registry(^${PSIBASE_VERSION})" 
+        "StagedTx(^${PSIBASE_VERSION})" 
+        "Transact(^${PSIBASE_VERSION})"
+        "SetCode(^${PSIBASE_VERSION})"
+        "Chainmail(^${PSIBASE_VERSION})"
+        "ClientData(^${PSIBASE_VERSION})"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/ui/dist/* /
+        DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
     DEPENDS ${Workshop_js_DEP}
+    DEPENDS ${Plugins_DEP}
 )
 
 psibase_package(
