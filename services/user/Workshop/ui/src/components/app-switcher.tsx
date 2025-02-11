@@ -18,27 +18,36 @@ import { useTrackedApps } from "@/hooks/useTrackedApps";
 // import { useParams } from "react-router-dom";
 import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
-import { useLocalStorage } from "@uidotdev/usehooks";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { CreateAppModal } from "./create-app-modal";
 
 export function AppSwitcher() {
   const { isMobile } = useSidebar();
 
-  const [selectedAppName, setSelectedAppName] = useLocalStorage(
-    "currentApp",
-    ""
-  );
+  const location = useLocation();
+
+  const navigate = useNavigate();
+  const selectedAppName = location.pathname.split("/")[2];
+
   const { data: currentUser } = useCurrentUser();
-  const { apps, addApp } = useTrackedApps(currentUser);
+  const { apps } = useTrackedApps(currentUser);
+
   const { data: chainId } = useChainId();
 
-  const selectedApp = apps.find((app) => app.account == selectedAppName);
+  const [showCreateAppModal, setShowCreateAppModal] = useState(false);
 
   const onAddApp = () => {
-    addApp(Math.random().toString().split(".")[1]);
+    // use the mutation new
+    setShowCreateAppModal(true);
   };
 
   return (
     <SidebarMenu>
+      <CreateAppModal
+        openChange={(e) => setShowCreateAppModal(e)}
+        show={showCreateAppModal}
+      />
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -54,9 +63,9 @@ export function AppSwitcher() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {selectedApp?.account}
+                  {selectedAppName}
                 </span>
-                {/* <span className="truncate text-xs">{selectedAppName.plan}</span> */}
+                {/* <span className="truncate text-xs">{"test"}</span> */}
               </div>
               <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
@@ -73,7 +82,7 @@ export function AppSwitcher() {
             {apps.map((app) => (
               <DropdownMenuItem
                 key={app.account}
-                onClick={() => setSelectedAppName(app.account)}
+                onClick={() => navigate(`/app/${app.account}`)}
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-sm border">

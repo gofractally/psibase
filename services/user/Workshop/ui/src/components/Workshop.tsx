@@ -1,6 +1,4 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { Button } from "./ui/button";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 import {
   appMetadataQueryKey,
@@ -50,7 +48,6 @@ export const Workshop = () => {
     error: metadataError,
   } = useAppMetadata(currentUser);
 
-  const { mutateAsync: login } = useCreateConnectionToken();
   const { mutateAsync: updateMetadata } = useSetMetadata();
   const { mutateAsync: publishApp } = usePublishApp();
 
@@ -103,14 +100,6 @@ export const Workshop = () => {
     return (
       <div className="mt-4 mx-4">
         <div className="flex flex-col gap-4">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              login();
-            }}
-          >
-            Change app
-          </Button>
           <div className="flex justify-between">
             <div className="text-lg font-semibold text-center">
               {currentUser}

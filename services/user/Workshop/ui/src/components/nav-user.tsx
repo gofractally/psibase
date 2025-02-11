@@ -1,10 +1,11 @@
 import {
-  BadgeCheck,
-  Bell,
   ChevronsUpDown,
-  CreditCard,
+  LogIn,
   LogOut,
-  Sparkles,
+  Moon,
+  PlusCircle,
+  Sun,
+  UserPlus,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,7 +15,11 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,15 +29,40 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { generateAvatar } from "@/lib/createIdenticon";
+import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
+import { useLogout } from "@/hooks/useLogout";
+import { useTheme } from "./theme-provider";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useSelectAccount } from "@/hooks/use-select-account";
+import { cn } from "@/lib/utils";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
 
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isFetched: isFetchedLoggedInuser } =
+    useCurrentUser();
 
-  const { data: chainId } = useChainId();
+  const { data: chainId, isFetched: isFetchedChainId } = useChainId();
+  const { mutate: logout } = useLogout();
+
+  const { setTheme } = useTheme();
+
+  const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
+    useConnectedAccounts();
+
+  const { mutateAsync: login } = useCreateConnectionToken();
+  const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
+    useSelectAccount();
+
+  const isNoOptions = connectedAccounts.length == 0;
+  const isLoading =
+    !(
+      isFetchedLoggedInuser &&
+      isFetchedConnectedAccounts &&
+      isFetchedChainId
+    ) || isConnectingToAccount;
 
   return (
     <SidebarMenu>
@@ -79,29 +109,83 @@ export function NavUser() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
+            {isNoOptions ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  login();
+                }}
+                disabled={!isFetchedConnectedAccounts}
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                <span>
+                  {!isFetchedConnectedAccounts ? "Loading..." : "Login"}
+                </span>
               </DropdownMenuItem>
+            ) : (
+              <DropdownMenuGroup>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger disabled={isLoading}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    <span className={cn({ italic: isLoading })}>
+                      {currentUser ? "Switch account" : "Select account"}
+                    </span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      {connectedAccounts.map((connectedAccount) => (
+                        <DropdownMenuItem
+                          disabled={isConnectingToAccount}
+                          key={connectedAccount}
+                          onClick={() => connectToAccount(connectedAccount)}
+                        >
+                          <img
+                            className="mr-2 h-4 w-4 rounded-none"
+                            src={createIdenticon(chainId + connectedAccount)}
+                          />
+                          <span>{connectedAccount}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          login();
+                        }}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        <span>More...</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+              </DropdownMenuGroup>
+            )}
+            <DropdownMenuGroup>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Theme</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => setTheme("light")}>
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>Light</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme("dark")}>
+                      <Moon className="mr-2 h-4 w-4" />
+                      <span>Dark</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setTheme("system")}>
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>System</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheck />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => logout()}>
               <LogOut />
               Log out
             </DropdownMenuItem>

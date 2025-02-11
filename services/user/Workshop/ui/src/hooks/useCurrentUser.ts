@@ -16,9 +16,10 @@ export const queryFn = async () => {
   return res ? z.string().parse(res) : null;
 };
 
-export const useCurrentUser = () =>
+export const useCurrentUser = (refetchInterval?: number) =>
   useQuery({
     queryKey,
     queryFn,
+    refetchInterval,
     staleTime: 60000,
   });

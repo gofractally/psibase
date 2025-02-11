@@ -13,14 +13,14 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import React from "react";
-import { Await, Outlet, useLoaderData, useNavigation } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 export const Layout = () => {
-  const navigation = useNavigation();
+  const location = useLocation();
 
-  const data: any = useLoaderData();
-  console.log({ navigation, data });
+  console.log(location, "is the location");
+  const appName = location.pathname.split("/")[2];
+  const pageName = "Settings";
 
   return (
     <SidebarProvider>
@@ -33,21 +33,17 @@ export const Layout = () => {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">path name here</BreadcrumbLink>
+                  <BreadcrumbLink>{appName}</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                  <BreadcrumbPage>{pageName}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <Await resolve={data.userStatus}>
-            <Outlet />
-          </Await>
-        </React.Suspense>
+        <Outlet />
       </SidebarInset>
     </SidebarProvider>
   );

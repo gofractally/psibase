@@ -6,6 +6,7 @@ import { IntroCard } from "./intro-card";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useBranding } from "@/hooks/useBranding";
 import { useEffect } from "react";
+import { Spinner } from "./ui/spinner";
 
 export const Loader = () => {
   const { data: currentUser, isLoading } = useCurrentUser();
@@ -30,7 +31,7 @@ export const Loader = () => {
   });
 
   useEffect(() => {
-    navigate("/app/derp");
+    navigate("/app/monsters");
   }, []);
 
   // Display loader
@@ -39,7 +40,12 @@ export const Loader = () => {
   // Figure out if there's any apps
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div>
+        i am loading
+        <Spinner />
+      </div>
+    );
   } else if (isNotLoggedIn) {
     return (
       <IntroCard
