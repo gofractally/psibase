@@ -38,6 +38,16 @@ namespace
       }
       return result;
    }
+
+   // Used to convert a split_view element to a string_view.
+   // Note that this is only needed when the standard library
+   // doesn't implement P2210R2
+   std::string_view split2sv(const auto& r)
+   {
+      auto data = &*r.begin();
+      auto size = static_cast<std::size_t>(std::ranges::distance(r));
+      return std::string_view{data, size};
+   }
 }  // namespace
 
 namespace psibase
@@ -79,7 +89,7 @@ namespace psibase
          {
             for (auto kvrange : header.value | std::views::split(';'))
             {
-               std::string_view kv(kvrange.begin(), kvrange.end());
+               std::string_view kv  = split2sv(kvrange);
                auto             pos = kv.find('=');
                check(pos != std::string_view::npos, "Invalid cookie");
                auto key   = kv.substr(kv.find_first_not_of(" \t"), pos);
@@ -102,7 +112,7 @@ namespace psibase
             bool first = true;
             for (auto kvrange : header.value | std::views::split(';'))
             {
-               std::string_view kv(kvrange.begin(), kvrange.end());
+               std::string_view kv      = split2sv(kvrange);
                auto             pos     = kv.find('=');
                bool             matched = false;
                if (pos != std::string_view::npos)
