@@ -37,7 +37,7 @@ export const client = {
 };
 
 export const web = {
-    openSubpage(url_path) {
-        return host.openSubpage(url_path)
+    popup(url_path) {
+        return host.popup(url_path)
     }
 }

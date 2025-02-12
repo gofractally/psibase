@@ -32,9 +32,7 @@ const PERM_REQUEST_EXPIRATION: i64 = 2 * 60;
 
 fn verify_caller_is_this_app() -> Result<(), Error> {
     let requester = get_sender_app().app.unwrap();
-    println!("requester: {}", requester);
     let this_plugin = my_service_account();
-    println!("this_plugin: {}", this_plugin);
     if requester != this_plugin {
         return Err(ErrorType::InvalidRequester().into());
     } else {
@@ -78,7 +76,7 @@ impl UsersApi for PermissionsPlugin {
         let perms_pref = Keyvalue::get(&k);
         if perms_pref.is_none() {
             log_permission_request(caller.clone(), callee.clone())?;
-            CommonWeb::open_subpage(&format!("permissions.html?caller={caller}&callee={callee}"))?;
+            CommonWeb::popup(&format!("permissions.html?caller={caller}&callee={callee}"))?;
             return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
         } else {
             Ok(true)

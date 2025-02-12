@@ -18,12 +18,6 @@ export class InvalidUrl extends Error {
     }
 }
 
-export class InvalidQueryParams extends Error {
-    constructor(url: string) {
-        super(`Invalid Query Params: ${url}`);
-    }
-}
-
 export class InvalidCall extends PluginError {
     constructor(
         pluginId: QualifiedPluginId,

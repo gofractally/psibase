@@ -1,19 +1,13 @@
 #[allow(warnings)]
 mod bindings;
 
-// use bindings::exports::callee::plugin::api::Guest as Api;
 use bindings::exports::callee::plugin::queries::Guest as Queries;
 use bindings::host::common::client::get_sender_app;
+use bindings::host::common::types::Error;
 use bindings::permissions::plugin::users::is_permitted;
 use errors::ErrorType;
-// use bindings::host::common::server as CommonServer;
-use bindings::host::common::types::Error;
-// use bindings::transact::plugin::intf::add_action_to_transaction;
-
-// use psibase::fracpack::Pack;
 
 mod errors;
-// use errors::ErrorType;
 
 struct CalleePlugin;
 

@@ -6,44 +6,29 @@ import { Checkbox } from "@shadcn/checkbox";
 import { siblingUrl } from "@psibase/common-lib";
 import { Nav } from "@components/nav";
 
-import { useCreateConnectionToken } from "@hooks";
-
 import { supervisor } from "./perms_main";
 
-interface PermRequest {
-    caller: string;
-    callee: string;
-    expiry_timestamp: number;
-}
-
-const PERM_REQUEST_TIMEOUT = 2 * 60;
-
 export const App = () => {
-    const thisServiceName = "Permissions";
+    const thisServiceName = "permissions";
     const [remember, setRemember] = useState<boolean>(true);
     const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [errorMsg, setErrorMsg] = useState<string>("");
     const [params, setParams] = useState<any>({});
     const [isValidPermRequest, setIsValidPermRequest] = useState<any>({});
 
-    const { mutateAsync: onLogin } = useCreateConnectionToken();
-
     const init = async () => {
         await supervisor.onLoaded();
-        // Get query parameters as an object
+
         const qps = getQueryParams();
-        console.info("info().qps: ", qps);
         setParams(qps);
-        console.info("calling isValidRequest()");
+
         const isValidRequest = await supervisor.functionCall({
-            service: "permissions",
+            service: thisServiceName,
             intf: "admin",
             method: "isValidRequest",
             params: [qps.caller, qps.callee],
         });
-        console.info("isValidRequest:", isValidRequest);
         setIsValidPermRequest(isValidRequest);
-        console.info("setting isLoading to false");
+
         setIsLoading(false);
     };
 
@@ -54,7 +39,7 @@ export const App = () => {
     const accept = async () => {
         try {
             let res = await supervisor.functionCall({
-                service: "permissions",
+                service: thisServiceName,
                 intf: "api",
                 method: "savePermission",
                 /* TODO: WORKAROUND: logs in as boot account (assuming "myproducer" as boot account). Update this with token actual login. */
@@ -83,12 +68,11 @@ export const App = () => {
         console.error("Malformed query params: ", window.location.href);
     }
 
-    console.info("isValidPermRequest: ", isValidPermRequest);
     if (!isValidPermRequest) {
         console.error("Forged request detected.");
-        setErrorMsg("Forged request detected.");
         return <div>Forged request detected.</div>;
     }
+
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav title="Grant access?" />
@@ -106,7 +90,6 @@ export const App = () => {
             </div>
             <Button onClick={accept}>Accept</Button>
             <Button onClick={deny}>Deny</Button>
-            {/* Clicking Accept/Deny calls savePermission() with user response, then closes window (to resolve the promise) --> */}
         </div>
     );
 };

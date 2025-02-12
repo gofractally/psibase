@@ -104,7 +104,7 @@ interface client {
 interface web {
     use types.{error};
 
-    open-subpage: func(url-path: string) -> result<_, error>;
+    popup: func(url-path: string) -> result<_, error>;
 }
 
 world imports {

@@ -2,7 +2,7 @@ package permissions:plugin;
 
 interface admin {
     use host:common/types.{error};
-    // caller should be permissions
+
     is-valid-request: func(caller: string, callee: string) -> result<bool, error>;
 }
 

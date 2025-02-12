@@ -6,7 +6,7 @@ import {
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
-import { InvalidQueryParams, RecoverableErrorPayload } from "./errors";
+import { RecoverableErrorPayload } from "./errors";
 
 interface HttpRequest {
     uri: string;
@@ -212,17 +212,7 @@ export class PluginHost implements HostInterface {
     }
 
     // Web interface
-    // TODO: This is no longer properly named. perhaps `openPopup()`?
-    // TODO: this checking of query params needs to be in a perms setting, not a general method like this in Supervisor
-    openSubpage(url_path: string): Result<void, PluginError> {
-        let qMarkPos = url_path.indexOf("?");
-        let qps = "";
-        if (qMarkPos >= 0) {
-            qps = url_path.substring(qMarkPos + 1);
-        }
-        if (qps.indexOf("caller") == -1 || qps.indexOf("callee") == -1) {
-            throw new InvalidQueryParams(url_path);
-        }
+    popup(url_path: string): Result<void, PluginError> {
         let url = this.self.origin;
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
         url = url + url_path;
