@@ -1,17 +1,13 @@
 import { createBrowserRouter } from "react-router-dom";
 import { Workshop } from "./components/Workshop";
 import { Layout } from "./components/layout";
-import { Loader } from "./components/Loader";
 import { ProtectedRoute } from "./components/protected-route";
+import { Loader } from "./components/Loader";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <Loader />,
-  },
-  {
-    path: "/login",
-    element: <div>You should login now..</div>,
   },
   {
     path: "/app",

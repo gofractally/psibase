@@ -13,7 +13,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 // import { useParams } from "react-router-dom";
 import { useChainId } from "@/hooks/use-chain-id";
@@ -29,10 +28,9 @@ export function AppSwitcher() {
   const location = useLocation();
 
   const navigate = useNavigate();
-  const selectedAppName = location.pathname.split("/")[2];
+  const selectedAppAccount = location.pathname.split("/")[2];
 
-  const { data: currentUser } = useCurrentUser();
-  const { apps } = useTrackedApps(currentUser);
+  const { apps } = useTrackedApps();
 
   const { data: chainId } = useChainId();
 
@@ -59,15 +57,15 @@ export function AppSwitcher() {
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-background text-sidebar-primary-foreground">
                 <img
                   className="size-4"
-                  src={createIdenticon(chainId + selectedAppName)}
+                  src={createIdenticon(chainId + selectedAppAccount)}
                 />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {app ? app.appMetadata.name : selectedAppName}
+                  {app ? app.appMetadata.name : selectedAppAccount}
                 </span>
                 {app && (
-                  <span className="truncate text-xs">{selectedAppName}</span>
+                  <span className="truncate text-xs">{selectedAppAccount}</span>
                 )}
               </div>
               <ChevronsUpDown className="ml-auto" />
@@ -82,18 +80,20 @@ export function AppSwitcher() {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Apps
             </DropdownMenuLabel>
-            {apps.map((app) => (
-              <DropdownMenuItem
-                key={app.account}
-                onClick={() => navigate(`/app/${app.account}`)}
-                className="gap-2 p-2"
-              >
-                <div className="flex size-6 items-center justify-center rounded-sm border">
-                  <img src={createIdenticon(chainId + app.account)} />
-                </div>
-                {app.account}
-              </DropdownMenuItem>
-            ))}
+            {apps
+              .filter((app) => app.account !== selectedAppAccount)
+              .map((app) => (
+                <DropdownMenuItem
+                  key={app.account}
+                  onClick={() => navigate(`/app/${app.account}`)}
+                  className="gap-2 p-2"
+                >
+                  <div className="flex size-6 items-center justify-center rounded-sm border">
+                    <img src={createIdenticon(chainId + app.account)} />
+                  </div>
+                  {app.account}
+                </DropdownMenuItem>
+              ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 p-2"

@@ -2,25 +2,45 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
-import { IntroCard } from "./intro-card";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useBranding } from "@/hooks/useBranding";
-import { Spinner } from "./ui/spinner";
+import { useEffect, useState } from "react";
+
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Drill } from "lucide-react";
+import { LoginButton } from "./login-button";
+import { CreateAppModal } from "./create-app-modal";
 
 export const Loader = () => {
   const { data: currentUser, isLoading } = useCurrentUser();
+  const navigate = useNavigate();
 
-  const { apps } = useTrackedApps(currentUser);
+  const { apps } = useTrackedApps();
 
-  const { mutate: login } = useCreateConnectionToken();
+  useEffect(() => {
+    if (apps.length > 0) {
+      console.log(apps, "are the apps");
+      const firstApp = apps[0]!;
+      console.log({ firstApp });
+      navigate(`/app/${firstApp.account}`);
+    } else {
+      // - Root page
+      // - No tracked apps
+      // - Logged - not logged in
+    }
+  }, [apps, navigate]);
 
   const { data: networkName } = useBranding();
 
   const isLoggedInWithNoApps = currentUser && apps.length == 0;
   const isLoggedInWithApps = currentUser && apps.length > 0;
   const isNotLoggedIn = currentUser === null;
-
-  const navigate = useNavigate();
+  const isLoggedIn = typeof currentUser === "string";
 
   console.log({
     isLoading,
@@ -29,39 +49,49 @@ export const Loader = () => {
     isNotLoggedIn,
   });
 
+  const [showModal, setShowModal] = useState<boolean>(false);
+
   // Display loader
   // If logged in, no apps, prompt to create a new app or look one up
   // If not logged in, display what the workshop is about and prompt a login
   // Figure out if there's any apps
 
-  if (isLoading) {
-    return (
-      <div>
-        i am loading
-        <Spinner />
-      </div>
-    );
-  } else if (isNotLoggedIn) {
-    return (
-      <IntroCard
-        networkName={networkName || ""}
-        onLogin={() => {
-          login();
+  return (
+    <Card className="mx-auto mt-4 w-[350px]">
+      <CreateAppModal
+        show={showModal}
+        openChange={(e) => {
+          setShowModal(e);
         }}
       />
-    );
-  }
+      <CardHeader>
+        <div className="mx-auto">
+          <Drill className="h-12 w-12" />
+        </div>
+        <CardTitle>Workshop</CardTitle>
+        <CardDescription>
+          {`The workshop app allows developers to deploy apps on the ${
+            networkName ? `${networkName} ` : ""
+          }network.`}
+        </CardDescription>
 
-  return (
-    <div>
-      <div className="p-4">Current user: {currentUser}</div>
-      <Button
-        onClick={() => {
-          navigate("/app/derp");
-        }}
-      >
-        Go to derp
-      </Button>
-    </div>
+        <CardDescription>
+          {isLoggedIn ? "Add an app to continue" : "Login to continue"}
+        </CardDescription>
+        <CardFooter className="flex justify-end">
+          {isLoggedIn ? (
+            <Button
+              onClick={() => {
+                setShowModal(true);
+              }}
+            >
+              Add app
+            </Button>
+          ) : (
+            <LoginButton />
+          )}
+        </CardFooter>
+      </CardHeader>
+    </Card>
   );
 };

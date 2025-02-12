@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/dialog";
 import { CreateAppForm } from "./create-app-form";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useNavigate } from "react-router-dom";
 
 export const CreateAppModal = ({
@@ -16,8 +15,7 @@ export const CreateAppModal = ({
   show: boolean;
   openChange: (show: boolean) => void;
 }) => {
-  const { data: currentUser } = useCurrentUser();
-  const { addApp } = useTrackedApps(currentUser);
+  const { addApp } = useTrackedApps();
 
   const navigate = useNavigate();
 

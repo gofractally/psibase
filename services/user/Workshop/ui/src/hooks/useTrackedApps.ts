@@ -2,17 +2,18 @@ import { z } from "zod";
 import { Account } from "@/lib/zodTypes";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { useLocation } from "react-router-dom";
+import { useCurrentApp } from "./useCurrentApp";
+import { useEffect } from "react";
 
 type AccountType = z.infer<typeof Account>;
 
 const AppItem = z.object({
   account: Account,
-  owner: Account,
 });
 
 export const Apps = AppItem.array();
 
-export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
+export const useTrackedApps = () => {
   const [apps, setApps] = useLocalStorage<z.infer<typeof Apps>>(
     "trackedApps",
     []
@@ -20,6 +21,23 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
 
   const location = useLocation();
 
+  const currentApp = useCurrentApp();
+
+  useEffect(() => {
+    const firstApp = apps[0];
+
+    if (firstApp && firstApp.account !== currentApp) {
+      console.log("current app is not the first app");
+      const currentAppStored = apps.find((app) => app.account === currentApp);
+      if (currentAppStored) {
+        console.log("current app is stored already...");
+        setApps((preExistingApps) => [
+          currentAppStored,
+          ...preExistingApps.filter((app) => app.account !== currentApp),
+        ]);
+      }
+    }
+  }, [currentApp, apps, setApps]);
   console.log(location, "is the location");
 
   const addApp = (newApp: AccountType): void => {
@@ -28,10 +46,7 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
       console.warn("Tried adding an app already tracked in local storage");
       return;
     }
-    setApps((apps) => [
-      { account: newApp, owner: Account.parse(currentUser) },
-      ...apps,
-    ]);
+    setApps((apps) => [{ account: newApp }, ...apps]);
   };
 
   const removeApp = (appBeingRemoved: AccountType) => {
@@ -49,6 +64,6 @@ export const useTrackedApps = (currentUser: AccountType | null | undefined) => {
   return {
     addApp,
     removeApp,
-    apps: apps.filter((app) => app.owner == currentUser),
+    apps,
   };
 };

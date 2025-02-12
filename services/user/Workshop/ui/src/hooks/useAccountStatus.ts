@@ -2,7 +2,12 @@ import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountNameStatus = z.enum(["Available", "Taken", "Invalid", "Loading"]);
+export const AccountNameStatus = z.enum([
+  "Available",
+  "Taken",
+  "Invalid",
+  "Loading",
+]);
 const GetAccountReturn = z
   .object({
     accountNum: z.string(),

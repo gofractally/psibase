@@ -45,7 +45,7 @@ export const CreateAppForm = ({ onSubmit }: Props) => {
           name="appName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>App name</FormLabel>
+              <FormLabel>App account name</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>

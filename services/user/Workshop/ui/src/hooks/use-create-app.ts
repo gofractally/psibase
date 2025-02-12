@@ -1,7 +1,9 @@
 import { Account } from "@/lib/zodTypes";
+import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { AccountNameStatus } from "./useAccountStatus";
 
 export const useCreateApp = () =>
   useMutation<void, Error, string>({
@@ -16,6 +18,10 @@ export const useCreateApp = () =>
     },
     onSuccess: (_, accountName) => {
       toast.success(`Created app ${accountName}`);
+      queryClient.setQueryData(
+        ["userAccount", accountName],
+        () => AccountNameStatus.Enum.Taken
+      );
     },
     onError: (error) => {
       if (error instanceof Error) {

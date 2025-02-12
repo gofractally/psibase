@@ -18,13 +18,11 @@ export const CreateAppAccountCard = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{currentApp} not found</CardTitle>
+        <CardTitle>Account not found</CardTitle>
       </CardHeader>
-      <CardContent>
-        <p>
-          {currentApp} is not currently an app, continue to create and list on
-          the registry{" "}
-        </p>
+      <CardContent className="text-muted-foreground">
+        Account {currentApp} does not exist, click continue to create{" "}
+        <span className="text-primary"> {currentApp}</span> as an app.
       </CardContent>
       <CardFooter>
         {error && <div className="text-destructive">{error.message}</div>}
@@ -34,7 +32,7 @@ export const CreateAppAccountCard = () => {
             createApp(currentApp);
           }}
         >
-          Create app
+          Create account
         </Button>
       </CardFooter>
     </Card>
