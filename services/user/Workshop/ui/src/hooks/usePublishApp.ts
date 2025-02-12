@@ -1,11 +1,10 @@
+import { Account } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountId = z.string();
-
 const Params = z.object({
-  account: AccountId,
+  account: Account,
   publish: z.boolean(),
 });
 

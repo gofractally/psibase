@@ -1,11 +1,11 @@
+import { Account } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { z } from "zod";
 
-const AccountId = z.string();
-
 const Params = z.object({
-  account: AccountId,
+  account: Account,
   enableSpa: z.boolean(),
 });
 
@@ -23,5 +23,8 @@ export const useSpa = () =>
       });
 
       return null;
+    },
+    onSuccess: (_, { account, enableSpa }) => {
+      toast.success(`${enableSpa ? "Enabled" : "Disabled"} SPA on ${account}`);
     },
   });

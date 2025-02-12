@@ -1,17 +1,16 @@
+import { Account } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-const AccountId = z.string();
-
 const Params = z.object({
-  account: AccountId,
+  account: Account,
   enableCache: z.boolean(),
 });
 
-export const useSpa = () =>
+export const useSetCacheMode = () =>
   useMutation<null, Error, z.infer<typeof Params>>({
-    mutationKey: ["spa"],
+    mutationKey: ["cacheMode"],
     mutationFn: async (params) => {
       const { account, enableCache } = Params.parse(params);
 

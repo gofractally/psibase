@@ -18,6 +18,8 @@ import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CreateAppAccountCard } from "./create-app-account-card";
 import { Account } from "@/lib/zodTypes";
+import { ControlPanel } from "./control-panel";
+import { FileUploader } from "./file-uploader";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -104,44 +106,52 @@ export const Workshop = () => {
     );
   } else
     return (
-      <div className="mt-4 mx-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between">
-            <div className="text-lg font-semibold text-center">
-              {currentApp}
-            </div>
-            {isSuccess && (
-              <div className="flex gap-2">
-                <div className="flex flex-col justify-center">
-                  <Label>Publish</Label>
-                </div>
-                <Switch
-                  checked={isAppPublished}
-                  disabled={isPublishingApp}
-                  onCheckedChange={(checked) =>
-                    handleChecked(checked, Account.parse(currentApp))
-                  }
-                />
+      <div className="grid p-4 grid-cols-3 gap-2">
+        <div className="">
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between">
+              <div className="text-lg font-semibold text-center">
+                {currentApp}
               </div>
+              {isSuccess && (
+                <div className="flex gap-2">
+                  <div className="flex flex-col justify-center">
+                    <Label>Publish</Label>
+                  </div>
+                  <Switch
+                    checked={isAppPublished}
+                    disabled={isPublishingApp}
+                    onCheckedChange={(checked) =>
+                      handleChecked(checked, Account.parse(currentApp))
+                    }
+                  />
+                </div>
+              )}
+            </div>
+
+            {isSuccess && (
+              <MetaDataForm
+                key={currentApp}
+                existingValues={metadata ? metadata.appMetadata : undefined}
+                onSubmit={async (x) => {
+                  await updateMetadata({
+                    metadata: {
+                      ...x,
+                      owners: [],
+                    },
+                    account: Account.parse(currentApp),
+                  });
+                  return x;
+                }}
+              />
             )}
           </div>
-
-          {isSuccess && (
-            <MetaDataForm
-              key={currentApp}
-              existingValues={metadata ? metadata.appMetadata : undefined}
-              onSubmit={async (x) => {
-                await updateMetadata({
-                  metadata: {
-                    ...x,
-                    owners: [],
-                  },
-                  account: Account.parse(currentApp),
-                });
-                return x;
-              }}
-            />
-          )}
+        </div>
+        <div>
+          <FileUploader />
+        </div>
+        <div>
+          <ControlPanel />
         </div>
       </div>
     );

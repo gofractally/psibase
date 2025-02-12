@@ -3,12 +3,7 @@ import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-export const AccountNameStatus = z.enum([
-  "Available",
-  "Taken",
-  "Invalid",
-  "Loading",
-]);
+export const AccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 const GetAccountReturn = z
   .object({
     accountNum: z.string(),
@@ -32,6 +27,7 @@ export const isAccountAvailable = async (
 
     return AccountNameStatus.parse(res ? "Taken" : "Available");
   } catch (e) {
+    // TODO: read this error, actually throw if there's something wrong, other than being invalid
     console.error(e);
     return AccountNameStatus.parse("Invalid");
   }
@@ -45,5 +41,4 @@ export const useAccountStatus = (account: string | undefined) =>
     },
     staleTime: 10000,
     enabled: !!account,
-    initialData: "Loading",
   });
