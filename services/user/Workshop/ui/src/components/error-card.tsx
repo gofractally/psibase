@@ -21,7 +21,6 @@ export const ErrorCard = ({ error, retry }: Props) => {
           <TriangleAlert className="h-12 w-12 text-destructive" />
         </div>
         <CardTitle>Uh oh</CardTitle>
-        <CardDescription>An error occured.</CardDescription>
         <CardDescription>{error.message}</CardDescription>
         {retry && (
           <CardFooter className="flex justify-end">

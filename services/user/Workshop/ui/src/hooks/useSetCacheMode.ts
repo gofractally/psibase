@@ -5,20 +5,20 @@ import { z } from "zod";
 
 const Params = z.object({
   account: Account,
-  publish: z.boolean(),
+  enableCache: z.boolean(),
 });
 
-export const usePublishApp = () =>
+export const useSetCacheMode = () =>
   useMutation<null, Error, z.infer<typeof Params>>({
-    mutationKey: ["publishApp"],
+    mutationKey: ["cacheMode"],
     mutationFn: async (params) => {
-      const { account, publish } = Params.parse(params);
+      const { account, enableCache } = Params.parse(params);
 
       await supervisor.functionCall({
-        method: publish ? "publishApp" : "unpublishApp",
-        params: [account],
+        method: "setCacheMode",
+        params: [account, enableCache],
         service: "workshop",
-        intf: "registry",
+        intf: "app",
       });
 
       return null;

@@ -1,9 +1,42 @@
 import { createBrowserRouter } from "react-router-dom";
-import App from "./App";
+import { Workshop } from "./components/Workshop";
+import { Layout } from "./components/layout";
+import { ProtectedRoute } from "./components/protected-route";
+import { Loader } from "./components/Loader";
 
-export default createBrowserRouter([
+export const router = createBrowserRouter([
   {
     path: "/",
-    element: <App />,
+    element: <Loader />,
+  },
+  {
+    path: "/app",
+    element: <Layout />,
+    children: [
+      {
+        path: ":appName",
+        element: (
+          <ProtectedRoute>
+            <Workshop />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ":appName/support",
+        element: (
+          <ProtectedRoute>
+            <div>Support Page</div>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ":appName/pending-requests",
+        element: (
+          <ProtectedRoute>
+            <div>Pending Requests Page</div>
+          </ProtectedRoute>
+        ),
+      },
+    ],
   },
 ]);

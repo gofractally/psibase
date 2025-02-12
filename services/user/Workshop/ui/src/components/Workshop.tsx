@@ -1,6 +1,3 @@
-import { useLoggedInUser } from "@/hooks/useLoggedInUser";
-import { Button } from "./ui/button";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 import {
   appMetadataQueryKey,
@@ -11,14 +8,18 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { MetaDataForm } from "./metadata-form";
 import { usePublishApp } from "@/hooks/usePublishApp";
-import { queryClient } from "@/main";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Label } from "./ui/label";
 import { Spinner } from "./ui/spinner";
-import { useBranding } from "@/hooks/useBranding";
 import { ErrorCard } from "./error-card";
-import { IntroCard } from "./intro-card";
+import { queryClient } from "@/queryClient";
+import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { useAccountStatus } from "@/hooks/useAccountStatus";
+import { CreateAppAccountCard } from "./create-app-account-card";
+import { Account } from "@/lib/zodTypes";
+import { ControlPanel } from "./control-panel";
+import { FileUploader } from "./file-uploader";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -40,22 +41,22 @@ const setCacheData = (appName: string, checked: boolean) => {
 };
 
 export const Workshop = () => {
-  const {
-    data: currentUser,
-    isFetched: isFetchedUser,
-    error: loggedInUserError,
-  } = useLoggedInUser();
+  const currentApp = useCurrentApp();
+
   const {
     data: metadata,
+    isLoading,
     isSuccess,
     error: metadataError,
-  } = useAppMetadata(currentUser);
+  } = useAppMetadata(currentApp);
 
-  const { data: networkName } = useBranding();
+  const { data: accountStatus } = useAccountStatus(currentApp);
+  const invalidAccountError =
+    accountStatus == "Invalid" ? new Error(`Invalid account name`) : undefined;
 
-  const { mutateAsync: login } = useCreateConnectionToken();
   const { mutateAsync: updateMetadata } = useSetMetadata();
-  const { mutateAsync: publishApp } = usePublishApp();
+  const { mutateAsync: publishApp, isPending: isPublishingApp } =
+    usePublishApp();
 
   const handleChecked = async (checked: boolean, appName: string) => {
     try {
@@ -82,21 +83,10 @@ export const Workshop = () => {
     ? metadata.extraMetadata.status == Status.Enum.published
     : false;
 
-  const error = loggedInUserError || metadataError;
-  const isLoading = !isSuccess;
-  const isNotLoggedIn = currentUser === null && isFetchedUser;
+  const error = metadataError || invalidAccountError;
 
   if (error) {
     return <ErrorCard error={error} />;
-  } else if (isNotLoggedIn) {
-    return (
-      <IntroCard
-        networkName={networkName}
-        onLogin={() => {
-          login();
-        }}
-      />
-    );
   } else if (isLoading) {
     return (
       <div className="h-dvh w-full flex justify-center">
@@ -104,58 +94,64 @@ export const Workshop = () => {
           <div className="w-full flex justify-center">
             <Spinner size="lg" className="bg-black text-center dark:bg-white" />
           </div>
-          <div>
-            {isFetchedUser
-              ? "Fetching app metadata..."
-              : "Fetching account status..."}
-          </div>
+          <div>Fetching app metadata...</div>
         </div>
+      </div>
+    );
+  } else if (accountStatus == "Available") {
+    return (
+      <div className="mx-auto p-4 max-w-screen-md">
+        <CreateAppAccountCard />
       </div>
     );
   } else
     return (
-      <div className="mt-4 mx-4">
-        <div className="flex flex-col gap-4">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              login();
-            }}
-          >
-            Change app
-          </Button>
-          <div className="flex justify-between">
-            <div className="text-lg font-semibold text-center">
-              {currentUser}
-            </div>
-            {isSuccess && (
-              <div className="flex gap-2">
-                <div className="flex flex-col justify-center">
-                  <Label>Publish</Label>
-                </div>
-                <Switch
-                  checked={isAppPublished}
-                  disabled={!currentUser}
-                  onCheckedChange={(checked) =>
-                    handleChecked(checked, z.string().parse(currentUser))
-                  }
-                />
+      <div className="grid p-4 grid-cols-3 gap-2">
+        <div className="">
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-between">
+              <div className="text-lg font-semibold text-center">
+                {currentApp}
               </div>
+              {isSuccess && (
+                <div className="flex gap-2">
+                  <div className="flex flex-col justify-center">
+                    <Label>Publish</Label>
+                  </div>
+                  <Switch
+                    checked={isAppPublished}
+                    disabled={isPublishingApp}
+                    onCheckedChange={(checked) =>
+                      handleChecked(checked, Account.parse(currentApp))
+                    }
+                  />
+                </div>
+              )}
+            </div>
+
+            {isSuccess && (
+              <MetaDataForm
+                key={currentApp}
+                existingValues={metadata ? metadata.appMetadata : undefined}
+                onSubmit={async (x) => {
+                  await updateMetadata({
+                    metadata: {
+                      ...x,
+                      owners: [],
+                    },
+                    account: Account.parse(currentApp),
+                  });
+                  return x;
+                }}
+              />
             )}
           </div>
-
-          {isSuccess && (
-            <MetaDataForm
-              existingValues={metadata ? metadata.appMetadata : undefined}
-              onSubmit={async (x) => {
-                await updateMetadata({
-                  ...x,
-                  owners: [],
-                });
-                return x;
-              }}
-            />
-          )}
+        </div>
+        <div>
+          <FileUploader />
+        </div>
+        <div>
+          <ControlPanel />
         </div>
       </div>
     );

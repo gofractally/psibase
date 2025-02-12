@@ -1,7 +1,7 @@
 import { siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "@/lib/modifyUrlParams";
 import { z } from "zod";
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 
 export const useCreateConnectionToken = () =>
@@ -16,11 +16,10 @@ export const useCreateConnectionToken = () =>
         })
       ),
     onSuccess: (token) => {
-      window.location.href = modifyUrlParams(
-        siblingUrl(undefined, "accounts"),
-        {
+      window.open(
+        modifyUrlParams(siblingUrl(undefined, "accounts"), {
           token,
-        }
+        })
       );
     },
   });

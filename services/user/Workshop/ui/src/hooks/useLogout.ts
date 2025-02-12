@@ -1,9 +1,10 @@
+import { supervisor } from "@/supervisor";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-
-import { supervisor } from "@/main";
+import { useExpectCurrentUser } from "./useExpectCurrentUser";
 
 export const useLogout = () => {
   const queryClient = useQueryClient();
+  const [_, setExpectCurrentUser] = useExpectCurrentUser();
 
   return useMutation({
     mutationKey: ["logout"],
@@ -15,7 +16,8 @@ export const useLogout = () => {
         intf: "activeApp",
       }),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+      setExpectCurrentUser(false);
+      queryClient.setQueryData(["loggedInUser"], null);
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
       }, 2500);
