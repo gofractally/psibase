@@ -12,7 +12,7 @@ namespace arbtrie
    static constexpr bool debug_cache = false;
    static constexpr bool debug_invariant = true;
    static constexpr bool debug_roots = false;
-   static constexpr bool debug_memory = false;
+   static constexpr bool debug_memory = true;
 
    struct scope
    {

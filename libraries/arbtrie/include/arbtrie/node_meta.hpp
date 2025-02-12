@@ -27,9 +27,9 @@ namespace arbtrie
       //bitfield = 8,
       //merge    = 9,  // delta applied to existing node
    };
-   static constexpr int num_types = 7;
-   static const char* node_type_names[] = {"freelist", "binary", "value",
-                                           "setlist",  "full",   "bitset", "undefined"};
+   static constexpr int num_types         = 7;
+   static const char*   node_type_names[] = {"freelist", "binary", "value",    "setlist",
+                                             "full",     "bitset", "undefined"};
 
    inline std::ostream& operator<<(std::ostream& out, node_type t)
    {
@@ -107,13 +107,14 @@ namespace arbtrie
        */
       struct bitfield
       {
-         uint64_t ref : 14       = 0;
-         uint64_t type : 3       = 0;
-         uint64_t read : 1       = 0; // indicates someone read this node since last cleared
-         uint64_t copy_flag : 1  = 0;  // set this bit on start of copy, clear it on start of modify
-         uint64_t modify_flag : 1 = 0;  // 0 when modifying, 1 when not
-         // gives 1024 TB addressable cachelines
-         uint64_t location : 44 = 0;
+         uint64_t ref : 14      = 0;
+         uint64_t type : 3      = 0;
+         uint64_t read : 1      = 0;  // indicates someone read this node since last cleared
+         uint64_t copy_flag : 1 = 0;  // set this bit on start of copy, clear it on start of modify
+         uint64_t modify_flag : 1   = 0;  // 0 when modifying, 1 when not
+         uint64_t pending_cache : 1 = 0;  // indicates this node is pending cache update
+         // gives 512 TB addressable cachelines
+         uint64_t location : 43 = 0;
 
          constexpr bitfield& from_int(uint64_t i)
          {
@@ -146,13 +147,14 @@ namespace arbtrie
      public:
       using temp_type = node_meta<uint64_t>;
 
-      static constexpr const int     location_offset = 20;
-      static constexpr const uint64_t ref_mask      = make_mask<0, 14>();
-      static constexpr const uint64_t type_mask     = make_mask<14, 3>();
-      static constexpr const uint64_t read_mask     = make_mask<17, 1>();
-      static constexpr const uint64_t copy_mask     = make_mask<18, 1>();
-      static constexpr const uint64_t modify_mask   = make_mask<19, 1>();
-      static constexpr const uint64_t location_mask = make_mask<location_offset, 44>();
+      static constexpr const int      location_offset    = 21;
+      static constexpr const uint64_t ref_mask           = make_mask<0, 14>();
+      static constexpr const uint64_t type_mask          = make_mask<14, 3>();
+      static constexpr const uint64_t read_mask          = make_mask<17, 1>();
+      static constexpr const uint64_t copy_mask          = make_mask<18, 1>();
+      static constexpr const uint64_t modify_mask        = make_mask<19, 1>();
+      static constexpr const uint64_t pending_cache_mask = make_mask<20, 1>();
+      static constexpr const uint64_t location_mask      = make_mask<location_offset, 43>();
 
       /**
        *  Because retain() uses fetch_add() there is a possability of
@@ -187,24 +189,78 @@ namespace arbtrie
       bool          is_const() const { return not is_changing(); }
       bool          is_copying() const { return to_int() & copy_mask; }
       bool          is_read() const { return to_int() & read_mask; }
+      bool          is_pending_cache() const { return to_int() & pending_cache_mask; }
       uint16_t      ref() const { return bitfield(to_int()).ref; }
       node_location loc() const { return node_location::from_aligned(bitfield(to_int()).location); }
       node_type     type() const { return node_type(bitfield(to_int()).type); }
 
-      auto& set_read() {
-         _meta |= read_mask;
+      auto& set_pending_cache()
+      {
+         if constexpr (std::is_same_v<Storage, std::atomic<uint64_t>>)
+            _meta.fetch_or(pending_cache_mask, std::memory_order_relaxed);
+         else
+            _meta |= pending_cache_mask;
          return *this;
       }
 
-      bool try_set_read( temp_type expect ) {
-         auto e = expect.to_int();
-         auto next = e | read_mask;
-         if constexpr (std::is_same_v<Storage, uint64_t>) {
-            _meta = next;
+      auto& set_read()
+      {
+         if constexpr (std::is_same_v<Storage, std::atomic<uint64_t>>)
+            _meta.fetch_or(read_mask, std::memory_order_relaxed);
+         else
+            _meta |= read_mask;
+         return *this;
+      }
+
+      auto& clear_read_bit(std::memory_order order = std::memory_order_relaxed)
+      {
+         if constexpr (std::is_same_v<Storage, std::atomic<uint64_t>>)
+            _meta.fetch_and(~read_mask, order);
+         else
+            _meta &= ~read_mask;
+         return *this;
+      }
+
+      auto& start_pending_cache()
+      {
+         if constexpr (std::is_same_v<Storage, std::atomic<uint64_t>>)
+            _meta.fetch_or(pending_cache_mask, std::memory_order_relaxed);
+         else
+            _meta |= pending_cache_mask;
+         return *this;
+      }
+
+      auto& end_pending_cache()
+      {
+         if constexpr (std::is_same_v<Storage, std::atomic<uint64_t>>)
+            _meta.fetch_and(~(read_mask | pending_cache_mask), std::memory_order_relaxed);
+         else
+            _meta &= ~(read_mask | pending_cache_mask);
+         return *this;
+      }
+
+      /**
+       * Attempts to set the read bit atomically.
+       * @return true if and only if the read bit was successfully changed from 0 to 1 
+       *         via a successful compare and exchange operation.
+       *         Returns false if the read bit was already set, if the pending_cache bit was set,
+       *         or if the compare/exchange failed.
+       */
+      bool try_set_read()
+      {
+         if constexpr (std::is_same_v<Storage, uint64_t>)
+         {
+            _meta |= read_mask;
             return true;
          }
-         else 
-            return _meta.compare_exchange_weak( e, next, std::memory_order_relaxed, std::memory_order_relaxed );
+         else
+         {
+            auto e    = _meta.load(std::memory_order_relaxed);
+            auto next = e | read_mask;
+            return ((e & (read_mask | pending_cache_mask)) == 0) &&
+                   _meta.compare_exchange_weak(e, next, std::memory_order_relaxed,
+                                               std::memory_order_relaxed);
+         }
       }
 
       auto& set_ref(uint16_t ref)
@@ -212,17 +268,18 @@ namespace arbtrie
          assert(ref < max_ref_count);
          if constexpr (std::is_same_v<Storage, uint64_t>)
             _meta = bitfield(to_int()).set_ref(ref).to_int();
-         else { 
-
+         else
+         {
             bitfield bf(0);
             bf.set_ref(ref);
             uint64_t bfi = bf.to_int() & ref_mask;
 
             uint64_t desired;
-            auto expect = _meta.load( std::memory_order_relaxed );
-            do {
+            auto     expect = _meta.load(std::memory_order_relaxed);
+            do
+            {
                desired = (expect & ~(ref_mask)) | bfi;
-            } while( not _meta.compare_exchange_weak( expect, desired, std::memory_order_relaxed) );
+            } while (not _meta.compare_exchange_weak(expect, desired, std::memory_order_relaxed));
          }
          return *this;
       }
@@ -231,8 +288,9 @@ namespace arbtrie
       {
          if constexpr (std::is_same_v<Storage, uint64_t>)
             _meta = bitfield(to_int()).set_type(t).to_int();
-         else {
-            static_assert( false, "not an atomic operation" );
+         else
+         {
+            static_assert(false, "not an atomic operation");
          }
          return *this;
       }
@@ -240,27 +298,30 @@ namespace arbtrie
       {
          if constexpr (std::is_same_v<Storage, uint64_t>)
             _meta = bitfield(to_int()).set_location(nl).to_int();
-         else 
-            static_assert( false, "not an atomic operation" );
+         else
+            static_assert(false, "not an atomic operation");
          return *this;
       }
 
-      node_meta& set_location_and_type( node_location l, node_type t, auto memory_order ) {
+      node_meta& set_location_and_type(node_location l, node_type t, auto memory_order)
+      {
          if constexpr (std::is_same_v<Storage, uint64_t>)
             return set_location(l).set_type(t);
-         else {
+         else
+         {
             bitfield bf(0);
             bf.set_type(t);
             bf.set_location(l);
-            uint64_t bfi = bf.to_int() & (location_mask|type_mask);
+            uint64_t bfi = bf.to_int() & (location_mask | type_mask);
 
             uint64_t desired;
-            auto expect = _meta.load( std::memory_order_relaxed );
-            do {
-               desired = (expect & ~(location_mask|type_mask)) | bfi;
-            } while( not _meta.compare_exchange_weak( expect, desired, memory_order ) );
-            assert( type() == t );
-            assert( loc() == l );
+            auto     expect = _meta.load(std::memory_order_relaxed);
+            do
+            {
+               desired = (expect & ~(location_mask | type_mask)) | bfi;
+            } while (not _meta.compare_exchange_weak(expect, desired, memory_order));
+            assert(type() == t);
+            assert(loc() == l);
          }
          return *this;
       }
@@ -277,7 +338,7 @@ namespace arbtrie
       }
       auto exchange(temp_type v, std::memory_order memory_order = std::memory_order_relaxed)
       {
-         return temp_type( _meta.exchange(v.to_int(), memory_order) );
+         return temp_type(_meta.exchange(v.to_int(), memory_order));
       }
 
       void store(temp_type v, std::memory_order memory_order = std::memory_order_relaxed)
@@ -307,13 +368,14 @@ namespace arbtrie
       // returns the state prior to start modify
       temp_type start_modify()
       {
-         do {
-            uint64_t prior = _meta.fetch_or( modify_mask, std::memory_order_acquire );
-            if (not (prior & copy_mask) )
+         do
+         {
+            uint64_t prior = _meta.fetch_or(modify_mask, std::memory_order_acquire);
+            if (not(prior & copy_mask))
                return temp_type(prior);
 
             _meta.wait(prior | modify_mask);
-         } while( true );
+         } while (true);
       }
 
       temp_type end_modify()
@@ -330,9 +392,10 @@ namespace arbtrie
          return prior;
       }
 
-      bool end_move() {
+      bool end_move()
+      {
          auto prior = _meta.fetch_and(~copy_mask, std::memory_order_release);
-         if( prior & modify_mask )
+         if (prior & modify_mask)
             _meta.notify_all();
          return false;
       }
@@ -342,22 +405,62 @@ namespace arbtrie
        */
       bool try_start_move(node_location expected)
       {
-         do {
-            uint64_t prior = _meta.load( std::memory_order_relaxed );
-            do {
+         do
+         {
+            uint64_t prior = _meta.load(std::memory_order_relaxed);
+            do
+            {
                temp_type meta(prior);
 
-               if( not meta.ref() or meta.loc() != expected ) [[unlikely]] 
+               if (not meta.ref() or meta.loc() != expected) [[unlikely]]
                   return end_move();
 
-            } while( not _meta.compare_exchange_weak( prior, prior | copy_mask, 
-                                                  std::memory_order_acquire ) );
+            } while (not _meta.compare_exchange_weak(prior, prior | copy_mask,
+                                                     std::memory_order_acquire));
 
-            if( not temp_type(prior).is_changing() ) 
+            if (not temp_type(prior).is_changing())
                return true;
 
-            _meta.wait( prior, std::memory_order_relaxed );
-         } while ( true );
+            _meta.wait(prior, std::memory_order_relaxed);
+         } while (true);
+      }
+
+      /**
+       * Attempts to set the copy bit and returns the current location if successful.
+       * Returns std::nullopt if the reference count is 0 or if unable to set the copy bit.
+       */
+      std::optional<node_location> try_move_location()
+      {
+         uint64_t prior = _meta.load(std::memory_order_relaxed);
+         do
+         {
+            temp_type meta(prior);
+            if (not meta.ref()) [[unlikely]]
+            {
+               //   TRIEDENT_DEBUG("try_move_location: ref count is 0");
+               return std::nullopt;
+            }
+            if (not meta.is_pending_cache()) [[unlikely]]
+            {
+               //  TRIEDENT_DEBUG("try_move_location: pending_cache bit is not set");
+               return std::nullopt;
+            }
+
+            // Try to set the copy bit
+            if (not _meta.compare_exchange_weak(prior, prior | copy_mask,
+                                                std::memory_order_acquire))
+            {
+               continue;
+            }
+
+            // If we got here, we successfully set the copy bit
+            if (not temp_type(prior).is_changing())
+               return meta.loc();
+
+            // If the node is being modified, clear the copy bit and try again
+            _meta.fetch_and(~copy_mask, std::memory_order_release);
+            _meta.wait(prior, std::memory_order_relaxed);
+         } while (true);
       }
 
       enum move_result : int_fast8_t
@@ -376,7 +479,7 @@ namespace arbtrie
        */
       move_result try_move(node_location expect_loc, node_location new_loc)
       {
-         uint64_t expected = _meta.load( std::memory_order_relaxed );
+         uint64_t  expected = _meta.load(std::memory_order_relaxed);
          temp_type ex;
          do
          {
@@ -395,7 +498,7 @@ namespace arbtrie
          } while (
              not _meta.compare_exchange_weak(expected, ex.to_int(), std::memory_order_release));
 
-         if( expected & modify_mask ) [[unlikely]]
+         if (expected & modify_mask) [[unlikely]]
             _meta.notify_all();
 
          //mut().unlock();
@@ -425,9 +528,9 @@ namespace arbtrie
          if (prior.ref() > node_meta::max_ref_count) [[unlikely]]
          {
             _meta.fetch_sub(1, std::memory_order_relaxed);
-            throw std::runtime_error( "reference count exceeded limits" );
+            throw std::runtime_error("reference count exceeded limits");
          }
-         assert( prior.ref() > 0 );
+         assert(prior.ref() > 0);
          return true;
       }
       temp_type release()
@@ -452,10 +555,12 @@ namespace arbtrie
          assert(prior.ref() != 0);
          if constexpr (debug_memory)
          {
+            //  if (prior.ref() == 1 and prior.is_pending_cache())
+            //     TRIEDENT_WARN("release node in pending cache");
             // no one should use meta.  Setting it to 0
-          //  if (prior.ref() == 1)
-          //     _meta.store(0, std::memory_order_relaxed);
-            if (prior.ref() == 0) 
+            //  if (prior.ref() == 1)
+            //     _meta.store(0, std::memory_order_relaxed);
+            if (prior.ref() == 0)
                abort();
          }
          return prior;

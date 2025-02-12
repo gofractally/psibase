@@ -1,11 +1,12 @@
 #pragma once
-#include <arbtrie/mapped_memory.hpp>
+#include <arbtrie/circular_buffer.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/id_alloc.hpp>
+#include <arbtrie/mapped_memory.hpp>
 #include <arbtrie/mapping.hpp>
 #include <arbtrie/node_header.hpp>
-#include <arbtrie/sync_lock.hpp>
 #include <arbtrie/segment_read_stats.hpp>
+#include <arbtrie/sync_lock.hpp>
 #include <thread>
 
 /**
@@ -207,7 +208,10 @@ namespace arbtrie
                template <typename T = node_header, bool SetReadBit = false>
                const T* header() const;
 
-               template <typename Type, bool SetReadBit=false>
+               template <typename T = node_header>
+               std::pair<const T*, node_location> try_move_header();
+
+               template <typename Type, bool SetReadBit = false>
                const Type* as() const;
 
                void store(temp_meta_type tmt, auto memory_order);
@@ -221,6 +225,8 @@ namespace arbtrie
 
                void            prefetch() { __builtin_prefetch(&_meta, 1, 1); }
                node_meta_type& meta() { return _meta; }
+
+               void maybe_update_read_stats() const;
 
               protected:
                friend class seg_allocator;
@@ -236,16 +242,10 @@ namespace arbtrie
                fast_meta_address                  _address;
             };  // object_ref
 
-            object_ref alloc(id_region reg,
-                                          uint32_t  size,
-                                          node_type type,
-                                          auto      initfunc);
+            object_ref alloc(id_region reg, uint32_t size, node_type type, auto initfunc);
 
             // fast_meta_address reuse,
-            object_ref realloc(object_ref& r,
-                                            uint32_t  size,
-                                            node_type type,
-                                            auto      initfunc);
+            object_ref realloc(object_ref& r, uint32_t size, node_type type, auto initfunc);
 
             /**
              * @defgroup Region Alloc Helpers
@@ -266,7 +266,7 @@ namespace arbtrie
             ~read_lock() { _session.release_read_lock(); }
 
             node_header* get_node_pointer(node_location);
-            void  update_read_stats(node_location, uint32_t node_size, uint64_t time);
+            void         update_read_stats(node_location, uint32_t node_size, uint64_t time);
 
             bool       is_synced(node_location);
             sync_lock& get_sync_lock(int seg);
@@ -308,25 +308,29 @@ namespace arbtrie
          session()               = delete;
          session(const session&) = delete;
 
-         void                                   unalloc(uint32_t size);
-         std::pair<node_location, node_header*> alloc_data(uint32_t size, fast_meta_address adr, uint64_t time = size_weighted_age::now());
+         void unalloc(uint32_t size);
+         std::pair<node_location, node_header*>
+         alloc_data(uint32_t size, fast_meta_address adr, uint64_t time = size_weighted_age::now());
 
          uint32_t _session_num;  // index into _sega's active sessions list
 
          segment_number                 _alloc_seg_num = -1ull;
          mapped_memory::segment_header* _alloc_seg_ptr = nullptr;
+         bool                           _in_alloc      = false;
 
          std::atomic<uint64_t>&              _session_lock_ptr;
          std::unique_ptr<segment_read_stat>& _segment_read_stat;
-         seg_allocator& _sega;
-         int            _nested_read_lock = 0;
+         seg_allocator&                      _sega;
+         int                                 _nested_read_lock = 0;
+         circular_buffer<1024 * 1024>&
+             _rcache_queue;  // Reference to the read cache queue from seg_allocator
       };
 
       session start_session() { return session(*this, alloc_session_num()); }
 
      private:
       friend class session;
-      std::optional<session> cses;
+      std::optional<session> _compactor_session;
 
       mapped_memory::segment_header* get_segment(segment_number seg) noexcept
       {
@@ -338,8 +342,14 @@ namespace arbtrie
 
       std::pair<segment_number, mapped_memory::segment_header*> get_new_segment();
 
+      void compact_loop2();
+      void aggregate_read_stats();
+
       void compact_loop();
       void compact_segment(session& ses, uint64_t seg_num);
+      void select_segments();
+      void sort_selected_segments();
+      void promote_rcache_data();
 
       /**
        * This must be called via a session because the session is responsible
@@ -383,10 +393,11 @@ namespace arbtrie
       // allocates new segments
       block_allocator _block_alloc;
 
-      // keeps track of the segments that are mlocked.... 
+      // keeps track of the segments that are mlocked....
       // TODO: this needs to get refactored
-      alignas(64) std::atomic<uint32_t> _total_mlocked = 0;
-      alignas(64) std::array<std::atomic<int32_t>, 256> _mlocked;
+      alignas(std::hardware_destructive_interference_size) std::atomic<uint32_t> _total_mlocked = 0;
+      alignas(std::hardware_destructive_interference_size)
+          std::array<std::atomic<int32_t>, 256> _mlocked;
 
       /**
        *  This is the highest the alloc_ptr is allowed to
@@ -398,10 +409,18 @@ namespace arbtrie
       uint64_t              get_min_read_ptr();
       void                  set_session_end_ptrs(uint32_t e);
 
+      // Track total bytes copied during promote_rcache_data operations
+      uint64_t _total_promoted_bytes{0};
+
+      // Difficulty threshold for read bit updates (0-4294967295)
+      std::atomic<uint32_t> _read_difficulty{uint32_t(-1) -
+                                             (uint32_t(-1) / 16)};  // 1 in 16 probability
+
       struct aligned_atomic64 : public std::atomic<uint64_t>
       {
-         uint64_t padding[7];
+         char padding[std::hardware_destructive_interference_size - sizeof(std::atomic<uint64_t>)];
       } __attribute__((__aligned__(8)));
+      static_assert(sizeof(aligned_atomic64) == std::hardware_destructive_interference_size);
 
       /**
        *  Lower 32 bits represent R* above
@@ -422,6 +441,22 @@ namespace arbtrie
        */
       std::array<std::unique_ptr<segment_read_stat>, 64> _session_seg_read_stats;
 
+      /**
+       * Each session has its own read cache queue to track read operations
+       * for promoting data during compaction.
+       */
+      std::array<std::unique_ptr<circular_buffer<1024 * 1024>>, 64> _rcache_queues;
+
+      struct sort_meta
+      {
+         uint32_t          seg_num;
+         uint32_t          read_frequency() const { return read_age.time_ms - unread_age.time_ms; }
+         uint32_t          unread_frequency(uint64_t now) { return now - unread_age.time_ms; }
+         size_weighted_age unread_age;
+         size_weighted_age read_age;
+         uint32_t          free_space;
+      };
+      std::vector<sort_meta> _filtered_segs;
 
       // to allocate a new session in thread-safe way you
       // load, find first non-zero bit, and attempt to set it via C&S,
@@ -429,11 +464,10 @@ namespace arbtrie
       // Reverse the process to free a session
       std::atomic<uint64_t> _free_sessions = -1ull;
 
-      std::atomic<bool> _done;
+      std::atomic<bool> _done = false;
 
       mapping                          _header_file;
       mapped_memory::allocator_header* _header;
-      bool                             _in_alloc = false;
       std::mutex                       _sync_mutex;
 
       std::vector<sync_lock> _seg_sync_locks;
@@ -456,7 +490,6 @@ namespace arbtrie
    };  // seg_allocator
 
    using object_ref = seg_allocator::session::read_lock::object_ref;
-
 
    // copy E to R*
    inline void seg_allocator::session::retain_read_lock()
@@ -499,8 +532,6 @@ namespace arbtrie
       if (not _released)
          unlock();
    }
-
-
 
 }  // namespace arbtrie
 #include <arbtrie/seg_allocator_object_ref.hpp>

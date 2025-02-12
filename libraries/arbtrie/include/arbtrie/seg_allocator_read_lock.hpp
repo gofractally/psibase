@@ -2,11 +2,10 @@ namespace arbtrie
 {
 
    /// @pre refcount of id is 1
-   inline object_ref seg_allocator::session::read_lock::realloc(
-       object_ref& oref,
-       uint32_t                 size,
-       node_type                type,
-       auto                     init)
+   inline object_ref seg_allocator::session::read_lock::realloc(object_ref& oref,
+                                                                uint32_t    size,
+                                                                node_type   type,
+                                                                auto        init)
    {
       auto adr = oref.address();
       assert(oref.meta().is_changing());
@@ -47,14 +46,14 @@ namespace arbtrie
    }
 
    inline object_ref seg_allocator::session::read_lock::alloc(id_region reg,
-                                                                           uint32_t  size,
-                                                                           node_type type,
-                                                                           auto      init)
+                                                              uint32_t  size,
+                                                              node_type type,
+                                                              auto      init)
    {
       if constexpr (debug_memory)
       {
-         assert(not _session._sega._in_alloc);
-         _session._sega._in_alloc = true;
+         assert(not _session._in_alloc);
+         _session._in_alloc = true;
       }
 
       assert(size >= sizeof(node_header));
@@ -81,7 +80,7 @@ namespace arbtrie
 
       if constexpr (debug_memory)
       {
-         _session._sega._in_alloc = false;
+         _session._in_alloc = false;
       }
 
       return object_ref(*this, id, atom);
@@ -90,7 +89,7 @@ namespace arbtrie
    inline bool seg_allocator::session::read_lock::is_synced(node_location loc)
    {
       int64_t seg = loc.segment();
-      return _session._sega._header->seg_meta[seg]._last_sync_pos.load(std::memory_order_relaxed) >
+      return _session._sega._header->seg_meta[seg].get_last_sync_pos() >
              loc.abs_index();  // - seg * segment_size;
    }
 
@@ -126,10 +125,11 @@ namespace arbtrie
       return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) +
                             loc.abs_index());
    }
-   inline void seg_allocator::session::read_lock::update_read_stats(node_location loc, 
-                                                                    uint32_t size, 
-                                                                    uint64_t time ) {
-      _session._segment_read_stat->read_bytes( loc.segment(), size, time );
+   inline void seg_allocator::session::read_lock::update_read_stats(node_location loc,
+                                                                    uint32_t      size,
+                                                                    uint64_t      time)
+   {
+      _session._segment_read_stat->read_bytes(loc.segment(), size, time);
    }
 
    inline void seg_allocator::session::read_lock::free_meta_node(fast_meta_address a)

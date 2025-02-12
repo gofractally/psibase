@@ -1,4 +1,5 @@
 #include <arbtrie/seg_allocator.hpp>
+#include <cassert>
 
 namespace arbtrie
 {
@@ -8,15 +9,20 @@ namespace arbtrie
          _alloc_seg_num(mv._alloc_seg_num),
          _alloc_seg_ptr(mv._alloc_seg_ptr),
          _session_lock_ptr(mv._session_lock_ptr),
-         _segment_read_stat(mv._segment_read_stat)
+         _segment_read_stat(mv._segment_read_stat),
+         _rcache_queue(mv._rcache_queue)
    {
       mv._session_num = -1;
    }
 
    seg_allocator::session::session(seg_allocator& a, uint32_t ses_num)
-       : _session_num(ses_num), _alloc_seg_num(-1ull), _alloc_seg_ptr(nullptr),
-       _session_lock_ptr(a._session_lock_ptrs[ses_num]),
-       _segment_read_stat(a._session_seg_read_stats[ses_num]),_sega(a)
+       : _session_num(ses_num),
+         _alloc_seg_num(-1ull),
+         _alloc_seg_ptr(nullptr),
+         _session_lock_ptr(a._session_lock_ptrs[ses_num]),
+         _segment_read_stat(a._session_seg_read_stats[ses_num]),
+         _sega(a),
+         _rcache_queue(*a._rcache_queues[ses_num])
    {
    }
 
@@ -40,7 +46,7 @@ namespace arbtrie
 
    std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t          size,
                                                                              fast_meta_address adr,
-                                                                             uint64_t          time )
+                                                                             uint64_t          time)
    {
       assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
       // A - if no segment get a new segment
@@ -54,7 +60,8 @@ namespace arbtrie
          //  {
          //     TRIEDENT_WARN("unable to get write lock on segment");
          //  }
-         _sega._header->seg_meta[_alloc_seg_num]._last_sync_pos.store(0, std::memory_order_relaxed);
+         //_sega._header->seg_meta[_alloc_seg_num].set_last_sync_pos(0);
+         _sega._header->seg_meta[_alloc_seg_num].start_alloc_segment();
       }
 
       auto* sh           = _alloc_seg_ptr;
@@ -65,6 +72,10 @@ namespace arbtrie
       auto spec_pos   = uint64_t(cur_apos) + rounded_size;
       auto free_space = segment_size - cur_apos;
 
+      // TODO: should we cache this pointer on the session rather
+      // than do several indirections...
+      auto& smeta = _sega._header->seg_meta[_alloc_seg_num];
+
       // B - if there isn't enough space, notify compactor go to A
       if (spec_pos > (segment_size - sizeof(node_header))) [[unlikely]]
       {
@@ -73,7 +84,8 @@ namespace arbtrie
             assert(cur_apos + sizeof(uint64_t) <= segment_size);
             memset(((char*)sh) + cur_apos, 0, sizeof(node_header));
          }
-         _sega._header->seg_meta[_alloc_seg_num].free(segment_size - sh->_alloc_pos);
+         //smeta.free(segment_size - sh->_alloc_pos);
+         smeta.finalize_segment(segment_size - sh->_alloc_pos);  // not alloc
          sh->_alloc_pos.store(uint32_t(-1), std::memory_order_release);
          _sega.push_dirty_segment(_alloc_seg_num);
          _alloc_seg_ptr = nullptr;
@@ -86,7 +98,7 @@ namespace arbtrie
       auto head = (node_header*)obj;
       head      = new (head) node_header(size, adr);
 
-      sh->_base_time.update( round_up_multiple<64>(size)/64, time );
+      smeta._base_time.update(round_up_multiple<64>(size) / 64, time);
 
       auto new_alloc_pos =
           rounded_size + sh->_alloc_pos.fetch_add(rounded_size, std::memory_order_relaxed);
@@ -113,12 +125,14 @@ namespace arbtrie
       }
    }
 
-   void      seg_allocator::session::sync(sync_type st)
+   void seg_allocator::session::sync(sync_type st)
    {
       _sega.push_dirty_segment(_alloc_seg_num);
       _sega.sync(st);
    }
 
-
-   uint64_t seg_allocator::session::count_ids_with_refs() { return _sega.count_ids_with_refs(); }
+   uint64_t seg_allocator::session::count_ids_with_refs()
+   {
+      return _sega.count_ids_with_refs();
+   }
 }  // namespace arbtrie

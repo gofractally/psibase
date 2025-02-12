@@ -1,3 +1,5 @@
+#pragma once
+#include <assert.h>
 namespace arbtrie
 {
 
@@ -14,7 +16,7 @@ namespace arbtrie
    {
    }
    inline void seg_allocator::session::read_lock::object_ref::store(temp_meta_type tmt,
-                                                                auto           memory_order)
+                                                                    auto           memory_order)
    {
       if constexpr (not debug_memory)
       {
@@ -37,16 +39,24 @@ namespace arbtrie
    const Type* seg_allocator::session::read_lock::object_ref::as() const
    {
       assert(header()->validate_checksum());
-      assert(Type::type == header<SetReadBit>()->get_type());
+      assert((Type::type == header<Type, SetReadBit>()->get_type()));
       return reinterpret_cast<const Type*>(header());
    };
 
-   inline auto seg_allocator::session::read_lock::object_ref::try_move(node_location expected_prior_loc,
-                                                                   node_location move_to_loc)
+   inline auto seg_allocator::session::read_lock::object_ref::try_move(
+       node_location expected_prior_loc,
+       node_location move_to_loc)
    {
       return _meta.try_move(expected_prior_loc, move_to_loc);
    }
 
+   /**
+    *  Returns the header pointer for the node.
+    *  Asserts that the node is valid and has a reference count greater than 0.
+    *  If debug_memory is enabled, it also validates the checksum of the node.
+    *  If SetReadBit is true, it updates the read statistics.
+    *  Returns the header pointer for the node.
+    */
    template <typename T, bool SetReadBit>
    inline const T* seg_allocator::session::read_lock::object_ref::header() const
    {
@@ -63,22 +73,47 @@ namespace arbtrie
          assert(r->validate_checksum());
       }
       if constexpr (SetReadBit)
-      {
-         if (not m.is_read())
-         {
-            uint64_t time = rdtsc();
-            if( (time & 0xf) == 0xf ) {
-               if (_meta.try_set_read(m))
-               {
-                  _rlock.update_read_stats( m.loc(), r->_nsize, time >> 4 );
-               }
-            }
-         }
-      }
-      // TODO: determine if we need to set read bit on node
+         maybe_update_read_stats();
       return r;
    }
 
+   template <typename T>
+   std::pair<const T*, node_location>
+   seg_allocator::session::read_lock::object_ref::try_move_header()
+   {
+      if (auto opt_loc = _meta.try_move_location())
+      {
+         return {_rlock.get_node_pointer(*opt_loc), *opt_loc};
+      }
+      return {nullptr, node_location::from_absolute(0)};
+   }
+
+   inline void seg_allocator::session::read_lock::object_ref::maybe_update_read_stats() const
+   {
+      // Generate random number using rdtsc hashed with XXHash for better distribution
+      uint64_t tsc    = rdtsc();
+      uint32_t random = XXH32(&tsc, sizeof(uint64_t), 0);
+
+      // Check if random number exceeds difficulty threshold
+      // Using lower 8 bits for a simple random check
+      if (random > _rlock._session._sega._read_difficulty)
+      {
+         // Try to set read bit
+         auto m = _meta.load(std::memory_order_relaxed);
+         if (_meta.try_set_read())
+         {
+            // try_set_read() returns true if read bit was already set
+            _meta.start_pending_cache();
+            assert(_meta.is_pending_cache());
+            _rlock._session._rcache_queue.push(address().to_int());
+            //  TRIEDENT_WARN("set read bit success: ", address());
+         }
+         else
+         {
+            // TRIEDENT_WARN("set read bit failed: ", address(), "");
+         }
+      }
+   }
    /**
     *  Returns the last value of the node pointer prior to release so that
     *  its children may be released, or null if the children shouldn't be released.

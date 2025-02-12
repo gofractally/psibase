@@ -52,6 +52,14 @@ namespace arbtrie
          _total.fetch_add(clines, std::memory_order_relaxed);
       }
 
+      void set_age_weight( uint32_t seg, size_weighted_age v ) {
+         _stats[seg].store( std::bit_cast<uint64_t>(v), std::memory_order_relaxed );
+      }
+      size_weighted_age get_age_weight( uint32_t seg ) {
+         assert( seg < max_segment_count );
+         return std::bit_cast<size_weighted_age> (_stats[seg].load(std::memory_order_relaxed) );
+      }
+
       /**
        * adds the data from other into this and clears other, the compactor
        * thread will accumulate the read stats from all other threads.

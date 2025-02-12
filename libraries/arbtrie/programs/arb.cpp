@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <boost/program_options.hpp>
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -391,11 +392,11 @@ int  main(int argc, char** argv)
    //   test_refactor();
    //   return 0;
    //
-   bool sync_compact = argc > 1;  //true;//false;  // false = use threads
+   bool sync_compact = false;  //argc > 1;  //true;//false;  // false = use threads
 
    std::cerr << "resetting database\n";
    std::filesystem::remove_all("arbtriedb");
-   arbtrie::database::create("arbtriedb", {.run_compact_thread = false});
+   arbtrie::database::create("arbtriedb", {.run_compact_thread = true});
 
    //const char* filename = "/Users/dlarimer/all_files.txt";
    auto          filename = "/usr/share/dict/words";
@@ -428,8 +429,25 @@ int  main(int argc, char** argv)
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
          auto                       r      = ws.create_root();
-         const int                  rounds = 5;
-         const int                  count  = 1'000'000;
+         const int                  rounds = 3;
+
+         namespace po = boost::program_options;
+         // clang-format off
+         po::options_description desc("Test options");
+         desc.add_options()
+            ("dense-rand", po::bool_switch()->default_value(false), "Run dense random insert test")
+            ("little-endian-seq", po::bool_switch()->default_value(true), "Run little endian sequential insert test")
+            ("big-endian-seq", po::bool_switch()->default_value(true), "Run big endian sequential insert test")
+            ("big-endian-rev", po::bool_switch()->default_value(true), "Run big endian reverse sequential insert test")
+            ("rand-string", po::bool_switch()->default_value(true), "Run random string insert test")
+            ("count", po::value<int>()->default_value(1000000), "Number of items to insert");
+         // clang-format on
+
+         po::variables_map vm;
+         po::store(po::parse_command_line(argc, argv, desc), vm);
+         po::notify(vm);
+
+         const int count = vm["count"].as<int>();
 
          auto iterate_all = [&]()
          {
@@ -439,24 +457,17 @@ int  main(int argc, char** argv)
                auto     itr        = ws.create_iterator(r);
                assert(not itr.valid());
 
-               //{
-               //auto l = ws._segas.lock();
-               //print(l, r.address());
-               // }
-
                std::vector<char> data;
-               auto                 start = std::chrono::steady_clock::now();
+               auto              start = std::chrono::steady_clock::now();
                if (itr.lower_bound())
                {
                   itr.read_value(data);
                   ++item_count;
-                  //              std::cerr << bswap(*((uint64_t*)data.data())) <<" - key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data()) ) <<" \n";
                }
                while (itr.next())
                {
                   itr.key();
                   itr.read_value(data);
-                  //             std::cerr << bswap(*((uint64_t*)data.data())) <<" + key size:" << itr.key().size() <<"  " << bswap( *((uint64_t*)itr.key().data() )) <<" \n";
                   ++item_count;
                }
                auto end   = std::chrono::steady_clock::now();
@@ -479,291 +490,239 @@ int  main(int argc, char** argv)
          uint64_t seq3  = 0;
          auto     ttest = temp_meta_type(5).to_bitfield();
 
-         std::cerr << "insert dense rand \n";
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["dense-rand"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count * 3; i += 3)
+            std::cerr << "insert dense rand \n";
+            for (int ro = 0; ro < rounds; ++ro)
             {
-               //  auto l = ws._segas.lock();
-               uint64_t val = rand64();
-               ++seq;
-               key_view kstr((char*)&val, sizeof(val));
-               ws.insert(r, kstr, kstr);
-               /*
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
-                         {
-                            TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                            assert(!"should have found key!");
-                            abort();
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
-                      */
-
-               if ((seq % batch_size) == (batch_size - 1))
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count * 3; i += 3)
                {
-                  ws.set_root<sync_type::sync>(r);
+                  uint64_t val = rand64();
+                  ++seq;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.insert(r, kstr, kstr);
+
+                  if ((seq % batch_size) == (batch_size - 1))
+                  {
+                     ws.set_root<sync_type::sync>(r);
+                  }
                }
+               TRIEDENT_DEBUG("set root");
+               ws.set_root(r);
+
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
+               while (sync_compact and db.compact_next_segment())
+                  ;
+
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
+               iterate_all();
             }
-            TRIEDENT_DEBUG("set root");
-            ws.set_root(r);
-            //  last_root = r;
-
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
-            while (sync_compact and db.compact_next_segment())
-               ;
-
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " dense rand insert/sec  total items: " << add_comma(seq) << "\n";
-            iterate_all();
          }
-         /*
-         {
-            auto l = ws._segas.lock();
-            validate_invariant(l, r.address());
-         }
-         */
 
-         std::cerr << "insert little endian seq\n";
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["little-endian-seq"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "insert little endian seq\n";
+            for (int ro = 0; ro < rounds; ++ro)
             {
-               uint64_t val = ++seq3;
-               seq++;
-               key_view kstr((char*)&val, sizeof(val));
-               ws.insert(r, kstr, kstr);
-               /*
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
-                         {
-                            TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                            assert(!"should have found key!");
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
-                      */
-               if ((i % batch_size) == 0)
-                  ws.set_root<sync_type::sync>(r);
-            }
-            ws.set_root<sync_type::sync>(r);
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
+               {
+                  uint64_t val = ++seq3;
+                  seq++;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.insert(r, kstr, kstr);
+                  if ((i % batch_size) == 0)
+                     ws.set_root<sync_type::sync>(r);
+               }
+               ws.set_root<sync_type::sync>(r);
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
 
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " insert/sec  total items: " << add_comma(seq) << "\n";
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << " insert/sec  total items: " << add_comma(seq) << "\n";
+            }
          }
-         //iterate_all();
-         /*
-         {
-            auto l = ws._segas.lock();
-            validate_invariant(l, r.address());
-         }
-         */
+
          auto start_big_end = seq3;
-         std::cerr << "insert big endian seq starting with: " << seq3 << "\n";
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["big-endian-seq"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "insert big endian seq starting with: " << seq3 << "\n";
+            for (int ro = 0; ro < rounds; ++ro)
             {
-               uint64_t val = bswap(seq3++);
-               ++seq;
-               key_view kstr((char*)&val, sizeof(val));
-               ws.insert(r, kstr, kstr);
-               if ((i % batch_size) == 0)
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
                {
-                  ws.set_root<sync_type::sync>(r);
+                  uint64_t val = bswap(seq3++);
+                  ++seq;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.insert(r, kstr, kstr);
+                  if ((i % batch_size) == 0)
+                  {
+                     ws.set_root<sync_type::sync>(r);
+                  }
+
+                  ws.get(r, kstr,
+                         [&](bool found, const value_type& r)
+                         {
+                            if (not found)
+                            {
+                               TRIEDENT_WARN("unable to find key: ", seq3, " ro: ", ro, " i:", i);
+                               assert(!"should have found key!");
+                            }
+                            else
+                            {
+                               assert(r.view() == kstr);
+                            }
+                         });
                }
+               ws.set_root<sync_type::sync>(r);
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
 
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
-                         {
-                            TRIEDENT_WARN("unable to find key: ", seq3, " ro: ", ro, " i:", i);
-                            assert(!"should have found key!");
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << " insert/sec  total items: " << add_comma(seq) << "\n";
+               iterate_all();
             }
-            ws.set_root<sync_type::sync>(r);
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
-
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " insert/sec  total items: " << add_comma(seq) << "\n";
-            iterate_all();
-            //   TRIEDENT_WARN( "didn't fail.." );
          }
-         //print_pre(l, r.address(), "");
 
          uint64_t seq4 = -1;
-         std::cerr << "insert big endian rev seq\n";
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["big-endian-rev"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "insert big endian rev seq\n";
+            for (int ro = 0; ro < rounds; ++ro)
             {
-               uint64_t val = bswap(seq4--);
-               ++seq;
-               key_view kstr((char*)&val, sizeof(val));
-               ws.insert(r, kstr, kstr);
-               if ((i % batch_size) == 0)
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
                {
-                  ws.set_root<sync_type::sync>(r);
+                  uint64_t val = bswap(seq4--);
+                  ++seq;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.insert(r, kstr, kstr);
+                  if ((i % batch_size) == 0)
+                  {
+                     ws.set_root<sync_type::sync>(r);
+                  }
                }
+               ws.set_root<sync_type::sync>(r);
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
 
-               /*
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
-                         {
-                            TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                            assert(!"should have found key!");
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
-                      */
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << " insert/sec  total items: " << add_comma(seq) << "\n";
             }
-            ws.set_root<sync_type::sync>(r);
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
-
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " insert/sec  total items: " << add_comma(seq) << "\n";
          }
-         //auto l = ws._segas.lock();
-         //print_pre(l, r.address(), "");
-         iterate_all();
 
-         std::cerr << "insert to_string(rand) \n";
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["rand-string"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "insert to_string(rand) \n";
+            for (int ro = 0; ro < rounds; ++ro)
             {
-               ++seq;
-               auto kstr = std::to_string(rand64());
-               ws.insert(r, to_key_view(kstr), to_value_view(kstr));
-               if ((i % batch_size) == 0)
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
                {
-                  ws.set_root<sync_type::sync>(r);
+                  ++seq;
+                  auto kstr = std::to_string(rand64());
+                  ws.insert(r, to_key_view(kstr), to_value_view(kstr));
+                  if ((i % batch_size) == 0)
+                  {
+                     ws.set_root<sync_type::sync>(r);
+                  }
                }
-            }
-            ws.set_root<sync_type::sync>(r);
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
+               ws.set_root<sync_type::sync>(r);
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
 
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << " rand str insert/sec  total items: " << add_comma(seq) << "\n";
+            }
          }
          iterate_all();
 
-         //validate_invariant( l, r.address() );
-         std::cerr << "get known key little endian seq\n";
-         uint64_t seq2 = 0;
-         for (int ro = 0; true and ro < rounds; ++ro)
+         if (vm["little-endian-seq"].as<bool>())
          {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "get known key little endian seq\n";
+            uint64_t seq2 = 0;
+            for (int ro = 0; true and ro < rounds; ++ro)
             {
-               uint64_t val = ++seq2;
-               key_view kstr((char*)&val, sizeof(val));
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
+               {
+                  uint64_t val = ++seq2;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.get(r, kstr,
+                         [&](bool found, const value_type& r)
                          {
-                            TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
+                            if (not found)
+                            {
+                               TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
+                            }
+                            else
+                            {
+                               assert(r.view() == kstr);
+                            }
+                         });
+               }
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
+
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << "  seq get/sec  total items: " << add_comma(seq) << "\n";
             }
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
 
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << "  seq get/sec  total items: " << add_comma(seq) << "\n";
-         }
-
-         std::cerr << "get known key little endian rand\n";
-         for (int ro = 0; true and ro < rounds; ++ro)
-         {
-            auto start = std::chrono::steady_clock::now();
-            for (int i = 0; i < count; ++i)
+            std::cerr << "get known key little endian rand\n";
+            for (int ro = 0; true and ro < rounds; ++ro)
             {
-               uint64_t rnd  = rand64();
-               uint64_t val  = (rnd % (seq2 - 1)) + 1;
-               uint64_t val2 = val;
-               //   TRIEDENT_DEBUG( "val: ", val, " val2: ", val2 );
-               key_view kstr((char*)&val, sizeof(val));
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
+               auto start = std::chrono::steady_clock::now();
+               for (int i = 0; i < count; ++i)
+               {
+                  uint64_t rnd  = rand64();
+                  uint64_t val  = (rnd % (seq2 - 1)) + 1;
+                  uint64_t val2 = val;
+                  key_view kstr((char*)&val, sizeof(val));
+                  ws.get(r, kstr,
+                         [&](bool found, const value_type& r)
                          {
-                            TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro,
-                                          " i:", i, " rnd: ", rnd, " seq2: ", seq2);
-                         }
-                         else
-                         {
-                            assert(found and r.view() == kstr);
-                            //              TRIEDENT_DEBUG( "found key!!!!!" );
-                         }
-                      });
-               //     TRIEDENT_DEBUG( "post val: ", val, " val2: ", val2 );
-            }
-            auto end   = std::chrono::steady_clock::now();
-            auto delta = end - start;
+                            if (not found)
+                            {
+                               TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro,
+                                             " i:", i, " rnd: ", rnd, " seq2: ", seq2);
+                            }
+                            else
+                            {
+                               assert(found and r.view() == kstr);
+                            }
+                         });
+               }
+               auto end   = std::chrono::steady_clock::now();
+               auto delta = end - start;
 
-            std::cout << ro << "] " << std::setw(12)
-                      << add_comma(int64_t(
-                             (count) /
-                             (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                      << "  rand get/sec  total items: " << add_comma(seq) << "\n";
+               std::cout << ro << "] " << std::setw(12)
+                         << add_comma(int64_t(
+                                (count) /
+                                (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                         << "  rand get/sec  total items: " << add_comma(seq) << "\n";
+            }
          }
          std::cerr << "get known key big endian seq\n";
          for (int ro = 0; true and ro < rounds; ++ro)
@@ -772,7 +731,6 @@ int  main(int argc, char** argv)
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = bswap(start_big_end++);
-               //TRIEDENT_WARN( "find ", start_big_end );
                key_view kstr((char*)&val, sizeof(val));
                ws.get(r, kstr,
                       [&](bool found, const value_type& r)
@@ -806,7 +764,7 @@ int  main(int argc, char** argv)
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
-               uint64_t val = rand64();  //bswap(++seq2);
+               uint64_t val = rand64();
                key_view kstr((char*)&val, sizeof(val));
                itr.lower_bound(kstr);
             }
@@ -860,17 +818,14 @@ int  main(int argc, char** argv)
                   for (int i = 0; i < batch_size; ++i)
                   {
                      ++added;
-                     uint64_t val = rand64();  //bswap(++seq2);
-                     //auto str = std::to_string(val);
+                     uint64_t val = XXH64(&i, sizeof(i), 0);
+                     // rand64();
                      key_view kstr((char*)&val, sizeof(val));
-                     //key_view kstr(str);
                      if (not itr.lower_bound(kstr))
                      {
-                        //   std::cerr << "what's the problem? "<<val <<"\n";
                      }
                      else
                      {
-                        //  std::cerr << "everything ok "<<val <<"\n";
                      }
                      if ((i & 0x4ff) == 0)
                      {
@@ -884,7 +839,7 @@ int  main(int argc, char** argv)
          }
 
          std::cerr << "insert dense rand while reading " << rthreads.size() << " threads\n";
-         for (int ro = 0; ro < 2000 * 5; ++ro)
+         for (int ro = 0; ro < 20; ++ro)
          {
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
@@ -922,13 +877,15 @@ int  main(int argc, char** argv)
                              (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                       << "  lowerbound/sec \n";
          }
+         std::this_thread::sleep_for(std::chrono::seconds(5));
+         db.print_stats(std::cout);
+
          done = true;
          for (auto& r : rthreads)
             r->join();
 
          while (sync_compact and db.compact_next_segment())
             ;
-         //   ws.validate(r);
          TRIEDENT_WARN("ROOT GOING OUT OF SCOPE r.id: ", r.address());
       } while (false);
       /*
@@ -948,8 +905,6 @@ int  main(int argc, char** argv)
       {
       }
       db.stop_compact_thread();
-
-      db.print_stats(std::cout);
    }
    catch (const std::exception& e)
    {
@@ -964,8 +919,8 @@ struct environ
    {
       std::cerr << "resetting database\n";
       std::filesystem::remove_all("arbtriedb");
-      arbtrie::database::create("arbtriedb", {.run_compact_thread = false});
-      db = new database("arbtriedb", {.run_compact_thread = false});
+      arbtrie::database::create("arbtriedb", {.run_compact_thread = true});
+      db = new database("arbtriedb", {.run_compact_thread = true});
    }
    ~environ() { delete db; }
    arbtrie::database* db;

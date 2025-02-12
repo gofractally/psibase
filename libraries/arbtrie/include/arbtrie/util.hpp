@@ -15,6 +15,12 @@ namespace arbtrie
       static_assert(std::popcount(N) == 1, "N must be power of 2");
       return (v + (T(N) - 1)) & -T(N);
    }
+   template <unsigned int N, typename T>
+   constexpr T round_down_multiple(T v)
+   {
+      static_assert(std::popcount(N) == 1, "N must be power of 2");
+      return v & ~(N-1);
+   }
 
    template <uint32_t offset, uint32_t width>
    constexpr uint64_t make_mask()

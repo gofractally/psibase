@@ -1,6 +1,8 @@
 #include <arbtrie/binary_node.hpp>
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/seg_allocator.hpp>
+#include <bit>
+#include <cassert>
 
 static const uint64_t page_size      = getpagesize();
 static const uint64_t page_size_mask = ~(page_size - 1);
@@ -33,7 +35,7 @@ namespace arbtrie
    seg_allocator::~seg_allocator()
    {
       stop_compact_thread();
-      cses.reset();
+      _compactor_session.reset();
    }
    uint32_t seg_allocator::alloc_session_num()
    {
@@ -52,8 +54,10 @@ namespace arbtrie
          fs          = std::countr_zero(fs_bits);
          new_fs_bits = fs_bits & ~(1 << fs);
       }
-      if( not _session_seg_read_stats[fs] )
-         _session_seg_read_stats[fs].reset( new segment_read_stat );
+      if (not _session_seg_read_stats[fs])
+         _session_seg_read_stats[fs].reset(new segment_read_stat);
+      if (not _rcache_queues[fs])
+         _rcache_queues[fs].reset(new circular_buffer<1024 * 1024>());
       //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
       //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
       //    _free_sessions.store(new_fs_bits);
@@ -85,12 +89,86 @@ namespace arbtrie
          _compact_thread.join();
    }
 
+   void seg_allocator::aggregate_read_stats()
+   {
+      auto& srs        = _session_seg_read_stats;
+      auto& msrs       = srs[_compactor_session->_session_num];
+      auto  num_blocks = _block_alloc.num_blocks();
+
+      // TODO: we know the "max session number" so
+      // there is no need to iterate over all 64
+      // TODO: if we can prove that the compactor session
+      // is always session 0, then we can skip the
+      // check for ses.
+      //
+      // These optimizations should only help
+      // compactor CPU usage and are likely hardly
+      // measurable.
+      for (auto& ptr : srs)
+      {
+         if (&ptr != &msrs and bool(ptr))
+            msrs->accumulate(*ptr, num_blocks);
+      }
+   }
+
+   void seg_allocator::select_segments()
+   {
+      auto num_segs = _block_alloc.num_blocks();
+      /*
+      auto& rstats  = _compactor_session->get_read_stats();
+
+      for( uint32_t seg = 0; seg < num_segs; ++seg ) {
+         // don't include segments that are in active allocation
+         // ... how do I know that without looking at header?
+         auto& sm = _header->seg_meta[seg];
+
+         auto free_data                  = sm.get_free_space_and_objs();
+         size_weighted_age& unread_data  = sm._base_time;
+         size_weighted_age& read_data    = rstats.get_age_weight(seg);
+
+         if( fs.
+         if( fs.first > compact_free_space_threshold )
+            // schedule..
+      }
+      */
+   }
+   void seg_allocator::sort_selected_segments() {}
+
+   /**
+    *  1. aggregate read stats from per-thread counters
+    */
+   void seg_allocator::compact_loop2()
+   {
+      if (not _compactor_session)
+         _compactor_session.emplace(start_session());
+
+      while (not _done.load())
+      {
+         aggregate_read_stats();
+         // read frequency 2x unread frequency or 50% freed data
+         select_segments();
+         // segments are sorted by frequency with each segment appearing
+         // twice.. once for its read frequency and once for its unread frequency
+         sort_selected_segments();
+
+         // process them in order moving the data to a new segment in the
+         // order of most frequently accessed to least. The frequency of the
+         // "read items" is the difference between the base time and the read time.
+
+         // do not move unread data from a segment unless it
+         // comprises less than 50% of a segment size and it is a space
+         // recovery justification.
+      }
+      _compactor_session.reset();
+   }
    void seg_allocator::compact_loop()
    {
+      TRIEDENT_WARN("compact_loop");
       using namespace std::chrono_literals;
-      if (not cses)
-         cses.emplace(start_session());
+      if (not _compactor_session)
+         _compactor_session.emplace(start_session());
 
+      TRIEDENT_WARN("compact_loop start: ", _done.load());
       while (not _done.load())
       {
          if (not compact_next_segment())
@@ -125,17 +203,65 @@ namespace arbtrie
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(100ms);
          }
+         promote_rcache_data();
+      }
+      TRIEDENT_WARN("compact_loop end: ", _done.load());
+      TRIEDENT_WARN("compact_loop done");
+      _compactor_session.reset();
+   }
 
-         // find most empty segment
-         // move it to my own personal write session
-         // add it to the free segment queue
+   void seg_allocator::promote_rcache_data()
+   {
+      uint32_t read_ids[1024];
+      for (auto& rcache : _rcache_queues)
+      {
+         if (not rcache)
+            break;
+         auto state      = _compactor_session->lock();
+         auto num_loaded = rcache->pop(read_ids, 1024);
+
+         if (num_loaded > 0)
+            std::cerr << "num_loaded: " << num_loaded << "\n";
+         for (uint32_t i = 0; i < num_loaded; ++i)
+         {
+            auto addr    = fast_meta_address::from_int(read_ids[i]);
+            auto obj_ref = state.get(addr);
+            if (auto [header, loc] = obj_ref.try_move_header(); header)
+            {
+               auto [new_loc, new_header] = _compactor_session->alloc_data(header->size(), addr);
+               memcpy(new_header, header, header->size());
+
+               if constexpr (update_checksum_on_compact)
+               {
+                  if (not new_header->has_checksum())
+                     new_header->update_checksum();
+               }
+
+               if (node_meta_type::success == obj_ref.try_move(loc, new_loc))
+               {
+                  _total_promoted_bytes += header->size();
+                  TRIEDENT_WARN("moved header, total promoted: ", _total_promoted_bytes);
+               }
+               else
+               {
+                  //     TRIEDENT_DEBUG("failed to move header");
+                  // TODO: get fancy!
+                  //   _compactor_session->unalloc(header->size());
+               }
+            }
+            else
+            {
+               //    TRIEDENT_WARN("failed to try_move_header");
+            }
+            obj_ref.meta().end_pending_cache();
+         }
       }
    }
 
    bool seg_allocator::compact_next_segment()
    {
-      if (not cses)
-         cses.emplace(start_session());
+      if (not _compactor_session)
+         _compactor_session.emplace(start_session());
 
       uint64_t most_empty_seg_num  = -1ll;
       uint64_t most_empty_seg_free = 0;
@@ -144,8 +270,8 @@ namespace arbtrie
       for (uint32_t s = 0; s < total_segs; ++s)
       {
          auto fso = _header->seg_meta[s].get_free_space_and_objs();
-         if (fso.first > most_empty_seg_free)
-            if (fso.first > segment_size / 8)  // most_empty_seg_free)
+         if (fso.free_space > most_empty_seg_free)
+            if (fso.free_space > segment_size / 8)  // most_empty_seg_free)
             {
                auto seg = get_segment(s);
                // only consider segs that are not actively allocing
@@ -155,7 +281,7 @@ namespace arbtrie
                   //      if (seg->_age <= oldest)
                   {
                      most_empty_seg_num  = s;
-                     most_empty_seg_free = fso.first;
+                     most_empty_seg_free = fso.free_space;
                      oldest              = seg->_age;
                   }
                }
@@ -168,7 +294,7 @@ namespace arbtrie
          return false;
       }
 
-      compact_segment(*cses, most_empty_seg_num);
+      compact_segment(*_compactor_session, most_empty_seg_num);
       return true;
    }
 
@@ -181,9 +307,9 @@ namespace arbtrie
       //     abort();
       //  }
       auto*        shead = (mapped_memory::segment_header*)s;
-      auto         send = (node_header*)((char*)s + segment_size);
-      char*        foc       = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
-      node_header* foo       = (node_header*)(foc);
+      auto         send  = (node_header*)((char*)s + segment_size);
+      char*        foc   = (char*)s + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
+      node_header* foo   = (node_header*)(foc);
 
       /*
       std::cerr << "compacting segment: " << seg_num << " into " << ses._alloc_seg_num << " "
@@ -205,6 +331,9 @@ namespace arbtrie
       std::vector<std::pair<node_header*, temp_meta_type>> skipped;
       std::vector<node_header*>                            skipped_ref;
       std::vector<node_header*>                            skipped_try_start;
+
+      auto& smeta    = _header->seg_meta[seg_num];
+      auto  src_time = smeta._base_time.time_ms;
 
       madvise(s, segment_size, MADV_SEQUENTIAL);
       while (foo < send and foo->address())
@@ -242,7 +371,7 @@ namespace arbtrie
          }
 
          auto obj_size   = foo->size();
-         auto [loc, ptr] = ses.alloc_data(obj_size, foo_address, shead->_base_time.time_ms);
+         auto [loc, ptr] = ses.alloc_data(obj_size, foo_address, src_time);
 
          if (obj_ref.try_start_move(obj_ref.loc())) [[likely]]
          {
@@ -380,8 +509,7 @@ namespace arbtrie
           * There is no need for a global sync lock if each segment has its
           * own sync lock!
           */
-         _header->seg_meta[seg_num]._last_sync_pos.store(
-             start_seg_ptr->_alloc_pos.load(std::memory_order_relaxed), std::memory_order_relaxed);
+         _header->seg_meta[seg_num].set_last_sync_pos(start_seg_ptr->get_alloc_pos());
       }
 
       //   s->_write_lock.unlock();
@@ -509,8 +637,6 @@ namespace arbtrie
     *
     *  If reuse_ptr == min_read_ptr then advance the alloc_ptr by
     *  segment_size to claim a new segment.
-    *
-    *
     */
    std::pair<segment_number, mapped_memory::segment_header*> seg_allocator::get_new_segment()
    {
@@ -596,9 +722,19 @@ namespace arbtrie
 
    void seg_allocator::sync_segment(int s, sync_type st) noexcept
    {
-      auto seg        = get_segment(s);
-      auto last_sync  = _header->seg_meta[s]._last_sync_pos.load(std::memory_order_relaxed);
-      auto last_alloc = seg->_alloc_pos.load(std::memory_order_relaxed);
+      auto seg = get_segment(s);
+      // TODO BUG: when syncing we must sync to the end of a page,
+      // but start the next sync from the beginning of the page
+      // since we only store the last paged synced... we no longer
+      // know if the alloc_pos was in the middle of that page and
+      // therefore it may be dirty again. We may need to
+      // subtract 1 page from the last sync pos (assuming it doesn't go neg)
+      // and sync the page before.
+      //
+      // If we store last_sync_pos as the rounded down position, then
+      // getting this will work!
+      auto last_sync  = _header->seg_meta[s].get_last_sync_pos();
+      auto last_alloc = seg->get_alloc_pos();
 
       if (last_alloc > segment_size)
          last_alloc = segment_size;
@@ -620,7 +756,7 @@ namespace arbtrie
             total_synced += sync_bytes;
             //           TRIEDENT_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
          }
-         _header->seg_meta[s]._last_sync_pos.store(last_alloc);
+         _header->seg_meta[s].set_last_sync_pos(last_alloc);
       }
    }
    void seg_allocator::sync(sync_type st)
@@ -658,25 +794,29 @@ namespace arbtrie
                 << " | ";
       std::cerr << std::setw(12) << "alloc pos"
                 << " | ";
-      std::cerr << std::setw(12) << "alloced obj"
+      std::cerr << std::setw(12) << "is alloc"
                 << " | ";
-      std::cerr << std::setw(12) << "num obj"
+      std::cerr << std::setw(12) << "is pinned"
                 << " | ";
       std::cerr << std::setw(8) << "age"
                 << " \n";
       for (uint32_t i = 0; i < total_segs; ++i)
       {
-         auto seg        = get_segment(i);
-         auto space_objs = _header->seg_meta[i].get_free_space_and_objs();
+         auto  seg        = get_segment(i);
+         auto& meta       = _header->seg_meta[i];
+         auto  space_objs = meta.get_free_space_and_objs();
 
          std::cerr << std::setw(6) << i << " | ";
-         std::cerr << std::setw(8) << int(100 * double(space_objs.first) / segment_size) << " | ";
-         total_free_space += space_objs.first;
-         std::cerr << std::setw(12) << space_objs.first << " | ";
-         std::cerr << std::setw(12) << space_objs.second << " | ";
+         std::cerr << std::setw(8) << int(100 * double(space_objs.free_space) / segment_size)
+                   << " | ";
+         total_free_space += space_objs.free_space;
+         std::cerr << std::setw(12) << space_objs.free_space << " | ";
+         std::cerr << std::setw(12) << space_objs.free_objects << " | ";
          std::cerr << std::setw(12)
-                   << (seg->_alloc_pos == -1 ? "END" : std::to_string(seg->_alloc_pos)) << " | ";
-         //std::cerr << std::setw(12) << seg->_num_objects << " | ";
+                   << (seg->_alloc_pos == -1 ? "END" : std::to_string(seg->get_alloc_pos()))
+                   << " | ";
+         std::cerr << std::setw(12) << (space_objs.is_alloc ? "alloc" : "") << " | ";
+         std::cerr << std::setw(12) << (space_objs.is_pinned ? "pin" : "") << " | ";
          //total_retained += seg->_num_objects - space_objs.second;
          //std::cerr << std::setw(12) << seg->_num_objects - space_objs.second << " | ";
          std::cerr << std::setw(8) << seg->_age << " \n";
@@ -716,4 +856,5 @@ namespace arbtrie
       std::cerr << "--------------------------\n";
       std::cerr << "free release +/- = " << _id_alloc.free_release_count() << " \n";
    }
+
 };  // namespace arbtrie

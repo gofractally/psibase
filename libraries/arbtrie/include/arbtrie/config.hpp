@@ -34,6 +34,8 @@ namespace arbtrie {
    static constexpr const uint64_t GB = 1024ull * MB;
    static constexpr const uint64_t TB = 1024ull * GB;
 
+   // On M2+ macs this is 128, use std::hardware_destructive_interference_size 
+   // if you need the real cacheline size, we assume 64 for most x86 architectures
    static constexpr const uint32_t cacheline_size = 64;
 
 
@@ -83,6 +85,7 @@ namespace arbtrie {
     */
    static constexpr const uint32_t max_threads = 64;
 
+   static constexpr const uint32_t os_page_size = 4096;
    /**
     * Each ID region can store 512 IDs before the ID
     * file needs to grow becuase each ID takes 8 bytes, making
@@ -100,7 +103,7 @@ namespace arbtrie {
     * spread across all regions to prevent premature growth to
     * 512MB or more just because one region is too dense.
     */
-   static constexpr const uint32_t id_page_size = 4096;
+   static constexpr const uint32_t id_page_size = os_page_size;
 
 
    static_assert( segment_size < 4*GB, "size must be less than 4GB" );

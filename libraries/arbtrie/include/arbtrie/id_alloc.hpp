@@ -67,7 +67,7 @@ namespace arbtrie
          std::mutex            alloc_mutex;
          std::atomic<uint32_t> use_count;
          std::atomic<uint32_t> next_alloc;
-         std::atomic<uint64_t> first_free;  
+         std::atomic<uint64_t> first_free;
       };
 
       struct id_alloc_state
@@ -110,13 +110,14 @@ namespace arbtrie
       }
    }
 
-   inline node_meta_type& id_alloc::get_or_alloc(fast_meta_address nid) {
-      uint64_t abs_pos        = nid.index * sizeof(node_meta_type);
-      uint64_t block_num      = abs_pos / id_page_size;
-      if( block_num > 0xffff )
-         throw std::runtime_error( "block num out of range!" );
-      if( block_num >= _block_alloc.num_blocks() )
-         _block_alloc.reserve( block_num+1, true );
+   inline node_meta_type& id_alloc::get_or_alloc(fast_meta_address nid)
+   {
+      uint64_t abs_pos   = nid.index * sizeof(node_meta_type);
+      uint64_t block_num = abs_pos / id_page_size;
+      if (block_num > 0xffff)
+         throw std::runtime_error("block num out of range!");
+      if (block_num >= _block_alloc.num_blocks())
+         _block_alloc.reserve(block_num + 1, true);
       return get(nid);
    }
 
@@ -160,7 +161,7 @@ namespace arbtrie
 
       if (r.region == 0)
       {
-         // TODO: allow region 0 once we have caught all places where 
+         // TODO: allow region 0 once we have caught all places where
          // region is uninitilized and therefore overflowing region 0
          TRIEDENT_WARN("who is alloc to region 0!\n");
       }
@@ -175,7 +176,8 @@ namespace arbtrie
       {
          // reserve() is thread safe and if two threads both try to alloc then
          // only one will actually do the work.
-         if( num_pages > 3 ) {
+         if (num_pages > 3)
+         {
             TRIEDENT_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
                           r.region, ") exceeded cap: numpages: ", num_pages, " -> ", num_pages + 1);
             // TODO: calculate a load factor before warning
@@ -187,7 +189,7 @@ namespace arbtrie
       //TRIEDENT_WARN( "num_pages: ", num_pages, "  region: ", r.region ," next alloc: ", na );
       if (na < num_pages * ids_per_page)
       {
-         // TODO: change to C & E 
+         // TODO: change to C & E
          // then skip the free list, and grab a new one!
          auto nid = rhead.next_alloc.fetch_add(1, std::memory_order_relaxed);
 
@@ -204,7 +206,8 @@ namespace arbtrie
             // race condition caused attempt to allocate beyond end of page,
             // must undo the add to restore balance... then consult free list
             rhead.next_alloc.fetch_sub(1, std::memory_order_relaxed);
-            TRIEDENT_WARN( "id alloc race condition detected, should be fine, just letting you know" );
+            TRIEDENT_WARN(
+                "id alloc race condition detected, should be fine, just letting you know");
          }
       }
       // there must be something in the free list because if use count implied no
@@ -262,14 +265,17 @@ namespace arbtrie
 
    inline void id_alloc::free_id(fast_meta_address adr)
    {
-      if constexpr (debug_memory) {
+      if constexpr (debug_memory)
+      {
          _state->free_release_count.fetch_sub(1, std::memory_order_relaxed);
       }
 
       auto& rhead     = _state->regions[adr.region];
       auto& next_free = get(adr);
-      auto  new_head =
-          temp_meta_type().set_location(node_location::from_aligned(adr.index)).to_int();
+      auto  new_head  = temp_meta_type()
+                          .set_location(node_location::from_aligned(adr.index))
+                          .end_pending_cache()
+                          .to_int();
 
       {
          {

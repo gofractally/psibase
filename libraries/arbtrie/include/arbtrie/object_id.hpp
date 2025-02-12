@@ -2,89 +2,102 @@
 #include <cstdint>
 #include <iostream>
 
-namespace arbtrie {
+namespace arbtrie
+{
 
    struct object_id;
 
-   struct id_region {
-      constexpr id_region( uint16_t r = 0 ):region(r){}
-      constexpr uint16_t to_int()const{ return region; }
-      uint16_t region;
-      friend bool operator == ( id_region a, id_region b ) = default;
+   struct id_region
+   {
+      constexpr id_region(uint16_t r = 0) : region(r) {}
+      constexpr uint16_t to_int() const { return region; }
+      uint16_t           region;
+      friend bool        operator==(id_region a, id_region b) = default;
 
-      friend std::ostream& operator  << ( std::ostream& out, id_region r) {
-         return out << r.region;
-      }
+      friend std::ostream& operator<<(std::ostream& out, id_region r) { return out << r.region; }
    } __attribute__((aligned(1)));
-   static_assert( sizeof(id_region) == 2 );
+   static_assert(sizeof(id_region) == 2);
 
-   struct id_index {
-      constexpr id_index( uint32_t r = 0 ):index(r){}
+   struct id_index
+   {
+      constexpr id_index(uint32_t r = 0) : index(r) {}
       //uint32_t index:24;
       uint16_t index;
-      operator bool()const { return index; }
-      friend bool operator == ( id_index a, id_index b ) { return a.index == b.index; };
+      operator bool() const { return index; }
+      friend bool operator==(id_index a, id_index b) { return a.index == b.index; };
    } __attribute__((packed)) __attribute__((aligned(1)));
-   static_assert( sizeof(id_index) == 2 );
+   static_assert(sizeof(id_index) == 2);
 
-   struct id_address {
-      constexpr id_address() = default;
-      constexpr id_address( const id_address& ) = default;
-      constexpr id_address( id_region r, id_index i ):_region(r),_index(i.index){}
-      constexpr id_address( object_id oid ); 
+   struct id_address
+   {
+      constexpr id_address()                  = default;
+      constexpr id_address(const id_address&) = default;
+      constexpr id_address(id_region r, id_index i) : _region(r), _index(i.index) {}
+      constexpr id_address(object_id oid);
 
-      operator object_id()const;
+      operator object_id() const;
 
-      uint64_t to_int()const { return (uint64_t(_region.region)<<24) | _index.index; }
-      uint16_t region()const { return _region.region; }
-      uint32_t index()const  { return _index.index; }
+      uint64_t  to_int() const { return (uint64_t(_region.region) << 24) | _index.index; }
+      uint16_t  region() const { return _region.region; }
+      uint32_t  index() const { return _index.index; }
       id_region _region;
       id_index  _index;
 
-      friend std::ostream& operator  << ( std::ostream& out, id_address a) {
-         return out << a.region() <<"."<<a.index();
+      friend std::ostream& operator<<(std::ostream& out, id_address a)
+      {
+         return out << a.region() << "." << a.index();
       }
-      friend bool operator == ( id_address a, id_address b ) = default;
-      friend bool operator != ( id_address a, object_id b );
+      friend bool operator==(id_address a, id_address b) = default;
+      friend bool operator!=(id_address a, object_id b);
 
-      operator bool()const { return _index; }
-      void reset() { _region.region = 0; _index.index = 0; }
-   }__attribute__((packed)) __attribute__((aligned(1)));
+      operator bool() const { return _index; }
+      void reset()
+      {
+         _region.region = 0;
+         _index.index   = 0;
+      }
+   } __attribute__((packed)) __attribute__((aligned(1)));
 
    /**
     *  This type isn't for storage, but for computation 
     */
-   struct fast_meta_address {
-      uint16_t region=0;
-      uint32_t index=0;
+   struct fast_meta_address
+   {
+      uint16_t region = 0;
+      uint32_t index  = 0;
 
-      constexpr fast_meta_address()=default;
-      constexpr fast_meta_address( id_region r, id_index i )
-      :region( r.region), index(i.index){}
+      constexpr fast_meta_address() = default;
+      constexpr fast_meta_address(id_region r, id_index i) : region(r.region), index(i.index) {}
 
-      constexpr fast_meta_address( id_address a )
-         :region(a.region()),index(a.index()){}
+      constexpr fast_meta_address(id_address a) : region(a.region()), index(a.index()) {}
 
-      constexpr static inline fast_meta_address from_int( uint64_t i ) {
-         return { i>>24, i & 0xffffff };
+      constexpr static inline fast_meta_address from_int(uint64_t i)
+      {
+         return {i >> 24, i & 0xffffff};
       }
-      constexpr uint64_t to_int()const { return (uint64_t(region)<<24) | uint64_t(index); }
+      constexpr uint64_t to_int() const { return (uint64_t(region) << 24) | uint64_t(index); }
 
-      constexpr void reset(){region=0;index=0;}
-
-      operator bool()const { return index; }
-      explicit operator id_address()const { return {region,index}; }
-      constexpr id_address to_address()const { return {region,index}; }
-
-      friend std::ostream& operator  << ( std::ostream& out, fast_meta_address a) {
-         return out << a.region <<"."<<a.index;
+      constexpr void reset()
+      {
+         region = 0;
+         index  = 0;
       }
-      friend bool operator != ( fast_meta_address a, fast_meta_address b ) = default;
-      friend bool operator == ( fast_meta_address a, fast_meta_address b ) = default;
+
+      operator bool() const { return index; }
+      explicit             operator id_address() const { return {region, index}; }
+      constexpr id_address to_address() const { return {region, index}; }
+
+      friend std::ostream& operator<<(std::ostream& out, fast_meta_address a)
+      {
+         return out << a.region << "." << a.index;
+      }
+      friend bool operator!=(fast_meta_address a, fast_meta_address b) = default;
+      friend bool operator==(fast_meta_address a, fast_meta_address b) = default;
    };
 
-   inline fast_meta_address operator + ( id_region r, id_index i ) {
-      return fast_meta_address( r, i );
+   inline fast_meta_address operator+(id_region r, id_index i)
+   {
+      return fast_meta_address(r, i);
    }
 
    /**
@@ -102,32 +115,36 @@ namespace arbtrie {
       {
          return out << id_address(oid);
       }
-      constexpr object_id():id(0){}
-      explicit constexpr object_id( uint64_t i ):id(i){}
+      constexpr object_id() : id(0) {}
+      explicit constexpr object_id(uint64_t i) : id(i) {}
 
-      explicit object_id( id_address a ):id(a.to_int()){}
+      explicit object_id(id_address a) : id(a.to_int()) {}
 
-      uint64_t to_int()const { return id; }
-      
-      void reset(){id=0;}
-      private:
-      uint64_t             id : 40 = 0;  // obj id
+      uint64_t to_int() const { return id; }
+
+      void reset() { id = 0; }
+
+     private:
+      uint64_t id : 40 = 0;  // obj id
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(object_id) == 5, "unexpected padding");
    static_assert(alignof(object_id) == 1, "unexpected alignment");
    //static_assert( sizeof(id_address) == sizeof(object_id) );
 
-   constexpr inline id_address::id_address( object_id oid ) {
-      auto i = oid.to_int();
+   constexpr inline id_address::id_address(object_id oid)
+   {
+      auto i         = oid.to_int();
       _index.index   = i & 0xffffff;
       _region.region = i >> 24;
    }
 
-   inline id_address::operator object_id()const {
-      return object_id( to_int() );
+   inline id_address::operator object_id() const
+   {
+      return object_id(to_int());
    }
-   inline bool operator != ( id_address a, object_id b ) {
+   inline bool operator!=(id_address a, object_id b)
+   {
       return a.to_int() != b.to_int();
    }
 
-} // namespace arbtrie
+}  // namespace arbtrie

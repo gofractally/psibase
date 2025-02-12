@@ -55,7 +55,8 @@ std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64
       // end.
       while (file >> key)
       {
-         if( count == 295 ) {
+         if (count == 295)
+         {
             ws.count_ids_with_refs();
          }
          val = key;
@@ -638,7 +639,8 @@ TEST_CASE("random-size-updates-shared")
          auto                       rng = std::default_random_engine{};
          for (int i = 0; i < 910; ++i)
          {
-            if( i == 909 ) {
+            if (i == 909)
+            {
                std::cerr << "break;\n";
             }
             auto idx = rng() % (words.size());
@@ -651,16 +653,16 @@ TEST_CASE("random-size-updates-shared")
             auto postsize = ws.get(root, to_key_view(words[idx]), nullptr);
             REQUIRE(postsize == data.size());
             tmp = root;
-          //  if( i % 1000 == 0 ) {
-          //     TRIEDENT_DEBUG( "i: ", i, " ", ws.count_ids_with_refs() );
-          //  }
+            //  if( i % 1000 == 0 ) {
+            //     TRIEDENT_DEBUG( "i: ", i, " ", ws.count_ids_with_refs() );
+            //  }
          }
          env.db->print_stats(std::cerr);
          TRIEDENT_DEBUG("references before release: ", ws.count_ids_with_refs());
       }
       TRIEDENT_DEBUG("references after release: ", ws.count_ids_with_refs());
       env.db->print_stats(std::cerr);
-      REQUIRE( 0 == ws.count_ids_with_refs());
+      REQUIRE(0 == ws.count_ids_with_refs());
    }
    // let the compactor catch up
    usleep(1000000 * 2);
@@ -759,16 +761,17 @@ TEST_CASE("subtree2")
                  10);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", and "S" key
 
          ws.upsert(empty, to_key_view("start-with-data"), to_value_view("data"));
-         ws.upsert(empty, to_key_view("start-with-data"), root );
+         ws.upsert(empty, to_key_view("start-with-data"), root);
 
-         REQUIRE(root.ref() ==
-                 11);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", "start-with-data", and "S" key
-         ws.upsert(empty, to_key_view("start-with-data"), to_value_view("release test") );
+         REQUIRE(
+             root.ref() ==
+             11);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", "", "start-with-data", and "S" key
+         ws.upsert(empty, to_key_view("start-with-data"), to_value_view("release test"));
          REQUIRE(root.ref() ==
                  10);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", ", and "S" key
-         ws.upsert(empty, to_key_view("start-with-data"), root );
-         ws.upsert(empty, to_key_view("start-with-data"), root );
-         ws.upsert(empty, to_key_view("start-with-data"), root );
+         ws.upsert(empty, to_key_view("start-with-data"), root);
+         ws.upsert(empty, to_key_view("start-with-data"), root);
+         ws.upsert(empty, to_key_view("start-with-data"), root);
          REQUIRE(root.ref() ==
                  11);  // r1, r2, r3, r4, r5, r6 and root, and value of "subtree", ", and "S" key
 
@@ -1251,7 +1254,8 @@ TEST_CASE("dense-rand-upsert")
             {
                ++count;
                if (print_dbg)
-                  TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first) );
+                  TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()),
+                                 "  ref: ", to_hex(ref_itr->first));
                itr.next();
                ++ref_itr;
                if (ref_itr != reference.end())
@@ -1259,8 +1263,8 @@ TEST_CASE("dense-rand-upsert")
             }
             else
             {
-                  if( print_dbg and itr.valid() )
-                     TRIEDENT_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first) );
+               if (print_dbg and itr.valid())
+                  TRIEDENT_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first));
                break;
             }
          }
@@ -1336,38 +1340,41 @@ uint64_t bswap(uint64_t x)
    return x;
 }
 
-TEST_CASE( "thread-write" ) {
-   environ env;
+TEST_CASE("thread-write")
+{
+   environ        env;
    const uint64_t per_thread = 10'000'000;
-   const int rounds = 2;
-   auto run_thread = [&](int num) {
-      TRIEDENT_WARN( "start thread ", num );
-      auto    ws = env.db->start_write_session();
-      auto r = ws.create_root();
+   const int      rounds     = 2;
+   auto           run_thread = [&](int num)
+   {
+      TRIEDENT_WARN("start thread ", num);
+      auto ws = env.db->start_write_session();
+      auto r  = ws.create_root();
 
-      for (int x = 0; x < rounds; ++x ) {
-      for (int64_t i = 0; i < per_thread; i++)
+      for (int x = 0; x < rounds; ++x)
       {
-         uint64_t val = rand64();//bswap(i);
-         key_view kstr((char*)&val, sizeof(val));
-         ws.upsert(r, kstr, kstr);
-         ws.get(r, kstr,
-                [&](bool found, const value_type& r)
-                {
-                   if (not found)
+         for (int64_t i = 0; i < per_thread; i++)
+         {
+            uint64_t val = rand64();  //bswap(i);
+            key_view kstr((char*)&val, sizeof(val));
+            ws.upsert(r, kstr, kstr);
+            ws.get(r, kstr,
+                   [&](bool found, const value_type& r)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
-                      assert(!"should have found key!");
-                   }
-                   REQUIRE(found);
-                });
-      }
-      TRIEDENT_WARN( "Thread ", num, " round: ", x );
+                      if (not found)
+                      {
+                         TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                         assert(!"should have found key!");
+                      }
+                      REQUIRE(found);
+                   });
+         }
+         TRIEDENT_WARN("Thread ", num, " round: ", x);
       }
    };
-   auto          start = std::chrono::steady_clock::now();
-   std::thread t1(run_thread,1);
-   std::thread t2(run_thread,2);
+   auto        start = std::chrono::steady_clock::now();
+   std::thread t1(run_thread, 1);
+   std::thread t2(run_thread, 2);
    /*
    std::thread t3(run_thread,3);
    std::thread t4(run_thread,4);
@@ -1386,14 +1393,15 @@ TEST_CASE( "thread-write" ) {
    t7.join();
    t8.join();
    */
-   auto    ws = env.db->start_write_session();
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
+   auto ws    = env.db->start_write_session();
+   auto end   = std::chrono::steady_clock::now();
+   auto delta = end - start;
 
-      std::cout << "db loaded " << std::setw(12)
-                << add_comma(int64_t(
-                       (per_thread*2*rounds) / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                << " random upserts/sec  total items: " << add_comma(per_thread*2*rounds) << " \n";
+   std::cout << "db loaded " << std::setw(12)
+             << add_comma(
+                    int64_t((per_thread * 2 * rounds) /
+                            (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+             << " random upserts/sec  total items: " << add_comma(per_thread * 2 * rounds) << " \n";
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
 
@@ -1426,7 +1434,6 @@ TEST_CASE("dense-big-seq-upsert")
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
 
-
 /**
  *  Verify that everything continues to work even if the maximum reference count
  *  of a single node is exceeded. 
@@ -1434,3 +1441,32 @@ TEST_CASE("dense-big-seq-upsert")
  *  - exception should be thrown when reaching max ref count
  */
 TEST_CASE("many refs") {}
+
+TEST_CASE("move-frequently-read-node")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   // load words from system dictionary
+   std::ifstream file("/usr/share/dict/words");
+   std::string   word;
+   while (file >> word)
+   {
+      ws.upsert(r, key_view(word), value_view(word));
+   }
+
+   // start the compactor thread
+   env.db->start_compact_thread();
+
+   // repeatedly query the same word using a caching iterator
+   const std::string target_word = "mango";  // Middle word to ensure traversal
+   const int         num_queries = 1000 * 1000;
+
+   auto rs  = env.db->start_read_session();
+   auto itr = ws.create_iterator<arbtrie::caching>(r);
+   for (int i = 0; i < num_queries; i++)
+   {
+      itr.lower_bound(key_view(target_word));
+   }
+}
