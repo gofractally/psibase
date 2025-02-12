@@ -1,9 +1,51 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
 #include <arbtrie/saturated_uint32.hpp>
+#include <concepts>
 
 namespace arbtrie
 {
+   template <typename T>
+   struct inner_node;
+
+   template <typename T>
+   concept inner_node_concept =
+       requires(T node, branch_index_type br, fast_meta_address addr, const T& const_node) {
+          // Required static members
+          requires std::same_as<decltype(T::type), const node_type>;
+
+          // Required member functions
+          {
+             node.add_branch(br, addr)
+          } -> std::same_as<T&>;
+          {
+             node.remove_branch(br)
+          } -> std::same_as<T&>;
+          {
+             node.set_branch(br, addr)
+          } -> std::same_as<T&>;
+          {
+             const_node.get_branch(br)
+          } -> std::same_as<fast_meta_address>;
+          {
+             const_node.lower_bound(br)
+          } -> std::same_as<std::pair<branch_index_type, fast_meta_address>>;
+          {
+             const_node.can_add_branch()
+          } -> std::same_as<bool>;
+          {
+             const_node.get_prefix()
+          } -> std::same_as<key_view>;
+          {
+             const_node.has_eof_value()
+          } -> std::same_as<bool>;
+          {
+             const_node.get_eof_value()
+          } -> std::same_as<fast_meta_address>;
+
+          // Required from inner_node base
+          requires std::derived_from<T, inner_node<T>>;
+       };
 
    /**
     *  Extra header information shared by all inner nodes,
@@ -107,8 +149,47 @@ namespace arbtrie
       const uint8_t*  end_prefix() const { return start_prefix() + _prefix_capacity; }
       uint16_t        prefix_capacity() const { return _prefix_capacity; }
       uint16_t        prefix_size() const { return _prefix_size; }
-      inline key_view get_prefix() const { return key_view((const char*)start_prefix(), prefix_size()); }
+      inline key_view get_prefix() const
+      {
+         return key_view((const char*)start_prefix(), prefix_size());
+      }
    } __attribute__((packed));
-   static_assert(sizeof(inner_node<void>) == 28);
+
+   struct void_node
+   {
+      static const node_type type = node_type::undefined;
+
+      // Required interface methods for inner_node_concept
+      key_view          get_prefix() const { return {}; }
+      bool              has_eof_value() const { return false; }
+      fast_meta_address get_eof_value() const { return {}; }
+      bool              is_eof_subtree() const { return false; }
+      id_region         branch_region() const { return {}; }
+      uint16_t          num_branches() const { return 0; }
+
+      // Branch operations
+      void              add_branch(branch_index_type, fast_meta_address) {}
+      void              remove_branch(branch_index_type) {}
+      void              set_branch(branch_index_type, fast_meta_address) {}
+      fast_meta_address get_branch(branch_index_type) const { return {}; }
+
+      // Lower/upper bound operations
+      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type) const
+      {
+         return {max_branch_count, {}};
+      }
+
+      template <typename F>
+      void visit_branches(F&&) const
+      {
+      }
+
+      template <typename F>
+      void visit_branches_with_br(F&&) const
+      {
+      }
+   };
+
+   static_assert(sizeof(inner_node<void_node>) == 28);
 
 }  // namespace arbtrie

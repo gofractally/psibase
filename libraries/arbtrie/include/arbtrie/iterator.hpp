@@ -11,15 +11,16 @@ namespace arbtrie
     * read so that the compactor can better sort the most frequently
     * used items.
     */
-   enum iterator_caching_mode {
+   enum iterator_caching_mode
+   {
       noncaching = 0,
-      caching = 1
+      caching    = 1
    };
    /**
     *   An iterator grabs a read-only snapshot of the database
     *   and provides a consistent view.
     */
-   template<iterator_caching_mode CacheMode = noncaching>
+   template <iterator_caching_mode CacheMode = noncaching>
    class iterator
    {
       friend class read_session;
@@ -73,10 +74,15 @@ namespace arbtrie
       // valid() will return false if this returns false
       bool first(key_view prefix = {});
 
-      // moves to the key(), return valid()
       // returns false if not found
-      // TODO: forward to session::get
-   //   bool get(key_view key);
+      template <typename Callback>
+      bool get(key_view key, Callback&& callback) const;
+
+      // Like get(), but also positions the iterator at the found key
+      // Returns true if found and positions iterator at the key
+      // Returns false and calls end() if not found
+      template <typename Callback>
+      bool get2(key_view key, Callback&& callback);
 
       // true if the iterator points to a key/value pair
       bool valid() const { return _path.size() > 0; }
@@ -147,13 +153,12 @@ namespace arbtrie
       bool lower_bound_impl(object_ref& r, key_view prefix);
 
       bool reverse_lower_bound_impl(object_ref& r, const auto* in, key_view prefix);
-      bool reverse_lower_bound_impl(object_ref& r,
-                                    const binary_node*       bn,
-                                    key_view                 prefix);
-      bool reverse_lower_bound_impl(object_ref& r,
-                                    const value_node*        bn,
-                                    key_view                 prefix);
+      bool reverse_lower_bound_impl(object_ref& r, const binary_node* bn, key_view prefix);
+      bool reverse_lower_bound_impl(object_ref& r, const value_node* bn, key_view prefix);
       bool reverse_lower_bound_impl(object_ref& r, key_view prefix);
+
+      template <typename Callback>
+      bool get2_impl(object_ref& r, key_view key, Callback&& callback);
    };
 
 }  // namespace arbtrie

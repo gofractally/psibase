@@ -104,7 +104,6 @@ namespace arbtrie
          {
             // try_set_read() returns true if read bit was already set
             _meta.start_pending_cache();
-            assert(_meta.is_pending_cache());
             _rlock._session._rcache_queue.push(address().to_int());
             //  TRIEDENT_WARN("set read bit success: ", address());
          }

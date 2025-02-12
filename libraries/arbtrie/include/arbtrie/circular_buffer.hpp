@@ -6,6 +6,33 @@
 #include <iostream>
 #include <new>  // Include for std::hardware_destructive_interference_size
 
+/**
+ * @brief A lock-free single-producer single-consumer circular buffer implementation
+ * 
+ * This class implements a fixed-size circular buffer that allows concurrent access from one producer 
+ * and one consumer thread without requiring explicit locks. It uses atomic operations and cache line 
+ * padding to provide efficient thread-safe communication.
+ *
+ * The buffer size must be a power of 2 to allow efficient wrapping using bitwise operations.
+ * The buffer stores 32-bit unsigned integers.
+ *
+ * Key features:
+ * - Lock-free implementation using atomic operations
+ * - Cache line padding to prevent false sharing
+ * - Fixed size buffer with power-of-2 size requirement
+ * - Single producer / single consumer design
+ * - Non-blocking push and pop operations
+ *
+ * Usage:
+ * The producer thread calls push() to add data while the consumer thread calls pop() to retrieve data.
+ * If the buffer is full, push() will return false. If the buffer is empty, pop() will return 0.
+ *
+ * This buffer is used within the arbtrie library for efficient inter-thread communication, particularly
+ * for passing read node IDs from read threads to the compact thread so that they can be moved to
+ * the pinned RAM cache.
+ *
+ * @tparam buffer_size The size of the circular buffer, must be a power of 2
+ */
 template <std::uint64_t buffer_size>
 class circular_buffer
 {

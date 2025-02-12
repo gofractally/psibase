@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
+#include <arbtrie/binary_node.hpp>
 #include <arbtrie/iterator.hpp>
 #include <arbtrie/node_handle.hpp>
 #include <arbtrie/node_stats.hpp>
@@ -105,7 +106,7 @@ namespace arbtrie
    class read_session
    {
      protected:
-      template<iterator_caching_mode>
+      template <iterator_caching_mode>
       friend class iterator;
       friend class database;
       friend class root_data;
@@ -114,10 +115,8 @@ namespace arbtrie
       read_session(database& db);
       database& _db;
 
-      int get(object_ref&                root,
-              key_view                                key,
-              std::invocable<bool, value_type> auto&& callback);
-      int get(object_ref&                root,
+      int get(object_ref& root, key_view key, std::invocable<bool, value_type> auto&& callback);
+      int get(object_ref&                             root,
               const auto*                             inner,
               key_view                                key,
               std::invocable<bool, value_type> auto&& callback);
@@ -131,26 +130,26 @@ namespace arbtrie
               std::invocable<bool, value_type> auto&& callback);
 
       inline uint32_t count_keys(object_ref& r, key_view from, key_view to) const;
-      inline uint32_t count_keys(object_ref& r,
-                                 const full_node*         n,
-                                 key_view                 from,
-                                 key_view                 to) const;
-      inline uint32_t count_keys(object_ref& r,
-                                 const bitset_node*       n,
-                                 key_view                 from,
-                                 key_view                 to) const;
-      inline uint32_t count_keys(object_ref& r,
-                                 const setlist_node*      n,
-                                 key_view                 from,
-                                 key_view                 to) const;
-      inline uint32_t count_keys(object_ref& r,
-                                 const binary_node*       n,
-                                 key_view                 from,
-                                 key_view                 to) const;
-      inline uint32_t count_keys(object_ref& r,
-                                 const value_node*        n,
-                                 key_view                 from,
-                                 key_view                 to) const;
+      inline uint32_t count_keys(object_ref&      r,
+                                 const full_node* n,
+                                 key_view         from,
+                                 key_view         to) const;
+      inline uint32_t count_keys(object_ref&        r,
+                                 const bitset_node* n,
+                                 key_view           from,
+                                 key_view           to) const;
+      inline uint32_t count_keys(object_ref&         r,
+                                 const setlist_node* n,
+                                 key_view            from,
+                                 key_view            to) const;
+      inline uint32_t count_keys(object_ref&        r,
+                                 const binary_node* n,
+                                 key_view           from,
+                                 key_view           to) const;
+      inline uint32_t count_keys(object_ref&       r,
+                                 const value_node* n,
+                                 key_view          from,
+                                 key_view          to) const;
 
       /** creates a new handle for address, retains it */
       node_handle create_handle(fast_meta_address a) { return node_handle(*this, a); }
@@ -160,8 +159,11 @@ namespace arbtrie
 
       uint64_t count_ids_with_refs() { return _segas.count_ids_with_refs(); }
 
-      template<iterator_caching_mode CacheMode = noncaching>
-      auto create_iterator(node_handle h) { return iterator<CacheMode>(*this, h); }
+      template <iterator_caching_mode CacheMode = noncaching>
+      auto create_iterator(node_handle h)
+      {
+         return iterator<CacheMode>(*this, h);
+      }
 
       /**
        * count the keys in the range [from,to)
@@ -377,29 +379,31 @@ namespace arbtrie
       fast_meta_address upsert(object_ref&& root, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_existing_br(object_ref& r, key_view key, 
-                                                                const NodeType* fn,
-                                                                key_view cpre,
-                                                                branch_index_type bidx,
-                                                                fast_meta_address br );
+      fast_meta_address upsert_inner_existing_br(object_ref&       r,
+                                                 key_view          key,
+                                                 const NodeType*   fn,
+                                                 key_view          cpre,
+                                                 branch_index_type bidx,
+                                                 fast_meta_address br);
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_new_br(object_ref& r, key_view key, 
-                                                                const NodeType* fn,
-                                                                key_view cpre,
-                                                                branch_index_type bidx,
-                                                                fast_meta_address br );
+      fast_meta_address upsert_inner_new_br(object_ref&       r,
+                                            key_view          key,
+                                            const NodeType*   fn,
+                                            key_view          cpre,
+                                            branch_index_type bidx,
+                                            fast_meta_address br);
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_prefix(object_ref& r,
-                                      key_view                 key,
-                                      key_view                 cpre,
-                                      const NodeType*          fn,
-                                      key_view                 rootpre);
+      fast_meta_address upsert_prefix(object_ref&     r,
+                                      key_view        key,
+                                      key_view        cpre,
+                                      const NodeType* fn,
+                                      key_view        rootpre);
 
-      template<upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_eof( object_ref& r, const NodeType* fn );
+      template <upsert_mode mode, typename NodeType>
+      fast_meta_address upsert_eof(object_ref& r, const NodeType* fn);
 
-      template<upsert_mode mode, typename NodeType>
-      fast_meta_address remove_eof( object_ref& r, const NodeType* fn );
+      template <upsert_mode mode, typename NodeType>
+      fast_meta_address remove_eof(object_ref& r, const NodeType* fn);
 
       template <upsert_mode mode, typename NodeType>
       fast_meta_address upsert_inner(object_ref& r, key_view key);
@@ -428,15 +432,15 @@ namespace arbtrie
       fast_meta_address upsert_binary(object_ref& root, key_view key);
 
       template <upsert_mode mode>
-      fast_meta_address update_binary_key(object_ref& root,
-                                          const binary_node*       bn,
-                                          uint16_t                 lb_idx,
-                                          key_view                 key);
+      fast_meta_address update_binary_key(object_ref&        root,
+                                          const binary_node* bn,
+                                          uint16_t           lb_idx,
+                                          key_view           key);
       template <upsert_mode mode>
-      fast_meta_address remove_binary_key(object_ref& root,
-                                          const binary_node*       bn,
-                                          uint16_t                 lb_idx,
-                                          key_view                 key);
+      fast_meta_address remove_binary_key(object_ref&        root,
+                                          const binary_node* bn,
+                                          uint16_t           lb_idx,
+                                          key_view           key);
    };
 
    class database
@@ -604,14 +608,14 @@ namespace arbtrie
       return data_size;
    }
 
-   int read_session::get(object_ref&                root,
+   int read_session::get(object_ref&                             root,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
    {
       return cast_and_call(root.header(),
                            [&](const auto* n) { return get(root, n, key, callback); });
    }
-   int read_session::get(object_ref&                root,
+   int read_session::get(object_ref&                             root,
                          const auto*                             inner,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
@@ -665,7 +669,7 @@ namespace arbtrie
       callback(false, value_type());
       return 0;
    }
-   int read_session::get(object_ref&                root,
+   int read_session::get(object_ref&                             root,
                          const value_node*                       vn,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)
@@ -674,7 +678,7 @@ namespace arbtrie
       return 1;
    }
 
-   int read_session::get(object_ref&                root,
+   int read_session::get(object_ref&                             root,
                          const binary_node*                      bn,
                          key_view                                key,
                          std::invocable<bool, value_type> auto&& callback)

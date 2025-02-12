@@ -3,6 +3,7 @@
 #include <arbtrie/seg_allocator.hpp>
 #include <bit>
 #include <cassert>
+#include <new>
 
 static const uint64_t page_size      = getpagesize();
 static const uint64_t page_size_mask = ~(page_size - 1);
@@ -80,6 +81,15 @@ namespace arbtrie
                 set_current_thread_name("compactor");
                 compact_loop();
              });
+
+         // Start read bit clearer thread
+         _read_bit_clearer = std::thread(
+             [this]()
+             {
+                thread_name("read_bit_clearer");
+                set_current_thread_name("read_bit_clearer");
+                clear_read_bits_loop();
+             });
       }
    }
    void seg_allocator::stop_compact_thread()
@@ -87,6 +97,33 @@ namespace arbtrie
       _done.store(true);
       if (_compact_thread.joinable())
          _compact_thread.join();
+      if (_read_bit_clearer.joinable())
+         _read_bit_clearer.join();
+   }
+
+   void seg_allocator::clear_read_bits_loop()
+   {
+      using namespace std::chrono;
+      using namespace std::chrono_literals;
+
+      uint16_t current_region = 0;
+
+      while (!_done)
+      {
+         // Calculate target regions per iteration to finish in time
+         const auto target_regions_per_iteration = std::max<uint32_t>(
+             1u, id_alloc::max_regions /
+                     (_cache_frequency_window.count() / 100));  // Based on 100ms sleep
+
+         // Process regions
+         _id_alloc.clear_some_read_bits(current_region, target_regions_per_iteration);
+
+         // Update current_region for next iteration, wrapping around because uint16_t
+         current_region += target_regions_per_iteration;
+
+         // Sleep for a fixed interval
+         std::this_thread::sleep_for(100ms);
+      }
    }
 
    void seg_allocator::aggregate_read_stats()
@@ -220,8 +257,8 @@ namespace arbtrie
          auto state      = _compactor_session->lock();
          auto num_loaded = rcache->pop(read_ids, 1024);
 
-         if (num_loaded > 0)
-            std::cerr << "num_loaded: " << num_loaded << "\n";
+         //if (num_loaded > 0)
+         //   std::cerr << "num_loaded: " << num_loaded << "\n";
          for (uint32_t i = 0; i < num_loaded; ++i)
          {
             auto addr    = fast_meta_address::from_int(read_ids[i]);
@@ -240,13 +277,11 @@ namespace arbtrie
                if (node_meta_type::success == obj_ref.try_move(loc, new_loc))
                {
                   _total_promoted_bytes += header->size();
-                  TRIEDENT_WARN("moved header, total promoted: ", _total_promoted_bytes);
+                  // TRIEDENT_WARN("moved header, total promoted: ", _total_promoted_bytes);
                }
                else
                {
                   //     TRIEDENT_DEBUG("failed to move header");
-                  // TODO: get fancy!
-                  //   _compactor_session->unalloc(header->size());
                }
             }
             else
@@ -783,6 +818,8 @@ namespace arbtrie
       auto     total_segs       = _block_alloc.num_blocks();
       auto     total_retained   = 0;
       uint64_t total_free_space = 0;
+      uint64_t total_read_bytes = 0;
+      uint32_t total_read_nodes = 0;
       std::cerr << "total segments: " << total_segs << "\n";
       std::cerr << std::setw(6) << "#"
                 << " | ";
@@ -799,12 +836,19 @@ namespace arbtrie
       std::cerr << std::setw(12) << "is pinned"
                 << " | ";
       std::cerr << std::setw(8) << "age"
+                << " | ";
+      std::cerr << std::setw(12) << "read nodes"
+                << " | ";
+      std::cerr << std::setw(12) << "read bytes"
                 << " \n";
       for (uint32_t i = 0; i < total_segs; ++i)
       {
-         auto  seg        = get_segment(i);
-         auto& meta       = _header->seg_meta[i];
-         auto  space_objs = meta.get_free_space_and_objs();
+         auto  seg                     = get_segment(i);
+         auto& meta                    = _header->seg_meta[i];
+         auto  space_objs              = meta.get_free_space_and_objs();
+         auto [read_nodes, read_bytes] = calculate_segment_read_stats(i);
+         total_read_nodes += read_nodes;
+         total_read_bytes += read_bytes;
 
          std::cerr << std::setw(6) << i << " | ";
          std::cerr << std::setw(8) << int(100 * double(space_objs.free_space) / segment_size)
@@ -817,13 +861,16 @@ namespace arbtrie
                    << " | ";
          std::cerr << std::setw(12) << (space_objs.is_alloc ? "alloc" : "") << " | ";
          std::cerr << std::setw(12) << (space_objs.is_pinned ? "pin" : "") << " | ";
-         //total_retained += seg->_num_objects - space_objs.second;
-         //std::cerr << std::setw(12) << seg->_num_objects - space_objs.second << " | ";
-         std::cerr << std::setw(8) << seg->_age << " \n";
+         std::cerr << std::setw(8) << seg->_age << " | ";
+         std::cerr << std::setw(12) << read_nodes << " | ";
+         std::cerr << std::setw(12) << read_bytes << " \n";
       }
       std::cerr << "total free: " << total_free_space / 1024 / 1024. << "Mb  "
                 << (100 * total_free_space / double(total_segs * segment_size)) << "%\n";
       std::cerr << "total retained: " << total_retained << " objects\n";
+      std::cerr << "total read nodes: " << total_read_nodes << "\n";
+      std::cerr << "total read bytes: " << total_read_bytes / 1024 / 1024. << "Mb  "
+                << (100 * total_read_bytes / double(total_segs * segment_size)) << "%\n";
 
       std::cerr << "---- free segment Q ------\n";
       std::cerr << "[---A---R*---E------]\n";
@@ -855,6 +902,43 @@ namespace arbtrie
       }
       std::cerr << "--------------------------\n";
       std::cerr << "free release +/- = " << _id_alloc.free_release_count() << " \n";
+   }
+
+   std::pair<uint32_t, uint64_t> seg_allocator::calculate_segment_read_stats(segment_number seg_num)
+   {
+      uint32_t nodes_with_read_bit = 0;
+      uint64_t total_bytes         = 0;
+
+      auto        seg  = get_segment(seg_num);
+      auto        send = (node_header*)((char*)seg + segment_size);
+      const char* foc =
+          (const char*)seg + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
+      node_header* foo = (node_header*)(foc);
+
+      while (foo < send && foo->address())
+      {
+         // Get the object reference for this node
+         auto  foo_address = foo->address();
+         auto& obj_ref     = _id_alloc.get(foo_address);
+
+         // Check if the read bit is set and if the location matches
+         if (obj_ref.is_read())
+         {
+            auto foo_idx     = (char*)foo - (char*)seg;
+            auto current_loc = obj_ref.loc();
+
+            // Only count if the object reference is pointing to this exact node
+            if (current_loc.to_abs() == seg_num * segment_size + foo_idx)
+            {
+               nodes_with_read_bit++;
+               total_bytes += foo->size();
+            }
+         }
+
+         foo = foo->next();
+      }
+
+      return {nodes_with_read_bit, total_bytes};
    }
 
 };  // namespace arbtrie

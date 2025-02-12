@@ -2,6 +2,11 @@
 namespace arbtrie
 {
 
+   /**
+    * Bitset Node - A node implementation that uses a bitset to track which branches are present.
+    * This type must satisfy inner_node_concept to ensure it provides all required
+    * functionality for inner nodes in the tree.
+    */
    struct bitset_node : inner_node<bitset_node>
    {
       static const node_type type = node_type::bitset;
@@ -155,13 +160,13 @@ namespace arbtrie
       // returns a number between 0 and 255
       int get_branch_index(int b) const
       {
-         int            count    = 0;
-         int            case_num = (b + 63) / 64;
+         int count    = 0;
+         int case_num = (b + 63) / 64;
 
-         assert( (64*case_num - b) >= 0 ); // no UB
-         assert( (64*case_num - b) < 64 );
+         assert((64 * case_num - b) >= 0);  // no UB
+         assert((64 * case_num - b) < 64);
 
-         const uint64_t mask     = (-1ull >> (64 * case_num - b));
+         const uint64_t mask = (-1ull >> (64 * case_num - b));
 
          // clang-format off
          switch (case_num)
@@ -198,12 +203,13 @@ namespace arbtrie
          return std::pair<branch_index_type, fast_meta_address>(lbbr, get_branch(lbbr));
       }
 
-      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(branch_index_type br) const
+      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(
+          branch_index_type br) const
       {
          auto lbb  = reverse_lower_bound_bit(br - 1);
          auto lbbr = lbb + 1;
 
-         if ( lbbr == 0)
+         if (lbbr == 0)
          {
             if (_eof_value)
                return std::pair<branch_index_type, fast_meta_address>(0, _eof_value);
@@ -256,31 +262,31 @@ namespace arbtrie
          {
             case 0:
             {
-               const uint64_t mask = b == 64 ? 0 : -1ull >> (b&63);
-               return 255 - 3*64 + std::countl_zero(bits[0] & mask);
+               const uint64_t mask = b == 64 ? 0 : -1ull >> (b & 63);
+               return 255 - 3 * 64 + std::countl_zero(bits[0] & mask);
             }
             case 1:
             {
-               const uint64_t mask = b == 2*64 ? 0 : -1ull >> (b&63);
-               auto temp = 2*64 + std::countl_zero(bits[1] & mask);
-               temp += std::countl_zero(bits[0]) & -uint64_t(temp==64*3);
+               const uint64_t mask = b == 2 * 64 ? 0 : -1ull >> (b & 63);
+               auto           temp = 2 * 64 + std::countl_zero(bits[1] & mask);
+               temp += std::countl_zero(bits[0]) & -uint64_t(temp == 64 * 3);
                return 255 - temp;
             }
             case 2:
             {
-               const uint64_t mask = b == 3*64 ? 0 : -1ull >> (b&63);
-               auto temp = 1*64 + std::countl_zero(bits[2] & mask);
-               temp += std::countl_zero(bits[1]) & -uint64_t(temp==64*2);
-               temp += std::countl_zero(bits[0]) & -uint64_t(temp==64*3);
+               const uint64_t mask = b == 3 * 64 ? 0 : -1ull >> (b & 63);
+               auto           temp = 1 * 64 + std::countl_zero(bits[2] & mask);
+               temp += std::countl_zero(bits[1]) & -uint64_t(temp == 64 * 2);
+               temp += std::countl_zero(bits[0]) & -uint64_t(temp == 64 * 3);
                return 255 - temp;
             }
             case 3:
             {
-               const uint64_t mask = b == 4*64 ? 0 : -1ull >> (b&63);
-               auto temp = std::countl_zero(bits[3] & mask);
-               temp += std::countl_zero(bits[2]) & -uint64_t(temp==64*1);
-               temp += std::countl_zero(bits[1]) & -uint64_t(temp==64*2);
-               temp += std::countl_zero(bits[0]) & -uint64_t(temp==64*3);
+               const uint64_t mask = b == 4 * 64 ? 0 : -1ull >> (b & 63);
+               auto           temp = std::countl_zero(bits[3] & mask);
+               temp += std::countl_zero(bits[2]) & -uint64_t(temp == 64 * 1);
+               temp += std::countl_zero(bits[1]) & -uint64_t(temp == 64 * 2);
+               temp += std::countl_zero(bits[0]) & -uint64_t(temp == 64 * 3);
                return 255 - temp;
             }
             default:

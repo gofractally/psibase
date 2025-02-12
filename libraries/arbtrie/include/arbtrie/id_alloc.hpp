@@ -26,6 +26,8 @@ namespace arbtrie
    class id_alloc
    {
      public:
+      static constexpr const uint32_t max_regions = 0xffff;
+
       id_alloc(std::filesystem::path id_file);
       ~id_alloc();
 
@@ -59,14 +61,30 @@ namespace arbtrie
 
       // return the number of modify bits that were set
       int64_t clear_lock_bits();
+
+      /**
+       * Clear read bits from node metadata entries, processing by regions
+       * @param start_region the region to start clearing from
+       * @param num_regions the number of regions to try to clear
+       */
+      void clear_some_read_bits(id_region start_region, uint32_t num_regions);
+
       // @}
 
      private:
       struct region_header
       {
-         std::mutex            alloc_mutex;
+         /** Mutex protecting allocation operations within this region */
+         std::mutex alloc_mutex;
+
+         /** Number of IDs currently in use in this region */
          std::atomic<uint32_t> use_count;
+
+         /** Next ID to allocate sequentially in this region */
          std::atomic<uint32_t> next_alloc;
+
+         /** Head of the free list for this region, encoded as a meta value.
+             Points to end_of_freelist when empty */
          std::atomic<uint64_t> first_free;
       };
 

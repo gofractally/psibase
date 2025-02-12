@@ -1,16 +1,26 @@
 #pragma once
+#include <arbtrie/binary_node.hpp>
+#include <arbtrie/full_node.hpp>
+#include <arbtrie/inner_node.hpp>
+#include <arbtrie/node_handle.hpp>
+#include <arbtrie/node_header.hpp>
+#include <arbtrie/node_meta.hpp>
+#include <arbtrie/setlist_node.hpp>
+#include <arbtrie/value_node.hpp>
+
 namespace arbtrie
 {
 
-
-   template<iterator_caching_mode CacheMode>
-   inline bool iterator<CacheMode>::is_subtree()const {
-      if( not valid() )  [[unlikely]]
+   template <iterator_caching_mode CacheMode>
+   inline bool iterator<CacheMode>::is_subtree() const
+   {
+      if (not valid()) [[unlikely]]
          return false;
 
       auto state = _rs._segas.lock();
       auto rr    = state.get(_path.back().first);
-      switch( rr.type() ) {
+      switch (rr.type())
+      {
          case node_type::binary:
             return rr.as<binary_node>()->is_subtree(_path.back().second);
          case node_type::full:
@@ -20,37 +30,39 @@ namespace arbtrie
          case node_type::value:
             return rr.as<value_node>()->is_subtree();
          default:
-            throw std::runtime_error( "iterator::is_subtree unhandled type" );
+            throw std::runtime_error("iterator::is_subtree unhandled type");
       }
    }
 
-   template<iterator_caching_mode CacheMode>
-   inline node_handle iterator<CacheMode>::subtree()const {
-      if( not is_subtree() ) [[unlikely]]
-         throw std::runtime_error( "iterator::subtree: not a subtree" );
+   template <iterator_caching_mode CacheMode>
+   inline node_handle iterator<CacheMode>::subtree() const
+   {
+      if (not is_subtree()) [[unlikely]]
+         throw std::runtime_error("iterator::subtree: not a subtree");
 
       auto state = _rs._segas.lock();
       auto rr    = state.get(_path.back().first);
-      switch( rr.type() ) {
+      switch (rr.type())
+      {
          case node_type::binary:
          {
-            auto bn = rr.as<binary_node>();
+            auto bn  = rr.as<binary_node>();
             auto idx = _path.back().second;
             auto kvp = bn->get_key_val_ptr(idx);
             return _rs.create_handle(kvp->value_id());
          }
          case node_type::full:
-            return _rs.create_handle( rr.as<full_node>()->get_eof_value() );
+            return _rs.create_handle(rr.as<full_node>()->get_eof_value());
          case node_type::setlist:
-            return _rs.create_handle( rr.as<setlist_node>()->get_eof_value() );
+            return _rs.create_handle(rr.as<setlist_node>()->get_eof_value());
          case node_type::value:
-            return _rs.create_handle(  rr.as<value_node>()->subtree() );
+            return _rs.create_handle(rr.as<value_node>()->subtree());
          default:
-            throw std::runtime_error( "iterator::subtree unhandled type" );
+            throw std::runtime_error("iterator::subtree unhandled type");
       }
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    inline int32_t iterator<CacheMode>::read_value(auto& buffer)
    {
       if (0 == _path.size())
@@ -101,20 +113,20 @@ namespace arbtrie
          }
 
          default:
-            throw std::runtime_error( "iterator::read_value unhandled type" );
+            throw std::runtime_error("iterator::read_value unhandled type");
       }
       return -1;
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    iterator<CacheMode> iterator<CacheMode>::subtree_iterator() const
    {
       return iterator<CacheMode>(_rs, subtree());
    }
-   template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
-                                           const value_node*        in,
-                                           key_view                 query)
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref&       r,
+                                                      const value_node* in,
+                                                      key_view          query)
    {
       auto ikey = in->key();
       if (ikey <= query)
@@ -125,7 +137,7 @@ namespace arbtrie
       _path.pop_back();
       return query >= key_view();
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const value_node* in, key_view query)
    {
       auto ikey = in->key();
@@ -137,7 +149,7 @@ namespace arbtrie
       _path.pop_back();
       return false;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const auto* in, key_view query)
    {
       auto node_prefix = in->get_prefix();
@@ -208,10 +220,8 @@ namespace arbtrie
       return false;
    }
 
-   template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
-                                           const auto*              in,
-                                           key_view                 query)
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r, const auto* in, key_view query)
    {
       auto node_prefix = in->get_prefix();
       pushkey(node_prefix);
@@ -276,10 +286,8 @@ namespace arbtrie
       return false;
    }
 
-   template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref& r,
-                                   const binary_node*       bn,
-                                   key_view                 query)
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const binary_node* bn, key_view query)
    {
       auto lbx            = bn->lower_bound_idx(query);
       _path.back().second = lbx;
@@ -305,7 +313,7 @@ namespace arbtrie
       //  }
       return true;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::first(key_view prefix)
    {
       if (lower_bound(prefix))
@@ -316,7 +324,7 @@ namespace arbtrie
       }
       return false;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::last(key_view prefix)
    {
       if (not _root.address()) [[unlikely]]
@@ -346,10 +354,10 @@ namespace arbtrie
       return true;
    }
 
-   template<iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r,
-                                           const binary_node*       bn,
-                                           key_view                 query)
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref&        r,
+                                                      const binary_node* bn,
+                                                      key_view           query)
    {
       auto lbx            = bn->reverse_lower_bound_idx(query);
       _path.back().second = lbx;
@@ -367,26 +375,26 @@ namespace arbtrie
       return true;
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound_impl(object_ref& r, key_view query)
    {
       _path.push_back({r.address(), 0});
-      if (not cast_and_call(r.header<node_header,CacheMode>(),
+      if (not cast_and_call(r.header<node_header, CacheMode>(),
                             [&](const auto* n) { return lower_bound_impl(r, n, query); }))
          return next();
       return true;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r, key_view query)
    {
       _path.push_back({r.address(), 257});
-      if (not cast_and_call(r.header<node_header,CacheMode>(),
+      if (not cast_and_call(r.header<node_header, CacheMode>(),
                             [&](const auto* n) { return reverse_lower_bound_impl(r, n, query); }))
          return prev();
       return true;
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound(key_view prefix)
    {
       if (not _root.address())
@@ -402,7 +410,7 @@ namespace arbtrie
          return end();
       return true;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::reverse_lower_bound(key_view prefix)
    {
       if (lower_bound(prefix))
@@ -422,7 +430,7 @@ namespace arbtrie
       }
       return false;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::upper_bound(key_view search)
    {
       if (lower_bound(search))
@@ -433,7 +441,7 @@ namespace arbtrie
       }
       return false;
    }
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::reverse_upper_bound(key_view search)
    {
       if (reverse_lower_bound(search))
@@ -445,7 +453,7 @@ namespace arbtrie
       return false;
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::next()
    {
       if (_path.size() == 0)
@@ -482,7 +490,7 @@ namespace arbtrie
       {
          case node_type::binary:
          {
-            auto bn = oref.as<binary_node,CacheMode>();
+            auto bn = oref.as<binary_node, CacheMode>();
 
             if (current < bn->num_branches())
                popkey(bn->get_key_val_ptr(current)->key_size());
@@ -496,12 +504,12 @@ namespace arbtrie
             return true;
          }
          case node_type::full:
-            return handle_inner(oref.as<full_node,CacheMode>());
+            return handle_inner(oref.as<full_node, CacheMode>());
          case node_type::setlist:
-            return handle_inner(oref.as<setlist_node,CacheMode>());
+            return handle_inner(oref.as<setlist_node, CacheMode>());
          case node_type::value:
          {
-            auto vn = oref.as<value_node,CacheMode>();
+            auto vn = oref.as<value_node, CacheMode>();
             popkey(vn->key().size());
             _path.pop_back();
             return next();
@@ -512,7 +520,7 @@ namespace arbtrie
       // unreachable
    }
 
-   template<iterator_caching_mode CacheMode>
+   template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::prev()
    {
       if (_path.size() == 0)
@@ -569,7 +577,7 @@ namespace arbtrie
          case node_type::binary:
          {
             //   TRIEDENT_DEBUG( "binary _path.size: ", _path.size(), " idx: ", _path.back().second );
-            const auto* bn = oref.as<binary_node,CacheMode>();
+            const auto* bn = oref.as<binary_node, CacheMode>();
             if (current < bn->num_branches())
             {
                popkey(bn->get_key_val_ptr(current)->key_size());
@@ -592,13 +600,13 @@ namespace arbtrie
             }
          }
          case node_type::full:
-            return handle_inner(oref.as<full_node,CacheMode>());
+            return handle_inner(oref.as<full_node, CacheMode>());
          case node_type::setlist:
             //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
-            return handle_inner(oref.as<setlist_node,CacheMode>());
+            return handle_inner(oref.as<setlist_node, CacheMode>());
          case node_type::value:
          {
-            auto vn = oref.as<value_node,CacheMode>();
+            auto vn = oref.as<value_node, CacheMode>();
             popkey(vn->key().size());
             _path.pop_back();
             return prev();
@@ -607,6 +615,155 @@ namespace arbtrie
             throw std::runtime_error("iterator::prevunexpected type");
       }
       // unreachable
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <typename Callback>
+   bool iterator<CacheMode>::get(key_view key, Callback&& callback) const
+   {
+      if (not _root.address()) [[unlikely]]
+      {
+         callback(false, value_type{});
+         return false;
+      }
+
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_root.address());
+
+      return _rs.get(rr, key, std::forward<Callback>(callback));
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <typename Callback>
+   bool iterator<CacheMode>::get2(key_view key, Callback&& callback)
+   {
+      if (not _root.address()) [[unlikely]]
+      {
+         callback(false, value_type{});
+         return end();
+      }
+
+      _branches.clear();
+      _path.clear();
+
+      auto state = _rs._segas.lock();
+      auto rr    = state.get(_root.address());
+
+      // _path.push_back({rr.address(), 0});
+
+      if (get2_impl(rr, key, std::forward<Callback>(callback)))
+         return true;
+      return end();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <typename Callback>
+   bool iterator<CacheMode>::get2_impl(object_ref& r, key_view key, Callback&& callback)
+   {
+      if (_path.empty())
+      {
+         _path.push_back({r.address(), 0});
+      }
+
+      auto handle_inner = [&](const inner_node_concept auto* in)
+      {
+         auto node_prefix = in->get_prefix();
+         pushkey(node_prefix);
+
+         auto cpre = common_prefix(node_prefix, key);
+         if (cpre != node_prefix)
+         {
+            return false;
+         }
+
+         auto remaining_key = key.substr(cpre.size());
+         if (not remaining_key.empty())
+         {
+            auto br   = char_to_branch(remaining_key.front());
+            auto addr = in->get_branch(br);
+            if (not addr)
+            {
+               return false;
+            }
+            _path.push_back({fast_meta_address(addr), 0});
+            pushkey(branch_to_char(br));
+            auto next_ref = r.rlock().get(addr);
+            bool result =
+                get2_impl(next_ref, remaining_key.substr(1), std::forward<Callback>(callback));
+            if (!result)
+            {
+               popkey(1);
+               _path.pop_back();
+            }
+            return result;
+         }
+
+         if (not in->has_eof_value())
+         {
+            return false;
+         }
+
+         auto eof_addr = in->get_eof_value();
+         assert(eof_addr);
+
+         if (in->is_eof_subtree())
+         {
+            callback(true, value_type(eof_addr));
+         }
+         else
+         {
+            auto val = r.rlock().get(eof_addr);
+            callback(true, value_type(val.template as<value_node>()->value()));
+         }
+         return true;
+      };
+
+      switch (r.type())
+      {
+         case node_type::full:
+            return handle_inner(r.template as<full_node>());
+         case node_type::setlist:
+            return handle_inner(r.template as<setlist_node>());
+         case node_type::binary:
+         {
+            auto bn  = r.template as<binary_node>();
+            auto idx = bn->find_key_idx(key);
+            if (idx < 0)
+               return false;
+
+            _path.back().second = idx;
+            pushkey(bn->get_key_val_ptr(idx)->key());
+
+            auto kvp = bn->get_key_val_ptr(idx);
+
+            if (bn->is_subtree(idx))
+            {
+               callback(true, value_type(kvp->value_id()));
+            }
+            else if (bn->is_obj_id(idx))
+            {
+               auto val = r.rlock().get(kvp->value_id());
+               callback(true, value_type(val.template as<value_node>()->value()));
+            }
+            else
+            {
+               callback(true, kvp->value());
+            }
+            return true;
+         }
+         case node_type::value:
+         {
+            auto vn = r.template as<value_node>();
+            if (vn->key() != key)
+               return false;
+
+            pushkey(vn->key());
+            callback(true, vn->value());
+            return true;
+         }
+         default:
+            throw std::runtime_error("iterator::get2 unexpected type");
+      }
    }
 
 }  // namespace arbtrie

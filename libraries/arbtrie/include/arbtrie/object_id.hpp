@@ -21,7 +21,6 @@ namespace arbtrie
    struct id_index
    {
       constexpr id_index(uint32_t r = 0) : index(r) {}
-      //uint32_t index:24;
       uint16_t index;
       operator bool() const { return index; }
       friend bool operator==(id_index a, id_index b) { return a.index == b.index; };
@@ -37,7 +36,7 @@ namespace arbtrie
 
       operator object_id() const;
 
-      uint64_t  to_int() const { return (uint64_t(_region.region) << 24) | _index.index; }
+      uint32_t  to_int() const { return (uint32_t(_region.region) << 16) | _index.index; }
       uint16_t  region() const { return _region.region; }
       uint32_t  index() const { return _index.index; }
       id_region _region;
@@ -71,11 +70,12 @@ namespace arbtrie
 
       constexpr fast_meta_address(id_address a) : region(a.region()), index(a.index()) {}
 
-      constexpr static inline fast_meta_address from_int(uint64_t i)
+      constexpr static inline fast_meta_address from_int(uint32_t i)
       {
-         return {i >> 24, i & 0xffffff};
+         return {i >> 16, i & 0xffff};
       }
-      constexpr uint64_t to_int() const { return (uint64_t(region) << 24) | uint64_t(index); }
+      constexpr uint32_t to_int() const { return (uint32_t(region) << 16) | uint32_t(index); }
+      static_assert(sizeof(id_region) + sizeof(id_index) == sizeof(uint32_t));
 
       constexpr void reset()
       {
@@ -109,7 +109,7 @@ namespace arbtrie
     */
    struct object_id
    {
-      explicit             operator bool() const { return (id & 0xffffff) != 0; }
+      explicit             operator bool() const { return (id & 0xffff) != 0; }
       friend bool          operator==(object_id a, object_id b) = default;
       friend std::ostream& operator<<(std::ostream& out, const object_id& oid)
       {
@@ -134,8 +134,8 @@ namespace arbtrie
    constexpr inline id_address::id_address(object_id oid)
    {
       auto i         = oid.to_int();
-      _index.index   = i & 0xffffff;
-      _region.region = i >> 24;
+      _index.index   = i & 0xffff;
+      _region.region = i >> 16;
    }
 
    inline id_address::operator object_id() const

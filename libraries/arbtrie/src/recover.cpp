@@ -60,7 +60,7 @@ namespace arbtrie
  */
    void database::recover(recover_args args)
    {
-      TRIEDENT_WARN( "Recovering... reset meta nodes!" );
+      TRIEDENT_WARN("Recovering... reset meta nodes!");
       // all recovered nodes have a ref of 1
       _sega.reset_meta_nodes(args);
 
@@ -68,9 +68,10 @@ namespace arbtrie
       {
          auto s     = start_read_session();
          auto state = s._segas.lock();
-         for( int i = 0; i < num_top_roots; ++i ) {
-            auto r     = s.get_root(i);
-            if( r.address() )
+         for (int i = 0; i < num_top_roots; ++i)
+         {
+            auto r = s.get_root(i);
+            if (r.address())
                recusive_retain_all(state.get(r.address()));
          }
       }
@@ -79,11 +80,13 @@ namespace arbtrie
       // if a ref was 1 it is added to free list
       _sega.release_unreachable();
    }
-   void seg_allocator::reset_reference_counts() {
+   void seg_allocator::reset_reference_counts()
+   {
       _id_alloc.reset_all_refs();
    }
 
-   void database::reset_reference_counts() {
+   void database::reset_reference_counts()
+   {
       // set all refs > 1 to 1
       _sega.reset_reference_counts();
 
@@ -91,9 +94,10 @@ namespace arbtrie
       {
          auto s     = start_read_session();
          auto state = s._segas.lock();
-         for( int i = 0; i < num_top_roots; ++i ) {
-            auto r     = s.get_root(i);
-            if( r.address() )
+         for (int i = 0; i < num_top_roots; ++i)
+         {
+            auto r = s.get_root(i);
+            if (r.address())
                recusive_retain_all(state.get(r.address()));
          }
       }
@@ -104,12 +108,12 @@ namespace arbtrie
       _sega.release_unreachable();
    }
 
-   void seg_allocator::reset_meta_nodes( recover_args args )
+   void seg_allocator::reset_meta_nodes(recover_args args)
    {
       _id_alloc.clear_all();
 
       std::vector<int> age_index;
-      age_index.resize(_block_alloc.num_blocks()); 
+      age_index.resize(_block_alloc.num_blocks());
       for (int i = 0; i < age_index.size(); ++i)
          age_index[i] = i;
 
@@ -118,14 +122,16 @@ namespace arbtrie
       int next_free_seg = 0;
       for (auto i : age_index)
       {
-         if (get_segment(i)->_age < 0) {
+         if (get_segment(i)->_age < 0)
+         {
             _header->free_seg_buffer[next_free_seg++] = i;
             continue;
          }
          auto seg  = get_segment(i);
          auto send = (node_header*)((char*)seg + segment_size);
 
-         const char* foc = (const char*)seg + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
+         const char* foc =
+             (const char*)seg + round_up_multiple<64>(sizeof(mapped_memory::segment_header));
          node_header* foo = (node_header*)(foc);
 
          madvise(seg, segment_size, MADV_SEQUENTIAL);
@@ -146,7 +152,7 @@ namespace arbtrie
             //  and we are iterating segments from newest to oldest
             if ((not loc.to_aligned()) or (loc.segment() == i))
             {
-               if( loc.segment() == i ) 
+               if (loc.segment() == i)
                   free_space += ((const node_header*)((const char*)seg + loc.abs_index()))->_nsize;
                met.store(temp_meta_type()
                              .set_location(node_location::from_absolute(i * segment_size +
@@ -154,7 +160,9 @@ namespace arbtrie
                              .set_ref(1)
                              .set_type(foo->get_type()),
                          std::memory_order_relaxed);
-            } else {
+            }
+            else
+            {
                free_space += foo->_nsize;
             }
 
@@ -167,8 +175,8 @@ namespace arbtrie
       }
       _header->alloc_ptr.store(0);
       _header->end_ptr.store(next_free_seg);
-      _header->clean_exit_flag.store( false );
-      _header->next_alloc_age.store( get_segment( age_index[0] )->_age + 1 );
+      _header->clean_exit_flag.store(false);
+      _header->next_alloc_age.store(get_segment(age_index[0])->_age + 1);
    }
 
    void seg_allocator::release_unreachable()
@@ -179,8 +187,9 @@ namespace arbtrie
    {
       return _id_alloc.clear_lock_bits();
    }
-   int64_t id_alloc::clear_lock_bits() {
-      int64_t count = 0;
+   int64_t id_alloc::clear_lock_bits()
+   {
+      int64_t    count     = 0;
       const auto num_block = _block_alloc.num_blocks();
       for (int block = 0; block < num_block; ++block)
          for (int region = 0; region < 0xffff; ++region)
@@ -188,11 +197,12 @@ namespace arbtrie
             {
                fast_meta_address fma  = {region, ids_per_page * block + index};
                auto&             meta = get(fma);
-               auto mval = meta.to_int();
-               if( mval & (node_meta<>::copy_mask | node_meta<>::modify_mask) )
+               auto              mval = meta.to_int();
+               if (mval & (node_meta<>::copy_mask | node_meta<>::modify_mask))
                {
                   count += bool(mval & node_meta<>::modify_mask);
-                  meta.store( mval & ~(node_meta<>::copy_mask | node_meta<>::modify_mask), std::memory_order_relaxed );
+                  meta.store(mval & ~(node_meta<>::copy_mask | node_meta<>::modify_mask),
+                             std::memory_order_relaxed);
                }
             }
       return count;
@@ -206,7 +216,7 @@ namespace arbtrie
          auto ptr = _block_alloc.get(block);
          memset(ptr, 0, id_block_size);
       }
-      for (int region = 0; region < 0xffff; ++region)
+      for (int region = 0; region < max_regions; ++region)
       {
          _state->regions[region].use_count.store(0, std::memory_order_relaxed);
          _state->regions[region].next_alloc.store(0, std::memory_order_relaxed);
@@ -216,40 +226,61 @@ namespace arbtrie
       }
    }
 
-   // set all refs greater than 1 to 1
-   void id_alloc::reset_all_refs() {
-      const auto num_block = _block_alloc.num_blocks();
-      for (int block = 0; block < num_block; ++block)
-         for (int region = 0; region < 0xffff; ++region)
+   /**
+    * @param start_region the region to start clearing from
+    * @param num_regions the number of regions to try to clear
+    */
+   void id_alloc::clear_some_read_bits(id_region start_region, uint32_t num_regions)
+   {
+      const auto num_blocks = _block_alloc.num_blocks();
+      const auto end_region = std::min<uint32_t>(start_region.region + num_regions, max_regions);
+
+      for (int block = 0; block < num_blocks; ++block)
+         for (uint16_t region = start_region.region; region < end_region; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
                fast_meta_address fma  = {region, ids_per_page * block + index};
                auto&             meta = get(fma);
-               if( meta.ref() > 0 )
+               if (meta.is_read())
+                  meta.clear_read_bit(std::memory_order_relaxed);
+            }
+   }
+
+   // set all refs greater than 1 to 1
+   void id_alloc::reset_all_refs()
+   {
+      const auto num_block = _block_alloc.num_blocks();
+      for (int block = 0; block < num_block; ++block)
+         for (int region = 0; region < max_regions; ++region)
+            for (int index = block ? 0 : 8; index < ids_per_page; ++index)
+            {
+               fast_meta_address fma  = {region, ids_per_page * block + index};
+               auto&             meta = get(fma);
+               if (meta.ref() > 0)
                   meta.set_ref(1);
             }
    }
-   uint64_t id_alloc::count_ids_with_refs() {
-      uint64_t count = 0;
+   uint64_t id_alloc::count_ids_with_refs()
+   {
+      uint64_t   count     = 0;
       const auto num_block = _block_alloc.num_blocks();
-      uint64_t by_type[8];
-      memset( by_type, 0, sizeof(by_type) );
+      uint64_t   by_type[8];
+      memset(by_type, 0, sizeof(by_type));
       for (int block = 0; block < num_block; ++block)
-         for (int region = 0; region < 0xffff; ++region)
+         for (int region = 0; region < max_regions; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
                fast_meta_address fma  = {region, ids_per_page * block + index};
                auto&             meta = get(fma);
                by_type[meta.type()]++;
-               //if( meta.ref() )
-               //   TRIEDENT_DEBUG( "id: ", fma );
                count += meta.ref() > 0;
             }
       std::cerr << "------------------------------\n";
-      for( int i = 0 ; i < node_type::undefined; ++i ) {
-         std::cerr << node_type_names[i] <<": " << by_type[i] <<"\n";
+      for (int i = 0; i < node_type::undefined; ++i)
+      {
+         std::cerr << node_type_names[i] << ": " << by_type[i] << "\n";
       }
-      std::cerr << "total: " << count <<"\n";
+      std::cerr << "total: " << count << "\n";
       std::cerr << "------------------------------\n";
 
       return count;
@@ -258,15 +289,17 @@ namespace arbtrie
    void id_alloc::release_unreachable()
    {
       const auto num_block = _block_alloc.num_blocks();
-      for (int region = 0; region < 0xffff; ++region) {
+      for (int region = 0; region < max_regions; ++region)
+      {
          _state->regions[region].use_count.store(0, std::memory_order_relaxed);
          _state->regions[region].first_free.store(
              temp_meta_type().set_location(end_of_freelist).to_int(), std::memory_order_relaxed);
-         _state->regions[region].next_alloc.store(num_block*ids_per_page, std::memory_order_relaxed);
+         _state->regions[region].next_alloc.store(num_block * ids_per_page,
+                                                  std::memory_order_relaxed);
       }
       for (int block = 0; block < num_block; ++block)
       {
-         for (int region = 0; region < 0xffff; ++region)
+         for (int region = 0; region < max_regions; ++region)
          {
             _state->regions[region].use_count.fetch_add(ids_per_page);
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)

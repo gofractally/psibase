@@ -40,11 +40,12 @@ namespace arbtrie
    {
       uint32_t checksum;
       uint32_t _ntype : 3;              // node_type
-      uint32_t _read: 1 = 0;            // currently unused
+      uint32_t _read : 1 = 0;           // currently unused
       uint32_t _nsize : 27;             // bytes allocated for this node
       uint64_t _num_branches : 9;       // number of branches that are set
       uint64_t _branch_id_region : 16;  // the ID region branches from this node are allocated to
-      uint64_t _node_id : 40;           // the ID of this node
+      uint64_t _node_id : 32;           // the ID of this node
+      uint64_t _unused : 8;             // unused bits
 
       inline node_header(uint32_t          size,
                          fast_meta_address nid,
@@ -138,4 +139,3 @@ namespace arbtrie
    };
 
 }  // namespace arbtrie
-

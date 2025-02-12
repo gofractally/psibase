@@ -350,6 +350,14 @@ namespace arbtrie
       void select_segments();
       void sort_selected_segments();
       void promote_rcache_data();
+      void clear_read_bits_loop();
+
+      /**
+       * Calculate statistics about read bits in a segment
+       * @param seg_num The segment number to analyze
+       * @return A pair containing {number of node headers with read bit set, total bytes of those nodes}
+       */
+      std::pair<uint32_t, uint64_t> calculate_segment_read_stats(segment_number seg_num);
 
       /**
        * This must be called via a session because the session is responsible
@@ -392,6 +400,12 @@ namespace arbtrie
 
       // allocates new segments
       block_allocator _block_alloc;
+
+      // Thread for clearing read bits
+      std::thread _read_bit_clearer;
+
+      // Duration for cache frequency window (default 1 minute)
+      std::chrono::milliseconds _cache_frequency_window{60000};
 
       // keeps track of the segments that are mlocked....
       // TODO: this needs to get refactored

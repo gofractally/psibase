@@ -818,8 +818,8 @@ int  main(int argc, char** argv)
                   for (int i = 0; i < batch_size; ++i)
                   {
                      ++added;
-                     uint64_t val = XXH64(&i, sizeof(i), 0);
-                     // rand64();
+                     // uint64_t val = XXH64(&i, sizeof(i), 0);
+                     uint64_t val = rand64();
                      key_view kstr((char*)&val, sizeof(val));
                      if (not itr.lower_bound(kstr))
                      {

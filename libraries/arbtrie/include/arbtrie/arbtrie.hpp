@@ -1,21 +1,15 @@
 #pragma once
+#include <arbtrie/binary_node.hpp>
+#include <arbtrie/full_node.hpp>
+#include <arbtrie/inner_node.hpp>
 #include <arbtrie/node_header.hpp>
+#include <arbtrie/setlist_node.hpp>
+#include <arbtrie/value_node.hpp>
 #include <cassert>
 
 namespace arbtrie
 {
-
-
-};  // namespace arbtrie
-
-#include <arbtrie/setlist_node.hpp>
-#include <arbtrie/value_node.hpp>
-#include <arbtrie/full_node.hpp>
-#include <arbtrie/index_node.hpp>
-#include <arbtrie/binary_node.hpp>
-#include <arbtrie/bitset_node.hpp>
-
-namespace arbtrie {
+   class bitset_node;
 
    template <typename T>
       requires is_node_header<T>
@@ -30,8 +24,8 @@ namespace arbtrie {
          // always predicted extremely unlikely.
          [[likely]] case node_type::setlist:
             return func(static_cast<transcribe_const_t<T, setlist_node>*>(h));
-       //  [[likely]] case node_type::bitset:
-       //     return func(static_cast<transcribe_const_t<T, bitset_node>*>(h));
+            //  [[likely]] case node_type::bitset:
+            //     return func(static_cast<transcribe_const_t<T, bitset_node>*>(h));
          [[likely]] case node_type::full:
             return func(static_cast<transcribe_const_t<T, full_node>*>(h));
          case node_type::binary:
@@ -39,10 +33,10 @@ namespace arbtrie {
          [[unlikely]] case node_type::value:
             return func(static_cast<transcribe_const_t<T, value_node>*>(h));
          [[unlikely]] case node_type::freelist:
-            assert( !"cast and call on freelist" );
+            assert(!"cast and call on freelist");
             throw std::runtime_error("cast and call on node type freelist");
          [[unlikely]] default:
-            assert( !"cast and call on unknown node type" );
+            assert(!"cast and call on unknown node type");
             throw std::runtime_error("cast and call on unknown node type");
       }
    }
@@ -51,11 +45,7 @@ namespace arbtrie {
       requires is_node_header<T>
    inline auto cast_and_call(T* h, auto&& func)
    {
-      return cast_and_call( h->get_type(), h, std::forward<decltype(func)>(func) );
+      return cast_and_call(h->get_type(), h, std::forward<decltype(func)>(func));
    }
 
-
-
-}
-
-
+}  // namespace arbtrie

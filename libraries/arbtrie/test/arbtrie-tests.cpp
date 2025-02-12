@@ -1,6 +1,16 @@
-#include <algorithm>
+#include <arbtrie/xxhash.h>
+#include <arbtrie/binary_node.hpp>
 #include <arbtrie/database.hpp>
+#include <arbtrie/inner_node.hpp>
+#include <arbtrie/iterator.hpp>
+#include <arbtrie/mapping.hpp>
+#include <arbtrie/node_handle.hpp>
+#include <arbtrie/node_meta.hpp>
 #include <arbtrie/rdtsc.hpp>
+#include <arbtrie/value_node.hpp>
+#include <cctype>  // for std::toupper
+
+#include <algorithm>
 
 #include <random>
 
@@ -22,7 +32,7 @@ using namespace std::literals::string_literals;
 void toupper(std::string& s)
 {
    for (auto& c : s)
-      c = std::toupper(c);
+      c = std::toupper(static_cast<unsigned char>(c));
 }
 
 struct environ
@@ -1469,4 +1479,104 @@ TEST_CASE("move-frequently-read-node")
    {
       itr.lower_bound(key_view(target_word));
    }
+}
+
+TEST_CASE("iterator-get-methods")
+{
+   environ env;
+   auto    ws   = env.db->start_write_session();
+   auto    root = ws.create_root();
+
+   // Load dictionary words and store them for verification
+   auto words = load_words(ws, root);
+   ws.set_root<sync_type::sync>(root);
+
+   // Create read session and iterator
+   auto rs = env.db->start_read_session();
+   auto it = rs.create_iterator(root);
+
+   // Test a sample of words from the dictionary
+   for (size_t i = 0; i < words.size();
+        i += 100)  // Test every 100th word to keep test duration reasonable
+   {
+      const auto& word = words[i];
+
+      // First verify get() works correctly
+      it.lower_bound(key_view(word));
+      REQUIRE(it.valid());
+      std::string current_key(it.key().data(), it.key().size());
+      REQUIRE(current_key == word);
+
+      // Now test next() followed by prev() returns to same key
+      REQUIRE(it.next());  // Move to next key
+      REQUIRE(it.prev());  // Move back
+      std::string returned_key(it.key().data(), it.key().size());
+      REQUIRE(returned_key == word);  // Should be back at original key
+
+      // Test session get
+      bool        session_found = false;
+      std::string session_value;
+      rs.get(root, word,
+             [&](bool found, const value_type& val)
+             {
+                session_found = found;
+                if (found)
+                   session_value = std::string(val.view().data(), val.view().size());
+             });
+
+      // Test iterator get
+      bool        get_found = false;
+      std::string get_value;
+      it.get(word,
+             [&](bool found, const value_type& val)
+             {
+                get_found = found;
+                if (found)
+                   get_value = std::string(val.view().data(), val.view().size());
+             });
+
+      // Test iterator get2
+      bool        get2_found = false;
+      std::string get2_value;
+      it.get2(word,
+              [&](bool found, const value_type& val)
+              {
+                 get2_found = found;
+                 if (found)
+                    get2_value = std::string(val.view().data(), val.view().size());
+              });
+
+      // Verify results
+      REQUIRE(session_found);
+      REQUIRE(get_found);
+      REQUIRE(get2_found);
+
+      // The value should be the uppercase version of the word, padded to 64 bytes
+      std::string expected = word;
+      toupper(expected);
+      expected.resize(64);
+
+      REQUIRE(session_value == expected);
+      REQUIRE(get_value == expected);
+      REQUIRE(get2_value == expected);
+
+      // Verify that iterator.key() returns the original word after get2
+      REQUIRE(std::string(it.key().data(), it.key().size()) == word);
+   }
+
+   // Test non-existent key
+   std::string nonexistent = "THIS_KEY_SHOULD_NOT_EXIST_IN_DICTIONARY_12345";
+
+   bool session_found = false;
+   rs.get(root, nonexistent, [&](bool found, const value_type&) { session_found = found; });
+
+   bool get_found = false;
+   it.get(nonexistent, [&](bool found, const value_type&) { get_found = found; });
+
+   bool get2_found = false;
+   it.get2(nonexistent, [&](bool found, const value_type&) { get2_found = found; });
+
+   REQUIRE(not session_found);
+   REQUIRE(not get_found);
+   REQUIRE(not get2_found);
 }
