@@ -66,7 +66,6 @@ namespace psibase
          if (!isReadOnly)
             db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
       }
-      databaseStatus = *dbStatus;
 
       current.header.producer = producer;
       current.header.term     = term;
@@ -331,9 +330,12 @@ namespace psibase
 
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      check(!!dbStatus, "databaseStatus not set");
+
       Merkle m;
-      for (std::uint64_t i   = databaseStatus.blockMerkleEventNumber,
-                         end = databaseStatus.nextMerkleEventNumber;
+      for (std::uint64_t i   = dbStatus->blockMerkleEventNumber,
+                         end = dbStatus->nextMerkleEventNumber;
            i != end; ++i)
       {
          auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
@@ -480,8 +482,10 @@ namespace psibase
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
-      databaseStatus.blockMerkleEventNumber = databaseStatus.nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, databaseStatus.key(), databaseStatus);
+      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      check(!!dbStatus, "databaseStatus not set");
+      dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
+      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode
