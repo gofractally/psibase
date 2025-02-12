@@ -22,7 +22,7 @@ import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useNavigate } from "react-router-dom";
-import { useLocalStorage } from "@uidotdev/usehooks";
+import { useAutoNavigate } from "@/hooks/useAutoNav";
 
 const Other = "-other" as const;
 
@@ -42,7 +42,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { mutateAsync: selectAccount, isPending: isConnectingToAccount } =
     useSelectAccount();
 
-  const [autoNavigate, setAutoNavigate] = useLocalStorage("autoNavigate", true);
+  const [autoNavigate, setAutoNavigate] = useAutoNavigate();
 
   useEffect(() => {
     if (currentUser && !autoNavigate) {
@@ -84,7 +84,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         if (open) {
           setShowModal(open);
         } else {
-          if (currentUser === null) {
+          const isRefusingToLogin = currentUser === null;
+          if (isRefusingToLogin) {
             setAutoNavigate(false);
             navigate("/");
           } else {

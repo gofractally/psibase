@@ -15,14 +15,14 @@ import {
 import { Drill } from "lucide-react";
 import { LoginButton } from "./login-button";
 import { CreateAppModal } from "./create-app-modal";
-import { useLocalStorage } from "@uidotdev/usehooks";
+import { useAutoNavigate } from "@/hooks/useAutoNav";
 
 export const Loader = () => {
   const { data: currentUser, isLoading } = useCurrentUser();
   const navigate = useNavigate();
 
   const { apps } = useTrackedApps();
-  const [autoNavigate] = useLocalStorage("autoNavigate", true);
+  const [autoNavigate] = useAutoNavigate();
 
   useEffect(() => {
     if (apps.length > 0 && (autoNavigate || currentUser)) {

@@ -37,6 +37,7 @@ import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -45,7 +46,13 @@ export function NavUser() {
     useCurrentUser();
 
   const { data: chainId, isFetched: isFetchedChainId } = useChainId();
-  const { mutate: logout } = useLogout();
+  const { mutateAsync: logout } = useLogout();
+  const navigate = useNavigate();
+
+  const onLogout = async () => {
+    await logout();
+    navigate("/");
+  };
 
   const { setTheme } = useTheme();
 
@@ -185,7 +192,7 @@ export function NavUser() {
               </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => logout()}>
+            <DropdownMenuItem onClick={() => onLogout()}>
               <LogOut />
               Log out
             </DropdownMenuItem>

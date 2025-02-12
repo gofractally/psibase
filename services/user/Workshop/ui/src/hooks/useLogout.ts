@@ -1,8 +1,10 @@
 import { supervisor } from "@/supervisor";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useAutoNavigate } from "./useAutoNav";
 
 export const useLogout = () => {
   const queryClient = useQueryClient();
+  const [_, setAutoNav] = useAutoNavigate();
 
   return useMutation({
     mutationKey: ["logout"],
@@ -14,7 +16,8 @@ export const useLogout = () => {
         intf: "activeApp",
       }),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+      setAutoNav(false);
+      queryClient.setQueryData(["loggedInUser"], null);
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
       }, 2500);
