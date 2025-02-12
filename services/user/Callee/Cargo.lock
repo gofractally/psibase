@@ -1642,8 +1642,6 @@ version = "0.14.0"
 dependencies = [
  "callee-pkg",
  "psibase",
- "serde",
- "serde_json",
  "wit-bindgen-rt 0.30.0",
 ]
 

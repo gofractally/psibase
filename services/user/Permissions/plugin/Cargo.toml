@@ -1,9 +1,9 @@
 [package]
-name = "plugin"
+name = "permissions"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-publish.workspace = true
+publish = false
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
@@ -23,9 +23,4 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
-
-[dev-dependencies]
-permissions-pkg = { path = "..", version = "0.14.0" }
