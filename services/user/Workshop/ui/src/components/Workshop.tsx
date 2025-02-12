@@ -1,4 +1,3 @@
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 import {
   appMetadataQueryKey,
@@ -18,6 +17,7 @@ import { queryClient } from "@/queryClient";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CreateAppAccountCard } from "./create-app-account-card";
+import { Account } from "@/lib/zodTypes";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -39,16 +39,11 @@ const setCacheData = (appName: string, checked: boolean) => {
 };
 
 export const Workshop = () => {
-  const {
-    data: currentUser,
-    isFetched: isFetchedUser,
-    error: loggedInUserError,
-  } = useCurrentUser();
-
   const currentApp = useCurrentApp();
 
   const {
     data: metadata,
+    isLoading,
     isSuccess,
     error: metadataError,
   } = useAppMetadata(currentApp);
@@ -58,7 +53,8 @@ export const Workshop = () => {
     accountStatus == "Invalid" ? new Error(`Invalid account name`) : undefined;
 
   const { mutateAsync: updateMetadata } = useSetMetadata();
-  const { mutateAsync: publishApp } = usePublishApp();
+  const { mutateAsync: publishApp, isPending: isPublishingApp } =
+    usePublishApp();
 
   const handleChecked = async (checked: boolean, appName: string) => {
     try {
@@ -85,8 +81,7 @@ export const Workshop = () => {
     ? metadata.extraMetadata.status == Status.Enum.published
     : false;
 
-  const error = loggedInUserError || metadataError || invalidAccountError;
-  const isLoading = !isSuccess;
+  const error = metadataError || invalidAccountError;
 
   if (error) {
     return <ErrorCard error={error} />;
@@ -97,11 +92,7 @@ export const Workshop = () => {
           <div className="w-full flex justify-center">
             <Spinner size="lg" className="bg-black text-center dark:bg-white" />
           </div>
-          <div>
-            {isFetchedUser
-              ? "Fetching app metadata..."
-              : "Fetching account status..."}
-          </div>
+          <div>Fetching app metadata...</div>
         </div>
       </div>
     );
@@ -126,9 +117,9 @@ export const Workshop = () => {
                 </div>
                 <Switch
                   checked={isAppPublished}
-                  disabled={!(currentUser && currentApp)}
+                  disabled={isPublishingApp}
                   onCheckedChange={(checked) =>
-                    handleChecked(checked, z.string().parse(currentUser))
+                    handleChecked(checked, Account.parse(currentApp))
                   }
                 />
               </div>

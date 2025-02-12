@@ -12,7 +12,6 @@ import { useCreateApp } from "@/hooks/use-create-app";
 
 export const CreateAppAccountCard = () => {
   const currentApp = useCurrentApp();
-
   const { mutateAsync: createApp, isPending, error } = useCreateApp();
 
   return (
@@ -29,7 +28,7 @@ export const CreateAppAccountCard = () => {
         <Button
           disabled={isPending}
           onClick={() => {
-            createApp(currentApp);
+            createApp({ account: currentApp, allowExistingAccount: true });
           }}
         >
           Create account

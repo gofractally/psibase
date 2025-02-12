@@ -15,23 +15,21 @@ import {
 import { Drill } from "lucide-react";
 import { LoginButton } from "./login-button";
 import { CreateAppModal } from "./create-app-modal";
+import { useLocalStorage } from "@uidotdev/usehooks";
 
 export const Loader = () => {
   const { data: currentUser, isLoading } = useCurrentUser();
   const navigate = useNavigate();
 
   const { apps } = useTrackedApps();
+  const [autoNavigate] = useLocalStorage("autoNavigate", true);
 
   useEffect(() => {
-    if (apps.length > 0) {
+    if (apps.length > 0 && (autoNavigate || currentUser)) {
       console.log(apps, "are the apps");
       const firstApp = apps[0]!;
       console.log({ firstApp });
       navigate(`/app/${firstApp.account}`);
-    } else {
-      // - Root page
-      // - No tracked apps
-      // - Logged - not logged in
     }
   }, [apps, navigate]);
 

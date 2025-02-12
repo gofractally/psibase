@@ -16,7 +16,7 @@ const GetAccountReturn = z
   })
   .optional();
 
-const isAccountAvailable = async (
+export const isAccountAvailable = async (
   accountName: string
 ): Promise<z.infer<typeof AccountNameStatus>> => {
   try {

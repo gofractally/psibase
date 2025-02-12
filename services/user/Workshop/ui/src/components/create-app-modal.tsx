@@ -7,6 +7,7 @@ import {
 import { CreateAppForm } from "./create-app-form";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 import { useNavigate } from "react-router-dom";
+import { useCreateApp } from "@/hooks/use-create-app";
 
 export const CreateAppModal = ({
   show,
@@ -16,6 +17,7 @@ export const CreateAppModal = ({
   openChange: (show: boolean) => void;
 }) => {
   const { addApp } = useTrackedApps();
+  const { mutateAsync: createApp } = useCreateApp();
 
   const navigate = useNavigate();
 
@@ -26,6 +28,11 @@ export const CreateAppModal = ({
           <DialogTitle>Add an app</DialogTitle>
           <CreateAppForm
             onSubmit={async (data) => {
+              void (await createApp({
+                account: data.appName,
+                allowExistingAccount: true,
+              }));
+
               addApp(data.appName);
               openChange(false);
               navigate(`/app/${data.appName}`);

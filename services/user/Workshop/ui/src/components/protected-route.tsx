@@ -21,6 +21,8 @@ import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
+import { useNavigate } from "react-router-dom";
+import { useLocalStorage } from "@uidotdev/usehooks";
 
 const Other = "-other" as const;
 
@@ -39,6 +41,16 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { mutate: login, isPending } = useCreateConnectionToken();
   const { mutateAsync: selectAccount, isPending: isConnectingToAccount } =
     useSelectAccount();
+
+  const [autoNavigate, setAutoNavigate] = useLocalStorage("autoNavigate", true);
+
+  useEffect(() => {
+    if (currentUser && !autoNavigate) {
+      setAutoNavigate(true);
+    }
+  }, [autoNavigate, setAutoNavigate, currentUser]);
+
+  const navigate = useNavigate();
 
   const { data: chainId } = useChainId();
 
@@ -69,9 +81,16 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     <Dialog
       open={showModal}
       onOpenChange={(open) => {
-        if (!open) {
-          setIsDismissed(false);
-          setShowModal(false);
+        if (open) {
+          setShowModal(open);
+        } else {
+          if (currentUser === null) {
+            setAutoNavigate(false);
+            navigate("/");
+          } else {
+            setIsDismissed(false);
+            setShowModal(false);
+          }
         }
       }}
     >
