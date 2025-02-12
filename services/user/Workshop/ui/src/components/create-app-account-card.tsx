@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "./ui/button";
 import { useCreateApp } from "@/hooks/use-create-app";
+import { Account } from "@/lib/zodTypes";
 
 export const CreateAppAccountCard = () => {
   const currentApp = useCurrentApp();
@@ -28,7 +29,10 @@ export const CreateAppAccountCard = () => {
         <Button
           disabled={isPending}
           onClick={() => {
-            createApp({ account: currentApp, allowExistingAccount: true });
+            createApp({
+              account: Account.parse(currentApp),
+              allowExistingAccount: true,
+            });
           }}
         >
           Create account

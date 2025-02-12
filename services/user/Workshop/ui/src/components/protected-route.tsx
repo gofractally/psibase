@@ -22,13 +22,12 @@ import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/use-chain-id";
 import { useNavigate } from "react-router-dom";
-import { useAutoNavigate } from "@/hooks/useAutoNav";
+import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 
 const Other = "-other" as const;
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [showModal, setShowModal] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
 
   const [isAwaitingLogin, setIsAwaitingLogin] = useState(false);
 
@@ -42,13 +41,13 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { mutateAsync: selectAccount, isPending: isConnectingToAccount } =
     useSelectAccount();
 
-  const [autoNavigate, setAutoNavigate] = useAutoNavigate();
+  const [expectCurrentUser, setExpectCurrentUser] = useExpectCurrentUser();
 
   useEffect(() => {
-    if (currentUser && !autoNavigate) {
-      setAutoNavigate(true);
+    if (currentUser && !expectCurrentUser) {
+      setExpectCurrentUser(true);
     }
-  }, [autoNavigate, setAutoNavigate, currentUser]);
+  }, [expectCurrentUser, setExpectCurrentUser, currentUser]);
 
   const navigate = useNavigate();
 
@@ -72,26 +71,21 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    if (currentUser === null && !isDismissed) {
+    if (currentUser === null) {
       setShowModal(true);
     }
-  }, [currentUser, isDismissed]);
+  }, [currentUser]);
 
   return (
     <Dialog
       open={showModal}
       onOpenChange={(open) => {
-        if (open) {
-          setShowModal(open);
+        const isRefusingToLogin = !open && currentUser === null;
+        if (isRefusingToLogin) {
+          setExpectCurrentUser(false);
+          navigate("/");
         } else {
-          const isRefusingToLogin = currentUser === null;
-          if (isRefusingToLogin) {
-            setAutoNavigate(false);
-            navigate("/");
-          } else {
-            setIsDismissed(false);
-            setShowModal(false);
-          }
+          setShowModal(open);
         }
       }}
     >

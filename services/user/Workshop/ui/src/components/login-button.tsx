@@ -12,10 +12,10 @@ import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
 
 export const LoginButton = () => {
-  const isNoOptions = false;
-
   const { mutate: login, isPending } = useCreateConnectionToken();
   const { data: connectedAccounts } = useConnectedAccounts();
+
+  const isNoOptions = connectedAccounts && connectedAccounts.length == 0;
 
   const { isPending: isConnectingToAccount, mutate: onSelect } =
     useSelectAccount();

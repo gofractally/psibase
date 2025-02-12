@@ -1,3 +1,4 @@
+import { Account } from "@/lib/zodTypes";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -39,7 +40,10 @@ export const isAccountAvailable = async (
 export const useAccountStatus = (account: string | undefined) =>
   useQuery<z.infer<typeof AccountNameStatus>>({
     queryKey: ["userAccount", account],
-    queryFn: async () => isAccountAvailable(account!),
+    queryFn: async () => {
+      return isAccountAvailable(Account.parse(account));
+    },
+    staleTime: 10000,
     enabled: !!account,
     initialData: "Loading",
   });

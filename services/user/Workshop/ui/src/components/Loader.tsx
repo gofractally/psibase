@@ -15,44 +15,26 @@ import {
 import { Drill } from "lucide-react";
 import { LoginButton } from "./login-button";
 import { CreateAppModal } from "./create-app-modal";
-import { useAutoNavigate } from "@/hooks/useAutoNav";
+import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 
 export const Loader = () => {
-  const { data: currentUser, isLoading } = useCurrentUser();
+  const { data: currentUser } = useCurrentUser();
   const navigate = useNavigate();
 
   const { apps } = useTrackedApps();
-  const [autoNavigate] = useAutoNavigate();
+  const [expectCurrentUser] = useExpectCurrentUser();
 
   useEffect(() => {
-    if (apps.length > 0 && (autoNavigate || currentUser)) {
-      console.log(apps, "are the apps");
-      const firstApp = apps[0]!;
-      console.log({ firstApp });
-      navigate(`/app/${firstApp.account}`);
+    if (apps.length > 0 && (expectCurrentUser || currentUser)) {
+      navigate(`/app/${apps[0]!.account}`);
     }
-  }, [apps, navigate]);
+  }, [apps, navigate, expectCurrentUser, currentUser]);
 
   const { data: networkName } = useBranding();
 
-  const isLoggedInWithNoApps = currentUser && apps.length == 0;
-  const isLoggedInWithApps = currentUser && apps.length > 0;
-  const isNotLoggedIn = currentUser === null;
   const isLoggedIn = typeof currentUser === "string";
 
-  console.log({
-    isLoading,
-    isLoggedInWithApps,
-    isLoggedInWithNoApps,
-    isNotLoggedIn,
-  });
-
   const [showModal, setShowModal] = useState<boolean>(false);
-
-  // Display loader
-  // If logged in, no apps, prompt to create a new app or look one up
-  // If not logged in, display what the workshop is about and prompt a login
-  // Figure out if there's any apps
 
   return (
     <Card className="mx-auto mt-4 w-[350px]">

@@ -20,8 +20,13 @@ import { createIdenticon } from "@/lib/createIdenticon";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { CreateAppModal } from "./create-app-modal";
-import { useAppMetadata } from "@/hooks/useAppMetadata";
+import {
+  appMetadataQueryKey,
+  MetadataResponse,
+  useAppMetadata,
+} from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { queryClient } from "@/queryClient";
 
 export function AppSwitcher() {
   const { isMobile } = useSidebar();
@@ -82,18 +87,26 @@ export function AppSwitcher() {
             </DropdownMenuLabel>
             {apps
               .filter((app) => app.account !== selectedAppAccount)
-              .map((app) => (
-                <DropdownMenuItem
-                  key={app.account}
-                  onClick={() => navigate(`/app/${app.account}`)}
-                  className="gap-2 p-2"
-                >
-                  <div className="flex size-6 items-center justify-center rounded-sm border">
-                    <img src={createIdenticon(chainId + app.account)} />
-                  </div>
-                  {app.account}
-                </DropdownMenuItem>
-              ))}
+              .map((app) => {
+                const metadata = MetadataResponse.safeParse(
+                  queryClient.getQueryData(appMetadataQueryKey(app.account))
+                );
+                const displayName =
+                  metadata.success && metadata.data.appMetadata.name;
+
+                return (
+                  <DropdownMenuItem
+                    key={app.account}
+                    onClick={() => navigate(`/app/${app.account}`)}
+                    className="gap-2 p-2"
+                  >
+                    <div className="flex size-6 items-center justify-center rounded-sm border">
+                      <img src={createIdenticon(chainId + app.account)} />
+                    </div>
+                    {displayName || app.account}
+                  </DropdownMenuItem>
+                );
+              })}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 p-2"

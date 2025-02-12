@@ -128,6 +128,7 @@ export const Workshop = () => {
 
           {isSuccess && (
             <MetaDataForm
+              key={currentApp}
               existingValues={metadata ? metadata.appMetadata : undefined}
               onSubmit={async (x) => {
                 await updateMetadata({
@@ -135,7 +136,7 @@ export const Workshop = () => {
                     ...x,
                     owners: [],
                   },
-                  account: currentApp,
+                  account: Account.parse(currentApp),
                 });
                 return x;
               }}

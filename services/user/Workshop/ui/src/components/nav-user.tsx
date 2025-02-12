@@ -64,6 +64,8 @@ export function NavUser() {
     useSelectAccount();
 
   const isNoOptions = connectedAccounts.length == 0;
+  const isUsingOnlyOption =
+    connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
   const isLoading =
     !(
       isFetchedLoggedInuser &&
@@ -116,7 +118,7 @@ export function NavUser() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {isNoOptions ? (
+            {isNoOptions || isUsingOnlyOption ? (
               <DropdownMenuItem
                 onClick={() => {
                   login();
@@ -125,7 +127,11 @@ export function NavUser() {
               >
                 <LogIn className="mr-2 h-4 w-4" />
                 <span>
-                  {!isFetchedConnectedAccounts ? "Loading..." : "Login"}
+                  {!isFetchedConnectedAccounts
+                    ? "Loading..."
+                    : isUsingOnlyOption
+                    ? "Switch account"
+                    : "Login"}
                 </span>
               </DropdownMenuItem>
             ) : (

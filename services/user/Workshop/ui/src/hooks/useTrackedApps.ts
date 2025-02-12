@@ -22,19 +22,23 @@ export const useTrackedApps = () => {
 
   useEffect(() => {
     const firstApp = apps[0];
+    const currentAppIsntFirst = firstApp.account !== currentApp;
 
-    if (firstApp && firstApp.account !== currentApp) {
-      console.log("current app is not the first app");
+    if (firstApp && currentAppIsntFirst && currentApp) {
+      AppItem.parse(firstApp);
       const currentAppStored = apps.find((app) => app.account === currentApp);
       if (currentAppStored) {
-        console.log("current app is stored already...");
-        setApps((preExistingApps) => [
-          currentAppStored,
-          ...preExistingApps.filter((app) => app.account !== currentApp),
-        ]);
+        setApps((preExistingApps) => {
+          const newData = AppItem.array().parse([
+            currentAppStored,
+            ...preExistingApps.filter((app) => app.account !== currentApp),
+          ]);
+
+          return newData;
+        });
       }
     }
-  }, [currentApp, apps, setApps]);
+  }, [currentApp, apps]);
 
   const addApp = (newApp: AccountType): void => {
     const isAlreadyExisting = apps.some((app) => app.account == newApp);
@@ -42,14 +46,18 @@ export const useTrackedApps = () => {
       console.warn("Tried adding an app already tracked in local storage");
       return;
     }
-    setApps((apps) => [{ account: newApp }, ...apps]);
+    setApps((apps) => AppItem.array().parse([{ account: newApp }, ...apps]));
   };
 
   const removeApp = (appBeingRemoved: AccountType) => {
     const isExisting = apps.some((app) => app.account == appBeingRemoved);
 
     if (isExisting) {
-      setApps((apps) => apps.filter((app) => app.account !== appBeingRemoved));
+      setApps((apps) =>
+        AppItem.array().parse(
+          apps.filter((app) => app.account !== appBeingRemoved)
+        )
+      );
     } else {
       throw new Error(
         `Failed to remove app ${appBeingRemoved}, does not exist.`
