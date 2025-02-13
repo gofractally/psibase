@@ -39,14 +39,13 @@ struct XAdminPlugin;
 impl Boot for XAdminPlugin {
     fn boot_transactions(
         producer: String,
-        js_services: Vec<Code>,
+        js_packages: Vec<PackageContents>,
         block_signing_key: Option<Pem>,
         tx_signing_key: Option<Pem>,
         compression_level: u32,
     ) -> Result<(Tx, Vec<Tx>), String> {
         let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-        let deserialized_services = js_services;
-        for s in &deserialized_services[..] {
+        for s in &js_packages[..] {
             services.push(PackagedService::new(Cursor::new(&s[..])).map_err(|e| e.to_string())?);
         }
 
