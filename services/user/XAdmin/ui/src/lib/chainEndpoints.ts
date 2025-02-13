@@ -14,6 +14,7 @@ import {
     type KeyDevice,
     type PsinodeConfigSelect,
     type PsinodeConfigUpdate,
+    type ServerKey,
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
@@ -206,7 +207,7 @@ class Chain {
     }: {
         key?: string;
         device?: string;
-    }): Promise<{ rawData: string; service: string }[]> {
+    }): Promise<ServerKey[]> {
         const res = await postJson("/native/admin/keys", {
             service: "verify-sig",
             rawData: key,
@@ -224,6 +225,10 @@ class Chain {
             device,
             pin,
         });
+    }
+
+    public getServerKeys(): Promise<ServerKey[]> {
+        return getJson("/native/admin/keys");
     }
 }
 

@@ -42,6 +42,11 @@ export type KeyDevice = {
     unlocked: boolean;
 };
 
+export type ServerKey = {
+    rawData: string;
+    service: string;
+};
+
 const port = z.coerce.number();
 
 const LogConfigSchema = z.object({
