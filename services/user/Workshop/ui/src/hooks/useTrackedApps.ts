@@ -22,7 +22,7 @@ export const useTrackedApps = () => {
 
   useEffect(() => {
     const firstApp = apps[0];
-    const currentAppIsntFirst = firstApp.account !== currentApp;
+    const currentAppIsntFirst = firstApp?.account !== currentApp;
 
     if (firstApp && currentAppIsntFirst && currentApp) {
       AppItem.parse(firstApp);
