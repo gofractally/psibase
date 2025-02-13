@@ -21,13 +21,6 @@ export const App = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav title="Permissions Admin Page" />
-            <form className="mx-auto grid max-w-screen-md grid-cols-6">
-                <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <Label htmlFor="permissions" className="col-span-2">
-                        Permissions Admin
-                    </Label>
-                </div>
-            </form>
         </div>
     );
 };
