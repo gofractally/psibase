@@ -32,7 +32,7 @@ mod service {
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
     #[action]
-    fn propose(actions: Vec<Action>) -> u32 {
+    fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
         unimplemented!()
     }
 
@@ -54,6 +54,12 @@ mod service {
     /// Indicates that the caller rejects the staged transaction
     #[action]
     fn reject(id: u32, txid: Checksum256) {
+        unimplemented!()
+    }
+
+    /// Executes a staged transaction
+    #[action]
+    fn execute(id: u32, txid: Checksum256) {
         unimplemented!()
     }
 

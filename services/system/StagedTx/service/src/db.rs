@@ -40,6 +40,10 @@ pub mod tables {
 
         /// The list of actions that are staged for execution
         pub action_list: ActionList,
+
+        /// Whether the transaction should execute automatically as soon
+        /// as it has enough approvals
+        pub auto_exec: bool,
     }
     impl StagedTx {
         #[primary_key]
@@ -123,18 +127,20 @@ pub mod impls {
     use psibase::{check, get_sender, AccountNumber, Action, Checksum256, Table};
 
     impl StagedTx {
-        pub fn add(actions: Vec<Action>) -> Self {
+        pub fn add(actions: Vec<Action>, auto_exec: bool) -> Self {
             check(
                 actions.len() > 0,
                 "Staged transaction must contain at least one action",
             );
 
-            for action in &actions {
-                let sender = action.sender;
-                check(
-                    Accounts::call().getAccount(sender).is_some(),
-                    "Sender account in staged tx is invalid",
-                );
+            if auto_exec {
+                for action in &actions {
+                    let sender = action.sender;
+                    check(
+                        Accounts::call().getAccount(sender).is_some(),
+                        "Sender account in staged tx is invalid",
+                    );
+                }
             }
 
             let monotonic_id = LastUsed::get_next_id();
@@ -153,6 +159,7 @@ pub mod impls {
                 propose_date: current_block.time,
                 proposer: get_sender(),
                 action_list: ActionList { actions },
+                auto_exec,
             };
 
             StagedTxTable::new().put(&new_tx).unwrap();

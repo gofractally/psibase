@@ -7,7 +7,7 @@ use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites};
+use psibase::services::{accounts, auth_delegate, sites, staged_tx};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
     get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
@@ -89,6 +89,10 @@ struct SigArgs {
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
+
+    /// Stages transactions instead of executing them immediately
+    #[clap(long, value_name = "ACCOUNT")]
+    proposer: Option<ExactAccountNumber>,
 }
 
 #[derive(Args, Debug)]
@@ -428,9 +432,16 @@ fn store_sys(
     )
 }
 
-fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
+fn with_tapos(
+    tapos: &TaposRefBlock,
+    mut actions: Vec<Action>,
+    proposer: &Option<ExactAccountNumber>,
+) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec::from(now_plus_10secs);
+    if let Some(proposer) = proposer {
+        actions = vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, false)];
+    }
     Transaction {
         tapos: Tapos {
             expiration,
@@ -467,6 +478,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
     );
     push_transaction(
         &args.node_args.api,
@@ -512,6 +524,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
     );
     push_transaction(
         &args.node_args.api,
@@ -569,6 +582,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
     );
     push_transaction(
         &args.node_args.api,
@@ -623,6 +637,7 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
     );
 
     push_transaction(
@@ -901,7 +916,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         }
 
         let (selected_files, selected_actions) = actions.drain(..n).unzip();
-        let trx = with_tapos(&tapos, selected_actions);
+        let trx = with_tapos(&tapos, selected_actions, &args.sig_args.proposer);
         running.push(monitor_trx(
             args,
             &client,
@@ -1034,7 +1049,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             );
         }
         Ok(sign_transaction(
-            with_tapos(&tapos, actions),
+            with_tapos(&tapos, actions, &args.sig_args.proposer),
             &args.sig_args.sign,
         )?)
     };

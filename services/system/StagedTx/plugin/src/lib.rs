@@ -205,7 +205,11 @@ fn propose_wrap(sender: String, actions: Vec<Action>) -> Action {
         sender,
         service: psibase::services::staged_tx::SERVICE.to_string(),
         method: propose::ACTION_NAME.to_string(),
-        raw_data: propose { actions }.packed(),
+        raw_data: propose {
+            actions,
+            auto_exec: true,
+        }
+        .packed(),
     }
 }
 
