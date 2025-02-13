@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { queryKeys } from "@/lib/queryKeys";
 
-export const useBranding = () =>
+export const useBranding = ({ enabled = false }: { enabled?: boolean }) =>
     useQuery({
         queryKey: [queryKeys.branding],
         queryFn: async () => {
@@ -18,4 +18,5 @@ export const useBranding = () =>
             });
             return z.string().parse(res);
         },
+        enabled,
     });

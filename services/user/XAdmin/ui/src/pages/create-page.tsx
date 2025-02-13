@@ -31,6 +31,7 @@ import { bootChain } from "@/lib/bootChain";
 import { calculateIndex } from "@/lib/calculateIndex";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
+import { generateP256Key } from "@/lib/keys";
 
 // types
 import {
@@ -54,7 +55,6 @@ import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 // relative imports
 import { SetupWrapper } from "./setup-wrapper";
 import { DependencyDialog } from "./dependency-dialog";
-import { generateP256Key } from "@/lib/keys";
 
 export const BlockProducerSchema = z.object({
     name: z.string().min(1),
