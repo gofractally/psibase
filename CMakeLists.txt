@@ -314,21 +314,20 @@ add_rs_component_workspace(services/:Plugins
     transact
 )
 
-set(XADMIN_TRANSPILE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-transpiled)
-set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_TRANSPILE_PATH}/x_admin.core.wasm)
+set(XADMIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui)
+set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_PATH}/wasm-transpiled/x_admin.core.wasm)
 add_js_target(${ADMIN_DIR} index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
 add_dependencies(XAdmin_js XAdminWasm)
 
 add_custom_command(
     OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
-    WORKING_DIRECTORY ${XADMIN_TRANSPILE_PATH}
+    WORKING_DIRECTORY ${XADMIN_PATH}
     COMMAND yarn
-    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_TRANSPILE_PATH}
+    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
 )
 add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
 add_dependencies(xadmin-wasm-transpiled rust)
-
 
 function(psinode_files target pfx)
     add_custom_target(
