@@ -296,6 +296,7 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
+add_rs_component(services/user/XAdmin/ui/wasm:XAdminWasm x_admin.wasm wasm32-wasip1)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
@@ -313,21 +314,21 @@ add_rs_component_workspace(services/:Plugins
     transact
 )
 
-set(WASM_PSIBASE_BYPRODUCTS
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.js
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.wasm
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase_bg.wasm.d.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.d.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase/wasm-psibase.js
-)
-add_js_target(${ADMIN_DIR} index.html ${WASM_PSIBASE_BYPRODUCTS} ${CommonApiCommonLib_js_DEP})
+set(XADMIN_TRANSPILE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-transpiled)
+set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_TRANSPILE_PATH}/x_admin.core.wasm)
+add_js_target(${ADMIN_DIR} index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
+add_dependencies(XAdmin_js XAdminWasm)
+
 add_custom_command(
-    OUTPUT ${WASM_PSIBASE_BYPRODUCTS}
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
-    COMMAND wasm-pack build ${CMAKE_CURRENT_SOURCE_DIR}/rust/psibase --out-dir ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui/wasm-psibase --out-name wasm-psibase
+    OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
+    WORKING_DIRECTORY ${XADMIN_TRANSPILE_PATH}
+    COMMAND yarn
+    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_TRANSPILE_PATH}
 )
-add_custom_target(wasm-psibase ALL DEPENDS ${WASM_PSIBASE_BYPRODUCTS})
-add_dependencies(wasm-psibase rust)
+add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
+add_dependencies(xadmin-wasm-transpiled rust)
+
 
 function(psinode_files target pfx)
     add_custom_target(
@@ -346,7 +347,7 @@ function(psinode_files target pfx)
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(XAdmin_js wasm-psibase CommonApiCommonLib_js)
+add_dependencies(XAdmin_js xadmin-wasm-transpiled CommonApiCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)

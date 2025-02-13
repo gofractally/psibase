@@ -1,0 +1,23 @@
+package psibase:x-admin;
+
+interface boot {
+    type code = list<u8>;
+    type pem = string;
+    type tx = list<u8>;
+
+    boot-transactions: func(producer: string, js-services: list<code>, block-signing-key: option<pem>, tx-signing-key: option<pem>, compression-level: u32) -> result<tuple<tx, list<tx>>, string>;
+}
+
+interface packages {
+    resolve-packages: func(index-json-str: string, packages: list<string>) -> result<string, string>;
+}
+
+interface util {
+    deserialize-trace: func(buffer: list<u8>) -> result<string, string>;
+}
+
+world impl {
+    export boot;
+    export util;
+    export packages;
+}
