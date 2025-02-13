@@ -136,13 +136,10 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
-        // TODO: check if sender authorizes caller app to set key
-        // Currently only an AuthSig app would be able to set a user's key
         let caller = get_sender_app().app.unwrap();
 
         if !from_auth_sig_ui() {
-            let is_permitted = is_permitted(&caller)?;
-            if !is_permitted {
+            if is_permitted(&caller)? {
                 return Err(InsufficientPermissions(String::from("set key")).into());
             }
         }

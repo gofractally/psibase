@@ -1,8 +1,0 @@
-package callee:plugin;
-
-world impl {
-    include host:common/imports;
-    include permissions:plugin/imports;
-
-    export queries;
-}

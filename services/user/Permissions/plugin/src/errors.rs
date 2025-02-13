@@ -6,4 +6,5 @@ plugin_error! {
     PermissionsDialogAsyncNotYetAvailable() => "Permissions dialog will fail until WASM async is implemented. Respond to dialog and repeat action to continue.",
     InvalidRequester() => "Disallowed third-party requester while saving permission",
     PermissionRequestFailure() => "Failed while authorizing a permission request",
+    SerderError(msg: String) => "(de)serialization error: {msg}"
 }

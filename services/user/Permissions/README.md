@@ -20,11 +20,10 @@ What constitutes protected data is up to `Callee`.
 ```
 impl Queries for CalleePlugin {
     fn get_private_data() -> Result<String, Error> {
-        // ask Permissions if this caller can call this callee
+        // ask Permissions if this caller can call this app (callee)
         let caller = get_sender_app().app.unwrap();
-        let is_permitted = is_permitted(&caller)?;
         // return data or error if not permitted
-        if !is_permitted {
+        if !is_permitted(&caller)? {
             return Err(ErrorType::QueryNotPermittedError().into());
         }
         Ok(String::from("private data"))
