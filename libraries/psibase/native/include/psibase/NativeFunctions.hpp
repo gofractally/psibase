@@ -40,6 +40,7 @@ namespace psibase
       void     writeConsole(eosio::vm::span<const char> str);
       void     abortMessage(eosio::vm::span<const char> str);
       int32_t  clockTimeGet(uint32_t id, eosio::vm::argument_proxy<uint64_t*> time);
+      void     getRandom(eosio::vm::span<char> dest);
       void     setMaxTransactionTime(uint64_t nanoseconds);
       uint32_t getCurrentAction();
       uint32_t call(eosio::vm::span<const char> data);

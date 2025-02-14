@@ -247,18 +247,7 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
    return t;
 }
 
-[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
-    const SignedTransaction& signedTrx)
-{
-   if (!producing)
-      startBlock();
-   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
-   auto              size = tester::raw::pushTransaction(id, packed_trx.data(), packed_trx.size());
-   return psio::from_frac<TransactionTrace>(getResult(size));
-}
-
-[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,
-                                                                            const KeyList& keys)
+psibase::SignedTransaction psibase::TestChain::signTransaction(Transaction trx, const KeyList& keys)
 {
    for (auto& [pub, priv] : keys)
       trx.claims.push_back({
@@ -273,8 +262,23 @@ psibase::Transaction psibase::TestChain::makeTransaction(std::vector<Action>&& a
       auto proof = sign(priv, hash);
       signedTrx.proofs.push_back({proof.begin(), proof.end()});
    }
+   return signedTrx;
+}
 
-   return pushTransaction(signedTrx);
+[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(
+    const SignedTransaction& signedTrx)
+{
+   if (!producing)
+      startBlock();
+   std::vector<char> packed_trx = psio::convert_to_frac(signedTrx);
+   auto              size = tester::raw::pushTransaction(id, packed_trx.data(), packed_trx.size());
+   return psio::from_frac<TransactionTrace>(getResult(size));
+}
+
+[[nodiscard]] psibase::TransactionTrace psibase::TestChain::pushTransaction(Transaction    trx,
+                                                                            const KeyList& keys)
+{
+   return pushTransaction(signTransaction(std::move(trx), keys));
 }
 
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)

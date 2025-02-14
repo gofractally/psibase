@@ -365,8 +365,8 @@ struct test_chain
                 },
                 status->consensus.next->consensus.data);
          }
-         if (!status->consensus.next
-             || status->current.commitNum < status->consensus.next->blockNum)
+         if (!status->consensus.next ||
+             status->current.commitNum < status->consensus.next->blockNum)
          {
             std::visit(
                 [&](const auto& c)
@@ -633,8 +633,8 @@ struct HttpSocket : psibase::AutoCloseSocket
          case psibase::HttpStatus::notFound:
             break;
          default:
-            psibase::check(false, "HTTP response code not allowed: "
-                                      + std::to_string(static_cast<std::uint16_t>(status)));
+            psibase::check(false, "HTTP response code not allowed: " +
+                                      std::to_string(static_cast<std::uint16_t>(status)));
       }
       sendImpl(std::vector(data.begin(), data.end()));
    }
@@ -833,8 +833,8 @@ struct callbacks
 
    file* get_file(int32_t file_index)
    {
-      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size()
-          || !state.files[file_index].f)
+      if (file_index < 0 || static_cast<uint32_t>(file_index) >= state.files.size() ||
+          !state.files[file_index].f)
          return nullptr;
       return &state.files[file_index];
    }
@@ -1262,9 +1262,10 @@ struct callbacks
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
       psibase::TransactionTrace trace;
+      trace.actionTraces.emplace_back();
       try
       {
-         chain.readBlockContext()->execExport("verify", std::move(act), trace);
+         chain.readBlockContext()->execNonTrxAction(std::move(act), trace.actionTraces.back());
       }
       catch (const std::exception& e)
       {
@@ -1402,8 +1403,8 @@ struct callbacks
                 socket->queryTimes.databaseTime =
                     std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
                 socket->queryTimes.wasmExecTime =
-                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime()
-                                                                          - tc.databaseTime);
+                    std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
+                                                                          tc.databaseTime);
                 socket->queryTimes.startTime = startTime;
              });
          psibase::Action action{

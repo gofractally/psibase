@@ -29,10 +29,16 @@ namespace psibase
       /// A service runs in RPC mode while serving an HTTP request. This mode prevents database writes,
       /// but allows database reads, including reading data and events which are normally not available
       /// to services; see [psibase::DbId].
+      ///
+      /// If the request is made by an authenticated user, the user name will be passed.
+      ///
+      /// Services that rely on socket or user must verify that the sender is HttpServer.
       //
       // Note: intentionally doesn't use psio::const_view, since that complicates documentation.
       //       implementations of this interface may, of course, use it.
-      std::optional<HttpReply> serveSys(HttpRequest request, std::optional<std::int32_t> socket);
+      std::optional<HttpReply> serveSys(HttpRequest                  request,
+                                        std::optional<std::int32_t>  socket,
+                                        std::optional<AccountNumber> user);
       PSIO_REFLECT(ServerInterface, method(serveSys, request, socket))
    };
 

@@ -187,6 +187,7 @@ namespace psibase
       Action action{
           .sender  = {},
           .service = data.claim.service,
+          .method  = MethodNumber{"verifySys"},
           .rawData = psio::convert_to_frac(data),
       };
       auto& atrace     = transactionTrace.actionTraces.emplace_back();
@@ -195,7 +196,7 @@ namespace psibase
       try
       {
          auto& ec = getExecutionContext(action.service);
-         ec.execVerify(ac);
+         ec.execCalled(0, ac);
       }
       catch (std::exception& e)
       {

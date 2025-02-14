@@ -12,6 +12,12 @@ interface admin {
     finish-tx: func() -> result<_, error>;
 }
 
+interface login {
+    use host:common/types.{error};
+
+    /// Gets a token for current user to access the app
+    login: func(app: string) -> result<string, error>;
+}
 
 interface hook-handlers {
     use host:common/types.{error, plugin-ref};
@@ -35,6 +41,7 @@ world impl {
 
     export admin;
     export intf;
+    export login;
 
     import hook-handlers;
     export hooks;

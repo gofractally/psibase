@@ -178,6 +178,14 @@ namespace SystemService
                 //
    )
 
+   struct VerifyInterface
+   {
+      void verifySys(psibase::Checksum256 transactionHash,
+                     psibase::Claim       claim,
+                     std::vector<char>    proof);
+   };
+   PSIO_REFLECT(VerifyInterface, method(verifySys, transactionHash, claim, proof))
+
    struct TransactStatus
    {
       bool enforceAuth = true;

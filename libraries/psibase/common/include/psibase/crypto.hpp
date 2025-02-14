@@ -22,6 +22,13 @@ namespace psibase
       return sha256(bin.data(), bin.size());
    }
 
+   Checksum256 hmacSha256(const char* key,
+                          std::size_t keyLen,
+                          const char* data,
+                          std::size_t dataLen);
+
+   Checksum256 hmacSha256(std::span<const char> key, std::span<const char> data);
+
    // The Merkle class incrementally constructs a merkle tree
    //
    // An empty tree is represented by the zero hash

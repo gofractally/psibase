@@ -12,6 +12,8 @@ namespace psibase
       std::string name;
       std::string value;
       PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+
+      bool matches(std::string_view h) const;
    };
 
    /// An HTTP Request
@@ -59,6 +61,14 @@ namespace psibase
       ///
       // %XX escapes are decoded.
       std::string path() const;
+
+      /// Searches for a cookie by name
+      ///
+      /// The value returned is not validated or decoded
+      std::optional<std::string_view> getCookie(std::string_view name) const;
+
+      /// Removes a cookie
+      void removeCookie(std::string_view name);
    };
 
    struct URIPath

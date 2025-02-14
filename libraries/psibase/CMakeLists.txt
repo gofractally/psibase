@@ -14,6 +14,7 @@ function(add suffix)
         common/src/Rpc.cpp
         common/src/schema.cpp
         common/src/trace.cpp
+        common/src/jwt.cpp
     )
 
     if(DEFINED IS_WASM)

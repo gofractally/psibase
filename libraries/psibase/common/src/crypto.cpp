@@ -21,6 +21,51 @@ namespace psibase
       return result;
    }
 
+   // RFC 2104
+   Checksum256 hmacSha256(const char* key,
+                          std::size_t keyLen,
+                          const char* data,
+                          std::size_t dataLen)
+   {
+      constexpr std::size_t B                             = 64;
+      unsigned char         buf[B + Checksum256{}.size()] = {};
+      SHA256_CTX            ctx;
+      SHA256_Init(&ctx);
+      // pad or hash key
+      if (keyLen < B)
+      {
+         std::memcpy(buf, key, keyLen);
+      }
+      else
+      {
+         Checksum256 hashedKey = sha256(key, keyLen);
+         std::memcpy(buf, hashedKey.data(), hashedKey.size());
+      }
+      // K ^ ipad
+      for (std::size_t i = 0; i < B; ++i)
+      {
+         buf[i] ^= 0x36;
+      }
+      SHA256_Update(&ctx, buf, B);
+      SHA256_Update(&ctx, reinterpret_cast<const unsigned char*>(data), dataLen);
+      SHA256_Final(buf + B, &ctx);
+      // K ^ opad
+      for (std::size_t i = 0; i < B; ++i)
+      {
+         buf[i] ^= 0x36 ^ 0x5c;
+      }
+      SHA256_Init(&ctx);
+      SHA256_Update(&ctx, buf, sizeof(buf));
+      Checksum256 result;
+      SHA256_Final(result.data(), &ctx);
+      return result;
+   }
+
+   Checksum256 hmacSha256(std::span<const char> key, std::span<const char> data)
+   {
+      return hmacSha256(key.data(), key.size(), data.data(), data.size());
+   }
+
    Checksum256 Merkle::combine(const Checksum256& lhs, const Checksum256& rhs)
    {
       char buf[1 + lhs.size() + rhs.size()];

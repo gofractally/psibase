@@ -141,6 +141,11 @@ namespace psibase
       /// - `EINVAL`: the clock id is not supported
       int32_t clockTimeGet(uint32_t id, uint64_t* time);
 
+      /// Fills a buffer with random bytes
+      ///
+      /// This function is non-deterministic and is only available in subjective services.
+      PSIBASE_NATIVE(getRandom) void getRandom(void* buf, std::uint32_t len);
+
       /// Sets the transaction timer to expire a given number of nanoseconds
       /// after the beginning of the current transaction.
       PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);

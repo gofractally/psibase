@@ -151,6 +151,14 @@ namespace psibase
       std::string_view  text;
    };
 
+   template <typename T>
+   struct FracPackBody
+   {
+      std::string       contentType() const { return "application/octet-stream"; }
+      std::vector<char> body() const { return psio::to_frac(value); }
+      T                 value;
+   };
+
    /**
     * Manages a chain.
     * The test chain uses simulated time.
@@ -244,6 +252,11 @@ namespace psibase
                                   uint32_t              expire_sec = 2) const;
 
       /**
+       * Signs a transaction with the provided keys.
+       */
+      SignedTransaction signTransaction(Transaction trx, const KeyList& keys = {});
+
+      /**
        * Pushes a transaction onto the chain.  If no block is currently pending, starts one.
        */
       [[nodiscard]] TransactionTrace pushTransaction(const SignedTransaction& signedTrx);
@@ -316,13 +329,13 @@ namespace psibase
             {
                if (response.contentType == "text/html")
                {
-                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " "
-                               + std::string(response.body.begin(), response.body.end()));
+                  abortMessage(std::to_string(static_cast<std::uint16_t>(response.status)) + " " +
+                               std::string(response.body.begin(), response.body.end()));
                }
                else
                {
-                  abortMessage("Request returned "
-                               + std::to_string(static_cast<std::uint16_t>(response.status)));
+                  abortMessage("Request returned " +
+                               std::to_string(static_cast<std::uint16_t>(response.status)));
                }
             }
             if (response.contentType != "application/json")

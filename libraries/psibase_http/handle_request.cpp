@@ -23,7 +23,7 @@ namespace psibase::http
 {
 
    // Private HTTP headers that are not forwarded to wasm
-   const std::unordered_set<std::string> private_headers = {"authorization", "proxy-authorization"};
+   const std::unordered_set<std::string> private_headers = {"proxy-authorization"};
 
    bool is_private_header(const std::string& name)
    {
@@ -151,7 +151,7 @@ namespace psibase::http
       {
          try
          {
-            token_data token = decode_jwt(auth.key, authorization.substr(prefix.size()));
+            auto token = decodeJWT<token_data>(auth.key, authorization.substr(prefix.size()));
             if (std::chrono::system_clock::now() >
                 std::chrono::system_clock::time_point{std::chrono::seconds(token.exp)})
             {
@@ -1267,7 +1267,7 @@ namespace psibase::http
                   return send(auth_error(bhttp::status::unauthorized,
                                          "Bearer scope=\"" + mkscope(required_mode) + "\""));
             }
-            auto token = encode_jwt(*key, params);
+            auto token = encodeJWT(*key, params);
 
             std::vector<char>   data;
             psio::vector_stream out{data};
