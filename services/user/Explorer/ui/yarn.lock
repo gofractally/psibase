@@ -435,9 +435,9 @@
   integrity sha512-YaDrquRpZwfcXbnlDsSrBQNCChVOT9MGuSg+dMAyfsAa1SmiAhrA5jUYUiIMC59G92kIbY/AaQOWcBdq+lh+zg==
 
 "@sveltejs/kit@^2.8.1":
-  version "2.17.1"
-  resolved "https://registry.yarnpkg.com/@sveltejs/kit/-/kit-2.17.1.tgz#24a55dc164f2c88511daac6fcc8bb7db6802d1ba"
-  integrity sha512-CpoGSLqE2MCmcQwA2CWJvOsZ9vW+p/1H3itrFykdgajUNAEyQPbsaSn7fZb6PLHQwe+07njxje9ss0fjZoCAyw==
+  version "2.17.2"
+  resolved "https://registry.yarnpkg.com/@sveltejs/kit/-/kit-2.17.2.tgz#87c6a1efe42a3f06dd0558e49b79988fec4338bd"
+  integrity sha512-Vypk02baf7qd3SOB1uUwUC/3Oka+srPo2J0a8YN3EfJypRshDkNx9HzNKjSmhOnGWwT+SSO06+N0mAb8iVTmTQ==
   dependencies:
     "@types/cookie" "^0.6.0"
     cookie "^0.6.0"
@@ -2483,9 +2483,9 @@ read-cache@^1.0.0:
     pify "^2.3.0"
 
 readdirp@^4.0.1:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/readdirp/-/readdirp-4.1.1.tgz#bd115327129672dc47f87408f05df9bd9ca3ef55"
-  integrity sha512-h80JrZu/MHUZCyHu5ciuoI0+WxsCxzxJTILn6Fs8rxSnFPh+UVHYfeIxK1nVGugMqkfC4vJcBOYbkfkwYK0+gw==
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/readdirp/-/readdirp-4.1.2.tgz#eb85801435fbf2a7ee58f19e0921b068fc69948d"
+  integrity sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==
 
 readdirp@~3.6.0:
   version "3.6.0"
