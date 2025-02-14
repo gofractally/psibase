@@ -12,6 +12,12 @@ export class PluginInvalid extends PluginError {
     }
 }
 
+export class InvalidUrl extends Error {
+    constructor(url: string) {
+        super(`Invalid Url: ${url}`);
+    }
+}
+
 export class InvalidCall extends PluginError {
     constructor(
         pluginId: QualifiedPluginId,

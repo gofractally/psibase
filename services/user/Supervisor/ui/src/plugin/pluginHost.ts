@@ -1,4 +1,8 @@
-import { assertTruthy, QualifiedFunctionCallArgs } from "@psibase/common-lib";
+import {
+    assertTruthy,
+    PluginError,
+    QualifiedFunctionCallArgs,
+} from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
@@ -205,5 +209,17 @@ export class PluginHost implements HostInterface {
 
     myServiceOrigin(): string {
         return this.self.origin;
+    }
+
+    // Web interface
+    popup(url_path: string): Result<void, PluginError> {
+        let url = this.self.origin;
+        if (!url_path.startsWith("/")) url_path = "/" + url_path;
+        url = url + url_path;
+        window.open(
+            url,
+            "_blank",
+            "popup=true,menubar=false,width=640,height=480,left=100,top=100,location=false,toolbar=false",
+        );
     }
 }

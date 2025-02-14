@@ -101,8 +101,15 @@ interface client {
     my-service-origin: func() -> string;
 }
 
+interface web {
+    use types.{error};
+
+    popup: func(url-path: string) -> result<_, error>;
+}
+
 world imports {
     import types;
     import server;
     import client;
+    import web;
 }

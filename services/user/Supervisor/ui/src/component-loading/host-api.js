@@ -35,3 +35,9 @@ export const client = {
         return host.myServiceOrigin();
     },
 };
+
+export const web = {
+    popup(url_path) {
+        return host.popup(url_path)
+    }
+}
