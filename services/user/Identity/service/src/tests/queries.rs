@@ -1,5 +1,5 @@
 use crate::{
-    service::{Attestation, AttestationStats},
+    tables::{Attestation, AttestationStats},
     tests::helpers::test_helpers::{
         init_identity_svc, PartialAttestation, PartialAttestationStats,
     },

@@ -1,4 +1,4 @@
-use crate::service::AttestationStats;
+use crate::tables::AttestationStats;
 use crate::tests::helpers::test_helpers::{init_identity_svc, PartialAttestationStats};
 use psibase::AccountNumber;
 

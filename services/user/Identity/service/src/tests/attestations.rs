@@ -1,4 +1,4 @@
-use crate::service::{Attestation, AttestationStats};
+use crate::tables::{Attestation, AttestationStats};
 use crate::tests::helpers::test_helpers::{
     init_identity_svc, PartialAttestation, PartialAttestationStats,
 };

@@ -4,8 +4,9 @@ mod tests;
 
 #[psibase::service_tables]
 mod tables {
+    use core::fmt;
+
     use async_graphql::*;
-    use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
     use psibase::*;
     use serde::{Deserialize, Serialize};
     #[table(name = "AttestationTable", index = 0)]
@@ -53,11 +54,14 @@ mod tables {
         pub subject: AccountNumber,
 
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
+        #[allow(non_snake_case)]
         pub numHighConfAttestations: u16,
 
+        #[allow(non_snake_case)]
         pub uniqueAttesters: u16,
 
         // freshness indicator
+        #[allow(non_snake_case)]
         pub mostRecentAttestation: TimePointSec,
     }
 
@@ -80,20 +84,18 @@ mod tables {
 #[psibase::service(name = "identity")]
 #[allow(non_snake_case)]
 mod service {
-    use core::fmt;
-
     use async_graphql::*;
     use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
+    use crate::tables::{Attestation, AttestationStats, AttestationStatsTable, AttestationTable};
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
         check(value <= 100, "bad confidence score");
         let attester = get_sender();
-        let issued = transact::Wrapper::call().currentBlock().time;
+        let issued = transact::Wrapper::call().currentBlock().time.seconds();
 
         let attestation_table = AttestationTable::new();
 

@@ -1,5 +1,5 @@
 use super::gql::Queryable;
-use crate::service::{Attestation, AttestationStats};
+use crate::tables::{Attestation, AttestationStats};
 use crate::Wrapper as Identity;
 use psibase::services::http_server;
 use psibase::AccountNumber;
