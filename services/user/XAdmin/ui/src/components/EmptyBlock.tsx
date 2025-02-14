@@ -4,8 +4,8 @@ import { Button } from "./ui/button";
 interface Props {
     title: string;
     description?: string;
-    buttonLabel: string;
-    onClick: () => void;
+    buttonLabel?: string;
+    onClick?: () => void;
     ButtonIcon?: React.ForwardRefExoticComponent<
         Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
     >;
@@ -28,9 +28,11 @@ export const EmptyBlock = ({
                         {description}
                     </p>
                 )}
-                <Button size="sm" onClick={() => onClick()}>
-                    {buttonLabel}
-                </Button>
+                {buttonLabel && (
+                    <Button size="sm" onClick={() => onClick?.()}>
+                        {buttonLabel}
+                    </Button>
+                )}
             </div>
         </div>
     );

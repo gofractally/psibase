@@ -8,12 +8,16 @@ import { HoverBorderGradient } from "./hover-border-gradient";
 import { MenuContent } from "./menu-content";
 import { useBranding } from "../hooks/useBranding";
 import { useStatuses } from "../hooks/useStatuses";
+import { useKeyDevices } from "../hooks/useKeyDevices";
 
 const Loading = () => <div>Loading...</div>;
 
 export const NavHeader = ({ title }: { title?: string }) => {
     const { data: status, isLoading } = useStatuses();
+    const { data: keyDevices } = useKeyDevices();
+
     const isBootable = status && status.includes("needgenesis");
+    const hasKeyDevices = keyDevices && keyDevices.length > 0;
 
     const { data: networkName } = useBranding({ enabled: !isBootable });
 
@@ -22,7 +26,7 @@ export const NavHeader = ({ title }: { title?: string }) => {
         "Peers",
         "Logs",
         "Configuration",
-        "Keys and devices",
+        ...(hasKeyDevices ? ["Keys and devices"] : []),
         ...(isBootable ? ["Boot"] : []),
     ];
 
