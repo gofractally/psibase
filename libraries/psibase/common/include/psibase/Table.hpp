@@ -348,6 +348,47 @@ namespace psibase
    using KeySuffix =
        typename key_suffix_unqual<std::remove_cvref_t<T>, std::remove_cvref_t<U>>::type;
 
+   template <typename T>
+   struct flatten_key
+   {
+      using type = std::tuple<T>;
+   };
+
+   template <typename T>
+   using flatten_key_t = flatten_key<T>::type;
+
+   template <typename T>
+   struct flatten_key<T&>
+   {
+      using type = flatten_key_t<T>;
+   };
+   template <typename T>
+   struct flatten_key<T&&>
+   {
+      using type = flatten_key_t<T>;
+   };
+   template <typename T>
+   struct flatten_key<const T>
+   {
+      using type = flatten_key_t<T>;
+   };
+
+   template <typename... T>
+   using tuple_cat_t = decltype(std::tuple_cat(std::declval<T>()...));
+
+   template <typename... T>
+   struct flatten_key<std::tuple<T...>>
+   {
+      using type = tuple_cat_t<flatten_key_t<T>...>;
+   };
+   template <typename T>
+      requires psio::Reflected<T>
+   struct flatten_key<T>
+   {
+      using type = flatten_key_t<
+          typename psio::get_struct_tuple_impl<typename psio::reflect<T>::data_members>::type>;
+   };
+
    /// A primary or secondary index in a Table
    ///
    /// Use [Table::getIndex] to get this.
@@ -434,12 +475,26 @@ namespace psibase
       /// then `subindex` returns another `TableIndex` which restricts its view
       /// to the subrange. e.g. it will iterate and search for `std::tuple(cValue, dValue)`,
       /// holding `aValue` and `bValue` constant.
-      template <CompatibleKeyPrefix<K> K2>
+      template <typename Dummy = void, CompatibleKeyPrefix<K> K2>
+         requires std::same_as<Dummy, void>
       TableIndex<T, KeySuffix<K2, K>> subindex(K2&& k)
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
          auto    key = psio::composite_key(key_base, k);
          return TableIndex<T, KeySuffix<K2, K>>(db, std::move(key), is_secondary);
+      }
+
+      /// Divide the key space, with an explicit key type for the new index.
+      ///
+      /// The combination of K2 and SubKey must be equivalent to K
+      template <typename SubKey, typename K2>
+         requires std::same_as<flatten_key_t<K>,
+                               tuple_cat_t<flatten_key_t<K2>, flatten_key_t<SubKey>>>
+      TableIndex<T, SubKey> subindex(K2&& k)
+      {
+         KeyView key_base{{prefix.data(), prefix.size()}};
+         auto    key = psio::composite_key(key_base, k);
+         return TableIndex<T, SubKey>(db, std::move(key), is_secondary);
       }
 
       /// Look up object by key
