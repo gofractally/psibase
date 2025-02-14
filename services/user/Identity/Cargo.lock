@@ -1220,6 +1220,7 @@ name = "identity"
 version = "0.14.0"
 dependencies = [
  "async-graphql",
+ "identity-pkg",
  "psibase",
  "psibase_macros",
  "serde",
@@ -1660,7 +1661,7 @@ dependencies = [
  "psibase",
  "serde",
  "serde_json",
- "wit-bindgen-rt 0.28.0",
+ "wit-bindgen-rt 0.30.0",
 ]
 
 [[package]]
@@ -3034,9 +3035,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen-rt"
-version = "0.28.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7a37bd9274cb2d4754b915d624447ec0dce9105d174361841c0826efc79ceb9"
+checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
 
 [[package]]
 name = "wit-bindgen-rt"
