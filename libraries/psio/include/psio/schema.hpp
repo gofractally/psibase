@@ -15,6 +15,9 @@ namespace psio
       requires Packable<std::remove_cv_t<T>>
    class shared_view_ptr;
 
+   template <typename T>
+   struct nested;
+
    struct FracStream
    {
       FracStream(std::span<const char> buf) : src(buf.data())
@@ -1061,9 +1064,11 @@ namespace psio
       }
 
       template <typename T>
-      constexpr bool is_shared_view_ptr_v = false;
+      constexpr bool is_nested_wrapper_v = false;
       template <typename T>
-      constexpr bool is_shared_view_ptr_v<shared_view_ptr<T>> = true;
+      constexpr bool is_nested_wrapper_v<shared_view_ptr<T>> = true;
+      template <typename T>
+      constexpr bool is_nested_wrapper_v<nested<T>> = true;
 
       template <typename T>
       constexpr bool is_duration_v = false;
@@ -1176,7 +1181,7 @@ namespace psio
                   schema.insert(name, insert<std::remove_cvref_t<decltype(clio_unwrap_packable(
                                           std::declval<T&>()))>>());
                }
-               else if constexpr (is_shared_view_ptr_v<T>)
+               else if constexpr (is_nested_wrapper_v<T>)
                {
                   if (expandNested_)
                   {
