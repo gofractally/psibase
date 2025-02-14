@@ -1,3 +1,5 @@
+// TODO: check for secure context
+
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -48,7 +50,11 @@ import { TabsContent } from "@/components/ui/tabs";
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
 import { KeyDeviceSchema } from "@/types";
-import { hexDERPublicKeyToCryptoKey, exportKeyToPEM } from "@/lib/keys";
+import {
+    hexDERPublicKeyToCryptoKey,
+    exportKeyToPEM,
+    calculateKeyFingerprint,
+} from "@/lib/keys";
 import { getErrorMessage } from "@/lib/utils";
 
 import {
@@ -104,6 +110,10 @@ export const KeysPage = () => {
 
     const keyDeviceForm = useForm<z.infer<typeof KeyDeviceSchema>>();
 
+    const [fingerprints, setFingerprints] = useState<Record<string, string>>(
+        {}
+    );
+
     useEffect(() => {
         if (!isErrorFetchingServerKeys) return;
         toast({
@@ -120,6 +130,22 @@ export const KeysPage = () => {
             ),
         });
     }, [isErrorFetchingServerKeys, errorFetchingServerKeys]);
+
+    useEffect(() => {
+        if (!serverKeys) return;
+
+        const loadFingerprints = async () => {
+            const prints: Record<string, string> = {};
+            for (const key of serverKeys) {
+                prints[key.rawData] = await calculateKeyFingerprint(
+                    key.rawData
+                );
+            }
+            setFingerprints(prints);
+        };
+
+        loadFingerprints();
+    }, [serverKeys]);
 
     const onSubmit = async (
         e?: React.SyntheticEvent,
@@ -374,7 +400,9 @@ export const KeysPage = () => {
                                                 {device.name}
                                             </TableCell>
                                             <TableCell className="max-w-0 px-4 py-2">
-                                                {device.id}
+                                                <div className="truncate font-mono">
+                                                    {device.id}
+                                                </div>
                                             </TableCell>
                                             <TableCell className="mt-0.5 flex items-center justify-center px-4 py-2">
                                                 {device.unlocked ? (
@@ -420,7 +448,7 @@ export const KeysPage = () => {
                                                 Auth service
                                             </TableHead>
                                             <TableHead className="w-full">
-                                                Public key (hex-encoded DER)
+                                                Key fingerprint
                                             </TableHead>
                                             <TableHead className="w-16 text-right"></TableHead>
                                         </TableRow>
@@ -428,25 +456,14 @@ export const KeysPage = () => {
                                     <TableBody>
                                         {serverKeys?.map((key) => (
                                             <TableRow key={key.rawData}>
-                                                <TableCell className="px-4 py-2 text-center font-medium">
+                                                <TableCell className="px-4 py-2 text-center font-mono font-medium">
                                                     {key.service}
                                                 </TableCell>
                                                 <TableCell className="max-w-0 px-4 py-2">
-                                                    <div className="flex">
-                                                        <div className="truncate">
-                                                            {
-                                                                splitDerKey(
-                                                                    key.rawData
-                                                                )[0]
-                                                            }
-                                                        </div>
-                                                        <div className="shrink-0">
-                                                            {
-                                                                splitDerKey(
-                                                                    key.rawData
-                                                                )[1]
-                                                            }
-                                                        </div>
+                                                    <div className="truncate font-mono">
+                                                        {fingerprints[
+                                                            key.rawData
+                                                        ]?.toUpperCase()}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="px-4 py-2 text-right">
