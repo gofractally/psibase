@@ -6,6 +6,13 @@ import { z } from "zod";
 
 // ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 
 // components
 import {
@@ -24,11 +31,13 @@ import { bootChain } from "@/lib/bootChain";
 import { calculateIndex } from "@/lib/calculateIndex";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
+import { generateP256Key } from "@/lib/keys";
 
 // types
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
+    KeyDeviceSchema,
     PackageInfo,
     RequestUpdate,
     RequestUpdateSchema,
@@ -46,15 +55,9 @@ import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
 // relative imports
 import { SetupWrapper } from "./setup-wrapper";
 import { DependencyDialog } from "./dependency-dialog";
-import { generateP256Key } from "@/lib/keys";
 
 export const BlockProducerSchema = z.object({
     name: z.string().min(1),
-});
-
-export const KeyDeviceSchema = z.object({
-    id: z.string().min(1),
-    pin: z.string().optional(),
 });
 
 interface DependencyState {
@@ -310,7 +313,24 @@ export const CreatePage = () => {
                     )}
                     {currentStep === Step.KeyDevice && (
                         <div className="flex justify-center">
-                            <KeyDeviceForm form={keyDeviceForm} next={next} />
+                            <Card className="min-w-[350px]">
+                                <CardHeader>
+                                    <CardTitle>
+                                        Select security device
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Where do you want your block producer
+                                        server key to be stored?
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <KeyDeviceForm
+                                        form={keyDeviceForm}
+                                        next={next}
+                                        deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
+                                    />
+                                </CardContent>
+                            </Card>
                         </div>
                     )}
                     {currentStep === Step.Confirmation && (

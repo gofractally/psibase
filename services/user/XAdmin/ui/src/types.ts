@@ -74,3 +74,8 @@ export const WrappedPackages = z
     .array();
 
 export type PackageInfoShape = z.infer<typeof PackageInfoSchema>;
+
+export const KeyDeviceSchema = z.object({
+    id: z.string().min(1),
+    pin: z.string().optional(),
+});

@@ -17,6 +17,19 @@ export const useKeyDevices = () =>
         },
     });
 
+export const useServerKeys = () =>
+    useQuery({
+        queryKey: queryKeys.serverKeys,
+        queryFn: async () => {
+            try {
+                return await chain.getServerKeys();
+            } catch (e) {
+                console.error("Failed to fetch server keys", e);
+                throw new Error("Failed to fetch server keys");
+            }
+        },
+    });
+
 export const useAddServerKey = () =>
     useMutation<CryptoKey, string, string>({
         mutationKey: queryKeys.addServerKey,

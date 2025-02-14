@@ -1,8 +1,8 @@
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 
-import { KeyDeviceSchema } from "@/pages/create-page";
 import { getErrorMessage } from "@/lib/utils";
+import { KeyDeviceSchema } from "@/types";
 
 import {
     Form,
@@ -12,13 +12,6 @@ import {
     FormLabel,
     FormMessage,
 } from "../ui/form";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "../ui/card";
 import { Input } from "../ui/input";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
@@ -27,9 +20,14 @@ import { useKeyDevices, useUnlockKeyDevice } from "../../hooks/useKeyDevices";
 interface Props {
     form: UseFormReturn<z.infer<typeof KeyDeviceSchema>>;
     next: () => Promise<void>;
+    deviceNotFoundErrorMessage: string;
 }
 
-export const KeyDeviceForm = ({ form, next }: Props) => {
+export const KeyDeviceForm = ({
+    form,
+    next,
+    deviceNotFoundErrorMessage,
+}: Props) => {
     const { data: keyDevices, isError, isSuccess } = useKeyDevices();
     const { mutateAsync: unlock } = useUnlockKeyDevice();
 
@@ -53,107 +51,90 @@ export const KeyDeviceForm = ({ form, next }: Props) => {
     };
 
     return (
-        <Card className="min-w-[350px]">
-            <CardHeader>
-                <CardTitle>Select security device</CardTitle>
-                <CardDescription>
-                    Where do you want your block producer server key to be
-                    stored?
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {isSuccess && !keyDevices.length ? (
-                    <div className="mb-4 flex max-w-[450px] items-center gap-3">
-                        <p className="text-2xl">⚠️</p>
-                        <p>
-                            No security devices were found. Please ensure one is
-                            available. Alternatively, you may boot in an
-                            insecure keyless mode by going back and selecting
-                            the Development boot template.
-                        </p>
-                    </div>
-                ) : null}
-                {isError ? (
-                    <div className="mb-4 flex max-w-[450px] items-center gap-3">
-                        <p className="text-2xl">⚠️</p>
-                        <p>
-                            There was an error fetching security devices. See
-                            the console for more information.
-                        </p>
-                    </div>
-                ) : null}
-                <Form {...form}>
-                    <form className="space-y-6" onSubmit={onSubmit}>
+        <>
+            {isSuccess && !keyDevices.length ? (
+                <div className="mb-4 flex max-w-[450px] items-center gap-3">
+                    <p className="text-2xl">⚠️</p>
+                    <p>{deviceNotFoundErrorMessage}</p>
+                </div>
+            ) : null}
+            {isError ? (
+                <div className="mb-4 flex max-w-[450px] items-center gap-3">
+                    <p className="text-2xl">⚠️</p>
+                    <p>
+                        There was an error fetching security devices. See the
+                        console for more information.
+                    </p>
+                </div>
+            ) : null}
+            <Form {...form}>
+                <form className="space-y-6" onSubmit={onSubmit}>
+                    <FormField
+                        control={form.control}
+                        name="id"
+                        rules={{
+                            required: true,
+                        }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel htmlFor="key-device">
+                                    Security device
+                                </FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        id="key-device"
+                                    >
+                                        {keyDevices?.map((device) => (
+                                            <FormItem
+                                                className="flex items-center space-x-2"
+                                                key={device.id}
+                                            >
+                                                <FormControl>
+                                                    <RadioGroupItem
+                                                        value={device.id}
+                                                        id={device.id}
+                                                    />
+                                                </FormControl>
+                                                <FormLabel htmlFor={device.id}>
+                                                    {device.name || device.id}
+                                                </FormLabel>
+                                            </FormItem>
+                                        ))}
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    {selectedDevice && !selectedDevice?.unlocked ? (
                         <FormField
                             control={form.control}
-                            name="id"
+                            name="pin"
                             rules={{
-                                required: true,
+                                validate: unlockDevice,
                             }}
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel htmlFor="key-device">
-                                        Security device
+                                    <FormLabel htmlFor="pin">
+                                        Device unlock PIN
                                     </FormLabel>
                                     <FormControl>
-                                        <RadioGroup
-                                            onValueChange={field.onChange}
-                                            defaultValue={field.value}
-                                            id="key-device"
-                                        >
-                                            {keyDevices?.map((device) => (
-                                                <FormItem
-                                                    className="flex items-center space-x-2"
-                                                    key={device.id}
-                                                >
-                                                    <FormControl>
-                                                        <RadioGroupItem
-                                                            value={device.id}
-                                                            id={device.id}
-                                                        />
-                                                    </FormControl>
-                                                    <FormLabel
-                                                        htmlFor={device.id}
-                                                    >
-                                                        {device.name ||
-                                                            device.id}
-                                                    </FormLabel>
-                                                </FormItem>
-                                            ))}
-                                        </RadioGroup>
+                                        <Input
+                                            placeholder="Device PIN"
+                                            id="pin"
+                                            type="password"
+                                            {...field}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                        {selectedDevice && !selectedDevice?.unlocked ? (
-                            <FormField
-                                control={form.control}
-                                name="pin"
-                                rules={{
-                                    validate: unlockDevice,
-                                }}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel htmlFor="pin">
-                                            Device unlock PIN
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                placeholder="Device PIN"
-                                                id="pin"
-                                                type="password"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        ) : null}
-                    </form>
-                </Form>
-            </CardContent>
-        </Card>
+                    ) : null}
+                </form>
+            </Form>
+        </>
     );
 };
