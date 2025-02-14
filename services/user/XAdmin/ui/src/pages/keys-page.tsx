@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
     MoreHorizontal,
-    Copy,
     SquarePlus,
     FileKey2,
     FileKey,
@@ -14,6 +13,8 @@ import {
     Loader2,
     Lock,
     Unlock,
+    Fingerprint,
+    Hexagon,
 } from "lucide-react";
 
 import {
@@ -485,6 +486,24 @@ export const KeysPage = () => {
                                                             <DropdownMenuItem
                                                                 onClick={() => {
                                                                     copyToClipboard(
+                                                                        fingerprints[
+                                                                            key
+                                                                                .rawData
+                                                                        ]?.toUpperCase()
+                                                                    );
+                                                                    toast({
+                                                                        title: "Copied",
+                                                                        description:
+                                                                            "The key fingerprint has been copied to the clipboard.",
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <Fingerprint className="mr-2 h-4 w-4" />
+                                                                Copy fingerprint
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => {
+                                                                    copyToClipboard(
                                                                         key.rawData
                                                                     );
                                                                     toast({
@@ -494,7 +513,7 @@ export const KeysPage = () => {
                                                                     });
                                                                 }}
                                                             >
-                                                                <Copy className="mr-2 h-4 w-4" />
+                                                                <Hexagon className="mr-2 h-4 w-4" />
                                                                 Copy hex DER
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem
