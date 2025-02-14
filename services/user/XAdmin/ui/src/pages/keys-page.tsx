@@ -1,5 +1,3 @@
-// TODO: check for secure context
-
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
