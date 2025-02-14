@@ -1,0 +1,9 @@
+package producers:plugin;
+
+world impl {
+    include transact:plugin/imports;
+    include host:common/imports;
+    include auth-sig:plugin/imports;
+    include staged-tx:plugin/imports;
+    export api;
+}
