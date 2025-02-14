@@ -52,8 +52,6 @@
     },
     "include": [
         "src",
-        "./wasm-psibase/*.d.ts",
-        "wasm-psibase"
     ],
     "references": [
         {

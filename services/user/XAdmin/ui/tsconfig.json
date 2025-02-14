@@ -12,7 +12,8 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
-            "@/*": ["./src/*"]
+            "@/*": ["./src/*"],
+            "wasm-transpiled": ["./wasm-transpiled/x_admin.d.ts"]
         },
         "skipLibCheck": true,
         "esModuleInterop": true,
@@ -26,7 +27,11 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "./wasm-psibase/*.d.ts", "wasm-psibase"],
+    "include": [
+        "src",
+        "./wasm-transpiled/*.d.ts",
+        "wasm-transpiled"
+    ],
     "references": [
         {
             "path": "./tsconfig.node.json"

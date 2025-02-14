@@ -108,6 +108,13 @@ export default defineConfig(({ command }) => ({
         alias: {
             "@/lib": path.resolve(__dirname, "./src/lib"),
             "@/components": path.resolve(__dirname, "./src/components"),
+            "wasm-transpiled": path.resolve(
+                __dirname,
+                "./wasm-transpiled/x_admin"
+            ),
         },
+    },
+    build: {
+        minify: false,
     },
 }));
