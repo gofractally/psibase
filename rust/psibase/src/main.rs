@@ -985,7 +985,7 @@ async fn apply_packages<
                 // Remove out-dated files. This needs to happen before installing
                 // new files, to handle the case where a service that stores
                 // data files is replaced by a service that does not provide
-                // removeSys.
+                // remove.
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
                 old_manifest.upgrade(package.manifest(), out)?;

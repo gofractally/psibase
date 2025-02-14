@@ -436,7 +436,7 @@ namespace SystemService
       table.put(row);
    }
 
-   void Sites::removeSys(std::string path)
+   void Sites::remove(std::string path)
    {
       Tables tables{};
       auto   table = tables.open<SitesContentTable>();

@@ -92,7 +92,7 @@ namespace SystemService
                     std::vector<char>          content);
 
       /// Removes content from the caller's subdomain
-      void removeSys(std::string path);
+      void remove(std::string path);
 
       /// Checks whether a request for content on a site at the given path is valid (such a request will not produce a 404).
       ///
@@ -129,7 +129,7 @@ namespace SystemService
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, contentEncoding, content),
-                method(removeSys, path),
+                method(remove, path),
                 method(isValidPath, site, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),

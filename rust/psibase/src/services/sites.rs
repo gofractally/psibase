@@ -85,7 +85,7 @@ mod service {
 
     /// Removes content from the caller's subdomain
     #[action]
-    fn removeSys(path: String) {
+    fn remove(path: String) {
         unimplemented!()
     }
 
