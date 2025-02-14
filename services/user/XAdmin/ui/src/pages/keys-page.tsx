@@ -15,6 +15,7 @@ import {
     Unlock,
     Fingerprint,
     Hexagon,
+    ShieldOff,
 } from "lucide-react";
 
 import {
@@ -63,12 +64,6 @@ import {
     useAddServerKey,
     useKeyDevices,
 } from "../hooks/useKeyDevices";
-
-const splitDerKey = (key: string) => {
-    const segment0 = key.slice(0, key.length - 30);
-    const segment1 = key.slice(key.length - 30);
-    return [segment0, segment1];
-};
 
 const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -133,7 +128,7 @@ export const KeysPage = () => {
     }, [isErrorFetchingServerKeys, errorFetchingServerKeys]);
 
     useEffect(() => {
-        if (!serverKeys) return;
+        if (!serverKeys || !window.isSecureContext) return;
 
         const loadFingerprints = async () => {
             const prints: Record<string, string> = {};
@@ -146,7 +141,21 @@ export const KeysPage = () => {
         };
 
         loadFingerprints();
-    }, [serverKeys]);
+    }, [serverKeys, window.isSecureContext]);
+
+    if (!window.isSecureContext) {
+        return (
+            <main className="flex select-none justify-center">
+                <div className="mt-4 w-full">
+                    <EmptyBlock
+                        title="Keys and devices is not available"
+                        description="This panel is only available in secure contexts (HTTPS or localhost)."
+                        ButtonIcon={ShieldOff}
+                    />
+                </div>
+            </main>
+        );
+    }
 
     const onSubmit = async (
         e?: React.SyntheticEvent,
