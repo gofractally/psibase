@@ -28,6 +28,9 @@ import {
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { queryClient } from "@/queryClient";
 
+const buildImageSrc = (mimeType: string, icon: string) =>
+  `data:${mimeType};base64,${icon}`;
+
 export function AppSwitcher() {
   const { isMobile } = useSidebar();
   const location = useLocation();
@@ -43,6 +46,11 @@ export function AppSwitcher() {
 
   const currentApp = useCurrentApp();
   const { data: app } = useAppMetadata(currentApp);
+
+  const currentSrc =
+    app &&
+    app.appMetadata.icon &&
+    buildImageSrc(app.appMetadata.iconMimeType, app.appMetadata.icon);
 
   console.log({ app });
 
@@ -62,7 +70,9 @@ export function AppSwitcher() {
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-background text-sidebar-primary-foreground">
                 <img
                   className="size-4"
-                  src={createIdenticon(chainId + selectedAppAccount)}
+                  src={
+                    currentSrc || createIdenticon(chainId + selectedAppAccount)
+                  }
                 />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -94,6 +104,14 @@ export function AppSwitcher() {
                 const displayName =
                   metadata.success && metadata.data.appMetadata.name;
 
+                const src =
+                  metadata.success && metadata.data.appMetadata.icon
+                    ? buildImageSrc(
+                        metadata.data.appMetadata.iconMimeType,
+                        metadata.data.appMetadata.icon
+                      )
+                    : createIdenticon(chainId + app.account);
+
                 return (
                   <DropdownMenuItem
                     key={app.account}
@@ -101,7 +119,7 @@ export function AppSwitcher() {
                     className="gap-2 p-2"
                   >
                     <div className="flex size-6 items-center justify-center rounded-sm border">
-                      <img src={createIdenticon(chainId + app.account)} />
+                      <img src={src} />
                     </div>
                     {displayName || app.account}
                   </DropdownMenuItem>

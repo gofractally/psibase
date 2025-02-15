@@ -3,6 +3,9 @@ import { Account } from "@/lib/zodTypes";
 import { useCurrentApp } from "./useCurrentApp";
 import { useEffect } from "react";
 import { useLocalStorage } from "@uidotdev/usehooks";
+import { queryClient } from "@/queryClient";
+import { appMetadataQueryKey, fetchMetadata } from "./useAppMetadata";
+import { wait } from "./wait";
 
 type AccountType = z.infer<typeof Account>;
 
@@ -11,6 +14,18 @@ const AppItem = z.object({
 });
 
 export const Apps = AppItem.array();
+
+const cacheApps = async (accountNames: z.infer<typeof Account>[]) => {
+  for (const account of accountNames) {
+    await wait(1000);
+    queryClient.prefetchQuery({
+      queryKey: appMetadataQueryKey(account),
+      queryFn: async () => {
+        return fetchMetadata(account);
+      },
+    });
+  }
+};
 
 export const useTrackedApps = () => {
   const [apps, setApps] = useLocalStorage<z.infer<typeof Apps>>(
@@ -39,6 +54,10 @@ export const useTrackedApps = () => {
       }
     }
   }, [currentApp, apps]);
+
+  useEffect(() => {
+    cacheApps(apps.map((app) => app.account));
+  }, []);
 
   const addApp = (newApp: AccountType): void => {
     const isAlreadyExisting = apps.some((app) => app.account == newApp);
