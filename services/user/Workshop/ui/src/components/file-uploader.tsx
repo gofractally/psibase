@@ -1,14 +1,10 @@
-import { useState } from "react";
-import { useAppMetadata } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { FileInput } from "./file-input";
 import { useUploadTree } from "@/hooks/useUploadTree";
 import { Account } from "@/lib/zodTypes";
-import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
 export const FileUploader = () => {
   const currentApp = useCurrentApp();
-  const { data: metadata } = useAppMetadata(currentApp);
 
   const { mutateAsync } = useUploadTree();
 
@@ -35,7 +31,6 @@ export const FileUploader = () => {
     selectedFiles.forEach((file) => {
       console.log("File uploaded:", file.name);
       console.log("File content (Uint8Array):", file.bytes);
-      console.log("File should be at", siblingUrl(null, currentApp, file.path));
     });
   };
 
