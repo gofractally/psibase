@@ -1,44 +1,14 @@
 import { useSetMetadata } from "@/hooks/useSetMetadata";
-import {
-  appMetadataQueryKey,
-  MetadataResponse,
-  Status,
-  useAppMetadata,
-} from "@/hooks/useAppMetadata";
-import { Switch } from "@/components/ui/switch";
+import { useAppMetadata } from "@/hooks/useAppMetadata";
 import { MetaDataForm } from "./metadata-form";
-import { usePublishApp } from "@/hooks/usePublishApp";
-import { z } from "zod";
-import { toast } from "sonner";
-import { Label } from "./ui/label";
 import { Spinner } from "./ui/spinner";
 import { ErrorCard } from "./error-card";
-import { queryClient } from "@/queryClient";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { CreateAppAccountCard } from "./create-app-account-card";
 import { Account } from "@/lib/zodTypes";
 import { ControlPanel } from "./control-panel";
 import { FileUploader } from "./file-uploader";
-
-const setStatus = (
-  metadata: z.infer<typeof MetadataResponse>,
-  published: boolean
-): z.infer<typeof MetadataResponse> => ({
-  ...metadata,
-  extraMetadata: {
-    ...metadata.extraMetadata,
-    status: published ? Status.Enum.published : Status.Enum.unpublished,
-  },
-});
-
-const setCacheData = (appName: string, checked: boolean) => {
-  queryClient.setQueryData(appMetadataQueryKey(appName), (data: unknown) => {
-    if (data) {
-      return setStatus(MetadataResponse.parse(data), checked);
-    }
-  });
-};
 
 export const Workshop = () => {
   const currentApp = useCurrentApp();
@@ -55,33 +25,6 @@ export const Workshop = () => {
     accountStatus == "Invalid" ? new Error(`Invalid account name`) : undefined;
 
   const { mutateAsync: updateMetadata } = useSetMetadata();
-  const { mutateAsync: publishApp, isPending: isPublishingApp } =
-    usePublishApp();
-
-  const handleChecked = async (checked: boolean, appName: string) => {
-    try {
-      setCacheData(appName, checked);
-      toast(`Updating..`, {
-        description: `${checked ? "Publishing" : "Unpublishing"} ${appName}`,
-      });
-      void (await publishApp({ account: appName, publish: checked }));
-      toast(checked ? "Published" : "Unpublished", {
-        description: checked
-          ? `${appName} is now published.`
-          : `${appName} is no longer published.`,
-      });
-    } catch (e) {
-      toast("Failed to update", {
-        description:
-          e instanceof Error ? e.message : "Unrecognised error, see logs.",
-      });
-      setCacheData(appName, !checked);
-    }
-  };
-
-  const isAppPublished = metadata
-    ? metadata.extraMetadata.status == Status.Enum.published
-    : false;
 
   const error = metadataError || invalidAccountError;
 
@@ -109,25 +52,7 @@ export const Workshop = () => {
       <div className="grid p-4 grid-cols-3 gap-2">
         <div className="">
           <div className="flex flex-col gap-4">
-            <div className="flex justify-between">
-              <div className="text-lg font-semibold text-center">
-                {currentApp}
-              </div>
-              {isSuccess && (
-                <div className="flex gap-2">
-                  <div className="flex flex-col justify-center">
-                    <Label>Publish</Label>
-                  </div>
-                  <Switch
-                    checked={isAppPublished}
-                    disabled={isPublishingApp}
-                    onCheckedChange={(checked) =>
-                      handleChecked(checked, Account.parse(currentApp))
-                    }
-                  />
-                </div>
-              )}
-            </div>
+            <div className="flex justify-between"></div>
 
             {isSuccess && (
               <MetaDataForm
