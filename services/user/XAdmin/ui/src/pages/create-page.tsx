@@ -214,17 +214,21 @@ export const CreatePage = () => {
                             setCurrentState(newIndex);
                         } else if (isBootCompleteUpdate(state)) {
                             if (state.success) {
-                                navigate("/Dashboard");
                                 setCurrentState(loadingStates.length + 1);
                                 toast({
                                     title: "Success",
                                     description: "Successfully booted chain.",
                                 });
 
-                                importAccount({
-                                    privateKey: txSigningKeyPair?.privateKey,
-                                    account: bpName,
-                                });
+                                setTimeout(() => {
+                                    navigate("/Dashboard");
+
+                                    importAccount({
+                                        privateKey:
+                                            txSigningKeyPair?.privateKey,
+                                        account: bpName,
+                                    });
+                                }, 1000);
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";

@@ -579,17 +579,20 @@ namespace psibase
                       "value of putSequential must have service account as its first member");
              }
 
-             auto&    dbStatus = transactionContext.blockContext.databaseStatus;
+             auto dbStatus =
+                 database.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+             check(!!dbStatus, "databaseStatus not set");
+
              uint64_t indexNumber;
              if (db == uint32_t(DbId::historyEvent))
-                indexNumber = dbStatus.nextHistoryEventNumber++;
+                indexNumber = dbStatus->nextHistoryEventNumber++;
              else if (db == uint32_t(DbId::uiEvent))
-                indexNumber = dbStatus.nextUIEventNumber++;
+                indexNumber = dbStatus->nextUIEventNumber++;
              else if (db == uint32_t(DbId::merkleEvent))
-                indexNumber = dbStatus.nextMerkleEventNumber++;
+                indexNumber = dbStatus->nextMerkleEventNumber++;
              else
                 check(false, "putSequential: unsupported db");
-             database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
+             database.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
              database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
              return indexNumber;

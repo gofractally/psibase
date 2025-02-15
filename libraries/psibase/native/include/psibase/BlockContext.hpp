@@ -15,7 +15,6 @@ namespace psibase
       WriterPtr         writer;
       Database::Session session;
       Block             current;
-      DatabaseStatusRow databaseStatus;
       bool              isProducing       = false;
       bool              isReadOnly        = false;
       bool              isGenesisBlock    = false;
