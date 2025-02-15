@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psio/fracpack.hpp>
+#include <psio/nested.hpp>
 #include <psio/schema.hpp>
 #include <psio/shared_view_ptr.hpp>
 #include <psio/stream.hpp>
@@ -37,8 +38,7 @@ struct Catch::StringMaker<std::variant<T...>>
    {
       return std::visit(
           [](const auto& v)
-          { return Catch::StringMaker<std::remove_cvref_t<decltype(v)>>::convert(v); },
-          value);
+          { return Catch::StringMaker<std::remove_cvref_t<decltype(v)>>::convert(v); }, value);
    }
 };
 
@@ -138,6 +138,12 @@ template <typename T>
 bool bitwise_equal(const psio::shared_view_ptr<T>& lhs, const psio::shared_view_ptr<T>& rhs)
 {
    return bitwise_equal(lhs->unpack(), rhs->unpack());
+}
+
+template <typename T>
+bool bitwise_equal(const psio::nested<T>& lhs, const psio::nested<T>& rhs)
+{
+   return bitwise_equal(lhs.value, rhs.value);
 }
 
 template <typename T>
@@ -515,6 +521,13 @@ void test(std::initializer_list<T> values)
       for (const auto& v : values)
       {
          test(psio::shared_view_ptr{v});
+      }
+   }
+   // nested
+   {
+      for (const auto& v : values)
+      {
+         test(psio::nested{v});
       }
    }
    // Sandwiched between two heap objects (checks correct tracking of fixed_pos vs heap_pos)
