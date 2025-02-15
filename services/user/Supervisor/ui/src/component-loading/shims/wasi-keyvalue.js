@@ -135,10 +135,10 @@ class Bucket {
     set(key, value) {
         this.validateKey(key);
 
-        // 100kb
-        const maxSize = 100 * 1024;
-        if (value.length >= maxSize) {
-            throw new ErrorOther("value must be less than 100KB");
+        // 3072 kb
+        const maxSize = 3072 * 1024;
+        if (value.length > maxSize) {
+            throw new ErrorOther("value must be less than 4096KB");
         }
 
         try {
