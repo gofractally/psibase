@@ -36,5 +36,4 @@ crate-type = ["rlib"]
 
 [dependencies]
 identity = { path = "service", version = "0.14.0" }
-# r-identity = { path = "query-service", version = "0.14.0" }
 plugin = { path = "plugin", version = "0.14.0" }

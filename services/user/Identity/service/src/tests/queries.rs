@@ -9,6 +9,9 @@ use crate::{
 // ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
+
+    chain.new_account("alice".into())?;
+    chain.new_account("bob".into())?;
     chain.new_account("carol".into())?;
 
     svc.from("carol").attest("bob".into(), 76).get()?;
@@ -57,6 +60,9 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
 // ATTEST QUERY: verify empty query responses are correct
 pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
+
+    chain.new_account("alice".into())?;
+    chain.new_account("bob".into())?;
     chain.new_account("carol".into())?;
 
     let response = svc.query::<Vec<Attestation>>("allAttestations");

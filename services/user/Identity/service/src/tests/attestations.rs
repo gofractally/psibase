@@ -1,3 +1,5 @@
+use psibase::AccountNumber;
+
 use crate::tables::{Attestation, AttestationStats};
 use crate::tests::helpers::test_helpers::{
     init_identity_svc, PartialAttestation, PartialAttestationStats,
@@ -7,6 +9,9 @@ use crate::tests::helpers::test_helpers::{
 // ATTEST: verify first *high* confidence attestation is saved properly to table
 pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
+
+    chain.new_account("alice".into())?;
+    chain.new_account("bob".into())?;
 
     svc.from("alice").attest("bob".into(), 95).get()?;
 
@@ -25,6 +30,11 @@ pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase:
 // ATTEST: verify first *low* confidence attestation is saved properly to table
 pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
+
+    let alice = AccountNumber::from("alice");
+    chain.new_account(alice).unwrap();
+    let bob = AccountNumber::from("bob");
+    chain.new_account(bob).unwrap();
 
     svc.from("alice").attest("bob".into(), 75).get()?;
 
