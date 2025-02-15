@@ -1,6 +1,6 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
-import { Button } from "./ui/button";
+import { Button } from "../components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useBranding } from "@/hooks/useBranding";
 import { useEffect, useState } from "react";
@@ -11,10 +11,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "./ui/card";
+} from "../components/ui/card";
 import { Drill } from "lucide-react";
-import { LoginButton } from "./login-button";
-import { CreateAppModal } from "./create-app-modal";
+import { LoginButton } from "../components/login-button";
+import { CreateAppModal } from "../components/create-app-modal";
 import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 
 export const Loader = () => {

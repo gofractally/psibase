@@ -1,8 +1,9 @@
 import { createBrowserRouter } from "react-router-dom";
-import { Workshop } from "./components/Workshop";
 import { Layout } from "./components/layout";
 import { ProtectedRoute } from "./components/protected-route";
-import { Loader } from "./components/Loader";
+import { Loader } from "./pages/Loader";
+import { Settings } from "./pages/Settings";
+import { Upload } from "./pages/Upload";
 
 export const router = createBrowserRouter([
   {
@@ -17,7 +18,15 @@ export const router = createBrowserRouter([
         path: ":appName",
         element: (
           <ProtectedRoute>
-            <Workshop />
+            <Settings />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ":appName/upload",
+        element: (
+          <ProtectedRoute>
+            <Upload />
           </ProtectedRoute>
         ),
       },
@@ -25,7 +34,7 @@ export const router = createBrowserRouter([
         path: ":appName/support",
         element: (
           <ProtectedRoute>
-            <div>Support Page</div>
+            <div>Coming soon: Support Page</div>
           </ProtectedRoute>
         ),
       },
@@ -33,7 +42,7 @@ export const router = createBrowserRouter([
         path: ":appName/pending-requests",
         element: (
           <ProtectedRoute>
-            <div>Pending Requests Page</div>
+            <div>Coming soon: Pending Requests Page</div>
           </ProtectedRoute>
         ),
       },

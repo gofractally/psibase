@@ -1,43 +1,59 @@
 import { ChangeEvent, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "./ui/badge";
 
 interface FileInputProps {
-  value: Uint8Array;
-  onChange: (value: Uint8Array, rawInput: string) => void;
-  rawInput: string;
+  onChange: (
+    files: {
+      name: string;
+      contentType: string;
+      path: string;
+      bytes: Uint8Array;
+    }[]
+  ) => void;
 }
 
-export const FileInput = ({ onChange, rawInput }: FileInputProps) => {
-  const [status, setStatus] = useState<"idle" | "success">("idle");
+export const FileInput = ({ onChange }: FileInputProps) => {
+  const [files, setFiles] = useState<
+    { name: string; contentType: string; path: string; bytes: Uint8Array }[]
+  >([]);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setStatus("idle");
-      return;
-    }
+    if (!e.target.files) return;
+
+    const selectedFiles = Array.from(e.target.files);
+    const fileDataPromises = selectedFiles.map(async (file) => {
+      const buffer = await file.arrayBuffer();
+      return {
+        name: file.name,
+        contentType: file.type,
+        path: `/${file.name}`,
+        bytes: new Uint8Array(buffer),
+      };
+    });
 
     try {
-      const buffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      onChange(bytes, file.name);
-      setStatus("success");
+      const fileData = await Promise.all(fileDataPromises);
+      setFiles(fileData);
+      onChange(fileData);
     } catch {
-      setStatus("idle");
+      setFiles([]);
     }
   };
 
   return (
-    <div>
-      <input
-        type="file"
-        className="common-input file-input"
-        onChange={handleFileChange}
-      />
-      {status === "success" && (
-        <div className="status-message success">
-          File <code>{rawInput}</code> successfully loaded
-        </div>
+    <Card className="p-4">
+      <Input type="file" multiple onChange={handleFileChange} />
+      {files.length > 0 && (
+        <CardContent className="mt-4 space-y-2">
+          {files.map((file, index) => (
+            <Badge key={index} variant="secondary" className="mr-2">
+              {file.name}
+            </Badge>
+          ))}
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 };

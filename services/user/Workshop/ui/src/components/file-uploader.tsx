@@ -10,43 +10,38 @@ export const FileUploader = () => {
   const currentApp = useCurrentApp();
   const { data: metadata } = useAppMetadata(currentApp);
 
-  console.log({ metadata });
-  const [fileValue, setFileValue] = useState<Uint8Array>(new Uint8Array());
-  const [fileName, setFileName] = useState("");
-
   const { mutateAsync } = useUploadTree();
 
-  const handleFileChange = async (value: Uint8Array, filename: string) => {
-    setFileValue(value);
-    setFileName(filename);
-
-    console.log("starting upload?");
-    await mutateAsync({
+  const handleFileChange = async (
+    selectedFiles: {
+      name: string;
+      contentType: string;
+      path: string;
+      bytes: Uint8Array;
+    }[]
+  ) => {
+    const res = await mutateAsync({
       account: Account.parse(currentApp),
       compressionQuality: 0,
-      files: [
-        {
-          contentType: "png",
-          path: "/yes.png",
-          content: value,
-        },
-      ],
+      files: selectedFiles.map((file) => ({
+        contentType: file.contentType,
+        path: file.path,
+        content: file.bytes,
+      })),
     });
-    console.log("File uploaded:", filename);
-    console.log("File content (Uint8Array):", value);
-    window.open(siblingUrl(null, currentApp, "/yes.png"));
+
+    console.log(res, "was the res");
+
+    selectedFiles.forEach((file) => {
+      console.log("File uploaded:", file.name);
+      console.log("File content (Uint8Array):", file.bytes);
+      console.log("File should be at", siblingUrl(null, currentApp, file.path));
+    });
   };
 
   return (
     <div className="w-full">
-      <h1 className="text-lg font-semibold">Upload Files</h1>
-      <FileInput
-        value={fileValue}
-        onChange={(value, filename) => {
-          handleFileChange(value, filename);
-        }}
-        rawInput={fileName}
-      />
+      <FileInput onChange={handleFileChange} />
     </div>
   );
 };

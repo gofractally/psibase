@@ -1,16 +1,15 @@
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 import { useAppMetadata } from "@/hooks/useAppMetadata";
-import { MetaDataForm } from "./metadata-form";
-import { Spinner } from "./ui/spinner";
-import { ErrorCard } from "./error-card";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
-import { CreateAppAccountCard } from "./create-app-account-card";
+import { ErrorCard } from "@/components/error-card";
+import { Spinner } from "@/components/ui/spinner";
+import { CreateAppAccountCard } from "@/components/create-app-account-card";
+import { MetaDataForm } from "@/components/metadata-form";
 import { Account } from "@/lib/zodTypes";
-import { ControlPanel } from "./control-panel";
-import { FileUploader } from "./file-uploader";
+import { ControlPanel } from "@/components/control-panel";
 
-export const Workshop = () => {
+export const Settings = () => {
   const currentApp = useCurrentApp();
 
   const {
@@ -49,32 +48,23 @@ export const Workshop = () => {
     );
   } else
     return (
-      <div className="grid p-4 grid-cols-3 gap-2">
-        <div className="">
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between"></div>
-
-            {isSuccess && (
-              <MetaDataForm
-                key={currentApp}
-                existingValues={metadata ? metadata.appMetadata : undefined}
-                onSubmit={async (x) => {
-                  await updateMetadata({
-                    metadata: {
-                      ...x,
-                      owners: [],
-                    },
-                    account: Account.parse(currentApp),
-                  });
-                  return x;
-                }}
-              />
-            )}
-          </div>
-        </div>
-        <div>
-          <FileUploader />
-        </div>
+      <div className="mx-auto w-full grid p-4 grid-cols-1 lg:grid-cols-2 gap-8 max-w-screen-xl">
+        {isSuccess && (
+          <MetaDataForm
+            key={currentApp}
+            existingValues={metadata ? metadata.appMetadata : undefined}
+            onSubmit={async (x) => {
+              await updateMetadata({
+                metadata: {
+                  ...x,
+                  owners: [],
+                },
+                account: Account.parse(currentApp),
+              });
+              return x;
+            }}
+          />
+        )}
         <div>
           <ControlPanel />
         </div>

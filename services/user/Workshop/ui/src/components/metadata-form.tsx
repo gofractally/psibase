@@ -1,3 +1,4 @@
+import type React from "react";
 import { useForm } from "react-hook-form";
 import { z, ZodError } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,7 +18,15 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
 import { fileToBase64 } from "@/lib/fileToBase64";
-import { Trash } from "lucide-react";
+import { Trash, Upload } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Separator } from "./ui/separator";
 
 const formSchema = z.object({
   name: z.string(),
@@ -79,7 +88,7 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
             message: field.message,
           });
         });
-        toast("Invalid submssion", {
+        toast("Invalid submission", {
           description: "One or more fields are invalid.",
         });
       } else if (error instanceof Error) {
@@ -119,149 +128,190 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
   };
 
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(submit)}
-        className="flex flex-col gap-2"
-      >
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>App Name</FormLabel>
-              <FormControl>
-                <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="md:grid grid-cols-2 gap-2">
-          <FormField
-            control={form.control}
-            name="shortDescription"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tagline</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormDescription>Brief description of the app.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="icon"
-            render={() => (
-              <FormItem>
-                <FormLabel>Icon</FormLabel>
-                <FormControl>
-                  <div className="flex items-center space-x-4">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleIconChange}
-                      className="w-full max-w-xs"
-                    />
-                    {isIcon && (
-                      <img
-                        src={iconPreview || currentSrc}
-                        alt="Icon preview"
-                        className="h-10 w-10 rounded-lg object-cover"
+    <Card className="w-full mx-auto">
+      <CardHeader>
+        <CardTitle>App Metadata</CardTitle>
+        <CardDescription>
+          Configure your app's information and settings
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>App Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Enter your app name" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="shortDescription"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tagline</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Brief description of the app"
                       />
-                    )}
-                    {iconPreview && (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setIconPreview(null);
-                          form.resetField("icon");
-                          form.resetField("iconMimeType");
-                        }}
-                        variant="outline"
-                      >
-                        <Trash className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    )}
-                  </div>
-                </FormControl>
-
-                <FormDescription>
-                  Upload an icon for your app (recommended size: 512x512px)
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <FormField
-          control={form.control}
-          name="longDescription"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Long Description</FormLabel>
-              <FormControl>
-                <Textarea className="resize-none" {...field} />
-              </FormControl>
-
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="md:grid grid-cols-3 gap-2">
-          <FormField
-            control={form.control}
-            name="tosSubpage"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Terms of service</FormLabel>
-                <FormControl>
-                  <Input required placeholder="/terms-of-service" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="privacyPolicySubpage"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Privacy Policy</FormLabel>
-                <FormControl>
-                  <Input required placeholder="/privacy-policy" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="appHomepageSubpage"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>App home subpage</FormLabel>
-                <FormControl>
-                  <Input required placeholder="/" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <Button
-          type="submit"
-          disabled={form.formState.isSubmitting || !form.formState.isDirty}
-        >
-          Save
-        </Button>
-        <div>
-          <FormRootError />
-        </div>
-      </form>
-    </Form>
+                    </FormControl>
+                    <FormDescription>
+                      Brief description of the app (max 100 characters)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="icon"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Icon</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1">
+                          <label
+                            htmlFor="icon-upload"
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center justify-center w-full h-10 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                              <Upload className="w-5 h-5 mr-2" />
+                              Upload Icon
+                            </div>
+                          </label>
+                          <Input
+                            id="icon-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleIconChange}
+                            className="hidden"
+                          />
+                        </div>
+                        {isIcon && (
+                          <img
+                            src={iconPreview || currentSrc}
+                            alt="Icon preview"
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        )}
+                        {iconPreview && (
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setIconPreview(null);
+                              form.resetField("icon");
+                              form.resetField("iconMimeType");
+                            }}
+                            variant="outline"
+                            size="icon"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Upload an icon for your app (recommended size: 512x512px)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="longDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Long Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      className="resize-none min-h-[100px]"
+                      {...field}
+                      placeholder="Provide a detailed description of your app"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Separator />
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">App Pages</h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="tosSubpage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Terms of Service</FormLabel>
+                      <FormControl>
+                        <Input
+                          required
+                          placeholder="/terms-of-service"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="privacyPolicySubpage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Privacy Policy</FormLabel>
+                      <FormControl>
+                        <Input
+                          required
+                          placeholder="/privacy-policy"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="appHomepageSubpage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>App Home</FormLabel>
+                      <FormControl>
+                        <Input required placeholder="/" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                disabled={
+                  form.formState.isSubmitting || !form.formState.isDirty
+                }
+              >
+                Save Changes
+              </Button>
+            </div>
+            <FormRootError />
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 };

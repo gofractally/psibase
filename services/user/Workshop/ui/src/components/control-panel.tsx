@@ -111,7 +111,7 @@ export const ControlPanel = () => {
             setCacheLocal(checked);
           }}
           title="Cache"
-          description="Enable or disable caching of responses for the specified app. When enabled, responses may be cached to improve performance."
+          description="When enabled, responses may be cached to improve performance."
         />
       </div>
     </div>
