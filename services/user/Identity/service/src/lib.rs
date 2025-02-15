@@ -1,15 +1,25 @@
+#![allow(non_snake_case)]
+
 mod stats;
 #[cfg(test)]
 mod tests;
 
 #[psibase::service_tables]
 mod tables {
-    use core::fmt;
-
     use async_graphql::*;
+    use core::fmt;
     use psibase::*;
     use serde::{Deserialize, Serialize};
-    #[table(name = "AttestationTable", index = 0)]
+
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "AttestationTable", index = 1)]
     #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Attestation {
         /// The attesting account / the issuer
@@ -46,7 +56,7 @@ mod tables {
         }
     }
 
-    #[table(name = "AttestationStatsTable", index = 1)]
+    #[table(name = "AttestationStatsTable", index = 2)]
     #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
@@ -54,14 +64,11 @@ mod tables {
         pub subject: AccountNumber,
 
         // % high conf + # unique attestations will give an approximation of a Google Review for a user
-        #[allow(non_snake_case)]
         pub numHighConfAttestations: u16,
 
-        #[allow(non_snake_case)]
         pub uniqueAttesters: u16,
 
         // freshness indicator
-        #[allow(non_snake_case)]
         pub mostRecentAttestation: TimePointSec,
     }
 
@@ -89,7 +96,24 @@ mod service {
     use psibase::*;
 
     use crate::stats::update_attestation_stats;
-    use crate::tables::{Attestation, AttestationStats, AttestationStatsTable, AttestationTable};
+    use crate::tables::*;
+
+    #[action]
+    fn init() {
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
+        services::http_server::Wrapper::call().registerServer(SERVICE);
+    }
+
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        let table = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_some(),
+            "service not initialized",
+        );
+    }
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
@@ -214,10 +238,6 @@ mod service {
             subject: AccountNumber,
         ) -> async_graphql::Result<Option<AttestationStats>, async_graphql::Error> {
             Ok(AttestationStatsTable::new().get_index_pk().get(&subject))
-        }
-
-        async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
-            get_event(id)
         }
     }
 

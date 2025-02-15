@@ -3,7 +3,7 @@ use crate::tests::helpers::test_helpers::{
     init_identity_svc, PartialAttestation, PartialAttestationStats,
 };
 
-#[psibase::test_case(services("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST: verify first *high* confidence attestation is saved properly to table
 pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
@@ -21,7 +21,7 @@ pub fn test_attest_first_high_conf(chain: psibase::Chain) -> Result<(), psibase:
     Ok(())
 }
 
-#[psibase::test_case(services("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST: verify first *low* confidence attestation is saved properly to table
 pub fn test_attest_first_low_conf(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);

@@ -2,7 +2,7 @@ use crate::tables::AttestationStats;
 use crate::tests::helpers::test_helpers::{init_identity_svc, PartialAttestationStats};
 use psibase::AccountNumber;
 
-#[psibase::test_case(services("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // STATS: Verify that issued gets updated when a more recent attestation comes in
 pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
@@ -21,7 +21,7 @@ pub fn test_issued_field_updates(chain: psibase::Chain) -> Result<(), psibase::E
     Ok(())
 }
 
-#[psibase::test_case(services("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // STATS: 3 attestations attesting to same subject; check that stats are updated properly as more recent attestations come in
 pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
@@ -47,7 +47,7 @@ pub fn test_attest_stats_math(chain: psibase::Chain) -> Result<(), psibase::Erro
     Ok(())
 }
 
-#[psibase::test_case(services("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // STATS: 4 different attesters attesting to same subject; check that stats are updated properly as new attestations come in
 pub fn test_attest_stats_math_over_time(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);

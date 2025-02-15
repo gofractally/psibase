@@ -1220,6 +1220,7 @@ name = "identity"
 version = "0.14.0"
 dependencies = [
  "async-graphql",
+ "identity-pkg",
  "psibase",
  "psibase_macros",
  "serde",

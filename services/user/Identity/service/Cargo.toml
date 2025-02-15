@@ -18,3 +18,6 @@ psibase = { path = "../../../../rust/psibase", version = "0.14.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 async-graphql = "7.0.7"
 serde_json = "1.0.120"
+
+[dev-dependencies]
+identity-pkg = { path = "..", version = "0.14.0" }
