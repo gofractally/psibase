@@ -29,7 +29,6 @@ additional-css = [
     "theme/css/tabs.css"
 ]
 additional-js = [
-    "theme/js/mermaid.min.js",
     "theme/js/mermaid-load.js", 
     "theme/js/fix-github-edit-link.js", 
     "theme/js/pagetoc.js",
