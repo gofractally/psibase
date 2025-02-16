@@ -3,7 +3,7 @@
 
 namespace arbtrie
 {
-   seg_allocator::session::session(session&& mv)
+   seg_alloc_session::seg_alloc_session(seg_alloc_session&& mv)
        : _sega(mv._sega),
          _session_num(mv._session_num),
          _alloc_seg_num(mv._alloc_seg_num),
@@ -15,7 +15,7 @@ namespace arbtrie
       mv._session_num = -1;
    }
 
-   seg_allocator::session::session(seg_allocator& a, uint32_t ses_num)
+   seg_alloc_session::seg_alloc_session(seg_allocator& a, uint32_t ses_num)
        : _session_num(ses_num),
          _alloc_seg_num(-1ull),
          _alloc_seg_ptr(nullptr),
@@ -26,7 +26,7 @@ namespace arbtrie
    {
    }
 
-   seg_allocator::session::~session()
+   seg_alloc_session::~seg_alloc_session()
    {
       if (_session_num == -1)
          return;
@@ -44,9 +44,9 @@ namespace arbtrie
       _sega.release_session_num(_session_num);
    }
 
-   std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t   size,
-                                                                             id_address adr,
-                                                                             uint64_t   time)
+   std::pair<node_location, node_header*> seg_alloc_session::alloc_data(uint32_t   size,
+                                                                        id_address adr,
+                                                                        uint64_t   time)
    {
       assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
       // A - if no segment get a new segment
@@ -108,7 +108,7 @@ namespace arbtrie
 
       return {node_location::from_absolute(loc), head};
    }
-   void seg_allocator::session::unalloc(uint32_t size)
+   void seg_alloc_session::unalloc(uint32_t size)
    {
       auto rounded_size = round_up_multiple<64>(size);
       if (_alloc_seg_ptr) [[likely]]
@@ -125,13 +125,13 @@ namespace arbtrie
       }
    }
 
-   void seg_allocator::session::sync(sync_type st)
+   void seg_alloc_session::sync(sync_type st)
    {
       _sega.push_dirty_segment(_alloc_seg_num);
       _sega.sync(st);
    }
 
-   uint64_t seg_allocator::session::count_ids_with_refs()
+   uint64_t seg_alloc_session::count_ids_with_refs()
    {
       return _sega.count_ids_with_refs();
    }

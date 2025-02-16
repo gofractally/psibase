@@ -212,7 +212,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-             // then we start at the beginning of the next level
+               // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());
@@ -536,6 +536,7 @@ namespace arbtrie
          {
             popkey(in->get_prefix().size());
             _path.pop_back();
+            assert(verify_branches_invariant());
             return prev();
          }
          //  TRIEDENT_DEBUG( "current: ", current );
@@ -544,20 +545,21 @@ namespace arbtrie
          _path.back().second = lbx.first;
          if (not lbx.second)
          {
-            // add 1 because we are not eof because current != 0 at start of call
             popkey(in->get_prefix().size() + 1);
             _path.pop_back();
+            assert(verify_branches_invariant());
             return prev();
          }
          if (lbx.first == 0)
          {
             popkey(current < 257);
+            assert(verify_branches_invariant());
             return true;
          }
          if (lbx.first)
          {
-            //     TRIEDENT_DEBUG( "branches.back = ", branch_to_char(lbx.first) );
             _branches.back() = branch_to_char(lbx.first);
+            assert(verify_branches_invariant());
 
             auto oref = state.get(lbx.second);
             return reverse_lower_bound_impl(oref, npos);
@@ -566,6 +568,7 @@ namespace arbtrie
          {
             _branches.pop_back();
             _path.pop_back();
+            assert(verify_branches_invariant());
          }
          return true;
       };
@@ -589,12 +592,14 @@ namespace arbtrie
 
                current = --_path.back().second;
                pushkey(bn->get_key_val_ptr(current)->key());
+               assert(verify_branches_invariant());
                return true;
             }
             else
             {
                current = _path.back().second = bn->num_branches() - 1;
                pushkey(bn->get_key_val_ptr(current)->key());
+               assert(verify_branches_invariant());
                return true;
             }
          }
@@ -763,6 +768,54 @@ namespace arbtrie
          default:
             throw std::runtime_error("iterator::get2 unexpected type");
       }
+   }
+
+   template <iterator_caching_mode CacheMode>
+   std::vector<uint8_t> iterator<CacheMode>::calculate_expected_branches() const
+   {
+      auto state = _rs._segas.lock();
+
+      std::vector<uint8_t> expected;
+      auto push_expected = [&](key_view k) { expected.insert(expected.end(), k.begin(), k.end()); };
+      auto push_expected_branch = [&](branch_index_type b)
+      { expected.push_back(branch_to_char(b)); };
+
+      for (const auto& p : _path)
+      {
+         auto oref = state.get(p.first);
+         switch (oref.type())
+         {
+            case node_type::binary:
+            {
+               auto bn = oref.as<binary_node, CacheMode>();
+               push_expected(bn->get_key_val_ptr(p.second)->key());
+               break;
+            }
+            case node_type::value:
+            {
+               auto vn = oref.as<value_node, CacheMode>();
+               push_expected(vn->key());
+               break;
+            }
+            case node_type::setlist:
+            {
+               auto sl = oref.as<setlist_node, CacheMode>();
+               push_expected(sl->get_prefix());
+               if (p.second > 0)
+                  push_expected_branch(p.second);
+               break;
+            }
+            case node_type::full:
+            {
+               auto fn = oref.as<full_node, CacheMode>();
+               push_expected(fn->get_prefix());
+               if (p.second > 0)
+                  push_expected_branch(p.second);
+               break;
+            }
+         }
+      }
+      return expected;
    }
 
 }  // namespace arbtrie

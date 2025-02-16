@@ -3,19 +3,19 @@
 namespace arbtrie
 {
 
-   inline seg_allocator::session::read_lock::object_ref::object_ref(
-       seg_allocator::session::read_lock& rlock,
+   inline seg_alloc_session::read_lock::object_ref::object_ref(
+       seg_alloc_session::read_lock& rlock,
        id_address                         adr,
        node_meta_type&                    met)
        : _rlock(rlock), _meta(met), _cached(_meta.load(std::memory_order_relaxed)), _address(adr)
    {
    }
 
-   inline seg_allocator::session::read_lock::object_ref::object_ref(const object_ref& p)
+   inline seg_alloc_session::read_lock::object_ref::object_ref(const object_ref& p)
        : _rlock(p._rlock), _address(p._address), _meta(p._meta), _cached(p._cached)
    {
    }
-   inline void seg_allocator::session::read_lock::object_ref::store(temp_meta_type tmt,
+   inline void seg_alloc_session::read_lock::object_ref::store(temp_meta_type tmt,
                                                                     auto           memory_order)
    {
       if constexpr (not debug_memory)
@@ -36,14 +36,14 @@ namespace arbtrie
    }
 
    template <typename Type, bool SetReadBit>
-   const Type* seg_allocator::session::read_lock::object_ref::as() const
+   const Type* seg_alloc_session::read_lock::object_ref::as() const
    {
       assert(header()->validate_checksum());
       assert((Type::type == header<Type, SetReadBit>()->get_type()));
       return reinterpret_cast<const Type*>(header());
    };
 
-   inline auto seg_allocator::session::read_lock::object_ref::try_move(
+   inline auto seg_alloc_session::read_lock::object_ref::try_move(
        node_location expected_prior_loc,
        node_location move_to_loc)
    {
@@ -58,7 +58,7 @@ namespace arbtrie
     *  Returns the header pointer for the node.
     */
    template <typename T, bool SetReadBit>
-   inline const T* seg_allocator::session::read_lock::object_ref::header() const
+   inline const T* seg_alloc_session::read_lock::object_ref::header() const
    {
       assert(_meta.load(std::memory_order_relaxed).ref());
       auto m = _meta.load(std::memory_order_acquire);
@@ -79,7 +79,7 @@ namespace arbtrie
 
    template <typename T>
    std::pair<const T*, node_location>
-   seg_allocator::session::read_lock::object_ref::try_move_header()
+   seg_alloc_session::read_lock::object_ref::try_move_header()
    {
       if (auto opt_loc = _meta.try_move_location())
       {
@@ -88,7 +88,7 @@ namespace arbtrie
       return {nullptr, node_location::from_absolute(0)};
    }
 
-   inline void seg_allocator::session::read_lock::object_ref::maybe_update_read_stats() const
+   inline void seg_alloc_session::read_lock::object_ref::maybe_update_read_stats() const
    {
       // Generate random number using rdtsc hashed with XXHash for better distribution
       uint64_t tsc    = rdtsc();
@@ -117,7 +117,7 @@ namespace arbtrie
     *  Returns the last value of the node pointer prior to release so that
     *  its children may be released, or null if the children shouldn't be released.
     */
-   inline const node_header* seg_allocator::session::read_lock::object_ref::release()
+   inline const node_header* seg_alloc_session::read_lock::object_ref::release()
    {
       //      TRIEDENT_DEBUG( "  ", address(), "  ref: ", ref(), " type: ", node_type_names[type()] );
       auto prior = _meta.release();

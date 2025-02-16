@@ -127,6 +127,24 @@ namespace arbtrie
          _path.clear();
       }
 
+      // Calculate what _branches should be based on current _path
+      std::vector<uint8_t> calculate_expected_branches() const;
+
+      // Verify that current _branches matches what we expect from _path
+      bool verify_branches_invariant()
+      {
+         auto expected = calculate_expected_branches();
+         if (_branches != expected)
+         {
+            _branches = expected;
+            TRIEDENT_DEBUG(
+                "branches mismatch: ", key_view((char*)_branches.data(), _branches.size()),
+                " expected: ", key_view((char*)expected.data(), expected.size()));
+            return true;
+         }
+         return true;
+      }
+
       void pushkey(key_view k)
       {
          _branches.resize(_branches.size() + k.size());

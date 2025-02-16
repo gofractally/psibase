@@ -1,6 +1,5 @@
 #pragma once
 #include <arbtrie/node_header.hpp>
-#include <arbtrie/saturated_uint32.hpp>
 #include <concepts>
 
 namespace arbtrie
@@ -111,12 +110,12 @@ namespace arbtrie
       }
       uint32_t descendants() const { return _descendants; }
 
-      saturated_uint32 _descendants = 0;
-      uint32_t         _prefix_capacity : 10;
-      uint32_t         _prefix_size : 10;
-      uint32_t         _unused : 11;  // TODO: this could be used extend range of _descendants
-      uint32_t         _eof_subtree : 1 = false;
-      id_address       _eof_value;
+      uint32_t   _descendants = 0;
+      uint32_t   _prefix_capacity : 10;
+      uint32_t   _prefix_size : 10;
+      uint32_t   _unused : 11;  // TODO: this could be used extend range of _descendants
+      uint32_t   _eof_subtree : 1 = false;
+      id_address _eof_value;
 
       void set_eof(id_address e)
       {
