@@ -45,7 +45,7 @@ namespace arbtrie
    }
 
    std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t          size,
-                                                                             fast_meta_address adr,
+                                                                             id_address adr,
                                                                              uint64_t          time)
    {
       assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));

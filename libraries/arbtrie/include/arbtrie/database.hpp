@@ -152,7 +152,7 @@ namespace arbtrie
                                  key_view          to) const;
 
       /** creates a new handle for address, retains it */
-      node_handle create_handle(fast_meta_address a) { return node_handle(*this, a); }
+      node_handle create_handle(id_address a) { return node_handle(*this, a); }
 
      public:
       seg_allocator::session _segas;
@@ -282,22 +282,13 @@ namespace arbtrie
       friend class database;
       write_session(database& db) : read_session(db) {}
 
-      fast_meta_address upsert(session_rlock&    state,
-                               fast_meta_address root,
-                               key_view          key,
-                               const value_type& val);
+      id_address upsert(session_rlock& state, id_address root, key_view key, const value_type& val);
 
-      fast_meta_address insert(session_rlock&    state,
-                               fast_meta_address root,
-                               key_view          key,
-                               const value_type& val);
+      id_address insert(session_rlock& state, id_address root, key_view key, const value_type& val);
 
-      fast_meta_address update(session_rlock&    state,
-                               fast_meta_address root,
-                               key_view          key,
-                               const value_type& val);
+      id_address update(session_rlock& state, id_address root, key_view key, const value_type& val);
 
-      fast_meta_address remove(session_rlock& state, fast_meta_address root, key_view key);
+      id_address remove(session_rlock& state, id_address root, key_view key);
 
       value_type _cur_val;
       bool       _sync_lock = false;
@@ -374,73 +365,73 @@ namespace arbtrie
 
      private:
       template <upsert_mode mode>
-      fast_meta_address upsert(object_ref& root, key_view key);
+      id_address upsert(object_ref& root, key_view key);
       template <upsert_mode mode>
-      fast_meta_address upsert(object_ref&& root, key_view key);
+      id_address upsert(object_ref&& root, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_existing_br(object_ref&       r,
-                                                 key_view          key,
-                                                 const NodeType*   fn,
-                                                 key_view          cpre,
-                                                 branch_index_type bidx,
-                                                 fast_meta_address br);
+      id_address upsert_inner_existing_br(object_ref&       r,
+                                          key_view          key,
+                                          const NodeType*   fn,
+                                          key_view          cpre,
+                                          branch_index_type bidx,
+                                          id_address        br);
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner_new_br(object_ref&       r,
-                                            key_view          key,
-                                            const NodeType*   fn,
-                                            key_view          cpre,
-                                            branch_index_type bidx,
-                                            fast_meta_address br);
+      id_address upsert_inner_new_br(object_ref&       r,
+                                     key_view          key,
+                                     const NodeType*   fn,
+                                     key_view          cpre,
+                                     branch_index_type bidx,
+                                     id_address        br);
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_prefix(object_ref&     r,
-                                      key_view        key,
-                                      key_view        cpre,
-                                      const NodeType* fn,
-                                      key_view        rootpre);
+      id_address upsert_prefix(object_ref&     r,
+                               key_view        key,
+                               key_view        cpre,
+                               const NodeType* fn,
+                               key_view        rootpre);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_eof(object_ref& r, const NodeType* fn);
+      id_address upsert_eof(object_ref& r, const NodeType* fn);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address remove_eof(object_ref& r, const NodeType* fn);
+      id_address remove_eof(object_ref& r, const NodeType* fn);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref& r, key_view key);
+      id_address upsert_inner(object_ref& r, key_view key);
 
       template <upsert_mode mode, typename NodeType>
-      fast_meta_address upsert_inner(object_ref&& r, key_view key)
+      id_address upsert_inner(object_ref&& r, key_view key)
       {
          return upsert_inner<mode>(r, key);
       }
 
       template <upsert_mode mode>
-      fast_meta_address upsert_eof_value(object_ref& root);
+      id_address upsert_eof_value(object_ref& root);
 
       template <upsert_mode mode>
-      fast_meta_address upsert_value(object_ref& root, key_view key);
+      id_address upsert_value(object_ref& root, key_view key);
 
       //=======================
       // binary_node operations
       // ======================
-      fast_meta_address make_binary(id_region         reg,
-                                    session_rlock&    state,
-                                    key_view          key,
-                                    const value_type& val);
+      id_address make_binary(id_region         reg,
+                             session_rlock&    state,
+                             key_view          key,
+                             const value_type& val);
 
       template <upsert_mode mode>
-      fast_meta_address upsert_binary(object_ref& root, key_view key);
+      id_address upsert_binary(object_ref& root, key_view key);
 
       template <upsert_mode mode>
-      fast_meta_address update_binary_key(object_ref&        root,
-                                          const binary_node* bn,
-                                          uint16_t           lb_idx,
-                                          key_view           key);
+      id_address update_binary_key(object_ref&        root,
+                                   const binary_node* bn,
+                                   uint16_t           lb_idx,
+                                   key_view           key);
       template <upsert_mode mode>
-      fast_meta_address remove_binary_key(object_ref&        root,
-                                          const binary_node* bn,
-                                          uint16_t           lb_idx,
-                                          key_view           key);
+      id_address remove_binary_key(object_ref&        root,
+                                   const binary_node* bn,
+                                   uint16_t           lb_idx,
+                                   key_view           key);
    };
 
    class database
@@ -523,7 +514,7 @@ namespace arbtrie
    {
       auto& state = r.rlock();
 
-      auto release_id = [&](fast_meta_address b) { release_node(state.get(b)); };
+      auto release_id = [&](id_address b) { release_node(state.get(b)); };
 
       if (auto n = r.release())
          cast_and_call(r.type(), n, [&](const auto* ptr) { ptr->visit_branches(release_id); });
@@ -694,7 +685,7 @@ namespace arbtrie
                return true;
             case kv_index::obj_id:
                callback(true, root.rlock()
-                                  .get(fast_meta_address(kvp->value_id()))
+                                  .get(id_address(kvp->value_id()))
                                   .template as<value_node>()
                                   ->value());
                return true;
@@ -761,7 +752,7 @@ namespace arbtrie
             }
          }
       }
-      return r.give(fast_meta_address::from_int(old_r));
+      return r.give(id_address(old_r));
    }
 
    /**

@@ -41,7 +41,7 @@ namespace arbtrie
          return asize;
       }
 
-      void set_branch(branch_index_type br, fast_meta_address adr)
+      void set_branch(branch_index_type br, id_address adr)
       {
          assert(br > 0);
          /*
@@ -60,7 +60,7 @@ namespace arbtrie
          get_branch_ptr()[idx] = adr.index;
       }
 
-      void add_branch(branch_index_type br, fast_meta_address adr)
+      void add_branch(branch_index_type br, id_address adr)
       {
          assert(br > 0);
          /*
@@ -108,7 +108,7 @@ namespace arbtrie
          --_num_branches;
       }
 
-      fast_meta_address get_branch(branch_index_type br) const
+      id_address get_branch(branch_index_type br) const
       {
          assert(br < 257);
          assert(br > 0);
@@ -119,27 +119,27 @@ namespace arbtrie
 
          auto b = br - 1;
          if (bits[b / 64] & (1ull << (b % 64)))
-            return fast_meta_address(branch_region(), get_branch_ptr()[get_branch_index(b)]);
+            return id_address(branch_region(), get_branch_ptr()[get_branch_index(b)]);
          return {};
       }
 
-      inline void visit_branches(std::invocable<fast_meta_address> auto&& visitor) const
+      inline void visit_branches(std::invocable<id_address> auto&& visitor) const
       {
          const bool has_eof = has_eof_value();
 
          if (has_eof)
-            visitor(fast_meta_address(_eof_value));
+            visitor(id_address(_eof_value));
 
          auto*             ptr = get_branch_ptr();
          const auto* const end = ptr + num_branches() - has_eof;
          while (ptr != end)
          {
-            visitor(fast_meta_address{branch_region(), *ptr});
+            visitor(id_address{branch_region(), *ptr});
             ++ptr;
          }
       }
       inline void visit_branches_with_br(
-          std::invocable<branch_index_type, fast_meta_address> auto&& visitor) const
+          std::invocable<branch_index_type, id_address> auto&& visitor) const
       {
          const bool        has_eof = has_eof_value();
          const auto*       start   = get_branch_ptr();
@@ -147,12 +147,12 @@ namespace arbtrie
          const auto*       ptr     = start;
 
          if (has_eof)
-            visitor(0, fast_meta_address(_eof_value));
+            visitor(0, id_address(_eof_value));
 
          for (int lb = 0; lb < 256; lb = lower_bound_bit(lb + 1))
          {
             assert(ptr < end);
-            visitor(branch_index_type(lb) + 1, fast_meta_address(branch_region(), *ptr));
+            visitor(branch_index_type(lb) + 1, id_address(branch_region(), *ptr));
             ++ptr;
          }
       }
@@ -187,23 +187,23 @@ namespace arbtrie
          // clang-format on
       }
 
-      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type br) const
+      std::pair<branch_index_type, id_address> lower_bound(branch_index_type br) const
       {
          if (br >= max_branch_count) [[unlikely]]
-            return std::pair<branch_index_type, fast_meta_address>(max_branch_count, {});
+            return std::pair<branch_index_type, id_address>(max_branch_count, {});
          if (br == 0)
          {
             if (_eof_value)
-               return std::pair<branch_index_type, fast_meta_address>(0, _eof_value);
+               return std::pair<branch_index_type, id_address>(0, _eof_value);
             ++br;
          }
 
          auto lbb  = lower_bound_bit(br - 1);
          auto lbbr = lbb + 1;
-         return std::pair<branch_index_type, fast_meta_address>(lbbr, get_branch(lbbr));
+         return std::pair<branch_index_type, id_address>(lbbr, get_branch(lbbr));
       }
 
-      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(
+      std::pair<branch_index_type, id_address> reverse_lower_bound(
           branch_index_type br) const
       {
          auto lbb  = reverse_lower_bound_bit(br - 1);
@@ -212,11 +212,11 @@ namespace arbtrie
          if (lbbr == 0)
          {
             if (_eof_value)
-               return std::pair<branch_index_type, fast_meta_address>(0, _eof_value);
-            return std::pair<branch_index_type, fast_meta_address>(-1, {});
+               return std::pair<branch_index_type, id_address>(0, _eof_value);
+            return std::pair<branch_index_type, id_address>(-1, {});
          }
 
-         return std::pair<branch_index_type, fast_meta_address>(lbbr, get_branch(lbbr));
+         return std::pair<branch_index_type, id_address>(lbbr, get_branch(lbbr));
       }
 
       int lower_bound_bit(int b) const

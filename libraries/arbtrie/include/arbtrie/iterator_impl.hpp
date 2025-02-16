@@ -160,7 +160,7 @@ namespace arbtrie
       {
          //  TRIEDENT_DEBUG( "query: ", to_hex(query) , " <= pre: ", to_hex(node_prefix) );
          // go to first branch
-         std::pair<branch_index_type, fast_meta_address> idx = in->lower_bound(0);
+         std::pair<branch_index_type, id_address> idx = in->lower_bound(0);
          if (idx.first == 0)
          {
             assert(_path.back().second == 0);
@@ -195,7 +195,7 @@ namespace arbtrie
       // TRIEDENT_DEBUG( "remaining query: ", to_hex(remaining_query) );
       assert(remaining_query.size() > 0);
 
-      std::pair<branch_index_type, fast_meta_address> idx =
+      std::pair<branch_index_type, id_address> idx =
           in->lower_bound(char_to_branch(remaining_query.front()));
 
       // TRIEDENT_WARN( "lower bound: ", to_hex(branch_to_char(idx.first) ) );
@@ -212,7 +212,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-             // then we start at the beginning of the next level
+               // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());
@@ -232,8 +232,7 @@ namespace arbtrie
          branch_index_type qidx = char_to_branch(query[0]);
 
          // go to last branch
-         std::pair<branch_index_type, fast_meta_address> idx = in->reverse_lower_bound(qidx);
-         assert(idx.second >= 0);
+         std::pair<branch_index_type, id_address> idx = in->reverse_lower_bound(qidx);
 
          if (idx.first == 0)
          {
@@ -265,7 +264,7 @@ namespace arbtrie
       auto remaining_query = query.substr(cpre.size());
       assert(remaining_query.size() > 0);
 
-      std::pair<branch_index_type, fast_meta_address> idx =
+      std::pair<branch_index_type, id_address> idx =
           in->reverse_lower_bound(char_to_branch(remaining_query.front()));
 
       if (idx.second)
@@ -685,7 +684,7 @@ namespace arbtrie
             {
                return false;
             }
-            _path.push_back({fast_meta_address(addr), 0});
+            _path.push_back({id_address(addr), 0});
             pushkey(branch_to_char(br));
             auto next_ref = r.rlock().get(addr);
             bool result =

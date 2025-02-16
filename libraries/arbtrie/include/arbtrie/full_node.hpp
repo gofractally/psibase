@@ -27,10 +27,7 @@ namespace arbtrie
          return round_up_multiple<64>(min_size);
       }
 
-      full_node(int_fast16_t        asize,
-                fast_meta_address   nid,
-                const full_node*    src,
-                const clone_config& cfg)
+      full_node(int_fast16_t asize, id_address nid, const full_node* src, const clone_config& cfg)
           : inner_node<full_node>(asize, nid, src, cfg)
       {
          _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count * sizeof(id_index);
@@ -38,7 +35,7 @@ namespace arbtrie
          memcpy(branches(), src->branches(), branch_count * sizeof(id_index));
       }
 
-      full_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg)
+      full_node(int_fast16_t asize, id_address nid, const clone_config& cfg)
           : inner_node<full_node>(asize, nid, cfg, 0)
       {
          _prefix_capacity = asize - sizeof(inner_node<full_node>) - branch_count * sizeof(id_index);
@@ -48,7 +45,7 @@ namespace arbtrie
 
       bool can_add_branch() const { return num_branches() < max_branch_count; }
 
-      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type br) const
+      std::pair<branch_index_type, id_address> lower_bound(branch_index_type br) const
       {
          if (br == 0)
          {
@@ -66,14 +63,13 @@ namespace arbtrie
          {
             if (*ptr)
             {
-               return {1 + (ptr - beg), fast_meta_address(branch_region(), *ptr)};
+               return {1 + (ptr - beg), id_address(branch_region(), *ptr)};
             }
             ++ptr;
          }
          return {max_branch_count, {}};
       }
-      std::pair<branch_index_type, fast_meta_address> reverse_lower_bound(
-          branch_index_type br) const
+      std::pair<branch_index_type, id_address> reverse_lower_bound(branch_index_type br) const
       {
          auto beg = branches();
          auto ptr = beg + br - 1;
@@ -82,7 +78,7 @@ namespace arbtrie
          {
             if (*ptr)
             {
-               return {1 + (ptr - beg), fast_meta_address(branch_region(), *ptr)};
+               return {1 + (ptr - beg), id_address(branch_region(), *ptr)};
             }
             --ptr;
          }
@@ -91,17 +87,17 @@ namespace arbtrie
          return {-1, {}};
       }
 
-      auto& add_branch(branch_index_type br, fast_meta_address b)
+      auto& add_branch(branch_index_type br, id_address b)
       {
          assert(br < max_branch_count);
          assert(br > 0);
          assert(not branches()[br - 1]);
-         assert(b.region == branch_region());
+         assert(b.region() == branch_region());
          assert(_num_branches < max_branch_count);
 
          ++_num_branches;
          auto& idx = branches()[br - 1];
-         idx.index = b.index;
+         idx       = id_index(b.index().to_int());
          return *this;
       }
 
@@ -117,29 +113,29 @@ namespace arbtrie
          return *this;
       }
 
-      auto& set_branch(branch_index_type br, fast_meta_address b)
+      auto& set_branch(branch_index_type br, id_address b)
       {
          assert(br < max_branch_count);
          assert(br > 0);
          assert(get_branch(br));
-         assert(b.region == branch_region());
+         assert(b.region() == branch_region());
 
          auto& idx = branches()[br - 1];
-         idx.index = b.index;
+         idx       = id_index(b.index().to_int());
 
          return *this;
       }
 
-      fast_meta_address get_branch(branch_index_type br) const
+      id_address get_branch(branch_index_type br) const
       {
          assert(br < max_branch_count);
          assert(br > 0);
 
          //if (br == 0) return _eof_value;
-         return fast_meta_address(branch_region(), branch(br - 1));
+         return id_address(branch_region(), branch(br - 1));
       }
 
-      inline void visit_branches(std::invocable<fast_meta_address> auto&& visitor) const
+      inline void visit_branches(std::invocable<id_address> auto&& visitor) const
       {
          if (has_eof_value())
             visitor(_eof_value);
@@ -148,12 +144,12 @@ namespace arbtrie
          for (int i = 0; i < branch_count; ++i)
          {
             if (auto b = branch(i))
-               visitor(fast_meta_address(region, b));
+               visitor(id_address(region, b));
          }
       }
 
       inline void visit_branches_with_br(
-          std::invocable<branch_index_type, fast_meta_address> auto&& visitor) const
+          std::invocable<branch_index_type, id_address> auto&& visitor) const
       {
          if (has_eof_value())
             visitor(0, _eof_value);
@@ -162,7 +158,7 @@ namespace arbtrie
          for (branch_index_type i = 0; i < branch_count;)
          {
             if (auto b = branch(i))
-               visitor(++i, fast_meta_address(region, b));
+               visitor(++i, id_address(region, b));
             else
                ++i;
          }

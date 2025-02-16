@@ -104,20 +104,20 @@ std::vector<std::string> load_words(write_session& ws, node_handle& root, uint64
       return result;
    }
 }
-void validate_refcount(session_rlock& state, fast_meta_address i, int c = 1);
-void validate_refcount(session_rlock& state, fast_meta_address i, const auto* in, int c)
+void validate_refcount(session_rlock& state, id_address i, int c = 1);
+void validate_refcount(session_rlock& state, id_address i, const auto* in, int c)
 {
    in->visit_branches_with_br(
-       [&](int br, fast_meta_address adr)
+       [&](int br, id_address adr)
        {
-          if (in->branch_region() != adr.region)
+          if (in->branch_region().to_int() != adr.region().to_int())
              throw std::runtime_error("region refcount violated");
           validate_refcount(state, adr, c);
        });
 }
-void validate_refcount(session_rlock& state, fast_meta_address i, const binary_node* inner, int) {}
-void validate_refcount(session_rlock& state, fast_meta_address i, const value_node* inner, int) {}
-void validate_refcount(session_rlock& state, fast_meta_address i, int c)
+void validate_refcount(session_rlock& state, id_address i, const binary_node* inner, int) {}
+void validate_refcount(session_rlock& state, id_address i, const value_node* inner, int) {}
+void validate_refcount(session_rlock& state, id_address i, int c)
 {
    if (i)
    {
@@ -131,8 +131,7 @@ void validate_refcount(session_rlock& state, fast_meta_address i, int c)
 TEST_CASE("binary-node")
 {
    alignas(64) char node_buffer[64 * 16];
-   auto             bn =
-       new (node_buffer) binary_node(sizeof(node_buffer), fast_meta_address{}, clone_config{});
+   auto bn = new (node_buffer) binary_node(sizeof(node_buffer), id_address{}, clone_config{});
    TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
    TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
    TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);

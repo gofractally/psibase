@@ -1,7 +1,7 @@
 #pragma once
+#include <arbtrie/address.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/node_meta.hpp>
-#include <arbtrie/object_id.hpp>
 #include <arbtrie/util.hpp>
 #include <string_view>
 
@@ -38,31 +38,34 @@ namespace arbtrie
     */
    struct node_header
    {
-      uint32_t checksum;
-      uint32_t _ntype : 3;              // node_type
-      uint32_t _read : 1 = 0;           // currently unused
-      uint32_t _nsize : 27;             // bytes allocated for this node
-      uint64_t _num_branches : 9;       // number of branches that are set
-      uint64_t _branch_id_region : 16;  // the ID region branches from this node are allocated to
-      uint64_t _node_id : 32;           // the ID of this node
-      uint64_t _unused : 8;             // unused bits
+      uint32_t   checksum;
+      id_address _node_id;  // the ID of this node
 
-      inline node_header(uint32_t          size,
-                         fast_meta_address nid,
-                         node_type         type       = node_type::freelist,
-                         uint16_t          num_branch = 0)
+      uint32_t _ntype : 3;    // node_type
+      uint32_t _nsize : 27;   // bytes allocated for this node
+      uint32_t _unused2 : 2;  // unused bits
+
+      id_region _branch_id_region;  // the ID region branches from this node are allocated to
+
+      uint16_t _num_branches : 9;  // number of branches that are set
+      uint16_t _unused : 7;        // unused bits
+
+      inline node_header(uint32_t   size,
+                         id_address nid,
+                         node_type  type       = node_type::freelist,
+                         uint16_t   num_branch = 0)
           : checksum(0),
             _ntype(type),
             _nsize(size),
             _num_branches(num_branch),
             _branch_id_region(0),
-            _node_id(nid.to_int())
+            _node_id(nid)
       {
-         assert(fast_meta_address::from_int(_node_id) == nid);
+         assert(id_address::from_int(_node_id.to_int()) == nid);
          assert(intptr_t(this) % 64 == 0);
       }
 
-      void      set_address(fast_meta_address a) { _node_id = a.to_int(); }
+      void      set_address(id_address a) { _node_id = a; }
       id_region branch_region() const { return id_region(_branch_id_region); }
 
       template <typename T>
@@ -79,17 +82,17 @@ namespace arbtrie
       }
 
       void set_type(node_type t) { _ntype = (int)t; }
-      void set_id(fast_meta_address i) { _node_id = i.to_int(); }
+      void set_id(id_address i) { _node_id = i; }
       void set_branch_region(id_region r) { _branch_id_region = r.to_int(); }
 
-      uint32_t          size() const { return _nsize; }
-      fast_meta_address address() const { return fast_meta_address::from_int(_node_id); }
-      node_type         get_type() const { return (node_type)_ntype; }
-      uint16_t          num_branches() const { return _num_branches; }
-      char*             body() { return (char*)(this + 1); }
-      const char*       body() const { return (const char*)(this + 1); }
-      char*             tail() { return ((char*)this) + _nsize; }
-      const uint8_t*    tail() const { return ((const uint8_t*)this) + _nsize; }
+      uint32_t       size() const { return _nsize; }
+      id_address     address() const { return id_address::from_int(_node_id.to_int()); }
+      node_type      get_type() const { return (node_type)_ntype; }
+      uint16_t       num_branches() const { return _num_branches; }
+      char*          body() { return (char*)(this + 1); }
+      const char*    body() const { return (const char*)(this + 1); }
+      char*          tail() { return ((char*)this) + _nsize; }
+      const uint8_t* tail() const { return ((const uint8_t*)this) + _nsize; }
 
       // size rounded up to the nearest 16 bytes
       inline uint32_t     object_capacity() const { return (_nsize + 15) & -16; }
@@ -119,7 +122,7 @@ namespace arbtrie
 
    template <typename T>
    concept is_value_type = std::is_same_v<std::remove_cv_t<T>, value_view> or
-                           std::is_same_v<std::remove_cv_t<T>, object_id>;
+                           std::is_same_v<std::remove_cv_t<T>, id_address>;
 
    struct clone_config
    {

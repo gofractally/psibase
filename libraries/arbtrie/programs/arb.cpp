@@ -74,20 +74,20 @@ std::string add_comma(uint64_t s)
 };
 */
 
-void validate_invariant(session_rlock& state, fast_meta_address i);
-void validate_invariant(session_rlock& state, fast_meta_address i, auto* in)
+void validate_invariant(session_rlock& state, id_address i);
+void validate_invariant(session_rlock& state, id_address i, auto* in)
 {
    in->visit_branches_with_br(
-       [&](int br, fast_meta_address adr)
+       [&](int br, id_address adr)
        {
-          if (in->branch_region() != adr.region)
+          if (in->branch_region() != adr.region())
              throw std::runtime_error("region invariant violated");
           validate_invariant(state, adr);
        });
 }
-void validate_invariant(session_rlock& state, fast_meta_address i, const binary_node* inner) {}
-void validate_invariant(session_rlock& state, fast_meta_address i, const value_node* inner) {}
-void validate_invariant(session_rlock& state, fast_meta_address i)
+void validate_invariant(session_rlock& state, id_address i, const binary_node* inner) {}
+void validate_invariant(session_rlock& state, id_address i, const value_node* inner) {}
+void validate_invariant(session_rlock& state, id_address i)
 {
    if (i)
    {
@@ -96,9 +96,9 @@ void validate_invariant(session_rlock& state, fast_meta_address i)
    }
 }
 
-void print(session_rlock& state, fast_meta_address i, int depth = 1);
+void print(session_rlock& state, id_address i, int depth = 1);
 void print_pre(session_rlock&           state,
-               fast_meta_address        i,
+               id_address               i,
                std::string              prefix,
                std::vector<std::string> path  = {},
                int                      depth = 1);
@@ -132,7 +132,7 @@ void print_pre(session_rlock&           state,
    path.push_back(to_hex(in->get_prefix()));
 
    in->visit_branches_with_br(
-       [&](int br, fast_meta_address bid)
+       [&](int br, id_address bid)
        {
           if (0 == br)
           {
@@ -201,7 +201,7 @@ void print_pre(session_rlock&           state,
 }
 
 void print_pre(session_rlock&           state,
-               fast_meta_address        i,
+               id_address               i,
                std::string              prefix,
                std::vector<std::string> path,
                int                      depth)
@@ -273,7 +273,7 @@ void print(session_rlock& state, const full_node* sl, int depth = 0)
       std::cerr << "\n";
    }
    sl->visit_branches_with_br(
-       [&](int br, fast_meta_address bid)
+       [&](int br, id_address bid)
        {
           if (not br)
              return;
@@ -309,7 +309,7 @@ void print(session_rlock& state, const setlist_node* sl, int depth = 0)
    //     std::cerr << int(b) <<"\n";
    // }
    sl->visit_branches_with_br(
-       [&](int br, fast_meta_address bid)
+       [&](int br, id_address bid)
        {
           if (not br)
              return;
@@ -362,7 +362,7 @@ void find_refs(session_rlock& state, object_id i, int depth)
 }
 
 */
-void print(session_rlock& state, fast_meta_address i, int depth)
+void print(session_rlock& state, id_address i, int depth)
 {
    auto obj = state.get(i);
    switch (obj.type())

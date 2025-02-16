@@ -13,7 +13,7 @@ namespace arbtrie
    void recusive_retain_all(object_ref&& r)
    {
       r.retain();
-      auto retain_id = [&](fast_meta_address b) { recusive_retain_all(r.rlock().get(b)); };
+      auto retain_id = [&](id_address b) { recusive_retain_all(r.rlock().get(b)); };
       cast_and_call(r.type(), r.header(), [&](const auto* ptr) { ptr->visit_branches(retain_id); });
    }
 
@@ -195,9 +195,9 @@ namespace arbtrie
          for (int region = 0; region < 0xffff; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
-               fast_meta_address fma  = {region, ids_per_page * block + index};
-               auto&             meta = get(fma);
-               auto              mval = meta.to_int();
+               id_address fma  = {region, ids_per_page * block + index};
+               auto&      meta = get(fma);
+               auto       mval = meta.to_int();
                if (mval & (node_meta<>::copy_mask | node_meta<>::modify_mask))
                {
                   count += bool(mval & node_meta<>::modify_mask);
@@ -233,14 +233,14 @@ namespace arbtrie
    void id_alloc::clear_some_read_bits(id_region start_region, uint32_t num_regions)
    {
       const auto num_blocks = _block_alloc.num_blocks();
-      const auto end_region = std::min<uint32_t>(start_region.region + num_regions, max_regions);
+      const auto end_region = std::min<uint32_t>(start_region.to_int() + num_regions, max_regions);
 
       for (int block = 0; block < num_blocks; ++block)
-         for (uint16_t region = start_region.region; region < end_region; ++region)
+         for (uint16_t region = start_region.to_int(); region < end_region; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
-               fast_meta_address fma  = {region, ids_per_page * block + index};
-               auto&             meta = get(fma);
+               id_address fma  = {region, ids_per_page * block + index};
+               auto&      meta = get(fma);
                if (meta.is_read())
                   meta.clear_read_bit(std::memory_order_relaxed);
             }
@@ -254,8 +254,8 @@ namespace arbtrie
          for (int region = 0; region < max_regions; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
-               fast_meta_address fma  = {region, ids_per_page * block + index};
-               auto&             meta = get(fma);
+               id_address fma  = {region, ids_per_page * block + index};
+               auto&      meta = get(fma);
                if (meta.ref() > 0)
                   meta.set_ref(1);
             }
@@ -270,8 +270,8 @@ namespace arbtrie
          for (int region = 0; region < max_regions; ++region)
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
-               fast_meta_address fma  = {region, ids_per_page * block + index};
-               auto&             meta = get(fma);
+               id_address fma  = {region, ids_per_page * block + index};
+               auto&      meta = get(fma);
                by_type[meta.type()]++;
                count += meta.ref() > 0;
             }
@@ -304,8 +304,8 @@ namespace arbtrie
             _state->regions[region].use_count.fetch_add(ids_per_page);
             for (int index = block ? 0 : 8; index < ids_per_page; ++index)
             {
-               fast_meta_address fma  = {region, ids_per_page * block + index};
-               auto&             meta = get(fma);
+               id_address fma  = {region, ids_per_page * block + index};
+               auto&      meta = get(fma);
                if (meta.ref() == 0)
                   free_id(fma);
                else if (meta.release().ref() == 1)

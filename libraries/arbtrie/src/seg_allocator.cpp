@@ -261,7 +261,7 @@ namespace arbtrie
          //   std::cerr << "num_loaded: " << num_loaded << "\n";
          for (uint32_t i = 0; i < num_loaded; ++i)
          {
-            auto addr    = fast_meta_address::from_int(read_ids[i]);
+            auto addr    = id_address::from_int(read_ids[i]);
             auto obj_ref = state.get(addr);
             if (auto [header, loc] = obj_ref.try_move_header(); header)
             {

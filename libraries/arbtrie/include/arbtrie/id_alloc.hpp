@@ -1,11 +1,11 @@
 #pragma once
+#include <arbtrie/address.hpp>
 #include <arbtrie/block_allocator.hpp>
 #include <arbtrie/config.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/file_fwd.hpp>
 #include <arbtrie/mapping.hpp>
 #include <arbtrie/node_meta.hpp>
-#include <arbtrie/object_id.hpp>
 #include <arbtrie/util.hpp>
 
 namespace arbtrie
@@ -31,12 +31,12 @@ namespace arbtrie
       id_alloc(std::filesystem::path id_file);
       ~id_alloc();
 
-      node_meta_type& get(fast_meta_address nid);
+      node_meta_type& get(id_address nid);
 
-      id_region                                     get_new_region();
-      std::pair<node_meta_type&, fast_meta_address> get_new_id(id_region r);
-      void                                          free_id(fast_meta_address id);
-      int64_t                                       free_release_count() const
+      id_region                              get_new_region();
+      std::pair<node_meta_type&, id_address> get_new_id(id_region r);
+      void                                   free_id(id_address id);
+      int64_t                                free_release_count() const
       {
          return _state->free_release_count.load(std::memory_order_relaxed);
       }
@@ -46,7 +46,7 @@ namespace arbtrie
       // @group recover_api
       //   These methods are used as part of recovery only
       // @{
-      node_meta_type& get_or_alloc(fast_meta_address nid);
+      node_meta_type& get_or_alloc(id_address nid);
 
       // set all meta nodes to 0
       void clear_all();
@@ -128,9 +128,9 @@ namespace arbtrie
       }
    }
 
-   inline node_meta_type& id_alloc::get_or_alloc(fast_meta_address nid)
+   inline node_meta_type& id_alloc::get_or_alloc(id_address nid)
    {
-      uint64_t abs_pos   = nid.index * sizeof(node_meta_type);
+      uint64_t abs_pos   = nid.index().to_int() * sizeof(node_meta_type);
       uint64_t block_num = abs_pos / id_page_size;
       if (block_num > 0xffff)
          throw std::runtime_error("block num out of range!");
@@ -139,13 +139,14 @@ namespace arbtrie
       return get(nid);
    }
 
-   inline node_meta_type& id_alloc::get(fast_meta_address nid)
+   inline node_meta_type& id_alloc::get(id_address nid)
    {
-      uint64_t abs_pos        = nid.index * sizeof(node_meta_type);
+      uint64_t abs_pos        = nid.index().to_int() * sizeof(node_meta_type);
       uint64_t block_num      = abs_pos / id_page_size;
       uint64_t index_in_block = abs_pos & uint64_t(id_page_size - 1);
 
-      auto ptr = ((char*)_block_alloc.get(block_num)) + nid.region * id_page_size + index_in_block;
+      auto ptr = ((char*)_block_alloc.get(block_num)) + nid.region().to_int() * id_page_size +
+                 index_in_block;
 
       return reinterpret_cast<node_meta_type&>(*ptr);
    }
@@ -172,12 +173,12 @@ namespace arbtrie
     *  the free list with a bit-per-slot to optimize placement and eliminate
     *  locks. (free lists thrash locality)
     */
-   inline std::pair<node_meta_type&, fast_meta_address> id_alloc::get_new_id(id_region r)
+   inline std::pair<node_meta_type&, id_address> id_alloc::get_new_id(id_region r)
    {
       if constexpr (debug_memory)
          _state->free_release_count.fetch_add(1, std::memory_order_relaxed);
 
-      if (r.region == 0)
+      if (r.to_int() == 0)
       {
          // TODO: allow region 0 once we have caught all places where
          // region is uninitilized and therefore overflowing region 0
@@ -187,7 +188,7 @@ namespace arbtrie
       const uint32_t ids_per_page = id_page_size / sizeof(node_meta_type);
 
       auto  num_pages = _block_alloc.num_blocks();
-      auto& rhead     = _state->regions[r.region];
+      auto& rhead     = _state->regions[r.to_int()];
 
       auto prior_ucount = rhead.use_count.fetch_add(1, std::memory_order_acquire);
       if (prior_ucount >= num_pages * ids_per_page)
@@ -197,14 +198,15 @@ namespace arbtrie
          if (num_pages > 3)
          {
             TRIEDENT_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
-                          r.region, ") exceeded cap: numpages: ", num_pages, " -> ", num_pages + 1);
+                          r.to_int(), ") exceeded cap: numpages: ", num_pages, " -> ",
+                          num_pages + 1);
             // TODO: calculate a load factor before warning
          }
          num_pages = _block_alloc.reserve(num_pages + 1, true);
       }
       auto na = rhead.next_alloc.load(std::memory_order_relaxed);
 
-      //TRIEDENT_WARN( "num_pages: ", num_pages, "  region: ", r.region ," next alloc: ", na );
+      //TRIEDENT_WARN( "num_pages: ", num_pages, "  region: ", r.to_int() ," next alloc: ", na );
       if (na < num_pages * ids_per_page)
       {
          // TODO: change to C & E
@@ -234,8 +236,8 @@ namespace arbtrie
       // TODO: ff_index must init to node_meta::location_mask == end of list
       uint64_t ff_index = 0;
 
-      fast_meta_address alloced_id;
-      node_meta_type*   ffa;
+      id_address      alloced_id;
+      node_meta_type* ffa;
 
       // TODO: make this compile time constant
       static const uint64_t eofl = temp_meta_type().set_location(end_of_freelist).to_int();
@@ -245,7 +247,7 @@ namespace arbtrie
          std::unique_lock<std::mutex> l{rhead.alloc_mutex};
          ff_index = rhead.first_free.load(std::memory_order_seq_cst);
 
-         //     TRIEDENT_DEBUG("reg: ", r.region, " alloc from ff_index: ", ff_index, " idx: ", (ff_index >> 18),
+         //     TRIEDENT_DEBUG("reg: ", r.to_int(), " alloc from ff_index: ", ff_index, " idx: ", (ff_index >> 18),
          //                   "  tmd: ", temp_meta_type(ff_index).loc().to_aligned(), "  eofl: ", eofl);
          uint64_t next_free = get(r + id_index(temp_meta_type(ff_index).loc().to_aligned()))
                                   .to_int(std::memory_order_seq_cst);
@@ -281,17 +283,17 @@ namespace arbtrie
       return {*ffa, alloced_id};
    }
 
-   inline void id_alloc::free_id(fast_meta_address adr)
+   inline void id_alloc::free_id(id_address adr)
    {
       if constexpr (debug_memory)
       {
          _state->free_release_count.fetch_sub(1, std::memory_order_relaxed);
       }
 
-      auto& rhead     = _state->regions[adr.region];
+      auto& rhead     = _state->regions[adr.region().to_int()];
       auto& next_free = get(adr);
       auto  new_head  = temp_meta_type()
-                          .set_location(node_location::from_aligned(adr.index))
+                          .set_location(node_location::from_aligned(adr.index().to_int()))
                           .end_pending_cache()
                           .to_int();
 

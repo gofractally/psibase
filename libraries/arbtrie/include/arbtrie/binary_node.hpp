@@ -194,7 +194,7 @@ namespace arbtrie
                                    key_index::value_type t2);
 
       binary_node(int_fast16_t          asize,
-                  fast_meta_address     nid,
+                  id_address            nid,
                   const clone_config&   cfg,
                   id_region             branch_reg,
                   key_view              k1,
@@ -205,27 +205,27 @@ namespace arbtrie
                   key_index::value_type t2);
 
       // make empty
-      binary_node(int_fast16_t asize, fast_meta_address nid, const clone_config& cfg);
+      binary_node(int_fast16_t asize, id_address nid, const clone_config& cfg);
       // clone
       binary_node(int_fast16_t        asize,
-                  fast_meta_address   nid,
+                  id_address          nid,
                   const binary_node*  src,
                   const clone_config& cfg);
       // clone + insert
       binary_node(int_fast16_t        asize,
-                  fast_meta_address   nid,
+                  id_address          nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_insert& ins);
 
       binary_node(int_fast16_t        asize,
-                  fast_meta_address   nid,
+                  id_address          nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_update& upv);
 
       binary_node(int_fast16_t        asize,
-                  fast_meta_address   nid,
+                  id_address          nid,
                   const binary_node*  src,
                   const clone_config& cfg,
                   const clone_remove& upv);
@@ -235,10 +235,9 @@ namespace arbtrie
       //            is_value_type auto val);
 
       static inline uint64_t key_hash(key_view k) { return XXH3_64bits(k.data(), k.size()); }
-      static inline uint64_t value_hash(value_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(id_address k) { return XXH3_64bits(&k, sizeof(k)); }
-      static inline uint64_t value_hash(value_type::remove k) { return 0; }
-      static inline uint64_t value_hash(fast_meta_address m) { return value_hash(m.to_address()); }
+      static inline uint64_t value_hash(arbtrie::remove k) { return 0; }
+      static inline uint64_t value_hash(value_view v) { return XXH3_64bits(v.data(), v.size()); }
 
       static inline uint8_t key_header_hash(uint64_t kh) { return uint8_t(kh); }
       static inline uint8_t value_header_hash(uint64_t vh) { return uint8_t(vh); }
@@ -266,7 +265,7 @@ namespace arbtrie
          inline key_view       key() const { return to_key(_key, _key_size); }
          inline value_view     value() const { return to_value(_key + _key_size, value_size()); }
 
-         inline const fast_meta_address value_id() const
+         inline const id_address value_id() const
          {
             assert(_val_size == sizeof(id_address));
             return *((const id_address*)(_key + _key_size));
@@ -280,7 +279,7 @@ namespace arbtrie
          void set_value(id_address adr)
          {
             assert(_val_size >= sizeof(id_address));
-            _val_size  = sizeof(fast_meta_address);
+            _val_size  = sizeof(id_address);
             value_id() = adr;
          }
 
@@ -306,7 +305,7 @@ namespace arbtrie
                assert(_val_size >= sizeof(id_address));
                deadspace  = _val_size - sizeof(id_address);
                _val_size  = sizeof(id_address);
-               value_id() = v.id().to_address();
+               value_id() = v.id();
             }
             else
             {
@@ -326,7 +325,7 @@ namespace arbtrie
       value_type get_value(int index) const
       {
          if (is_obj_id(index))
-            return fast_meta_address(get_key_val_ptr(index)->value_id());
+            return id_address(get_key_val_ptr(index)->value_id());
          return get_key_val_ptr(index)->value();
       }
 
@@ -463,7 +462,6 @@ namespace arbtrie
          return val.size() <= max_inline_value_size;
       }
       inline static constexpr bool can_inline(id_address) { return true; }
-      inline static constexpr bool can_inline(fast_meta_address) { return true; }
 
       // calculates the space required to store this key/val exclusive of node_header,
       // assuming that if value cannot be inlined it will be converted to an object_id
@@ -481,7 +479,7 @@ namespace arbtrie
       inline static int calc_key_val_pair_size(key_view key, const value_type& val)
       {
          if (val.is_subtree())
-            return calc_key_val_pair_size(key, val.id().to_address());
+            return calc_key_val_pair_size(key, val.id());  // Pass the id_address directly
          return calc_key_val_pair_size(key, val.view());
       }
 
@@ -537,7 +535,7 @@ namespace arbtrie
       int find_key_idx(key_view key, uint64_t khash) const
       {
          key_view hashes = to_key(key_hashes(), num_branches());
-         auto     khh = key_header_hash(khash);
+         auto     khh    = key_header_hash(khash);
          //  TRIEDENT_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
 
          int base = 0;
@@ -641,7 +639,8 @@ namespace arbtrie
        *
        *  callss visitor() with an object_id 
        */
-      inline void visit_branches(auto&& visitor) const
+      template <typename Visitor>
+      inline void visit_branches(Visitor&& visitor) const
       {
          auto       start = key_offsets();
          auto       pos   = start;
@@ -651,7 +650,7 @@ namespace arbtrie
             if (pos->type & key_index::obj_id)  // object_id or subtree
             {
                assert(get_key_val_ptr_offset(pos->pos)->value_size() == sizeof(id_address));
-               visitor(fast_meta_address(get_key_val_ptr_offset(pos->pos)->value_id()));
+               visitor(id_address(get_key_val_ptr_offset(pos->pos)->value_id()));
             }
             ++pos;
          }

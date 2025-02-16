@@ -16,10 +16,12 @@ namespace arbtrie
       constexpr id_region(uint16_t r = 0) : region(r) {}
       constexpr uint16_t to_int() const { return region; }
       bool               operator!() const { return region == 0; }
-      operator bool() const { return region != 0; }
+      explicit           operator bool() const { return region != 0; }
 
       friend bool          operator==(id_region a, id_region b) { return a.region == b.region; }
+      friend bool          operator!=(id_region a, id_region b) { return a.region != b.region; }
       friend std::ostream& operator<<(std::ostream& out, id_region r) { return out << r.region; }
+
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(id_region) == 2);
 
@@ -33,9 +35,10 @@ namespace arbtrie
 
      public:
       constexpr id_index(uint16_t r = 0) : index(r) {}
-      operator bool() const { return index; }
-      constexpr uint16_t to_int() const { return index; }
-      friend bool        operator==(id_index a, id_index b) { return a.index == b.index; };
+      explicit             operator bool() const { return index; }
+      constexpr uint16_t   to_int() const { return index; }
+      friend bool          operator==(id_index a, id_index b) { return a.index == b.index; };
+      friend std::ostream& operator<<(std::ostream& out, id_index i) { return out << i.index; }
    } __attribute__((packed)) __attribute__((aligned(1)));
    static_assert(sizeof(id_index) == 2);
 
@@ -65,12 +68,11 @@ namespace arbtrie
       {
          return out << a.region() << "." << a.index();
       }
-      friend bool operator==(id_address a, id_address b) { return a.to_int() == b.to_int(); }
-      friend bool operator!=(id_address a, id_address b) { return a.to_int() != b.to_int(); }
-      id_address& operator=(const id_address&) = default;
+      friend auto operator<=>(const id_address&, const id_address&) = default;
+      id_address& operator=(const id_address&)                      = default;
 
       /** every region has a null address */
-      operator bool() const { return index(); }
+      explicit operator bool() const { return bool(index()); }
    } __attribute__((packed)) __attribute__((aligned(1)));
 
    static_assert(alignof(id_address) == 1, "unexpected alignment");

@@ -10,7 +10,7 @@ namespace arbtrie
 
    template <typename T>
    concept inner_node_concept =
-       requires(T node, branch_index_type br, fast_meta_address addr, const T& const_node) {
+       requires(T node, branch_index_type br, id_address addr, const T& const_node) {
           // Required static members
           requires std::same_as<decltype(T::type), const node_type>;
 
@@ -26,10 +26,10 @@ namespace arbtrie
           } -> std::same_as<T&>;
           {
              const_node.get_branch(br)
-          } -> std::same_as<fast_meta_address>;
+          } -> std::same_as<id_address>;
           {
              const_node.lower_bound(br)
-          } -> std::same_as<std::pair<branch_index_type, fast_meta_address>>;
+          } -> std::same_as<std::pair<branch_index_type, id_address>>;
           {
              const_node.can_add_branch()
           } -> std::same_as<bool>;
@@ -41,7 +41,7 @@ namespace arbtrie
           } -> std::same_as<bool>;
           {
              const_node.get_eof_value()
-          } -> std::same_as<fast_meta_address>;
+          } -> std::same_as<id_address>;
 
           // Required from inner_node base
           requires std::derived_from<T, inner_node<T>>;
@@ -65,7 +65,7 @@ namespace arbtrie
    struct inner_node : node_header
    {
       inline inner_node(uint32_t            size,
-                        fast_meta_address   nid,
+                        id_address          nid,
                         const clone_config& cfg,
                         uint16_t            num_branch = 0)
           : node_header(size, nid, Derived::type, num_branch)
@@ -75,10 +75,7 @@ namespace arbtrie
             set_prefix(*cfg.set_prefix);
       }
 
-      inline inner_node(uint32_t            size,
-                        fast_meta_address   nid,
-                        const Derived*      src,
-                        const clone_config& cfg)
+      inline inner_node(uint32_t size, id_address nid, const Derived* src, const clone_config& cfg)
           : node_header(size, nid, Derived::type, src->_num_branches),
             _descendants(src->_descendants),
             _eof_value(src->_eof_value)
@@ -121,20 +118,20 @@ namespace arbtrie
       uint32_t         _eof_subtree : 1 = false;
       id_address       _eof_value;
 
-      void set_eof(fast_meta_address e)
+      void set_eof(id_address e)
       {
-         _eof_value   = e.to_address();
+         _eof_value   = e;
          _eof_subtree = false;
       }
-      void set_eof_subtree(fast_meta_address e)
+      void set_eof_subtree(id_address e)
       {
-         _eof_value   = e.to_address();
+         _eof_value   = e;
          _eof_subtree = true;
       }
 
-      bool              is_eof_subtree() const { return _eof_subtree; }
-      bool              has_eof_value() const { return _eof_value; }
-      fast_meta_address get_eof_value() const { return _eof_value; }
+      bool       is_eof_subtree() const { return _eof_subtree; }
+      bool       has_eof_value() const { return bool(_eof_value); }
+      id_address get_eof_value() const { return _eof_value; }
 
       void set_prefix(key_view pre)
       {
@@ -160,21 +157,21 @@ namespace arbtrie
       static const node_type type = node_type::undefined;
 
       // Required interface methods for inner_node_concept
-      key_view          get_prefix() const { return {}; }
-      bool              has_eof_value() const { return false; }
-      fast_meta_address get_eof_value() const { return {}; }
-      bool              is_eof_subtree() const { return false; }
-      id_region         branch_region() const { return {}; }
-      uint16_t          num_branches() const { return 0; }
+      key_view   get_prefix() const { return {}; }
+      bool       has_eof_value() const { return false; }
+      id_address get_eof_value() const { return {}; }
+      bool       is_eof_subtree() const { return false; }
+      id_region  branch_region() const { return {}; }
+      uint16_t   num_branches() const { return 0; }
 
       // Branch operations
-      void              add_branch(branch_index_type, fast_meta_address) {}
-      void              remove_branch(branch_index_type) {}
-      void              set_branch(branch_index_type, fast_meta_address) {}
-      fast_meta_address get_branch(branch_index_type) const { return {}; }
+      void       add_branch(branch_index_type, id_address) {}
+      void       remove_branch(branch_index_type) {}
+      void       set_branch(branch_index_type, id_address) {}
+      id_address get_branch(branch_index_type) const { return {}; }
 
       // Lower/upper bound operations
-      std::pair<branch_index_type, fast_meta_address> lower_bound(branch_index_type) const
+      std::pair<branch_index_type, id_address> lower_bound(branch_index_type) const
       {
          return {max_branch_count, {}};
       }

@@ -1,7 +1,7 @@
 #pragma once
+#include <arbtrie/address.hpp>
 #include <arbtrie/config.hpp>
 #include <arbtrie/node_location.hpp>
-#include <arbtrie/object_id.hpp>
 #include <arbtrie/util.hpp>
 #include <cassert>
 #include <iostream>

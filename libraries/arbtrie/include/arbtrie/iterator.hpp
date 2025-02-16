@@ -139,11 +139,11 @@ namespace arbtrie
          _branches.resize(_branches.size() - s);
       }
 
-      std::vector<uint8_t>                                          _branches;
-      std::vector<std::pair<fast_meta_address, branch_index_type> > _path;
+      std::vector<uint8_t>                                   _branches;
+      std::vector<std::pair<id_address, branch_index_type> > _path;
 
       int           _size;  // -1 if unknown
-      object_id     _oid;
+      id_address    _oid;
       read_session& _rs;
       node_handle   _root;
 

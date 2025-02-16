@@ -111,7 +111,7 @@ namespace arbtrie
        const clone_config&              cfg   = {},
        std::invocable<NodeType*> auto&& uinit = [](NodeType*) {})
    {
-      return clone_impl<mode.make_same_region()>(r.address().region, r, src, cfg,
+      return clone_impl<mode.make_same_region()>(r.address().region().to_int(), r, src, cfg,
                                                  std::forward<decltype(uinit)>(uinit));
    }
 
@@ -133,7 +133,7 @@ namespace arbtrie
                     std::invocable<NodeType*> auto&& uinit,
                     CArgs&&... cargs)
    {
-      return clone_impl<mode.make_same_region()>(r.address().region, r, src, cfg,
+      return clone_impl<mode.make_same_region()>(r.address().region().to_int(), r, src, cfg,
                                                  std::forward<decltype(uinit)>(uinit),
                                                  std::forward<CArgs>(cargs)...);
    }
@@ -153,7 +153,7 @@ namespace arbtrie
    object_ref clone(object_ref& r, const NodeType* src, const clone_config& cfg, CArgs&&... cargs)
    {
       return clone_impl<mode.make_same_region()>(
-          r.address().region, r, src, cfg, [](auto) {}, std::forward<CArgs>(cargs)...);
+          r.address().region().to_int(), r, src, cfg, [](auto) {}, std::forward<CArgs>(cargs)...);
    }
 
    template <upsert_mode mode, typename NodeType, typename... CArgs>
@@ -184,8 +184,8 @@ namespace arbtrie
       //     attempt to retain the meta while making sure the top root
       //     hasn't changed, the lock is probably faster anyway
       std::unique_lock lock(_db._root_change_mutex[index]);
-      return node_handle(*this, fast_meta_address::from_int(
-                                    _db._dbm->top_root[index].load(std::memory_order_relaxed)));
+      return node_handle(
+          *this, id_address::from_int(_db._dbm->top_root[index].load(std::memory_order_relaxed)));
    }
 
    database::database(std::filesystem::path dir, config cfg, access_mode mode)
@@ -289,7 +289,7 @@ namespace arbtrie
       in->visit_branches([&](auto bid) { state.get(bid).retain(); });
    }
 
-   fast_meta_address make_value(id_region reg, session_rlock& state, const value_type& val)
+   id_address make_value(id_region reg, session_rlock& state, const value_type& val)
    {
       return make<value_node>(
                  reg, state, [](auto) {}, val)
@@ -319,7 +319,7 @@ namespace arbtrie
       _old_value_size = -1;
       auto state      = _segas.lock();
 
-      fast_meta_address adr = r.take();
+      id_address adr = r.take();
       try
       {
          r.give(upsert(state, adr, key, val));
@@ -359,39 +359,37 @@ namespace arbtrie
       return _old_value_size;
    }
 
-   fast_meta_address write_session::upsert(session_rlock&    state,
-                                           fast_meta_address root,
-                                           key_view          key,
-                                           const value_type& val)
+   id_address write_session::upsert(session_rlock&    state,
+                                    id_address        root,
+                                    key_view          key,
+                                    const value_type& val)
    {
       if (not root) [[unlikely]]
          return make<value_node>(state.get_new_region(), state, key, val).address();
       _cur_val = val;
       return upsert<upsert_mode::unique_upsert>(state.get(root), key);
    }
-   fast_meta_address write_session::insert(session_rlock&    state,
-                                           fast_meta_address root,
-                                           key_view          key,
-                                           const value_type& val)
+   id_address write_session::insert(session_rlock&    state,
+                                    id_address        root,
+                                    key_view          key,
+                                    const value_type& val)
    {
       if (not root) [[unlikely]]
          return make<value_node>(state.get_new_region(), state, key, val).address();
       _cur_val = val;
       return upsert<upsert_mode::unique_insert>(state.get(root), key);
    }
-   fast_meta_address write_session::update(session_rlock&    state,
-                                           fast_meta_address root,
-                                           key_view          key,
-                                           const value_type& val)
+   id_address write_session::update(session_rlock&    state,
+                                    id_address        root,
+                                    key_view          key,
+                                    const value_type& val)
    {
       if (not root) [[unlikely]]
          throw std::runtime_error("cannot update key that doesn't exist");
       _cur_val = val;
       return upsert<upsert_mode::unique_update>(state.get(root), key);
    }
-   fast_meta_address write_session::remove(session_rlock&    state,
-                                           fast_meta_address root,
-                                           key_view          key)
+   id_address write_session::remove(session_rlock& state, id_address root, key_view key)
    {
       if (not root) [[unlikely]]
          throw std::runtime_error("cannot remove key that doesn't exist");
@@ -460,7 +458,7 @@ namespace arbtrie
          uint32_t count = 0;
          while (pos < end)
          {
-            auto bref = r.rlock().get(fast_meta_address(n->branch_region(), *pos));
+            auto bref = r.rlock().get(id_address(n->branch_region(), *pos));
             count += count_keys(bref, key_view(), key_view());
             ++pos;
          }
@@ -494,7 +492,7 @@ namespace arbtrie
          uint64_t count = n->has_eof_value() + count_range(begin, end);
          if (end != abs_end and end_byte == uint8_t(to[pre.size()]))
          {
-            auto sref = r.rlock().get(fast_meta_address(n->branch_region(), *end));
+            auto sref = r.rlock().get(id_address(n->branch_region(), *end));
             count += count_keys(sref, key_view(), to.substr(pre.size() + 1));
          }
 
@@ -526,7 +524,7 @@ namespace arbtrie
             {
                counted_end_byte = start_byte == end_byte;
                //      TRIEDENT_WARN( "start_byte == from[pre.size()]" );
-               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
+               auto sref  = r.rlock().get(id_address(n->branch_region(), *start));
                auto btail = from.substr(pre.size() + 1);
                auto etail = (end_byte == start_byte) ? to.substr(pre.size() + 1) : key_view();
                count      = count_keys(sref, btail, etail);
@@ -539,7 +537,7 @@ namespace arbtrie
             // TRIEDENT_WARN( "end byte: ", end_byte, " start: ", start_byte, " to[pre.size]: ", to[pre.size()] );
             if (!counted_end_byte and end_byte == to[pre.size()])
             {
-               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *end));
+               auto sref  = r.rlock().get(id_address(n->branch_region(), *end));
                auto etail = to.substr(pre.size() + 1);
                //   TRIEDENT_WARN( "END BYTE == to[pre.size()] aka: ", to[pre.size()], " init count: ", count, " etail: '", to_str(etail), "'" );
                count += count_keys(sref, key_view(), etail);
@@ -555,7 +553,7 @@ namespace arbtrie
             uint32_t count = 0;
             if (start_byte == uint8_t(from[pre.size()]))
             {
-               auto sref  = r.rlock().get(fast_meta_address(n->branch_region(), *start));
+               auto sref  = r.rlock().get(id_address(n->branch_region(), *start));
                auto btail = from.substr(pre.size() + 1);
                count += count_keys(sref, btail, key_view());
                ++start;
@@ -681,7 +679,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert(object_ref&& root, key_view key)
+   id_address write_session::upsert(object_ref&& root, key_view key)
    {
       return upsert<mode>(root, key);
    }
@@ -689,7 +687,7 @@ namespace arbtrie
     *  Inserts key under root, if necessary 
     */
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert(object_ref& root, key_view key)
+   id_address write_session::upsert(object_ref& root, key_view key)
    {
       if constexpr (mode.is_unique())
       {
@@ -707,7 +705,7 @@ namespace arbtrie
          }
       }
 
-      fast_meta_address result;
+      id_address result;
       switch (root.type())
       {
          case node_type::value:
@@ -749,7 +747,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode>
-   fast_meta_address upsert(object_ref&& root, key_view key)
+   id_address upsert(object_ref&& root, key_view key)
    {
       return upsert<mode>(root, key);
    }
@@ -762,7 +760,7 @@ namespace arbtrie
    //  split into a binary node containing both keys
    //================================
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_value(object_ref& root, key_view key)
+   id_address write_session::upsert_value(object_ref& root, key_view key)
    {
       auto& state        = root.rlock();
       auto  vn           = root.as<value_node>();
@@ -773,7 +771,7 @@ namespace arbtrie
          if (vn->key() == key)
          {
             _delta_keys = -1;
-            return fast_meta_address();
+            return id_address();
          }
          if constexpr (mode.must_remove())
             throw std::runtime_error("attempt to remove key that does not exist");
@@ -787,7 +785,7 @@ namespace arbtrie
          {
             if (vn->value_capacity() >= new_val_size)
             {
-               fast_meta_address old_subtree = root.modify().as<value_node>()->set_value(_cur_val);
+               id_address old_subtree = root.modify().as<value_node>()->set_value(_cur_val);
                if (old_subtree)
                {
                   // TODO: this could be an expensive operation, say a snapshot with
@@ -807,7 +805,8 @@ namespace arbtrie
          else  // shared
          {
             //TRIEDENT_WARN( "make value node" );
-            return make<value_node>(root.address().region, state, key, _cur_val).address();
+            return make<value_node>(root.address().region().to_int(), state, key, _cur_val)
+                .address();
          }
       }
       else  // add key
@@ -848,7 +847,7 @@ namespace arbtrie
             }
             else  // shared
             {
-               return make<binary_node>(root.address().region, state,
+               return make<binary_node>(root.address().region().to_int(), state,
                                         clone_config{.data_cap = binary_node_initial_size}, new_reg,
                                         k1, v1, t1, k2, v2, t2)
                    .address();
@@ -892,7 +891,7 @@ namespace arbtrie
             }
             else  // shared
             {
-               return make<setlist_node>(root.address().region, state, 
+               return make<setlist_node>(root.address().region().to_int(), state, 
                                            [&]( setlist_node* sln ) {
                                            sln->set_branch_region( new_reg );
                                               if( not k1.size() )
@@ -917,7 +916,7 @@ namespace arbtrie
     * tree is a value node with a key.  
     */
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_eof_value(object_ref& root)
+   id_address write_session::upsert_eof_value(object_ref& root)
    {
       if constexpr (mode.is_unique())
       {
@@ -971,12 +970,12 @@ namespace arbtrie
    }
 
    template <upsert_mode mode>
-   fast_meta_address clone_binary_range(id_region          reg,
-                                        object_ref&        r,
-                                        const binary_node* src,
-                                        key_view           minus_prefix,
-                                        int                from,
-                                        int                to)
+   id_address clone_binary_range(id_region          reg,
+                                 object_ref&        r,
+                                 const binary_node* src,
+                                 key_view           minus_prefix,
+                                 int                from,
+                                 int                to)
    {
       auto nbranch       = to - from;
       int  total_kv_size = 0;
@@ -991,7 +990,7 @@ namespace arbtrie
       auto& state       = r.rlock();
       auto  init_binary = [&](binary_node* bn)
       {
-         bn->_branch_id_region = state.get_new_region().region;
+         bn->_branch_id_region = state.get_new_region().to_int();
 
          for (int i = from; i < to; ++i)
          {
@@ -1048,8 +1047,8 @@ namespace arbtrie
          freq_table[f]++;
       }
 
-      auto              bregion = r.rlock().get_new_region();
-      fast_meta_address eof_val;
+      auto       bregion = r.rlock().get_new_region();
+      id_address eof_val;
       if (has_eof_value) [[unlikely]]
          eof_val = root->is_obj_id(0)
                        ? root->get_key_val_ptr(0)->value_id()
@@ -1064,7 +1063,7 @@ namespace arbtrie
          const int     to   = from + freq_table[byte];
 
          // TRIEDENT_DEBUG( "branch: ", to_hex(byte), " key: ", to_hex(k) );
-         fast_meta_address new_child;
+         id_address new_child;
          if (to - from > 1)
             new_child =
                 clone_binary_range<mode>(bregion, r, root, k.substr(0, cpre.size() + 1), from, to);
@@ -1109,7 +1108,7 @@ namespace arbtrie
          from = to;
 
          assert(next_branch < branches + nbranch);
-         *next_branch = {byte, new_child.index};
+         *next_branch = {byte, new_child.index().to_int()};
          ++next_branch;
          //fn->add_branch(uint16_t(byte) + 1, new_child);
       }
@@ -1125,7 +1124,7 @@ namespace arbtrie
             fn->set_descendants(root->_num_branches);
             //TRIEDENT_DEBUG( "num_br: ", root->_num_branches, " desc: ", fn->descendants() );
             for (auto& p : branches)
-               fn->add_branch(branch_index_type(p.first) + 1, fast_meta_address(bregion, p.second));
+               fn->add_branch(branch_index_type(p.first) + 1, id_address(bregion, p.second));
          };
          if constexpr (mode.is_unique())
          {
@@ -1133,7 +1132,8 @@ namespace arbtrie
          }
          else
          {
-            return make<full_node>(r.address().region, r.rlock(), {.set_prefix = cpre}, init_full);
+            return make<full_node>(r.address().region().to_int(), r.rlock(), {.set_prefix = cpre},
+                                   init_full);
          }
       }
 
@@ -1150,7 +1150,7 @@ namespace arbtrie
          int nb = sl->_num_branches;
          for (int i = 0; i < nb; ++i)
          {
-            sl->set_index(i, branches[i].first, fast_meta_address(bregion, branches[i].second));
+            sl->set_index(i, branches[i].first, id_address(bregion, branches[i].second));
          }
          assert(sl->get_setlist_size() == nb);
          assert(sl->validate());
@@ -1160,7 +1160,7 @@ namespace arbtrie
          return remake<setlist_node>(r, init_setlist,
                                      clone_config{.branch_cap = nbranch, .set_prefix = cpre});
       else
-         return make<setlist_node>(r.address().region, r.rlock(),
+         return make<setlist_node>(r.address().region().to_int(), r.rlock(),
                                    {.branch_cap = nbranch, .set_prefix = cpre}, init_setlist);
    }
    template <upsert_mode mode, typename NodeType>
@@ -1171,7 +1171,7 @@ namespace arbtrie
          fn->set_branch_region(src->branch_region());
          fn->set_descendants(src->descendants());
          src->visit_branches_with_br(
-             [&](short br, fast_meta_address oid)
+             [&](short br, id_address oid)
              {
                 // TODO: it should be possible to remove this branch
                 // because it will always mispredict once
@@ -1188,8 +1188,8 @@ namespace arbtrie
       if constexpr (mode.is_unique())
          return remake<full_node>(r, init_fn, clone_config{.set_prefix = src->get_prefix()});
       else
-         return make<full_node>(r.address().region, r.rlock(), {.set_prefix = src->get_prefix()},
-                                init_fn);
+         return make<full_node>(r.address().region().to_int(), r.rlock(),
+                                {.set_prefix = src->get_prefix()}, init_fn);
    }
 
    // Example Transformation:
@@ -1213,11 +1213,11 @@ namespace arbtrie
    //
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_prefix(object_ref&     r,
-                                                  key_view        key,
-                                                  key_view        cpre,
-                                                  const NodeType* fn,
-                                                  key_view        rootpre)
+   id_address write_session::upsert_prefix(object_ref&     r,
+                                           key_view        key,
+                                           key_view        cpre,
+                                           const NodeType* fn,
+                                           key_view        rootpre)
    {
       auto& state = r.rlock();
       if constexpr (mode.is_remove())
@@ -1238,14 +1238,15 @@ namespace arbtrie
 
       auto new_reg = state.get_new_region();
       // TRIEDENT_DEBUG( "New Region: ", new_reg );
-      while (new_reg == r.address().region or new_reg == fn->branch_region()) [[unlikely]]
+      while (id_region(new_reg) == r.address().region() or
+             id_region(new_reg) == id_region(fn->branch_region())) [[unlikely]]
          new_reg = state.get_new_region();
 
       // there is a chance that r.modify() will rewrite the data
       // pointed at by rootpre... so we should read what we need first
       char root_prebranch = rootpre[cpre.size()];
 
-      fast_meta_address child_id;
+      id_address child_id;
 
       // the compactor needs to be smart enough to detect
       // when the node's address has changed before we can take
@@ -1283,14 +1284,15 @@ namespace arbtrie
       {  // eof
          //   TRIEDENT_DEBUG("  value is on the node (EOF)");
          _delta_keys = 1;
-         auto v      = make_value(child_id.region, state, _cur_val);
+         auto v      = make_value(child_id.region().to_int(), state, _cur_val);
          // must be same region as r because we can't cange the region our parent
          // put this node in.
-         return make<setlist_node>(r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
+         return make<setlist_node>(r.address().region().to_int(), state,
+                                   {.branch_cap = 2, .set_prefix = cpre},
                                    [&](setlist_node* sln)
                                    {
                                       //                                TRIEDENT_WARN("CHILD ID REGION INSTEAD OF NEW?");
-                                      sln->set_branch_region(child_id.region);
+                                      sln->set_branch_region(child_id.region().to_int());
                                       sln->set_eof(v);
                                       sln->add_branch(char_to_branch(root_prebranch), child_id);
                                       sln->set_descendants(1 + fn->descendants());
@@ -1303,14 +1305,15 @@ namespace arbtrie
          //                     " rpre: ", to_hex(rootpre));
          //
          // NOTE: make_binary with 1 key currently makes a value_node.. TODO: rename
-         auto abx    = make_binary(child_id.region, state, key.substr(cpre.size() + 1), _cur_val);
+         auto abx =
+             make_binary(child_id.region().to_int(), state, key.substr(cpre.size() + 1), _cur_val);
          _delta_keys = 1;
          return make<setlist_node>(
-                    r.address().region, state, {.branch_cap = 2, .set_prefix = cpre},
+                    r.address().region().to_int(), state, {.branch_cap = 2, .set_prefix = cpre},
                     [&](setlist_node* sln)
                     {
                        sln->set_branch_region(new_reg);
-                       std::pair<branch_index_type, fast_meta_address> brs[2];
+                       std::pair<branch_index_type, id_address> brs[2];
                        sln->set_descendants(1 + fn->descendants());
 
                        auto order  = key[cpre.size()] < root_prebranch;  //rootpre[cpre.size()];
@@ -1330,7 +1333,7 @@ namespace arbtrie
     * the eof position on this node.
     */
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_eof(object_ref& r, const NodeType* fn)
+   id_address write_session::upsert_eof(object_ref& r, const NodeType* fn)
    {
       if constexpr (mode.is_remove())
          return remove_eof<mode, NodeType>(r, fn);
@@ -1340,8 +1343,8 @@ namespace arbtrie
       //  TRIEDENT_WARN("upsert value node on inner node");
       if (fn->has_eof_value())  //val_nid)
       {
-         fast_meta_address val_nid = fn->get_eof_value();
-         auto              old_val = state.get(val_nid);
+         id_address val_nid = fn->get_eof_value();
+         auto       old_val = state.get(val_nid);
          if constexpr (mode.is_unique())
          {
             if (_cur_val.is_subtree())
@@ -1352,7 +1355,7 @@ namespace arbtrie
             else
             {
                //TRIEDENT_DEBUG("... upsert_value<mode>\n");
-               fast_meta_address new_id = upsert_eof_value<mode>(old_val);
+               id_address new_id = upsert_eof_value<mode>(old_val);
                if (new_id != val_nid)
                {
                   TRIEDENT_WARN("new id: ", new_id, " old val: ", val_nid);
@@ -1412,7 +1415,7 @@ namespace arbtrie
          }
          else  // inserting data
          {
-            fast_meta_address new_id = make_value(fn->branch_region(), state, _cur_val);
+            id_address new_id = make_value(fn->branch_region(), state, _cur_val);
             if constexpr (mode.is_unique())
             {
                r.modify().template as<NodeType>(
@@ -1439,7 +1442,7 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::remove_eof(object_ref& r, const NodeType* fn)
+   id_address write_session::remove_eof(object_ref& r, const NodeType* fn)
    {
       auto& state = r.rlock();
       //      TRIEDENT_DEBUG( "remove key ends on this node" );
@@ -1458,7 +1461,7 @@ namespace arbtrie
                 });
 
             if (fn->num_branches() == 0)
-               return fast_meta_address();
+               return id_address();
             return r.address();
          }
          else  // mode.is_shared()
@@ -1467,7 +1470,7 @@ namespace arbtrie
             if (fn->num_branches() == 0)
             {
                //  TRIEDENT_DEBUG("  num_branch == 0, return null");
-               return fast_meta_address();
+               return id_address();
             }
             return clone<mode>(r, fn, {},
                                [&](auto cl)
@@ -1487,12 +1490,12 @@ namespace arbtrie
       return r.address();
    }
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner_existing_br(object_ref&       r,
-                                                             key_view          key,
-                                                             const NodeType*   fn,
-                                                             key_view          cpre,
-                                                             branch_index_type bidx,
-                                                             fast_meta_address br)
+   id_address write_session::upsert_inner_existing_br(object_ref&       r,
+                                                      key_view          key,
+                                                      const NodeType*   fn,
+                                                      key_view          cpre,
+                                                      branch_index_type bidx,
+                                                      id_address        br)
    {
       auto& state = r.rlock();
 
@@ -1517,7 +1520,7 @@ namespace arbtrie
                if (fn->num_branches() + fn->has_eof_value() > 0)
                   return r.address();
                else
-                  return fast_meta_address();
+                  return id_address();
             }
             if (br != new_br)
             {
@@ -1583,7 +1586,7 @@ namespace arbtrie
                // because we didn't use to release it...
                temp_retain.take();
 
-               return fast_meta_address();
+               return id_address();
             }
             else
             {
@@ -1632,12 +1635,12 @@ namespace arbtrie
    }
 
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner_new_br(object_ref&       r,
-                                                        key_view          key,
-                                                        const NodeType*   fn,
-                                                        key_view          cpre,
-                                                        branch_index_type bidx,
-                                                        fast_meta_address br)
+   id_address write_session::upsert_inner_new_br(object_ref&       r,
+                                                 key_view          key,
+                                                 const NodeType*   fn,
+                                                 key_view          cpre,
+                                                 branch_index_type bidx,
+                                                 id_address        br)
    {
       auto& state = r.rlock();
       if constexpr (mode.must_remove())
@@ -1713,7 +1716,7 @@ namespace arbtrie
    //
    //========================================
    template <upsert_mode mode, typename NodeType>
-   fast_meta_address write_session::upsert_inner(object_ref& r, key_view key)
+   id_address write_session::upsert_inner(object_ref& r, key_view key)
    {
       auto& state = r.rlock();
       auto  fn    = r.as<NodeType>();
@@ -1744,7 +1747,7 @@ namespace arbtrie
    }  // end upsert_inner<T>
 
    template <upsert_mode mode>
-   fast_meta_address write_session::upsert_binary(object_ref& root, key_view key)
+   id_address write_session::upsert_binary(object_ref& root, key_view key)
    {
       auto bn = root.as<binary_node>();
 
@@ -1868,10 +1871,10 @@ namespace arbtrie
    }  // upsert_binary
 
    template <upsert_mode mode>
-   fast_meta_address write_session::remove_binary_key(object_ref&        root,
-                                                      const binary_node* bn,
-                                                      uint16_t           lb_idx,
-                                                      key_view           key)
+   id_address write_session::remove_binary_key(object_ref&        root,
+                                               const binary_node* bn,
+                                               uint16_t           lb_idx,
+                                               key_view           key)
    {
       auto kvp        = bn->get_key_val_ptr(lb_idx);
       _old_value_size = kvp->value_size();
@@ -1892,7 +1895,7 @@ namespace arbtrie
          root.modify().as<binary_node>([&](auto* b) { b->remove_value(lb_idx); });
 
          if (bn->num_branches() == 0)
-            return fast_meta_address();
+            return id_address();
 
          return root.address();
       }
@@ -1911,7 +1914,7 @@ namespace arbtrie
 
             return cl;
          }
-         return fast_meta_address();
+         return id_address();
       }
    }
 
@@ -1937,10 +1940,10 @@ namespace arbtrie
     *     subtree    -> value node
     */
    template <upsert_mode mode>
-   fast_meta_address write_session::update_binary_key(object_ref&        root,
-                                                      const binary_node* bn,
-                                                      uint16_t           lb_idx,
-                                                      key_view           key)
+   id_address write_session::update_binary_key(object_ref&        root,
+                                               const binary_node* bn,
+                                               uint16_t           lb_idx,
+                                               key_view           key)
    {
       const auto* kvp = bn->get_key_val_ptr(lb_idx);
       assert(kvp->key() == key);
@@ -1968,7 +1971,7 @@ namespace arbtrie
          {
             auto cval = root.rlock().get(kvp->value_id());
             if (bn->is_subtree(lb_idx))
-               _old_value_size = sizeof(fast_meta_address);
+               _old_value_size = sizeof(id_address);
             else
                _old_value_size = cval.as<value_node>()->value_size();
 
@@ -2075,7 +2078,7 @@ namespace arbtrie
             {
                kv_index kidx(lb_idx, kv_type::subtree);
 
-               if (sizeof(fast_meta_address) >= _old_value_size)
+               if (sizeof(id_address) >= _old_value_size)
                {
                   // we can update in place
                   root.modify().as<binary_node>()->set_value(kidx, _cur_val);
@@ -2360,10 +2363,10 @@ namespace arbtrie
     * A binary node with a single key is now just a value node until there
     * is a collision. 
     */
-   fast_meta_address write_session::make_binary(id_region         reg,
-                                                session_rlock&    state,
-                                                key_view          key,
-                                                const value_type& val)
+   id_address write_session::make_binary(id_region         reg,
+                                         session_rlock&    state,
+                                         key_view          key,
+                                         const value_type& val)
    {
       return make<value_node>(reg, state, key, val).address();
 

@@ -189,7 +189,7 @@ namespace arbtrie
               public:
                object_ref(const object_ref& p);
 
-               inline fast_meta_address address() const { return _address; }
+               inline id_address address() const { return _address; }
                inline uint32_t          ref() const { return _cached.ref(); }
                inline node_type         type() const { return _cached.type(); }
                inline node_location     loc() const { return _cached.loc(); }
@@ -233,18 +233,18 @@ namespace arbtrie
                friend class seg_allocator::session;
 
                object_ref(seg_allocator::session::read_lock& rlock,
-                          fast_meta_address                  adr,
+                          id_address                  adr,
                           node_meta_type&                    met);
 
                seg_allocator::session::read_lock& _rlock;
                node_meta_type&                    _meta;
                temp_meta_type                     _cached;  // cached read of atomic _atom_loc
-               fast_meta_address                  _address;
+               id_address                  _address;
             };  // object_ref
 
             object_ref alloc(id_region reg, uint32_t size, node_type type, auto initfunc);
 
-            // fast_meta_address reuse,
+            // id_address reuse,
             object_ref realloc(object_ref& r, uint32_t size, node_type type, auto initfunc);
 
             /**
@@ -252,11 +252,11 @@ namespace arbtrie
              */
             /// @{
             id_region get_new_region() { return _session._sega._id_alloc.get_new_region(); }
-            void      free_meta_node(fast_meta_address);
-            std::pair<node_meta_type&, fast_meta_address> get_new_meta_node(id_region);
+            void      free_meta_node(id_address);
+            std::pair<node_meta_type&, id_address> get_new_meta_node(id_region);
             /// @}
 
-            inline object_ref get(fast_meta_address adr)
+            inline object_ref get(id_address adr)
             {
                return object_ref(*this, adr, _session._sega._id_alloc.get(adr));
             }
@@ -310,7 +310,7 @@ namespace arbtrie
 
          void unalloc(uint32_t size);
          std::pair<node_location, node_header*>
-         alloc_data(uint32_t size, fast_meta_address adr, uint64_t time = size_weighted_age::now());
+         alloc_data(uint32_t size, id_address adr, uint64_t time = size_weighted_age::now());
 
          uint32_t _session_num;  // index into _sega's active sessions list
 

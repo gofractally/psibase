@@ -28,17 +28,17 @@ namespace arbtrie
       if constexpr (update_checksum_on_modify)
          node_ptr->update_checksum();
 
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
+      assert(type == node_type::value or bool(node_ptr->_branch_id_region));
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
-      assert(node_ptr->_node_id == adr.to_int());
+      assert(node_ptr->_node_id == adr);
 
       oref.meta().set_location_and_type(loc, type, std::memory_order_release);
       oref.refresh(std::memory_order_relaxed);
       return oref;
    }
 
-   inline std::pair<node_meta_type&, fast_meta_address>
+   inline std::pair<node_meta_type&, id_address>
    seg_allocator::session::read_lock::get_new_meta_node(id_region reg)
    {
       return _session._sega._id_alloc.get_new_id(reg);
@@ -68,14 +68,14 @@ namespace arbtrie
       if constexpr (update_checksum_on_modify)
          node_ptr->update_checksum();
 
-      assert(type == node_type::value or node_ptr->_branch_id_region != 0);
+      assert(type == node_type::value or bool(node_ptr->_branch_id_region));
 
       atom.store(temp_meta_type().set_type(type).set_location(loc).set_ref(1),
                  std::memory_order_release);
 
       assert(node_ptr->_nsize == size);
       assert(node_ptr->_ntype == type);
-      assert(node_ptr->_node_id == id.to_int());
+      assert(node_ptr->_node_id == id);
       assert(object_ref(*this, id, atom).type() != node_type::undefined);
 
       if constexpr (debug_memory)
@@ -132,7 +132,7 @@ namespace arbtrie
       _session._segment_read_stat->read_bytes(loc.segment(), size, time);
    }
 
-   inline void seg_allocator::session::read_lock::free_meta_node(fast_meta_address a)
+   inline void seg_allocator::session::read_lock::free_meta_node(id_address a)
    {
       _session._sega._id_alloc.free_id(a);
    }

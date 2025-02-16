@@ -1,4 +1,3 @@
-
 #include <arbtrie/database.hpp>
 #include <arbtrie/node_handle.hpp>
 
@@ -22,7 +21,7 @@ namespace arbtrie
          auto oref  = state.get(_id);
          //    std::cerr<< "release id: " << oref.address() <<"  init ref: " << oref.ref() <<"\n";
          release_node(oref);
-         _id.reset();
+         _id = id_address(0);
       }
    }
    void node_handle::retain()
