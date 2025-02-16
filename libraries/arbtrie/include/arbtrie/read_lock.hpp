@@ -7,6 +7,13 @@ namespace arbtrie
    class read_lock;
    class node_header;
 
+   /**
+   * @brief A lock that allows a single thread to modify a node
+   * 
+   * This object is returned by the modify() method on object_ref and
+   * ensures that the modify lock is released when the modify lock 
+   * goes out of scope.
+   */
    class modify_lock
    {
      public:

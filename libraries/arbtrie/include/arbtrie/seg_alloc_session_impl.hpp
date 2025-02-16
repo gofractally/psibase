@@ -36,27 +36,6 @@ namespace arbtrie
       assert(_nested_read_lock >= 0);
    }
 
-   inline modify_lock::modify_lock(node_meta_type& m, read_lock& rl)
-       : _meta(m), _rlock(rl), _sync_lock(nullptr)
-   {
-      _locked_val = _meta.start_modify();
-   }
-
-   inline modify_lock::~modify_lock()
-   {
-      if (not _released)
-         unlock();
-   }
-
-   inline id_region read_lock::get_new_region()
-   {
-      return _session._sega._id_alloc.get_new_region();
-   }
-   inline object_ref read_lock::get(id_address adr)
-   {
-      return object_ref(*this, adr, _session._sega._id_alloc.get(adr));
-   }
-
    inline read_lock seg_alloc_session::lock()
    {
       return read_lock(*this);

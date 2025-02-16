@@ -1,3 +1,6 @@
+#pragma once
+#include <arbtrie/read_lock.hpp>
+
 namespace arbtrie
 {
 
@@ -128,6 +131,15 @@ namespace arbtrie
       _session._sega._id_alloc.free_id(a);
    }
 
+   inline id_region read_lock::get_new_region()
+   {
+      return _session._sega._id_alloc.get_new_region();
+   }
+   inline object_ref read_lock::get(id_address adr)
+   {
+      return object_ref(*this, adr, _session._sega._id_alloc.get(adr));
+   }
+
    // returned mutable T is only valid while modify lock is in scope
    // TODO: compile time optimziation or a state variable can avoid sync_lock
    // the sync locks and atomic operations if we know for certain that
@@ -185,4 +197,17 @@ namespace arbtrie
       // allow compactor to copy
       _meta.end_modify();
    }
+
+   inline modify_lock::modify_lock(node_meta_type& m, read_lock& rl)
+       : _meta(m), _rlock(rl), _sync_lock(nullptr)
+   {
+      _locked_val = _meta.start_modify();
+   }
+
+   inline modify_lock::~modify_lock()
+   {
+      if (not _released)
+         unlock();
+   }
+
 }  // namespace arbtrie
