@@ -203,8 +203,7 @@ namespace arbtrie
          return std::pair<branch_index_type, id_address>(lbbr, get_branch(lbbr));
       }
 
-      std::pair<branch_index_type, id_address> reverse_lower_bound(
-          branch_index_type br) const
+      std::pair<branch_index_type, id_address> reverse_lower_bound(branch_index_type br) const
       {
          auto lbb  = reverse_lower_bound_bit(br - 1);
          auto lbbr = lbb + 1;

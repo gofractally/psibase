@@ -333,24 +333,25 @@ int main(int argc, char** argv)
    if (use_string)
    {
       {
-      std::cout << "inserting dictionary in ordr order\n";
-      auto start = std::chrono::steady_clock::now();
-      auto wt    = ws.startTransaction();
+         std::cout << "inserting dictionary in ordr order\n";
+         auto start = std::chrono::steady_clock::now();
+         auto wt    = ws.startTransaction();
 
-      for (uint32_t i = 0; i < dict.size(); ++i)
-      {
-         auto old_size = wt->put(dict[rand64()%dict.size()], dict[i]);
-      }
-      auto end   = std::chrono::steady_clock::now();
-      auto delta = end - start;
-      wt->commit();
+         for (uint32_t i = 0; i < dict.size(); ++i)
+         {
+            auto old_size = wt->put(dict[rand64() % dict.size()], dict[i]);
+         }
+         auto end   = std::chrono::steady_clock::now();
+         auto delta = end - start;
+         wt->commit();
 
-      std::cerr << std::setw(12)
-                << add_comma(int64_t(
-                       count / (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
-                << " items/sec   \n";
+         std::cerr << std::setw(12)
+                   << add_comma(int64_t(
+                          count /
+                          (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                   << " items/sec   \n";
       }
-      for( int r =0; r < rounds; ++r ) 
+      for (int r = 0; r < rounds; ++r)
       {
          std::cout << "updating dictionary in ordr order\n";
          auto start = std::chrono::steady_clock::now();
@@ -358,7 +359,7 @@ int main(int argc, char** argv)
 
          for (uint32_t i = 0; i < dict.size(); ++i)
          {
-            auto old_size = wt->put(dict[rand64()%dict.size()], dict[i]);
+            auto old_size = wt->put(dict[rand64() % dict.size()], dict[i]);
          }
          wt->commit();
          auto end   = std::chrono::steady_clock::now();

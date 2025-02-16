@@ -17,7 +17,7 @@
 
 #include <arbtrie/mapping.hpp>
 
-namespace arbtrie 
+namespace arbtrie
 {
 
    /**
@@ -35,7 +35,7 @@ namespace arbtrie
                       bool                  read_write = true)
           : _filename(file), _block_size(block_size)
       {
-         _max_blocks = max_blocks;
+         _max_blocks    = max_blocks;
          _block_mapping = new char_ptr[max_blocks];
 
          int flags = O_CLOEXEC;
@@ -53,8 +53,9 @@ namespace arbtrie
          }
 
          _fd = ::open(file.native().c_str(), flags, 0644);
-         if (_fd == -1) {
-            std::cerr <<"opening " << file.native() <<"\n";
+         if (_fd == -1)
+         {
+            std::cerr << "opening " << file.native() << "\n";
             throw std::runtime_error("unable to open block file");
          }
 
@@ -85,7 +86,7 @@ namespace arbtrie
                auto  end  = data + _file_size;
                while (data != end)
                {
-                  _block_mapping[ _num_blocks.fetch_add(1) ] = data;
+                  _block_mapping[_num_blocks.fetch_add(1)] = data;
                   //_block_mapping.push_back(data);
                   data += _block_size;
                }
@@ -104,72 +105,78 @@ namespace arbtrie
       {
          if (_fd)
          {
-            for( uint32_t i = 0; i < _num_blocks.load(); ++i )
+            for (uint32_t i = 0; i < _num_blocks.load(); ++i)
                ::munmap(_block_mapping[i], _block_size);
             ::close(_fd);
          }
       }
 
       uint64_t block_size() const { return _block_size; }
-      uint64_t num_blocks()const  { return _num_blocks.load( std::memory_order_relaxed ); } 
-      
+      uint64_t num_blocks() const { return _num_blocks.load(std::memory_order_relaxed); }
+
       /**
        * This method brute forces syncing all blocks which likely
        * flushes more than needed.
        */
-      void sync(sync_type st) {
-         if (_fd and sync_type::none != st )
+      void sync(sync_type st)
+      {
+         if (_fd and sync_type::none != st)
          {
             uint64_t nb = num_blocks();
-            for( uint32_t i = 0; i < nb; ++i )
-               ::msync(_block_mapping[i], _block_size, msync_flag(st) );
+            for (uint32_t i = 0; i < nb; ++i)
+               ::msync(_block_mapping[i], _block_size, msync_flag(st));
          }
       }
 
       // return the base pointer for the mapped segment
-      inline void* get(id i) noexcept { 
-         assert( i < _num_blocks.load(std::memory_order_relaxed) );
-         // this is safe because block mapping reserved capacity so 
+      inline void* get(id i) noexcept
+      {
+         assert(i < _num_blocks.load(std::memory_order_relaxed));
+         // this is safe because block mapping reserved capacity so
          // resize should never move the data
-         return _block_mapping[i]; 
+         return _block_mapping[i];
       }
 
       // ensures that at least the desired number of blocks are present
-      uint32_t reserve( uint32_t desired_num_blocks, bool memlock = false) {
-         if( desired_num_blocks > _max_blocks )
-            throw std::runtime_error( "unable to reserve, maximum block would be reached" );
+      uint32_t reserve(uint32_t desired_num_blocks, bool memlock = false)
+      {
+         if (desired_num_blocks > _max_blocks)
+            throw std::runtime_error("unable to reserve, maximum block would be reached");
 
          std::lock_guard l{_resize_mutex};
-         if( num_blocks() >= desired_num_blocks ) 
+         if (num_blocks() >= desired_num_blocks)
             return desired_num_blocks;
 
-         auto cur_num = num_blocks();
-         auto add_count = desired_num_blocks-cur_num;
+         auto cur_num   = num_blocks();
+         auto add_count = desired_num_blocks - cur_num;
 
-         auto new_size = _file_size + _block_size*add_count;
+         auto new_size = _file_size + _block_size * add_count;
          if (::ftruncate(_fd, new_size) < 0)
          {
             throw std::system_error(errno, std::generic_category());
          }
 
-         auto prot = PROT_READ | PROT_WRITE;  
+         auto prot = PROT_READ | PROT_WRITE;
          if (auto addr = ::mmap(nullptr, _block_size, prot, MAP_SHARED, _fd, _file_size);
              addr != MAP_FAILED)
          {
-            if( memlock ) {
-               if (::mlock(addr, new_size - _file_size)) {
+            if (memlock)
+            {
+               if (::mlock(addr, new_size - _file_size))
+               {
                   std::cerr << "WARNING: unable to mlock ID lookups\n";
-                  ::madvise(addr, new_size-_file_size, MADV_RANDOM);
+                  ::madvise(addr, new_size - _file_size, MADV_RANDOM);
                }
             }
             char* ac = (char*)addr;
-            while( cur_num < desired_num_blocks ) {
+            while (cur_num < desired_num_blocks)
+            {
                _block_mapping[cur_num] = ac;
                ++cur_num;
                ac += _block_size;
             }
             _file_size = new_size;
-            return _num_blocks.fetch_add(add_count, std::memory_order_release)+add_count;
+            return _num_blocks.fetch_add(add_count, std::memory_order_release) + add_count;
          }
          if (::ftruncate(_fd, _file_size) < 0)
          {
@@ -177,7 +184,6 @@ namespace arbtrie
          }
          throw std::runtime_error("unable to mmap new block");
       }
-
 
       id alloc()
       {
@@ -193,13 +199,13 @@ namespace arbtrie
          if (auto addr = ::mmap(nullptr, _block_size, prot, MAP_SHARED, _fd, _file_size);
              addr != MAP_FAILED)
          {
-            auto nb = _num_blocks.load( std::memory_order_relaxed );
-            if( nb == _max_blocks )
+            auto nb = _num_blocks.load(std::memory_order_relaxed);
+            if (nb == _max_blocks)
                throw std::runtime_error("maximum block number reached");
 
-               _block_mapping[_num_blocks.load(std::memory_order_relaxed)] = (char*)addr;
-               _file_size = new_size;
-               return _num_blocks.fetch_add(1, std::memory_order_release);
+            _block_mapping[_num_blocks.load(std::memory_order_relaxed)] = (char*)addr;
+            _file_size                                                  = new_size;
+            return _num_blocks.fetch_add(1, std::memory_order_release);
          }
          if (::ftruncate(_fd, _file_size) < 0)
          {
@@ -215,9 +221,9 @@ namespace arbtrie
       uint64_t              _file_size;
       int                   _fd;
       std::atomic<uint64_t> _num_blocks;
-    //  std::vector<void*>    _block_mapping;
+      //  std::vector<void*>    _block_mapping;
       using char_ptr = char*;
-      char_ptr*             _block_mapping;
-      mutable std::mutex    _resize_mutex;
+      char_ptr*          _block_mapping;
+      mutable std::mutex _resize_mutex;
    };
-}  // namespace arbtrie 
+}  // namespace arbtrie

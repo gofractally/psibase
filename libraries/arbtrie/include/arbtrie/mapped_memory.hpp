@@ -1,8 +1,8 @@
 #pragma once
+#include <assert.h>
 #include <arbtrie/config.hpp>
 #include <arbtrie/rdtsc.hpp>
 #include <arbtrie/size_weighted_age.hpp>
-#include <assert.h>
 
 namespace arbtrie
 {
@@ -21,37 +21,37 @@ namespace arbtrie
       {
          struct state_data
          {
-            uint64_t free_space : 26;    // Max 128 MB in bytes
-            uint64_t free_objects : 21;  // 128MB / 64 byte cacheline
-            uint64_t last_sync_page: 15; // 128MB / 4096 byte pages
-            uint64_t is_alloc : 1 = 0;
-            uint64_t is_pinned: 1 = 0;
+            uint64_t free_space : 26;      // Max 128 MB in bytes
+            uint64_t free_objects : 21;    // 128MB / 64 byte cacheline
+            uint64_t last_sync_page : 15;  // 128MB / 4096 byte pages
+            uint64_t is_alloc : 1  = 0;
+            uint64_t is_pinned : 1 = 0;
 
-            static_assert( (1 << 26) > segment_size );
-            static_assert( (1 << 21) > segment_size / cacheline_size );
-            static_assert( (1 << 15) > segment_size / os_page_size );
-
+            static_assert((1 << 26) > segment_size);
+            static_assert((1 << 21) > segment_size / cacheline_size);
+            static_assert((1 << 15) > segment_size / os_page_size);
 
             uint64_t to_int() const { return std::bit_cast<uint64_t>(*this); }
             explicit state_data(uint64_t x) { *this = std::bit_cast<state_data>(x); }
 
-            state_data& set_last_sync_page( uint32_t page ) {
-               assert( page <= segment_size/os_page_size );
+            state_data& set_last_sync_page(uint32_t page)
+            {
+               assert(page <= segment_size / os_page_size);
                last_sync_page = page;
                return *this;
             }
 
             state_data& free(uint32_t size)
             {
-               assert( size > 0 );
-               assert( free_space + size <= segment_size );
+               assert(size > 0);
+               assert(free_space + size <= segment_size);
                free_space += size;
                return *this;
             }
             state_data& free_object(uint32_t size)
             {
-               assert( size > 0 );
-               assert( free_space + size <= segment_size );
+               assert(size > 0);
+               assert(free_space + size <= segment_size);
 
                free_space += size;
                ++free_objects;
@@ -109,14 +109,14 @@ namespace arbtrie
                updated = state_data(expected).free(size).to_int();
          }
 
-         // after allocating 
+         // after allocating
          void finalize_segment(uint32_t size)
          {
             auto expected = _state_data.load(std::memory_order_relaxed);
 
-            assert( state_data(expected).is_alloc );
+            assert(state_data(expected).is_alloc);
 
-            auto updated  = state_data(expected).free(size).set_alloc(false).to_int();
+            auto updated = state_data(expected).free(size).set_alloc(false).to_int();
             while (
                 not _state_data.compare_exchange_weak(expected, updated, std::memory_order_relaxed))
                updated = state_data(expected).free(size).set_alloc(false).to_int();
@@ -139,31 +139,36 @@ namespace arbtrie
                updated = state_data(expected).set_alloc(a).to_int();
          }
 
-
-         uint64_t get_last_sync_pos()const {
-            return state_data(_state_data.load(std::memory_order_relaxed)).last_sync_page * os_page_size;
+         uint64_t get_last_sync_pos() const
+         {
+            return state_data(_state_data.load(std::memory_order_relaxed)).last_sync_page *
+                   os_page_size;
          }
 
-         void start_alloc_segment(  ) {
+         void start_alloc_segment()
+         {
             auto expected = _state_data.load(std::memory_order_relaxed);
-            assert( not state_data(expected).is_alloc );
+            assert(not state_data(expected).is_alloc);
             auto updated = state_data(expected).set_last_sync_page(0).set_alloc(true).to_int();
-            assert( state_data(updated).is_alloc );
+            assert(state_data(updated).is_alloc);
 
-            while( not _state_data.compare_exchange_weak( expected, updated, std::memory_order_relaxed ) ) 
-              updated = state_data(expected).set_last_sync_page(0).set_alloc(true).to_int();
-            assert( state_data(updated).is_alloc );
+            while (
+                not _state_data.compare_exchange_weak(expected, updated, std::memory_order_relaxed))
+               updated = state_data(expected).set_last_sync_page(0).set_alloc(true).to_int();
+            assert(state_data(updated).is_alloc);
          }
 
-         void set_last_sync_pos( uint64_t pos ) {
-            auto page_num = round_down_multiple<4096>(pos)/4096;
+         void set_last_sync_pos(uint64_t pos)
+         {
+            auto page_num = round_down_multiple<4096>(pos) / 4096;
             auto expected = _state_data.load(std::memory_order_relaxed);
-            auto updated = state_data(expected).set_last_sync_page( page_num ).to_int();
-            while( not _state_data.compare_exchange_weak( expected, updated, std::memory_order_relaxed ) ) 
-              updated = state_data(expected).set_last_sync_page( page_num ).to_int();
+            auto updated  = state_data(expected).set_last_sync_page(page_num).to_int();
+            while (
+                not _state_data.compare_exchange_weak(expected, updated, std::memory_order_relaxed))
+               updated = state_data(expected).set_last_sync_page(page_num).to_int();
          }
 
-         //std::atomic<uint64_t> _last_sync_pos;  
+         //std::atomic<uint64_t> _last_sync_pos;
          // position of alloc pointer when last synced
 
          /**
@@ -202,7 +207,7 @@ namespace arbtrie
       /// should align on a page boundary
       struct segment_header
       {
-         uint32_t get_alloc_pos()const { return _alloc_pos.load(std::memory_order_relaxed); }
+         uint32_t get_alloc_pos() const { return _alloc_pos.load(std::memory_order_relaxed); }
 
          // the next position to allocate data, only
          // used by the thread that owns this segment and

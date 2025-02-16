@@ -19,7 +19,7 @@ namespace arbtrie
    constexpr T round_down_multiple(T v)
    {
       static_assert(std::popcount(N) == 1, "N must be power of 2");
-      return v & ~(N-1);
+      return v & ~(N - 1);
    }
 
    template <uint32_t offset, uint32_t width>
@@ -62,9 +62,9 @@ namespace arbtrie
 
    inline std::string add_comma(uint64_t v)
    {
-      auto s = std::to_string(v);
-      int n   = s.length() - 3;
-      int end = (v >= 0) ? 0 : 1;  // Support for negative numbers
+      auto s   = std::to_string(v);
+      int  n   = s.length() - 3;
+      int  end = (v >= 0) ? 0 : 1;  // Support for negative numbers
       while (n > end)
       {
          s.insert(n, ",");
@@ -73,10 +73,28 @@ namespace arbtrie
       return s;
    };
 
-   inline constexpr key_view   to_key( const char* c, size_t len ) { return key_view( (const byte_type*) c, len); }
-   inline constexpr key_view   to_key( const uint8_t* c, size_t len ) { return key_view( (const byte_type*) c, len); }
-   inline constexpr key_view   to_key( const char* c ) { return key_view( (const byte_type*) c, strnlen(c, max_key_length ) ); }
-   inline constexpr key_view   to_value( const char* c, size_t len ) { return key_view( (const byte_type*) c, len); }
-   inline constexpr key_view   to_value( const uint8_t* c, size_t len ) { return key_view( (const byte_type*) c, len); }
-   inline constexpr value_view to_value( const char* c ) { return value_view( (const byte_type*) c, strnlen(c, max_value_size ) ); }
+   inline constexpr key_view to_key(const char* c, size_t len)
+   {
+      return key_view((const byte_type*)c, len);
+   }
+   inline constexpr key_view to_key(const uint8_t* c, size_t len)
+   {
+      return key_view((const byte_type*)c, len);
+   }
+   inline constexpr key_view to_key(const char* c)
+   {
+      return key_view((const byte_type*)c, strnlen(c, max_key_length));
+   }
+   inline constexpr key_view to_value(const char* c, size_t len)
+   {
+      return key_view((const byte_type*)c, len);
+   }
+   inline constexpr key_view to_value(const uint8_t* c, size_t len)
+   {
+      return key_view((const byte_type*)c, len);
+   }
+   inline constexpr value_view to_value(const char* c)
+   {
+      return value_view((const byte_type*)c, strnlen(c, max_value_size));
+   }
 }  // namespace arbtrie

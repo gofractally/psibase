@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-namespace arbtrie 
+namespace arbtrie
 {
    namespace
    {
@@ -81,15 +81,14 @@ namespace arbtrie
          {
             _data = addr;
             try_pin(&_pinned, addr, _size);
-      //      std::cerr<<"madvise random  " << int64_t(addr) <<"   " << _size << " \n";
-      //      madvise(addr, _size, MADV_RANDOM );
+            //      std::cerr<<"madvise random  " << int64_t(addr) <<"   " << _size << " \n";
+            //      madvise(addr, _size, MADV_RANDOM );
          }
          else
          {
             ::close(_fd);
             throw std::system_error{errno, std::generic_category()};
          }
-
       }
    }
 
@@ -167,4 +166,4 @@ namespace arbtrie
       }
    }
 
-}  // namespace triedent
+}  // namespace arbtrie

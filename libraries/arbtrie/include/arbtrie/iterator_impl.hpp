@@ -212,7 +212,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-               // then we start at the beginning of the next level
+             // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());

@@ -44,9 +44,9 @@ namespace arbtrie
       _sega.release_session_num(_session_num);
    }
 
-   std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t          size,
+   std::pair<node_location, node_header*> seg_allocator::session::alloc_data(uint32_t   size,
                                                                              id_address adr,
-                                                                             uint64_t          time)
+                                                                             uint64_t   time)
    {
       assert(size < segment_size - round_up_multiple<64>(sizeof(mapped_memory::segment_header)));
       // A - if no segment get a new segment

@@ -42,8 +42,9 @@ int main(int argc, char** argv)
       po::store(po::parse_command_line(argc, argv, desc), vm);
       po::notify(vm);
 
-      if (vm.count("about" )) {
-         std::cout<<"Mermaid helps maintain, migrate, and repair triedent databases\n";
+      if (vm.count("about"))
+      {
+         std::cout << "Mermaid helps maintain, migrate, and repair triedent databases\n";
          return 0;
       }
       if (vm.count("help"))

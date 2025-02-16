@@ -1,5 +1,5 @@
 
-namespace arbtrie 
+namespace arbtrie
 {
 
    /*
@@ -108,4 +108,4 @@ namespace arbtrie
    }
    */
 
-}  // namespace triedent
+}  // namespace arbtrie

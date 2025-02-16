@@ -1,7 +1,8 @@
 #pragma once
 #include <atomic>
 
-namespace arbtrie {
+namespace arbtrie
+{
    /**
     *  Any number of threads may modify data so long as they are the
     *  unique owner of that data and the data hasn't already been synced.
@@ -34,10 +35,12 @@ namespace arbtrie {
     *     - the sync lock can be on a per-segment basis, meaning modifications
     *       can occur on other unsynced segments while one segment is syncing.
     */
-   struct sync_lock {
+   struct sync_lock
+   {
       static constexpr const uint64_t sync_mask = make_mask<63, 1>();
 
-      bool try_modify() {
+      bool try_modify()
+      {
          // this is relaxed because we don't need to acquire any memory
          // from the thread that is doing the syncing nor publish our
          // writes because this is done before we write.
@@ -47,42 +50,46 @@ namespace arbtrie {
          // C&S here and abort if it fails rather than calling
          // end_modify() to undo the increment.
          auto prior = _state.fetch_add(1, std::memory_order_relaxed);
-         if( prior & sync_mask ) 
+         if (prior & sync_mask)
          {
             end_modify();
             return false;
          }
          return true;
       }
-      void end_modify() {
+      void end_modify()
+      {
          // after modfying the data we need to make sure the sync thread
          // sees it before flushing to disk.
          auto prior = _state.fetch_sub(1, std::memory_order_release);
-         if( prior -1 == sync_mask )
+         if (prior - 1 == sync_mask)
             _state.notify_all();
       }
 
-      void start_sync() {
+      void start_sync()
+      {
          _sync_lock.lock();
          // acquire the memory written before end_modify() was called
-         auto prior = _state.fetch_or( sync_mask, std::memory_order_acquire);
+         auto prior = _state.fetch_or(sync_mask, std::memory_order_acquire);
          prior |= sync_mask;
-         while( prior != sync_mask ) {
-            TRIEDENT_WARN( "prior: ", prior, " vs sync mask: ", sync_mask );
-            _state.wait( prior | sync_mask );
+         while (prior != sync_mask)
+         {
+            TRIEDENT_WARN("prior: ", prior, " vs sync mask: ", sync_mask);
+            _state.wait(prior | sync_mask);
             // this can be relaxed because we already synchronized
             // on the wait()/notify_all() from end_modify()
-            prior = _state.load( std::memory_order_relaxed );
+            prior = _state.load(std::memory_order_relaxed);
          }
       }
-      void end_sync() {
-         _state.fetch_and( ~sync_mask, std::memory_order_relaxed );
+      void end_sync()
+      {
+         _state.fetch_and(~sync_mask, std::memory_order_relaxed);
          _sync_lock.unlock();
       }
-      sync_lock():_state(0){}
+      sync_lock() : _state(0) {}
 
       std::mutex           _sync_lock;
       std::atomic<int64_t> _state;
    };
 
-} // arbtrie
+}  // namespace arbtrie

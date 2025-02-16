@@ -21,7 +21,6 @@ namespace arbtrie
     */
    struct segment_read_stat
    {
-
       /*
       uint32_t bytes_read(uint32_t segment_num) const
       {
@@ -41,7 +40,7 @@ namespace arbtrie
        */
       void read_bytes(uint32_t segment_num, uint32_t bytes, int64_t time)
       {
-         uint64_t clines = (bytes + (cacheline_size-1))/cacheline_size;
+         uint64_t clines = (bytes + (cacheline_size - 1)) / cacheline_size;
 
          auto expected = _stats[segment_num].load(std::memory_order_relaxed);
          auto updated  = size_weighted_age(expected).update(clines, time).to_int();
@@ -52,12 +51,14 @@ namespace arbtrie
          _total.fetch_add(clines, std::memory_order_relaxed);
       }
 
-      void set_age_weight( uint32_t seg, size_weighted_age v ) {
-         _stats[seg].store( std::bit_cast<uint64_t>(v), std::memory_order_relaxed );
+      void set_age_weight(uint32_t seg, size_weighted_age v)
+      {
+         _stats[seg].store(std::bit_cast<uint64_t>(v), std::memory_order_relaxed);
       }
-      size_weighted_age get_age_weight( uint32_t seg ) {
-         assert( seg < max_segment_count );
-         return std::bit_cast<size_weighted_age> (_stats[seg].load(std::memory_order_relaxed) );
+      size_weighted_age get_age_weight(uint32_t seg)
+      {
+         assert(seg < max_segment_count);
+         return std::bit_cast<size_weighted_age>(_stats[seg].load(std::memory_order_relaxed));
       }
 
       /**
@@ -80,15 +81,14 @@ namespace arbtrie
 
          while (opos != oend)
          {
-            size_weighted_age insd( opos->exchange(0, std::memory_order_relaxed) );
+            size_weighted_age insd(opos->exchange(0, std::memory_order_relaxed));
             tlines += insd.read_cl;
 
             auto expected = mpos->load(std::memory_order_relaxed);
-            auto updated = size_weighted_age(expected).update( insd.read_cl, insd.time_ms ).to_int();
+            auto updated  = size_weighted_age(expected).update(insd.read_cl, insd.time_ms).to_int();
 
-            while (not mpos->compare_exchange_weak(expected, updated,
-                                                                 std::memory_order_relaxed))
-               updated = size_weighted_age(expected).update( insd.read_cl, insd.time_ms ).to_int();
+            while (not mpos->compare_exchange_weak(expected, updated, std::memory_order_relaxed))
+               updated = size_weighted_age(expected).update(insd.read_cl, insd.time_ms).to_int();
 
             ++opos;
             ++mpos;

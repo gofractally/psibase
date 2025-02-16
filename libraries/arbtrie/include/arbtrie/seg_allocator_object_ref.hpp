@@ -5,7 +5,7 @@ namespace arbtrie
 
    inline seg_allocator::session::read_lock::object_ref::object_ref(
        seg_allocator::session::read_lock& rlock,
-       id_address                  adr,
+       id_address                         adr,
        node_meta_type&                    met)
        : _rlock(rlock), _meta(met), _cached(_meta.load(std::memory_order_relaxed)), _address(adr)
    {

@@ -1,6 +1,7 @@
 #pragma once
 
-namespace arbtrie {
+namespace arbtrie
+{
    using saturated_uint32 = uint32_t;
    /*
    struct saturated_uint32
@@ -34,4 +35,4 @@ namespace arbtrie {
    };
    static_assert(sizeof(saturated_uint32) == sizeof(uint32_t));
    */
-}
+}  // namespace arbtrie

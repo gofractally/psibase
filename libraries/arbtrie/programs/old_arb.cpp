@@ -4,9 +4,9 @@
 #include <string>
 
 #include <arbtrie/database.hpp>
-#include <vector>
-#include <sstream>
 #include <random>
+#include <sstream>
+#include <vector>
 
 using namespace triedent;
 
@@ -63,35 +63,38 @@ namespace triedent
          std::cerr << "    ";
    }
 
-   void print_hex( std::string_view v ) {
+   void print_hex(std::string_view v)
+   {
       std::cerr << std::setfill('0');
-      for( auto c : v ) 
-         std::cerr << std::hex<< std::setw(2) << uint16_t(uint8_t(c));
+      for (auto c : v)
+         std::cerr << std::hex << std::setw(2) << uint16_t(uint8_t(c));
    }
-   std::string to_hex( std::string_view v ) {
+   std::string to_hex(std::string_view v)
+   {
       std::stringstream ss;
       ss << std::setfill('0');
-      for( auto c : v ) 
-         ss << std::hex<< std::setw(2) << uint16_t(uint8_t(c));
+      for (auto c : v)
+         ss << std::hex << std::setw(2) << uint16_t(uint8_t(c));
       return ss.str();
    }
-   std::string to_hex( char c ) {
-      return to_hex( std::string_view(&c,1) );
+   std::string to_hex(char c)
+   {
+      return to_hex(std::string_view(&c, 1));
    }
 
    void print_hex(const value_node* vn, int depth = 0)
    {
       std::cerr << "'";
-      print_hex( vn->value() );
+      print_hex(vn->value());
       std::cerr << "'";
-   } 
+   }
 
    void print(const value_node* vn, int depth = 0)
    {
       std::cerr << "'";
       std::cerr << vn->value();
       std::cerr << "'";
-   } 
+   }
    /*
 void print(const setlist_node& bn, int depth = 0)
 {
@@ -270,22 +273,22 @@ int main(int argc, char** argv)
    }
    std::cerr << "loaded " << v.size() << " words from /usr/share/dict/words\n";
 
-   uint64_t seq = 0;
-   node_header* root   = nullptr;
+   uint64_t     seq  = 0;
+   node_header* root = nullptr;
    for (int r = 0; r < 100; ++r)
    {
-      auto         start  = std::chrono::steady_clock::now();
-      int          rounds = 1;
-      int          count  = 1*1000*1000;//v.size();
+      auto start  = std::chrono::steady_clock::now();
+      int  rounds = 1;
+      int  count  = 1 * 1000 * 1000;  //v.size();
       for (int i = 0; i < rounds; ++i)
       {
          for (uint32_t i = 1; i < count; ++i)
          {
-            uint64_t val = bswap(++seq); //rand64();
-            key_view str((char*)&val,sizeof(val));
+            uint64_t val = bswap(++seq);  //rand64();
+            key_view str((char*)&val, sizeof(val));
             // auto& str = v[rand64() % v.size()];
             //auto& str = v[v.size() - i - 1];  //rand() % v.size()];
-                                              //    std::cerr<<i << "] insert "<<str<<"\n";
+            //    std::cerr<<i << "] insert "<<str<<"\n";
             int olds;
             root = upsert(root, true, str, str, olds);
             if (not root)
@@ -304,8 +307,9 @@ int main(int argc, char** argv)
       // std::cerr<<"Refactor---\n";
       // print(refactor(root->as<binary_node>()));
       std::cout << std::setw(12)
-                << add_comma(int64_t((rounds * count) /
-                           (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
+                << add_comma(
+                       int64_t((rounds * count) /
+                               (std::chrono::duration<double, std::milli>(delta).count() / 1000)))
                 << " insert/sec  \n";
    }
 
@@ -373,4 +377,3 @@ int main(int argc, char** argv)
    return 0;
 
 #endif
-

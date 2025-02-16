@@ -189,10 +189,10 @@ namespace arbtrie
               public:
                object_ref(const object_ref& p);
 
-               inline id_address address() const { return _address; }
-               inline uint32_t          ref() const { return _cached.ref(); }
-               inline node_type         type() const { return _cached.type(); }
-               inline node_location     loc() const { return _cached.loc(); }
+               inline id_address    address() const { return _address; }
+               inline uint32_t      ref() const { return _cached.ref(); }
+               inline node_type     type() const { return _cached.type(); }
+               inline node_location loc() const { return _cached.loc(); }
 
                // return false if ref count overflow
                bool retain() { return _meta.retain(); }
@@ -233,13 +233,13 @@ namespace arbtrie
                friend class seg_allocator::session;
 
                object_ref(seg_allocator::session::read_lock& rlock,
-                          id_address                  adr,
+                          id_address                         adr,
                           node_meta_type&                    met);
 
                seg_allocator::session::read_lock& _rlock;
                node_meta_type&                    _meta;
                temp_meta_type                     _cached;  // cached read of atomic _atom_loc
-               id_address                  _address;
+               id_address                         _address;
             };  // object_ref
 
             object_ref alloc(id_region reg, uint32_t size, node_type type, auto initfunc);

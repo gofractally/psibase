@@ -53,13 +53,13 @@ uint64_t bswap(uint64_t x)
    return x;
 }
 static bool addc = false;
-auto format_comma( auto arg ) {
-   if( addc )
+auto        format_comma(auto arg)
+{
+   if (addc)
       return add_comma(arg);
    return std::to_string(arg);
 }
 static char sepearator = '\t';
-
 
 int64_t get_test(benchmark_config   cfg,
                  arbtrie::database& db,
@@ -82,17 +82,20 @@ int64_t get_test(benchmark_config   cfg,
    std::cerr << "-----------------------------------------------------------------------\n";
 
    std::vector<char> key;
-   auto                 root  = ws.get_root();
-   auto                 start = std::chrono::steady_clock::now();
+   auto              root  = ws.get_root();
+   auto              start = std::chrono::steady_clock::now();
    for (uint64_t i = 0; i < cfg.items; ++i)
    {
       make_key(i, key);
       key_view kstr(key.data(), key.size());
-      ws.get(root, kstr, [=](bool found, const value_type& r) {
-             if( not found )  {
-                TRIEDENT_WARN( "seq: ", i );
-                abort();
-             }
+      ws.get(root, kstr,
+             [=](bool found, const value_type& r)
+             {
+                if (not found)
+                {
+                   TRIEDENT_WARN("seq: ", i);
+                   abort();
+                }
              });
    }
    auto   end    = std::chrono::steady_clock::now();
@@ -126,10 +129,10 @@ std::vector<int> insert_test(benchmark_config   cfg,
    result.reserve(cfg.rounds);
 
    auto root = ws.create_root();
-   if constexpr (mode.is_update() and not mode.is_insert() )
+   if constexpr (mode.is_update() and not mode.is_insert())
       root = ws.get_root();
 
-   uint64_t             seq = 0;
+   uint64_t          seq = 0;
    std::vector<char> key;
    std::vector<char> value;
    value.resize(cfg.value_size);
@@ -161,8 +164,8 @@ std::vector<int> insert_test(benchmark_config   cfg,
       result.push_back(inserted /
                        (std::chrono::duration<double, std::milli>(delta).count() / 1000));
       std::cerr << std::setw(4) << std::left << r << " " << std::setw(10) << std::right
-                << format_comma(seq) << sepearator <<"  " << std::setw(10) << std::right << format_comma(result.back())
-                << sepearator << "  items/sec\n";
+                << format_comma(seq) << sepearator << "  " << std::setw(10) << std::right
+                << format_comma(result.back()) << sepearator << "  items/sec\n";
    }
    return result;
 }
@@ -242,9 +245,10 @@ int main(int argc, char** argv)
    get_test(cfg, db, ws, "big endian seq get",
             [](uint64_t seq, auto& v) { to_key(bswap(seq), v); });
    get_test(cfg, db, ws, "big endian rand get",
-            [cfg](uint64_t seq, auto& v) { 
-              uint64_t k = uint64_t(rand_from_seq(seq)) % (cfg.items*cfg.rounds);
-               to_key(bswap(k), v); 
+            [cfg](uint64_t seq, auto& v)
+            {
+               uint64_t k = uint64_t(rand_from_seq(seq)) % (cfg.items * cfg.rounds);
+               to_key(bswap(k), v);
             });
 
    insert_test<upsert_mode::update>(cfg, db, ws, "big endian seq update",
@@ -259,8 +263,7 @@ int main(int argc, char** argv)
                                     { to_key(std::to_string(rand_from_seq(seq)), v); });
    print_stat(ws);
    get_test(cfg, db, ws, "string number rand get",
-                        [](uint64_t seq, auto& v)
-                        { to_key(std::to_string(rand_from_seq(seq)), v); });
+            [](uint64_t seq, auto& v) { to_key(std::to_string(rand_from_seq(seq)), v); });
 
    insert_test<upsert_mode::update>(cfg, db, ws, "string number rand update",
                                     [](uint64_t seq, auto& v)

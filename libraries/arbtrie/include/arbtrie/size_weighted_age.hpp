@@ -1,6 +1,6 @@
 #pragma once
-#include <arbtrie/util.hpp>
 #include <arbtrie/rdtsc.hpp>
+#include <arbtrie/util.hpp>
 
 namespace arbtrie
 {
@@ -42,7 +42,7 @@ namespace arbtrie
       static uint64_t now()
       {
          return rdtsc() >> 20;
-         return 1; //std::chrono::duration_cast<duration_type>(clock_type::now().time_since_epoch()).count();
+         return 1;  //std::chrono::duration_cast<duration_type>(clock_type::now().time_since_epoch()).count();
       }
 
       uint64_t read_cl : 21;  // read cachelines, 21 bits supports up to 128MB segments

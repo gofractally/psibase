@@ -1,6 +1,7 @@
 #pragma once
 
-namespace arbtrie {
+namespace arbtrie
+{
 
    struct node_stats
    {
@@ -59,4 +60,4 @@ namespace arbtrie {
       }
    };
 
-}
+}  // namespace arbtrie
