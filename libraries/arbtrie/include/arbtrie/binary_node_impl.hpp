@@ -388,7 +388,7 @@ namespace arbtrie
                // TRIEDENT_DEBUG( "clone insert type: ", ins.lb_idx.val_type() );
                ko[idx].type       = ins.lb_idx.val_type();  //key_index::obj_id;
                kvp->_val_size     = sizeof(id_address);
-               kvp->value_id()    = id_address(ins.val.id().to_int());
+               kvp->value_id()    = ins.val.id();
                value_hashes()[lb] = value_header_hash(value_hash(ins.val.id()));
             }
             else
@@ -507,7 +507,7 @@ namespace arbtrie
       if (val.is_subtree())
       {
          kvp->_val_size   = sizeof(id_address);
-         kvp->value_id()  = id_address(val.id().to_int());
+         kvp->value_id()  = val.id();
          ko[lbx.pos].type = lbx.val_type();  //key_index::obj_id;
       }
       else
@@ -547,7 +547,7 @@ namespace arbtrie
       if (kidx.type)
       {
          kvp->_val_size  = sizeof(id_address);
-         kvp->value_id() = id_address(val.id().to_int());
+         kvp->value_id() = val.id();
       }
       else
       {

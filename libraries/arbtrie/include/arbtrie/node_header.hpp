@@ -61,7 +61,7 @@ namespace arbtrie
             _branch_id_region(0),
             _node_id(nid)
       {
-         assert(id_address::from_int(_node_id.to_int()) == nid);
+         assert(_node_id == nid);
          assert(intptr_t(this) % 64 == 0);
       }
 
@@ -86,7 +86,7 @@ namespace arbtrie
       void set_branch_region(id_region r) { _branch_id_region = r.to_int(); }
 
       uint32_t       size() const { return _nsize; }
-      id_address     address() const { return id_address::from_int(_node_id.to_int()); }
+      id_address     address() const { return _node_id; }
       node_type      get_type() const { return (node_type)_ntype; }
       uint16_t       num_branches() const { return _num_branches; }
       char*          body() { return (char*)(this + 1); }
