@@ -17,6 +17,7 @@ command = "mdbook-mermaid"
 [preprocessor.tabs]
 
 [preprocessor.pagetoc]
+
 [output.html]
 default-theme = "ayu"
 preferred-dark-theme = "ayu"
