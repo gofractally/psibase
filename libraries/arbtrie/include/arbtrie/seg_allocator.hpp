@@ -138,7 +138,7 @@ namespace arbtrie
       // only 64 bits in bitfield used to allocate sessions
       // only really require 1 per thread
       static const uint32_t max_session_count = 64;
-      using session                           = seg_alloc_session;
+      // using session                           = seg_alloc_session;
 
       seg_allocator(std::filesystem::path dir);
       ~seg_allocator();
@@ -151,11 +151,14 @@ namespace arbtrie
       void     stop_compact_thread();
       bool     compact_next_segment();
 
-      session start_session() { return session(*this, alloc_session_num()); }
+      seg_alloc_session start_session() { return seg_alloc_session(*this, alloc_session_num()); }
 
      private:
       friend class seg_alloc_session;
-      std::optional<session> _compactor_session;
+      friend class read_lock;
+      friend class modify_lock;
+
+      std::optional<seg_alloc_session> _compactor_session;
 
       mapped_memory::segment_header* get_segment(segment_number seg) noexcept
       {
@@ -171,7 +174,7 @@ namespace arbtrie
       void aggregate_read_stats();
 
       void compact_loop();
-      void compact_segment(session& ses, uint64_t seg_num);
+      void compact_segment(seg_alloc_session& ses, uint64_t seg_num);
       void select_segments();
       void sort_selected_segments();
       void promote_rcache_data();
@@ -208,6 +211,18 @@ namespace arbtrie
        */
       void release_segment(segment_number);
 
+      void push_dirty_segment(int seg_num)
+      {
+         std::unique_lock lock(_dirty_segs_mutex);
+         _dirty_segs[_next_dirt_seg_index % max_segment_count] = seg_num;
+         ++_next_dirt_seg_index;
+      }
+      int get_last_dirty_seg_idx()
+      {
+         std::unique_lock lock(_dirty_segs_mutex);
+         return _next_dirt_seg_index;
+      }
+
       /**
        * finds the most empty segment that is at least 25% empty
        * - marks it for sequential access
@@ -234,7 +249,7 @@ namespace arbtrie
 
       // keeps track of the segments that are mlocked....
       // TODO: this needs to get refactored
-      alignas(std::hardware_destructive_interference_size) std::atomic<uint64_t> _total_mlocked = 0;
+      alignas(std::hardware_destructive_interference_size) std::atomic<uint32_t> _total_mlocked = 0;
       alignas(std::hardware_destructive_interference_size)
           std::array<std::atomic<int32_t>, 256> _mlocked;
 
@@ -315,62 +330,7 @@ namespace arbtrie
       uint64_t               _next_dirt_seg_index = 0;
       uint64_t               _last_synced_index   = 0;
 
-      void push_dirty_segment(int seg_num)
-      {
-         std::unique_lock lock(_dirty_segs_mutex);
-         _dirty_segs[_next_dirt_seg_index % max_segment_count] = seg_num;
-         ++_next_dirt_seg_index;
-      }
-      int get_last_dirty_seg_idx()
-      {
-         std::unique_lock lock(_dirty_segs_mutex);
-         return _next_dirt_seg_index;
-      }
    };  // seg_allocator
-
-   using object_ref = seg_allocator::session::read_lock::object_ref;
-
-   // copy E to R*
-   inline void seg_allocator::session::retain_read_lock()
-   {
-      if (++_nested_read_lock != 1)
-         return;
-
-      uint64_t cur = _session_lock_ptr.load(std::memory_order_acquire);
-
-      //cur.locked_end = cur.view_of_end;
-      uint32_t view_of_end = cur >> 32;
-      uint32_t cur_end     = uint32_t(cur);
-      // it should be unlocked which signaled by max
-      assert(cur_end == uint32_t(-1));
-      auto diff = cur_end - view_of_end;
-
-      // an atomic sub should leave the higher-order bits in place where the view
-      // from the compactor is being updated.
-      _session_lock_ptr.fetch_sub(diff, std::memory_order_release);
-   }
-
-   // R* goes to inifinity and beyond
-   inline void seg_allocator::session::release_read_lock()
-   {
-      // set it to max uint32_t
-      if (not --_nested_read_lock)
-         _session_lock_ptr.fetch_or(uint32_t(-1));
-      assert(_nested_read_lock >= 0);
-   }
-
-   inline seg_allocator::session::read_lock::modify_lock::modify_lock(node_meta_type& m,
-                                                                      read_lock&      rl)
-       : _meta(m), _rlock(rl), _sync_lock(nullptr)
-   {
-      _locked_val = _meta.start_modify();
-   }
-
-   inline seg_allocator::session::read_lock::modify_lock::~modify_lock()
-   {
-      if (not _released)
-         unlock();
-   }
 
 }  // namespace arbtrie
 #include <arbtrie/seg_alloc_session_impl.hpp>

@@ -333,7 +333,7 @@ namespace arbtrie
       return true;
    }
 
-   void seg_allocator::compact_segment(session& ses, uint64_t seg_num)
+   void seg_allocator::compact_segment(seg_alloc_session& ses, uint64_t seg_num)
    {
       auto state = ses.lock();
       auto s     = get_segment(seg_num);

@@ -12,7 +12,7 @@
 
 namespace arbtrie
 {
-   using session_rlock = seg_allocator::session::read_lock;
+   using session_rlock = read_lock;
    using kv_type       = binary_node::key_index::value_type;
    using kv_index      = binary_node::key_index;
 
@@ -155,7 +155,7 @@ namespace arbtrie
       node_handle create_handle(id_address a) { return node_handle(*this, a); }
 
      public:
-      seg_allocator::session _segas;
+      seg_alloc_session _segas;
 
       uint64_t count_ids_with_refs() { return _segas.count_ids_with_refs(); }
 

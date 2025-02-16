@@ -2,10 +2,7 @@ namespace arbtrie
 {
 
    /// @pre refcount of id is 1
-   inline object_ref seg_alloc_session::read_lock::realloc(object_ref& oref,
-                                                                uint32_t    size,
-                                                                node_type   type,
-                                                                auto        init)
+   inline object_ref read_lock::realloc(object_ref& oref, uint32_t size, node_type type, auto init)
    {
       auto adr = oref.address();
       assert(oref.meta().is_changing());
@@ -38,17 +35,13 @@ namespace arbtrie
       return oref;
    }
 
-   inline std::pair<node_meta_type&, id_address>
-   seg_alloc_session::read_lock::get_new_meta_node(id_region reg)
+   inline std::pair<node_meta_type&, id_address> read_lock::get_new_meta_node(id_region reg)
    {
       return _session._sega._id_alloc.get_new_id(reg);
       //auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
    }
 
-   inline object_ref seg_alloc_session::read_lock::alloc(id_region reg,
-                                                              uint32_t  size,
-                                                              node_type type,
-                                                              auto      init)
+   inline object_ref read_lock::alloc(id_region reg, uint32_t size, node_type type, auto init)
    {
       if constexpr (debug_memory)
       {
@@ -86,18 +79,18 @@ namespace arbtrie
       return object_ref(*this, id, atom);
    }
 
-   inline bool seg_alloc_session::read_lock::is_synced(node_location loc)
+   inline bool read_lock::is_synced(node_location loc)
    {
       int64_t seg = loc.segment();
       return _session._sega._header->seg_meta[seg].get_last_sync_pos() >
              loc.abs_index();  // - seg * segment_size;
    }
 
-   inline sync_lock& seg_alloc_session::read_lock::get_sync_lock(int seg)
+   inline sync_lock& read_lock::get_sync_lock(int seg)
    {
       return _session._sega._seg_sync_locks[seg];
    }
-   inline node_header* seg_alloc_session::read_lock::get_node_pointer(node_location loc)
+   inline node_header* read_lock::get_node_pointer(node_location loc)
    {
       auto segment = (mapped_memory::segment_header*)_session._sega._block_alloc.get(loc.segment());
       // 0 means we are accessing a swapped object on a segment that hasn't started new allocs
@@ -125,14 +118,12 @@ namespace arbtrie
       return (node_header*)((char*)_session._sega._block_alloc.get(loc.segment()) +
                             loc.abs_index());
    }
-   inline void seg_alloc_session::read_lock::update_read_stats(node_location loc,
-                                                                    uint32_t      size,
-                                                                    uint64_t      time)
+   inline void read_lock::update_read_stats(node_location loc, uint32_t size, uint64_t time)
    {
       _session._segment_read_stat->read_bytes(loc.segment(), size, time);
    }
 
-   inline void seg_alloc_session::read_lock::free_meta_node(id_address a)
+   inline void read_lock::free_meta_node(id_address a)
    {
       _session._sega._id_alloc.free_id(a);
    }
@@ -143,7 +134,7 @@ namespace arbtrie
    // the process will not want to msync or is willing to risk
    // data not making it to disk.
    template <typename T>
-   T* seg_alloc_session::read_lock::modify_lock::as()
+   T* modify_lock::as()
    {
       if (_observed_ptr)
          return (T*)_observed_ptr;
@@ -167,19 +158,19 @@ namespace arbtrie
    }
 
    template <typename T>
-   void seg_alloc_session::read_lock::modify_lock::as(std::invocable<T*> auto&& call_with_tptr)
+   void modify_lock::as(std::invocable<T*> auto&& call_with_tptr)
    {
       assert(_locked_val.ref());
       call_with_tptr(as<T>());
    }
 
-   inline void seg_alloc_session::read_lock::modify_lock::release()
+   inline void modify_lock::release()
    {
       _released = true;
       unlock();
    }
 
-   inline void seg_alloc_session::read_lock::modify_lock::unlock()
+   inline void modify_lock::unlock()
    {
       if (_observed_ptr)
       {
