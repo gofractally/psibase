@@ -3,15 +3,21 @@
 
 namespace arbtrie
 {
+   class read_lock;
+   class seg_allocator;
+   class seg_alloc_session;
+   class modify_lock;
+   class node_header;
+
    class object_ref
    {
      public:
       object_ref(const object_ref& p);
 
-      inline id_address    address() const { return _address; }
-      inline uint32_t      ref() const { return _cached.ref(); }
-      inline node_type     type() const { return _cached.type(); }
-      inline node_location loc() const { return _cached.loc(); }
+      id_address    address() const { return _address; }
+      uint32_t      ref() const { return _cached.ref(); }
+      node_type     type() const { return _cached.type(); }
+      node_location loc() const { return _cached.loc(); }
 
       // return false if ref count overflow
       bool retain() { return _meta.retain(); }
@@ -61,3 +67,5 @@ namespace arbtrie
       id_address      _address;
    };  // object_ref
 }  // namespace arbtrie
+
+#include <arbtrie/object_ref_impl.hpp>

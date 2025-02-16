@@ -335,5 +335,4 @@ namespace arbtrie
 
 }  // namespace arbtrie
 #include <arbtrie/seg_alloc_session_impl.hpp>
-#include <arbtrie/seg_allocator_object_ref.hpp>
 #include <arbtrie/seg_allocator_read_lock.hpp>
