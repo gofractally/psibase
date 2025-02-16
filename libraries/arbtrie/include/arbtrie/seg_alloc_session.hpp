@@ -31,6 +31,7 @@ namespace arbtrie
       friend class read_lock;
       friend class modify_lock;
       friend class seg_allocator;
+      friend class object_ref;
 
       void retain_read_lock();
       void release_read_lock();

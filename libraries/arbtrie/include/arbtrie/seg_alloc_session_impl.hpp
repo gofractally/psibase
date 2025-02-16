@@ -5,7 +5,7 @@
 
 namespace arbtrie
 {
-   using object_ref = read_lock::object_ref;
+   class object_ref;
 
    // copy E to R*
    inline void seg_alloc_session::retain_read_lock()

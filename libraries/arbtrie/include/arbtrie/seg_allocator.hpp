@@ -157,6 +157,7 @@ namespace arbtrie
       friend class seg_alloc_session;
       friend class read_lock;
       friend class modify_lock;
+      friend class object_ref;
 
       std::optional<seg_alloc_session> _compactor_session;
 
