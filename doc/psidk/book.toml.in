@@ -31,7 +31,6 @@ additional-css = [
 additional-js = [
     "theme/js/mermaid.min.js",
     "theme/js/mermaid-load.js", 
-    "theme/js/app-init.js", 
     "theme/js/fix-github-edit-link.js", 
     "theme/js/pagetoc.js",
     "theme/js/tabs.js"
