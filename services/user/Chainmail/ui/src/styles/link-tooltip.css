@@ -1,3 +1,5 @@
+@reference "./globals.css"
+
 milkdown-link-preview {
     position: absolute;
     &[data-show="false"] {

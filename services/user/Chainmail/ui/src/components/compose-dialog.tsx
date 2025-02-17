@@ -168,7 +168,7 @@ export const ComposeDialog = ({
         >
             {trigger}
             <DialogContent
-                className="flex h-[90dvh] max-w-screen-lg flex-col"
+                className="flex h-[90dvh] max-w-(--breakpoint-lg) flex-col"
                 onCloseAutoFocus={(e) => {
                     // This helps in not focusing on the trigger after closing the modal
                     e.preventDefault();
@@ -178,7 +178,7 @@ export const ComposeDialog = ({
                     <Form {...form}>
                         <form
                             onSubmit={form.handleSubmit(onSubmit)}
-                            className="flex max-h-full flex-1 flex-grow flex-col space-y-2"
+                            className="flex max-h-full flex-1 grow flex-col space-y-2"
                         >
                             <DialogHeader>
                                 <DialogTitle>Compose message</DialogTitle>
