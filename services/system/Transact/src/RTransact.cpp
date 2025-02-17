@@ -56,7 +56,7 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    return result;
 }
 
-void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
+void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    auto                          clients = Subjective{}.open<TraceClientTable>();
@@ -85,7 +85,7 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    {
       HttpReply           reply{.contentType = "application/json"};
       psio::vector_stream stream{reply.body};
-      to_json(trace, stream);
+      to_json(trace.unpack(), stream);
       for (auto client : row->clients)
          if (client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -94,7 +94,10 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    {
       HttpReply           reply{.contentType = "application/octet-stream"};
       psio::vector_stream stream{reply.body};
-      to_frac(trace, stream);
+
+      std::span<const char> sp = find_view_span(trace);
+      stream.write(sp.data(), sp.size());
+
       for (auto client : row->clients)
          if (!client.json)
             to<HttpServer>().sendReply(client.socket, reply);

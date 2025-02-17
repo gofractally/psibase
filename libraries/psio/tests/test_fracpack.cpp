@@ -114,6 +114,7 @@ void test_compat_wrap(const T& t, const U& u, bool expect_unknown)
    test_compat(std::variant<T>{t}, std::variant<U>{u}, expect_unknown);
    test_compat(psio::shared_view_ptr{t}, psio::shared_view_ptr{u}, expect_unknown);
    test_compat(psio::shared_view_ptr<T>{t}, to_bytes(psio::to_frac(t)), false);
+   test_compat(psio::nested<T>{t}, to_bytes(psio::to_frac(t)), false);
 }
 
 template <typename...>
