@@ -18,6 +18,7 @@ members = [
 
 exclude = [
     "user/CommonApi/common/packages/component-parser",
+    "user/XAdmin/ui/wasm",
     # other excludes
 ]
 

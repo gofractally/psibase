@@ -18,7 +18,7 @@ import {
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
-import * as wasm from "wasm-psibase";
+import { util } from "wasm-transpiled";
 
 type Buffer = number[];
 
@@ -164,11 +164,11 @@ class Chain {
         });
     }
 
-    public pushArrayBufferBoot(buffer: Buffer) {
+    public pushArrayBufferBoot(buffer: ArrayBufferLike) {
         return postArrayBufferGetJson("/native/push_boot", buffer);
     }
 
-    public async pushArrayBufferTransaction(buffer: Buffer) {
+    public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
         let url = siblingUrl(null, "transact", "/push_transaction");
         let res = await throwIfError(
             await fetch(url, {
@@ -180,7 +180,9 @@ class Chain {
                 body: buffer as any,
             })
         );
-        return wasm.js_deserialize_trace(await res.arrayBuffer());
+        return JSON.parse(
+            util.deserializeTrace(new Uint8Array(await res.arrayBuffer()))
+        );
     }
 
     public async restart(): Promise<void> {
