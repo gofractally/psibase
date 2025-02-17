@@ -268,8 +268,8 @@ namespace arbtrie
       uint64_t _total_promoted_bytes{0};
 
       // Difficulty threshold for read bit updates (0-4294967295)
-      std::atomic<uint32_t> _read_difficulty{uint32_t(-1) -
-                                             (uint32_t(-1) / 16)};  // 1 in 16 probability
+      std::atomic<uint32_t> _cache_difficulty{uint32_t(-1) -
+                                              (uint32_t(-1) / 16)};  // 1 in 16 probability
 
       struct aligned_atomic64 : public std::atomic<uint64_t>
       {

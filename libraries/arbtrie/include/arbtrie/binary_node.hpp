@@ -236,7 +236,6 @@ namespace arbtrie
 
       static inline uint64_t key_hash(key_view k) { return XXH3_64bits(k.data(), k.size()); }
       static inline uint64_t value_hash(id_address k) { return XXH3_64bits(&k, sizeof(k)); }
-      static inline uint64_t value_hash(arbtrie::remove k) { return 0; }
       static inline uint64_t value_hash(value_view v) { return XXH3_64bits(v.data(), v.size()); }
 
       static inline uint8_t key_header_hash(uint64_t kh) { return uint8_t(kh); }
@@ -300,12 +299,12 @@ namespace arbtrie
          {
             int deadspace = 0;
             assert(v.size() <= _val_size);
-            if (v.is_subtree())
+            if (v.is_address())
             {
                assert(_val_size >= sizeof(id_address));
                deadspace  = _val_size - sizeof(id_address);
                _val_size  = sizeof(id_address);
-               value_id() = v.id();
+               value_id() = v.address();
             }
             else
             {
@@ -322,10 +321,19 @@ namespace arbtrie
       } __attribute((packed)) __attribute((aligned(1)));
 
       static_assert(sizeof(key_val_pair) == 2);
+
+      /**
+       * Gets the value at the given index in the binary node.
+       */
       value_type get_value(int index) const
       {
+         // is_obj_id() is true for both value_node and subtree
          if (is_obj_id(index))
-            return id_address(get_key_val_ptr(index)->value_id());
+         {
+            if (is_subtree(index))
+               return value_type::make_subtree(get_key_val_ptr(index)->value_id());
+            return value_type::make_value_node(get_key_val_ptr(index)->value_id());
+         }
          return get_key_val_ptr(index)->value();
       }
 
@@ -478,8 +486,8 @@ namespace arbtrie
       }
       inline static int calc_key_val_pair_size(key_view key, const value_type& val)
       {
-         if (val.is_subtree())
-            return calc_key_val_pair_size(key, val.id());  // Pass the id_address directly
+         if (val.is_subtree() or val.is_value_node())
+            return calc_key_val_pair_size(key, id_address());  // Pass the id_address directly
          return calc_key_val_pair_size(key, val.view());
       }
 

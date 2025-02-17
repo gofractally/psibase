@@ -1,4 +1,5 @@
 #pragma once
+#include <arbtrie/concepts.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/inner_node.hpp>
 #include <concepts>
@@ -24,7 +25,7 @@ namespace arbtrie
     *  notional data layout
     *  --------------------
     *  node_header head
-    *  uint64_t    descendants:48  // total values under this one
+    *  uint64_t    descendants:48 :e // total values under this one
     *  uint64_t    spare_capacity:8
     *  uint64_t    prefix_trunc:8
     *  uint8_t     prefix[_prefix_len]
@@ -37,6 +38,94 @@ namespace arbtrie
    struct setlist_node : inner_node<setlist_node>
    {
       static const node_type type = node_type::setlist;
+      using node_header::get_type;
+
+      // node concept
+      ///@{
+      //key_view      get_prefix() const { return to_key(key_ptr(), _ksize); }
+      search_result get_branch(key_view k) const
+      {
+         throw std::runtime_error("setlist_node::get_branch: not implemented");
+         return search_result::end();
+      }
+      search_result lower_bound(key_view k) const
+      {
+         throw std::runtime_error("setlist_node::get_branch: not implemented");
+         return search_result::end();
+      }
+
+      // Required functions for is_node_header_derived concept
+      local_index next_index(local_index index) const
+      {
+         assert(index >= begin_index() or index < end_index());
+         return ++index;
+      }
+
+      local_index prev_index(local_index index) const
+      {
+         assert(index <= end_index() or index > begin_index());
+         return --index;
+      }
+
+      key_view get_branch_key(local_index index) const
+      {
+         assert(index <= end_index() or index > begin_index());
+
+         // key_size is 1 when:
+         // 1. index > 0 (not the EOF value)
+         // 2. OR when index == 0 but there is no EOF value
+         // In other words, key_size is 1 for all branch indices except EOF value
+         const bool key_size = !(bool(index.to_int()) and has_eof_value());
+         return key_view((const char*)get_setlist_ptr() + index.to_int(), key_size);
+      }
+
+      constexpr local_index begin_index() const { return local_index(-1); }
+      constexpr local_index end_index() const
+      {
+         return local_index(num_branches() + has_eof_value());
+      }
+
+      local_index get_branch_index(key_view k) const
+      {
+         if (k.empty())
+         {
+            if (has_eof_value())
+               return local_index(0);
+            return end_index();
+         }
+         auto pos = get_setlist().find(k.front());
+         if (pos == key_view::npos)
+            return end_index();
+         return local_index(pos + has_eof_value());
+      }
+
+      bool       has_value() const { return true; }
+      value_type value() const
+      {
+         if (is_eof_subtree())
+            return value_type::make_subtree(get_eof_value());
+         return value_type::make_value_node(get_eof_value());
+      }
+      value_type::types get_value_type() const
+      {
+         if (is_eof_subtree())
+            return value_type::types::subtree;
+         return value_type::types::value_node;
+      }
+      value_type::types get_type(local_index index) const
+      {
+         if (has_eof_value() and index == local_index(0))
+            return get_value_type();
+         return value_type::types::value_node;
+      }
+      value_type get_value(local_index index) const
+      {
+         assert(index == local_index(0));
+         if (has_eof_value() and index == local_index(0))
+            return value();
+         return value_type::make_value_node(get_branch(index.to_int()));
+      }
+      ///@}
 
       // the data between tail() and end of prefix capacity
       uint16_t branch_data_cap() const

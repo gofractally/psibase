@@ -75,6 +75,8 @@ namespace arbtrie
       bool       is_synced(node_location);
       sync_lock& get_sync_lock(int seg);
 
+      void free_object(node_location loc, uint32_t size);
+
      private:
       friend class seg_alloc_session;
       friend class object_ref;
@@ -87,6 +89,7 @@ namespace arbtrie
       read_lock& operator=(read_lock&)       = delete;
       read_lock& operator=(read_lock&&)      = delete;
 
+      uint64_t           cache_difficulty() const;
       seg_alloc_session& _session;
    };
 

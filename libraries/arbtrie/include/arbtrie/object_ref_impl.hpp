@@ -85,7 +85,7 @@ namespace arbtrie
       uint32_t random = XXH32(&tsc, sizeof(uint64_t), 0);
 
       // Check if random number exceeds difficulty threshold
-      if (random > _rlock._session._sega._read_difficulty)
+      if (random > _rlock.cache_difficulty())
       {
          // Try to set read bit
          auto m = _meta.load(std::memory_order_relaxed);
@@ -110,8 +110,7 @@ namespace arbtrie
       auto obj_ptr = _rlock.get_node_pointer(ploc);
 
       _rlock.free_meta_node(_address);
-      _rlock._session._sega._header->seg_meta[ploc.segment()].free_object(
-          obj_ptr->object_capacity());
+      _rlock.free_object(ploc, obj_ptr->object_capacity());
       return result;
    }
 

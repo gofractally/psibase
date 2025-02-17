@@ -130,7 +130,8 @@ namespace arbtrie
 
       bool       is_eof_subtree() const { return _eof_subtree; }
       bool       has_eof_value() const { return bool(_eof_value); }
-      id_address get_eof_value() const { return _eof_value; }
+      id_address get_eof_value() const { return _eof_value; }  // TODO tag as value_node
+      value_type get_eof_subtree() const { return value_type(_eof_value); }  // TODO: tag as subtree
 
       void set_prefix(key_view pre)
       {

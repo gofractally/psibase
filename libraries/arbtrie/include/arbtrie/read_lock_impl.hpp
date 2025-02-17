@@ -210,4 +210,14 @@ namespace arbtrie
          unlock();
    }
 
+   inline uint64_t read_lock::cache_difficulty() const
+   {
+      return _session._sega._cache_difficulty.load(std::memory_order_relaxed);
+   }
+
+   inline void read_lock::free_object(node_location loc, uint32_t size)
+   {
+      _session._sega._header->seg_meta[loc.segment()].free_object(size);
+   }
+
 }  // namespace arbtrie

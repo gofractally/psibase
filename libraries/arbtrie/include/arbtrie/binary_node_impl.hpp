@@ -383,16 +383,18 @@ namespace arbtrie
             key_hashes()[lb] = key_header_hash(key_hash(ins.key));
 
             ko[idx].pos = _alloc_pos;
-            if (ins.val.is_subtree() /* or id*/)
+            if (ins.val.is_address())
             {
+               auto adr = ins.val.address();
                // TRIEDENT_DEBUG( "clone insert type: ", ins.lb_idx.val_type() );
                ko[idx].type       = ins.lb_idx.val_type();  //key_index::obj_id;
                kvp->_val_size     = sizeof(id_address);
-               kvp->value_id()    = ins.val.id();
-               value_hashes()[lb] = value_header_hash(value_hash(ins.val.id()));
+               kvp->value_id()    = adr;
+               value_hashes()[lb] = value_header_hash(value_hash(adr));
             }
             else
             {
+               assert(ins.val.is_view());
                ko[idx].type   = key_index::inline_data;
                const auto& vv = ins.val.view();
                kvp->_val_size = vv.size();
@@ -504,14 +506,15 @@ namespace arbtrie
       ko[lbx.pos].pos = _alloc_pos;
       auto kvp        = get_key_val_ptr(lbx.pos);
       kvp->set_key(key);
-      if (val.is_subtree())
+      if (val.is_address())
       {
          kvp->_val_size   = sizeof(id_address);
-         kvp->value_id()  = val.id();
+         kvp->value_id()  = val.address();
          ko[lbx.pos].type = lbx.val_type();  //key_index::obj_id;
       }
       else
       {
+         assert(val.is_view());
          auto vv        = val.view();
          kvp->_val_size = vv.size();
          memcpy(kvp->val_ptr(), vv.data(), vv.size());
@@ -546,8 +549,9 @@ namespace arbtrie
 
       if (kidx.type)
       {
+         assert(val.is_address());
          kvp->_val_size  = sizeof(id_address);
-         kvp->value_id() = val.id();
+         kvp->value_id() = val.address();
       }
       else
       {

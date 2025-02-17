@@ -1,8 +1,10 @@
 #pragma once
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
+#include <arbtrie/beta_iterator.hpp>
 #include <arbtrie/binary_node.hpp>
 #include <arbtrie/iterator.hpp>
+#include <arbtrie/mapped_memory.hpp>
 #include <arbtrie/node_handle.hpp>
 #include <arbtrie/node_stats.hpp>
 #include <arbtrie/seg_allocator.hpp>
@@ -108,6 +110,8 @@ namespace arbtrie
      protected:
       template <iterator_caching_mode>
       friend class iterator;
+      template <beta::iterator_caching_mode>
+      friend class beta::iterator;
       friend class database;
       friend class root_data;
       friend class root;
@@ -153,6 +157,7 @@ namespace arbtrie
 
       /** creates a new handle for address, retains it */
       node_handle create_handle(id_address a) { return node_handle(*this, a); }
+      read_lock   lock() { return _segas.lock(); }
 
      public:
       seg_alloc_session _segas;
@@ -162,7 +167,12 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode = noncaching>
       auto create_iterator(node_handle h)
       {
-         return iterator<CacheMode>(*this, h);
+         return iterator<CacheMode>(*this, std::move(h));
+      }
+      template <beta::iterator_caching_mode CacheMode = beta::noncaching>
+      auto create_beta_iterator(node_handle h)
+      {
+         return beta::iterator<CacheMode>(*this, std::move(h));
       }
 
       /**
@@ -459,6 +469,8 @@ namespace arbtrie
       bool validate();
 
      private:
+      friend class read_session;
+      friend class write_session;
       void reset_reference_counts();
 
       friend class write_session;
@@ -570,7 +582,7 @@ namespace arbtrie
              {
                 if (vt.is_subtree())
                 {
-                   result = node_handle(*this, vt.id());
+                   result = node_handle(*this, vt.subtree_address());
                 }
              }
           });
@@ -617,7 +629,7 @@ namespace arbtrie
          {
             if (inner->is_eof_subtree())
             {
-               callback(true, value_type(inner->_eof_value));
+               callback(true, value_type::make_subtree(inner->_eof_value));
             }
             else
             {
@@ -690,7 +702,7 @@ namespace arbtrie
                                   ->value());
                return true;
             case kv_index::subtree:
-               callback(true, kvp->value_id());
+               callback(true, value_type::make_subtree(kvp->value_id()));
                return true;
          }
       }
@@ -772,4 +784,5 @@ namespace arbtrie
    }
 }  // namespace arbtrie
 
+#include <arbtrie/beta_iterator_impl.hpp>
 #include <arbtrie/iterator_impl.hpp>

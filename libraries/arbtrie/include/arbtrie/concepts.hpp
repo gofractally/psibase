@@ -83,16 +83,6 @@ namespace arbtrie
    static constexpr key_index key_end_index   = key_index(257);
    static constexpr key_index key_rend_index  = key_index(-1);
 
-   /// @deprecated use key_index::from_char
-   inline constexpr key_index char_to_branch(uint8_t c)
-   {
-      return key_index::from_char(c);
-   }
-   /// @deprecated use key_index::to_char
-   inline constexpr char branch_to_char(key_index b)
-   {
-      return b.to_char();
-   }
    struct node_header;
 
    /**
@@ -103,7 +93,8 @@ namespace arbtrie
    struct search_result
    {
       // represents the part of the key that matched
-      key_view matched_key;
+      key_view prefix;
+      key_view matched_branch;
       // the most efficient way to reference this branch on the node
       local_index loc_idx = local_end_index;
       // represents the node to search for the rest of the key, if any
@@ -168,17 +159,19 @@ namespace arbtrie
           * and the address of the node to search for the rest of the key (if any)
           */
         { node.get_branch(key) } -> std::same_as<search_result>; // point lookup
-
+        { node.get_type(bindex) } -> std::same_as<value_type::types>; // get the type of the node
         /**
          * Returns the first branch that is greater than or equal to the key.
          */
         { node.lower_bound(key) } -> std::same_as<search_result>; // range lookup
         { node.next_index(bindex) } -> std::same_as<local_index>; // next branch
         { node.prev_index(bindex) } -> std::same_as<local_index>; // previous branch
-        { node.get_key_for_index(bindex) } -> std::same_as<key_view>; // get the key for a local index
-        { node.get_index_for_key(key) } -> std::same_as<local_index>; // get the local index for a key
-        { node.local_end() } -> std::same_as<local_index>; // end of the local index
         { node.get_prefix() } -> std::same_as<key_view>; // get the prefix of the node
+        { node.get_branch_key(bindex) } -> std::same_as<key_view>; // get the key for a local index
+        { node.get_branch_index(key) } -> std::same_as<local_index>; // get the local index for a key
+        { node.get_value(bindex) } -> std::same_as<value_type>; // get the value for a local index
+        { node.begin_index() } -> std::same_as<local_index>; // begin of the local index
+        { node.end_index() } -> std::same_as<local_index>; // end of the local index
 
         /**
          * Every node has a "value" which coresponds to the end of a key,
@@ -195,7 +188,7 @@ namespace arbtrie
          * Get the type of the value.
          * If there is no value, then the return type is value_types::remove.
          */
-        { node.value_type() } -> std::same_as<value_type::types>; // get the type of the value
+        { node.get_value_type() } -> std::same_as<value_type::types>; // get the type of the value
 
         // Required concepts
         requires std::derived_from<T, node_header>; // must be derived from node_header

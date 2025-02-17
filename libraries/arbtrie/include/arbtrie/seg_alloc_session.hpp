@@ -1,5 +1,7 @@
 #pragma once
 #include <arbtrie/circular_buffer.hpp>
+#include <arbtrie/mapped_memory.hpp>
+#include <arbtrie/mapping.hpp>
 #include <arbtrie/node_header.hpp>
 #include <arbtrie/node_meta.hpp>
 #include <arbtrie/segment_read_stats.hpp>

@@ -1579,3 +1579,25 @@ TEST_CASE("iterator-get-methods")
    REQUIRE(not get_found);
    REQUIRE(not get2_found);
 }
+
+TEST_CASE("beta-iterator")
+{
+   environ                  env;
+   auto                     ws    = env.db->start_write_session();
+   auto                     r     = ws.create_root();
+   std::vector<std::string> words = load_words(ws, r);
+   std::sort(words.begin(), words.end());
+
+   auto itr = ws.create_beta_iterator<beta::caching>(r);
+
+   std::cout << "Is begin: " << itr.is_begin() << std::endl;
+   std::cout << "Is end: " << itr.is_end() << std::endl;
+   std::cout << "Is valid: " << itr.valid() << std::endl;
+
+   REQUIRE(itr.valid());
+   REQUIRE(itr.is_begin());
+   //  itr.next();
+   REQUIRE(itr.key() == words[0]);
+   REQUIRE(not itr.is_begin());
+   REQUIRE(not itr.is_end());
+}

@@ -88,7 +88,7 @@ namespace arbtrie
          {
             auto b0 = rr.as<full_node>()->get_eof_value();
             assert(b0);
-            auto v = state.get(b0).as<value_node>()->value();
+            auto v = state.get(b0).as<value_node>()->value_view();
             auto s = v.size();
             buffer.resize(s);
             memcpy(buffer.data(), v.data(), s);
@@ -98,7 +98,7 @@ namespace arbtrie
          {
             auto b0 = rr.as<setlist_node>()->get_eof_value();
             assert(b0);
-            auto v = state.get(b0).as<value_node>()->value();
+            auto v = state.get(b0).as<value_node>()->value_view();
             auto s = v.size();
             buffer.resize(s);
             memcpy(buffer.data(), v.data(), s);
@@ -108,7 +108,7 @@ namespace arbtrie
          {
             auto b0 = rr.as<value_node>();
             buffer.resize(b0->value_size());
-            memcpy(buffer.data(), b0->value().data(), b0->value_size());
+            memcpy(buffer.data(), b0->value_view().data(), b0->value_size());
             return b0->value_size();
          }
 
@@ -712,7 +712,7 @@ namespace arbtrie
 
          if (in->is_eof_subtree())
          {
-            callback(true, value_type(eof_addr));
+            callback(true, value_type::make_subtree(eof_addr));
          }
          else
          {
@@ -742,7 +742,7 @@ namespace arbtrie
 
             if (bn->is_subtree(idx))
             {
-               callback(true, value_type(kvp->value_id()));
+               callback(true, value_type::make_subtree(kvp->value_id()));
             }
             else if (bn->is_obj_id(idx))
             {
@@ -813,6 +813,8 @@ namespace arbtrie
                   push_expected_branch(p.second);
                break;
             }
+            default:
+               break;
          }
       }
       return expected;
