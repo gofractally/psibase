@@ -58,7 +58,7 @@ impl App for WorkshopPlugin {
 
     fn set_service_code(app: String, code: Vec<u8>) -> Result<(), Error> {
         let _latch = ProposeLatch::new(&app);
-        setcode::plugin::api::set_service_code(&code);
+        setcode::plugin::api::set_service_code(app, code);
         Ok(())
     }
 }
