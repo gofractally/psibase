@@ -104,6 +104,14 @@ impl Sites for SitesPlugin {
         Ok(0)
     }
 
+    fn remove(path: String) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "remove",
+            &SitesService::action_structs::remove { path }.packed(),
+        )?;
+        Ok(())
+    }
+
     fn enable_spa(enable: bool) -> Result<(), Error> {
         Transact::add_action_to_transaction(
             "enableSpa",
