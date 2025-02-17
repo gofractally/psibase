@@ -208,10 +208,13 @@ pub fn create_boot_transactions<R: Read + Seek>(
         compression_level,
     )?;
     let mut transactions = Vec::new();
+    const TARGET_SIZE: usize = 1024 * 1024;
+
     while !actions.is_empty() {
-        let mut n = 0;
-        let mut size = 0;
-        while n < actions.len() && size < 1024 * 1024 {
+        let mut size = actions[0].rawData.len();
+        let mut n = 1;
+
+        while n < actions.len() && size + actions[n].rawData.len() <= TARGET_SIZE {
             size += actions[n].rawData.len();
             n += 1;
         }
