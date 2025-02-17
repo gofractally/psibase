@@ -324,7 +324,7 @@ add_custom_command(
     OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
     WORKING_DIRECTORY ${XADMIN_PATH}
-    COMMAND yarn
+    COMMAND yarn --mutex network
     COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
 )
 add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
