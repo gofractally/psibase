@@ -128,7 +128,7 @@ export function Editor() {
 
     return (
         <>
-            <div className="sticky top-0 z-10 bg-white/50 backdrop-blur-sm">
+            <div className="sticky top-0 z-10 bg-white/50 backdrop-blur">
                 <ControlBar />
                 <Separator />
             </div>

@@ -1,5 +1,3 @@
-@reference "./globals.css"
-
 [data-milkdown-root] {
     @apply min-h-0 flex-1;
 }
