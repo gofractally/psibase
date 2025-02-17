@@ -1,7 +1,6 @@
 use super::gql::Queryable;
 use crate::tables::{Attestation, AttestationStats};
 use crate::Wrapper as Identity;
-use psibase::services::http_server;
 use psibase::AccountNumber;
 use std::fmt::Debug;
 
@@ -25,7 +24,7 @@ impl PartialAttestation {
     }
 }
 impl HasQueryFields for Attestation {
-    const QUERY_FIELDS: &'static str = "attester, subject, value, issued { seconds }";
+    const QUERY_FIELDS: &'static str = "attester, subject, value, issued";
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +45,7 @@ impl PartialAttestationStats {
 }
 impl HasQueryFields for AttestationStats {
     const QUERY_FIELDS: &'static str =
-        "subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation { seconds }";
+        "subject, uniqueAttesters, numHighConfAttestations, mostRecentAttestation";
 }
 
 // Todo: implement a ServiceWrapper trait on the Wrapper itself, instead of needing a wrapper object
@@ -96,7 +95,8 @@ impl<'a, T: IsServiceWrapper> ChainPusher<'a, T> {
 }
 
 pub fn init_identity_svc(chain: &psibase::Chain) -> ChainPusher<Identity> {
-    http_server::Wrapper::push_from(&chain, Identity::SERVICE).registerServer(Identity::SERVICE);
+    chain.new_account(psibase::account!("alice")).unwrap();
+    chain.new_account(psibase::account!("bob")).unwrap();
     ChainPusher::<Identity>::new(&chain)
 }
 

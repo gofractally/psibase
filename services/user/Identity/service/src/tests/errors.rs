@@ -1,7 +1,7 @@
 use crate::tests::helpers::test_helpers::init_identity_svc;
 use psibase::anyhow;
 
-#[psibase::test_case(packages("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST: Fails for bad subject names
 pub fn test_reject_invalid_accounts(chain: psibase::Chain) -> Result<(), anyhow::Error> {
     let svc = init_identity_svc(&chain);
@@ -15,7 +15,7 @@ pub fn test_reject_invalid_accounts(chain: psibase::Chain) -> Result<(), anyhow:
     Ok(())
 }
 
-#[psibase::test_case(packages("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST: Fails for bad scores (outside of [0..10])
 pub fn test_reject_invalid_scores(chain: psibase::Chain) -> Result<(), anyhow::Error> {
     let svc = init_identity_svc(&chain);
