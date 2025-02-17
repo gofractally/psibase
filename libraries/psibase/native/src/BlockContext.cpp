@@ -663,15 +663,19 @@ namespace psibase
          if (enableUndo)
             session = db.startWrite(writer);
 
-         TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
-         if (initialWatchdogLimit)
-            t.setWatchdog(*initialWatchdogLimit);
-         t.execTransaction();
-
-         if (!isProducing)
+         std::vector<std::vector<char>> result;
          {
-            check(t.nextSubjectiveRead == trx.subjectiveData->size(),
-                  "transaction has unread subjective data");
+            TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
+            if (initialWatchdogLimit)
+               t.setWatchdog(*initialWatchdogLimit);
+            t.execTransaction();
+
+            if (!isProducing)
+            {
+               check(t.nextSubjectiveRead == trx.subjectiveData->size(),
+                     "transaction has unread subjective data");
+            }
+            result = std::move(t.subjectiveData);
          }
 
          if (commit)
@@ -682,7 +686,7 @@ namespace psibase
          }
          BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, info) << "Transaction succeeded";
-         return std::move(t.subjectiveData);
+         return result;
       }
       catch (const std::exception& e)
       {

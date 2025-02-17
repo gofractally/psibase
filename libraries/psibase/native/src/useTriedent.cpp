@@ -716,6 +716,13 @@ namespace psibase
          }
          subjectiveLimit = depth;
       }
+
+      void clearTemporary()
+      {
+         check(subjectiveRevisions.empty(),
+               "Cannot clear subjective db while a subjective transaction is pending");
+         temporaryDb.reset();
+      }
    };  // DatabaseImpl
 
    Database::Database(SharedDatabase shared, ConstRevisionPtr revision)
@@ -837,6 +844,11 @@ namespace psibase
    void Database::restoreSubjective(std::size_t depth)
    {
       impl->restoreSubjective(depth);
+   }
+
+   void Database::clearTemporary()
+   {
+      impl->clearTemporary();
    }
 
    void Database::kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value)
