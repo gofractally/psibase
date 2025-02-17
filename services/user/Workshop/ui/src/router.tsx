@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/protected-route";
 import { Loader } from "./pages/Loader";
 import { Settings } from "./pages/Settings";
 import { Upload } from "./pages/Upload";
+import { Support } from "./pages/Support";
 
 export const router = createBrowserRouter([
   {
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
         path: ":appName/support",
         element: (
           <ProtectedRoute>
-            <div>Coming soon: Support Page</div>
+            <Support />
           </ProtectedRoute>
         ),
       },
