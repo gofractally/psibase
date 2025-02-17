@@ -1,4 +1,4 @@
-import { Settings, LifeBuoy, LayoutList, FolderUp } from "lucide-react";
+import { Settings, FolderUp } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -6,33 +6,30 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useLocation, useNavigation, NavLink } from "react-router-dom";
+import { useLocation, NavLink } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export const appMenus = [
   {
     title: "Settings",
     icon: Settings,
-    isActive: true,
     path: "",
   },
   {
     title: "Upload",
     icon: FolderUp,
-    isActive: false,
     path: "upload",
   },
-  {
-    title: "Support",
-    icon: LifeBuoy,
-    isActive: false,
-    path: "support",
-  },
-  {
-    title: "Pending requests",
-    icon: LayoutList,
-    isActive: false,
-    path: "pending-requests",
-  },
+  // {
+  //   title: "Support",
+  //   icon: LifeBuoy,
+  //   path: "support",
+  // },
+  // {
+  //   title: "Pending requests",
+  //   icon: LayoutList,
+  //   path: "pending-requests",
+  // },
 ];
 
 export function NavMain() {
@@ -41,22 +38,24 @@ export function NavMain() {
   const appName = location.pathname.split("/")[2];
   console.log("current path", location);
 
-  const navigation = useNavigation();
-
-  console.log(navigation, "is navigation");
+  console.log(location.pathname, "is pathname");
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>App configuration</SidebarGroupLabel>
       <SidebarMenu>
         {appMenus.map((item) => (
-          <NavLink to={`/app/${appName}/${item.path}`}>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip={item.title}>
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+          <NavLink to={`/app/${appName}/${item.path}`} end>
+            {({ isActive }) => (
+              <SidebarMenuItem
+                className={cn({ "bg-muted/50 rounded-sm ": isActive })}
+              >
+                <SidebarMenuButton tooltip={item.title}>
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </NavLink>
         ))}
       </SidebarMenu>

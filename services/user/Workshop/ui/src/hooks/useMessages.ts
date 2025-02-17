@@ -3,7 +3,7 @@ import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-const Message = z.object({
+export const Message = z.object({
   body: z.string(),
   datetime: z.string(),
   isSavedMsg: z.boolean(),
@@ -12,6 +12,8 @@ const Message = z.object({
   sender: Account,
   subject: z.string(),
 });
+
+export type MessageType = z.infer<typeof Message>;
 
 export const useMessages = (app: string | undefined) =>
   useQuery({

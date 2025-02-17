@@ -761,6 +761,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
     DEPENDS ${Workshop_js_DEP}
     DEPENDS ${Plugins_DEP}
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Workshop/postinstall.json
 )
 
 psibase_package(

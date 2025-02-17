@@ -14,6 +14,7 @@ import { queryClient } from "@/queryClient";
 import { z } from "zod";
 import { toast } from "sonner";
 import { CheckCard } from "./Check-Card";
+import { ContractUpload } from "./contract-upload";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -113,6 +114,8 @@ export const ControlPanel = () => {
           title="Cache"
           description="When enabled, responses may be cached to improve performance."
         />
+
+        <ContractUpload />
       </div>
     </div>
   );

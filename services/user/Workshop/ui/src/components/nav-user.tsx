@@ -5,7 +5,6 @@ import {
   Moon,
   PlusCircle,
   Sun,
-  Terminal,
   UserPlus,
 } from "lucide-react";
 
@@ -39,7 +38,6 @@ import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { useSpa } from "@/hooks/useSpa";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -57,8 +55,6 @@ export function NavUser() {
   };
 
   const { setTheme } = useTheme();
-
-  const { mutate: enableSpa, isPending: isEnablingSpa } = useSpa();
 
   const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
     useConnectedAccounts();
@@ -201,16 +197,6 @@ export function NavUser() {
                 </DropdownMenuPortal>
               </DropdownMenuSub>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() =>
-                enableSpa({ account: "workshop", enableSpa: true })
-              }
-              disabled={isEnablingSpa}
-            >
-              <Terminal />
-              Enable SPA on workshop
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onLogout()}>
               <LogOut />

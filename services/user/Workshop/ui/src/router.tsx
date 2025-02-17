@@ -5,6 +5,7 @@ import { Loader } from "./pages/Loader";
 import { Settings } from "./pages/Settings";
 import { Upload } from "./pages/Upload";
 import { Support } from "./pages/Support";
+import { Thread } from "./pages/Support/Thread";
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Support />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ":appName/support/:threadId",
+        element: (
+          <ProtectedRoute>
+            <Thread />
           </ProtectedRoute>
         ),
       },
