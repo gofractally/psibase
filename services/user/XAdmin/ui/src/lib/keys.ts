@@ -1,7 +1,7 @@
-function arrayBufferToHex(buffer: ArrayBuffer): string {
+function arrayBufferToHex(buffer: ArrayBuffer, separator: string = ""): string {
     return Array.from(new Uint8Array(buffer))
         .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join("");
+        .join(separator);
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -87,4 +87,10 @@ export async function exportKeyToPEM(
         console.error(`Error exporting ${keyType} to PEM format:`, error);
         throw error;
     }
+}
+
+export async function calculateKeyFingerprint(hexDER: string): Promise<string> {
+    const derBuffer = hexToArrayBuffer(hexDER);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", derBuffer);
+    return arrayBufferToHex(hashBuffer, ":");
 }
