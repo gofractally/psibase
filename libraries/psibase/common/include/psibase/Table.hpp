@@ -862,6 +862,10 @@ namespace psibase
    template <typename... Tables>
    using SubjectiveTables = DbTables<DbId::subjective, Tables...>;
 
+   /// Defines tables in the `temporary` database
+   template <typename... Tables>
+   using TemporaryTables = DbTables<DbId::temporary, Tables...>;
+
    // An empty key that can be used for any singleton table
    struct SingletonKey
    {
