@@ -9,6 +9,8 @@ export interface Call {
     startTime?: number;
 }
 
+const onlyPrintRootCalls = true;
+
 // Callstack implementation that manages frames for every inter-plugin call
 export class CallStack {
     private storage: Array<Call> = [];
@@ -28,7 +30,7 @@ export class CallStack {
             rootCall === "startTx" ||
             rootCall === "finishTx" ||
             initiator === "supervisor" ||
-            this.storage.length > 1
+            (onlyPrintRootCalls && this.storage.length > 1)
         )
             return;
 
@@ -50,8 +52,8 @@ export class CallStack {
         if (
             rootCall !== "startTx" &&
             rootCall !== "finishTx" &&
-            this.storage.length === 1 &&
-            initiator !== "supervisor"
+            initiator !== "supervisor" &&
+            (!onlyPrintRootCalls || this.storage.length === 1)
         ) {
             const popped = this.peek(0)!;
             const resolutionTime = Date.now() - popped.startTime!;
