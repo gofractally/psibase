@@ -1580,6 +1580,64 @@ TEST_CASE("iterator-get-methods")
    REQUIRE(not get2_found);
 }
 
+TEST_CASE("beta-iterator-dense-validation")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   uint64_t              sample_size = 1000 * 1000;
+   std::vector<uint64_t> keys;
+
+   for (uint64_t i = 0; i < sample_size; i++)
+   {
+      uint64_t k = XXH3_64bits(&i, sizeof(i));
+      key_view kstr((char*)&k, sizeof(k));
+      // TRIEDENT_WARN("upserting key: ", i, " = ", to_hex(kstr));
+      ws.upsert(r, kstr, kstr);
+      keys.push_back(k);
+   }
+   std::sort(keys.begin(), keys.end(),
+             [](uint64_t a, uint64_t b) { return memcmp(&a, &b, sizeof(uint64_t)) < 0; });
+
+   auto oldi = ws.create_iterator<caching>(r);
+   oldi.lower_bound(key_view());
+
+   uint64_t count = 0;
+   /*
+   std::cout << "testing old iterator\n";
+
+   while (oldi.next())
+   {
+      key_view kstr((char*)&keys[count], sizeof(keys[count]));
+      if (oldi.key() != kstr)
+         TRIEDENT_WARN(count, "]  key mismatch: ", to_hex(oldi.key()), " != ", to_hex(kstr));
+      //  REQUIRE(oldi.key() == kstr);
+      ++count;
+   }
+   if (count != sample_size)
+      TRIEDENT_WARN("old iterator count mismatch: ", count, " != ", sample_size);
+      */
+
+   std::cout << "testing beta iterator\n";
+   auto bi = ws.create_beta_iterator<beta::caching>(r);
+   count   = 0;
+   while (bi.next())
+   {
+      key_view kstr((char*)&keys[count], sizeof(keys[count]));
+      if (bi.key() != kstr)
+         TRIEDENT_WARN(count, "]  key mismatch: ", to_hex(bi.key()), " != ", to_hex(kstr));
+      REQUIRE(bi.key() == kstr);
+      ++count;
+   }
+   REQUIRE(count == sample_size);
+   REQUIRE(bi.is_end());
+   while (bi.prev())
+      --count;
+   REQUIRE(bi.is_begin());
+   REQUIRE(count == 0);
+}
+
 TEST_CASE("beta-iterator-validation")
 {
    environ                  env;
