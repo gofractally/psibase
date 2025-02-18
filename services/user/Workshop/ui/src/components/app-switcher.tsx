@@ -52,8 +52,6 @@ export function AppSwitcher() {
     app.appMetadata.icon &&
     buildImageSrc(app.appMetadata.iconMimeType, app.appMetadata.icon);
 
-  console.log({ app });
-
   return (
     <SidebarMenu>
       <CreateAppModal

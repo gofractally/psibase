@@ -45,8 +45,6 @@ export const ControlPanel = () => {
 
   const { data: site } = useSiteConfig(currentApp);
 
-  console.log(site, "is the site data", currentApp);
-
   const { mutateAsync: publishApp, isPending: isPublishingApp } =
     usePublishApp();
 

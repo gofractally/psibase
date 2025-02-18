@@ -164,8 +164,6 @@ export const Upload = () => {
     .filter((path, index, arr) => arr.indexOf(path) == index)
     .sort();
 
-  console.log({ paths, requestedPaths, additionalCachedFlatPaths });
-
   const isEmpty = paths.length == 0;
 
   const treeFolderAndFiles = data ? buildTreeFolderAndFiles(paths) : [];
@@ -181,8 +179,6 @@ export const Upload = () => {
   };
 
   const [uploadPath, setUploadPath] = useState("/");
-
-  console.log({ selectedPath, uploadPath, normalizedPath });
 
   useEffect(() => {
     setUploadPath(normalizedPath || "");

@@ -40,7 +40,6 @@ export const FileUploader = ({ pathPrefix, onSuccess }: Props) => {
       }));
 
       if (onSuccess) {
-        console.log(files, "sending up...");
         onSuccess(files.map((file): string => file.path));
       }
     } catch (e) {
