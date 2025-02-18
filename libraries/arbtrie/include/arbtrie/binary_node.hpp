@@ -1,4 +1,5 @@
 #pragma once
+#include <arbtrie/concepts.hpp>
 #include <arbtrie/node_header.hpp>
 #include <arbtrie/value_type.hpp>
 
@@ -108,6 +109,7 @@ namespace arbtrie
       static const uint8_t      max_inline_value_size = 63;
       static const int_fast16_t key_not_found         = -1;
       static const node_type    type                  = node_type::binary;
+      using node_header::get_type;
 
       uint16_t _alloc_pos  = 0;
       uint16_t _branch_cap = 0;  // space reserved for branches, must be <= num_branches()
@@ -118,12 +120,30 @@ namespace arbtrie
 
       struct key_index
       {
+         /** matches value_type::types 
+          * obj_id is 1 and subtree is 3 so that if bit 1 is set then we have an id_address
+          * otherwise we have inline data
+          */
          enum value_type
          {
             inline_data = 0,
             obj_id      = 1,
+            remove      = 2,
             subtree     = 3  // because it is also an object_id
          };
+         /**
+          * The key_index value_type enum must match value_type::types exactly because:
+          * 1. The key_index type field is used to store the type of value stored at each position
+          * 2. When retrieving values via get_value(), the key_index type is used to construct 
+          *    the appropriate value_type variant
+          * 3. This allows zero-cost conversion between the compact 4-bit type field and the 
+          *    full value_type::types enum without any mapping or translation
+          */
+         static_assert(int(arbtrie::value_type::types::data) == inline_data);
+         static_assert(int(arbtrie::value_type::types::value_node) == obj_id);
+         static_assert(int(arbtrie::value_type::types::remove) == remove);
+         static_assert(int(arbtrie::value_type::types::subtree) == subtree);
+
          uint16_t   pos : 12 = 0;
          uint16_t   type : 4 = inline_data;
          value_type val_type() const { return (value_type)type; }
@@ -323,18 +343,55 @@ namespace arbtrie
       static_assert(sizeof(key_val_pair) == 2);
 
       /**
+       * node concept methods
+       */
+      ///@{
+      constexpr key_view    get_prefix() const { return key_view(); }
+      constexpr local_index next_index(local_index idx) const { return ++idx; }
+      constexpr local_index prev_index(local_index idx) const { return --idx; }
+      key_view              get_branch_key(local_index idx) const
+      {
+         return get_key_val_ptr(idx.to_int())->key();
+      }
+      constexpr local_index begin_index() const { return local_index(-1); }
+      constexpr local_index end_index() const { return local_index(num_branches()); }
+      value_type::types     get_type(local_index index) const
+      {
+         switch (key_offsets()[index.to_int()].val_type())
+         {
+            case key_index::subtree:
+               return value_type::types::subtree;
+            case key_index::obj_id:
+               return value_type::types::value_node;
+            case key_index::inline_data:
+            default:
+               return value_type::types::data;
+         }
+      }
+      value_type get_value(local_index index) const { return get_value(index.to_int()); }
+
+      ///@}
+      /**
+       * TODO: make key_index types align with value_type::types and eliminate
+       * the entire need for a switch statement and branching. 
+       * 
        * Gets the value at the given index in the binary node.
        */
       value_type get_value(int index) const
       {
-         // is_obj_id() is true for both value_node and subtree
-         if (is_obj_id(index))
+         auto& key_idx = key_offsets()[index];
+         auto* kv_ptr  = get_key_val_ptr(index);
+
+         switch (key_idx.val_type())
          {
-            if (is_subtree(index))
-               return value_type::make_subtree(get_key_val_ptr(index)->value_id());
-            return value_type::make_value_node(get_key_val_ptr(index)->value_id());
+            case key_index::subtree:
+               return value_type::make_subtree(kv_ptr->value_id());
+            case key_index::obj_id:
+               return value_type::make_value_node(kv_ptr->value_id());
+            case key_index::inline_data:
+            default:
+               return kv_ptr->value();
          }
-         return get_key_val_ptr(index)->value();
       }
 
       void reserve_branch_cap(short min_children);

@@ -618,6 +618,12 @@ namespace arbtrie
       return cast_and_call(root.header(),
                            [&](const auto* n) { return get(root, n, key, callback); });
    }
+
+   /**
+    * TODO: this method appears to be broken because key.size() == 0 
+    * does not always mean eof_address when there is also a prefix
+    * @bug: fix this
+    */
    int read_session::get(object_ref&                             root,
                          const auto*                             inner,
                          key_view                                key,
@@ -625,11 +631,11 @@ namespace arbtrie
    {
       if (key.size() == 0)
       {
-         if (auto val_node_id = inner->get_eof_value())
+         if (auto val_node_id = inner->get_eof_address())
          {
             if (inner->is_eof_subtree())
             {
-               callback(true, value_type::make_subtree(inner->_eof_value));
+               callback(true, value_type::make_subtree(val_node_id));
             }
             else
             {
@@ -658,10 +664,15 @@ namespace arbtrie
                   return get(bref, key.substr(cpre.size() + 1), callback);
                }
             }
-            else
+            else  // key is at the end of the prefix
             {
-               if (auto branch_id = inner->get_eof_value())
+               if (auto branch_id = inner->get_eof_address())
                {
+                  if (inner->is_eof_subtree())
+                  {
+                     callback(true, value_type::make_subtree(branch_id));
+                     return 1;
+                  }
                   auto bref = root.rlock().get(branch_id);
                   callback(true, bref.template as<value_node>()->value());
                   return 1;
@@ -704,6 +715,8 @@ namespace arbtrie
             case kv_index::subtree:
                callback(true, value_type::make_subtree(kvp->value_id()));
                return true;
+            case kv_index::remove:
+               throw std::runtime_error("remove value type not supported");
          }
       }
       callback(false, value_type());

@@ -1,4 +1,5 @@
 #pragma once
+#include <arbtrie/concepts.hpp>
 #include <arbtrie/inner_node.hpp>
 
 namespace arbtrie
@@ -11,8 +12,70 @@ namespace arbtrie
     */
    struct full_node : inner_node<full_node>
    {
+     public:
       static constexpr const int_fast16_t branch_count = 256;
       static const node_type              type         = node_type::full;
+
+      using node_header::get_type;
+
+      // idx 0 = eof_value
+      // idx 1..255 = branches
+      constexpr local_index next_index(local_index idx) const
+      {
+         if (idx == begin_index() and has_eof_value())
+            return local_index(0);
+
+         const auto* br  = branches();
+         const auto* bre = br + branch_count;
+         const auto* b   = br + idx.to_int();  // this is next when you factor in the eof_value
+         while (b < bre and not *b)
+            ++b;
+         return local_index(b - br + 1);
+      }
+      constexpr local_index prev_index(local_index idx) const
+      {
+         if (idx == local_index(1))
+            return local_index(-not has_eof_value());
+
+         const auto* br  = branches();
+         const auto* bre = br + branch_count;
+         const auto* b   = br + idx.to_int() - 2;
+         while (b >= br and not *b)
+            --b;
+         return local_index(b - br + 1);
+      }
+
+      constexpr local_index begin_index() const { return local_index(-1); }
+      constexpr local_index end_index() const { return local_index(branch_count + 1); }
+
+      value_type::types get_type(local_index index) const
+      {
+         if (index == local_index(0))
+         {
+            if (!has_eof_value())
+               throw std::runtime_error("No EOF value exists at index 0");
+            return is_eof_subtree() ? value_type::types::subtree : value_type::types::value_node;
+         }
+         return value_type::types::value_node;
+      }
+      value_type get_value(local_index index) const
+      {
+         assert(index != begin_index());
+         assert(index != end_index());
+         if (index == local_index(0))
+            return get_eof_value();
+         assert(get_branch(index.to_int()));
+         return value_type::make_value_node(get_branch(index.to_int()));
+      }
+      key_view get_branch_key(local_index index) const
+      {
+         assert(index != begin_index());
+         assert(index != end_index());
+
+         if (index == local_index(0))
+            return key_view();
+         return key_view(&branch_chars[index.to_int() - 1], 1);
+      }
 
       static int_fast16_t alloc_size(const clone_config& cfg)
       {

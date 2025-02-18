@@ -1343,7 +1343,7 @@ namespace arbtrie
       //  TRIEDENT_WARN("upsert value node on inner node");
       if (fn->has_eof_value())  //val_nid)
       {
-         id_address val_nid = fn->get_eof_value();
+         id_address val_nid = fn->get_eof_address();
          auto       old_val = state.get(val_nid);
          if constexpr (mode.is_unique())
          {
@@ -1453,7 +1453,7 @@ namespace arbtrie
          if constexpr (mode.is_unique())
          {
             //   TRIEDENT_DEBUG( "mode is unique?" );
-            release_node(state.get(fn->get_eof_value()));
+            release_node(state.get(fn->get_eof_address()));
             r.modify().as<NodeType>(
                 [](auto* p)
                 {
@@ -1477,7 +1477,7 @@ namespace arbtrie
                                [&](auto cl)
                                {
                                   //                                 TRIEDENT_DEBUG("remove eof value from clone");
-                                  release_node(state.get(cl->get_eof_value()));
+                                  release_node(state.get(cl->get_eof_address()));
                                   cl->set_eof({});
                                   cl->remove_descendant(1);
                                })

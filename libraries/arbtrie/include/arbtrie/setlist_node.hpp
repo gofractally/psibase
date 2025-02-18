@@ -40,6 +40,28 @@ namespace arbtrie
       static const node_type type = node_type::setlist;
       using node_header::get_type;
 
+      // the data between tail() and end of prefix capacity
+      uint16_t branch_data_cap() const
+      {
+         return (_nsize - sizeof(setlist_node) - prefix_capacity());
+      }
+      // the max number of branches
+      uint8_t        branch_capacity() const { return branch_data_cap() / (1 + sizeof(id_index)); }
+      uint8_t*       get_setlist_ptr() { return end_prefix(); }
+      const uint8_t* get_setlist_ptr() const { return end_prefix(); }
+      int            get_setlist_size() const { return num_branches(); }
+      key_view       get_setlist() const { return to_key(get_setlist_ptr(), get_setlist_size()); }
+
+      id_index*       get_branch_ptr() { return ((id_index*)tail()) - branch_capacity(); }
+      const id_index* get_branch_ptr() const
+      {
+         return ((const id_index*)tail()) - branch_capacity();
+      }
+      const id_index* get_branch_end_ptr() const
+      {
+         return ((id_index*)tail()) - branch_capacity() + num_branches();
+      }
+
       // node concept
       ///@{
       //key_view      get_prefix() const { return to_key(key_ptr(), _ksize); }
@@ -75,8 +97,9 @@ namespace arbtrie
          // 1. index > 0 (not the EOF value)
          // 2. OR when index == 0 but there is no EOF value
          // In other words, key_size is 1 for all branch indices except EOF value
-         const bool key_size = !(bool(index.to_int()) and has_eof_value());
-         return key_view((const char*)get_setlist_ptr() + index.to_int(), key_size);
+         const bool key_size = !(bool(index.to_int() == 0) and has_eof_value());
+         return key_view((const char*)get_setlist_ptr() + index.to_int() - has_eof_value(),
+                         key_size);
       }
 
       constexpr local_index begin_index() const { return local_index(-1); }
@@ -99,13 +122,9 @@ namespace arbtrie
          return local_index(pos + has_eof_value());
       }
 
-      bool       has_value() const { return true; }
-      value_type value() const
-      {
-         if (is_eof_subtree())
-            return value_type::make_subtree(get_eof_value());
-         return value_type::make_value_node(get_eof_value());
-      }
+      // TODO impliment thse on inner_node instead of setlist and full
+      bool              has_value() const { return has_eof_value(); }
+      value_type        value() const { return get_eof_value(); }
       value_type::types get_value_type() const
       {
          if (is_eof_subtree())
@@ -120,20 +139,13 @@ namespace arbtrie
       }
       value_type get_value(local_index index) const
       {
-         assert(index == local_index(0));
-         if (has_eof_value() and index == local_index(0))
+         //std::cerr << "setlist_node::get_value: index: " << index.to_int() << std::endl;
+         if (has_eof_value() and index == local_index(0)) [[unlikely]]
             return value();
-         return value_type::make_value_node(get_branch(index.to_int()));
+         auto branch_idx = get_branch_ptr()[index.to_int() - has_eof_value()];
+         return value_type::make_value_node(id_address(branch_region(), branch_idx));
       }
       ///@}
-
-      // the data between tail() and end of prefix capacity
-      uint16_t branch_data_cap() const
-      {
-         return (_nsize - sizeof(setlist_node) - prefix_capacity());
-      }
-      // the max number of branches
-      uint8_t branch_capacity() const { return branch_data_cap() / (1 + sizeof(id_index)); }
 
       // uint8_t             prefix[prefix_capacity()]
       // uint8_t             setlist[num_branches() - has_eof_value() ]
@@ -145,21 +157,6 @@ namespace arbtrie
       uint32_t calculate_checksum() const
       {
          return XXH3_64bits(((const char*)this) + sizeof(checksum), _nsize - sizeof(checksum));
-      }
-
-      uint8_t*       get_setlist_ptr() { return end_prefix(); }
-      const uint8_t* get_setlist_ptr() const { return end_prefix(); }
-      int            get_setlist_size() const { return num_branches(); }
-      key_view       get_setlist() const { return to_key(get_setlist_ptr(), get_setlist_size()); }
-
-      id_index*       get_branch_ptr() { return ((id_index*)tail()) - branch_capacity(); }
-      const id_index* get_branch_ptr() const
-      {
-         return ((const id_index*)tail()) - branch_capacity();
-      }
-      const id_index* get_branch_end_ptr() const
-      {
-         return ((id_index*)tail()) - branch_capacity() + num_branches();
       }
 
       bool          can_add_branch() const { return num_branches() < branch_capacity(); }

@@ -39,8 +39,14 @@ namespace arbtrie
              const_node.has_eof_value()
           } -> std::same_as<bool>;
           {
-             const_node.get_eof_value()
+             const_node.get_eof_address()
           } -> std::same_as<id_address>;
+          {
+             const_node.get_eof_value()
+          } -> std::same_as<value_type>;
+          {
+             const_node.is_eof_subtree()
+          } -> std::same_as<bool>;
 
           // Required from inner_node base
           requires std::derived_from<T, inner_node<T>>;
@@ -130,8 +136,13 @@ namespace arbtrie
 
       bool       is_eof_subtree() const { return _eof_subtree; }
       bool       has_eof_value() const { return bool(_eof_value); }
-      id_address get_eof_value() const { return _eof_value; }  // TODO tag as value_node
-      value_type get_eof_subtree() const { return value_type(_eof_value); }  // TODO: tag as subtree
+      id_address get_eof_address() const { return _eof_value; }  // TODO tag as value_node
+      value_type get_eof_value() const
+      {
+         if (is_eof_subtree())
+            return value_type::make_subtree(_eof_value);
+         return value_type::make_value_node(_eof_value);
+      }
 
       void set_prefix(key_view pre)
       {

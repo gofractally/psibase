@@ -52,9 +52,9 @@ namespace arbtrie
             return _rs.create_handle(kvp->value_id());
          }
          case node_type::full:
-            return _rs.create_handle(rr.as<full_node>()->get_eof_value());
+            return _rs.create_handle(rr.as<full_node>()->get_eof_address());
          case node_type::setlist:
-            return _rs.create_handle(rr.as<setlist_node>()->get_eof_value());
+            return _rs.create_handle(rr.as<setlist_node>()->get_eof_address());
          case node_type::value:
             return _rs.create_handle(rr.as<value_node>()->subtree());
          default:
@@ -86,7 +86,7 @@ namespace arbtrie
          }
          case node_type::full:
          {
-            auto b0 = rr.as<full_node>()->get_eof_value();
+            auto b0 = rr.as<full_node>()->get_eof_address();
             assert(b0);
             auto v = state.get(b0).as<value_node>()->value_view();
             auto s = v.size();
@@ -96,7 +96,7 @@ namespace arbtrie
          }
          case node_type::setlist:
          {
-            auto b0 = rr.as<setlist_node>()->get_eof_value();
+            auto b0 = rr.as<setlist_node>()->get_eof_address();
             assert(b0);
             auto v = state.get(b0).as<value_node>()->value_view();
             auto s = v.size();
@@ -212,7 +212,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-               // then we start at the beginning of the next level
+             // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());
@@ -707,7 +707,7 @@ namespace arbtrie
             return false;
          }
 
-         auto eof_addr = in->get_eof_value();
+         auto eof_addr = in->get_eof_address();
          assert(eof_addr);
 
          if (in->is_eof_subtree())
@@ -717,7 +717,7 @@ namespace arbtrie
          else
          {
             auto val = r.rlock().get(eof_addr);
-            callback(true, value_type(val.template as<value_node>()->value()));
+            callback(true, val.template as<value_node>()->value());
          }
          return true;
       };

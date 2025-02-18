@@ -3,6 +3,7 @@
 #include <arbtrie/database.hpp>
 #include <arbtrie/node_handle.hpp>
 #include <arbtrie/seg_alloc_session.hpp>
+#include <sstream>
 #include <vector>
 
 namespace arbtrie
@@ -51,7 +52,13 @@ namespace arbtrie
          friend class arbtrie::read_session;
          iterator(read_session& s, node_handle r) : _size(-1), _rs(s), _root(std::move(r))
          {
+            clear();
             push_rend(_root.address());
+         }
+         void clear()
+         {
+            _branches_end = _branches.data();
+            _path_back    = _path.data() - 1;
          }
 
         public:
@@ -68,11 +75,8 @@ namespace arbtrie
          }();
 
          bool is_rend() const { return is_begin(); }
-         bool is_begin() const
-         {
-            return _path.size() == 1 and _path[0].index == rend_index.to_int();
-         }
-         bool is_end() const { return _path.size() == 1 and _path[0].index == end_index.to_int(); }
+         bool is_begin() const { return _path[0].index == rend_index.to_int(); }
+         bool is_end() const { return _path[0].index == end_index.to_int(); }
 
          static constexpr const key_view npos = key_view(nposa.data(), nposa.size());
          static_assert(npos > key_view());
@@ -80,7 +84,7 @@ namespace arbtrie
          // return the root this iterator is based on
          node_handle get_root() const { return _root; }
          // the key the iterator is currently pointing to
-         key_view key() const { return to_key(_branches.data(), _branches.size()); }
+         key_view key() const { return to_key(_branches.data(), _branches_end - _branches.data()); }
 
          bool next();  // moves to next key, return valid()
          bool prev();  // moves to the prv key, return valid()
@@ -124,7 +128,7 @@ namespace arbtrie
          bool get2(key_view key, Callback&& callback);
 
          // true if the iterator points to a key/value pair
-         bool valid() const { return _path.size() > 0; }
+         bool valid() const { return _path_back != _path.data() - 1; }
 
          // if the value is a subtree, return an iterator into that subtree
          iterator subtree_iterator() const;
@@ -153,65 +157,72 @@ namespace arbtrie
 
          std::string value_as_string() const;
 
+         // Returns a formatted string showing the path decomposition with each node's prefix and branch components
+         std::string pretty_path() const;
+
         private:
+         template <typename... Args>
+         void debug_print(const Args&... args) const
+         {
+            return;
+            std::cerr << std::string(_path.size() * 4, ' ');
+            (std::cerr << ... << args) << "\n";
+         }
+
          bool next_impl(read_lock& state);
 
          void end()
          {
-            _branches.clear();
-            _path.clear();
+            clear();
             push_end(_root.address());
          }
          void begin()
          {
-            _branches.clear();
-            _path.clear();
+            clear();
             push_rend(_root.address());
          }
 
          void push_rend(id_address oid)
          {
-            _path.push_back({.oid = oid, .index = rend_index.to_int()});
+            _path_back++;
+            *_path_back = {.oid = oid, .index = rend_index.to_int()};
          }
          void push_end(id_address oid)
          {
-            _path.push_back({.oid = oid, .index = end_index.to_int()});
+            _path_back++;
+            *_path_back = {.oid = oid, .index = end_index.to_int()};
          }
-         void push_path(id_address oid, key_view prefix, local_index branch_index)
+         void push_path(id_address oid, local_index branch_index)
          {
-            _path.emplace_back(path_entry{.oid = oid, .index = branch_index.to_int()});
-            _branches.insert(_branches.end(), prefix.begin(), prefix.end());
+            _path_back++;
+            *_path_back = {.oid = oid, .index = branch_index.to_int()};
          }
          void pop_path()
          {
-            auto& back = _path.back();
-            _branches.resize(_branches.size() - back.key_size());
-            _path.pop_back();
+            _branches_end -= _path_back->key_size();
+            --_path_back;
          }
 
          void push_prefix(key_view prefix)
          {
-            _branches.insert(_branches.end(), prefix.begin(), prefix.end());
-            _path.back().prefix_size = prefix.size();
-            _path.back().branch_size = 0;
+            memcpy(_branches_end, prefix.data(), prefix.size());
+            _branches_end += prefix.size();
+            _path_back->prefix_size = prefix.size();
+            _path_back->branch_size = 0;
          }
 
          void update_branch(key_view new_branch, local_index new_index)
          {
-            auto& back = _path.back();
             // Adjust size of branches to remove old key and make space for new key
-            _branches.resize(_branches.size() - back.branch_size + new_branch.size());
+            _branches_end -= _path_back->branch_size;
+            memcpy(_branches_end, new_branch.data(), new_branch.size());
+            _branches_end += new_branch.size();
 
-            // Copy new key into the end of branches if it exists
-            if (new_branch.size() > 0)
-               memcpy(_branches.data() + _branches.size() - new_branch.size(), new_branch.data(),
-                      new_branch.size());
-
-            back.branch_size = new_branch.size();
-            back.index       = new_index.to_int();
+            _path_back->branch_size = new_branch.size();
+            _path_back->index       = new_index.to_int();
          }
 
-         local_index current_index() const { return local_index(_path.back().index); }
+         local_index current_index() const { return local_index(_path_back->index); }
 
          struct path_entry
          {
@@ -227,8 +238,10 @@ namespace arbtrie
          };
          static_assert(sizeof(path_entry) == sizeof(id_address) + sizeof(uint32_t));
 
-         std::vector<path_entry> _path;
-         std::vector<uint8_t>    _branches;
+         std::array<path_entry, max_key_length + 1> _path;
+         std::array<char, max_key_length>           _branches;
+         path_entry*                                _path_back;
+         char*                                      _branches_end;
 
          int           _size;  // -1 if unknown of value at current key
          read_session& _rs;

@@ -16,9 +16,9 @@ namespace arbtrie
       enum class types
       {
          data,        // binary data
-         subtree,     // contains a address as a user value
          value_node,  // contains an address of a value_node containing user data
-         remove       // empty state
+         remove,      // empty state
+         subtree      // contains a address as a user value
       };
 
       value_type(const char* str) : data(to_key(str)) {}
@@ -94,10 +94,11 @@ namespace arbtrie
      private:
       // Order must match types enum
       std::variant<
-          value_view,
-          id_address,  // subtree
-          id_address,  // value_node - TODO: consider using a different type to avoid ambiguity
-          std::monostate>
+          value_view,      // data
+          id_address,      // subtree
+          std::monostate,  // remove
+          id_address       // value_node - TODO: consider using a different type to avoid ambiguity
+          >
           data;
 
       // Allow construction with in_place_index

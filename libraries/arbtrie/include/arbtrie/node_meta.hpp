@@ -1,6 +1,7 @@
 #pragma once
 #include <arbtrie/address.hpp>
 #include <arbtrie/config.hpp>
+#include <arbtrie/debug.hpp>
 #include <arbtrie/node_location.hpp>
 #include <arbtrie/util.hpp>
 #include <cassert>

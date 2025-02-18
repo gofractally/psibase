@@ -1580,7 +1580,7 @@ TEST_CASE("iterator-get-methods")
    REQUIRE(not get2_found);
 }
 
-TEST_CASE("beta-iterator")
+TEST_CASE("beta-iterator-validation")
 {
    environ                  env;
    auto                     ws    = env.db->start_write_session();
@@ -1588,16 +1588,96 @@ TEST_CASE("beta-iterator")
    std::vector<std::string> words = load_words(ws, r);
    std::sort(words.begin(), words.end());
 
-   auto itr = ws.create_beta_iterator<beta::caching>(r);
+   auto itr  = ws.create_beta_iterator<beta::caching>(r);
+   auto itr2 = ws.create_iterator<caching>(r);
 
+   // Test basic iterator state
    std::cout << "Is begin: " << itr.is_begin() << std::endl;
    std::cout << "Is end: " << itr.is_end() << std::endl;
    std::cout << "Is valid: " << itr.valid() << std::endl;
+   itr2.lower_bound(key_view());
+   REQUIRE(itr2.valid());
+   std::cout << "itr2 key: " << itr2.key() << std::endl;
 
    REQUIRE(itr.valid());
    REQUIRE(itr.is_begin());
-   //  itr.next();
-   REQUIRE(itr.key() == words[0]);
+
+   // Validate that both iterators return the same keys in the same order
+   std::cout << "\nValidating iterator correctness..." << std::endl;
+
+   // First validate beta iterator (itr)
+   size_t beta_count = 0;
+   for (const auto& word : words)
+   {
+      itr.next();
+      REQUIRE(itr.key() == word);
+      beta_count++;
+   }
+   REQUIRE(beta_count == words.size());
+
+   // Then validate regular iterator (itr2)
+   size_t reg_count = 0;
+   itr2.lower_bound(key_view());
+   for (const auto& word : words)
+   {
+      REQUIRE(itr2.next());
+      REQUIRE(itr2.key() == word);
+      reg_count++;
+   }
+   REQUIRE(reg_count == words.size());
+   REQUIRE(not itr2.next());  // Ensure itr2 is at the end
+
+   // Final validation
    REQUIRE(not itr.is_begin());
    REQUIRE(not itr.is_end());
+}
+
+TEST_CASE("beta-iterator-performance")
+{
+   environ                  env;
+   auto                     ws    = env.db->start_write_session();
+   auto                     r     = ws.create_root();
+   std::vector<std::string> words = load_words(ws, r);
+   std::sort(words.begin(), words.end());
+
+   auto itr  = ws.create_beta_iterator<beta::caching>(r);
+   auto itr2 = ws.create_iterator<caching>(r);
+
+   // Measure regular iterator performance
+   std::cout << "Measuring regular iterator performance..." << std::endl;
+   size_t reg_count = 0;
+   auto   reg_start = std::chrono::steady_clock::now();
+   itr2.lower_bound(key_view());
+   while (itr2.next())
+   {
+      reg_count++;
+   }
+   auto   reg_end          = std::chrono::steady_clock::now();
+   auto   reg_duration     = std::chrono::duration<double>(reg_end - reg_start).count();
+   double reg_keys_per_sec = reg_count / reg_duration;
+
+   // Measure beta iterator performance
+   std::cout << "\nMeasuring beta iterator performance..." << std::endl;
+   size_t beta_count = 0;
+   auto   beta_start = std::chrono::steady_clock::now();
+   while (itr.next())
+   {
+      beta_count++;
+   }
+   auto   beta_end          = std::chrono::steady_clock::now();
+   auto   beta_duration     = std::chrono::duration<double>(beta_end - beta_start).count();
+   double beta_keys_per_sec = beta_count / beta_duration;
+
+   // Report performance results
+   std::cout << "\nPerformance Results:" << std::endl;
+   std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_keys_per_sec
+             << " keys/sec (" << beta_count << " keys in " << beta_duration << " seconds)"
+             << std::endl;
+   std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_keys_per_sec
+             << " keys/sec (" << reg_count << " keys in " << reg_duration << " seconds)"
+             << std::endl;
+
+   // Verify both iterators processed the same number of keys
+   REQUIRE(beta_count == words.size());
+   REQUIRE(reg_count == words.size());
 }
