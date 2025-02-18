@@ -221,6 +221,21 @@ namespace arbtrie
             _path_back->branch_size = new_branch.size();
             _path_back->index       = new_index.to_int();
          }
+         void update_branch(local_index new_index)
+         {
+            _branches_end -= _path_back->branch_size;
+            _path_back->index       = new_index.to_int();
+            _path_back->branch_size = 0;
+         }
+         void update_branch(char new_branch, local_index new_index)
+         {
+            // Adjust size of branches to remove old key and make space for new key
+            _branches_end -= _path_back->branch_size;
+            *_branches_end = new_branch;
+            _branches_end++;
+            _path_back->branch_size = 1;
+            _path_back->index       = new_index.to_int();
+         }
 
          local_index current_index() const { return local_index(_path_back->index); }
 

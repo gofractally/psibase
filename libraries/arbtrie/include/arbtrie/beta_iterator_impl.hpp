@@ -42,80 +42,57 @@ namespace arbtrie
       }
 
       /**
-    * @brief Move to the next key in the iterator
-    * 
-    * @param state the segment allocator state
-    * @return true if the iterator is now at a valid key, false if the iterator is at the end
-    */
+       * @brief Move to the next key in the iterator
+       * 
+       * @param state the segment allocator state
+       * @return true if the iterator is now at a valid key, false if the iterator is at the end
+       */
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::next_impl(read_lock& state)
       {
          // Loop until we reach the end of the iterator
-         while (true)  //not is_end())
+         while (true)
          {
             auto oref = state.get(_path_back->oid);
-            //   debug_print("Node ", _path.back().oid, " key: ", key());
 
             // Cast to appropriate node type and process
-            if (cast_and_call(oref.template header<node_header, CacheMode>(),
-                              [&](const /*arbtrie::node*/ auto* n)
-                              {
-                                 const local_index start_idx = current_index();
-                                 // debug_print("  Type: ", node_type_names[n->get_type()],
-                                 //             " start_idx: ", start_idx.to_int());
+            if (cast_and_call(
+                    oref.template header<node_header, CacheMode>(),
+                    [&](const /*arbtrie::node*/ auto* n)
+                    {
+                       const local_index start_idx = current_index();
+                       // on transition from before the first key,
+                       // push the common prefix
+                       if (start_idx == begin_index)
+                          push_prefix(n->get_prefix());
 
-                                 // on transition from before the first key,
-                                 // push the common prefix
-                                 if (start_idx == begin_index)
-                                 {
-                                    // debug_print("  Pushing prefix: ", n->get_prefix());
-                                    push_prefix(n->get_prefix());
-                                 }
+                       // Get the next index in this node
+                       auto nidx = n->next_index(start_idx);
 
-                                 // Get the next index in this node
-                                 auto nidx = n->next_index(start_idx);
-                                 // debug_print("  Next index: ", nidx.to_int());
+                       if (nidx >= n->end_index())
+                       {
+                          if (_path_back != _path.data())
+                             return pop_path(), false;  // continue up the tree
 
-                                 if (nidx >= n->end_index())
-                                 {
-                                    // debug_print("  At end of node");
-                                    // if we are at the top of the tree, we are done
-                                    if (_path_back == _path.data())
-                                    {
-                                       // debug_print("  At root - setting end index");
-                                       _path_back->index = end_index.to_int();
-                                       return true;
-                                    }
+                          // if we are at the top of the tree, we are done
+                          _path_back->index = end_index.to_int();
+                          return true;
+                       }
 
-                                    // If at end of node, pop it and continue searching up the tree
-                                    // debug_print("  Popping node and continuing up");
-                                    pop_path();
-                                    return false;  // continue the outer loop
-                                 }
+                       // if the branch key is empty, that means the branch is EOF
+                       auto bkey = n->get_branch_key(nidx);
 
-                                 // on setlist and full nodes just swap the last byte
-                                 // on binary nodes we have to swap the entire key
-                                 // debug_print("  Updating branch key for index ", nidx.to_int());
-                                 update_branch(n->get_branch_key(nidx), nidx);
-
-                                 // I have either arrived at the next value, or need to continue down the tree
-                                 switch (n->get_type(nidx))
-                                 {
-                                    case value_type::types::subtree:
-                                       // debug_print("  Found subtree - stopping");
-                                       return true;  // stop searching
-                                    case value_type::types::data:
-                                       // debug_print("  Found data - stopping");
-                                       return true;  // stop searching
-                                    case value_type::types::value_node:
-                                       // debug_print("  Found value node - continuing down");
-                                       push_path(n->get_value(nidx).value_address(), begin_index);
-                                       return false;  // continue down the tree
-                                    case value_type::types::remove:
-                                       throw std::runtime_error(
-                                           "iterator::next: remove type found");
-                                 }
-                              }))
+                       if constexpr (std::is_same_v<decltype(n), const setlist_node*> or
+                                     std::is_same_v<decltype(n), const full_node*>)
+                       {
+                          if (not bkey.size())  // eof value
+                             return update_branch(nidx), true;
+                          update_branch(bkey.front(), nidx);  // on just swap the last byte
+                          return push_path(n->get_value(nidx).value_address(), begin_index), false;
+                       }
+                       else  // on binary nodes / value nodes we have to swap the entire key
+                          return update_branch(bkey, nidx), true;
+                    }))
                return not is_end();
          }
          throw std::runtime_error("iterator::next: attempt to move past end");
