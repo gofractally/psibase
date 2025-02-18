@@ -138,7 +138,7 @@ class Bucket {
         // 3072 kb
         const maxSize = 3072 * 1024;
         if (value.length > maxSize) {
-            throw new ErrorOther("value must be less than 4096KB");
+            throw new ErrorOther("value must be less than 3072KB");
         }
 
         try {
