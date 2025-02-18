@@ -58,42 +58,41 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 
 namespace
 {
-   ActionTrace pruneActionTrace(const ActionTrace& at);
+   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at);
 
-   InnerTrace pruneInnerTrace(const InnerTrace& inner)
+   InnerTrace pruneInnerTrace(psio::view<const InnerTrace> inner)
    {
       InnerTrace pruned;
-      if (std::holds_alternative<ActionTrace>(inner.inner))
+      if (psio::holds_alternative<ActionTrace>(inner.inner()))
       {
-         pruned.inner = pruneActionTrace(std::get<ActionTrace>(inner.inner));
-         return pruned;
+         pruned.inner = pruneActionTrace(psio::get<ActionTrace>(inner.inner()));
       }
       else
       {
-         pruned.inner = inner.inner;
+         pruned.inner = inner.inner();
       }
       return pruned;
    }
 
-   Action pruneAction(const Action& action)
+   Action pruneAction(psio::view<const Action> action)
    {
       Action pruned;
-      pruned.sender  = action.sender;
-      pruned.service = action.service;
-      pruned.method  = action.method;
+      pruned.sender  = action.sender();
+      pruned.service = action.service();
+      pruned.method  = action.method();
       pruned.rawData = {};
       return pruned;
    }
 
-   ActionTrace pruneActionTrace(const ActionTrace& at)
+   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at)
    {
       ActionTrace pruned;
-      pruned.error     = at.error;
-      pruned.totalTime = at.totalTime;
-      pruned.rawRetval = at.rawRetval;
-      pruned.action    = pruneAction(at.action);
-      pruned.innerTraces.reserve(at.innerTraces.size());
-      for (const auto& inner : at.innerTraces)
+      pruned.error     = at.error();
+      pruned.totalTime = at.totalTime();
+      pruned.rawRetval = at.rawRetval();
+      pruned.action    = pruneAction(at.action());
+      pruned.innerTraces.reserve(at.innerTraces().size());
+      for (const auto& inner : at.innerTraces())
       {
          pruned.innerTraces.push_back(pruneInnerTrace(inner));
       }
