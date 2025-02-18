@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use accounts::plugin::api::get_current_user;
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
 use psibase::services::setcode::action_structs::setCode;
@@ -13,15 +12,11 @@ use psibase::fracpack::Pack;
 struct SetcodePlugin;
 
 impl Api for SetcodePlugin {
-    fn set_service_code(code: Vec<u8>) {
-        let Ok(Some(user)) = get_current_user() else {
-            panic!("No logged in user");
-        };
-
+    fn set_service_code(account: String, code: Vec<u8>) {
         add_action_to_transaction(
             setCode::ACTION_NAME,
             &setCode {
-                service: AccountNumber::from(user.as_str()),
+                service: AccountNumber::from(account.as_str()),
                 vmType: 0,
                 vmVersion: 0,
                 code: code.into(),
