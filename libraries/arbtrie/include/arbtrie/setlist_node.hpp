@@ -86,6 +86,8 @@ namespace arbtrie
       local_index prev_index(local_index index) const
       {
          assert(index <= end_index() or index > begin_index());
+         if (index == local_end_index) [[unlikely]]
+            index = end_index();
          return --index;
       }
 

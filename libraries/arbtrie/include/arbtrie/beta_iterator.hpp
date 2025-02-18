@@ -76,7 +76,7 @@ namespace arbtrie
 
          bool is_rend() const { return is_begin(); }
          bool is_begin() const { return _path[0].index == rend_index.to_int(); }
-         bool is_end() const { return _path[0].index == end_index.to_int(); }
+         bool is_end() const { return _path_back == _path.data() - 1; }
 
          static constexpr const key_view npos = key_view(nposa.data(), nposa.size());
          static_assert(npos > key_view());
@@ -170,6 +170,7 @@ namespace arbtrie
          }
 
          bool next_impl(read_lock& state);
+         bool prev_impl(read_lock& state);
 
          void end()
          {

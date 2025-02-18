@@ -1603,9 +1603,9 @@ TEST_CASE("beta-iterator-validation")
    REQUIRE(itr.is_begin());
 
    // Validate that both iterators return the same keys in the same order
-   std::cout << "\nValidating iterator correctness..." << std::endl;
+   std::cout << "\nValidating beta iterator next() correctness..." << std::endl;
 
-   // First validate beta iterator (itr)
+   // First validate beta iterator (itr) forward traversal
    size_t beta_count = 0;
    for (const auto& word : words)
    {
@@ -1613,9 +1613,55 @@ TEST_CASE("beta-iterator-validation")
       REQUIRE(itr.key() == word);
       beta_count++;
    }
+   REQUIRE(not itr.is_end());
+   REQUIRE(not itr.next());
+   REQUIRE(itr.is_end());
    REQUIRE(beta_count == words.size());
+   REQUIRE(not itr.is_begin());
 
-   // Then validate regular iterator (itr2)
+   // Now validate beta iterator (itr) reverse traversal
+   std::cout << "\nValidating beta iterator prev() functionality..." << std::endl;
+
+   size_t prev_count = 0;
+   for (auto it = words.rbegin(); it != words.rend(); ++it)
+   {
+      itr.prev();
+      REQUIRE(itr.key() == *it);
+      prev_count++;
+   }
+   REQUIRE(not itr.prev());
+   REQUIRE(prev_count == words.size());
+
+   // Validate that prev() on first element moves to rend
+   REQUIRE(itr.prev() == false);
+   REQUIRE(itr.is_rend());
+
+   // Test alternating next() and prev() on beta iterator
+   //itr.lower_bound();  // Move back to first element
+
+   // Move forward 10 elements
+   for (int i = 0; i < 10 && itr.next(); ++i)
+   {
+   }
+
+   // Store the current key
+   std::string mid_key(itr.key().data(), itr.key().size());
+
+   // Move back 5 elements
+   for (int i = 0; i < 5 && itr.prev(); ++i)
+   {
+   }
+
+   // Move forward 5 elements
+   for (int i = 0; i < 5 && itr.next(); ++i)
+   {
+   }
+
+   // Should be back at the same key
+   REQUIRE(std::string(itr.key().data(), itr.key().size()) == mid_key);
+
+   // Now validate regular iterator (itr2)
+   std::cout << "\nValidating regular iterator..." << std::endl;
    size_t reg_count = 0;
    itr2.lower_bound(key_view());
    for (const auto& word : words)
@@ -1626,10 +1672,6 @@ TEST_CASE("beta-iterator-validation")
    }
    REQUIRE(reg_count == words.size());
    REQUIRE(not itr2.next());  // Ensure itr2 is at the end
-
-   // Final validation
-   REQUIRE(not itr.is_begin());
-   REQUIRE(not itr.is_end());
 }
 
 TEST_CASE("beta-iterator-performance")

@@ -348,8 +348,13 @@ namespace arbtrie
       ///@{
       constexpr key_view    get_prefix() const { return key_view(); }
       constexpr local_index next_index(local_index idx) const { return ++idx; }
-      constexpr local_index prev_index(local_index idx) const { return --idx; }
-      key_view              get_branch_key(local_index idx) const
+      constexpr local_index prev_index(local_index idx) const
+      {
+         if (idx == local_end_index) [[unlikely]]
+            idx = end_index();
+         return --idx;
+      }
+      key_view get_branch_key(local_index idx) const
       {
          return get_key_val_ptr(idx.to_int())->key();
       }

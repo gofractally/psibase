@@ -37,10 +37,36 @@ namespace arbtrie
          return ++index;
       }
 
+      /**
+       * Returns the previous index in a value node.
+       * 
+       * A value node has only 3 possible indices:
+       * - begin_index() (-1): Before the value
+       * - 0: At the value 
+       *  
+       * If index is -1 or less it will remain at -1
+       * If index is 0 (at the value) it will become -1 (before the value)
+       * If index is 1 or greater it will become 0 (at the value)
+       */
       local_index prev_index(local_index index) const
       {
-         assert(index == end_index() or index == local_index(0));
-         return --index;
+         /**
+          * A value node has only 3 possible indices:
+          * - begin_index() (-1): Before the value
+          * - 0: At the value 
+          * - end_index() (1): After the value
+          * 
+          * After calling prev_index() there are only 2 possible indices:
+          * - begin_index() (-1): Before the value
+          * - 0: At the value 
+          *
+          * Given an index:
+          * - If index >= 1 (at or after end), returns 0 (the value)
+          * otherwise it returns -1;
+          * 
+          * This construction avoids a branch.
+          */
+         return local_index((index.to_int() >= 1) - 1);
       }
 
       key_view get_branch_key(local_index index) const
