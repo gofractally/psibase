@@ -1,109 +1,83 @@
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent } from "react";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "./ui/badge";
+import { Card } from "@/components/ui/card";
 import { useSetServiceCode } from "@/hooks/useSetServiceCode";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { Account } from "@/lib/zodTypes";
+import { Label } from "./ui/label";
+import { useCodeHash } from "@/hooks/useCodeHash";
 
 interface FileInputProps {
-  onChange: (
-    files: {
-      name: string;
-      contentType: string;
-      path: string;
-      bytes: Uint8Array;
-    }[]
-  ) => void;
+  onChange: (file: {
+    name: string;
+    contentType: string;
+    path: string;
+    bytes: Uint8Array;
+  }) => void;
+  disabled: boolean;
 }
 
-export const FileInput = ({ onChange }: FileInputProps) => {
-  const [files, setFiles] = useState<
-    { name: string; contentType: string; path: string; bytes: Uint8Array }[]
-  >([]);
-
+export const FileInput = ({ onChange, disabled }: FileInputProps) => {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
-    const fileDataPromises = selectedFiles.map(async (file) => {
-      const buffer = await file.arrayBuffer();
-      return {
-        name: file.name,
-        contentType: file.type,
-        path: `/${file.name}`,
-        bytes: new Uint8Array(buffer),
-      };
-    });
+    const file = selectedFiles[0];
 
-    try {
-      const fileData = await Promise.all(fileDataPromises);
-      setFiles(fileData);
-      onChange(fileData);
-    } catch {
-      setFiles([]);
-    }
+    const built = {
+      name: file.name,
+      contentType: file.type,
+      path: `/${file.name}`,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    };
+    onChange(built);
   };
 
   return (
-    <Card className="p-4">
-      <Input type="file" multiple onChange={handleFileChange} />
-      {files.length > 0 && (
-        <CardContent className="mt-4 space-y-2">
-          {files.map((file, index) => (
-            <Badge key={index} variant="secondary" className="mr-2">
-              {file.name}
-            </Badge>
-          ))}
-        </CardContent>
-      )}
+    <Card className="p-4 border-none">
+      <Input disabled={disabled} type="file" onChange={handleFileChange} />
     </Card>
   );
 };
 
 export const ContractUpload = () => {
-  const { mutateAsync } = useSetServiceCode();
+  const { mutateAsync: uploadServiceCode, isPending: isUploading } =
+    useSetServiceCode();
   const currentApp = useCurrentApp();
 
-  const handleFileChange = async (
-    selectedFiles: {
-      name: string;
-      contentType: string;
-      path: string;
-      bytes: Uint8Array;
-    }[]
-  ) => {
-    console.log(selectedFiles, "came back");
-    // const res = await mutateAsync({
-    //   account: Account.parse(currentApp),
-    //   compressionQuality: 0,
-    //   files: selectedFiles.map((file) => ({
-    //     contentType: file.contentType,
-    //     path: file.path,
-    //     content: file.bytes,
-    //   })),
-    // });
+  const { data: hash } = useCodeHash(currentApp);
 
-    const wasm = selectedFiles[0].bytes;
+  const handleFileChange = async (file: {
+    name: string;
+    contentType: string;
+    path: string;
+    bytes: Uint8Array;
+  }) => {
+    console.log(file, "came back");
+    const wasm = file.bytes;
 
-    const res = await mutateAsync({
+    const res = await uploadServiceCode({
       account: Account.parse(currentApp),
       code: wasm,
     });
 
     console.log(res, "was res");
-    selectedFiles.forEach((file) => {
-      console.log("File uploaded:", file.name);
-      console.log("File content (Uint8Array):", file.bytes);
-    });
   };
+
+  const description = isUploading
+    ? `Uploading...`
+    : `Upload WASM file to the ${currentApp} service.`;
 
   return (
     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
-      Set code
-      <FileInput onChange={handleFileChange} />
+      <div className="space-y-0.5">
+        <Label className="text-base">Service Upload</Label>
+        <div className="text-sm text-muted-foreground">{description}</div>
+        {hash && !isUploading && (
+          <div className="text-sm text-muted-foreground">Hash: {hash}</div>
+        )}
+      </div>
+      <FileInput disabled={isUploading} onChange={handleFileChange} />
     </div>
   );
 };
-
-//     set-service-code: func(app: string, code: list<u8>) -> result<_, error>;

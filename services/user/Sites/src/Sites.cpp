@@ -582,13 +582,6 @@ namespace SystemService
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
             auto tables = Sites::Tables{service};
-            auto content =
-                tables.open<SitesContentTable>().getIndex<0>().subindex(std::tuple{account});
-            if (content.begin() == content.end())
-            {
-               // Site has no content
-               return std::nullopt;
-            }
 
             // Get the site config, or return a default
             auto record = tables.open<SiteConfigTable>().get(account).value_or(

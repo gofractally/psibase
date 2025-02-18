@@ -7,7 +7,6 @@ import {
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSpa } from "@/hooks/useSpa";
 import { Account } from "@/lib/zodTypes";
-import { useLocalStorage } from "@uidotdev/usehooks";
 import { useSetCacheMode } from "@/hooks/useSetCacheMode";
 import { usePublishApp } from "@/hooks/usePublishApp";
 import { queryClient } from "@/queryClient";
@@ -15,6 +14,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { CheckCard } from "./Check-Card";
 import { ContractUpload } from "./contract-upload";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -43,8 +43,9 @@ export const ControlPanel = () => {
   const { mutateAsync: setCacheMode, isPending: isSettingCacheMode } =
     useSetCacheMode();
 
-  const [spa, setSpaLocal] = useLocalStorage(`${currentApp}-spa`, false);
-  const [cache, setCacheLocal] = useLocalStorage(`${currentApp}-cache`, false);
+  const { data: site } = useSiteConfig(currentApp);
+
+  console.log(site, "is the site data", currentApp);
 
   const { mutateAsync: publishApp, isPending: isPublishingApp } =
     usePublishApp();
@@ -88,28 +89,26 @@ export const ControlPanel = () => {
         />
 
         <CheckCard
-          checked={spa}
+          checked={!!(site && site.getConfig && site.getConfig.spa)}
           disabled={isSettingSpa}
           onChange={async (checked) => {
             await setSpa({
               account: Account.parse(currentApp),
               enableSpa: checked,
             });
-            setSpaLocal(checked);
           }}
           title="Single Page Application (SPA)"
           description="When enabled, all content requests return the root document except for requests to static assets (files with an extension)."
         />
 
         <CheckCard
-          checked={cache}
+          checked={!!(site && site.getConfig && site.getConfig.cache)}
           disabled={isSettingCacheMode}
           onChange={async (checked) => {
             await setCacheMode({
               account: Account.parse(currentApp),
               enableCache: checked,
             });
-            setCacheLocal(checked);
           }}
           title="Cache"
           description="When enabled, responses may be cached to improve performance."
