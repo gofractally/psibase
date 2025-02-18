@@ -146,6 +146,10 @@ namespace psibase
       nativeSubjective,
 
       endIndependent,
+
+      /// Subjective tables that are local to the transaction/query/callback
+      /// context.
+      temporary,
    };
 
    inline constexpr uint32_t numChainDatabases = ((uint32_t)DbId::numChainDatabases);

@@ -203,6 +203,8 @@ namespace psibase
       std::size_t saveSubjective();
       void        restoreSubjective(std::size_t depth);
 
+      void clearTemporary();
+
       // TODO: kvPutRaw, kvRemoveRaw: return deltas
       // TODO: getters: pass in input buffers instead of returning KVResult
 

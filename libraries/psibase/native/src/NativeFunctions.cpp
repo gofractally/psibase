@@ -36,7 +36,7 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::native))
             return (DbId)db;
-         if (db == uint32_t(DbId::subjective))
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
          {
             uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
@@ -80,7 +80,7 @@ namespace psibase
       bool keyHasServicePrefix(uint32_t db)
       {
          return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
-                db == uint32_t(DbId::subjective);
+                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary);
       }
 
       struct Writable
@@ -100,7 +100,7 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         if (db == uint32_t(DbId::subjective) &&
+         if ((db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary)) &&
              (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
