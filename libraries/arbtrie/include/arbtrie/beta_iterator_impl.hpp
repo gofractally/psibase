@@ -70,7 +70,11 @@ namespace arbtrie
 
                        auto nidx = n->lower_bound_index(key);
                        if (nidx >= n->end_index())
-                          return pop_path(), next_impl(state);
+                       {
+                          pop_path();
+                          next_impl(state);
+                          return true;
+                       }
 
                        auto bkey = n->get_branch_key(nidx);
 

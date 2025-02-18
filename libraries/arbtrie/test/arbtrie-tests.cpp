@@ -1893,3 +1893,84 @@ TEST_CASE("beta-upper-bound")
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
+
+TEST_CASE("lower-bound-performance")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   {
+      auto r = ws.create_root();
+
+      // Function to generate random key using rand64
+      auto make_key = [](uint64_t val, size_t len)
+      {
+         std::string key;
+         key.resize(len);
+         memcpy(key.data(), &val, std::min(len, sizeof(val)));
+         return key;
+      };
+
+      // Insert 1 million random keys
+      size_t                   total_keys = 1'000'000;
+      std::vector<std::string> inserted_keys;
+      inserted_keys.reserve(total_keys);
+
+      for (size_t i = 0; i < total_keys; ++i)
+      {
+         uint64_t    val = uint64_t(rand64());
+         size_t      len = (val % 8) + 1;  // Random length 1-8 bytes
+         std::string key = make_key(val, len);
+         key_view    kstr(key.data(), key.size());
+         ws.upsert(r, kstr, kstr);
+      }
+
+      // Generate 100k random search keys
+      std::vector<std::string> search_keys;
+      search_keys.reserve(1000000);
+      for (int i = 0; i < 1000000; ++i)
+      {
+         uint64_t val = uint64_t(rand64());
+         size_t   len = (val % 8) + 1;
+         search_keys.push_back(make_key(val, len));
+      }
+
+      // Test regular iterator performance
+      auto reg_start = std::chrono::steady_clock::now();
+      {
+         auto itr = ws.create_iterator<caching>(r);
+         for (const auto& key : search_keys)
+         {
+            itr.lower_bound(key_view(key.data(), key.size()));
+         }
+      }
+      auto reg_end      = std::chrono::steady_clock::now();
+      auto reg_duration = std::chrono::duration<double>(reg_end - reg_start).count();
+
+      // Test beta iterator performance
+      auto beta_start = std::chrono::steady_clock::now();
+      {
+         auto itr = ws.create_beta_iterator<beta::caching>(r);
+         for (int i = 0; i < search_keys.size(); ++i)
+         {
+            itr.lower_bound(key_view(search_keys[i].data(), search_keys[i].size()));
+         }
+      }
+      auto beta_end      = std::chrono::steady_clock::now();
+      auto beta_duration = std::chrono::duration<double>(beta_end - beta_start).count();
+
+      // Report performance results
+      double reg_ops_per_sec  = search_keys.size() / reg_duration;
+      double beta_ops_per_sec = search_keys.size() / beta_duration;
+
+      std::cout << "\nLower Bound Performance Results:" << std::endl;
+      std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_ops_per_sec
+                << " ops/sec (" << search_keys.size() << " searches in " << reg_duration
+                << " seconds)" << std::endl;
+      std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_ops_per_sec
+                << " ops/sec (" << search_keys.size() << " searches in " << beta_duration
+                << " seconds)" << std::endl;
+      std::cout << "Beta/Regular Ratio: " << std::fixed << std::setprecision(4)
+                << (beta_ops_per_sec / reg_ops_per_sec) << std::endl;
+   }
+   REQUIRE(ws.count_ids_with_refs() == 0);
+}
