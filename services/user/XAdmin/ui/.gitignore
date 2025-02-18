@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-wasm-psibase
+wasm-transpiled
 
 # Editor directories and files
 .vscode/*

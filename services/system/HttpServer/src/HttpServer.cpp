@@ -109,22 +109,23 @@ namespace SystemService
          socketSend(socket, psio::to_frac(result));
       }
 
-      std::vector<PendingRequestRow>   ownedRequests;
-      std::optional<PendingRequestRow> currentRequest;
+      using Temporary = TemporaryTables<PendingRequestTable>;
    }  // namespace
 
    void HttpServer::deferReply(std::int32_t socket)
    {
       auto sender = getSender();
-      if (currentRequest && currentRequest->owner == sender && currentRequest->socket == socket)
+      auto owned  = Temporary{}.open<PendingRequestTable>();
+      auto row    = owned.getIndex<0>().get(socket);
+      if (row && row->owner == sender)
       {
          PSIBASE_SUBJECTIVE_TX
          {
             auto requests = HttpServer::Subjective{}.open<PendingRequestTable>();
-            requests.put(*currentRequest);
+            requests.put(*row);
+            owned.remove(*row);
             socketAutoClose(socket, false);
          }
-         currentRequest.reset();
       }
       else
       {
@@ -138,20 +139,12 @@ namespace SystemService
       PSIBASE_SUBJECTIVE_TX
       {
          auto requests = Subjective{}.open<PendingRequestTable>();
+         auto owned    = Temporary{}.open<PendingRequestTable>();
          auto row      = requests.get(socket);
          if (row && row->owner == sender)
          {
             requests.remove(*row);
-            if (auto pos = std::ranges::find_if(ownedRequests,
-                                                [&](auto& r) { return r.socket == socket; });
-                pos != ownedRequests.end())
-            {
-               *pos = *row;
-            }
-            else
-            {
-               ownedRequests.push_back(*row);
-            }
+            owned.put(*row);
          }
          else
          {
@@ -166,11 +159,12 @@ namespace SystemService
    {
       bool okay   = false;
       auto sender = getSender();
-      if (currentRequest && currentRequest->socket == socket)
+      auto owned  = Temporary{}.open<PendingRequestTable>();
+      if (auto row = owned.get(socket))
       {
-         if (currentRequest->owner == sender)
+         if (row->owner == sender)
          {
-            currentRequest.reset();
+            owned.remove(*row);
             okay = true;
          }
       }
@@ -180,28 +174,10 @@ namespace SystemService
          {
             auto requests = Subjective{}.open<PendingRequestTable>();
             auto row      = requests.get(socket);
-            if (!row)
-            {
-               if (auto pos = std::ranges::find_if(ownedRequests,
-                                                   [&](auto& r) { return r.socket == socket; });
-                   pos != ownedRequests.end() && pos->owner == sender)
-               {
-                  ownedRequests.erase(pos);
-                  okay = true;
-               }
-               else
-               {
-                  okay = false;
-               }
-            }
-            else if (row && row->owner == sender)
+            if (row && row->owner == sender)
             {
                requests.remove(*row);
                okay = true;
-            }
-            else
-            {
-               okay = false;
             }
             if (okay && socketAutoClose(socket, true) != 0)
                okay = false;
@@ -229,10 +205,12 @@ namespace SystemService
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
 
+      auto owned = Temporary{act.service}.open<PendingRequestTable>();
+
       auto checkServer = [&](psibase::AccountNumber srv)
       {
-         server         = srv;
-         currentRequest = {.socket = sock, .owner = server};
+         server = srv;
+         owned.put({.socket = sock, .owner = server});
          return iface(server).serveSys(req, std::optional{sock});
       };
 
@@ -241,12 +219,12 @@ namespace SystemService
          result = checkServer(registered->server);
       }
 
-      if (!registered || (!result && currentRequest))
+      if (!registered || (!result && owned.get(sock)))
       {
          result = checkServer("sites"_a);
       }
 
-      if (currentRequest)
+      if (owned.get(sock))
       {
          if (result)
          {
@@ -260,7 +238,6 @@ namespace SystemService
                            .contentType = "text/html",
                            .body        = std::vector(msg.begin(), msg.end())});
          }
-         currentRequest.reset();
       }
    }  // serve()
 

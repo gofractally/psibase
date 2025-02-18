@@ -47,7 +47,10 @@ namespace psibase
    {
    }
 
-   TransactionContext::~TransactionContext() {}
+   TransactionContext::~TransactionContext()
+   {
+      blockContext.db.clearTemporary();
+   }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit);

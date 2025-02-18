@@ -160,6 +160,16 @@ std::optional<HttpReply> AsyncQueryService::serveSys(const HttpRequest&         
       }
       to<HttpServer>().sendReply(*socket, reply);
    }
+   else if (path == "/send_async_with_contention")
+   {
+      auto table = Subjective{}.open<AsyncResponseTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         table.put({.socket = *socket, .reply = reply});
+         to<HttpServer>().deferReply(*socket);
+         wait_for(delay);
+      }
+   }
    return {};
 }
 
