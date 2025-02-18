@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use accounts::plugin::api::get_current_user;
 use bindings::*;
 use exports::setcode::plugin::api::Guest as Api;
 use psibase::services::setcode::action_structs::setCode;
