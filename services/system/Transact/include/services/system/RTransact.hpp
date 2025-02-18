@@ -83,17 +83,8 @@ namespace SystemService
       std::vector<TraceClientInfo> clients;
    };
    PSIO_REFLECT(TraceClientRow, id, clients)
-   using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
-   // Holds the size of the last transaction trace
-   struct TraceSizeRow
-   {
-      psibase::Checksum256 id;
-      uint64_t             size;
-      auto                 primary_key() const { return psibase::SingletonKey{}; }
-   };
-   PSIO_REFLECT(TraceSizeRow, id, size)
-   using TraceSizeTable = psibase::Table<TraceSizeRow, &TraceSizeRow::primary_key>;
+   using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
 
    class RTransact : psibase::Service
    {
@@ -102,8 +93,7 @@ namespace SystemService
       using Subjective              = psibase::SubjectiveTables<PendingTransactionTable,
                                                                 TransactionDataTable,
                                                                 AvailableSequenceTable,
-                                                                TraceClientTable,
-                                                                TraceSizeTable>;
+                                                                TraceClientTable>;
       using WriteOnly = psibase::WriteOnlyTables<UnappliedTransactionTable, ReversibleBlocksTable>;
       std::optional<psibase::SignedTransaction> next();
       // Handles transactions coming over P2P

@@ -3,7 +3,6 @@
 #include <services/system/Transact.hpp>
 
 #include <psibase/dispatch.hpp>
-#include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSchema.hpp>
 
 using namespace psibase;
@@ -117,12 +116,7 @@ namespace
 void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   auto size = find_view_span(trace).size();
-   PSIBASE_SUBJECTIVE_TX
-   {
-      auto table = Subjective{}.open<TraceSizeTable>();
-      table.put({id, size});
-   }
+   printf("trace size: %zu\n", find_view_span(trace).size());
 
    TransactionTrace pruned = pruneTrace(trace);
 
@@ -440,20 +434,6 @@ void RTransact::recv(const SignedTransaction& trx)
       forwardTransaction(trx);
 }
 
-struct Query
-{
-   auto lastTraceSize() const -> std::optional<TraceSizeRow>
-   {
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto table = Subjective{}.open<TraceSizeTable>();
-         return table.get(SingletonKey{});
-      }
-      return std::nullopt;
-   }
-};
-PSIO_REFLECT(Query, method(lastTraceSize))
-
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request,
                                              std::optional<std::int32_t> socket)
 {
@@ -481,10 +461,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
    {
       return res;
    }
-   else if (auto res = psibase::serveGraphQL(request, Query{}))
-   {
-      return res;
-   }
+
    return {};
 }
 
