@@ -53,15 +53,12 @@ export const ContractUpload = () => {
     path: string;
     bytes: Uint8Array;
   }) => {
-    console.log(file, "came back");
     const wasm = file.bytes;
 
-    const res = await uploadServiceCode({
+    void (await uploadServiceCode({
       account: Account.parse(currentApp),
       code: wasm,
-    });
-
-    console.log(res, "was res");
+    }));
   };
 
   const description = isUploading
@@ -74,7 +71,12 @@ export const ContractUpload = () => {
         <Label className="text-base">Service Upload</Label>
         <div className="text-sm text-muted-foreground">{description}</div>
         {hash && !isUploading && (
-          <div className="text-sm text-muted-foreground">Hash: {hash}</div>
+          <div className="text-sm text-muted-foreground">
+            <span className="font-medium">Hash: </span>
+            <span className="font-mono bg-muted px-2  rounded-md">
+              {hash.slice(0, 6)}...{hash.slice(-6)}
+            </span>
+          </div>
         )}
       </div>
       <FileInput disabled={isUploading} onChange={handleFileChange} />

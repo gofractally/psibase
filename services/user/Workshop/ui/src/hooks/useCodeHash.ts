@@ -12,11 +12,15 @@ export const ConfigResponse = z.object({
     .or(z.null()),
 });
 
+export const codeHashQueryKey = (
+  account: z.infer<typeof Account> | undefined | null
+) => ["code", account];
+
 export const useCodeHash = (
   account: z.infer<typeof Account> | undefined | null
 ) =>
   useQuery({
-    queryKey: ["code", account],
+    queryKey: codeHashQueryKey(account),
     enabled: !!account,
     queryFn: async () => {
       const res = await graphql(

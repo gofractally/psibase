@@ -54,7 +54,7 @@ export const useSiteConfig = (
             cache
             globalCsp
           }
-          getContent(account: "${account}", first: 10) {
+          getContent(account: "${account}", first: 99) {
             edges {
               node {
                 account
