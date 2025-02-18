@@ -51,7 +51,7 @@ impl KeyValue for ClientData {
         // Set the value on the key
         bucket
             .set(&key, &value)
-            .map_err(|e| format!("Error setting value on key: {}", e.to_string()))
+            .map_err(|e| format!("Error setting value on key {}: {}", key, e.to_string()))
             .unwrap_or_else(|e| panic!("{}", e));
 
         Ok(())
