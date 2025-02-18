@@ -24,7 +24,7 @@ export const Layout = () => {
   const selectedPage = appMenus.find(
     (menu) => location.pathname.split("/")[3] == menu.path
   );
-  const pageName = selectedPage?.title || "Settings?";
+  const pageName = selectedPage?.title || "Settings";
 
   return (
     <SidebarProvider>

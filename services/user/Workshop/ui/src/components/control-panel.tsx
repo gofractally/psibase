@@ -13,7 +13,7 @@ import { queryClient } from "@/queryClient";
 import { z } from "zod";
 import { toast } from "sonner";
 import { CheckCard } from "./Check-Card";
-import { ContractUpload } from "./contract-upload";
+import { ServiceUpload } from "./service-upload";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 const setStatus = (
@@ -115,7 +115,7 @@ export const ControlPanel = () => {
           description="When enabled, responses may be cached to improve performance."
         />
 
-        <ContractUpload />
+        <ServiceUpload />
       </div>
     </div>
   );

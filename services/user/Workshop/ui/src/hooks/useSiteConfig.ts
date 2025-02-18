@@ -77,11 +77,10 @@ export const useSiteConfig = (
           siblingUrl(null, "sites", "graphql")
         );
 
-        console.log(res, "raw graphql");
         return SiteConfigResponse.parse(res);
       } catch (e) {
         toast("failure");
-        console.error(e, "sss");
+        console.error(e);
       }
     },
   });

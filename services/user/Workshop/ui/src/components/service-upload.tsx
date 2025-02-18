@@ -40,7 +40,7 @@ export const FileInput = ({ onChange, disabled }: FileInputProps) => {
   );
 };
 
-export const ContractUpload = () => {
+export const ServiceUpload = () => {
   const { mutateAsync: uploadServiceCode, isPending: isUploading } =
     useSetServiceCode();
   const currentApp = useCurrentApp();

@@ -115,8 +115,8 @@ export const MetaDataForm = ({ existingValues, onSubmit }: Props) => {
       const base64Icon = await fileToBase64(file);
 
       const iconSrc = `data:${mimeType};base64,${base64Icon}`;
-      form.setValue("icon", base64Icon);
-      form.setValue("iconMimeType", mimeType);
+      form.setValue("icon", base64Icon, { shouldDirty: true });
+      form.setValue("iconMimeType", mimeType, { shouldDirty: true });
       setIconPreview(iconSrc);
 
       const reader = new FileReader();

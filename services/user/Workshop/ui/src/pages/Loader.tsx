@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Drill } from "lucide-react";
+import { Terminal } from "lucide-react";
 import { LoginButton } from "../components/login-button";
 import { CreateAppModal } from "../components/create-app-modal";
 import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
@@ -46,7 +46,7 @@ export const Loader = () => {
       />
       <CardHeader>
         <div className="mx-auto">
-          <Drill className="h-12 w-12" />
+          <Terminal className="h-12 w-12" />
         </div>
         <CardTitle>Workshop</CardTitle>
         <CardDescription>

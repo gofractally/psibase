@@ -1,3 +1,4 @@
+import { AwaitTime } from "@/lib/globals";
 import { Account } from "@/lib/zodTypes";
 import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
@@ -19,7 +20,7 @@ export const useSelectAccount = () =>
       queryClient.setQueryData(["loggedInUser"], () => accountName);
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-      }, 2000);
+      }, AwaitTime);
     },
     onError: (error) => {
       if (error instanceof Error) {
