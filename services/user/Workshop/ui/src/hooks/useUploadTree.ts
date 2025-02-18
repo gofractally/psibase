@@ -19,22 +19,18 @@ const Params = z.object({
 });
 
 export const useUploadTree = () =>
-  useMutation<null, Error, z.infer<typeof Params>>({
+  useMutation<number, Error, z.infer<typeof Params>>({
     mutationKey: ["uploadTree"],
     mutationFn: async (params) => {
       const { account, compressionQuality, files } = Params.parse(params);
-      const finalisedParams = [account, files, compressionQuality];
 
-      console.log("Sending", finalisedParams);
       const res = await supervisor.functionCall({
         method: "uploadTree",
-        params: finalisedParams,
+        params: [account, files, compressionQuality],
         service: "workshop",
         intf: "app",
       });
 
-      console.log(res, "came back on upload!!!");
-
-      return null;
+      return z.number().parse(res);
     },
   });

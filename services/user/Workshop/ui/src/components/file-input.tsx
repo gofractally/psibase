@@ -1,7 +1,6 @@
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent } from "react";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "./ui/badge";
+import { Card } from "@/components/ui/card";
 
 interface FileInputProps {
   onChange: (
@@ -12,13 +11,10 @@ interface FileInputProps {
       bytes: Uint8Array;
     }[]
   ) => void;
+  disabled?: boolean;
 }
 
-export const FileInput = ({ onChange }: FileInputProps) => {
-  const [files, setFiles] = useState<
-    { name: string; contentType: string; path: string; bytes: Uint8Array }[]
-  >([]);
-
+export const FileInput = ({ onChange, disabled }: FileInputProps) => {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
@@ -33,27 +29,18 @@ export const FileInput = ({ onChange }: FileInputProps) => {
       };
     });
 
-    try {
-      const fileData = await Promise.all(fileDataPromises);
-      setFiles(fileData);
-      onChange(fileData);
-    } catch {
-      setFiles([]);
-    }
+    const fileData = await Promise.all(fileDataPromises);
+    onChange(fileData);
   };
 
   return (
-    <Card className="p-4">
-      <Input type="file" multiple onChange={handleFileChange} />
-      {files.length > 0 && (
-        <CardContent className="mt-4 space-y-2">
-          {files.map((file, index) => (
-            <Badge key={index} variant="secondary" className="mr-2">
-              {file.name}
-            </Badge>
-          ))}
-        </CardContent>
-      )}
+    <Card className="p-4 border-none">
+      <Input
+        disabled={disabled}
+        type="file"
+        multiple
+        onChange={handleFileChange}
+      />
     </Card>
   );
 };

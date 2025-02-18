@@ -37,3 +37,14 @@ export const Metadata = z.object({
   owners: Account.array().default([]),
   tags: z.string().array().max(3),
 });
+
+export const Path = z.string().transform((path) => {
+  const normalizedPath = path.replace(/\/+/g, "/");
+  const cleanPath = normalizedPath.startsWith("/")
+    ? normalizedPath.slice(1)
+    : normalizedPath;
+  const trimmedPath = cleanPath.endsWith("/")
+    ? cleanPath.slice(0, -1)
+    : cleanPath;
+  return "/" + trimmedPath;
+});

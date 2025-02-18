@@ -67,7 +67,10 @@ export const ControlPanel = () => {
         description:
           e instanceof Error ? e.message : "Unrecognised error, see logs.",
       });
-      setCacheData(appName, !checked);
+
+      const isAppAlreadyPublishedError =
+        e instanceof Error && e.message.includes("App is already published");
+      setCacheData(appName, isAppAlreadyPublishedError || !checked);
     }
   };
 
