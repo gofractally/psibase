@@ -32,7 +32,7 @@ export const Settings = () => {
   } else if (isLoading) {
     return (
       <div className="h-dvh w-full flex justify-center">
-        <div className="w-full">
+        <div>
           <div className="w-full flex justify-center">
             <Spinner size="lg" className="bg-black text-center dark:bg-white" />
           </div>
