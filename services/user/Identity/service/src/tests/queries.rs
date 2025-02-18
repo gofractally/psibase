@@ -5,7 +5,7 @@ use crate::{
     },
 };
 
-#[psibase::test_case(packages("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST QUERY: verify first *high* confidence attestation is saved properly to table
 pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
@@ -56,7 +56,7 @@ pub fn test_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Er
     Ok(())
 }
 
-#[psibase::test_case(packages("identity"))]
+#[psibase::test_case(packages("Identity"))]
 // ATTEST QUERY: verify empty query responses are correct
 pub fn test_empty_attestation_queries(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let svc = init_identity_svc(&chain);
