@@ -128,7 +128,7 @@ namespace arbtrie
          bool get2(key_view key, Callback&& callback);
 
          // true if the iterator points to a key/value pair
-         bool valid() const { return _path_back != _path.data() - 1; }
+         bool valid() const { return _path_back >= _path.data(); }
 
          // if the value is a subtree, return an iterator into that subtree
          iterator subtree_iterator() const;
@@ -171,12 +171,9 @@ namespace arbtrie
 
          bool next_impl(read_lock& state);
          bool prev_impl(read_lock& state);
+         bool lower_bound_impl(read_lock& state, key_view key);
 
-         void end()
-         {
-            clear();
-            push_end(_root.address());
-         }
+         void end() { clear(); }
          void begin()
          {
             clear();

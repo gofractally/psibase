@@ -1638,6 +1638,29 @@ TEST_CASE("beta-iterator-dense-validation")
    REQUIRE(count == 0);
 }
 
+TEST_CASE("beta-iterator-lower-bound-validation")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   auto    r  = ws.create_root();
+
+   std::vector<std::string> words = load_words(ws, r);
+   std::sort(words.begin(), words.end());
+
+   auto itr = ws.create_beta_iterator<beta::caching>(r);
+   itr.lower_bound(key_view());
+   for (size_t i = 0; i < words.size(); ++i)
+   {
+      key_view kstr = words[i];
+      REQUIRE(itr.lower_bound(kstr));
+      REQUIRE(itr.key() == kstr);
+   }
+   std::string last_word = words.back();
+   last_word.back()++;
+   REQUIRE(not itr.lower_bound(key_view(last_word)));
+   REQUIRE(itr.is_end());
+}
+
 TEST_CASE("beta-iterator-validation")
 {
    environ                  env;
@@ -1646,24 +1669,18 @@ TEST_CASE("beta-iterator-validation")
    std::vector<std::string> words = load_words(ws, r);
    std::sort(words.begin(), words.end());
 
-   auto itr  = ws.create_beta_iterator<beta::caching>(r);
-   auto itr2 = ws.create_iterator<caching>(r);
+   auto itr = ws.create_beta_iterator<beta::caching>(r);
 
    // Test basic iterator state
    std::cout << "Is begin: " << itr.is_begin() << std::endl;
    std::cout << "Is end: " << itr.is_end() << std::endl;
    std::cout << "Is valid: " << itr.valid() << std::endl;
-   itr2.lower_bound(key_view());
-   REQUIRE(itr2.valid());
-   std::cout << "itr2 key: " << itr2.key() << std::endl;
 
    REQUIRE(itr.valid());
    REQUIRE(itr.is_begin());
 
-   // Validate that both iterators return the same keys in the same order
+   // First validate beta iterator forward traversal
    std::cout << "\nValidating beta iterator next() correctness..." << std::endl;
-
-   // First validate beta iterator (itr) forward traversal
    size_t beta_count = 0;
    for (const auto& word : words)
    {
@@ -1677,9 +1694,8 @@ TEST_CASE("beta-iterator-validation")
    REQUIRE(beta_count == words.size());
    REQUIRE(not itr.is_begin());
 
-   // Now validate beta iterator (itr) reverse traversal
+   // Now validate beta iterator reverse traversal
    std::cout << "\nValidating beta iterator prev() functionality..." << std::endl;
-
    size_t prev_count = 0;
    for (auto it = words.rbegin(); it != words.rend(); ++it)
    {
@@ -1687,49 +1703,63 @@ TEST_CASE("beta-iterator-validation")
       REQUIRE(itr.key() == *it);
       prev_count++;
    }
-   REQUIRE(not itr.prev());
    REQUIRE(prev_count == words.size());
+   REQUIRE(not itr.prev());
+   REQUIRE(itr.is_begin());
 
-   // Validate that prev() on first element moves to rend
-   REQUIRE(itr.prev() == false);
-   REQUIRE(itr.is_rend());
-
-   // Test alternating next() and prev() on beta iterator
-   //itr.lower_bound();  // Move back to first element
-
-   // Move forward 10 elements
+   // Test alternating next() and prev()
    for (int i = 0; i < 10 && itr.next(); ++i)
    {
    }
-
-   // Store the current key
    std::string mid_key(itr.key().data(), itr.key().size());
-
-   // Move back 5 elements
    for (int i = 0; i < 5 && itr.prev(); ++i)
    {
    }
-
-   // Move forward 5 elements
    for (int i = 0; i < 5 && itr.next(); ++i)
    {
    }
-
-   // Should be back at the same key
    REQUIRE(std::string(itr.key().data(), itr.key().size()) == mid_key);
+}
 
-   // Now validate regular iterator (itr2)
-   std::cout << "\nValidating regular iterator..." << std::endl;
+TEST_CASE("regular-iterator-validation")
+{
+   environ                  env;
+   auto                     ws    = env.db->start_write_session();
+   auto                     r     = ws.create_root();
+   std::vector<std::string> words = load_words(ws, r);
+   std::sort(words.begin(), words.end());
+
+   auto itr = ws.create_iterator<caching>(r);
+
+   // Test basic iterator state
+   itr.lower_bound(key_view());
+   REQUIRE(itr.valid());
+   std::cout << "Regular iterator key: " << itr.key() << std::endl;
+
+   // Validate regular iterator forward traversal
+   std::cout << "\nValidating regular iterator next() correctness..." << std::endl;
    size_t reg_count = 0;
-   itr2.lower_bound(key_view());
+   itr.lower_bound(key_view());
    for (const auto& word : words)
    {
-      REQUIRE(itr2.next());
-      REQUIRE(itr2.key() == word);
+      REQUIRE(itr.next());
+      REQUIRE(itr.key() == word);
       reg_count++;
    }
    REQUIRE(reg_count == words.size());
-   REQUIRE(not itr2.next());  // Ensure itr2 is at the end
+   REQUIRE(not itr.next());
+
+   // Test lower_bound functionality
+   for (const auto& word : words)
+   {
+      REQUIRE(itr.lower_bound(key_view(word)));
+      REQUIRE(itr.key() == word);
+   }
+
+   // Test that lower_bound past last word returns false
+   std::string last_word = words.back();
+   last_word.back()++;
+   REQUIRE(not itr.lower_bound(key_view(last_word)));
 }
 
 TEST_CASE("beta-iterator-performance")
@@ -1780,4 +1810,86 @@ TEST_CASE("beta-iterator-performance")
    // Verify both iterators processed the same number of keys
    REQUIRE(beta_count == words.size());
    REQUIRE(reg_count == words.size());
+}
+
+TEST_CASE("beta-upper-bound")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   {
+      auto r = ws.create_root();
+
+      // Create reference map for validation
+      std::map<std::string, int> reference;
+
+      // Function to generate random key using rand64
+      auto make_key = [](uint64_t val, size_t len)
+      {
+         std::string key;
+         key.resize(len);
+         memcpy(key.data(), &val, std::min(len, sizeof(val)));
+         return key;
+      };
+
+      // Insert 1 million unique random keys
+      size_t total_keys = 1'000'000;
+      for (size_t i = 0; i < total_keys;)
+      {
+         uint64_t    val = uint64_t(rand64());
+         size_t      len = (val % 8) + 1;  // Random length 1-8 bytes
+         std::string key = make_key(val, len);
+
+         // Only insert if key doesn't exist
+         if (reference.find(key) == reference.end())
+         {
+            reference[key] = 0;
+            key_view kstr(key.data(), key.size());
+            ws.upsert(r, kstr, kstr);
+            ++i;
+
+            if (i % 100000 == 0)
+            {
+               REQUIRE(reference.size() == ws.count_keys(r));
+            }
+         }
+      }
+      REQUIRE(reference.size() == ws.count_keys(r));
+
+      auto itr = ws.create_beta_iterator<beta::caching>(r);
+      // Test upper_bound with 100,000 random keys
+      for (int i = 0; i < 100'000; ++i)
+      {
+         if (i == 21)
+            TRIEDENT_DEBUG("i: ", i);
+         // Generate random test key
+         uint64_t    val = uint64_t(rand64());
+         size_t      len = (val % 8) + 1;
+         std::string key = make_key(val, len);
+
+         // Get upper_bound from reference map
+         auto ref_itr = reference.upper_bound(key);
+
+         // Get upper_bound from beta iterator
+         itr.upper_bound(key_view(key.data(), key.size()));
+
+         if (ref_itr == reference.end())
+         {
+            REQUIRE(not itr.valid());
+         }
+         else
+         {
+            if (!itr.valid())
+            {
+               std::stringstream ss;
+               ss << "Iterator not valid. Key: " << to_hex(key_view(key.data(), key.size()));
+               ss << ", Index: " << i;
+               FAIL(ss.str());
+            }
+            REQUIRE(to_str(itr.key()) == ref_itr->first);
+            // Verify that the key is strictly greater than the search key
+            REQUIRE(to_str(itr.key()) > key);
+         }
+      }
+   }
+   REQUIRE(ws.count_ids_with_refs() == 0);
 }

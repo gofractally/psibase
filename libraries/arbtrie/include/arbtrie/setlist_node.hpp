@@ -35,8 +35,9 @@ namespace arbtrie
     *  id_address   spareids[spare_capacity]
     */
 
-   struct setlist_node : inner_node<setlist_node>
+   class setlist_node : public inner_node<setlist_node>
    {
+     public:
       static const node_type type = node_type::setlist;
       using node_header::get_type;
 
@@ -74,6 +75,18 @@ namespace arbtrie
       {
          throw std::runtime_error("setlist_node::get_branch: not implemented");
          return search_result::end();
+      }
+
+      // Returns the index of the first branch greater than or equal to k
+      local_index lower_bound_index(key_view k) const
+      {
+         if (k.empty())
+            return local_index(0);
+
+         auto pos = get_setlist().find(k.front());
+         if (pos == key_view::npos)
+            return end_index();
+         return local_index(pos + has_eof_value());
       }
 
       // Required functions for is_node_header_derived concept

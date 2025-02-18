@@ -5,8 +5,9 @@
 namespace arbtrie
 {
 
-   struct value_node : public node_header
+   class value_node : public node_header
    {
+     public:
       static const node_type type            = node_type::value;
       uint32_t               _vsize          = 0;
       uint16_t               _is_subtree : 1 = 0;
@@ -28,6 +29,13 @@ namespace arbtrie
          if (k <= get_prefix())
             return search_result{get_prefix(), {}, local_index(0)};
          return search_result::end();
+      }
+
+      local_index lower_bound_index(key_view k) const
+      {
+         if (k <= get_prefix())
+            return local_index(0);
+         return end_index();
       }
 
       // Required functions for is_node_header_derived concept

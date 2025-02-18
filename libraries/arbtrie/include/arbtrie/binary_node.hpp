@@ -104,8 +104,9 @@ namespace arbtrie
     *    int8_t  val [_val_size] - sign bit indicates value is object id, 7 bits of hash data
     *    uint8_t pad [bytes_to_next_16 byte align] - stores up to 8 extra hash bytes of key/val
     */
-   struct binary_node : node_header
+   class binary_node : public node_header
    {
+     public:
       static const uint8_t      max_inline_value_size = 63;
       static const int_fast16_t key_not_found         = -1;
       static const node_type    type                  = node_type::binary;
@@ -346,7 +347,9 @@ namespace arbtrie
        * node concept methods
        */
       ///@{
-      constexpr key_view    get_prefix() const { return key_view(); }
+      constexpr key_view get_prefix() const { return key_view(); }
+      local_index lower_bound_index(key_view k) const { return local_index(lower_bound_idx(k)); }
+
       constexpr local_index next_index(local_index idx) const { return ++idx; }
       constexpr local_index prev_index(local_index idx) const
       {

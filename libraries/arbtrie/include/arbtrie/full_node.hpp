@@ -10,13 +10,20 @@ namespace arbtrie
     *  This type must satisfy inner_node_concept to ensure it provides all required
     *  functionality for inner nodes in the tree.
     */
-   struct full_node : inner_node<full_node>
+   class full_node : public inner_node<full_node>
    {
      public:
       static constexpr const int_fast16_t branch_count = 256;
       static const node_type              type         = node_type::full;
 
       using node_header::get_type;
+
+      local_index lower_bound_index(key_view k) const
+      {
+         if (k.empty())
+            return next_index(begin_index());
+         return next_index(local_index(uint8_t(k.front())));
+      }
 
       // idx 0 = eof_value
       // idx 1..255 = branches

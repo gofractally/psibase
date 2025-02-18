@@ -6,6 +6,13 @@
 
 namespace arbtrie
 {
+   // Forward declarations
+   struct node_header;
+   class binary_node;
+   class setlist_node;
+   class full_node;
+   class value_node;
+
    template <typename T>
    struct inner_node;
 
@@ -167,7 +174,17 @@ namespace arbtrie
         { node.next_index(bindex) } -> std::same_as<local_index>; // next branch
         { node.prev_index(bindex) } -> std::same_as<local_index>; // previous branch
         { node.get_prefix() } -> std::same_as<key_view>; // get the prefix of the node
-        { node.get_branch_key(bindex) } -> std::same_as<key_view>; // get the key for a local index
+
+
+        /**
+         * Returns the key for a local index, does not check that the index is valid
+         * and may return keys for branches that do not exist.
+         */
+        { node.get_branch_key(bindex) } -> std::same_as<key_view>; 
+        /**
+         * Returns the local index for a key, a key may or may not exist at that index and
+         * this method does not check for validity of the key.
+         */
         { node.get_branch_index(key) } -> std::same_as<local_index>; // get the local index for a key
         { node.get_value(bindex) } -> std::same_as<value_type>; // get the value for a local index
         { node.begin_index() } -> std::same_as<local_index>; // begin of the local index
@@ -213,5 +230,25 @@ namespace arbtrie
            //      { const_node.get_eof_value() } -> std::same_as<id_address>;
        };
    // clang-format on
+
+   // Helper type traits for node type checking
+   template <typename T>
+   concept is_binary_node =
+       std::is_same_v<std::remove_cv_t<std::remove_pointer_t<std::remove_cv_t<T>>>, binary_node>;
+
+   template <typename T>
+   concept is_setlist_node =
+       std::is_same_v<std::remove_cv_t<std::remove_pointer_t<std::remove_cv_t<T>>>, setlist_node>;
+
+   template <typename T>
+   concept is_full_node =
+       std::is_same_v<std::remove_cv_t<std::remove_pointer_t<std::remove_cv_t<T>>>, full_node>;
+
+   template <typename T>
+   concept is_value_node =
+       std::is_same_v<std::remove_cv_t<std::remove_pointer_t<std::remove_cv_t<T>>>, value_node>;
+
+   template <typename T>
+   concept is_inner_node = is_setlist_node<T> or is_full_node<T>;
 
 }  // namespace arbtrie
