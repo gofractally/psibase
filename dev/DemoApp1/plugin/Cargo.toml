@@ -1,14 +1,14 @@
 [package]
 name = "demoapp1"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 wit-bindgen-rt = { version = "0.27.0" }
-psibase = { path = "../../../rust/psibase/", version = "0.14.0" }
-service = { path = "../service", version = "0.14.0" }
+psibase = { path = "../../../rust/psibase/", version = "0.15.0" }
+service = { path = "../service", version = "0.15.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -17,8 +17,8 @@ crate-type = ["cdylib"]
 package = "demoapp1:example"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../../services/user/CommonApi/common/packages/wit/host-common.wit", version = "0.14.0" }
-"invite:plugin" = { path = "../../../services/user/Invite/plugin/wit/world.wit", version = "0.14.0" }
-"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/accounts/wit/world.wit", version = "0.14.0" }
-"transact:plugin" = { path = "../../../services/system/Transact/plugin/wit/world.wit", version = "0.14.0" }
-"auth-sig:plugin" = { path = "../../../services/system/AuthSig/plugin/wit/world.wit", version = "0.14.0" }
+"host:common" = { path = "../../../services/user/CommonApi/common/packages/wit/host-common.wit", version = "0.15.0" }
+"invite:plugin" = { path = "../../../services/user/Invite/plugin/wit/world.wit", version = "0.15.0" }
+"accounts:plugin" = { path = "../../../services/system/Accounts/plugin/accounts/wit/world.wit", version = "0.15.0" }
+"transact:plugin" = { path = "../../../services/system/Transact/plugin/wit/world.wit", version = "0.15.0" }
+"auth-sig:plugin" = { path = "../../../services/system/AuthSig/plugin/wit/world.wit", version = "0.15.0" }
