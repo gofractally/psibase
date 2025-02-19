@@ -1,4 +1,4 @@
-import { Settings, FolderUp } from "lucide-react";
+import { Settings, FolderUp, LifeBuoy } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -20,11 +20,11 @@ export const appMenus = [
     icon: FolderUp,
     path: "upload",
   },
-  // {
-  //   title: "Support",
-  //   icon: LifeBuoy,
-  //   path: "support",
-  // },
+  {
+    title: "Support",
+    icon: LifeBuoy,
+    path: "support",
+  },
   // {
   //   title: "Pending requests",
   //   icon: LayoutList,
