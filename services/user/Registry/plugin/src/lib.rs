@@ -23,7 +23,7 @@ impl Developer for RegistryPlugin {
         let action_create_input = RegistryService::action_structs::createApp {
             account: account.parse().unwrap(),
         };
-        Transact::add_action_to_transaction("create", &action_create_input.packed())?;
+        Transact::add_action_to_transaction("createApp", &action_create_input.packed())?;
         Ok(())
     }
 

@@ -24,14 +24,14 @@ interface app {
 
     /// Upload a single file to the site of the specified app.
     ///  
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     upload: func(app: string, file: file, compression-quality: u8) -> result<_, error>;
 
     /// Upload multiple files to the site of the specified app.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     /// 
