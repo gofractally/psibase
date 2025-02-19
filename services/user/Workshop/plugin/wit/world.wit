@@ -1,0 +1,85 @@
+package workshop:plugin;
+
+interface registry {
+    use host:common/types.{error};
+    use registry:plugin/types.{app-metadata};
+
+    /// Create a new app owned by the currently logged-in user.
+    /// `app` - The account name for the app
+    create-app: func(app: string) -> result<_, error>;
+
+    /// Set the metadata for the specified app
+    set-app-metadata: func(app: string, metadata: app-metadata) -> result<_, error>;
+
+    /// Publish the specified app
+    publish-app: func(app: string) -> result<_, error>;
+
+    /// Unpublish specified app
+    unpublish-app: func(app: string) -> result<_, error>;
+}
+
+interface app {
+    use sites:plugin/types.{file};
+    use host:common/types.{error};
+
+    /// Upload a single file to the site of the specified app.
+    ///  
+    /// The maximum size of a transaction submitted to upload content is 3mb.
+    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// file (after compression if applied).
+    upload: func(app: string, file: file, compression-quality: u8) -> result<_, error>;
+
+    /// Upload multiple files to the site of the specified app.
+    /// 
+    /// The maximum size of a transaction submitted to upload content is 3mb.
+    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// file (after compression if applied).
+    /// 
+    /// If the transaction size limit is exceeded, returns the index of the
+    /// first file that was not uploaded.
+    /// 
+    /// If all files are uploaded successfully, returns 0.
+    /// 
+    /// If the first file in the list exceeds the transaction size limit,
+    /// the transaction will be aborted and the error will contain the path
+    /// of the file that caused the error.
+    upload-tree: func(app: string, files: list<file>, compression-quality: u8) -> result<u16, error>;
+
+    /// Enable or disable single-page application mode for the specified app.
+    /// When enabled, all content requests return the root document
+    /// except for requests to static assets (files with an extension).
+    enable-spa: func(app: string, enable: bool) -> result<_, error>;
+
+    /// Set the Content Security Policy for the specified path.
+    /// If a specific CSP is set, it takes precedence over the global CSP.
+    /// If no specific or global CSP is set, a default CSP is used.
+    set-csp: func(app: string, path: string, csp: string) -> result<_, error>;
+
+    /// Enable or disable caching of responses for the specified app.
+    set-cache-mode: func(app: string, enable: bool) -> result<_, error>;
+
+    /// Upload compiled service code to the server into the namespace of the specified app.
+    ///
+    /// Parameters:
+    /// `code`: The compiled code as a byte array
+    set-service-code: func(app: string, code: list<u8>) -> result<_, error>;
+}
+
+interface mail {
+    use host:common/types.{error};
+
+    /// Send an email as the specified app
+    send: func(app: string, receiver: string, subject: string, body: string) -> result<_, error>;
+ 
+    /// Archive one of the specified app's emails
+    archive: func(app: string, msg-id: u64) -> result<_, error>;
+
+    /// Save one of the specified app's emails
+    /// Saved emails cannot be pruned
+    save: func(app: string, msg-id: u64) -> result<_, error>;
+}
+
+world imports {
+    import app;
+    import mail;
+}

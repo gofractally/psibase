@@ -5,50 +5,31 @@
 
 namespace SystemService
 {
-   struct SitesContentKey
-   {
-      psibase::AccountNumber account = {};
-      std::string            path    = {};
-
-      // TODO: upgrade wasi-sdk; <=> for string is missing
-      friend bool operator<(const SitesContentKey& a, const SitesContentKey& b)
-      {
-         return std::tie(a.account, a.path) < std::tie(b.account, b.path);
-      }
-   };
-   PSIO_REFLECT(SitesContentKey, account, path)
-
+   using SitesContentKey = std::tuple<psibase::AccountNumber, std::string>;
    struct SitesContentRow
    {
       psibase::AccountNumber     account         = {};
       std::string                path            = {};
       std::string                contentType     = {};
       std::vector<char>          content         = {};
-      std::string                csp             = {};
       uint64_t                   hash            = 0;
       std::optional<std::string> contentEncoding = std::nullopt;
+      std::optional<std::string> csp             = std::nullopt;
 
-      SitesContentKey key() const { return {account, path}; }
+      SitesContentKey key() const { return SitesContentKey{account, path}; }
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, csp, hash, contentEncoding)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, hash, contentEncoding, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
 
    struct SiteConfigRow
    {
-      psibase::AccountNumber account;
-      bool                   spa   = false;
-      bool                   cache = true;
+      psibase::AccountNumber     account;
+      bool                       spa       = false;
+      bool                       cache     = true;
+      std::optional<std::string> globalCsp = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
-
-   struct GlobalCspRow
-   {
-      psibase::AccountNumber account;
-      std::string            csp;
-   };
-   PSIO_REFLECT(GlobalCspRow, account, csp)
-   using GlobalCspTable = psibase::Table<GlobalCspRow, &GlobalCspRow::account>;
 
    /// Decompress content
    ///
@@ -80,7 +61,7 @@ namespace SystemService
    {
      public:
       static constexpr auto service = psibase::AccountNumber("sites");
-      using Tables = psibase::ServiceTables<SitesContentTable, SiteConfigTable, GlobalCspTable>;
+      using Tables                  = psibase::ServiceTables<SitesContentTable, SiteConfigTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
@@ -92,7 +73,7 @@ namespace SystemService
                     std::vector<char>          content);
 
       /// Removes content from the caller's subdomain
-      void removeSys(std::string path);
+      void remove(std::string path);
 
       /// Checks whether a request for content on a site at the given path is valid (such a request will not produce a 404).
       ///
@@ -129,7 +110,7 @@ namespace SystemService
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, contentEncoding, content),
-                method(removeSys, path),
+                method(remove, path),
                 method(isValidPath, site, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
