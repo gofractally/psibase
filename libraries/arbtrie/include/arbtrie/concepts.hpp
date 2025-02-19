@@ -207,6 +207,15 @@ namespace arbtrie
          */
         { node.get_value_type() } -> std::same_as<value_type::types>; // get the type of the value
 
+        /**
+         * Returns the value at the given key and modifies the key to contain only the trailing portion.
+         * If no value is found, returns a remove value_type.
+         * This is optimized for point lookups and is used by beta_iterator get_impl.
+         * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
+         * @return value_type - The value if found, or remove type if not found
+         */
+        { node.get_value_and_trailing_key(key) } -> std::same_as<value_type>;
+
         // Required concepts
         requires std::derived_from<T, node_header>; // must be derived from node_header
     };
@@ -250,5 +259,9 @@ namespace arbtrie
 
    template <typename T>
    concept is_inner_node = is_setlist_node<T> or is_full_node<T>;
+
+   template <typename T>
+   concept is_id_address =
+       std::is_same_v<std::remove_cv_t<std::remove_pointer_t<std::remove_cv_t<T>>>, id_address>;
 
 }  // namespace arbtrie

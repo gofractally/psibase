@@ -4,6 +4,7 @@
 #include <arbtrie/read_lock.hpp>
 #include <arbtrie/seg_alloc_session.hpp>
 #include <arbtrie/seg_allocator.hpp>
+#include <utility>
 
 namespace arbtrie
 {
@@ -36,6 +37,91 @@ namespace arbtrie
          }
          return ss.str();
       }
+
+      template <iterator_caching_mode CacheMode>
+      iterator<CacheMode> iterator<CacheMode>::subtree_iterator() const
+      {
+         id_address val_addr;
+         read_value(
+             [&](auto v)
+             {
+                if constexpr (is_id_address<decltype(v)>)
+                   val_addr = v;
+                else
+                   throw std::runtime_error(
+                       "cannot create subtree iterator from non-subtree value");
+             });
+         return iterator<CacheMode>(_rs, val_addr);
+      }
+
+      template <iterator_caching_mode CacheMode>
+      int32_t iterator<CacheMode>::read_value(auto& buffer) const
+      {
+         return read_value(
+             [=](value_view v)
+             {
+                if constexpr (is_id_address<decltype(v)>)
+                   throw std::runtime_error("subtree found in read_value");
+                else
+                {
+                   buffer.resize(v.size());
+                   memcpy(buffer.data(), v.data(), v.size());
+                   return buffer.size();
+                }
+             });
+      }
+
+      template <iterator_caching_mode CacheMode>
+      int32_t iterator<CacheMode>::read_value(char* s, uint32_t s_len) const
+      {
+         return read_value(
+             [=](auto v)
+             {
+                if constexpr (is_id_address<decltype(v)>)
+                   throw std::runtime_error("subtree found in read_value");
+                else
+                {
+                   uint32_t bytes_to_copy = std::min(v.size(), s_len);
+                   memcpy(s, v.data(), bytes_to_copy);
+                   return bytes_to_copy;
+                }
+             });
+      }
+
+      template <iterator_caching_mode CacheMode>
+      int32_t iterator<CacheMode>::read_value(auto&& callback) const
+      {
+         auto    state      = _rs.lock();
+         auto    addr       = _path_back->oid;
+         int32_t bytes_read = -1;
+         while (true)
+         {
+            auto oref = state.get(addr);
+            if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                              [&](const /*arbtrie::node*/ auto* n)
+                              {
+                                 auto val = n->get_value(local_index(_path_back->index));
+                                 switch (val.type())
+                                 {
+                                    case value_type::types::value_node:
+                                       addr = val.value_address();
+                                       return false;  // continue to value_node
+                                    case value_type::types::subtree:
+                                       bytes_read = -2;
+                                       callback(val.subtree_address());
+                                       return true;  // done
+                                    case value_type::types::data:
+                                       bytes_read = callback(val.view());
+                                    case value_type::types::remove:
+                                    default:
+                                       return true;  // done
+                                 }
+                              }))
+               return bytes_read;
+         }
+         __builtin_unreachable();
+      }
+
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::lower_bound(key_view key)
       {
@@ -236,6 +322,146 @@ namespace arbtrie
          if (key() == search)
             return next_impl(state);
          return true;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::last(key_view prefix)
+      {
+         if (not _root.address()) [[unlikely]]
+            return end();
+
+         if (prefix.size() > max_key_length)
+            throw std::runtime_error("invalid key length");
+
+         auto state = _rs.lock();
+         begin();
+
+         // If no prefix is provided, find the last key in the entire tree
+         if (prefix.empty())
+            return end(), prev_impl(state);
+
+         // Create a search key that is the prefix followed by 0xFF bytes
+         std::array<char, max_key_length> search_key;
+         memcpy(search_key.data(), prefix.data(), prefix.size());
+         memset(search_key.data() + prefix.size(), 0xff, max_key_length - prefix.size());
+
+         // Try to find a key greater than or equal to our search key
+         if (lower_bound_impl(state, key_view(search_key.data(), search_key.size())))
+         {
+            // If we found a key that starts with our prefix, we're done
+            if (key().starts_with(prefix))
+               return true;
+
+            // Otherwise try the previous key
+            if (prev_impl(state) and key().starts_with(prefix))
+               return true;
+         }
+         return end();
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::first(key_view prefix)
+      {
+         if (not _root.address()) [[unlikely]]
+            return end();
+
+         if (prefix.size() > max_key_length)
+            throw std::runtime_error("invalid key length");
+
+         auto state = _rs.lock();
+         begin();
+
+         // If no prefix is provided, just move to the first key
+         if (prefix.empty())
+            return next_impl(state);
+
+         // Find the first key that is greater than or equal to the prefix
+         if (not lower_bound_impl(state, prefix))
+            return end();
+
+         // Check if the found key starts with our prefix
+         if (not key().starts_with(prefix))
+            return end();
+
+         return true;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::reverse_lower_bound(key_view prefix)
+      {
+         if (not _root.address()) [[unlikely]]
+            return end();
+
+         if (prefix.size() > max_key_length)
+            throw std::runtime_error("invalid key length");
+
+         auto state = _rs.lock();
+         begin();
+
+         // First try to find the exact prefix or the next key after it
+         if (lower_bound_impl(state, prefix))
+         {
+            // If we found a key greater than the prefix, move back one
+            if (key() > prefix)
+               return prev_impl(state);
+            assert(key() == prefix);
+            return true;
+         }
+
+         // At this point:
+         // 1. lower_bound(prefix) returned end(), meaning all keys are < prefix
+         // 2. if prev_impl() succeeds, we're at the last key in the database
+         // 3. Since all keys are < prefix, this last key must be first key less than prefix
+         return end(), prev_impl(state);
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::find(key_view key, auto&& callback)
+      {
+         return false;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::get(key_view key, auto&& callback)
+      {
+         if (not _root.address()) [[unlikely]]
+            return false;
+
+         if (key.size() > max_key_length)
+            throw std::runtime_error("invalid key length");
+
+         auto state = _rs.lock();
+         return get_impl(state, key, std::forward<decltype(callback)>(callback));
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::get_impl(read_lock& state, key_view key, auto&& callback)
+      {
+         auto addr  = _path_back->oid;
+         bool found = false;
+         while (true)
+         {
+            auto oref = state.get(addr);
+            if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                              [&](const /*arbtrie::node*/ auto* n)
+                              {
+                                 auto val = n->get_value_and_trailing_key(key);
+                                 switch (val.type())
+                                 {
+                                    case value_type::types::value_node:
+                                       addr = val.value_address();
+                                       return false;  // continue to value_node
+                                    case value_type::types::subtree:
+                                    case value_type::types::data:
+                                       found = true;
+                                    case value_type::types::remove:
+                                    default:
+                                       return callback(val), true;  // done
+                                 }
+                              }))
+               return found;
+         }
+         __builtin_unreachable();
       }
 
    }  // namespace beta

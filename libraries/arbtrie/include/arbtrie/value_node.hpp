@@ -116,6 +116,25 @@ namespace arbtrie
          assert(index == local_index(0));
          return get_value();
       }
+
+      /**
+       * Returns the value at the given key and modifies the key to contain only the trailing portion.
+       * If no value is found, returns a remove value_type.
+       * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
+       * @return value_type - The value if found, or remove type if not found
+       */
+      value_type get_value_and_trailing_key(key_view& key) const
+      {
+         key_view prefix = get_prefix();
+         // For value_node, we just need to check if the key equals the prefix
+         if (key != prefix)
+            return value_type();  // Returns remove type
+
+         // Since we matched the entire prefix, the trailing key is empty
+         key = key_view();
+         return get_value();
+      }
+
       ///@}
 
       static constexpr int alloc_size(value_view v)

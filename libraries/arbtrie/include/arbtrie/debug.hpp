@@ -9,10 +9,48 @@
 
 namespace arbtrie
 {
-   static constexpr bool debug_cache     = false;
-   static constexpr bool debug_invariant = true;
-   static constexpr bool debug_roots     = false;
-   static constexpr bool debug_memory    = true;
+   /**
+    * Controls whether caching operations should log debug information.
+    * Used primarily in read operations and cache management to track:
+    * - Cache hit/miss patterns
+    * - Cache update timing
+    * - Cache state changes
+    */
+   static constexpr bool debug_cache = false;
+
+   /**
+    * Enables validation of structural invariants throughout the codebase.
+    * Used in:
+    * - binary_node operations - Verifies node structure and key ordering
+    * - tree operations - Ensures tree balance and connectivity
+    * - data structure validation - Checks internal consistency
+    * This is a fundamental debugging flag that helps maintain data structure integrity.
+    */
+   static constexpr bool debug_invariant = false;
+
+   /**
+    * Enables debug logging for root node operations.
+    * Used in database operations to track:
+    * - Root node modifications
+    * - Tree structure changes
+    * - Database state transitions
+    * Particularly useful for debugging database consistency issues.
+    */
+   static constexpr bool debug_roots = false;
+
+   /**
+    * Enables comprehensive memory operation validation and tracking.
+    * Used extensively throughout the codebase:
+    * - read_lock::alloc() - Validates allocation state and prevents double allocation
+    * - object_ref operations - Verifies checksums and validates memory moves
+    * - seg_allocator - Tracks segment compaction and memory management
+    * - node operations - Ensures proper memory boundaries and layout
+    * - binary_node operations - Validates memory operations during node modifications
+    * 
+    * This is a critical debugging flag for catching memory-related issues and 
+    * ensuring proper memory management throughout the system.
+    */
+   static constexpr bool debug_memory = false;
 
    struct scope
    {

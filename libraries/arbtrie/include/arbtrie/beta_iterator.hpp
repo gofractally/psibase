@@ -55,11 +55,6 @@ namespace arbtrie
             clear();
             push_rend(_root.address());
          }
-         void clear()
-         {
-            _branches_end = _branches.data();
-            _path_back    = _path.data() - 1;
-         }
 
         public:
          static constexpr local_index rend_index  = local_index(-1);
@@ -117,17 +112,21 @@ namespace arbtrie
          // valid() will return false if this returns false
          bool first(key_view prefix = {});
 
-         // returns false if not found
-         template <typename Callback>
-         bool get(key_view key, Callback&& callback) const;
+         // This method does not move the iterator, it looks for
+         // an exact match of the key and calls the callback with the value
+         // if found.
+         //
+         // @note the read lock is held while the callback is executed, so
+         // get the data you need quickly and return from the callback.
+         // @return true if found, false otherwise
+         bool get(key_view key, auto&& callback);
 
          // Like get(), but also positions the iterator at the found key
          // Returns true if found and positions iterator at the key
-         // Returns false and calls end() if not found
-         template <typename Callback>
-         bool get2(key_view key, Callback&& callback);
+         // Returns false and positions iterator at the end() if not found
+         bool find(key_view key, auto&& callback);
 
-         // true if the iterator points to a key/value pair
+         // true if the iterator isn't at the end()
          bool valid() const { return _path_back >= _path.data(); }
 
          // if the value is a subtree, return an iterator into that subtree
@@ -142,18 +141,20 @@ namespace arbtrie
          // @return a handle to the root of the tree this iterator is traversing
          node_handle root_handle() const { return _root; }
 
-         // return -1 if no
-         int32_t value_size() const { return _size; }
-
          // resizes v to the and copies the value into it
-         int32_t read_value(auto& buffer);
+         int32_t read_value(auto& buffer) const;
 
          // copies the value into [s,s+s_len)
          //
-         // @throw if type is a subtree
+         // @throw if type is a subtree or iterator is at end() or rend()
          // @return total bytes copied
          //
-         int32_t read_value(char* s, uint32_t s_len);
+         int32_t read_value(char* s, uint32_t s_len) const;
+
+         // calls the callback with value_view of the data,
+         // throws if type is a subtree or iterator is at end() or rend()
+         // @return total bytes copied
+         int32_t read_value(auto&& callback) const;
 
          std::string value_as_string() const;
 
@@ -173,7 +174,7 @@ namespace arbtrie
          bool prev_impl(read_lock& state);
          bool lower_bound_impl(read_lock& state, key_view key);
 
-         void end() { clear(); }
+         bool end() { return clear(), false; }
          void begin()
          {
             clear();
@@ -237,6 +238,12 @@ namespace arbtrie
 
          local_index current_index() const { return local_index(_path_back->index); }
 
+         void clear()
+         {
+            _branches_end = _branches.data();
+            _path_back    = _path.data() - 1;
+         }
+
          struct path_entry
          {
             id_address oid;
@@ -259,6 +266,8 @@ namespace arbtrie
          int           _size;  // -1 if unknown of value at current key
          read_session& _rs;
          node_handle   _root;
+
+         bool get_impl(read_lock& state, key_view key, auto&& callback);
       };
 
    }  // namespace beta

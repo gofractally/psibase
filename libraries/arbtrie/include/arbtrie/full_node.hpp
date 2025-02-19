@@ -74,6 +74,13 @@ namespace arbtrie
          assert(get_branch(index.to_int()));
          return value_type::make_value_node(get_branch(index.to_int()));
       }
+      /*
+      value_type get_branch_value(uint8_t branch) const
+      {
+         assert(branch < branch_count);
+         return value_type::make_value_node(get_branch(branch + 1));
+      }
+      */
       key_view get_branch_key(local_index index) const
       {
          assert(index != begin_index());
@@ -237,6 +244,41 @@ namespace arbtrie
       uint32_t calculate_checksum() const
       {
          return XXH3_64bits(((const char*)this) + sizeof(checksum), _nsize - sizeof(checksum));
+      }
+
+      /**
+       * Returns the value at the given key and modifies the key to contain only the trailing portion.
+       * If no value is found, returns a remove value_type.
+       * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
+       * @return value_type - The value if found, or remove type if not found
+       */
+      value_type get_value_and_trailing_key(key_view& key) const
+      {
+         // First check if key matches the common prefix
+         key_view prefix = get_prefix();
+         if (key.size() < prefix.size() || memcmp(key.data(), prefix.data(), prefix.size()) != 0)
+            return value_type();  // Returns remove type
+
+         // Advance past the prefix
+         key = key.substr(prefix.size());
+
+         // If we've consumed the entire key, check for EOF value
+         if (key.empty())
+         {
+            if (has_eof_value())
+               return get_eof_value();
+            return value_type();  // Returns remove type
+         }
+
+         // Look up the branch for the first character
+         uint8_t    first_char  = key.front();
+         id_address branch_addr = get_branch(first_char + 1);
+         if (!branch_addr)
+            return value_type();  // Returns remove type
+
+         // Advance past the matched character
+         key = key.substr(1);
+         return value_type::make_value_node(branch_addr);
       }
 
       //private:

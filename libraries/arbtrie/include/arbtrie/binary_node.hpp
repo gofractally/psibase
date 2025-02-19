@@ -402,6 +402,23 @@ namespace arbtrie
          }
       }
 
+      /**
+       * Returns the value at the given key and modifies the key to contain only the trailing portion.
+       * If no value is found, returns a remove value_type.
+       * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
+       * @return value_type - The value if found, or remove type if not found
+       */
+      value_type get_value_and_trailing_key(key_view& key) const
+      {
+         // Use key_hash for faster point lookups
+         auto idx = find_key_idx(key, key_hash(key));
+         if (idx < 0)
+            return value_type();  // Returns remove type
+
+         key = key_view();  // we had to match the full key above
+         return get_value(idx);
+      }
+
       void reserve_branch_cap(short min_children);
 
       uint8_t*       key_hashes() { return _key_hashes; }

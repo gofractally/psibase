@@ -1894,6 +1894,74 @@ TEST_CASE("beta-upper-bound")
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
 
+struct perf_test_data
+{
+   std::vector<std::string> test_keys;
+   std::vector<std::string> inserted_keys;
+};
+
+perf_test_data populate_test_db(write_session& ws,
+                                node_handle&   root,
+                                size_t         total_keys    = 10'000'000,
+                                size_t         num_test_keys = 10'000'000)
+{
+   perf_test_data result;
+   result.inserted_keys.reserve(total_keys);
+
+   // Function to generate random key using rand64
+   auto make_key = [](uint64_t val, size_t len)
+   {
+      std::string key;
+      key.resize(len);
+      memcpy(key.data(), &val, std::min(len, sizeof(val)));
+      return key;
+   };
+
+   std::cout << "Populating database with " << total_keys << " keys..." << std::endl;
+   auto insert_start = std::chrono::steady_clock::now();
+
+   // Insert random keys
+   for (size_t i = 0; i < total_keys; ++i)
+   {
+      uint64_t    val = uint64_t(rand64());
+      size_t      len = (val % 8) + 1;  // Random length 1-8 bytes
+      std::string key = make_key(val, len);
+      result.inserted_keys.push_back(key);
+      key_view kstr(key.data(), key.size());
+      ws.upsert(root, kstr, kstr);
+
+      if (i % 1'000'000 == 0 && i > 0)
+      {
+         std::cout << "Inserted " << i << " keys..." << std::endl;
+      }
+   }
+
+   auto insert_end      = std::chrono::steady_clock::now();
+   auto insert_duration = std::chrono::duration<double>(insert_end - insert_start).count();
+   std::cout << "Database population complete in " << insert_duration << " seconds ("
+             << (total_keys / insert_duration) << " keys/sec)" << std::endl;
+
+   std::cout << "Sampling " << num_test_keys << " test keys..." << std::endl;
+   auto sample_start = std::chrono::steady_clock::now();
+
+   // Randomly sample test keys from inserted keys
+   result.test_keys.reserve(num_test_keys);
+   std::random_device              rd;
+   std::mt19937                    gen(rd());
+   std::uniform_int_distribution<> dis(0, total_keys - 1);
+
+   for (int i = 0; i < num_test_keys; ++i)
+   {
+      result.test_keys.push_back(result.inserted_keys[dis(gen)]);
+   }
+
+   auto sample_end      = std::chrono::steady_clock::now();
+   auto sample_duration = std::chrono::duration<double>(sample_end - sample_start).count();
+   std::cout << "Test key sampling complete in " << sample_duration << " seconds" << std::endl;
+
+   return result;
+}
+
 TEST_CASE("lower-bound-performance")
 {
    environ env;
@@ -1901,44 +1969,14 @@ TEST_CASE("lower-bound-performance")
    {
       auto r = ws.create_root();
 
-      // Function to generate random key using rand64
-      auto make_key = [](uint64_t val, size_t len)
-      {
-         std::string key;
-         key.resize(len);
-         memcpy(key.data(), &val, std::min(len, sizeof(val)));
-         return key;
-      };
-
-      // Insert 1 million random keys
-      size_t                   total_keys = 1'000'000;
-      std::vector<std::string> inserted_keys;
-      inserted_keys.reserve(total_keys);
-
-      for (size_t i = 0; i < total_keys; ++i)
-      {
-         uint64_t    val = uint64_t(rand64());
-         size_t      len = (val % 8) + 1;  // Random length 1-8 bytes
-         std::string key = make_key(val, len);
-         key_view    kstr(key.data(), key.size());
-         ws.upsert(r, kstr, kstr);
-      }
-
-      // Generate 100k random search keys
-      std::vector<std::string> search_keys;
-      search_keys.reserve(1000000);
-      for (int i = 0; i < 1000000; ++i)
-      {
-         uint64_t val = uint64_t(rand64());
-         size_t   len = (val % 8) + 1;
-         search_keys.push_back(make_key(val, len));
-      }
+      // Populate database and get test data
+      auto test_data = populate_test_db(ws, r);
 
       // Test regular iterator performance
       auto reg_start = std::chrono::steady_clock::now();
       {
          auto itr = ws.create_iterator<caching>(r);
-         for (const auto& key : search_keys)
+         for (const auto& key : test_data.test_keys)
          {
             itr.lower_bound(key_view(key.data(), key.size()));
          }
@@ -1946,31 +1984,112 @@ TEST_CASE("lower-bound-performance")
       auto reg_end      = std::chrono::steady_clock::now();
       auto reg_duration = std::chrono::duration<double>(reg_end - reg_start).count();
 
-      // Test beta iterator performance
-      auto beta_start = std::chrono::steady_clock::now();
+      // Test beta iterator with caching performance
+      auto beta_cache_start = std::chrono::steady_clock::now();
       {
          auto itr = ws.create_beta_iterator<beta::caching>(r);
-         for (int i = 0; i < search_keys.size(); ++i)
+         for (const auto& key : test_data.test_keys)
          {
-            itr.lower_bound(key_view(search_keys[i].data(), search_keys[i].size()));
+            itr.lower_bound(key_view(key.data(), key.size()));
          }
       }
-      auto beta_end      = std::chrono::steady_clock::now();
-      auto beta_duration = std::chrono::duration<double>(beta_end - beta_start).count();
+      auto beta_cache_end = std::chrono::steady_clock::now();
+      auto beta_cache_duration =
+          std::chrono::duration<double>(beta_cache_end - beta_cache_start).count();
+
+      // Test beta iterator without caching performance
+      auto beta_nocache_start = std::chrono::steady_clock::now();
+      {
+         auto itr = ws.create_beta_iterator<beta::noncaching>(r);
+         for (const auto& key : test_data.test_keys)
+         {
+            itr.lower_bound(key_view(key.data(), key.size()));
+         }
+      }
+      auto beta_nocache_end = std::chrono::steady_clock::now();
+      auto beta_nocache_duration =
+          std::chrono::duration<double>(beta_nocache_end - beta_nocache_start).count();
+
+      // Calculate operations per second
+      double reg_ops_per_sec          = test_data.test_keys.size() / reg_duration;
+      double beta_cache_ops_per_sec   = test_data.test_keys.size() / beta_cache_duration;
+      double beta_nocache_ops_per_sec = test_data.test_keys.size() / beta_nocache_duration;
 
       // Report performance results
-      double reg_ops_per_sec  = search_keys.size() / reg_duration;
-      double beta_ops_per_sec = search_keys.size() / beta_duration;
-
       std::cout << "\nLower Bound Performance Results:" << std::endl;
       std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_ops_per_sec
-                << " ops/sec (" << search_keys.size() << " searches in " << reg_duration
+                << " ops/sec (" << test_data.test_keys.size() << " searches in " << reg_duration
                 << " seconds)" << std::endl;
-      std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_ops_per_sec
-                << " ops/sec (" << search_keys.size() << " searches in " << beta_duration
-                << " seconds)" << std::endl;
-      std::cout << "Beta/Regular Ratio: " << std::fixed << std::setprecision(4)
-                << (beta_ops_per_sec / reg_ops_per_sec) << std::endl;
+      std::cout << "Beta Iterator (cached): " << std::fixed << std::setprecision(4)
+                << beta_cache_ops_per_sec << " ops/sec (" << test_data.test_keys.size()
+                << " searches in " << beta_cache_duration << " seconds)" << std::endl;
+      std::cout << "Beta Iterator (no cache): " << std::fixed << std::setprecision(4)
+                << beta_nocache_ops_per_sec << " ops/sec (" << test_data.test_keys.size()
+                << " searches in " << beta_nocache_duration << " seconds)" << std::endl;
+      std::cout << "\nRatios vs Regular Iterator:" << std::endl;
+      std::cout << "Beta (cached)/Regular: " << std::fixed << std::setprecision(4)
+                << (beta_cache_ops_per_sec / reg_ops_per_sec) << std::endl;
+      std::cout << "Beta (no cache)/Regular: " << std::fixed << std::setprecision(4)
+                << (beta_nocache_ops_per_sec / reg_ops_per_sec) << std::endl;
+   }
+   REQUIRE(ws.count_ids_with_refs() == 0);
+}
+
+TEST_CASE("iterator-get-performance")
+{
+   environ env;
+   auto    ws = env.db->start_write_session();
+   {
+      auto r = ws.create_root();
+
+      // Populate database and get test data
+      auto test_data = populate_test_db(ws, r);
+
+      // Test regular iterator get performance
+      auto   reg_start = std::chrono::steady_clock::now();
+      size_t reg_found = 0;
+      {
+         auto itr = ws.create_iterator<caching>(r);
+         for (const auto& key : test_data.test_keys)
+         {
+            itr.get(key_view(key.data(), key.size()),
+                    [&](bool found, const value_type& val)
+                    {
+                       if (found)
+                          reg_found++;
+                    });
+         }
+      }
+      auto reg_end          = std::chrono::steady_clock::now();
+      auto reg_duration     = std::chrono::duration<double>(reg_end - reg_start).count();
+      auto reg_keys_per_sec = test_data.test_keys.size() / reg_duration;
+
+      // Test beta iterator get performance
+      auto   beta_start = std::chrono::steady_clock::now();
+      size_t beta_found = 0;
+      {
+         auto itr = ws.create_beta_iterator<beta::caching>(r);
+         for (const auto& key : test_data.test_keys)
+         {
+            beta_found += itr.get(key_view(key.data(), key.size()),
+                                  [&](const value_type& val) { return true; });
+         }
+      }
+      auto beta_end          = std::chrono::steady_clock::now();
+      auto beta_duration     = std::chrono::duration<double>(beta_end - beta_start).count();
+      auto beta_keys_per_sec = test_data.test_keys.size() / beta_duration;
+
+      // Report performance results
+      std::cout << "\nGet Performance Results:" << std::endl;
+      std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_keys_per_sec
+                << " keys/sec (" << beta_found << " found in " << beta_duration << " seconds)"
+                << std::endl;
+      std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_keys_per_sec
+                << " keys/sec (" << reg_found << " found in " << reg_duration << " seconds)"
+                << std::endl;
+
+      // Verify both iterators found the same number of keys
+      REQUIRE(beta_found == reg_found);
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
 }

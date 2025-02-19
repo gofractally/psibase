@@ -160,6 +160,41 @@ namespace arbtrie
          auto branch_idx = get_branch_ptr()[index.to_int() - has_eof_value()];
          return value_type::make_value_node(id_address(branch_region(), branch_idx));
       }
+
+      /**
+       * Returns the value at the given key and modifies the key to contain only the trailing portion.
+       * If no value is found, returns a remove value_type.
+       * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
+       * @return value_type - The value if found, or remove type if not found
+       */
+      value_type get_value_and_trailing_key(key_view& key) const
+      {
+         // First check if key matches the common prefix
+         key_view prefix = get_prefix();
+         if (key.size() < prefix.size() || memcmp(key.data(), prefix.data(), prefix.size()) != 0)
+            return value_type();  // Returns remove type
+
+         // Advance past the prefix
+         key = key.substr(prefix.size());
+
+         // If we've consumed the entire key, check for EOF value
+         if (key.empty())
+         {
+            if (has_eof_value())
+               return get_eof_value();
+            return value_type();  // Returns remove type
+         }
+
+         // Look up the branch in the setlist
+         auto pos = get_setlist().find(key.front());
+         if (pos == key_view::npos)
+            return value_type();  // Returns remove type
+
+         // Advance past the matched character
+         key = key.substr(1);
+         return get_value(local_index(pos + has_eof_value()));
+      }
+
       ///@}
 
       // uint8_t             prefix[prefix_capacity()]

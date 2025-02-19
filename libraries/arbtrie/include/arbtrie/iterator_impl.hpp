@@ -212,7 +212,7 @@ namespace arbtrie
          if (idx.first == char_to_branch(query.front()))
             return lower_bound_impl(bref, remaining_query.substr(1));
          else  // if the lower bound of the first byte is beyond the first byte of query,
-             // then we start at the beginning of the next level
+               // then we start at the beginning of the next level
             return lower_bound_impl(bref, key_view());
       }
       popkey(node_prefix.size());
@@ -622,8 +622,7 @@ namespace arbtrie
    }
 
    template <iterator_caching_mode CacheMode>
-   template <typename Callback>
-   bool iterator<CacheMode>::get(key_view key, Callback&& callback) const
+   bool iterator<CacheMode>::get(key_view key, auto&& callback) const
    {
       if (not _root.address()) [[unlikely]]
       {
@@ -634,12 +633,11 @@ namespace arbtrie
       auto state = _rs._segas.lock();
       auto rr    = state.get(_root.address());
 
-      return _rs.get(rr, key, std::forward<Callback>(callback));
+      return _rs.get(rr, key, std::forward<decltype(callback)>(callback));
    }
 
    template <iterator_caching_mode CacheMode>
-   template <typename Callback>
-   bool iterator<CacheMode>::get2(key_view key, Callback&& callback)
+   bool iterator<CacheMode>::get2(key_view key, auto&& callback)
    {
       if (not _root.address()) [[unlikely]]
       {
@@ -655,14 +653,13 @@ namespace arbtrie
 
       // _path.push_back({rr.address(), 0});
 
-      if (get2_impl(rr, key, std::forward<Callback>(callback)))
+      if (get2_impl(rr, key, std::forward<decltype(callback)>(callback)))
          return true;
       return end();
    }
 
    template <iterator_caching_mode CacheMode>
-   template <typename Callback>
-   bool iterator<CacheMode>::get2_impl(object_ref& r, key_view key, Callback&& callback)
+   bool iterator<CacheMode>::get2_impl(object_ref& r, key_view key, auto&& callback)
    {
       if (_path.empty())
       {
@@ -692,8 +689,8 @@ namespace arbtrie
             _path.push_back({id_address(addr), 0});
             pushkey(branch_to_char(br));
             auto next_ref = r.rlock().get(addr);
-            bool result =
-                get2_impl(next_ref, remaining_key.substr(1), std::forward<Callback>(callback));
+            bool result   = get2_impl(next_ref, remaining_key.substr(1),
+                                      std::forward<decltype(callback)>(callback));
             if (!result)
             {
                popkey(1);
