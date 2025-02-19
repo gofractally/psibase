@@ -6,8 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-staged-tx = { path = "../service/", version = "0.14.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
+staged-tx = { path = "../service/", version = "0.15.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.36.0", features = ["bitflags"] }
@@ -30,4 +30,4 @@ world = "impl"
 
 
 [dev-dependencies]
-staged-tx-pkg = { path = "..", version = "0.14.0" }
+staged-tx-pkg = { path = "..", version = "0.15.0" }
