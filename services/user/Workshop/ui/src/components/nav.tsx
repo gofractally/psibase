@@ -7,7 +7,7 @@ function HoverBorderGradientDemo() {
   const { data: networkName } = useBranding();
 
   return (
-    <div className=" flex justify-center text-center">
+    <div className="flex justify-center text-center">
       <HoverBorderGradient
         as="div"
         containerClassName="rounded-full"

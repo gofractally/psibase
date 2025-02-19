@@ -4,40 +4,30 @@ use async_graphql::SimpleObject;
 use fracpack::ToSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "SitesContentKeyInput")]
-struct SitesContentKey {
-    account: AccountNumber,
-    path: String,
-}
+#[allow(dead_code)]
+type SitesContentKey = (AccountNumber, String);
 
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "InviteRecordInput")]
+#[graphql(input_name = "SitesContentRowInput")]
 struct SitesContentRow {
     account: AccountNumber,
     path: String,
     contentType: String,
     content: Vec<u8>,
-    csp: String,
     hash: u64,
+    contentEncoding: Option<String>,
+    csp: Option<String>,
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "SiteConfigRowInput")]
 struct SiteConfigRow {
     account: AccountNumber,
     spa: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack")]
-#[graphql(input_name = "GlobalCspRowInput")]
-struct GlobalCspRow {
-    account: AccountNumber,
-    csp: String,
+    cache: bool,
+    globalCsp: Option<String>,
 }
 
 /// Decompress content
@@ -85,7 +75,7 @@ mod service {
 
     /// Removes content from the caller's subdomain
     #[action]
-    fn removeSys(path: String) {
+    fn remove(path: String) {
         unimplemented!()
     }
 

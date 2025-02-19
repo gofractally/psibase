@@ -563,7 +563,7 @@ impl PackageManifest {
             if !new_files.contains(file) {
                 out.push_action(
                     sites::Wrapper::pack_from_to(file.account, file.service)
-                        .removeSys(file.filename.clone()),
+                        .remove(file.filename.clone()),
                 )?;
             }
         }
@@ -585,7 +585,7 @@ impl PackageManifest {
         for file in &self.data {
             out.push_action(
                 sites::Wrapper::pack_from_to(file.account, file.service)
-                    .removeSys(file.filename.clone()),
+                    .remove(file.filename.clone()),
             )?;
         }
         for (service, info) in &self.services {

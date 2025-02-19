@@ -8,7 +8,7 @@ interface types {
     }
 }
 
-interface sites {
+interface api {
     use types.{file};
     use host:common/types.{error};
 
@@ -21,7 +21,7 @@ interface sites {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     upload: func(file: file, compression-quality: u8) -> result<_, error>;
@@ -35,7 +35,7 @@ interface sites {
     /// file-type of the content is supported. Compression-quality must be 
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
     /// 
-    /// The maximum size of a transaction submitted to upload content is 1mb.
+    /// The maximum size of a transaction submitted to upload content is 3mb.
     /// This also serves as the de facto limit on the size of a single uploaded 
     /// file (after compression if applied).
     /// 
@@ -48,6 +48,9 @@ interface sites {
     /// the transaction will be aborted and the error will contain the path
     /// of the file that caused the error.
     upload-tree: func(files: list<file>, compression-quality: u8) -> result<u16, error>;
+
+    /// Remove content from the caller's subdomain
+    remove: func(path: string) -> result<_, error>;
 
     /// Enable or disable single-page application mode.
     /// When enabled, all content requests return the root document
@@ -65,9 +68,9 @@ interface sites {
     /// - The hash is stored in the `ETag` header
     /// - If the hash matches, a 304 Not Modified response is returned
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
-    enable-cache: func(enable: bool) -> result<_, error>;
+    set-cache-mode: func(enable: bool) -> result<_, error>;
 }
 
 world imports {
-    import sites;
+    import api;
 }
