@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "addcheckinit"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -349,7 +349,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "basicwquery"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-graphql",
  "mincallrecvr",
@@ -435,7 +435,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "burst-transfer"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1052,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "example"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1122,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1249,7 +1249,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -2028,7 +2028,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "clap",
  "pulldown-cmark 0.9.6",
@@ -2093,7 +2093,7 @@ dependencies = [
 
 [[package]]
 name = "mincallrecvr"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2649,7 +2649,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2702,7 +2702,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2716,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -2728,21 +2728,21 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "seahash",
 ]
 
 [[package]]
 name = "psimacrotest"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "addcheckinit",
  "async-graphql",
@@ -2795,7 +2795,7 @@ dependencies = [
 
 [[package]]
 name = "r-tpack"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3435,7 +3435,7 @@ dependencies = [
 
 [[package]]
 name = "subjective"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "psibase_macros",
@@ -3590,7 +3590,7 @@ dependencies = [
 
 [[package]]
 name = "test-contract"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3599,7 +3599,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -3612,7 +3612,7 @@ dependencies = [
 
 [[package]]
 name = "test_package"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "r-tpack",
  "tpack",
@@ -3792,7 +3792,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpack"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "serde",
@@ -3801,7 +3801,7 @@ dependencies = [
 
 [[package]]
 name = "tpack-plugin"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt",
