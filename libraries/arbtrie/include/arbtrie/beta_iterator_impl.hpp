@@ -17,21 +17,21 @@ namespace arbtrie
          std::stringstream ss;
          ss << "'" << key() << "' => ";
          size_t pos = 0;
-         for (size_t i = 0; i < _path.size(); ++i)
+         for (size_t i = 0; i < _path->size(); ++i)
          {
-            const auto& entry = _path[i];
+            const auto& entry = (*_path)[i];
             if (&entry > _path_back)
                break;
 
             if (i > 0)
                ss << " / ";
             // Print prefix
-            ss << "'" << key_view(_branches.data() + pos, entry.prefix_size) << "'";
+            ss << "'" << key_view(_branches->data() + pos, entry.prefix_size) << "'";
             pos += entry.prefix_size;
             // Print branch if it exists
             if (entry.branch_size > 0)
             {
-               ss << " '" << key_view(_branches.data() + pos, entry.branch_size) << "'";
+               ss << " '" << key_view(_branches->data() + pos, entry.branch_size) << "'";
             }
             pos += entry.branch_size;
          }
@@ -51,7 +51,7 @@ namespace arbtrie
                    throw std::runtime_error(
                        "cannot create subtree iterator from non-subtree value");
              });
-         return iterator<CacheMode>(_rs, val_addr);
+         return iterator<CacheMode>(*_rs, val_addr);
       }
 
       template <iterator_caching_mode CacheMode>
@@ -91,7 +91,7 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode>
       int32_t iterator<CacheMode>::read_value(auto&& callback) const
       {
-         auto    state      = _rs.lock();
+         auto    state      = _rs->lock();
          auto    addr       = _path_back->oid;
          int32_t bytes_read = -1;
          while (true)
@@ -125,7 +125,7 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::lower_bound(key_view key)
       {
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          begin();
          return lower_bound_impl(state, key);
       }
@@ -183,7 +183,7 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::next()
       {
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          return next_impl(state);
       }
 
@@ -240,10 +240,10 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::prev()
       {
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          if (is_end()) [[unlikely]]
          {
-            _path_back = _path.data();
+            _path_back = _path->data();
             auto oref  = state.get(_path_back->oid);
             _path_back->index =
                 cast_and_call(oref.template header<node_header, CacheMode>(),
@@ -285,7 +285,7 @@ namespace arbtrie
 
                        if (nidx <= n->begin_index())
                        {
-                          if (_path_back != _path.data())
+                          if (_path_back != _path->data())
                              return pop_path(), false;  // continue up the tree
 
                           // if we are at the top of the tree, we are done
@@ -314,7 +314,7 @@ namespace arbtrie
       template <iterator_caching_mode CacheMode>
       bool iterator<CacheMode>::upper_bound(key_view search)
       {
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          begin();
          if (not lower_bound_impl(state, search))
             return false;
@@ -333,7 +333,7 @@ namespace arbtrie
          if (prefix.size() > max_key_length)
             throw std::runtime_error("invalid key length");
 
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          begin();
 
          // If no prefix is provided, find the last key in the entire tree
@@ -368,7 +368,7 @@ namespace arbtrie
          if (prefix.size() > max_key_length)
             throw std::runtime_error("invalid key length");
 
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          begin();
 
          // If no prefix is provided, just move to the first key
@@ -395,7 +395,7 @@ namespace arbtrie
          if (prefix.size() > max_key_length)
             throw std::runtime_error("invalid key length");
 
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          begin();
 
          // First try to find the exact prefix or the next key after it
@@ -430,7 +430,7 @@ namespace arbtrie
          if (key.size() > max_key_length)
             throw std::runtime_error("invalid key length");
 
-         auto state = _rs.lock();
+         auto state = _rs->lock();
          return get_impl(state, key, std::forward<decltype(callback)>(callback));
       }
 
