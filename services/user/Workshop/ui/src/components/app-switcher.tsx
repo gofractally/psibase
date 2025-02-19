@@ -14,7 +14,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
-// import { useParams } from "react-router-dom";
 import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { useLocation, useNavigate } from "react-router-dom";

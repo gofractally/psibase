@@ -3,7 +3,6 @@ import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-// const ByteObjectSchema = z.record(z.coerce.number().int().min(0).max(255));
 const u8Schema = z.number().int().min(0).max(255);
 
 const File = z.object({

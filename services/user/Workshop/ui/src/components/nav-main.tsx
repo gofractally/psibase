@@ -36,9 +36,6 @@ export function NavMain() {
   const location = useLocation();
 
   const appName = location.pathname.split("/")[2];
-  console.log("current path", location);
-
-  console.log(location.pathname, "is pathname");
 
   return (
     <SidebarGroup>
