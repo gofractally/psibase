@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/", version = "0.14.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
 wit-bindgen-rt = { version = "0.38.0", features = ["bitflags"] }
 
 [lib]

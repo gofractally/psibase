@@ -21,4 +21,4 @@ async-graphql = "7.0.7"
 serde = { version = "1.0.209", features = ["derive"] }
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.14.0" }
+chainmail_package = { path = "..", version = "0.15.0" }
