@@ -464,6 +464,145 @@ namespace arbtrie
          __builtin_unreachable();
       }
 
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::is_begin() const
+      {
+         return (*_path)[0].index == rend_index.to_int();
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::is_end() const
+      {
+         return _path_back == _path->data() - 1;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      node_handle iterator<CacheMode>::get_root() const
+      {
+         return _root;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      key_view iterator<CacheMode>::key() const
+      {
+         return to_key(_branches->data(), _branches_end - _branches->data());
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::valid() const
+      {
+         return _path_back >= _path->data();
+      }
+
+      template <iterator_caching_mode CacheMode>
+      node_handle iterator<CacheMode>::root_handle() const
+      {
+         return _root;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      template <typename... Args>
+      void iterator<CacheMode>::debug_print(const Args&... args) const
+      {
+         return;
+         std::cerr << std::string(_path->size() * 4, ' ');
+         (std::cerr << ... << args) << "\n";
+      }
+
+      template <iterator_caching_mode CacheMode>
+      bool iterator<CacheMode>::end()
+      {
+         return clear(), false;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::begin()
+      {
+         clear();
+         push_rend(_root.address());
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::push_rend(id_address oid)
+      {
+         _path_back++;
+         *_path_back = {.oid = oid, .index = rend_index.to_int()};
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::push_end(id_address oid)
+      {
+         _path_back++;
+         *_path_back = {.oid = oid, .index = end_index.to_int()};
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::push_path(id_address oid, local_index branch_index)
+      {
+         _path_back++;
+         *_path_back = {.oid = oid, .index = branch_index.to_int()};
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::pop_path()
+      {
+         _branches_end -= _path_back->key_size();
+         --_path_back;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::push_prefix(key_view prefix)
+      {
+         memcpy(_branches_end, prefix.data(), prefix.size());
+         _branches_end += prefix.size();
+         _path_back->prefix_size = prefix.size();
+         _path_back->branch_size = 0;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::update_branch(key_view new_branch, local_index new_index)
+      {
+         // Adjust size of branches to remove old key and make space for new key
+         _branches_end -= _path_back->branch_size;
+         memcpy(_branches_end, new_branch.data(), new_branch.size());
+         _branches_end += new_branch.size();
+
+         _path_back->branch_size = new_branch.size();
+         _path_back->index       = new_index.to_int();
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::update_branch(local_index new_index)
+      {
+         _branches_end -= _path_back->branch_size;
+         _path_back->index       = new_index.to_int();
+         _path_back->branch_size = 0;
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::update_branch(char new_branch, local_index new_index)
+      {
+         // Adjust size of branches to remove old key and make space for new key
+         _branches_end -= _path_back->branch_size;
+         *_branches_end = new_branch;
+         _branches_end++;
+         _path_back->branch_size = 1;
+         _path_back->index       = new_index.to_int();
+      }
+
+      template <iterator_caching_mode CacheMode>
+      local_index iterator<CacheMode>::current_index() const
+      {
+         return local_index(_path_back->index);
+      }
+
+      template <iterator_caching_mode CacheMode>
+      void iterator<CacheMode>::clear()
+      {
+         _branches_end = _branches->data();
+         _path_back    = _path->data() - 1;
+      }
+
    }  // namespace beta
 
 }  // namespace arbtrie

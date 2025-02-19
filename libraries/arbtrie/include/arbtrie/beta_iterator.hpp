@@ -145,19 +145,16 @@ namespace arbtrie
          }();
 
          bool is_rend() const { return is_begin(); }
-         bool is_begin() const { return (*_path)[0].index == rend_index.to_int(); }
-         bool is_end() const { return _path_back == _path->data() - 1; }
+         bool is_begin() const;
+         bool is_end() const;
 
          static constexpr const key_view npos = key_view(nposa.data(), nposa.size());
          static_assert(npos > key_view());
 
          // return the root this iterator is based on
-         node_handle get_root() const { return _root; }
+         node_handle get_root() const;
          // the key the iterator is currently pointing to
-         key_view key() const
-         {
-            return to_key(_branches->data(), _branches_end - _branches->data());
-         }
+         key_view key() const;
 
          bool next();  // moves to next key, return valid()
          bool prev();  // moves to the prv key, return valid()
@@ -205,7 +202,7 @@ namespace arbtrie
          bool find(key_view key, auto&& callback);
 
          // true if the iterator isn't at the end()
-         bool valid() const { return _path_back >= _path->data(); }
+         bool valid() const;
 
          // if the value is a subtree, return an iterator into that subtree
          iterator subtree_iterator() const;
@@ -217,7 +214,7 @@ namespace arbtrie
          node_handle subtree() const;
 
          // @return a handle to the root of the tree this iterator is traversing
-         node_handle root_handle() const { return _root; }
+         node_handle root_handle() const;
 
          // resizes v to the and copies the value into it
          int32_t read_value(auto& buffer) const;
@@ -239,86 +236,29 @@ namespace arbtrie
 
         private:
          template <typename... Args>
-         void debug_print(const Args&... args) const
-         {
-            return;
-            std::cerr << std::string(_path->size() * 4, ' ');
-            (std::cerr << ... << args) << "\n";
-         }
+         void debug_print(const Args&... args) const;
 
          bool next_impl(read_lock& state);
          bool prev_impl(read_lock& state);
          bool lower_bound_impl(read_lock& state, key_view key);
 
-         bool end() { return clear(), false; }
-         void begin()
-         {
-            clear();
-            push_rend(_root.address());
-         }
+         bool end();
+         void begin();
 
-         void push_rend(id_address oid)
-         {
-            _path_back++;
-            *_path_back = {.oid = oid, .index = rend_index.to_int()};
-         }
-         void push_end(id_address oid)
-         {
-            _path_back++;
-            *_path_back = {.oid = oid, .index = end_index.to_int()};
-         }
-         void push_path(id_address oid, local_index branch_index)
-         {
-            _path_back++;
-            *_path_back = {.oid = oid, .index = branch_index.to_int()};
-         }
-         void pop_path()
-         {
-            _branches_end -= _path_back->key_size();
-            --_path_back;
-         }
+         void push_rend(id_address oid);
+         void push_end(id_address oid);
+         void push_path(id_address oid, local_index branch_index);
+         void pop_path();
 
-         void push_prefix(key_view prefix)
-         {
-            memcpy(_branches_end, prefix.data(), prefix.size());
-            _branches_end += prefix.size();
-            _path_back->prefix_size = prefix.size();
-            _path_back->branch_size = 0;
-         }
+         void push_prefix(key_view prefix);
 
-         void update_branch(key_view new_branch, local_index new_index)
-         {
-            // Adjust size of branches to remove old key and make space for new key
-            _branches_end -= _path_back->branch_size;
-            memcpy(_branches_end, new_branch.data(), new_branch.size());
-            _branches_end += new_branch.size();
+         void update_branch(key_view new_branch, local_index new_index);
+         void update_branch(local_index new_index);
+         void update_branch(char new_branch, local_index new_index);
 
-            _path_back->branch_size = new_branch.size();
-            _path_back->index       = new_index.to_int();
-         }
-         void update_branch(local_index new_index)
-         {
-            _branches_end -= _path_back->branch_size;
-            _path_back->index       = new_index.to_int();
-            _path_back->branch_size = 0;
-         }
-         void update_branch(char new_branch, local_index new_index)
-         {
-            // Adjust size of branches to remove old key and make space for new key
-            _branches_end -= _path_back->branch_size;
-            *_branches_end = new_branch;
-            _branches_end++;
-            _path_back->branch_size = 1;
-            _path_back->index       = new_index.to_int();
-         }
+         local_index current_index() const;
 
-         local_index current_index() const { return local_index(_path_back->index); }
-
-         void clear()
-         {
-            _branches_end = _branches->data();
-            _path_back    = _path->data() - 1;
-         }
+         void clear();
 
          struct path_entry
          {
