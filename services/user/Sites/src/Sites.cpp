@@ -432,11 +432,12 @@ namespace SystemService
           .content         = std::move(content),
           .hash            = hash,
           .contentEncoding = std::move(contentEncoding),
+          .csp             = std::nullopt,
       };
       table.put(row);
    }
 
-   void Sites::removeSys(std::string path)
+   void Sites::remove(std::string path)
    {
       Tables tables{};
       auto   table = tables.open<SitesContentTable>();
@@ -491,23 +492,22 @@ namespace SystemService
    void Sites::setCsp(std::string path, std::string csp)
    {
       Tables tables{};
+
       if (path == "*")
       {
-         auto table = tables.open<GlobalCspTable>();
-         table.put({
-             .account = getSender(),
-             .csp     = std::move(csp),
-         });
+         auto siteTable = tables.open<SiteConfigTable>();
+         auto site = siteTable.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+         site.globalCsp = std::optional{std::move(csp)};
+         siteTable.put(std::move(site));
       }
       else
       {
-         auto table   = tables.open<SitesContentTable>();
-         auto index   = table.getIndex<0>();
-         auto content = index.get(SitesContentKey{getSender(), path});
-         check(!!content, "Content not found for the specified path");
+         auto contentTable = tables.open<SitesContentTable>();
+         auto content      = contentTable.get(SitesContentKey{getSender(), path});
+         check(!!content, "Invalid path");
 
-         content->csp = std::move(csp);
-         table.put(*content);
+         content->csp = std::optional{std::move(csp)};
+         contentTable.put(*content);
       }
    }
 
@@ -542,16 +542,16 @@ namespace SystemService
                                    const AccountNumber&                  account)
    {
       std::string cspHeader = DEFAULT_CSP_HEADER;
-      if (content && !content->csp.empty())
+      if (content && content->csp.has_value())
       {
-         cspHeader = content->csp;
+         cspHeader = *content->csp;
       }
       else
       {
-         auto globalCsp = Tables{}.open<GlobalCspTable>().get(account);
-         if (globalCsp)
+         auto siteConfig = Tables{}.open<SiteConfigTable>().get(account);
+         if (siteConfig && siteConfig->globalCsp)
          {
-            cspHeader = globalCsp->csp;
+            cspHeader = *siteConfig->globalCsp;
          }
       }
       return cspHeader;
@@ -566,33 +566,65 @@ namespace SystemService
 
    namespace
    {
+      struct SiteConfig
+      {
+         psibase::AccountNumber account;
+         bool                   spa       = false;
+         bool                   cache     = true;
+         std::string            globalCsp = "";
+      };
+      PSIO_REFLECT(SiteConfig, account, spa, cache, globalCsp)
+
       struct Query
       {
          AccountNumber service;
 
-         auto content() const
+         auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
-            return Sites::Tables{service}.open<SitesContentTable>().getIndex<0>();
+            auto tables = Sites::Tables{service};
+
+            // Get the site config, or return a default
+            auto record = tables.open<SiteConfigTable>().get(account).value_or(
+                SiteConfigRow{.account = account});
+            return SiteConfig{.account   = record.account,
+                              .spa       = record.spa,
+                              .cache     = record.cache,
+                              .globalCsp = record.globalCsp.value_or(DEFAULT_CSP_HEADER)};
+         }
+
+         auto getContent(AccountNumber account) const
+         {
+            auto tables = Sites::Tables{service};
+            auto record = tables.open<SiteConfigTable>().get(account).value_or(
+                SiteConfigRow{.account = account});
+            auto globalCsp = record.globalCsp.value_or(DEFAULT_CSP_HEADER);
+
+            auto idx =
+                tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
+
+            return TransformedConnection(idx,
+                                         [globalCsp = std::move(globalCsp)](auto&& row)
+                                         {
+                                            row.csp = row.csp.value_or(globalCsp);
+                                            return row;
+                                         });
          }
       };
-      PSIO_REFLECT(Query, method(content))
+      PSIO_REFLECT(Query,                        //
+                   method(getConfig, account),   //
+                   method(getContent, account),  //
+      )
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSitesApp(const HttpRequest& request)
    {
-      if (auto result = psibase::serveActionTemplates<Sites>(request))
-         return result;
-
-      if (auto result = psibase::servePackAction<Sites>(request))
-         return result;
-
       if (auto result = psibase::serveSchema<Sites>(request))
          return result;
 
       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
          return result;
 
-      if (auto result = psibase::serveSimpleUI<Sites, true>(request))
+      if (auto result = psibase::serveSimpleUI<Sites, false>(request))
          return result;
 
       return std::nullopt;

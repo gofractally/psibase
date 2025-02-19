@@ -6,7 +6,7 @@ use exports::branding::plugin::api::Guest as Api;
 use exports::branding::plugin::queries::Guest as Queries;
 use host::common::server as CommonServer;
 use host::common::types::Error;
-use sites::plugin::sites::{upload, File};
+use sites::plugin::api::{upload, File};
 use staged_tx::plugin::proposer::*;
 use transact::plugin::intf::add_action_to_transaction;
 

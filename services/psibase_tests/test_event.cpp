@@ -77,3 +77,17 @@ TEST_CASE("test merkle events")
       CHECK(expected_root == actual_root);
    }
 }
+
+TEST_CASE("test event in failed transaction")
+{
+   DefaultTestChain t;
+
+   auto event_service =
+       t.from(t.addService("event-service"_a, "event-service.wasm")).to<EventService>();
+
+   auto id1 = event_service.foo("a", 1).returnVal();
+   auto id2 = event_service.foo("b", 2).returnVal();
+   CHECK(event_service.emitFail("c", 3).failed("die"));
+   auto id3 = event_service.foo("d", 4).returnVal();
+   CHECK(id2 - id1 == id3 - id2);
+}

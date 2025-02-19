@@ -86,6 +86,10 @@ namespace SystemService
       /// for the owned account will check authorization for the owner instead.
       void setOwner(psibase::AccountNumber owner);
 
+      /// Create a new account with the specified name.
+      /// The sender of the action will be the owner of the new account.
+      void newAccount(psibase::AccountNumber name);
+
      private:
       Tables                        db{psibase::getReceiver()};
       psibase::AccountNumber        getOwner(psibase::AccountNumber account);
@@ -96,7 +100,8 @@ namespace SystemService
                 method(canAuthUserSys, user),
                 method(isAuthSys, sender, authorizers, authSet),
                 method(isRejectSys, sender, rejecters, authSet),
-                method(setOwner, owner)
+                method(setOwner, owner),
+                method(newAccount, name)
                 //
    )
 

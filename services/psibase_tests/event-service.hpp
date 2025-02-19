@@ -22,9 +22,10 @@ struct EventService : psibase::Service
    };
    psibase::EventNumber foo(std::string s, int i);
    psibase::EventNumber emitMerkle(std::string);
+   psibase::EventNumber emitFail(std::string s, int i);
 };
 
-PSIO_REFLECT(EventService, method(foo, s, i), method(emitMerkle, s))
+PSIO_REFLECT(EventService, method(foo, s, i), method(emitMerkle, s), method(emitFail, s, i))
 PSIBASE_REFLECT_EVENTS(EventService)
 
 PSIBASE_REFLECT_HISTORY_EVENTS(EventService, method(e, s, i))

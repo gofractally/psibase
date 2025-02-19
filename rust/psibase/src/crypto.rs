@@ -31,8 +31,7 @@ use cryptoki_sys::CK_VERSION;
 #[cfg(not(target_family = "wasm"))]
 use std::{
     collections::{hash_map, HashMap},
-    mem::MaybeUninit,
-    sync::{Arc, Mutex, Once},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 #[cfg(not(target_family = "wasm"))]
@@ -427,16 +426,12 @@ impl PKCS11ModuleSet {
         }
     }
     fn instance() -> &'static Mutex<PKCS11ModuleSet> {
-        static mut RESULT: MaybeUninit<Mutex<PKCS11ModuleSet>> = MaybeUninit::uninit();
-        static ONCE: Once = Once::new();
-        unsafe {
-            ONCE.call_once(|| {
-                RESULT.write(Mutex::new(PKCS11ModuleSet {
-                    modules: HashMap::new(),
-                }));
-            });
-            RESULT.assume_init_ref()
-        }
+        static INSTANCE: OnceLock<Mutex<PKCS11ModuleSet>> = OnceLock::new();
+        INSTANCE.get_or_init(|| {
+            Mutex::new(PKCS11ModuleSet {
+                modules: HashMap::new(),
+            })
+        })
     }
 }
 

@@ -100,9 +100,13 @@ struct BootArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
-    /// Set all accounts to authenticate using this key
+    /// Sets the producer account to use this key for transaction authentication
     #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
+    account_key: Option<AnyPublicKey>,
+
+    /// Sets the producer's block signing key
+    #[clap(long, value_name = "BLOCK_KEY")]
+    block_key: Option<AnyPublicKey>,
 
     /// Sets the name of the block producer
     #[clap(short = 'p', long, value_name = "PRODUCER")]
@@ -800,7 +804,8 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, transactions) = create_boot_transactions(
-        &args.key,
+        &args.block_key,
+        &args.account_key,
         args.producer.into(),
         true,
         expiration,
@@ -977,10 +982,6 @@ async fn apply_packages<
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
                 ));
-                // Remove out-dated files. This needs to happen before installing
-                // new files, to handle the case where a service that stores
-                // data files is replaced by a service that does not provide
-                // removeSys.
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
                 old_manifest.upgrade(package.manifest(), out)?;

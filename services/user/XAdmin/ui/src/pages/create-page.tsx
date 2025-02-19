@@ -6,6 +6,13 @@ import { z } from "zod";
 
 // ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 
 // components
 import {
@@ -24,11 +31,13 @@ import { bootChain } from "@/lib/bootChain";
 import { calculateIndex } from "@/lib/calculateIndex";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
+import { generateP256Key } from "@/lib/keys";
 
 // types
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
+    KeyDeviceSchema,
     PackageInfo,
     RequestUpdate,
     RequestUpdateSchema,
@@ -49,11 +58,6 @@ import { DependencyDialog } from "./dependency-dialog";
 
 export const BlockProducerSchema = z.object({
     name: z.string().min(1),
-});
-
-export const KeyDeviceSchema = z.object({
-    id: z.string().min(1),
-    pin: z.string().optional(),
 });
 
 interface DependencyState {
@@ -182,9 +186,11 @@ export const CreatePage = () => {
     useEffect(() => {
         const setKeysAndBoot = async () => {
             try {
-                let keyPair: CryptoKeyPair | undefined;
+                let blockSigningPubKey: CryptoKey | undefined; // server block signing pubkey
+                let txSigningKeyPair: CryptoKeyPair | undefined; // bp account tx signing key
                 if (!isDev) {
-                    keyPair = await createAndSetKey(keyDevice);
+                    blockSigningPubKey = await createAndSetKey(keyDevice);
+                    txSigningKeyPair = await generateP256Key();
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -197,7 +203,8 @@ export const CreatePage = () => {
                 bootChain({
                     packages: requiredPackages,
                     producerName: bpName,
-                    publicKey: keyPair?.publicKey,
+                    blockSigningPubKey,
+                    txSigningPubKey: txSigningKeyPair?.publicKey,
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
@@ -210,17 +217,21 @@ export const CreatePage = () => {
                             setCurrentState(newIndex);
                         } else if (isBootCompleteUpdate(state)) {
                             if (state.success) {
-                                navigate("/Dashboard");
                                 setCurrentState(loadingStates.length + 1);
                                 toast({
                                     title: "Success",
                                     description: "Successfully booted chain.",
                                 });
 
-                                importAccount({
-                                    privateKey: keyPair?.privateKey,
-                                    account: bpName,
-                                });
+                                setTimeout(() => {
+                                    navigate("/Dashboard");
+
+                                    importAccount({
+                                        privateKey:
+                                            txSigningKeyPair?.privateKey,
+                                        account: bpName,
+                                    });
+                                }, 1000);
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";
@@ -302,7 +313,24 @@ export const CreatePage = () => {
                     )}
                     {currentStep === Step.KeyDevice && (
                         <div className="flex justify-center">
-                            <KeyDeviceForm form={keyDeviceForm} next={next} />
+                            <Card className="min-w-[350px]">
+                                <CardHeader>
+                                    <CardTitle>
+                                        Select security device
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Where do you want your block producer
+                                        server key to be stored?
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <KeyDeviceForm
+                                        form={keyDeviceForm}
+                                        next={next}
+                                        deviceNotFoundErrorMessage="No security devices were found. Please ensure one is available. Alternatively, you may boot in an insecure keyless mode by going back and selecting the Development boot template."
+                                    />
+                                </CardContent>
+                            </Card>
                         </div>
                     )}
                     {currentStep === Step.Confirmation && (

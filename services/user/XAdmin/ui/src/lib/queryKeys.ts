@@ -6,9 +6,11 @@ export const queryKeys = {
     packages: ["packages"] as const,
     peers: ["peers"] as const,
     statuses: ["statuses"] as const,
+    branding: ["branding"] as const,
 
     // security devices
     addServerKey: ["addServerKey"] as const,
     keyDevices: ["keyDevices"] as const,
     unlockKeyDevice: ["unlockKeyDevice"] as const,
+    serverKeys: ["serverKeys"] as const,
 };

@@ -19,6 +19,14 @@ use bindings::transact::plugin::intf as Transact;
 struct RegistryPlugin;
 
 impl Developer for RegistryPlugin {
+    fn create_app(account: AccountId) -> Result<(), CommonTypes::Error> {
+        let action_create_input = RegistryService::action_structs::createApp {
+            account: account.parse().unwrap(),
+        };
+        Transact::add_action_to_transaction("createApp", &action_create_input.packed())?;
+        Ok(())
+    }
+
     fn set_app_metadata(metadata: AppMetadata) -> Result<(), CommonTypes::Error> {
         let action_metadata_input = RegistryService::action_structs::setMetadata::from(metadata);
         Transact::add_action_to_transaction("setMetadata", &action_metadata_input.packed())?;

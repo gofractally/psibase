@@ -1,4 +1,4 @@
-import * as wasm from "wasm-psibase";
+import { boot } from "wasm-transpiled";
 
 import { BootState, PackageInfo } from "@/types";
 
@@ -10,7 +10,8 @@ import { queryClient } from "../main";
 type BootChainParams = {
     packages: PackageInfo[];
     producerName: string;
-    publicKey: CryptoKey | undefined;
+    blockSigningPubKey: CryptoKey | undefined;
+    txSigningPubKey: CryptoKey | undefined;
     compression: number;
     onProgressUpdate: (state: BootState) => void;
 };
@@ -18,7 +19,8 @@ type BootChainParams = {
 export const bootChain = async ({
     packages,
     producerName,
-    publicKey,
+    blockSigningPubKey,
+    txSigningPubKey,
     compression,
     onProgressUpdate,
 }: BootChainParams): Promise<void> => {
@@ -36,27 +38,42 @@ export const bootChain = async ({
         const fetchedPackages: ArrayBuffer[] = await chain.getPackages(
             packages.map((pack) => pack.file)
         );
+        const packageBuffers = fetchedPackages.map(
+            (buf) => new Uint8Array(buf)
+        );
 
-        let publicKeyPem: string | undefined;
+        let blockSigningPubKeyPem: string | undefined;
+        let txSigningPubKeyPem: string | undefined;
         try {
-            if (publicKey) {
-                publicKeyPem = await exportKeyToPEM(publicKey, "PUBLIC KEY");
+            if (blockSigningPubKey) {
+                blockSigningPubKeyPem = await exportKeyToPEM(
+                    blockSigningPubKey,
+                    "PUBLIC KEY"
+                );
+            }
+            if (txSigningPubKey) {
+                txSigningPubKeyPem = await exportKeyToPEM(
+                    txSigningPubKey,
+                    "PUBLIC KEY"
+                );
             }
         } catch (e) {
-            onProgressUpdate("Failed to export publicKey to PEM format");
+            onProgressUpdate(
+                "Failed to export public key to PEM format during boot"
+            );
             return;
         }
 
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
         // in a dev environment.
 
-        const [boot_transaction, transactions] =
-            wasm.js_create_boot_transactions(
-                producerName,
-                fetchedPackages,
-                publicKeyPem,
-                compression
-            );
+        const [boot_transaction, transactions] = boot.bootTransactions(
+            producerName,
+            packageBuffers,
+            blockSigningPubKeyPem,
+            txSigningPubKeyPem,
+            compression
+        );
 
         let i = 1;
         onProgressUpdate(["push", i, transactions.length + 1]);

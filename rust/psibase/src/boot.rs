@@ -1,16 +1,13 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
-    MethodNumber, PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
+    AccountNumber, Action, AnyPublicKey, Claim, GenesisActionData, MethodNumber, PackagedService,
+    Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
-use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::io::{Cursor, Read, Seek};
-use std::str::FromStr;
-use wasm_bindgen::prelude::*;
+use std::io::{Read, Seek};
 
 macro_rules! method {
     ($name:expr) => {
@@ -77,7 +74,7 @@ fn genesis_transaction<R: Read + Seek>(
 ///
 /// This returns all actions that need to be packed into the boot block.
 fn genesis_block_actions<R: Read + Seek>(
-    initial_key: &Option<AnyPublicKey>,
+    block_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     service_packages: &mut [PackagedService<R>],
 ) -> Result<Vec<Action>, anyhow::Error> {
@@ -91,7 +88,7 @@ fn genesis_block_actions<R: Read + Seek>(
     }
 
     // Set the producers
-    let claim = initial_key
+    let claim = block_signing_key
         .as_ref()
         .map_or_else(|| Default::default(), |key| to_claim(key));
     actions.push(set_producers_action(initial_producer, claim));
@@ -104,7 +101,7 @@ fn genesis_block_actions<R: Read + Seek>(
 /// This returns all actions that need to be packed into the transactions pushed after the
 /// boot block.
 pub fn get_initial_actions<R: Read + Seek>(
-    initial_key: &Option<AnyPublicKey>,
+    tx_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
@@ -131,7 +128,7 @@ pub fn get_initial_actions<R: Read + Seek>(
     // Create producer account
     actions.push(new_account_action(accounts::SERVICE, initial_producer));
 
-    if let Some(key) = initial_key {
+    if let Some(key) = tx_signing_key {
         // Set transaction signing key for producer
         actions.push(set_key_action(initial_producer, &key));
         actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
@@ -193,7 +190,8 @@ pub fn get_initial_actions<R: Read + Seek>(
 /// `auth-any` (no keys required) and sets it up so producers
 /// don't need to sign blocks.
 pub fn create_boot_transactions<R: Read + Seek>(
-    initial_key: &Option<AnyPublicKey>,
+    block_signing_key: &Option<AnyPublicKey>,
+    tx_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     expiration: TimePointSec,
@@ -203,17 +201,20 @@ pub fn create_boot_transactions<R: Read + Seek>(
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
     let mut actions = get_initial_actions(
-        initial_key,
+        tx_signing_key,
         initial_producer,
         install_ui,
         service_packages,
         compression_level,
     )?;
     let mut transactions = Vec::new();
+    const TARGET_SIZE: usize = 1024 * 1024;
+
     while !actions.is_empty() {
-        let mut n = 0;
-        let mut size = 0;
-        while n < actions.len() && size < 1024 * 1024 {
+        let mut size = actions[0].rawData.len();
+        let mut n = 1;
+
+        while n < actions.len() && size + actions[n].rawData.len() <= TARGET_SIZE {
             size += actions[n].rawData.len();
             n += 1;
         }
@@ -227,7 +228,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
 
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
-            genesis_block_actions(initial_key, initial_producer, service_packages)?,
+            genesis_block_actions(block_signing_key, initial_producer, service_packages)?,
             expiration,
         )
         .packed()
@@ -251,72 +252,4 @@ pub fn create_boot_transactions<R: Read + Seek>(
         proofs: vec![],
     });
     Ok((boot_transactions, transactions))
-}
-
-fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
-    result.map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-/// Creates boot transactions.
-/// This function reuses the same boot transaction construction as the psibase CLI, and
-/// is used to generate a wasm that may be called from the browser to construct the boot
-/// transactions when booting the chain from the GUI.
-///
-/// If specified, `public_key_pem` is used to set the initial key for the producer account authorization.
-/// Compression level is used for brotli compression, must be between 1 and 11 inclusive.
-#[wasm_bindgen]
-pub fn js_create_boot_transactions(
-    producer: String,
-    js_services: JsValue,
-    public_key_pem: Option<String>,
-    compression_level: u32,
-) -> Result<JsValue, JsValue> {
-    let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-    let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
-    for s in &deserialized_services[..] {
-        services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
-    }
-    let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
-    let prod = js_err(ExactAccountNumber::from_str(&producer))?;
-
-    let initial_key = public_key_pem
-        .map(|k| -> Result<AnyPublicKey, JsValue> {
-            let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-            if data.tag() != "PUBLIC KEY" {
-                return Err(JsValue::from_str("Invalid public key"));
-            }
-
-            spki::SubjectPublicKeyInfoRef::try_from(data.contents())
-                .map_err(|e| JsValue::from_str(&format!("Invalid SPKI format: {}", e)))?;
-
-            Ok(AnyPublicKey {
-                key: crate::Claim {
-                    service: AccountNumber::from_str("verify-sig").unwrap(),
-                    rawData: data.contents().to_vec().into(),
-                },
-            })
-        })
-        .transpose()?;
-
-    let (boot_transactions, transactions) = js_err(create_boot_transactions(
-        &initial_key,
-        prod.into(),
-        true,
-        expiration,
-        &mut services[..],
-        compression_level,
-    ))?;
-
-    let boot_transactions = boot_transactions.packed();
-    let transactions: Vec<ByteBuf> = transactions
-        .into_iter()
-        .map(|tx| ByteBuf::from(tx.packed()))
-        .collect();
-
-    Ok(serde_wasm_bindgen::to_value(&(
-        ByteBuf::from(boot_transactions),
-        transactions,
-    ))?)
 }

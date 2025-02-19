@@ -19,7 +19,6 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use wasm_bindgen::prelude::*;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
@@ -564,7 +563,7 @@ impl PackageManifest {
             if !new_files.contains(file) {
                 out.push_action(
                     sites::Wrapper::pack_from_to(file.account, file.service)
-                        .removeSys(file.filename.clone()),
+                        .remove(file.filename.clone()),
                 )?;
             }
         }
@@ -586,7 +585,7 @@ impl PackageManifest {
         for file in &self.data {
             out.push_action(
                 sites::Wrapper::pack_from_to(file.account, file.service)
-                    .removeSys(file.filename.clone()),
+                    .remove(file.filename.clone()),
             )?;
         }
         for (service, info) in &self.services {
@@ -642,7 +641,7 @@ pub fn validate_dependencies<T: Read + Seek>(
     Ok(())
 }
 
-fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
+pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
     let re = Regex::new(r"^(.*?)(?:-(\d+\.\d+\.\d+(?:-[0-9a-zA-Z-.]+)?(?:\+[0-9a-zA-Z-.]+)?))?$")?;
     let mut refs = vec![];
     for package in packages {
@@ -1150,27 +1149,4 @@ impl PackageList {
         }
         self
     }
-}
-
-fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
-    result.map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-#[wasm_bindgen]
-pub fn js_resolve_packages(
-    js_index: JsValue,
-    js_packages: JsValue,
-    js_pinned: JsValue,
-) -> Result<JsValue, JsValue> {
-    let index: Vec<PackageInfo> = js_err(serde_wasm_bindgen::from_value(js_index))?;
-    let packages: Vec<String> = js_err(serde_wasm_bindgen::from_value(js_packages))?;
-    let pinned: Vec<(Meta, PackageDisposition)> =
-        js_err(serde_wasm_bindgen::from_value(js_pinned))?;
-
-    Ok(serde_wasm_bindgen::to_value(&js_err(solve_dependencies(
-        index,
-        js_err(make_refs(&packages))?,
-        pinned,
-        false,
-    ))?)?)
 }
