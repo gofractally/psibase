@@ -245,15 +245,15 @@ ExternalProject_Add(
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
     services/system/AuthSig/ui:AuthSig_js
-    services/user/Homepage/ui:Homepage_js
-    services/user/Workshop/ui:Workshop_js
-    services/user/Supervisor/ui:Supervisor_js
-    services/user/Permissions/ui:Permissions_js
-    services/user/Explorer/ui:Explorer_js
-    services/user/Tokens/ui:Tokens_js
     services/user/Branding/ui:Branding_js
     services/user/Chainmail/ui:Chainmail_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
+    services/user/Explorer/ui:Explorer_js
+    services/user/Homepage/ui:Homepage_js
+    services/user/Permissions/ui:Permissions_js
+    services/user/Supervisor/ui:Supervisor_js
+    services/user/Tokens/ui:Tokens_js
+    services/user/Workshop/ui:Workshop_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -461,7 +461,7 @@ psibase_package(
     DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Permissions(^${PSIBASE_VERSION})"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi)
@@ -705,13 +705,14 @@ psibase_package(
     NAME Permissions
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Handler for client-side permissions"
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
     NAME SupervisorTests
@@ -867,7 +868,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers TestDefault HttpServer
+    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -898,8 +899,8 @@ install(
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/Registry.psi
-          ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
