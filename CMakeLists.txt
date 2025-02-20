@@ -502,8 +502,10 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
-        SERVER auth-delegate
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        SERVER r-auth-dlg
+    SERVICE r-auth-dlg
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
