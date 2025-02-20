@@ -46,7 +46,7 @@ impl Api for AuthDelegate {
     fn set_owner(owner: String) -> Result<(), Error> {
         use psibase::services::auth_delegate::action_structs::setOwner as set_owner_action;
 
-        assert_caller_admin("new_account");
+        assert_caller_admin("set_owner");
 
         let set_owner = set_owner_action {
             owner: get_account_number(owner.as_str())?,
