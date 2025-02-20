@@ -81,3 +81,13 @@ TEST_CASE("hmac-sha256")
             c256("9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2"));
    }
 }
+
+TEST_CASE("hmac-sha256 extra")
+{
+   {
+      std::string key("A key sixty four bytes long, which is the block size for SHA256.");
+      std::string data("The quick brown fox jumps over the lazy dog");
+      CHECK(hmacSha256(key, data) ==
+            c256("709B1EF75B86F4EDD8B0C7E3FD665D552BE12AC54C27465CE04051CDB8137F5F"));
+   }
+}

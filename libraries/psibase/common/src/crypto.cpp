@@ -32,7 +32,7 @@ namespace psibase
       SHA256_CTX            ctx;
       SHA256_Init(&ctx);
       // pad or hash key
-      if (keyLen < B)
+      if (keyLen <= B)
       {
          std::memcpy(buf, key, keyLen);
       }
