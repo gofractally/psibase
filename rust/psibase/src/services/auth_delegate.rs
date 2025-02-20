@@ -25,7 +25,7 @@ mod service {
     }
 
     #[action]
-    fn newAccount(name: AccountNumber) {
+    fn newAccount(name: AccountNumber, owner: AccountNumber) {
         unimplemented!()
     }
 }
