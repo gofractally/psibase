@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -14,54 +14,9 @@ import { Account } from "@/lib/zodTypes";
 import dayjs from "dayjs";
 import { useChainId } from "@/hooks/use-chain-id";
 import { createIdenticon } from "@/lib/createIdenticon";
-
-const ticketData = {
-  id: "TICKET-1234",
-  title: "Unable to access dashboard",
-  status: "In Progress",
-  assignee: {
-    name: "Alice Johnson",
-    avatar: "/placeholder-avatar.jpg",
-    initials: "AJ",
-  },
-  customer: {
-    name: "John Doe",
-    avatar: "/placeholder-customer.jpg",
-    initials: "JD",
-  },
-  messages: [
-    {
-      id: 1,
-      author: "John Doe",
-      content:
-        'I can\'t access the dashboard after the recent update. It shows "Access Denied".',
-      timestamp: "2 hours ago",
-      isCustomer: true,
-    },
-    {
-      id: 2,
-      author: "Alice Johnson",
-      content:
-        "Thank you for reporting this, John. I'm looking into the issue now.",
-      timestamp: "1 hour 45 minutes ago",
-      isCustomer: false,
-    },
-    {
-      id: 3,
-      author: "John Doe",
-      content: "Any updates on this? I really need to access my dashboard.",
-      timestamp: "1 hour ago",
-      isCustomer: true,
-    },
-    {
-      id: 4,
-      author: "Alice Johnson",
-      content: `I've identified the problem. It seems to be related to a permissions issue. I'm working on a fix now.`,
-      timestamp: "30 minutes ago",
-      isCustomer: false,
-    },
-  ],
-};
+import { RefreshCcw } from "lucide-react";
+import { toast } from "sonner";
+import humanizeDuration from "humanize-duration";
 
 export const Thread: React.FC = () => {
   const [newMessage, setNewMessage] = React.useState("");
@@ -69,7 +24,12 @@ export const Thread: React.FC = () => {
 
   const { data: chainId } = useChainId();
 
-  const { data: appMessagesT, isLoading } = useMessages(currentApp);
+  const {
+    data: appMessagesT,
+    isLoading,
+    refetch: refetchAppMessages,
+    isFetching: isFetchingAppMessages,
+  } = useMessages(currentApp);
   const appMessages = appMessagesT ? appMessagesT : [];
 
   const { mutateAsync: mailAction } = useMail();
@@ -80,7 +40,11 @@ export const Thread: React.FC = () => {
   const subject = latestMessage ? latestMessage.subject : "";
   const customer = latestMessage && latestMessage.sender;
 
-  const { data: customerMessages } = useMessages(customer);
+  const {
+    data: customerMessages,
+    refetch: refetchCustomerMessages,
+    isFetching: isFetchingCustomerMessages,
+  } = useMessages(customer);
 
   const threadCustomerMessages = (customerMessages || []).filter(
     (message) => getThreadIdentifier(message, false) == threadId
@@ -89,24 +53,26 @@ export const Thread: React.FC = () => {
   const threadAppMessages = appMessages.filter(
     (message) => getThreadIdentifier(message) === threadId
   );
-  console.log({ threadMessages: threadAppMessages });
 
   const combinedMessages = [
     ...threadCustomerMessages,
     ...threadAppMessages,
   ].sort((a, b) => dayjs(a.datetime).valueOf() - dayjs(b.datetime).valueOf());
 
-  console.log(combinedMessages, "are the combined messages");
+  const firstMessage = combinedMessages[0];
+
+  const ageSeconds = firstMessage
+    ? dayjs().diff(firstMessage.datetime, "milliseconds")
+    : false;
 
   const sendMessage = async (message: string) => {
     mailAction({
       app: Account.parse(currentApp),
       body: message,
       method: "send",
-      receiver: "a",
+      receiver: customer,
       subject: threadAppMessages[0].subject,
     });
-    console.log(message);
   };
 
   const handleMessageSubmit = (e: React.FormEvent) => {
@@ -115,20 +81,37 @@ export const Thread: React.FC = () => {
     setNewMessage("");
   };
 
+  const refresh = async () => {
+    toast("Fetching messages...");
+    await Promise.all([refetchCustomerMessages(), refetchAppMessages()]);
+    toast("Fetched messages");
+  };
+
+  const isRefreshing = isFetchingCustomerMessages || isFetchingAppMessages;
+
   if (isLoading) {
     return <LoadingBlock />;
   }
 
   return (
-    <Card className="w-full h-dvh max-w-screen-xl mx-auto">
+    <Card className="w-full flex-1 min-h-0 max-w-screen-xl mx-auto border flex flex-col ">
       <CardHeader className="border-b">
         <div className="flex justify-between items-center">
           <CardTitle>{subject}</CardTitle>
+          <Button
+            disabled={isRefreshing}
+            onClick={() => {
+              refresh();
+            }}
+            variant="outline"
+          >
+            <RefreshCcw />
+          </Button>
         </div>
       </CardHeader>
-      <div className="flex flex-col md:flex-row">
-        <div className="md:w-2/3 border-r">
-          <div className="p-4 h-[calc(100vh-200px)] overflow-y-auto">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+        <div className="md:w-2/3 border-r flex flex-col overflow-hidden">
+          <div className="p-4 flex-1 overflow-y-auto">
             {combinedMessages.map((message) => {
               const isCustomer = message.sender !== currentApp;
               return (
@@ -149,7 +132,9 @@ export const Thread: React.FC = () => {
                       />
                     </Avatar>
                     <div className={`bg-muted p-3 rounded-lg `}>
-                      <p className="text-sm font-medium">{message.sender}</p>
+                      <p className="text-sm  text-muted-foreground">
+                        {message.sender}
+                      </p>
                       <p className="text-sm">{message.body}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {dayjs(message.datetime).format("YYYY-MM-DD HH:mm:ss")}
@@ -160,7 +145,7 @@ export const Thread: React.FC = () => {
               );
             })}
           </div>
-          <div className="p-4 border-t">
+          <div className="p-4 border-t ">
             <form onSubmit={handleMessageSubmit}>
               <Textarea
                 placeholder="Type your message..."
@@ -179,7 +164,15 @@ export const Thread: React.FC = () => {
               <p className="text-sm text-muted-foreground">
                 Ticket ID: {threadId}
               </p>
-              <p className="text-sm text-muted-foreground">Status unknown</p>
+              {ageSeconds && (
+                <p className="text-sm text-muted-foreground">
+                  Age:{" "}
+                  {humanizeDuration(ageSeconds, {
+                    units: ["y", "mo", "w", "d", "h", "m"],
+                    round: true,
+                  })}
+                </p>
+              )}
             </div>
 
             <Separator />
@@ -188,18 +181,12 @@ export const Thread: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <Avatar>
                   <AvatarImage
-                    src={ticketData.customer.avatar}
-                    alt={ticketData.customer.name}
+                    src={createIdenticon(chainId + customer)}
+                    alt={customer}
                   />
-                  <AvatarFallback>
-                    {ticketData.customer.initials}
-                  </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium">
-                    {ticketData.customer.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="text-sm font-medium">{customer}</p>
                 </div>
               </div>
             </div>

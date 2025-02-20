@@ -6,7 +6,10 @@ import relative from "dayjs/plugin/relativeTime";
 import { useNavigate } from "react-router-dom";
 import { EmptyBlock } from "@/components/EmptyBlock";
 import { LoadingBlock } from "@/components/LoadingBlock";
-import { getThreadIdentifier } from "@/lib/createThreadIdentifier";
+import {
+  getThreadIdentifier,
+  removeReplyPrefix,
+} from "@/lib/createThreadIdentifier";
 
 dayjs.extend(relative);
 
@@ -71,7 +74,7 @@ export const Support = () => {
                     </div>
                   </div>
                   <div className="text-xs font-medium">
-                    {thread.lastMessage.subject}
+                    {removeReplyPrefix(thread.lastMessage.subject)}
                   </div>
                 </div>
                 <div className="line-clamp-2 text-xs text-muted-foreground">
