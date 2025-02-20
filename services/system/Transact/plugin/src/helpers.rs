@@ -129,6 +129,19 @@ pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Hos
     Ok(claims)
 }
 
+pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, Host::types::Error> {
+    let mut claims = vec![];
+
+    let auth_service_acc = get_account(user)?.unwrap().auth_service;
+    let plugin_ref =
+        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    if let Some(claim) = on_user_auth_claim(plugin_ref, &user)? {
+        claims.push(claim);
+    }
+
+    Ok(claims)
+}
+
 pub fn get_proofs(
     tx_hash: &[u8; 32],
     use_hooks: bool,
@@ -156,6 +169,25 @@ pub fn get_proofs(
 
         ActionAuthPlugins::clear();
         ActionClaims::clear();
+    }
+
+    Ok(proofs
+        .into_iter()
+        .map(|proof| Hex::from(proof.signature))
+        .collect())
+}
+
+pub fn get_proofs_for_user(
+    tx_hash: &[u8; 32],
+    user: &String,
+) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
+    let mut proofs = vec![];
+
+    let auth_service_acc = get_account(user)?.unwrap().auth_service;
+    let plugin_ref =
+        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
+        proofs.push(proof);
     }
 
     Ok(proofs

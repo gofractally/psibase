@@ -9,7 +9,6 @@ mod db;
 mod types;
 use db::*;
 
-use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::transact::plugin::hook_handlers::*;
 
 // Other plugins
@@ -208,23 +207,20 @@ struct LoginReply {
 }
 
 impl Login for TransactPlugin {
-    fn login(app: String) -> Result<String, CommonTypes::Error> {
-        assert_from_supervisor();
-        let Some(user) = get_current_user()? else {
-            return Err(NotLoggedIn("login").into());
-        };
+    fn login(app: String, user: String) -> Result<String, CommonTypes::Error> {
+        assert!(get_sender_app() == "accounts");
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
         let actions = vec![Action {
-            sender: user,
+            sender: user.clone(),
             service: app,
             method: "loginSys".to_string(),
             raw_data: (root_host,).packed(),
         }];
 
         let claims =
-            get_claims(&actions, false).expect("Failed to retrieve claims from auth plugin");
+            get_claims_for_user(&user).expect("Failed to retrieve claims from auth plugin");
 
         let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
         let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
@@ -244,7 +240,7 @@ impl Login for TransactPlugin {
         };
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()), false)?,
+            proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
