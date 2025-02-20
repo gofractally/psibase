@@ -143,6 +143,10 @@ pub enum DbId {
     NativeSubjective,
 
     EndIndependent,
+
+    /// Subjective tables that are local to the transaction/query/callback
+    /// context.
+    Temporary,
 }
 
 const BEGIN_INDEPENDENT: u32 = 64;

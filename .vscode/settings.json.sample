@@ -1,5 +1,4 @@
 {
-    "clang-format.executable": "/usr/lib/llvm-16/bin/clang-format",
     "search.exclude": {
         "**/target": true
     },
@@ -10,7 +9,7 @@
         "files.trimTrailingWhitespace": false
     },
     "[cpp]": {
-        "editor.defaultFormatter": "xaver.clang-format",
+        "editor.defaultFormatter": "seaube.clangformat",
         "editor.tabSize": 3,
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file",

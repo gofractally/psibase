@@ -1,6 +1,8 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::transact::plugin::types::{Action, Claim};
 use psibase::fracpack::{Pack, Unpack};
+use std::cell::RefCell;
+use std::thread_local;
 
 pub struct ActionAuthPlugins;
 impl ActionAuthPlugins {
@@ -24,38 +26,32 @@ impl ActionAuthPlugins {
     }
 }
 
-#[derive(Pack, Unpack)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct ActionMetadata {
     pub action: Action,
     pub label: Option<String>,
 }
 
+thread_local! {
+    static CURRENT_ACTIONS_MEMORY: RefCell<Vec<ActionMetadata>> = RefCell::new(Vec::new());
+}
+
 pub struct CurrentActions;
 impl CurrentActions {
-    const KEY: &'static str = "actions";
-
     pub fn push(action: Action, label: Option<String>) {
-        let mut actions = Keyvalue::get(Self::KEY)
-            .map(|a| <Vec<ActionMetadata>>::unpacked(&a).expect("Failed to unpack actions"))
-            .unwrap_or(vec![]);
-
-        actions.push(ActionMetadata { action, label });
-
-        Keyvalue::set(Self::KEY, &actions.packed()).expect("Failed to set actions");
+        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow_mut().push(ActionMetadata { action, label }));
     }
 
     pub fn get() -> Vec<ActionMetadata> {
-        Keyvalue::get(Self::KEY)
-            .map(|a| <Vec<ActionMetadata>>::unpacked(&a).expect("Failed to unpack actions"))
-            .unwrap_or(vec![])
+        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow().clone())
     }
 
     pub fn has_actions() -> bool {
-        Keyvalue::get(Self::KEY).is_some()
+        CURRENT_ACTIONS_MEMORY.with(|mem| !mem.borrow().is_empty())
     }
 
     pub fn clear() {
-        Keyvalue::delete(Self::KEY);
+        CURRENT_ACTIONS_MEMORY.with(|mem| mem.borrow_mut().clear());
     }
 }
 

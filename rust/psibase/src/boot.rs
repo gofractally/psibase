@@ -1,16 +1,13 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, ExactAccountNumber, GenesisActionData,
-    MethodNumber, PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
+    AccountNumber, Action, AnyPublicKey, Claim, GenesisActionData, MethodNumber, PackagedService,
+    Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
-use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::io::{Cursor, Read, Seek};
-use std::str::FromStr;
-use wasm_bindgen::prelude::*;
+use std::io::{Read, Seek};
 
 macro_rules! method {
     ($name:expr) => {
@@ -211,10 +208,13 @@ pub fn create_boot_transactions<R: Read + Seek>(
         compression_level,
     )?;
     let mut transactions = Vec::new();
+    const TARGET_SIZE: usize = 1024 * 1024;
+
     while !actions.is_empty() {
-        let mut n = 0;
-        let mut size = 0;
-        while n < actions.len() && size < 1024 * 1024 {
+        let mut size = actions[0].rawData.len();
+        let mut n = 1;
+
+        while n < actions.len() && size + actions[n].rawData.len() <= TARGET_SIZE {
             size += actions[n].rawData.len();
             n += 1;
         }
@@ -252,79 +252,4 @@ pub fn create_boot_transactions<R: Read + Seek>(
         proofs: vec![],
     });
     Ok((boot_transactions, transactions))
-}
-
-fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
-    result.map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-fn parse_public_key_pem(public_key_pem: Option<String>) -> Result<Option<AnyPublicKey>, JsValue> {
-    public_key_pem
-        .map(|k| -> Result<AnyPublicKey, JsValue> {
-            let data = pem::parse(k.trim()).map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-            if data.tag() != "PUBLIC KEY" {
-                return Err(JsValue::from_str("Invalid public key"));
-            }
-
-            spki::SubjectPublicKeyInfoRef::try_from(data.contents())
-                .map_err(|e| JsValue::from_str(&format!("Invalid SPKI format: {}", e)))?;
-
-            Ok(AnyPublicKey {
-                key: crate::Claim {
-                    service: AccountNumber::from_str("verify-sig").unwrap(),
-                    rawData: data.contents().to_vec().into(),
-                },
-            })
-        })
-        .transpose()
-}
-
-/// Creates boot transactions.
-/// This function reuses the same boot transaction construction as the psibase CLI, and
-/// is used to generate a wasm that may be called from the browser to construct the boot
-/// transactions when booting the chain from the GUI.
-///
-/// If specified, `public_key_pem` is used to set the initial key for the producer account authorization.
-/// Compression level is used for brotli compression, must be between 1 and 11 inclusive.
-#[wasm_bindgen]
-pub fn js_create_boot_transactions(
-    producer: String,
-    js_services: JsValue,
-    block_signing_key_pem: Option<String>,
-    tx_signing_key_pem: Option<String>,
-    compression_level: u32,
-) -> Result<JsValue, JsValue> {
-    let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-    let deserialized_services: Vec<ByteBuf> = js_err(serde_wasm_bindgen::from_value(js_services))?;
-    for s in &deserialized_services[..] {
-        services.push(js_err(PackagedService::new(Cursor::new(&s[..])))?);
-    }
-    let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
-    let expiration = TimePointSec::from(now_plus_120secs);
-    let prod = js_err(ExactAccountNumber::from_str(&producer))?;
-
-    let initial_key = parse_public_key_pem(block_signing_key_pem)?;
-    let tx_key = parse_public_key_pem(tx_signing_key_pem)?;
-
-    let (boot_transactions, transactions) = js_err(create_boot_transactions(
-        &initial_key,
-        &tx_key,
-        prod.into(),
-        true,
-        expiration,
-        &mut services[..],
-        compression_level,
-    ))?;
-
-    let boot_transactions = boot_transactions.packed();
-    let transactions: Vec<ByteBuf> = transactions
-        .into_iter()
-        .map(|tx| ByteBuf::from(tx.packed()))
-        .collect();
-
-    Ok(serde_wasm_bindgen::to_value(&(
-        ByteBuf::from(boot_transactions),
-        transactions,
-    ))?)
 }

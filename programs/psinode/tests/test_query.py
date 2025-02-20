@@ -81,9 +81,14 @@ class TestQuery(unittest.TestCase):
         self.assertEqual(r1, {"i":5})
 
         # Test queries that cause retries
-        (r0, r1) = post_parallel(a, ('/send_with_contention', {"i":6}), ('/send_with_contention', {"i":7}))
+        (r0, r1) = post_parallel(a, ('/send_with_contention?delay=1', {"i":6}), ('/send_with_contention?delay=1', {"i":7}))
         self.assertEqual(r0, {"i":6})
         self.assertEqual(r1, {"i":7})
+
+        # Check deferReply with retries
+        (r0, r1) = post_parallel(a, ('/send_async_with_contention?delay=1', {"i":8}), ('/send_async_with_contention?delay=1', {"i":9}))
+        self.assertEqual(r0, {"i":8})
+        self.assertEqual(r1, {"i":9})
 
 if __name__ == '__main__':
     testutil.main()

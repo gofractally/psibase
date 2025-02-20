@@ -38,7 +38,7 @@ namespace psibase
             return (DbId)db;
          if (db == uint32_t(DbId::native))
             return (DbId)db;
-         if (db == uint32_t(DbId::subjective))
+         if (db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary))
          {
             uint64_t prefix = self.code.codeNum.value;
             std::reverse(reinterpret_cast<char*>(&prefix), reinterpret_cast<char*>(&prefix + 1));
@@ -82,7 +82,7 @@ namespace psibase
       bool keyHasServicePrefix(uint32_t db)
       {
          return db == uint32_t(DbId::service) || db == uint32_t(DbId::writeOnly) ||
-                db == uint32_t(DbId::subjective);
+                db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary);
       }
 
       struct Writable
@@ -102,7 +102,7 @@ namespace psibase
                   "key prefix must match service during write");
          };
 
-         if (db == uint32_t(DbId::subjective) &&
+         if ((db == uint32_t(DbId::subjective) || db == uint32_t(DbId::temporary)) &&
              (self.code.flags & CodeRow::isSubjective || self.allowDbReadSubjective) &&
              (self.code.flags & CodeRow::allowWriteSubjective))
             // Not chargeable since subjective services are skipped during replay
@@ -589,17 +589,20 @@ namespace psibase
                       "value of putSequential must have service account as its first member");
              }
 
-             auto&    dbStatus = transactionContext.blockContext.databaseStatus;
+             auto dbStatus =
+                 database.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+             check(!!dbStatus, "databaseStatus not set");
+
              uint64_t indexNumber;
              if (db == uint32_t(DbId::historyEvent))
-                indexNumber = dbStatus.nextHistoryEventNumber++;
+                indexNumber = dbStatus->nextHistoryEventNumber++;
              else if (db == uint32_t(DbId::uiEvent))
-                indexNumber = dbStatus.nextUIEventNumber++;
+                indexNumber = dbStatus->nextUIEventNumber++;
              else if (db == uint32_t(DbId::merkleEvent))
-                indexNumber = dbStatus.nextMerkleEventNumber++;
+                indexNumber = dbStatus->nextMerkleEventNumber++;
              else
                 check(false, "putSequential: unsupported db");
-             database.kvPut(DatabaseStatusRow::db, dbStatus.key(), dbStatus);
+             database.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
              database.kvPutRaw(m, psio::convert_to_key(indexNumber), {value.data(), value.size()});
              return indexNumber;

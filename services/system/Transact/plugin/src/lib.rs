@@ -89,7 +89,7 @@ impl Hooks for TransactPlugin {
             }
         }
 
-        // Temporary whitelist until we have oauth
+        // TODO: Use `permissions` oauth instead of hardcoded whitelist
         if transformer != "staged-tx" {
             panic!(
                 "hook_tx_transform_label: {} is not whitelisted",
@@ -168,7 +168,6 @@ impl Admin for TransactPlugin {
         if actions.len() == 0 {
             return Ok(());
         }
-        CurrentActions::clear();
 
         let actions = transform_actions(actions)?;
 

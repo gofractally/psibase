@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Schema } from "../../types";
 import { TypeBasedInput } from "./TypeBasedInput";
+import { camelCase } from "../../utils";
 
 interface RecordField {
   name: string;
@@ -27,7 +28,7 @@ export const RecordInput = ({
   const handleFieldChange = (fieldName: string, fieldValue: unknown) => {
     onChange({
       ...value,
-      [fieldName]: fieldValue,
+      [camelCase(fieldName)]: fieldValue,
     });
   };
 
@@ -46,7 +47,7 @@ export const RecordInput = ({
             key={field.name}
             type={field.type}
             schema={schema}
-            value={value?.[field.name]}
+            value={value?.[camelCase(field.name)]}
             onChange={(newValue) => handleFieldChange(field.name, newValue)}
             label={field.name}
           />
