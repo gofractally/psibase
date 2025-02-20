@@ -92,8 +92,9 @@ namespace psibase
                std::string_view kv  = split2sv(kvrange);
                auto             pos = kv.find('=');
                check(pos != std::string_view::npos, "Invalid cookie");
-               auto key   = kv.substr(kv.find_first_not_of(" \t"), pos);
-               auto value = kv.substr(pos + 1);
+               auto leading = kv.find_first_not_of(" \t");
+               auto key     = kv.substr(leading, pos - leading);
+               auto value   = kv.substr(pos + 1);
                if (key == name)
                   return value;
             }
@@ -104,34 +105,40 @@ namespace psibase
 
    void HttpRequest::removeCookie(std::string_view name)
    {
-      for (auto& header : headers)
+      for (auto iter = headers.begin(), end = headers.end(); iter != end;)
       {
+         auto& header = *iter;
          if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
          {
-            auto out   = header.value.begin();
-            bool first = true;
+            std::string newValue;
+            bool        first = true;
             for (auto kvrange : header.value | std::views::split(';'))
             {
-               std::string_view kv      = split2sv(kvrange);
-               auto             pos     = kv.find('=');
-               bool             matched = false;
-               if (pos != std::string_view::npos)
-               {
-                  auto key   = kv.substr(kv.find_first_not_of(" \t"), pos);
-                  auto value = kv.substr(pos + 1);
-                  matched    = key == name;
-               }
-               if (!matched)
+               std::string_view kv  = split2sv(kvrange);
+               auto             pos = kv.find('=');
+               check(pos != std::string_view::npos, "Invalid cookie");
+               bool matched = false;
+               auto leading = kv.find_first_not_of(" \t");
+               auto key     = kv.substr(leading, pos - leading);
+               auto value   = kv.substr(pos + 1);
+               matched      = key == name;
+               if (key != name)
                {
                   if (first)
                      first = false;
                   else
-                     *out++ = ';';
-                  std::ranges::copy(kv, out);
+                     newValue += "; ";
+                  newValue += kv.substr(leading);
                }
             }
-            header.value.resize(out - header.value.begin());
+            if (newValue.empty())
+            {
+               headers.erase(iter);
+               continue;
+            }
+            header.value = std::move(newValue);
          }
+         ++iter;
       }
    }
 }  // namespace psibase
