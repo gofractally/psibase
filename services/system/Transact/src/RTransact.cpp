@@ -528,7 +528,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
                         {
                            auto token   = value.substr(prefix.size());
                            auto decoded = decodeJWT<LoginTokenData>(key, token);
-                           if (decoded.aud == request.host && checkExp(decoded.exp))
+                           if (decoded.aud == request.rootHost && checkExp(decoded.exp))
                            {
                               result = decoded.sub;
                            }
@@ -541,7 +541,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    if (auto token = request.getCookie("__Host-SESSION"))
    {
       auto decoded = decodeJWT<LoginTokenData>(key, *token);
-      if (decoded.aud == request.host && checkExp(decoded.exp))
+      if (decoded.aud == request.rootHost && checkExp(decoded.exp))
          return decoded.sub;
    }
    return {};
@@ -584,7 +584,6 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       auto data     = psio::from_frac<LoginData>(loginAct.rawData());
       if (checkExp(trx.transaction->tapos().expiration()) && data.rootHost == request.rootHost)
       {
-         auto appHost = app.str() + "." + request.rootHost;
          // verify signatures
          auto claims = trx.transaction->claims();
          if (claims.size() != trx.proofs.size())
@@ -610,7 +609,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));
          auto                token = encodeJWT(getJWTKey(), LoginTokenData{.sub = sender,
-                                                                           .aud = std::move(appHost),
+                                                                           .aud = request.rootHost,
                                                                            .exp = exp.time_since_epoch().count()});
          HttpReply           reply{.contentType = "application/json"};
          psio::vector_stream stream{reply.body};
