@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/block.hpp>
+#include <psio/nested.hpp>
 #include <string>
 #include <vector>
 
@@ -90,13 +91,22 @@ namespace psibase
    /// An HTTP reply
    ///
    /// Services return this from their `serveSys` action.
-   struct HttpReply
+   template <typename T>
+   struct BasicHttpReply
    {
       HttpStatus              status = HttpStatus::ok;
       std::string             contentType;  ///< "application/json", "text/html", ...
-      std::vector<char>       body;         ///< Response body
+      T                       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
-      PSIO_REFLECT(HttpReply, status, contentType, body, headers)
+      PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
+
+   using HttpReply = BasicHttpReply<std::vector<char>>;
+
+   template <typename T>
+   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
+
+   template <typename T>
+   using JsonHttpReply = BasicHttpReply<psio::nested_json<T>>;
 
 }  // namespace psibase

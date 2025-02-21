@@ -76,6 +76,7 @@ namespace psibase
       AccountNumber   service;  ///< Service to execute the action
       MethodNumber    method;   ///< Service method to execute
       psio::nested<T> rawData;  ///< Data for the method
+      PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
 
    struct PackedActionProxy
@@ -88,11 +89,11 @@ namespace psibase
       template <typename... T>
       std::vector<char> packImpl(std::tuple<T...>*,
                                  MethodNumber method,
-                                 const std::type_identity_t<T>&... args)
+                                 const std::type_identity_t<T>&... args) const
       {
          TypedAction<std::tuple<const T&...>> action{
              sender, receiver, method, {std::tuple<const T&...>(args...)}};
-         return psio::convert_to_frac(action);
+         return psio::to_frac(action);
       }
 
       template <uint32_t idx, auto MemberPtr, typename... Args>
@@ -110,6 +111,47 @@ namespace psibase
              (param_tuple*)nullptr,
              MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
              args...);
+      }
+   };
+
+   struct ActionViewProxy
+   {
+      ActionViewProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
+
+      AccountNumber sender;
+      AccountNumber receiver;
+
+      template <typename... T, typename... U>
+      auto packImpl(std::tuple<T...>*,
+                    std::tuple<U...>*,
+                    MethodNumber method,
+                    const std::conditional_t<psio::PackableAs<U, T>, U, T>&... args) const
+      {
+         using Args = std::tuple<decltype(args)...>;
+         TypedAction<Args> action{sender, receiver, method, {Args(args...)}};
+         psio::size_stream ss;
+         psio::to_frac(action, ss);
+         psio::shared_view_ptr<TypedAction<std::tuple<T...>>> result(psio::size_tag{ss.size});
+         psio::fast_buf_stream                                stream(result.data(), result.size());
+         psio::to_frac(action, stream);
+         return result;
+      }
+
+      template <uint32_t idx, auto MemberPtr, typename... Args>
+      auto call(Args&&... args) const
+      {
+         using member_class = decltype(psio::class_of_member(MemberPtr));
+         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
+
+         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
+                       "too few arguments passed to method");
+         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
+                       "too many arguments passed to method");
+
+         return packImpl(
+             (param_tuple*)nullptr, (std::tuple<std::remove_cvref_t<Args>...>*)nullptr,
+             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
+             std::forward<Args>(args)...);
       }
    };
 
@@ -596,6 +638,13 @@ namespace psibase
 
       auto* operator->() const { return this; }
       auto& operator*() const { return *this; }
+   };
+
+   template <typename T>
+   struct ActionViewBuilder : public psio::reflect<T>::template proxy<ActionViewProxy>
+   {
+      using base = typename psio::reflect<T>::template proxy<ActionViewProxy>;
+      using base::base;
    };
 
 }  // namespace psibase
