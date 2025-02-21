@@ -1,4 +1,5 @@
 #include <arbtrie/xxhash.h>
+#include <algorithm>
 #include <arbtrie/binary_node.hpp>
 #include <arbtrie/database.hpp>
 #include <arbtrie/inner_node.hpp>
@@ -9,10 +10,9 @@
 #include <arbtrie/rdtsc.hpp>
 #include <arbtrie/value_node.hpp>
 #include <cctype>  // for std::toupper
-
-#include <algorithm>
-
 #include <random>
+#include <string>
+#include <vector>
 
 template <typename S, typename T>
 S& operator<<(S& stream, const std::optional<T>& obj)
@@ -417,32 +417,17 @@ TEST_CASE("insert-words")
          {
             uint64_t item_count = 0;
             auto     itr        = ws.create_iterator(root);
-            assert(not itr.valid());
+            //assert(not itr.valid());
 
             std::vector<char> data;
             auto              start = std::chrono::steady_clock::now();
             auto              fkeys = keys.begin();
-            if (itr.lower_bound())
-            {
-               itr.read_value(data);
-
-               /*
-               if( fkeys->size() != data.size() or
-                   0 != memcmp( fkeys->data(), data.data(), data.size() ) ) {
-                  TRIEDENT_WARN( "expected '", *fkeys, " got ", std::string(data.data(),data.size()) );
-               }
-               REQUIRE( fkeys->size() == data.size() );
-               REQUIRE( 0 == memcmp( fkeys->data(), data.data(), data.size() ) );
-               */
-
-               ++item_count;
-               ++fkeys;
-            }
+            itr.begin();
             while (itr.next())
             {
                itr.key();
                assert(itr.key().size() < 1024);
-               itr.read_value(data);
+               itr.value(data);
                assert(itr.key().size() == data.size());
 
                /*
@@ -472,9 +457,10 @@ TEST_CASE("insert-words")
             auto rkeys = keys.rbegin();
             while (itr.valid())
             {
+               assert(rkeys != keys.rend());
                REQUIRE(rkeys != keys.rend());
                //      TRIEDENT_WARN( "checking ", *rkeys );
-               itr.read_value(data);
+               itr.value(data);
                /*
                if( rkeys->size() != data.size() or
                    0 != memcmp( rkeys->data(), data.data(), data.size() ) ) {
@@ -788,18 +774,17 @@ TEST_CASE("subtree2")
             auto              itr = ws.create_iterator(empty);
             std::vector<char> buf;
             itr.lower_bound();
-            while (itr.valid())
+            while (not itr.is_end())
             {
-               std::cerr << '"' << to_str(itr.key()) << " = " << itr.is_subtree() << "\n";
-               if (itr.is_subtree())
+               if (itr.key() == "big")
+                  std::cerr << "break big\n";
+
+               std::cerr << '"' << to_str(itr.key()) << " = " << itr.subtree().is_valid() << "\n";
+               if (auto sitr = itr.subtree_iterator(); sitr.valid())
                {
-                  auto sitr = itr.subtree_iterator();
-                  sitr.lower_bound();
-                  while (sitr.valid())
-                  {
+                  sitr.begin();
+                  while (sitr.next())
                      std::cerr << "\t\t" << to_str(sitr.key()) << "\n";
-                     sitr.next();
-                  }
                }
                itr.next();
             }
@@ -816,8 +801,7 @@ TEST_CASE("subtree2")
          ws.get(*v1, to_key_view("goodbye"), &value);
          auto itr = ws.create_iterator(root);
          REQUIRE(itr.lower_bound(to_key_view("version1")));
-         REQUIRE(itr.is_subtree());
-         auto v1s = itr.subtree();
+         REQUIRE(itr.subtree().is_valid());
 
          TRIEDENT_DEBUG("output: ", std::string(value.data(), value.size()));
          // auto size    = ws.get( root, to_key_view("version1"), v1 );
@@ -1005,22 +989,87 @@ TEST_CASE("dense-rand-insert")
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
+
+std::string random_string(uint64_t seed)
+{
+   static const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+   static const int  charset_size = sizeof(charset) - 1;
+
+   std::mt19937_64                    gen(seed);
+   std::uniform_int_distribution<int> len_dist(0, 1023);  // Random length 0-1023
+   std::uniform_int_distribution<int> char_dist(0, charset_size - 1);
+
+   int         length = len_dist(gen);
+   std::string result;
+   result.reserve(length);
+
+   for (int i = 0; i < length; i++)
+   {
+      result += charset[char_dist(gen)];
+   }
+
+   return result;
+}
+
+TEST_CASE("random-string")
+{
+   // Test deterministic output for same seed
+   REQUIRE(random_string(42) == random_string(42));
+
+   // Test different seeds produce different strings
+   REQUIRE(random_string(1) != random_string(2));
+
+   // Test length constraints
+   for (int i = 0; i < 100; i++)
+   {
+      auto str = random_string(i);
+      REQUIRE(str.length() <= 1023);
+   }
+}
+
 TEST_CASE("lower-bound")
 {
    environ env;
    auto    ws = env.db->start_write_session();
    {
-      auto r = ws.create_root();
-
-      auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
-
+      auto                       r = ws.create_root();
       std::map<std::string, int> reference;
-      for (int i = 0; i < 100000; ++i)
-      {
-         auto itr = ws.create_iterator(r);
+      auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, sizeof(k)); };
 
-         uint64_t query = uint64_t(rand64());
-         auto     qv    = to_kv(query);
+      auto words = load_words(ws, r);
+      for (size_t i = 0; i < words.size(); i++)
+      {
+         reference[words[i]] = i;
+      }
+
+      REQUIRE(reference.size() == ws.count_keys(r));
+
+      std::sort(words.begin(), words.end());
+
+      for (const auto& [key, _] : reference)
+      {
+         auto witr = std::lower_bound(words.begin(), words.end(), key);
+         if (witr == words.end() || *witr != key)
+         {
+            TRIEDENT_DEBUG("key '", key, "' from reference not found in words");
+            REQUIRE(false);  // Key from reference must exist in words
+         }
+      }
+
+      auto itr = ws.create_iterator(r);
+
+      itr.begin();
+      int i = 0;
+      while (itr.next())
+      {
+         REQUIRE(itr.key() == words[i]);
+         i++;
+      }
+      REQUIRE(i == reference.size());
+
+      for (size_t i = 0; i < words.size(); i++)
+      {
+         auto qv = to_key_view(words[i]);
 
          auto rritr = reference.lower_bound(std::string(to_str(qv)));
          itr.lower_bound(qv);
@@ -1029,17 +1078,38 @@ TEST_CASE("lower-bound")
             REQUIRE(not itr.valid());
          if (rritr != reference.end())
          {
-            //      TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
-            //                     " =? itr: ", to_hex(itr.key()));
+            //        TRIEDENT_DEBUG("i: ", i, " q: ", qv, " ritr: ", to_key_view(rritr->first),
+            //                      " =? itr: ", itr.key());
+            assert(rritr->first == to_str(itr.key()));
             REQUIRE(rritr->first == to_str(itr.key()));
          }
+      }
 
-         uint64_t val                         = uint64_t(rand64());
-         key_view kstr                        = to_kv(val);
-         reference[std::string(to_str(kstr))] = 0;
-         int result                           = ws.upsert(r, kstr, kstr);
-         //TRIEDENT_DEBUG( "upsert: ", to_hex(kstr) );
-         REQUIRE(reference.size() == ws.count_keys(r));
+      for (int i = 0; i < 10000; ++i)
+      {
+         auto query = random_string(i);
+         auto qv    = to_key_view(query);
+
+         //     TRIEDENT_WARN(i, "]   query: '", query, "'");
+         auto rritr = reference.lower_bound(query);
+         itr.lower_bound(qv);
+
+         auto witr = std::lower_bound(words.begin(), words.end(), query);
+         if (witr != words.end())
+         {
+            // TRIEDENT_DEBUG(i, "]   word: '", *witr, "'");
+         }
+
+         if (rritr == reference.end())
+         {
+            assert(rritr->first == to_str(itr.key()));
+            REQUIRE(itr.is_end());
+         }
+         else
+         {
+            assert(rritr->first == to_str(itr.key()));
+            REQUIRE(rritr->first == to_str(itr.key()));
+         }
       }
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
@@ -1053,10 +1123,12 @@ TEST_CASE("upper-bound")
    auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
 
    std::map<std::string, int> reference;
+   ws.upsert(r, "hello", "world");
+   reference["hello"] = 0;
+
+   auto itr = ws.create_iterator(r);
    for (int i = 0; i < 100000; ++i)
    {
-      auto itr = ws.create_iterator(r);
-
       uint64_t query = uint64_t(rand64());
       auto     qv    = to_kv(query);
 
@@ -1067,16 +1139,23 @@ TEST_CASE("upper-bound")
          REQUIRE(not itr.valid());
       if (rritr != reference.end())
       {
-         //         TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv), " ritr: ", to_hex(to_key_view(rritr->first)),
-         //                        " =? itr: ", to_hex(itr.key()));
+         if (rritr->first != to_str(itr.key()))
+         {
+            TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv),
+                           " ritr: ", to_hex(to_key_view(rritr->first)),
+                           " =? itr: ", to_hex(itr.key()));
+         }
+         assert(rritr->first == to_str(itr.key()));
          REQUIRE(rritr->first == to_str(itr.key()));
       }
 
       uint64_t val                         = uint64_t(rand64());
       key_view kstr                        = to_kv(val);
       reference[std::string(to_str(kstr))] = 0;
-      int result                           = ws.upsert(r, kstr, kstr);
-      //TRIEDENT_DEBUG( "upsert: ", to_hex(kstr) );
+      //   TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      int result = ws.upsert(r, kstr, kstr);
+      //    TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      itr.set_root(r);
       REQUIRE(reference.size() == ws.count_keys(r));
    }
 }
@@ -1112,9 +1191,9 @@ TEST_CASE("rev-lower-bound")
       return m.end();
    };
 
+   auto itr = ws.create_iterator(r);
    for (int i = 0; i < 100000; ++i)
    {
-      auto     itr   = ws.create_iterator(r);
       uint64_t query = uint64_t(rand64());
       auto     qv    = to_kv(query);
 
@@ -1524,31 +1603,19 @@ TEST_CASE("iterator-get-methods")
              });
 
       // Test iterator get
-      bool        get_found = false;
       std::string get_value;
-      it.get(word,
-             [&](bool found, const value_type& val)
-             {
-                get_found = found;
-                if (found)
-                   get_value = std::string(val.view().data(), val.view().size());
-             });
-
-      // Test iterator get2
-      bool        get2_found = false;
-      std::string get2_value;
-      it.get2(word,
-              [&](bool found, const value_type& val)
-              {
-                 get2_found = found;
-                 if (found)
-                    get2_value = std::string(val.view().data(), val.view().size());
-              });
+      bool        get_found = it.get(word,
+                                     [&](const value_type& val)
+                                     {
+                                 if (not val.is_view())
+                                    return false;
+                                 get_value = std::string(val.view().data(), val.view().size());
+                                 return true;
+                              });
 
       // Verify results
       REQUIRE(session_found);
       REQUIRE(get_found);
-      REQUIRE(get2_found);
 
       // The value should be the uppercase version of the word, padded to 64 bytes
       std::string expected = word;
@@ -1557,7 +1624,6 @@ TEST_CASE("iterator-get-methods")
 
       REQUIRE(session_value == expected);
       REQUIRE(get_value == expected);
-      REQUIRE(get2_value == expected);
 
       // Verify that iterator.key() returns the original word after get2
       REQUIRE(std::string(it.key().data(), it.key().size()) == word);
@@ -1570,14 +1636,10 @@ TEST_CASE("iterator-get-methods")
    rs.get(root, nonexistent, [&](bool found, const value_type&) { session_found = found; });
 
    bool get_found = false;
-   it.get(nonexistent, [&](bool found, const value_type&) { get_found = found; });
-
-   bool get2_found = false;
-   it.get2(nonexistent, [&](bool found, const value_type&) { get2_found = found; });
+   it.get(nonexistent, [&](const value_type& val) { return val.is_view(); });
 
    REQUIRE(not session_found);
    REQUIRE(not get_found);
-   REQUIRE(not get2_found);
 }
 
 TEST_CASE("beta-iterator-dense-validation")
@@ -1620,7 +1682,7 @@ TEST_CASE("beta-iterator-dense-validation")
       */
 
    std::cout << "testing beta iterator\n";
-   auto bi = ws.create_beta_iterator<beta::caching>(r);
+   auto bi = ws.create_iterator<caching>(r);
    count   = 0;
    while (bi.next())
    {
@@ -1647,7 +1709,7 @@ TEST_CASE("beta-iterator-lower-bound-validation")
    std::vector<std::string> words = load_words(ws, r);
    std::sort(words.begin(), words.end());
 
-   auto itr = ws.create_beta_iterator<beta::caching>(r);
+   auto itr = ws.create_iterator<caching>(r);
    itr.lower_bound(key_view());
    for (size_t i = 0; i < words.size(); ++i)
    {
@@ -1669,7 +1731,7 @@ TEST_CASE("beta-iterator-validation")
    std::vector<std::string> words = load_words(ws, r);
    std::sort(words.begin(), words.end());
 
-   auto itr = ws.create_beta_iterator<beta::caching>(r);
+   auto itr = ws.create_iterator<caching>(r);
 
    // Test basic iterator state
    std::cout << "Is begin: " << itr.is_begin() << std::endl;
@@ -1681,17 +1743,17 @@ TEST_CASE("beta-iterator-validation")
 
    // First validate beta iterator forward traversal
    std::cout << "\nValidating beta iterator next() correctness..." << std::endl;
-   size_t beta_count = 0;
+   size_t count = 0;
    for (const auto& word : words)
    {
       itr.next();
       REQUIRE(itr.key() == word);
-      beta_count++;
+      count++;
    }
    REQUIRE(not itr.is_end());
    REQUIRE(not itr.next());
    REQUIRE(itr.is_end());
-   REQUIRE(beta_count == words.size());
+   REQUIRE(count == words.size());
    REQUIRE(not itr.is_begin());
 
    // Now validate beta iterator reverse traversal
@@ -1770,10 +1832,9 @@ TEST_CASE("beta-iterator-performance")
    std::vector<std::string> words = load_words(ws, r);
    std::sort(words.begin(), words.end());
 
-   auto itr  = ws.create_beta_iterator<beta::caching>(r);
    auto itr2 = ws.create_iterator<caching>(r);
 
-   // Measure regular iterator performance
+   // Measure iterator performance
    std::cout << "Measuring regular iterator performance..." << std::endl;
    size_t reg_count = 0;
    auto   reg_start = std::chrono::steady_clock::now();
@@ -1786,29 +1847,12 @@ TEST_CASE("beta-iterator-performance")
    auto   reg_duration     = std::chrono::duration<double>(reg_end - reg_start).count();
    double reg_keys_per_sec = reg_count / reg_duration;
 
-   // Measure beta iterator performance
-   std::cout << "\nMeasuring beta iterator performance..." << std::endl;
-   size_t beta_count = 0;
-   auto   beta_start = std::chrono::steady_clock::now();
-   while (itr.next())
-   {
-      beta_count++;
-   }
-   auto   beta_end          = std::chrono::steady_clock::now();
-   auto   beta_duration     = std::chrono::duration<double>(beta_end - beta_start).count();
-   double beta_keys_per_sec = beta_count / beta_duration;
-
    // Report performance results
    std::cout << "\nPerformance Results:" << std::endl;
-   std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_keys_per_sec
-             << " keys/sec (" << beta_count << " keys in " << beta_duration << " seconds)"
-             << std::endl;
    std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_keys_per_sec
              << " keys/sec (" << reg_count << " keys in " << reg_duration << " seconds)"
              << std::endl;
 
-   // Verify both iterators processed the same number of keys
-   REQUIRE(beta_count == words.size());
    REQUIRE(reg_count == words.size());
 }
 
@@ -1855,7 +1899,7 @@ TEST_CASE("beta-upper-bound")
       }
       REQUIRE(reference.size() == ws.count_keys(r));
 
-      auto itr = ws.create_beta_iterator<beta::caching>(r);
+      auto itr = ws.create_iterator<caching>(r);
       // Test upper_bound with 100,000 random keys
       for (int i = 0; i < 100'000; ++i)
       {
@@ -1984,53 +2028,30 @@ TEST_CASE("lower-bound-performance")
       auto reg_end      = std::chrono::steady_clock::now();
       auto reg_duration = std::chrono::duration<double>(reg_end - reg_start).count();
 
-      // Test beta iterator with caching performance
-      auto beta_cache_start = std::chrono::steady_clock::now();
-      {
-         auto itr = ws.create_beta_iterator<beta::caching>(r);
-         for (const auto& key : test_data.test_keys)
-         {
-            itr.lower_bound(key_view(key.data(), key.size()));
-         }
-      }
-      auto beta_cache_end = std::chrono::steady_clock::now();
-      auto beta_cache_duration =
-          std::chrono::duration<double>(beta_cache_end - beta_cache_start).count();
-
       // Test beta iterator without caching performance
-      auto beta_nocache_start = std::chrono::steady_clock::now();
+      auto nocache_start = std::chrono::steady_clock::now();
       {
-         auto itr = ws.create_beta_iterator<beta::noncaching>(r);
+         auto itr = ws.create_iterator<noncaching>(r);
          for (const auto& key : test_data.test_keys)
          {
             itr.lower_bound(key_view(key.data(), key.size()));
          }
       }
-      auto beta_nocache_end = std::chrono::steady_clock::now();
-      auto beta_nocache_duration =
-          std::chrono::duration<double>(beta_nocache_end - beta_nocache_start).count();
+      auto nocache_end      = std::chrono::steady_clock::now();
+      auto nocache_duration = std::chrono::duration<double>(nocache_end - nocache_start).count();
 
       // Calculate operations per second
-      double reg_ops_per_sec          = test_data.test_keys.size() / reg_duration;
-      double beta_cache_ops_per_sec   = test_data.test_keys.size() / beta_cache_duration;
-      double beta_nocache_ops_per_sec = test_data.test_keys.size() / beta_nocache_duration;
+      double reg_ops_per_sec     = test_data.test_keys.size() / reg_duration;
+      double nocache_ops_per_sec = test_data.test_keys.size() / nocache_duration;
 
       // Report performance results
       std::cout << "\nLower Bound Performance Results:" << std::endl;
       std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_ops_per_sec
                 << " ops/sec (" << test_data.test_keys.size() << " searches in " << reg_duration
                 << " seconds)" << std::endl;
-      std::cout << "Beta Iterator (cached): " << std::fixed << std::setprecision(4)
-                << beta_cache_ops_per_sec << " ops/sec (" << test_data.test_keys.size()
-                << " searches in " << beta_cache_duration << " seconds)" << std::endl;
-      std::cout << "Beta Iterator (no cache): " << std::fixed << std::setprecision(4)
-                << beta_nocache_ops_per_sec << " ops/sec (" << test_data.test_keys.size()
-                << " searches in " << beta_nocache_duration << " seconds)" << std::endl;
-      std::cout << "\nRatios vs Regular Iterator:" << std::endl;
-      std::cout << "Beta (cached)/Regular: " << std::fixed << std::setprecision(4)
-                << (beta_cache_ops_per_sec / reg_ops_per_sec) << std::endl;
-      std::cout << "Beta (no cache)/Regular: " << std::fixed << std::setprecision(4)
-                << (beta_nocache_ops_per_sec / reg_ops_per_sec) << std::endl;
+      std::cout << "Iterator (no cache): " << std::fixed << std::setprecision(4)
+                << nocache_ops_per_sec << " ops/sec (" << test_data.test_keys.size()
+                << " searches in " << nocache_duration << " seconds)" << std::endl;
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
@@ -2052,12 +2073,8 @@ TEST_CASE("iterator-get-performance")
          auto itr = ws.create_iterator<caching>(r);
          for (const auto& key : test_data.test_keys)
          {
-            itr.get(key_view(key.data(), key.size()),
-                    [&](bool found, const value_type& val)
-                    {
-                       if (found)
-                          reg_found++;
-                    });
+            reg_found += itr.get(key_view(key.data(), key.size()),
+                                 [&](const value_type& val) { return val.is_view(); });
          }
       }
       auto reg_end          = std::chrono::steady_clock::now();
@@ -2065,31 +2082,71 @@ TEST_CASE("iterator-get-performance")
       auto reg_keys_per_sec = test_data.test_keys.size() / reg_duration;
 
       // Test beta iterator get performance
-      auto   beta_start = std::chrono::steady_clock::now();
-      size_t beta_found = 0;
+      auto   start = std::chrono::steady_clock::now();
+      size_t found = 0;
       {
-         auto itr = ws.create_beta_iterator<beta::caching>(r);
+         auto itr = ws.create_iterator<caching>(r);
          for (const auto& key : test_data.test_keys)
          {
-            beta_found += itr.get(key_view(key.data(), key.size()),
-                                  [&](const value_type& val) { return true; });
+            found += itr.get(key_view(key.data(), key.size()),
+                             [&](const value_type& val) { return true; });
          }
       }
-      auto beta_end          = std::chrono::steady_clock::now();
-      auto beta_duration     = std::chrono::duration<double>(beta_end - beta_start).count();
-      auto beta_keys_per_sec = test_data.test_keys.size() / beta_duration;
+      auto end          = std::chrono::steady_clock::now();
+      auto duration     = std::chrono::duration<double>(end - start).count();
+      auto keys_per_sec = test_data.test_keys.size() / duration;
 
       // Report performance results
       std::cout << "\nGet Performance Results:" << std::endl;
-      std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << beta_keys_per_sec
-                << " keys/sec (" << beta_found << " found in " << beta_duration << " seconds)"
-                << std::endl;
+      std::cout << "Beta Iterator: " << std::fixed << std::setprecision(4) << keys_per_sec
+                << " keys/sec (" << found << " found in " << duration << " seconds)" << std::endl;
       std::cout << "Regular Iterator: " << std::fixed << std::setprecision(4) << reg_keys_per_sec
                 << " keys/sec (" << reg_found << " found in " << reg_duration << " seconds)"
                 << std::endl;
 
       // Verify both iterators found the same number of keys
-      REQUIRE(beta_found == reg_found);
+      REQUIRE(found == reg_found);
    }
    REQUIRE(ws.count_ids_with_refs() == 0);
+}
+
+TEST_CASE("lower_bound_prefix_edge_case")
+{
+   environ env;
+   {
+      auto ws   = env.db->start_write_session();
+      auto root = ws.create_root();
+
+      // Create 500 random keys with "test" prefix
+      std::random_device              rd;
+      std::mt19937                    gen(rd());
+      std::uniform_int_distribution<> dist(97, 122);  // a-z ASCII
+
+      std::vector<std::string> test_keys;
+      for (int i = 0; i < 500; i++)
+      {
+         std::string key = "test";
+         // Add 6 random characters after "test"
+         for (int j = 0; j < 6; j++)
+         {
+            key += static_cast<char>(dist(gen));
+         }
+         test_keys.push_back(key);
+         ws.upsert(root, to_key_view(key), to_value_view("value" + std::to_string(i)));
+      }
+
+      // Sort keys to verify results
+      std::sort(test_keys.begin(), test_keys.end());
+
+      // Create iterator and try to find lower_bound of "texx"
+      auto rs = env.db->start_read_session();
+      auto it = rs.create_iterator(root);
+
+      // This should find the first key greater than "texx"
+      bool found = it.lower_bound(to_key_view("texx"));
+
+      REQUIRE(it.is_end());
+      // Verify that we found a valid result
+      REQUIRE(not found);
+   }
 }

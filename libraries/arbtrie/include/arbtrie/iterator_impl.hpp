@@ -1,328 +1,510 @@
 #pragma once
-#include <arbtrie/binary_node.hpp>
-#include <arbtrie/full_node.hpp>
-#include <arbtrie/inner_node.hpp>
-#include <arbtrie/node_handle.hpp>
-#include <arbtrie/node_header.hpp>
-#include <arbtrie/node_meta.hpp>
-#include <arbtrie/setlist_node.hpp>
-#include <arbtrie/value_node.hpp>
+#include <arbtrie/beta_iterator.hpp>
+#include <arbtrie/concepts.hpp>
+#include <arbtrie/read_lock.hpp>
+#include <arbtrie/seg_alloc_session.hpp>
+#include <arbtrie/seg_allocator.hpp>
+#include <utility>
 
 namespace arbtrie
 {
 
    template <iterator_caching_mode CacheMode>
-   inline bool iterator<CacheMode>::is_subtree() const
+   std::string iterator<CacheMode>::pretty_path() const
    {
-      if (not valid()) [[unlikely]]
-         return false;
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_path.back().first);
-      switch (rr.type())
+      std::stringstream ss;
+      ss << "'" << key() << "' => ";
+      size_t pos = 0;
+      for (size_t i = 0; i < _path->size(); ++i)
       {
-         case node_type::binary:
-            return rr.as<binary_node>()->is_subtree(_path.back().second);
-         case node_type::full:
-            return rr.as<full_node>()->is_eof_subtree();
-         case node_type::setlist:
-            return rr.as<setlist_node>()->is_eof_subtree();
-         case node_type::value:
-            return rr.as<value_node>()->is_subtree();
-         default:
-            throw std::runtime_error("iterator::is_subtree unhandled type");
+         const auto& entry = (*_path)[i];
+         if (&entry > _path_back)
+            break;
+
+         if (i > 0)
+            ss << " / ";
+         // Print prefix
+         ss << "'" << key_view(_branches->data() + pos, entry.prefix_size) << "'";
+         pos += entry.prefix_size;
+         // Print branch if it exists
+         if (entry.branch_size > 0)
+         {
+            ss << " '" << key_view(_branches->data() + pos, entry.branch_size) << "'";
+         }
+         pos += entry.branch_size;
       }
-   }
-
-   template <iterator_caching_mode CacheMode>
-   inline node_handle iterator<CacheMode>::subtree() const
-   {
-      if (not is_subtree()) [[unlikely]]
-         throw std::runtime_error("iterator::subtree: not a subtree");
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_path.back().first);
-      switch (rr.type())
-      {
-         case node_type::binary:
-         {
-            auto bn  = rr.as<binary_node>();
-            auto idx = _path.back().second;
-            auto kvp = bn->get_key_val_ptr(idx);
-            return _rs.create_handle(kvp->value_id());
-         }
-         case node_type::full:
-            return _rs.create_handle(rr.as<full_node>()->get_eof_address());
-         case node_type::setlist:
-            return _rs.create_handle(rr.as<setlist_node>()->get_eof_address());
-         case node_type::value:
-            return _rs.create_handle(rr.as<value_node>()->subtree());
-         default:
-            throw std::runtime_error("iterator::subtree unhandled type");
-      }
-   }
-
-   template <iterator_caching_mode CacheMode>
-   inline int32_t iterator<CacheMode>::read_value(auto& buffer)
-   {
-      if (0 == _path.size())
-      {
-         buffer.resize(0);
-         return -1;
-      }
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_path.back().first);
-
-      switch (rr.type())
-      {
-         case node_type::binary:
-         {
-            auto kvp = rr.as<binary_node>()->get_key_val_ptr(_path.back().second);
-            auto s   = kvp->value_size();
-            buffer.resize(s);
-            memcpy(buffer.data(), kvp->val_ptr(), s);
-            return s;
-         }
-         case node_type::full:
-         {
-            auto b0 = rr.as<full_node>()->get_eof_address();
-            assert(b0);
-            auto v = state.get(b0).as<value_node>()->value_view();
-            auto s = v.size();
-            buffer.resize(s);
-            memcpy(buffer.data(), v.data(), s);
-            return s;
-         }
-         case node_type::setlist:
-         {
-            auto b0 = rr.as<setlist_node>()->get_eof_address();
-            assert(b0);
-            auto v = state.get(b0).as<value_node>()->value_view();
-            auto s = v.size();
-            buffer.resize(s);
-            memcpy(buffer.data(), v.data(), s);
-            return s;
-         }
-         case node_type::value:
-         {
-            auto b0 = rr.as<value_node>();
-            buffer.resize(b0->value_size());
-            memcpy(buffer.data(), b0->value_view().data(), b0->value_size());
-            return b0->value_size();
-         }
-
-         default:
-            throw std::runtime_error("iterator::read_value unhandled type");
-      }
-      return -1;
+      return ss.str();
    }
 
    template <iterator_caching_mode CacheMode>
    iterator<CacheMode> iterator<CacheMode>::subtree_iterator() const
    {
-      return iterator<CacheMode>(_rs, subtree());
+      return iterator<CacheMode>(*_rs, subtree());
    }
    template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref&       r,
-                                                      const value_node* in,
-                                                      key_view          query)
+   node_handle iterator<CacheMode>::subtree() const
    {
-      auto ikey = in->key();
-      if (ikey <= query)
-      {
-         pushkey(ikey);
-         return true;
-      }
-      _path.pop_back();
-      return query >= key_view();
+      return node_handle(*_rs, value(
+                                   [&](value_type v)
+                                   {
+                                      if (not v.is_subtree())
+                                         return id_address(0);
+                                      return v.subtree_address();
+                                   }));
    }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const value_node* in, key_view query)
-   {
-      auto ikey = in->key();
-      if (query <= ikey)
-      {
-         pushkey(ikey);
-         return true;
-      }
-      _path.pop_back();
-      return false;
-   }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const auto* in, key_view query)
-   {
-      auto node_prefix = in->get_prefix();
-      //   TRIEDENT_DEBUG( "prefix: ", to_hex(node_prefix) );
-      pushkey(node_prefix);
 
-      if (query <= node_prefix)
+   /**
+    * Read value into a resizeable buffer of contiguous memory
+    * @tparam Buffer Type that supports resize() and data() for contiguous memory access
+    * @param buffer The buffer to read the value into
+    * @return 
+    *   >= 0: Number of bytes read into buffer on success
+    *   iterator::value_nothing: Value not found
+    *   iterator::value_subtree: Found subtree value (use subtree_iterator() instead)
+    */
+   template <iterator_caching_mode CacheMode>
+   int32_t iterator<CacheMode>::value(Buffer auto&& buffer) const
+   {
+      return value(
+          [&](value_type v) -> int32_t
+          {
+             if (!v.is_view()) [[unlikely]]
+                return value_nothing - v.is_subtree();
+             auto view = v.view();
+             buffer.resize(view.size());
+             memcpy(buffer.data(), view.data(), view.size());
+             return static_cast<int32_t>(view.size());
+          });
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <typename B>
+      requires ConstructibleBuffer<B>
+   B iterator<CacheMode>::value() const
+   {
+      B buffer;
+      switch (value(buffer))
       {
-         //  TRIEDENT_DEBUG( "query: ", to_hex(query) , " <= pre: ", to_hex(node_prefix) );
-         // go to first branch
-         std::pair<branch_index_type, id_address> idx = in->lower_bound(0);
-         if (idx.first == 0)
+         case value_nothing:
+            throw std::runtime_error("value not found");
+         case value_subtree:
+            throw std::runtime_error("subtree value found, use subtree_iterator() instead");
+         default:
+            return buffer;
+      }
+      __builtin_unreachable();
+   }
+
+   /**
+    * Read value into a contiguous memory buffer
+    * @tparam ByteType Type of the buffer (e.g., char, unsigned char, etc.)
+    * @param s Pointer to the buffer
+    * @param s_len Length of the buffer
+    * @return Number of bytes read into buffer on success
+    *   iterator::value_nothing: Value not found
+    *   iterator::value_subtree: Found subtree value (use subtree_iterator() instead)
+    */
+   template <iterator_caching_mode CacheMode>
+   template <typename ByteType>
+   int32_t iterator<CacheMode>::value(ByteType* s, uint32_t s_len) const
+   {
+      static_assert(sizeof(ByteType) == 1, "ByteType must be a single byte type");
+      return value(
+          [&](value_type v) -> int32_t
+          {
+             if (!v.is_view()) [[unlikely]]
+                return value_nothing - v.is_subtree();
+             auto     view          = v.view();
+             uint32_t bytes_to_copy = std::min<uint32_t>(view.size(), s_len);
+             memcpy(s, view.data(), bytes_to_copy);
+             return bytes_to_copy;
+          });
+   }
+   /**
+    * Read value at current iterator position and invoke callback with the value
+    * @tparam Callback Callable type that accepts value_type parameter
+    * @param callback Function to call with the value
+    * @return Value returned by callback on success
+    */
+   template <iterator_caching_mode CacheMode>
+   auto iterator<CacheMode>::value(std::invocable<value_type> auto&& callback) const
+   {
+      auto state = _rs->lock();
+      auto addr  = _path_back->oid;
+
+      std::optional<decltype(callback(value_type()))> result;
+      auto                                            idx = _path_back->index;
+
+      while (true)
+      {
+         auto oref = state.get(addr);
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                           [&](const /*arbtrie::node*/ auto* n)
+                           {
+                              auto val = n->get_value(local_index(idx));
+                              switch (val.type())
+                              {
+                                 case value_type::types::value_node:
+                                    addr = val.value_address();
+                                    idx  = 0;
+                                    return false;  // continue to value_node
+                                 default:
+                                    result.emplace(callback(val));
+                                    return true;  // done
+                              }
+                           }))
+            return *result;
+      }
+      __builtin_unreachable();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::lower_bound(key_view key)
+   {
+      if (not _root.address()) [[unlikely]]
+         return false;
+      auto state = _rs->lock();
+      begin();
+      return lower_bound_impl(state, key);
+   }
+
+   /**
+    * Implementation of the lower_bound algorithm for finding the first key greater than or equal to a search key.
+    * The algorithm traverses the tree structure while maintaining the following invariants:
+    * 1. The path from root to current node represents the common prefix between search key and any potential match
+    * 2. At each node, we either:
+    *    a) Match the prefix and continue down
+    *    b) Find the prefix is greater than search key and move to next key
+    *    c) Find a mismatch in prefix and need to backtrack
+    *
+    * Algorithm steps:
+    * 1. At each node:
+    *    - For non-binary nodes (inner/radix):
+    *      a) Compare node's prefix with search key
+    *      b) If prefix > key: Move to next key as all following keys will be greater
+    *      c) Find common prefix between node's prefix and search key
+    *      d) If common prefix != node's prefix (aka prefix < key):
+    *            then all keys down this branch will be less than key
+    *            therefore pop back up and move to next key above current branch
+    *      e) Otherwise: Push common prefix and continue with remaining key
+    *
+    * 2. Find insertion point in current node:
+    *    - Get lower_bound_index for remaining key
+    *    - If index >= end: Pop up and move to next key as all keys in node are smaller
+    *    - If at begin_index: Move to next key as we need something greater
+    *
+    * 3. Process found branch:
+    *    - For inner nodes:
+    *      a) Handle EOF branch specially
+    *      b) Update branch with first byte
+    *      c) Check if we've moved past search key
+    *      d) Push path and continue or return based on comparison
+    *    - For binary/value nodes:
+    *      Simply update entire branch key
+    *
+    * The algorithm maintains correctness by:
+    * - Always comparing full prefixes before descending
+    * - Properly handling backtracking when prefixes mismatch
+    * - Ensuring movement to next key when current path can't contain target
+    * - Maintaining proper state during tree traversal
+    *
+    * @param state The read lock state for accessing nodes
+    * @param key The search key to find lower bound for
+    * @return true if a valid key was found, false if we reached the end
+    */
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::lower_bound_impl(read_lock& state, key_view key)
+   {
+      const bool should_debug = false;  //to_hex(key) == "598dd6d3bc4f";
+      size_t     depth        = 0;
+
+      while (true)
+      {
+         depth++;
+         if (should_debug)
          {
-            assert(_path.back().second == 0);
-            //   _path.back().second = 0;
-            return true;
+            TRIEDENT_DEBUG(std::string(depth * 4, ' '),
+                           "lower_bound_impl starting search for key: '", to_hex(key), "'");
          }
+         auto oref = state.get(_path_back->oid);
+         // clang-format off
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+              [&](const /*arbtrie::node*/ auto* n) -> bool
+              {
+               if( should_debug ) TRIEDENT_DEBUG( node_type_names[n->type] );
+                 if constexpr (not is_binary_node<decltype(n)>)
+                 {
+                    auto pre = n->get_prefix();
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Checking prefix: '", to_hex(pre), "' against key: '", to_hex(key), "'");
+                    }
+                    if (pre > key) [[unlikely]]  // then go up the tree
+                    {
+                       if (should_debug) {
+                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Prefix > key, go to next");
+                       }
+                       return next_impl(state), true;  // All keys in this subtree will be greater than search key
+                    }
 
-         if (idx.second)
-         {
-            _path.back().second = idx.first;
-            pushkey(branch_to_char(idx.first));
+                    auto cpre = common_prefix(pre, key);
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Common prefix length: ", cpre.size(), " prefix length: ", pre.size());
+                    }
 
-            auto bref = r.rlock().get(idx.second);
-            return lower_bound_impl(bref, {});
-         }
-         popkey(node_prefix.size() + 1);
-         _path.pop_back();
-         return false;
+                    // then go to the next branch of the parent
+                    if (cpre != pre)  {  // Prefix mismatch - current branch cannot contain target
+                       if (should_debug) {
+                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Prefix mismatch, popping path");
+                       }
+                       pop_path(); 
+                       if (not is_end())
+                          next_impl(state);  // Try next key at parent level
+                       return true;  // Reached end of tree
+                    }
+
+                    push_prefix(cpre);  // Record matched prefix
+                    key = key.substr(cpre.size());  // Continue with remaining key portion
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Pushed prefix, remaining key: '", to_hex(key), "'");
+                    }
+                 } // end not binary node 
+
+                 auto nidx = n->lower_bound_index(key);  // Find insertion point for remaining key
+                 if (should_debug) {
+                    TRIEDENT_DEBUG(std::string(depth*4, ' '), "Found index: ", nidx.to_int(), " of ", n->end_index().to_int());
+                 }
+                 if (nidx >= n->end_index())  // All keys in node are smaller
+                 {
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "All keys in node are smaller, popping path");
+                    }
+                    pop_path();
+                    if (not is_end())
+                       next_impl(state);  // Try next key at parent
+                    return true;  // Found valid key or reached end
+                 }
+
+                 if( nidx == n->begin_index() )  // Need something greater than current
+                 {
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "At begin index, moving to next");
+                    }
+                    return next_impl(state), true;
+                 }
+
+                 auto bkey = n->get_branch_key(nidx);
+                 if (should_debug) {
+                    TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key: '", to_hex(bkey), "'");
+                 }
+
+                 if constexpr (is_inner_node<decltype(n)>)
+                 {
+                    if (not bkey.size())  // eof value
+                    {
+                       if (should_debug) {
+                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Found EOF value");
+                       }
+                       return update_branch(nidx), true;  // Record EOF branch and we're done
+                    }
+                    update_branch(bkey.front(), nidx);  // Record first byte of branch
+
+                    bool past_key = not key.size() or uint8_t(bkey.front()) > uint8_t(key.front());  // Check if we've moved past search key
+                    if (should_debug) {
+                       TRIEDENT_WARN(" bkey: ", to_hex(bkey), "> key: ", to_hex(key));
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Past key: ", past_key);
+                    }
+
+                    key = key.substr(key.size() > 0);  // Remove first byte for recursion
+                    push_path(n->get_value(nidx).value_address(), begin_index);  // Descend to child node
+
+                    if (past_key)
+                    {
+                       if (should_debug) {
+                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Past key, moving to next_impl");
+                       }
+                       return next_impl(state), true;  // Found first key greater than search key
+                    }
+                    return false;  // Continue search in child node
+                 }
+                 else  // on binary nodes / value nodes we have to swap the entire key
+                 {
+                    if (should_debug) {
+                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "On binary/value node, updating branch with full key");
+                    }
+                    update_branch(bkey, nidx);
+
+                    if( bkey >= key )
+                    {
+                       if (should_debug) 
+                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key >= search key, we're done");
+                       return true;
+                    }
+                     if (should_debug) {
+                        TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key < search key, moving to next");
+                     }
+                     return next_impl(state), true;
+
+                 }
+              }))
+            return not is_end();
+         // clang-format on
       }
-
-      auto cpre = common_prefix(node_prefix, query);
-      // TRIEDENT_DEBUG( "query: ", to_hex(query) , " > pre: ",
-      //                to_hex(node_prefix), " cpre: ", to_hex(cpre));
-      if (cpre != node_prefix)
-      {
-         popkey(node_prefix.size());
-         _path.pop_back();
-         return false;
-      }
-
-      auto remaining_query = query.substr(cpre.size());
-      // TRIEDENT_DEBUG( "remaining query: ", to_hex(remaining_query) );
-      assert(remaining_query.size() > 0);
-
-      std::pair<branch_index_type, id_address> idx =
-          in->lower_bound(char_to_branch(remaining_query.front()));
-
-      // TRIEDENT_WARN( "lower bound: ", to_hex(branch_to_char(idx.first) ) );
-
-      if (idx.second)
-      {
-         assert(idx.first != 0);  // that would be handled in query <= node_prefix
-
-         _path.back().second = idx.first;
-
-         auto bref = r.rlock().get(idx.second);
-         pushkey(branch_to_char(idx.first));
-
-         if (idx.first == char_to_branch(query.front()))
-            return lower_bound_impl(bref, remaining_query.substr(1));
-         else  // if the lower bound of the first byte is beyond the first byte of query,
-               // then we start at the beginning of the next level
-            return lower_bound_impl(bref, key_view());
-      }
-      popkey(node_prefix.size());
-      _path.pop_back();
-      return false;
+      throw std::runtime_error("iterator::lower_bound: attempt to move past end");
    }
 
    template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r, const auto* in, key_view query)
+   bool iterator<CacheMode>::next()
    {
-      auto node_prefix = in->get_prefix();
-      pushkey(node_prefix);
+      auto state = _rs->lock();
+      return next_impl(state);
+   }
 
-      if (query > node_prefix)
+   /**
+       * @brief Move to the next key in the iterator
+       * 
+       * @param state the segment allocator state
+       * @return true if the iterator is now at a valid key, false if the iterator is at the end
+       */
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::next_impl(read_lock& state)
+   {
+      // Loop until we reach the end of the iterator
+      while (true)
       {
-         assert(query.size() > 0);
-         branch_index_type qidx = char_to_branch(query[0]);
+         auto oref = state.get(_path_back->oid);
 
-         // go to last branch
-         std::pair<branch_index_type, id_address> idx = in->reverse_lower_bound(qidx);
+         // Cast to appropriate node type and process
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                           [&](const /*arbtrie::node*/ auto* n)
+                           {
+                              const local_index start_idx = current_index();
 
-         if (idx.first == 0)
-         {
-            assert(_path.back().second == 0);
-            return true;
-         }
+                              // on transition from before the first key push the common prefix
+                              if constexpr (not is_binary_node<decltype(n)>)
+                                 if (start_idx == begin_index)
+                                    push_prefix(n->get_prefix());
 
-         if (idx.second)
-         {
-            _path.back().second = idx.first;
-            pushkey(branch_to_char(idx.first));
+                              // Get the next index in this node
+                              auto nidx = n->next_index(start_idx);
 
-            auto bref = r.rlock().get(idx.second);
-            return reverse_lower_bound_impl(bref, query.substr(1));
-         }
-         popkey(node_prefix.size() + _path.back().second > 0);
-         _path.pop_back();
-         return false;
+                              if (nidx >= n->end_index())
+                                 return pop_path(), is_end();
+
+                              // if the branch key is empty, that means the branch is EOF
+                              auto bkey = n->get_branch_key(nidx);
+
+                              if constexpr (is_inner_node<decltype(n)>)
+                              {
+                                 if (not bkey.size())  // eof value
+                                    return update_branch(nidx), true;
+                                 update_branch(bkey.front(), nidx);
+                                 return push_path(n->get_value(nidx).value_address(), begin_index),
+                                        false;
+                              }
+                              else  // on binary nodes / value nodes we have to swap the entire key
+                                 return update_branch(bkey, nidx), true;
+                           }))
+            return not is_end();
       }
-
-      auto cpre = common_prefix(node_prefix, query);
-      if (cpre != node_prefix)
-      {
-         popkey(node_prefix.size() + _path.back().second != 0);
-         _path.pop_back();
-         return false;
-      }
-
-      auto remaining_query = query.substr(cpre.size());
-      assert(remaining_query.size() > 0);
-
-      std::pair<branch_index_type, id_address> idx =
-          in->reverse_lower_bound(char_to_branch(remaining_query.front()));
-
-      if (idx.second)
-      {
-         assert(idx.first != 0);  // that would be handled in query <= node_prefix
-
-         _path.back().second = idx.first;
-
-         auto bref = r.rlock().get(idx.second);
-         pushkey(branch_to_char(idx.first));
-         if (idx.first == char_to_branch(query.front()))
-            return reverse_lower_bound_impl(bref, remaining_query.substr(1));
-         else
-            return reverse_lower_bound_impl(bref, npos);
-      }
-      popkey(node_prefix.size());
-      _path.pop_back();
-      return false;
+      throw std::runtime_error("iterator::next: attempt to move past end");
    }
 
    template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, const binary_node* bn, key_view query)
+   bool iterator<CacheMode>::prev()
    {
-      auto lbx            = bn->lower_bound_idx(query);
-      _path.back().second = lbx;
-
-      if (lbx >= bn->num_branches())
+      auto state = _rs->lock();
+      if (is_end()) [[unlikely]]
       {
-         // TODO: path.pop_back?
-         //TRIEDENT_WARN( "it happened" );
-         _path.pop_back();
+         _path_back = _path->data();
+         auto oref  = state.get(_path_back->oid);
+         _path_back->index =
+             cast_and_call(oref.template header<node_header, CacheMode>(),
+                           [&](const /*arbtrie::node*/ auto* n) { return n->end_index(); })
+                 .to_int();
+      }
+      return prev_impl(state);
+   }
+
+   /**
+       * @brief Move to the previous key in the iterator
+       * 
+       * @param state the segment allocator state
+       * @return true if the iterator is now at a valid key, false if the iterator is at the beginning
+       */
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::prev_impl(read_lock& state)
+   {
+      // Loop until we reach the beginning of the iterator
+      while (true)
+      {
+         //   std::cerr << "prev_impl: " << pretty_path() << "\n";
+         auto oref = state.get(_path_back->oid);
+
+         // Cast to appropriate node type and process
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                           [&](const /*arbtrie::node*/ auto* n)
+                           {
+                              const local_index start_idx = current_index();
+
+                              // on transition from after the last key, push the common prefix
+                              if constexpr (not is_binary_node<decltype(n)>)
+                                 if (start_idx >= n->end_index())
+                                    push_prefix(n->get_prefix());
+
+                              // Get the previous index in this node
+                              auto nidx = n->prev_index(start_idx);
+
+                              if (nidx <= n->begin_index())
+                              {
+                                 if (_path_back != _path->data())
+                                    return pop_path(), false;  // continue up the tree
+
+                                 // if we are at the top of the tree, we are done
+                                 _path_back->index = rend_index.to_int();
+                                 return true;
+                              }
+
+                              // if the branch key is empty, that means the branch is EOF
+                              auto bkey = n->get_branch_key(nidx);
+
+                              if constexpr (is_inner_node<decltype(n)>)
+                              {
+                                 if (not bkey.size())  // eof value
+                                    return update_branch(nidx), true;
+                                 update_branch(bkey.front(), nidx);  // on just swap the last byte
+                                 return push_path(n->get_value(nidx).value_address(), end_index),
+                                        false;
+                              }
+                              else  // on binary nodes / value nodes we have to swap the entire key
+                                 return update_branch(bkey, nidx), true;
+                           }))
+            return not is_rend();
+      }
+      throw std::runtime_error("iterator::prev: attempt to move before beginning");
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::upper_bound(key_view search)
+   {
+      if (not _root.address().to_int()) [[unlikely]]
+      {
+         TRIEDENT_WARN("upper_bound: no root: ", _root.address());
          return false;
       }
 
-      _path.back().second = lbx;
-      auto kvp            = bn->get_key_val_ptr(lbx);
-      pushkey(kvp->key());
-      _size = kvp->value_size();
+      auto state = _rs->lock();
+      begin();
+      if (not lower_bound_impl(state, search))
+         return false;
 
-      //  TRIEDENT_WARN( "lbx: ", lbx,  " query: ", to_hex(query), " key: ", to_hex(kvp->key())  );
-      //  if( lbx > 0 ) {
-      //    auto pk = bn->get_key_val_ptr(lbx-1)->key();
-      //    TRIEDENT_WARN( "prev key: ",to_hex( pk)  );
-      //    assert( pk < query );
-      //  }
+      //TRIEDENT_DEBUG(" lower_bound: ", to_hex(key()), " >= ", to_hex(search));
+      assert(key() >= search);
+      // If we found an exact match for the search key, move to the next element
+      if (key() == search)
+         return next_impl(state);
       return true;
    }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::first(key_view prefix)
-   {
-      if (lower_bound(prefix))
-      {
-         if (common_prefix(prefix, key()) == prefix)
-            return true;
-         return end();
-      }
-      return false;
-   }
+
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::last(key_view prefix)
    {
@@ -331,490 +513,353 @@ namespace arbtrie
 
       if (prefix.size() > max_key_length)
          throw std::runtime_error("invalid key length");
-      std::array<char, max_key_length> lastkey;
-      memcpy(lastkey.data(), prefix.data(), prefix.size());
-      memset(lastkey.data() + prefix.size(), 0xff, max_key_length - prefix.size());
-      if (lower_bound(key_view(lastkey.data(), lastkey.size())))
+
+      auto state = _rs->lock();
+      begin();
+
+      // If no prefix is provided, find the last key in the entire tree
+      if (prefix.empty())
+         return end(), prev_impl(state);
+
+      // Create a search key that is the prefix followed by 0xFF bytes
+      std::array<char, max_key_length> search_key;
+      memcpy(search_key.data(), prefix.data(), prefix.size());
+      memset(search_key.data() + prefix.size(), 0xff, max_key_length - prefix.size());
+
+      // Try to find a key greater than or equal to our search key
+      if (lower_bound_impl(state, key_view(search_key.data(), search_key.size())))
       {
-         if (key().substr(0, prefix.size()) == prefix)
+         // If we found a key that starts with our prefix, we're done
+         if (key().starts_with(prefix))
             return true;
-         if (prev())
-         {
-            if (key().substr(0, prefix.size()) == prefix)
-               return true;
-            return end();
-         }
-      }
-      end();
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_root.address());
-      if (not reverse_lower_bound_impl(rr, npos))
-         return end();
-      return true;
-   }
 
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref&        r,
-                                                      const binary_node* bn,
-                                                      key_view           query)
-   {
-      auto lbx            = bn->reverse_lower_bound_idx(query);
-      _path.back().second = lbx;
-
-      if (lbx < 0)
-      {
-         _path.pop_back();
-         return false;
-      }
-
-      auto kvp = bn->get_key_val_ptr(lbx);
-      pushkey(bn->get_key_val_ptr(lbx)->key());
-      _size = kvp->value_size();
-
-      return true;
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound_impl(object_ref& r, key_view query)
-   {
-      _path.push_back({r.address(), 0});
-      if (not cast_and_call(r.header<node_header, CacheMode>(),
-                            [&](const auto* n) { return lower_bound_impl(r, n, query); }))
-         return next();
-      return true;
-   }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound_impl(object_ref& r, key_view query)
-   {
-      _path.push_back({r.address(), 257});
-      if (not cast_and_call(r.header<node_header, CacheMode>(),
-                            [&](const auto* n) { return reverse_lower_bound_impl(r, n, query); }))
-         return prev();
-      return true;
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::lower_bound(key_view prefix)
-   {
-      if (not _root.address())
-         return end();
-
-      _branches.clear();
-      _branches.reserve(prefix.size());
-      _path.clear();
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_root.address());
-      if (not lower_bound_impl(rr, prefix))
-         return end();
-      return true;
-   }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_lower_bound(key_view prefix)
-   {
-      if (lower_bound(prefix))
-      {
-         if (key() > prefix)
-            return prev();
-         if (key() == prefix)
+         // Otherwise try the previous key
+         if (prev_impl(state) and key().starts_with(prefix))
             return true;
-         else
-            return end();
       }
-      if (last())
-      {
-         if (key() <= prefix)
-            return true;
-         return end();
-      }
-      return false;
-   }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::upper_bound(key_view search)
-   {
-      if (lower_bound(search))
-      {
-         if (key() == search)
-            return next();
-         return true;
-      }
-      return false;
-   }
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::reverse_upper_bound(key_view search)
-   {
-      if (reverse_lower_bound(search))
-      {
-         if (key() == search)
-            return prev();
-         return true;
-      }
-      return false;
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::next()
-   {
-      if (_path.size() == 0)
-         return end();
-
-      auto& db    = _rs._db;
-      auto  state = _rs._segas.lock();
-
-      auto current = _path.back().second++;
-
-      auto handle_inner = [&](const auto* in)
-      {
-         auto lbx = in->lower_bound(_path.back().second);
-
-         _path.back().second = lbx.first;
-
-         if (not lbx.second)
-         {
-            popkey(in->get_prefix().size() + (current != 0));
-            _path.pop_back();
-            return next();
-         }
-         if (current)
-            _branches.back() = branch_to_char(lbx.first);
-         else
-            pushkey(branch_to_char(lbx.first));
-
-         auto oref = state.get(lbx.second);
-         return lower_bound_impl(oref, {});
-      };
-
-      auto oref = state.get(_path.back().first);
-      switch (oref.type())
-      {
-         case node_type::binary:
-         {
-            auto bn = oref.as<binary_node, CacheMode>();
-
-            if (current < bn->num_branches())
-               popkey(bn->get_key_val_ptr(current)->key_size());
-
-            if (int(bn->num_branches()) - _path.back().second <= 0)
-            {
-               _path.pop_back();
-               return next();
-            }
-            pushkey(bn->get_key_val_ptr(current + 1)->key());
-            return true;
-         }
-         case node_type::full:
-            return handle_inner(oref.as<full_node, CacheMode>());
-         case node_type::setlist:
-            return handle_inner(oref.as<setlist_node, CacheMode>());
-         case node_type::value:
-         {
-            auto vn = oref.as<value_node, CacheMode>();
-            popkey(vn->key().size());
-            _path.pop_back();
-            return next();
-         }
-         default:
-            throw std::runtime_error("iterator::next unexpected type: ");
-      }
-      // unreachable
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::prev()
-   {
-      if (_path.size() == 0)
-         return end();
-
-      auto current = _path.back().second;
-
-      auto& db    = _rs._db;
-      auto  state = _rs._segas.lock();
-
-      auto handle_inner = [&](const auto* in)
-      {
-         if (current == 0)
-         {
-            popkey(in->get_prefix().size());
-            _path.pop_back();
-            assert(verify_branches_invariant());
-            return prev();
-         }
-         //  TRIEDENT_DEBUG( "current: ", current );
-         auto lbx = in->reverse_lower_bound(current - 1);
-         //   TRIEDENT_DEBUG( "rlb prev: ", lbx.first );
-         _path.back().second = lbx.first;
-         if (not lbx.second)
-         {
-            popkey(in->get_prefix().size() + 1);
-            _path.pop_back();
-            assert(verify_branches_invariant());
-            return prev();
-         }
-         if (lbx.first == 0)
-         {
-            popkey(current < 257);
-            assert(verify_branches_invariant());
-            return true;
-         }
-         if (lbx.first)
-         {
-            _branches.back() = branch_to_char(lbx.first);
-            assert(verify_branches_invariant());
-
-            auto oref = state.get(lbx.second);
-            return reverse_lower_bound_impl(oref, npos);
-         }
-         else
-         {
-            _branches.pop_back();
-            _path.pop_back();
-            assert(verify_branches_invariant());
-         }
-         return true;
-      };
-
-      auto oref = state.get(_path.back().first);
-      switch (oref.type())
-      {
-         case node_type::binary:
-         {
-            //   TRIEDENT_DEBUG( "binary _path.size: ", _path.size(), " idx: ", _path.back().second );
-            const auto* bn = oref.as<binary_node, CacheMode>();
-            if (current < bn->num_branches())
-            {
-               popkey(bn->get_key_val_ptr(current)->key_size());
-
-               if (current == 0)
-               {
-                  _path.pop_back();
-                  return prev();
-               }
-
-               current = --_path.back().second;
-               pushkey(bn->get_key_val_ptr(current)->key());
-               assert(verify_branches_invariant());
-               return true;
-            }
-            else
-            {
-               current = _path.back().second = bn->num_branches() - 1;
-               pushkey(bn->get_key_val_ptr(current)->key());
-               assert(verify_branches_invariant());
-               return true;
-            }
-         }
-         case node_type::full:
-            return handle_inner(oref.as<full_node, CacheMode>());
-         case node_type::setlist:
-            //  TRIEDENT_DEBUG( "setlist _path.size: ", _path.size(), " idx: ", _path.back().second );
-            return handle_inner(oref.as<setlist_node, CacheMode>());
-         case node_type::value:
-         {
-            auto vn = oref.as<value_node, CacheMode>();
-            popkey(vn->key().size());
-            _path.pop_back();
-            return prev();
-         }
-         default:
-            throw std::runtime_error("iterator::prevunexpected type");
-      }
-      // unreachable
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::get(key_view key, auto&& callback) const
-   {
-      if (not _root.address()) [[unlikely]]
-      {
-         callback(false, value_type{});
-         return false;
-      }
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_root.address());
-
-      return _rs.get(rr, key, std::forward<decltype(callback)>(callback));
-   }
-
-   template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::get2(key_view key, auto&& callback)
-   {
-      if (not _root.address()) [[unlikely]]
-      {
-         callback(false, value_type{});
-         return end();
-      }
-
-      _branches.clear();
-      _path.clear();
-
-      auto state = _rs._segas.lock();
-      auto rr    = state.get(_root.address());
-
-      // _path.push_back({rr.address(), 0});
-
-      if (get2_impl(rr, key, std::forward<decltype(callback)>(callback)))
-         return true;
       return end();
    }
 
    template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::get2_impl(object_ref& r, key_view key, auto&& callback)
+   bool iterator<CacheMode>::first(key_view prefix)
    {
-      if (_path.empty())
-      {
-         _path.push_back({r.address(), 0});
-      }
+      if (not _root.address()) [[unlikely]]
+         return end();
 
-      auto handle_inner = [&](const inner_node_concept auto* in)
-      {
-         auto node_prefix = in->get_prefix();
-         pushkey(node_prefix);
+      if (prefix.size() > max_key_length)
+         throw std::runtime_error("invalid key length");
 
-         auto cpre = common_prefix(node_prefix, key);
-         if (cpre != node_prefix)
-         {
-            return false;
-         }
+      auto state = _rs->lock();
+      begin();
 
-         auto remaining_key = key.substr(cpre.size());
-         if (not remaining_key.empty())
-         {
-            auto br   = char_to_branch(remaining_key.front());
-            auto addr = in->get_branch(br);
-            if (not addr)
-            {
-               return false;
-            }
-            _path.push_back({id_address(addr), 0});
-            pushkey(branch_to_char(br));
-            auto next_ref = r.rlock().get(addr);
-            bool result   = get2_impl(next_ref, remaining_key.substr(1),
-                                      std::forward<decltype(callback)>(callback));
-            if (!result)
-            {
-               popkey(1);
-               _path.pop_back();
-            }
-            return result;
-         }
+      // If no prefix is provided, just move to the first key
+      if (prefix.empty())
+         return next_impl(state);
 
-         if (not in->has_eof_value())
-         {
-            return false;
-         }
+      // Find the first key that is greater than or equal to the prefix
+      if (not lower_bound_impl(state, prefix))
+         return end();
 
-         auto eof_addr = in->get_eof_address();
-         assert(eof_addr);
+      // Check if the found key starts with our prefix
+      if (not key().starts_with(prefix))
+         return end();
 
-         if (in->is_eof_subtree())
-         {
-            callback(true, value_type::make_subtree(eof_addr));
-         }
-         else
-         {
-            auto val = r.rlock().get(eof_addr);
-            callback(true, val.template as<value_node>()->value());
-         }
-         return true;
-      };
-
-      switch (r.type())
-      {
-         case node_type::full:
-            return handle_inner(r.template as<full_node>());
-         case node_type::setlist:
-            return handle_inner(r.template as<setlist_node>());
-         case node_type::binary:
-         {
-            auto bn  = r.template as<binary_node>();
-            auto idx = bn->find_key_idx(key);
-            if (idx < 0)
-               return false;
-
-            _path.back().second = idx;
-            pushkey(bn->get_key_val_ptr(idx)->key());
-
-            auto kvp = bn->get_key_val_ptr(idx);
-
-            if (bn->is_subtree(idx))
-            {
-               callback(true, value_type::make_subtree(kvp->value_id()));
-            }
-            else if (bn->is_obj_id(idx))
-            {
-               auto val = r.rlock().get(kvp->value_id());
-               callback(true, value_type(val.template as<value_node>()->value()));
-            }
-            else
-            {
-               callback(true, kvp->value());
-            }
-            return true;
-         }
-         case node_type::value:
-         {
-            auto vn = r.template as<value_node>();
-            if (vn->key() != key)
-               return false;
-
-            pushkey(vn->key());
-            callback(true, vn->value());
-            return true;
-         }
-         default:
-            throw std::runtime_error("iterator::get2 unexpected type");
-      }
+      return true;
    }
 
    template <iterator_caching_mode CacheMode>
-   std::vector<uint8_t> iterator<CacheMode>::calculate_expected_branches() const
+   bool iterator<CacheMode>::reverse_lower_bound(key_view prefix)
    {
-      auto state = _rs._segas.lock();
+      if (not _root.address()) [[unlikely]]
+         return end();
 
-      std::vector<uint8_t> expected;
-      auto push_expected = [&](key_view k) { expected.insert(expected.end(), k.begin(), k.end()); };
-      auto push_expected_branch = [&](branch_index_type b)
-      { expected.push_back(branch_to_char(b)); };
+      if (prefix.size() > max_key_length)
+         throw std::runtime_error("invalid key length");
 
-      for (const auto& p : _path)
+      auto state = _rs->lock();
+      begin();
+
+      // First try to find the exact prefix or the next key after it
+      if (lower_bound_impl(state, prefix))
       {
-         auto oref = state.get(p.first);
-         switch (oref.type())
-         {
-            case node_type::binary:
-            {
-               auto bn = oref.as<binary_node, CacheMode>();
-               push_expected(bn->get_key_val_ptr(p.second)->key());
-               break;
-            }
-            case node_type::value:
-            {
-               auto vn = oref.as<value_node, CacheMode>();
-               push_expected(vn->key());
-               break;
-            }
-            case node_type::setlist:
-            {
-               auto sl = oref.as<setlist_node, CacheMode>();
-               push_expected(sl->get_prefix());
-               if (p.second > 0)
-                  push_expected_branch(p.second);
-               break;
-            }
-            case node_type::full:
-            {
-               auto fn = oref.as<full_node, CacheMode>();
-               push_expected(fn->get_prefix());
-               if (p.second > 0)
-                  push_expected_branch(p.second);
-               break;
-            }
-            default:
-               break;
-         }
+         // If we found a key greater than the prefix, move back one
+         if (key() > prefix)
+            return prev_impl(state);
+         assert(key() == prefix);
+         return true;
       }
-      return expected;
+
+      // At this point:
+      // 1. lower_bound(prefix) returned end(), meaning all keys are < prefix
+      // 2. if prev_impl() succeeds, we're at the last key in the database
+      // 3. Since all keys are < prefix, this last key must be first key less than prefix
+      end();
+      push_end(_root.address());
+      return prev_impl(state);
+   }
+
+   template <iterator_caching_mode CacheMode>
+   auto iterator<CacheMode>::find(key_view key, std::invocable<value_type> auto&& callback)
+       -> decltype(callback(value_type()))
+   {
+      auto state = _rs->lock();
+      return get_impl(state, key, std::forward<decltype(callback)>(callback));
+   }
+
+   template <iterator_caching_mode CacheMode>
+   auto iterator<CacheMode>::get(key_view key, std::invocable<value_type> auto&& callback)
+       -> decltype(callback(value_type()))
+   {
+      if (not _root.address()) [[unlikely]]
+         return callback(value_type());
+
+      if (key.size() > max_key_length)
+         throw std::runtime_error("invalid key length");
+
+      auto state = _rs->lock();
+      return get_impl(state, key, std::forward<decltype(callback)>(callback));
+   }
+
+   template <iterator_caching_mode CacheMode>
+   auto iterator<CacheMode>::get_impl(read_lock& state, key_view key, auto&& callback)
+       -> decltype(callback(value_type()))
+   {
+      auto                             addr = _path_back->oid;
+      decltype(callback(value_type())) result;
+
+      while (true)
+      {
+         auto oref = state.get(addr);
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+                           [&](const /*arbtrie::node*/ auto* n)
+                           {
+                              auto val = n->get_value_and_trailing_key(key);
+                              switch (val.type())
+                              {
+                                 case value_type::types::value_node:
+                                    addr = val.value_address();
+                                    return false;  // continue to value_node
+                                 default:
+                                    result = callback(val);
+                                    return true;
+                              }
+                           }))
+            return result;
+      }
+      __builtin_unreachable();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::is_begin() const
+   {
+      return (*_path)[0].index == rend_index.to_int();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::is_end() const
+   {
+      return _path_back == _path->data() - 1;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   node_handle iterator<CacheMode>::get_root() const
+   {
+      return _root;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   key_view iterator<CacheMode>::key() const
+   {
+      return to_key(_branches->data(), _branches_end - _branches->data());
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::valid() const
+   {
+      return _path_back >= _path->data() and _path_back->oid != id_address();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   node_handle iterator<CacheMode>::root_handle() const
+   {
+      return _root;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <typename... Args>
+   void iterator<CacheMode>::debug_print(const Args&... args) const
+   {
+      return;
+      std::cerr << std::string(_path->size() * 4, ' ');
+      (std::cerr << ... << args) << "\n";
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::end()
+   {
+      return clear(), false;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::begin()
+   {
+      clear();
+      push_rend(_root.address());
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::push_rend(id_address oid)
+   {
+      _path_back++;
+      *_path_back = {.oid = oid, .index = rend_index.to_int()};
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::push_end(id_address oid)
+   {
+      _path_back++;
+      *_path_back = {.oid = oid, .index = end_index.to_int()};
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::push_path(id_address oid, local_index branch_index)
+   {
+      _path_back++;
+      *_path_back = {.oid = oid, .index = branch_index.to_int()};
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::pop_path()
+   {
+      _branches_end -= _path_back->key_size();
+      --_path_back;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::push_prefix(key_view prefix)
+   {
+      memcpy(_branches_end, prefix.data(), prefix.size());
+      _branches_end += prefix.size();
+      _path_back->prefix_size = prefix.size();
+      _path_back->branch_size = 0;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::update_branch(key_view new_branch, local_index new_index)
+   {
+      // Adjust size of branches to remove old key and make space for new key
+      _branches_end -= _path_back->branch_size;
+      memcpy(_branches_end, new_branch.data(), new_branch.size());
+      _branches_end += new_branch.size();
+
+      _path_back->branch_size = new_branch.size();
+      _path_back->index       = new_index.to_int();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::update_branch(local_index new_index)
+   {
+      _branches_end -= _path_back->branch_size;
+      _path_back->index       = new_index.to_int();
+      _path_back->branch_size = 0;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::update_branch(char new_branch, local_index new_index)
+   {
+      // Adjust size of branches to remove old key and make space for new key
+      _branches_end -= _path_back->branch_size;
+      *_branches_end = new_branch;
+      _branches_end++;
+      _path_back->branch_size = 1;
+      _path_back->index       = new_index.to_int();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   local_index iterator<CacheMode>::current_index() const
+   {
+      return local_index(_path_back->index);
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void iterator<CacheMode>::clear()
+   {
+      _branches_end = _branches->data();
+      _path_back    = _path->data() - 1;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   iterator<CacheMode>::iterator(read_session& s, node_handle r)
+       : _size(-1),
+         _rs(&s),
+         _root(std::move(r)),
+         _path(std::make_unique<std::array<path_entry, max_key_length + 1>>()),
+         _branches(std::make_unique<std::array<char, max_key_length>>())
+   {
+      clear();
+      push_rend(_root.address());
+   }
+
+   template <iterator_caching_mode CacheMode>
+   iterator<CacheMode>::iterator(const iterator& other)
+       : _size(other._size),
+         _rs(other._rs),
+         _root(other._root),
+         _path(std::make_unique<std::array<path_entry, max_key_length + 1>>(*other._path)),
+         _branches(std::make_unique<std::array<char, max_key_length>>(*other._branches)),
+         _path_back(_path->data() + (other._path_back - other._path->data())),
+         _branches_end(_branches->data() + (other._branches_end - other._branches->data()))
+   {
+   }
+
+   template <iterator_caching_mode CacheMode>
+   iterator<CacheMode>::iterator(iterator&& other) noexcept
+       : _size(other._size),
+         _rs(other._rs),
+         _root(std::move(other._root)),
+         _path(std::move(other._path)),
+         _branches(std::move(other._branches)),
+         _path_back(other._path_back),
+         _branches_end(other._branches_end)
+   {
+      other._path_back    = nullptr;
+      other._branches_end = nullptr;
+      other._rs           = nullptr;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   iterator<CacheMode>& iterator<CacheMode>::operator=(const iterator& other)
+   {
+      if (this != &other)
+      {
+         _size         = other._size;
+         _rs           = other._rs;
+         _root         = other._root;
+         _path         = std::make_unique<std::array<path_entry, max_key_length + 1>>(*other._path);
+         _branches     = std::make_unique<std::array<char, max_key_length>>(*other._branches);
+         _path_back    = _path->data() + (other._path_back - other._path->data());
+         _branches_end = _branches->data() + (other._branches_end - other._branches->data());
+      }
+      return *this;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   iterator<CacheMode>& iterator<CacheMode>::operator=(iterator&& other) noexcept
+   {
+      if (this != &other)
+      {
+         _size               = other._size;
+         _rs                 = other._rs;
+         _root               = std::move(other._root);
+         _path               = std::move(other._path);
+         _branches           = std::move(other._branches);
+         _path_back          = other._path_back;
+         _branches_end       = other._branches_end;
+         other._path_back    = nullptr;
+         other._branches_end = nullptr;
+         other._rs           = nullptr;
+      }
+      return *this;
    }
 
 }  // namespace arbtrie

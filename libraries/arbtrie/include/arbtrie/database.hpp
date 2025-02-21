@@ -1,7 +1,6 @@
 #pragma once
 #include <algorithm>
 #include <arbtrie/arbtrie.hpp>
-#include <arbtrie/beta_iterator.hpp>
 #include <arbtrie/binary_node.hpp>
 #include <arbtrie/iterator.hpp>
 #include <arbtrie/mapped_memory.hpp>
@@ -110,8 +109,6 @@ namespace arbtrie
      protected:
       template <iterator_caching_mode>
       friend class iterator;
-      template <beta::iterator_caching_mode>
-      friend class beta::iterator;
       friend class database;
       friend class root_data;
       friend class root;
@@ -168,11 +165,6 @@ namespace arbtrie
       auto create_iterator(node_handle h)
       {
          return iterator<CacheMode>(*this, std::move(h));
-      }
-      template <beta::iterator_caching_mode CacheMode = beta::noncaching>
-      auto create_beta_iterator(node_handle h)
-      {
-         return beta::iterator<CacheMode>(*this, std::move(h));
       }
 
       /**
@@ -797,5 +789,4 @@ namespace arbtrie
    }
 }  // namespace arbtrie
 
-#include <arbtrie/beta_iterator_impl.hpp>
 #include <arbtrie/iterator_impl.hpp>

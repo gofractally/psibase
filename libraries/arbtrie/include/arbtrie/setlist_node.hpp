@@ -77,16 +77,30 @@ namespace arbtrie
          return search_result::end();
       }
 
-      // Returns the index of the first branch greater than or equal to k
-      local_index lower_bound_index(key_view k) const
+      // Returns the index of the the branch matching k or begin_index() if no match
+      local_index get_index(key_view k) const
       {
          if (k.empty())
-            return local_index(0);
+            return local_index(-has_eof_value());
 
          auto pos = get_setlist().find(k.front());
+
          if (pos == key_view::npos)
             return end_index();
          return local_index(pos + has_eof_value());
+      }
+      local_index lower_bound_index(key_view k) const
+      {
+         if (k.empty())
+            return local_index(-1 + has_eof_value());
+
+         auto sl  = get_setlist_ptr();
+         auto slp = sl;
+         auto sle = slp + num_branches();
+
+         while (slp != sle && uint8_t(*slp) < uint8_t(k.front()))
+            ++slp;
+         return local_index(slp - sl + has_eof_value());
       }
 
       // Required functions for is_node_header_derived concept

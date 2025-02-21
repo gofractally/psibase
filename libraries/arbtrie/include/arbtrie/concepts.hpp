@@ -3,6 +3,7 @@
 #include <compare>
 #include <concepts>
 #include <cstdint>
+#include <ostream>
 
 namespace arbtrie
 {
@@ -79,6 +80,13 @@ namespace arbtrie
       constexpr bool operator<=(const index_type& other) const { return value <= other.value; }
       constexpr bool operator>=(const index_type& other) const { return value >= other.value; }
    };
+
+   template <index_types T>
+   std::ostream& operator<<(std::ostream& s, const index_type<T>& idx)
+   {
+      return s << idx.to_int();
+   }
+
    using local_index = index_type<index_types::local_index>;
    using key_index   = index_type<index_types::key_index>;
 
@@ -210,7 +218,7 @@ namespace arbtrie
         /**
          * Returns the value at the given key and modifies the key to contain only the trailing portion.
          * If no value is found, returns a remove value_type.
-         * This is optimized for point lookups and is used by beta_iterator get_impl.
+         * This is optimized for point lookups and is used by iterator get_impl.
          * @param key - The key to look up, will be modified to contain only the trailing portion if a match is found
          * @return value_type - The value if found, or remove type if not found
          */

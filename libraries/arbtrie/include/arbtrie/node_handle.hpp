@@ -13,19 +13,26 @@ namespace arbtrie
    * releasing it. 'node_handle', like std::shared_ptr, is
    * not thread safe when being copied or modified. 
    *
-   * A node handle has the lifetime of the session that originally
-   * created it unless 
-   *
+   * A node handle should not outlive the session passed to
+   * its constructor unless the internal address is taken or
+   * its contents moved. If the handle still has a valid address
+   * on destruction, it will attempt to release the address by
+   * calling into the session's release_id() method.
+   * 
+   * TODO: should release just push it into a queue for the
+   * compactor to pick up, that way we avoid any potential issues
+   * with the handle being copied or moved to another thread.
    */
    class node_handle
    {
      private:
       friend class read_session;
       friend class write_session;
+
+     public:
       node_handle(read_session& s) : _session(&s) {}
       node_handle(read_session& s, id_address retains) : _session(&s), _id(retains) { retain(); }
 
-     public:
       ~node_handle() { release(); }
 
       node_handle(node_handle&& mv) : _id(mv._id), _session(mv._session) { mv._id = {}; }
@@ -51,6 +58,7 @@ namespace arbtrie
 
       id_address address() const { return _id; }
       int        ref() const;
+      bool       is_valid() const { return _id != id_address(); }
 
       /** The caller takes responsibility for releasing the id
          * that is returned.
