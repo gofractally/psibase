@@ -21,6 +21,7 @@ namespace psibase
 
       std::string contents;
 
+      Memo(const char* s) : contents{s} { validate(s); }
       Memo(const std::string& s) : contents{s} { validate(s); }
       Memo() : Memo("") {}
       static bool validate(std::string_view str)

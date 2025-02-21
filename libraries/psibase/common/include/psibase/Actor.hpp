@@ -79,41 +79,6 @@ namespace psibase
       PSIO_REFLECT(TypedAction, sender, service, method, rawData)
    };
 
-   struct PackedActionProxy
-   {
-      PackedActionProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
-
-      AccountNumber sender;
-      AccountNumber receiver;
-
-      template <typename... T>
-      std::vector<char> packImpl(std::tuple<T...>*,
-                                 MethodNumber method,
-                                 const std::type_identity_t<T>&... args) const
-      {
-         TypedAction<std::tuple<const T&...>> action{
-             sender, receiver, method, {std::tuple<const T&...>(args...)}};
-         return psio::to_frac(action);
-      }
-
-      template <uint32_t idx, auto MemberPtr, typename... Args>
-      auto call(Args&&... args) const
-      {
-         using member_class = decltype(psio::class_of_member(MemberPtr));
-         using param_tuple  = typename psio::make_param_value_tuple<decltype(MemberPtr)>::type;
-
-         static_assert(std::tuple_size<param_tuple>() <= sizeof...(Args),
-                       "too few arguments passed to method");
-         static_assert(std::tuple_size<param_tuple>() == sizeof...(Args),
-                       "too many arguments passed to method");
-
-         return packImpl(
-             (param_tuple*)nullptr,
-             MethodNumber(*psio::reflect<member_class>::member_function_names[idx].begin()),
-             args...);
-      }
-   };
-
    struct ActionViewProxy
    {
       ActionViewProxy(AccountNumber s, AccountNumber r) : sender(s), receiver(r) {}
@@ -168,10 +133,11 @@ namespace psibase
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         auto act = PackedActionProxy(sender, receiver)
+         auto act = ActionViewProxy(sender, receiver)
                         .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
-         return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(act);
+         return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
+             act.data_without_size_prefix());
       }
    };
 
@@ -185,14 +151,15 @@ namespace psibase
       template <uint32_t idx, auto MemberPtr, typename... Args>
       auto call(Args&&... args) const
       {
-         auto act = action_builder_proxy(sender, receiver)
+         auto act = ActionViewProxy(sender, receiver)
                         .call<idx, MemberPtr, Args...>(std::forward<Args>(args)...);
          using result_type = decltype(psio::result_of(MemberPtr));
          if constexpr (not std::is_same_v<void, result_type>)
-            return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(act)
+            return psibase::fraccall<std::remove_cv_t<psio::remove_view_t<result_type>>>(
+                       act.data_without_size_prefix())
                 .unpack();
          else
-            psibase::fraccall<void>(act);
+            psibase::fraccall<void>(act.data_without_size_prefix());
       }
    };
 
