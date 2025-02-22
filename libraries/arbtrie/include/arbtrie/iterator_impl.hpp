@@ -8,6 +8,38 @@
 
 namespace arbtrie
 {
+   namespace detail
+   {
+      // RAII helper to check iterator validity on scope exit
+      template <typename Iterator>
+      struct validity_guard
+      {
+         const Iterator& it;
+         const char*     func_name;
+         validity_guard(const Iterator& i, const char* fn) : it(i), func_name(fn) { check(); }
+         ~validity_guard() { check(); }
+         void check() const
+         {
+            if (!it.valid())
+            {
+               std::cerr << "Iterator must be valid after " << func_name << std::endl;
+               std::abort();
+            }
+         }
+      };
+   }  // namespace detail
+
+   template <typename Iterator>
+   auto make_validity_guard(const Iterator& it, const char* func_name)
+   {
+      return detail::validity_guard<Iterator>(it, func_name);
+   }
+
+#ifdef NDEBUG
+#define ARBTRIE_REQUIRE_ITR_VALID() ((void)0)
+#else
+#define ARBTRIE_REQUIRE_ITR_VALID() auto _validity_guard = make_validity_guard(*this, __func__)
+#endif
 
    template <iterator_caching_mode CacheMode>
    std::string iterator<CacheMode>::pretty_path() const
@@ -44,6 +76,7 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    node_handle iterator<CacheMode>::subtree() const
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       return node_handle(*_rs, value(
                                    [&](value_type v)
                                    {
@@ -65,6 +98,7 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    int32_t iterator<CacheMode>::value(Buffer auto&& buffer) const
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       return value(
           [&](value_type v) -> int32_t
           {
@@ -82,6 +116,7 @@ namespace arbtrie
       requires ConstructibleBuffer<B>
    B iterator<CacheMode>::value() const
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       B buffer;
       switch (value(buffer))
       {
@@ -109,6 +144,7 @@ namespace arbtrie
    int32_t iterator<CacheMode>::value(ByteType* s, uint32_t s_len) const
    {
       static_assert(sizeof(ByteType) == 1, "ByteType must be a single byte type");
+      ARBTRIE_REQUIRE_ITR_VALID();
       return value(
           [&](value_type v) -> int32_t
           {
@@ -129,6 +165,7 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    auto iterator<CacheMode>::value(std::invocable<value_type> auto&& callback) const
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       auto addr  = _path_back->oid;
 
@@ -158,13 +195,18 @@ namespace arbtrie
       __builtin_unreachable();
    }
 
+   /**
+    * Find the first key greater than or equal to the given key
+    * @param key The key to search for
+    * @return true if a valid key was found, false if we reached the end
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound(key_view key)
    {
-      if (not _root.address()) [[unlikely]]
-         return false;
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
-      begin();
+      start();
       return lower_bound_impl(state, key);
    }
 
@@ -215,7 +257,8 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::lower_bound_impl(read_lock& state, key_view key)
    {
-      const bool should_debug = false;  //to_hex(key) == "598dd6d3bc4f";
+      ARBTRIE_REQUIRE_ITR_VALID();
+      const bool should_debug = to_hex(key) == "382be6";
       size_t     depth        = 0;
 
       while (true)
@@ -352,9 +395,14 @@ namespace arbtrie
       throw std::runtime_error("iterator::lower_bound: attempt to move past end");
    }
 
+   /**
+    * Move iterator to the next key in the trie
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::next()
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       return next_impl(state);
    }
@@ -409,18 +457,24 @@ namespace arbtrie
       throw std::runtime_error("iterator::next: attempt to move past end");
    }
 
+   /**
+    * Move iterator to the previous key in the trie
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::prev()
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       if (is_end()) [[unlikely]]
       {
-         _path_back = _path->data();
-         auto oref  = state.get(_path_back->oid);
-         _path_back->index =
-             cast_and_call(oref.template header<node_header, CacheMode>(),
-                           [&](const /*arbtrie::node*/ auto* n) { return n->end_index(); })
-                 .to_int();
+         _path_back    = _path->data();
+         auto oref     = state.get(_path_back->oid);
+         _path_back[0] = {
+             .oid   = _root.address(),
+             .index = cast_and_call(oref.template header<node_header, CacheMode>(),
+                                    [&](const /*arbtrie::node*/ auto* n) { return n->end_index(); })
+                          .to_int()};
       }
       return prev_impl(state);
    }
@@ -434,6 +488,7 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::prev_impl(read_lock& state)
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       // Loop until we reach the beginning of the iterator
       while (true)
       {
@@ -444,12 +499,15 @@ namespace arbtrie
          if (cast_and_call(oref.template header<node_header, CacheMode>(),
                            [&](const /*arbtrie::node*/ auto* n)
                            {
-                              const local_index start_idx = current_index();
+                              local_index start_idx = current_index();
 
                               // on transition from after the last key, push the common prefix
                               if constexpr (not is_binary_node<decltype(n)>)
                                  if (start_idx >= n->end_index())
+                                 {
                                     push_prefix(n->get_prefix());
+                                    start_idx = n->end_index();
+                                 }
 
                               // Get the previous index in this node
                               auto nidx = n->prev_index(start_idx);
@@ -460,8 +518,7 @@ namespace arbtrie
                                     return pop_path(), false;  // continue up the tree
 
                                  // if we are at the top of the tree, we are done
-                                 _path_back->index = rend_index.to_int();
-                                 return true;
+                                 return start(), true;
                               }
 
                               // if the branch key is empty, that means the branch is EOF
@@ -483,21 +540,25 @@ namespace arbtrie
       throw std::runtime_error("iterator::prev: attempt to move before beginning");
    }
 
+   /**
+    * Find the first key strictly greater than the given key
+    * @param search The key to search for
+    * @return true if a valid key was found, false if we reached the end
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::upper_bound(key_view search)
    {
-      if (not _root.address().to_int()) [[unlikely]]
+      ARBTRIE_REQUIRE_ITR_VALID();
+
+      auto state = _rs->lock();
+      start();
+      if (not lower_bound_impl(state, search))
       {
-         TRIEDENT_WARN("upper_bound: no root: ", _root.address());
+         assert(is_end());
          return false;
       }
 
-      auto state = _rs->lock();
-      begin();
-      if (not lower_bound_impl(state, search))
-         return false;
-
-      //TRIEDENT_DEBUG(" lower_bound: ", to_hex(key()), " >= ", to_hex(search));
       assert(key() >= search);
       // If we found an exact match for the search key, move to the next element
       if (key() == search)
@@ -505,21 +566,25 @@ namespace arbtrie
       return true;
    }
 
+   /**
+    * Move to the last key in the trie that starts with the given prefix
+    * @param prefix The prefix to match
+    * @return true if a matching key was found, false otherwise
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::last(key_view prefix)
    {
-      if (not _root.address()) [[unlikely]]
-         return end();
-
-      if (prefix.size() > max_key_length)
-         throw std::runtime_error("invalid key length");
-
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
-      begin();
+      start();
 
       // If no prefix is provided, find the last key in the entire tree
       if (prefix.empty())
-         return end(), prev_impl(state);
+      {
+         end();
+         return prev_impl(state);
+      }
 
       // Create a search key that is the prefix followed by 0xFF bytes
       std::array<char, max_key_length> search_key;
@@ -540,17 +605,18 @@ namespace arbtrie
       return end();
    }
 
+   /**
+    * Move to the first key in the trie that starts with the given prefix
+    * @param prefix The prefix to match
+    * @return true if a matching key was found, false otherwise
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::first(key_view prefix)
    {
-      if (not _root.address()) [[unlikely]]
-         return end();
-
-      if (prefix.size() > max_key_length)
-         throw std::runtime_error("invalid key length");
-
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
-      begin();
+      start();
 
       // If no prefix is provided, just move to the first key
       if (prefix.empty())
@@ -567,49 +633,85 @@ namespace arbtrie
       return true;
    }
 
+   /**
+    * Find the last key less than or equal to the given prefix
+    * @param prefix The prefix to search for
+    * @return true if a valid key was found, false if we reached the beginning
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::reverse_lower_bound(key_view prefix)
    {
-      if (not _root.address()) [[unlikely]]
-         return end();
-
-      if (prefix.size() > max_key_length)
-         throw std::runtime_error("invalid key length");
-
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
-      begin();
+      start();
+      assert(is_start());
+      lower_bound_impl(state, prefix);  // we are at a key that is >= prefix
+      assert(not is_start());
 
-      // First try to find the exact prefix or the next key after it
-      if (lower_bound_impl(state, prefix))
+      if (is_end())
       {
-         // If we found a key greater than the prefix, move back one
-         if (key() > prefix)
-            return prev_impl(state);
-         assert(key() == prefix);
-         return true;
+         //   TRIEDENT_DEBUG("reverse_lower_bound: is_end(), prev()");
+         prev();
       }
-
-      // At this point:
-      // 1. lower_bound(prefix) returned end(), meaning all keys are < prefix
-      // 2. if prev_impl() succeeds, we're at the last key in the database
-      // 3. Since all keys are < prefix, this last key must be first key less than prefix
-      end();
-      push_end(_root.address());
-      return prev_impl(state);
+      else if (key() != prefix)  // the key is > prefix, go back one
+      {
+         //      TRIEDENT_DEBUG("reverse_lower_bound: itr.key() ", to_hex(key()), " != query ",
+         //                    to_hex(prefix), ", prev_impl");
+         assert(key() > prefix);
+         prev_impl(state);
+         assert(is_start() or key() < prefix);
+         // TRIEDENT_DEBUG("reverse_lower_bound: prev itr.key() ", to_hex(key()), " != query ",
+         //                to_hex(prefix), ", prev_impl is start: ", is_start());
+      }
+      return not is_start();
+   }
+   /**
+    * Find the last key strictly less than the given prefix
+    * @param prefix The prefix to search for
+    * @return true if a valid key was found, false if we reached the beginning
+    * @pre Iterator must be valid (valid() == true)
+    */
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::reverse_upper_bound(key_view prefix)
+   {
+      ARBTRIE_REQUIRE_ITR_VALID();
+      auto state = _rs->lock();
+      start();
+      lower_bound_impl(state, prefix);
+      if (key() == prefix)
+         return prev_impl(state);
+      return true;
    }
 
+   /**
+    * Find an exact key match and invoke callback with the value
+    * @param key The key to find
+    * @param callback Function to call with the value if found
+    * @return Value returned by callback on success
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    auto iterator<CacheMode>::find(key_view key, std::invocable<value_type> auto&& callback)
        -> decltype(callback(value_type()))
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       return get_impl(state, key, std::forward<decltype(callback)>(callback));
    }
 
+   /**
+    * Get value at exact key and invoke callback with the value
+    * @param key The key to get
+    * @param callback Function to call with the value
+    * @return Value returned by callback on success
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    auto iterator<CacheMode>::get(key_view key, std::invocable<value_type> auto&& callback)
        -> decltype(callback(value_type()))
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       if (not _root.address()) [[unlikely]]
          return callback(value_type());
 
@@ -624,6 +726,7 @@ namespace arbtrie
    auto iterator<CacheMode>::get_impl(read_lock& state, key_view key, auto&& callback)
        -> decltype(callback(value_type()))
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       auto                             addr = _path_back->oid;
       decltype(callback(value_type())) result;
 
@@ -650,9 +753,12 @@ namespace arbtrie
    }
 
    template <iterator_caching_mode CacheMode>
-   bool iterator<CacheMode>::is_begin() const
+   bool iterator<CacheMode>::is_start() const
    {
-      return (*_path)[0].index == rend_index.to_int();
+      ARBTRIE_REQUIRE_ITR_VALID();
+      if (not is_end())
+         return (*_path)[0].index == rend_index.to_int();
+      return false;
    }
 
    template <iterator_caching_mode CacheMode>
@@ -667,16 +773,47 @@ namespace arbtrie
       return _root;
    }
 
+   /**
+    * Get the current key at the iterator position
+    * @return View of the current key
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
    key_view iterator<CacheMode>::key() const
    {
+      ARBTRIE_REQUIRE_ITR_VALID();
       return to_key(_branches->data(), _branches_end - _branches->data());
    }
 
+   /** an iterator is only valid if it has a root node,
+    * a tree with 0 keys is invalid to iterate over
+    */
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::valid() const
    {
-      return _path_back >= _path->data() and _path_back->oid != id_address();
+#ifndef NDEBUG
+      if (_root.address())
+      {
+         if (_path_back == _path->data() - 1)
+            return true;  // end
+         if (_path_back == _path->data())
+         {
+            if (_path_back->index == -1)
+               assert(_path_back->prefix_size == 0);
+            assert(_path_back->index <= end_index.to_int());
+         }
+         else
+         {
+            // we must always point to a value
+            assert(_path_back->index > -1);
+            assert(_path_back->index < end_index.to_int());
+         }
+         // it should pop _path_back instead
+         // when we are at start() when _path_back = _path->data()
+      }
+#endif
+      return bool(_root.address());
+      //return _path_back >= _path->data() and _path_back->oid != id_address();
    }
 
    template <iterator_caching_mode CacheMode>
@@ -700,11 +837,29 @@ namespace arbtrie
       return clear(), false;
    }
 
+   /**
+    * Move iterator to the beginning of the trie
+    * @pre Iterator must be valid (valid() == true)
+    */
    template <iterator_caching_mode CacheMode>
-   void iterator<CacheMode>::begin()
+   bool iterator<CacheMode>::start()
    {
       clear();
       push_rend(_root.address());
+      return valid();
+   }
+
+   /**
+    * Move iterator to the beginning of the trie
+    * @pre Iterator must be valid (valid() == true)
+    */
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::begin()
+   {
+      assert(valid() && "Iterator must be valid to call begin");
+      ARBTRIE_REQUIRE_ITR_VALID();
+      start();
+      return next();
    }
 
    template <iterator_caching_mode CacheMode>

@@ -422,7 +422,7 @@ TEST_CASE("insert-words")
             std::vector<char> data;
             auto              start = std::chrono::steady_clock::now();
             auto              fkeys = keys.begin();
-            itr.begin();
+            itr.start();
             while (itr.next())
             {
                itr.key();
@@ -455,7 +455,7 @@ TEST_CASE("insert-words")
             int rcount = 0;
             itr.reverse_lower_bound();
             auto rkeys = keys.rbegin();
-            while (itr.valid())
+            while (not itr.is_rend())
             {
                assert(rkeys != keys.rend());
                REQUIRE(rkeys != keys.rend());
@@ -534,7 +534,6 @@ TEST_CASE("insert-words")
       REQUIRE(ws.count_keys(root) == 0);
       auto itr = ws.create_iterator(root);
       REQUIRE(not itr.valid());
-      REQUIRE(not itr.lower_bound());
       env.db->print_stats(std::cerr);
    };
    // TRIEDENT_DEBUG( "load in file order" );
@@ -782,7 +781,7 @@ TEST_CASE("subtree2")
                std::cerr << '"' << to_str(itr.key()) << " = " << itr.subtree().is_valid() << "\n";
                if (auto sitr = itr.subtree_iterator(); sitr.valid())
                {
-                  sitr.begin();
+                  sitr.start();
                   while (sitr.next())
                      std::cerr << "\t\t" << to_str(sitr.key()) << "\n";
                }
@@ -1058,7 +1057,7 @@ TEST_CASE("lower-bound")
 
       auto itr = ws.create_iterator(r);
 
-      itr.begin();
+      itr.start();
       int i = 0;
       while (itr.next())
       {
@@ -1136,9 +1135,10 @@ TEST_CASE("upper-bound")
       itr.upper_bound(qv);
 
       if (rritr == reference.end())
-         REQUIRE(not itr.valid());
+         REQUIRE(itr.is_end());
       if (rritr != reference.end())
       {
+         REQUIRE(not itr.is_end());
          if (rritr->first != to_str(itr.key()))
          {
             TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv),
@@ -1168,59 +1168,52 @@ TEST_CASE("rev-lower-bound")
 
    auto to_kv = [&](uint64_t& k) { return key_view((char*)&k, ((uint8_t*)&k)[7] % 9); };
 
-   std::map<std::string, int> reference;
+   using map_type = std::map<std::string, uint64_t>;
+   map_type reference;
 
-   auto map_valid = [](const auto& m, auto i) { return m.end() != i; };
-
-   auto map_rlb = [](const std::map<std::string, int>& m, key_view k)
+   auto map_rlb = [](const map_type& m, key_view k)
    {
-      auto itr = m.lower_bound(std::string(to_str(k)));
-      if (itr == m.end())
-      {
-         if (m.size())
-            --itr;
-         return itr;
-      }
-      if (to_key_view(itr->first) == k)
-         return itr;
-
-      if (itr != m.begin())
-      {
-         return --itr;
-      }
-      return m.end();
+      auto ub = m.upper_bound(std::string(k));  // First key > k
+      if (ub != m.begin())
+         return map_type::const_reverse_iterator(ub);
+      return m.crend();  // No key <= k
    };
 
-   auto itr = ws.create_iterator(r);
+   ws.upsert(r, "hello", "world");
+   reference["hello"] = 0;
+   auto itr           = ws.create_iterator(std::move(r));
    for (int i = 0; i < 100000; ++i)
    {
       uint64_t query = uint64_t(rand64());
       auto     qv    = to_kv(query);
 
-      //  TRIEDENT_DEBUG(i, "  query: ", to_hex(qv));
+      //   TRIEDENT_WARN(i, "  query: ", to_hex(qv));
       itr.reverse_lower_bound(qv);
       auto rritr = map_rlb(reference, qv);
-      if (rritr != reference.end())
+      if (rritr != reference.crend())
       {
-         REQUIRE(to_key_view(rritr->first) <= qv);
-         // TRIEDENT_DEBUG( "rlb: ", to_hex(to_key_view(rritr->first) ) );
-         // TRIEDENT_DEBUG( "qv:  ", to_hex(qv) );
-      }
-
-      if (itr.valid())
-      {
-         REQUIRE(itr.key() <= qv);
+         //  TRIEDENT_DEBUG(i, "  reference: ", to_hex(rritr->first), " itr: ", to_hex(itr.key()),
+         //                " <= ", to_hex(qv));
+         assert(not itr.is_end());
+         REQUIRE(not itr.is_end());
+         assert(itr.key() <= qv);
+         assert(itr.key() == to_key_view(rritr->first));
          REQUIRE(itr.key() == to_key_view(rritr->first));
+         REQUIRE(itr.key() <= qv);
       }
-
-      REQUIRE(itr.valid() == map_valid(reference, rritr));
-
+      else
+      {
+         REQUIRE(itr.is_rend());
+         REQUIRE(itr.is_start());
+      }
+      // add another key
       uint64_t val                         = uint64_t(rand64());
       key_view kstr                        = to_kv(val);
-      reference[std::string(to_str(kstr))] = 0;
-      int result                           = ws.upsert(r, kstr, kstr);
-      //  TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
-      REQUIRE(reference.size() == ws.count_keys(r));
+      reference[std::string(to_str(kstr))] = val;
+      //TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      int result = ws.upsert(itr.root_handle(), kstr, kstr);
+      //itr.set_root(r);
+      REQUIRE(reference.size() == ws.count_keys(itr.root_handle()));
    }
 }
 
@@ -1231,8 +1224,10 @@ TEST_CASE("sparse-rand-upsert")
    {
       auto r = ws.create_root();
 
-      auto test_count = [&](auto n)
+      auto test_count = [&](auto&& n)
       {
+         if (not n.address())
+            return;
          auto from = std::to_string(rand64() & 0xfffffff);
          auto to   = std::to_string(rand64() & 0xfffffff);
          while (to == from)
@@ -1244,13 +1239,12 @@ TEST_CASE("sparse-rand-upsert")
          auto itr = ws.create_iterator(n);
          itr.lower_bound(to_key_view(from));
          uint32_t count = 0;
-         while (itr.valid())
+         while (not itr.is_end())
          {
             assert(itr.key() >= to_key_view(from));
             if (itr.key() < to_key_view(to))
             {
                ++count;
-               //    TRIEDENT_DEBUG( count, " itrkey: ", to_str(itr.key()) );
                itr.next();
             }
             else
@@ -1298,6 +1292,7 @@ TEST_CASE("dense-rand-upsert")
 
       auto test_count = [&](auto n, bool print_dbg)
       {
+         print_dbg     = true;
          uint64_t from = rand64();
          uint64_t to   = rand64();
          while (to == from)
@@ -1318,7 +1313,7 @@ TEST_CASE("dense-rand-upsert")
          auto ref_itr = reference.lower_bound(std::string(to_str(kfrom)));
          if (ref_itr != reference.end())
          {
-            REQUIRE(itr.valid());
+            REQUIRE(not itr.is_end());
             if (to_key_view(ref_itr->first) != itr.key())
             {
                TRIEDENT_WARN("ref: ", to_hex(to_key_view(ref_itr->first)));
@@ -1327,9 +1322,10 @@ TEST_CASE("dense-rand-upsert")
                itr.lower_bound(kfrom);
             }
             REQUIRE(to_key_view(ref_itr->first) == itr.key());
+            //++count;
          }
 
-         while (itr.valid())
+         while (not itr.is_end())
          {
             REQUIRE(ref_itr != reference.end());
             if (to_key_view(ref_itr->first) != itr.key())
@@ -1347,11 +1343,11 @@ TEST_CASE("dense-rand-upsert")
                itr.next();
                ++ref_itr;
                if (ref_itr != reference.end())
-                  REQUIRE(itr.valid());
+                  REQUIRE(not itr.is_end());
             }
             else
             {
-               if (print_dbg and itr.valid())
+               if (print_dbg and not itr.is_end())
                   TRIEDENT_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first));
                break;
             }
@@ -1368,7 +1364,7 @@ TEST_CASE("dense-rand-upsert")
       for (int i = 0; i < 100000; i++)
       {
          REQUIRE(ws.count_keys(r) == i);
-         if (i % 10 == 0)
+         if (i % 10 == 1)
          {
             test_count(r, false);
          }
@@ -1696,7 +1692,7 @@ TEST_CASE("beta-iterator-dense-validation")
    REQUIRE(bi.is_end());
    while (bi.prev())
       --count;
-   REQUIRE(bi.is_begin());
+   REQUIRE(bi.is_start());
    REQUIRE(count == 0);
 }
 
@@ -1734,12 +1730,12 @@ TEST_CASE("beta-iterator-validation")
    auto itr = ws.create_iterator<caching>(r);
 
    // Test basic iterator state
-   std::cout << "Is begin: " << itr.is_begin() << std::endl;
+   std::cout << "Is begin: " << itr.is_start() << std::endl;
    std::cout << "Is end: " << itr.is_end() << std::endl;
    std::cout << "Is valid: " << itr.valid() << std::endl;
 
    REQUIRE(itr.valid());
-   REQUIRE(itr.is_begin());
+   REQUIRE(itr.is_start());
 
    // First validate beta iterator forward traversal
    std::cout << "\nValidating beta iterator next() correctness..." << std::endl;
@@ -1754,7 +1750,7 @@ TEST_CASE("beta-iterator-validation")
    REQUIRE(not itr.next());
    REQUIRE(itr.is_end());
    REQUIRE(count == words.size());
-   REQUIRE(not itr.is_begin());
+   REQUIRE(not itr.is_start());
 
    // Now validate beta iterator reverse traversal
    std::cout << "\nValidating beta iterator prev() functionality..." << std::endl;
@@ -1767,7 +1763,7 @@ TEST_CASE("beta-iterator-validation")
    }
    REQUIRE(prev_count == words.size());
    REQUIRE(not itr.prev());
-   REQUIRE(itr.is_begin());
+   REQUIRE(itr.is_start());
 
    // Test alternating next() and prev()
    for (int i = 0; i < 10 && itr.next(); ++i)
@@ -1801,10 +1797,11 @@ TEST_CASE("regular-iterator-validation")
    // Validate regular iterator forward traversal
    std::cout << "\nValidating regular iterator next() correctness..." << std::endl;
    size_t reg_count = 0;
-   itr.lower_bound(key_view());
+   itr.start();
    for (const auto& word : words)
    {
       REQUIRE(itr.next());
+      REQUIRE(not itr.is_end());
       REQUIRE(itr.key() == word);
       reg_count++;
    }
@@ -1839,9 +1836,10 @@ TEST_CASE("beta-iterator-performance")
    size_t reg_count = 0;
    auto   reg_start = std::chrono::steady_clock::now();
    itr2.lower_bound(key_view());
-   while (itr2.next())
+   while (not itr2.is_end())
    {
       reg_count++;
+      itr2.next();
    }
    auto   reg_end          = std::chrono::steady_clock::now();
    auto   reg_duration     = std::chrono::duration<double>(reg_end - reg_start).count();

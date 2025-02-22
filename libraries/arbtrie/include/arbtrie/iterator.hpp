@@ -100,13 +100,12 @@ namespace arbtrie
       static constexpr const key_view npos = key_view(npos_data.data(), npos_data.size());
       static_assert(npos > key_view());
 
-      bool is_rend() const { return is_begin(); }
-      bool is_begin() const;
+      /// @brief an alias for is_start()
+      bool is_rend() const { return is_start(); }
+      /// @brief true if the iterator is before the first key
+      bool is_start() const;
+      /// @brief true if the iterator is after the last key
       bool is_end() const;
-
-      // return the root this iterator is based on
-      node_handle get_root() const;
-      void        set_root(node_handle root) { _root = root; }
 
       // the key the iterator is currently pointing to
       // @note the key is not valid after the iterator is destroyed
@@ -127,14 +126,18 @@ namespace arbtrie
       // similar to std::map::lower_bound
       bool lower_bound(key_view prefix = {});
 
-      // moves to the last key <= prefix from the end, return valid()
-      //  reverse_lower_bound(key) == lower_bound(key) when key exists
-      //  otherwise it equals the key before lower_bound(key)
+      // finds the largest key <= prefix and moves to rend() if no such key
+      //
+      // ```c++
+      //    auto reverse_lower_bound( std::map<K,V> map ) {
+      //        auto ub = map.upper_bound(key);
+      //        return ub == map.begin() ?  return map.rend() : return std::map<K,V>::reverse_iterator(ub);
+      //    }
+      // ```
       bool reverse_lower_bound(key_view prefix = npos);
 
       // if reverse_lower_bound(key) == key,
-      // this returns the prior key, othewise equal to
-      // reverse_lower_bound(key)
+      // this returns the prior key, othewise equal to reverse_lower_bound(key)
       bool reverse_upper_bound(key_view prefix = npos);
 
       // moves to the last key with prefix
@@ -164,10 +167,7 @@ namespace arbtrie
       auto find(key_view key, std::invocable<value_type> auto&& callback)
           -> decltype(callback(value_type()));
 
-      // true if the iterator isn't at the end()
-      // @note the rend() and begin() are considered valid..
-      //  TODO: should we make rend() invalid?
-      //  TODO: should we remove this and force people to use is_end()?
+      // true if the tree is not empty
       bool valid() const;
 
       // if the value is a subtree, return an iterator into that subtree
@@ -179,7 +179,17 @@ namespace arbtrie
       node_handle subtree() const;
 
       // @return a handle to the root of the tree this iterator is traversing
-      node_handle root_handle() const;
+      node_handle  root_handle() const;
+      node_handle& root_handle() { return _root; }
+
+      // return the root this iterator is based on
+      // TODO: remove redundancy
+      node_handle get_root() const;
+      void        set_root(node_handle root)
+      {
+         _root = std::move(root);
+         clear();
+      }
 
       /**
        * Read value into a resizeable buffer of contiguous memory
@@ -227,8 +237,12 @@ namespace arbtrie
       // moves to the key after the last key in the database, aka end()
       bool end();
 
-      // moves to the key before the first key in the database, aka rend()
-      void begin();
+      // moves to the key before the first key in the database, (e.g. std::map::rend())
+      bool start();
+
+      // moves to the first key in the database, (e.g std::map::begin()),
+      // @return is_end()
+      bool begin();
 
      private:
       template <typename... Args>

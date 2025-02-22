@@ -653,6 +653,18 @@ namespace arbtrie
       }
       int lower_bound_idx(key_view key) const
       {
+         /*
+         TRIEDENT_WARN("lower_bound_idx: ", to_hex(key));
+         for (int i = 0; i < num_branches(); ++i)
+         {
+            auto k = get_key(i);
+            TRIEDENT_DEBUG("lower_bound_idx: ", i, " = ", to_hex(k), " key: ", to_hex(key));
+            if (k >= key)
+               return i;
+         }
+         return num_branches();
+         */
+
          __builtin_prefetch(tail() - _alloc_pos);
          int left  = -1;
          int right = num_branches();
