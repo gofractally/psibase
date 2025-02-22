@@ -1000,4 +1000,142 @@ namespace arbtrie
       return *this;
    }
 
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::upsert(key_view key, value_view val)
+   {
+      assert(valid());
+      auto result = _ws->upsert(root_handle(), key, val);
+      start();
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::upsert_find(key_view key, value_view val)
+   {
+      assert(valid());
+      auto result = _ws->upsert(root_handle(), key, val);
+      find(key);
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void mutable_iterator<CacheMode>::insert(key_view key, value_view val)
+   {
+      assert(valid());
+      _ws->insert(root_handle(), key, val);
+      start();
+   }
+
+   template <iterator_caching_mode CacheMode>
+   void mutable_iterator<CacheMode>::insert_find(key_view key, value_view val)
+   {
+      assert(valid());
+      _ws->insert(root_handle(), key, val);
+      find(key);
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::update(value_view val)
+   {
+      assert(valid());
+      assert(!is_end());
+      assert(!is_start());
+      auto result = _ws->update(root_handle(), key(), val);
+      start();
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::update_find(value_view val)
+   {
+      assert(valid());
+      assert(!is_end());
+      assert(!is_start());
+
+#ifndef NDEBUG
+      // Save current key to VLA for verification in debug builds,
+      // when find() is called it starts the search from the root and
+      // updates the key on its way back, it should be reading and updating
+      // the same key to its current value, this is a sanity check to ensure
+      // that the key hasn't changed or been cleared in any way.
+      auto current_key      = key();
+      auto current_key_size = current_key.size();
+      char current_key_buf[current_key_size];
+      std::memcpy(current_key_buf, current_key.data(), current_key_size);
+#endif
+
+      auto result = _ws->update(root_handle(), key(), val);
+
+#ifndef NDEBUG
+      find(key_view(current_key_buf, current_key_size));
+      // Verify the key hasn't changed
+      assert(key().size() == current_key_size);
+      assert(std::memcmp(key().data(), current_key_buf, current_key_size) == 0);
+#else
+      find(key());
+#endif
+
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::remove_end()
+   {
+      assert(valid());
+      assert(!is_end());
+      assert(!is_start());
+      auto result = _ws->remove(root_handle(), key());
+      start();
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::remove(key_view key)
+   {
+      assert(valid());
+      assert(!is_end());
+      assert(!is_start());
+      auto result = _ws->remove(root_handle(), key);
+      start();
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::remove_advance()
+   {
+      assert(valid());
+      assert(!is_end());
+      assert(!is_start());
+
+      // Save current key to VLA sized to actual key length
+      auto current_key      = key();
+      auto current_key_size = current_key.size();
+      char current_key_buf[current_key_size];
+      std::memcpy(current_key_buf, current_key.data(), current_key_size);
+
+      // Advance to next and get next key if not at end
+      next();
+
+      // Get next key size if not at end
+      auto next_key_size = !is_end() ? key().size() : 0;
+
+      // Store next key to VLA if we have one
+      char next_key_buf[next_key_size ? next_key_size : 1];  // Size 1 when no next key
+      if (next_key_size > 0)
+      {
+         std::memcpy(next_key_buf, key().data(), next_key_size);
+      }
+
+      // Remove the original key
+      auto result = _ws->remove(root_handle(), key_view(current_key_buf, current_key_size));
+
+      // Find the saved next key if it exists
+      if (next_key_size > 0)
+      {
+         find(key_view(next_key_buf, next_key_size));
+      }
+
+      return result;
+   }
+
 }  // namespace arbtrie

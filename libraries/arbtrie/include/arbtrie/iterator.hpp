@@ -1,14 +1,21 @@
 #pragma once
 #include <arbtrie/arbtrie.hpp>
+#include <arbtrie/concepts.hpp>
 #include <arbtrie/database.hpp>
 #include <arbtrie/node_handle.hpp>
 #include <arbtrie/seg_alloc_session.hpp>
+#include <arbtrie/seg_allocator.hpp>
+#include <arbtrie/value_type.hpp>
+#include <concepts>
+#include <memory>
 #include <sstream>
 #include <vector>
 
 namespace arbtrie
 {
-   class read_session;  // Forward declaration
+   class read_session;   // Forward declaration
+   class write_session;  // Forward declaration
+   struct path_entry;    // Forward declaration
 
    /**
     * In caching mode, every node that is visited is marked as
@@ -290,6 +297,117 @@ namespace arbtrie
 
       auto get_impl(read_lock& state, key_view key, auto&& callback)
           -> decltype(callback(value_type()));
+   };
+
+   /**
+    * A mutable iterator that adds write operations to the base iterator class.
+    * This iterator requires a write_session pointer and can perform upsert, insert,
+    * remove, and update operations at the current iterator position.
+    */
+   template <iterator_caching_mode CacheMode = noncaching>
+   class mutable_iterator : public iterator<CacheMode>
+   {
+     public:
+      mutable_iterator(write_session& ws, node_handle r)
+          : iterator<CacheMode>(ws, std::move(r)), _ws(&ws)
+      {
+      }
+
+      using iterator<CacheMode>::root_handle;
+      using iterator<CacheMode>::key;
+      using iterator<CacheMode>::start;
+      using iterator<CacheMode>::next;
+      using iterator<CacheMode>::find;
+      using iterator<CacheMode>::is_end;
+
+      /**
+       * Update or insert a value at the specified key, move to the start()
+       * @param key The key to upsert at
+       * @param val The value to upsert
+       * @return -1 on insert, otherwise the size of the old value
+       */
+      int upsert(key_view key, value_view val);
+
+      /**
+       * Update or insert a value at the specified key, move to the key
+       * 
+       * If you don't need the iterator at key postion, use upsert() instead
+       * 
+       * @param key The key to upsert at
+       * @param val The value to upsert
+       * @return -1 on insert, otherwise the size of the old value
+       * @pre valid()
+       */
+      int upsert_find(key_view key, value_view val);
+
+      /**
+       * Insert a value at the specified key, move to start()
+       * @param key The key to insert at
+       * @param val The value to insert
+       * @throws if a value already exists at this position
+       */
+      void insert(key_view key, value_view val);
+
+      /**
+       * Insert a value at the specified key, move to the key
+       * @param key The key to insert at
+       * @param val The value to insert
+       * @throws if a value already exists at this position
+       */
+      void insert_find(key_view key, value_view val);
+
+      /**
+       * Update the value at the current iterator position, move to start()
+       * 
+       * Because updating a value may change the path in the tree, we move
+       * to the start() of the tree after the update. If you want to update
+       * and preserve the iterator position, use update_find() instead which
+       * will move back to the key after the update. 
+       * 
+       * @param val The new value
+       * @return size of the old value
+       * @pre valid(), not is_end() and not is_start()
+       */
+      int update(value_view val);
+
+      /**   
+       * Update the value at the current iterator position, move to the key
+       * 
+       * If you don't need the iterator to remain in its current position,
+       * use update() instead which moves to start() after the update and
+       * is faster.
+       * 
+       * @param val The new value
+       * @return size of the old value
+       * @pre valid(), not is_end() and not is_start()   
+       */
+      int update_find(value_view val);
+
+      /**
+       * Remove the value at the current iterator position, move to the start()
+       * @return size of the removed value
+       * @throws if no value exists at this position
+       * @pre valid(), not is_end(), not is_start()
+       */
+      int remove_end();
+
+      /**
+       * Remove the value at the specified key, move to the start()
+       * @param key The key to remove
+       * @return size of the removed value, or -1 if no value exists
+       * @pre valid(), not is_end(), not is_start()
+       */
+      int remove(key_view key);
+
+      /**
+       * Remove the current key and move the iterator to the next key
+       * @return size of the removed value
+       * @pre valid(), not is_end(), not is_start()
+       */
+      int remove_advance();
+
+     private:
+      write_session* _ws;
    };
 
 }  // namespace arbtrie
