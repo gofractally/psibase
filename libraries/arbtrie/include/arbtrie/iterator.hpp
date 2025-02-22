@@ -157,15 +157,13 @@ namespace arbtrie
       // @note the read lock is held while the callback is executed, so
       // get the data you need quickly and return from the callback.
       // @return true if found, false otherwise
-
       auto get(key_view key, std::invocable<value_type> auto&& callback)
           -> decltype(callback(value_type()));
 
       // Like get(), but also positions the iterator at the found key
       // Returns true if found and positions iterator at the key
       // Returns false and positions iterator at the end() if not found
-      auto find(key_view key, std::invocable<value_type> auto&& callback)
-          -> decltype(callback(value_type()));
+      bool find(key_view key);
 
       // true if the tree is not empty
       bool valid() const;
@@ -250,6 +248,7 @@ namespace arbtrie
 
       bool next_impl(read_lock& state);
       bool prev_impl(read_lock& state);
+      bool find_impl(read_lock& state, key_view key);
       bool lower_bound_impl(read_lock& state, key_view key);
 
       void push_rend(id_address oid);
@@ -286,7 +285,6 @@ namespace arbtrie
       path_entry*                                                 _path_back;
       char*                                                       _branches_end;
 
-      int           _size;  // -1 if unknown of value at current key
       read_session* _rs;
       node_handle   _root;
 

@@ -18,11 +18,36 @@ namespace arbtrie
 
       using node_header::get_type;
 
+      /**
+       * Returns the index of the first branch that is >= the given key.
+       * 
+       * For an empty key, returns index 0 (eof value) if it exists, otherwise index 1 (first branch)
+       * For a non-empty key k, returns the index of the first branch >= k[0] + 1
+       * This implements lower_bound by:
+       * 1. For empty key - returning the first valid index (eof or first branch)
+       * 2. For non-empty key - using the first byte as direct index into branches array
+       *    and returning next valid index after that position
+       * This works because full_node maintains branches in sorted order by definition,
+       * with index positions directly corresponding to byte values.
+       */
       local_index lower_bound_index(key_view k) const
       {
          if (k.empty())
             return next_index(begin_index());
          return next_index(local_index(uint8_t(k.front())));
+      }
+
+      /**
+       * Returns the index of the branch that matches the given key exactly or end_index() if no match
+       */
+      local_index get_index(key_view k) const
+      {
+         if (k.empty())
+            return has_eof_value() ? local_index(0) : end_index();
+
+         // For non-empty key, check if branch exists at index corresponding to first byte
+         auto idx = uint8_t(k.front()) + 1;
+         return get_branch(idx) ? local_index(idx) : end_index();
       }
 
       // idx 0 = eof_value

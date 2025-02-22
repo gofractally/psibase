@@ -1779,7 +1779,7 @@ TEST_CASE("beta-iterator-validation")
    REQUIRE(std::string(itr.key().data(), itr.key().size()) == mid_key);
 }
 
-TEST_CASE("regular-iterator-validation")
+TEST_CASE("iterator-validation")
 {
    environ                  env;
    auto                     ws    = env.db->start_write_session();
@@ -1813,6 +1813,10 @@ TEST_CASE("regular-iterator-validation")
    {
       REQUIRE(itr.lower_bound(key_view(word)));
       REQUIRE(itr.key() == word);
+      if (not itr.find(key_view(word)))
+         TRIEDENT_WARN("find failed for: ", word);
+      REQUIRE(itr.find(key_view(word)));
+      REQUIRE(itr.key() == word);
    }
 
    // Test that lower_bound past last word returns false
@@ -1821,7 +1825,48 @@ TEST_CASE("regular-iterator-validation")
    REQUIRE(not itr.lower_bound(key_view(last_word)));
 }
 
-TEST_CASE("beta-iterator-performance")
+TEST_CASE("find-vs-lower_bound")
+{
+   environ                  env;
+   auto                     ws    = env.db->start_write_session();
+   auto                     r     = ws.create_root();
+   std::vector<std::string> words = load_words(ws, r);
+   std::sort(words.begin(), words.end());
+
+   auto itr = ws.create_iterator<caching>(r);
+
+   // time finding the lower bound of each word
+   auto lb_start = std::chrono::steady_clock::now();
+   for (const auto& word : words)
+   {
+      itr.lower_bound(key_view(word));
+   }
+   auto lb_end = std::chrono::steady_clock::now();
+
+   // time itr.find for each word
+   auto find_start = std::chrono::steady_clock::now();
+   for (const auto& word : words)
+   {
+      itr.find(key_view(word));
+   }
+   auto find_end = std::chrono::steady_clock::now();
+
+   auto lb_duration   = std::chrono::duration<double>(lb_end - lb_start).count();
+   auto find_duration = std::chrono::duration<double>(find_end - find_start).count();
+
+   // print the results
+   std::cout << "Lower bound time: " << lb_duration << " seconds" << std::endl;
+   std::cout << "Find time: " << find_duration << " seconds" << std::endl;
+
+   // print the relative performance of find vs lower_bound
+   std::cout << "Find is " << ((lb_duration - find_duration) / lb_duration) * 100
+             << "% faster than lower_bound" << std::endl;
+
+   // find should be faster than lower_bound
+   REQUIRE(find_duration < lb_duration);
+}
+
+TEST_CASE("terator-performance")
 {
    environ                  env;
    auto                     ws    = env.db->start_write_session();

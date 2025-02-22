@@ -622,6 +622,27 @@ namespace arbtrie
          return idx >= 0 ? get_key_val_ptr(idx) : nullptr;
       }
 
+      local_index get_index(key_view key) const
+      {
+         auto     khash  = key_hash(key);
+         key_view hashes = to_key(key_hashes(), num_branches());
+         auto     khh    = key_header_hash(khash);
+
+         int base = 0;
+         while (true)
+         {
+            auto idx = hashes.find(khh);
+            if (idx == key_view::npos)
+               return local_end_index;
+            auto bidx = base + idx;
+            auto kvp  = get_key_val_ptr(bidx);
+            if (kvp->key() == key)
+               return local_index(bidx);
+            hashes = hashes.substr(idx + 1);
+            base   = bidx + 1;
+         }
+      }
+
       int find_key_idx(key_view key, uint64_t khash) const
       {
          key_view hashes = to_key(key_hashes(), num_branches());

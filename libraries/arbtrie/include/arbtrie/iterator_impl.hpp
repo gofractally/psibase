@@ -1,6 +1,6 @@
 #pragma once
-#include <arbtrie/beta_iterator.hpp>
 #include <arbtrie/concepts.hpp>
+#include <arbtrie/iterator.hpp>
 #include <arbtrie/read_lock.hpp>
 #include <arbtrie/seg_alloc_session.hpp>
 #include <arbtrie/seg_allocator.hpp>
@@ -258,47 +258,24 @@ namespace arbtrie
    bool iterator<CacheMode>::lower_bound_impl(read_lock& state, key_view key)
    {
       ARBTRIE_REQUIRE_ITR_VALID();
-      const bool should_debug = to_hex(key) == "382be6";
-      size_t     depth        = 0;
 
       while (true)
       {
-         depth++;
-         if (should_debug)
-         {
-            TRIEDENT_DEBUG(std::string(depth * 4, ' '),
-                           "lower_bound_impl starting search for key: '", to_hex(key), "'");
-         }
          auto oref = state.get(_path_back->oid);
          // clang-format off
          if (cast_and_call(oref.template header<node_header, CacheMode>(),
               [&](const /*arbtrie::node*/ auto* n) -> bool
               {
-               if( should_debug ) TRIEDENT_DEBUG( node_type_names[n->type] );
                  if constexpr (not is_binary_node<decltype(n)>)
                  {
                     auto pre = n->get_prefix();
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Checking prefix: '", to_hex(pre), "' against key: '", to_hex(key), "'");
-                    }
                     if (pre > key) [[unlikely]]  // then go up the tree
-                    {
-                       if (should_debug) {
-                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Prefix > key, go to next");
-                       }
                        return next_impl(state), true;  // All keys in this subtree will be greater than search key
-                    }
 
                     auto cpre = common_prefix(pre, key);
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Common prefix length: ", cpre.size(), " prefix length: ", pre.size());
-                    }
 
                     // then go to the next branch of the parent
                     if (cpre != pre)  {  // Prefix mismatch - current branch cannot contain target
-                       if (should_debug) {
-                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Prefix mismatch, popping path");
-                       }
                        pop_path(); 
                        if (not is_end())
                           next_impl(state);  // Try next key at parent level
@@ -307,20 +284,11 @@ namespace arbtrie
 
                     push_prefix(cpre);  // Record matched prefix
                     key = key.substr(cpre.size());  // Continue with remaining key portion
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Pushed prefix, remaining key: '", to_hex(key), "'");
-                    }
                  } // end not binary node 
 
                  auto nidx = n->lower_bound_index(key);  // Find insertion point for remaining key
-                 if (should_debug) {
-                    TRIEDENT_DEBUG(std::string(depth*4, ' '), "Found index: ", nidx.to_int(), " of ", n->end_index().to_int());
-                 }
                  if (nidx >= n->end_index())  // All keys in node are smaller
                  {
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "All keys in node are smaller, popping path");
-                    }
                     pop_path();
                     if (not is_end())
                        next_impl(state);  // Try next key at parent
@@ -328,71 +296,38 @@ namespace arbtrie
                  }
 
                  if( nidx == n->begin_index() )  // Need something greater than current
-                 {
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "At begin index, moving to next");
-                    }
                     return next_impl(state), true;
-                 }
 
                  auto bkey = n->get_branch_key(nidx);
-                 if (should_debug) {
-                    TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key: '", to_hex(bkey), "'");
-                 }
 
                  if constexpr (is_inner_node<decltype(n)>)
                  {
                     if (not bkey.size())  // eof value
-                    {
-                       if (should_debug) {
-                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Found EOF value");
-                       }
                        return update_branch(nidx), true;  // Record EOF branch and we're done
-                    }
                     update_branch(bkey.front(), nidx);  // Record first byte of branch
 
                     bool past_key = not key.size() or uint8_t(bkey.front()) > uint8_t(key.front());  // Check if we've moved past search key
-                    if (should_debug) {
-                       TRIEDENT_WARN(" bkey: ", to_hex(bkey), "> key: ", to_hex(key));
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "Past key: ", past_key);
-                    }
 
                     key = key.substr(key.size() > 0);  // Remove first byte for recursion
                     push_path(n->get_value(nidx).value_address(), begin_index);  // Descend to child node
 
                     if (past_key)
-                    {
-                       if (should_debug) {
-                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Past key, moving to next_impl");
-                       }
                        return next_impl(state), true;  // Found first key greater than search key
-                    }
                     return false;  // Continue search in child node
                  }
                  else  // on binary nodes / value nodes we have to swap the entire key
                  {
-                    if (should_debug) {
-                       TRIEDENT_DEBUG(std::string(depth*4, ' '), "On binary/value node, updating branch with full key");
-                    }
                     update_branch(bkey, nidx);
 
                     if( bkey >= key )
-                    {
-                       if (should_debug) 
-                          TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key >= search key, we're done");
                        return true;
-                    }
-                     if (should_debug) {
-                        TRIEDENT_DEBUG(std::string(depth*4, ' '), "Branch key < search key, moving to next");
-                     }
-                     return next_impl(state), true;
-
+                    return next_impl(state), true;
                  }
               }))
             return not is_end();
          // clang-format on
       }
-      throw std::runtime_error("iterator::lower_bound: attempt to move past end");
+      __builtin_unreachable();
    }
 
    /**
@@ -692,12 +627,65 @@ namespace arbtrie
     * @pre Iterator must be valid (valid() == true)
     */
    template <iterator_caching_mode CacheMode>
-   auto iterator<CacheMode>::find(key_view key, std::invocable<value_type> auto&& callback)
-       -> decltype(callback(value_type()))
+   bool iterator<CacheMode>::find(key_view key)
    {
       ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
-      return get_impl(state, key, std::forward<decltype(callback)>(callback));
+      start();
+      return find_impl(state, key);
+   }
+
+   template <iterator_caching_mode CacheMode>
+   bool iterator<CacheMode>::find_impl(read_lock& state, key_view key)
+   {
+      ARBTRIE_REQUIRE_ITR_VALID();
+      while (true)
+      {
+         auto oref = state.get(_path_back->oid);
+         // clang-format off
+         if (cast_and_call(oref.template header<node_header, CacheMode>(),
+              [&](const /*arbtrie::node*/ auto* n) -> bool
+              {
+                 if constexpr (not is_binary_node<decltype(n)>)
+                 {
+                    auto pre = n->get_prefix();
+                    auto cpre = common_prefix(pre, key);
+
+                    // then go to the next branch of the parent
+                    if (cpre != pre) 
+                        return end(), true;
+
+                    push_prefix(cpre);  // Record matched prefix
+                    key = key.substr(cpre.size());  // Continue with remaining key portion
+                 } // end not binary node 
+
+                 auto nidx = n->get_index(key);
+
+                 if( nidx == n->end_index() )
+                    return end(), true;
+
+                 auto bkey = n->get_branch_key(nidx);
+
+                 if constexpr (is_inner_node<decltype(n)>)
+                 {
+                    if (not bkey.size())  // eof value
+                       return update_branch(nidx), true;  // Record EOF branch and we're done
+
+                    update_branch(bkey.front(), nidx);  // Record first byte of branch
+
+                    push_path(n->get_value(nidx).value_address(), begin_index);  // Descend to child node
+
+                    key = key.substr(bkey.size());
+
+                    return false;  // Continue search in child node
+                 }
+                 else  // on binary nodes / value nodes we have to swap the entire key
+                    return update_branch(bkey, nidx), true;
+              }))
+            return not is_end();
+         // clang-format on
+      }
+      __builtin_unreachable();
    }
 
    /**
@@ -945,8 +933,7 @@ namespace arbtrie
 
    template <iterator_caching_mode CacheMode>
    iterator<CacheMode>::iterator(read_session& s, node_handle r)
-       : _size(-1),
-         _rs(&s),
+       : _rs(&s),
          _root(std::move(r)),
          _path(std::make_unique<std::array<path_entry, max_key_length + 1>>()),
          _branches(std::make_unique<std::array<char, max_key_length>>())
@@ -957,8 +944,7 @@ namespace arbtrie
 
    template <iterator_caching_mode CacheMode>
    iterator<CacheMode>::iterator(const iterator& other)
-       : _size(other._size),
-         _rs(other._rs),
+       : _rs(other._rs),
          _root(other._root),
          _path(std::make_unique<std::array<path_entry, max_key_length + 1>>(*other._path)),
          _branches(std::make_unique<std::array<char, max_key_length>>(*other._branches)),
@@ -969,8 +955,7 @@ namespace arbtrie
 
    template <iterator_caching_mode CacheMode>
    iterator<CacheMode>::iterator(iterator&& other) noexcept
-       : _size(other._size),
-         _rs(other._rs),
+       : _rs(other._rs),
          _root(std::move(other._root)),
          _path(std::move(other._path)),
          _branches(std::move(other._branches)),
@@ -987,7 +972,6 @@ namespace arbtrie
    {
       if (this != &other)
       {
-         _size         = other._size;
          _rs           = other._rs;
          _root         = other._root;
          _path         = std::make_unique<std::array<path_entry, max_key_length + 1>>(*other._path);
@@ -1003,7 +987,6 @@ namespace arbtrie
    {
       if (this != &other)
       {
-         _size               = other._size;
          _rs                 = other._rs;
          _root               = std::move(other._root);
          _path               = std::move(other._path);

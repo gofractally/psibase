@@ -86,13 +86,17 @@ namespace arbtrie
       constexpr local_index begin_index() const { return local_index(-1); }
       constexpr local_index end_index() const { return local_index(1); }
 
+      /**
+       * The key of the value is assumed to be the prefix, so get_index(k)
+       * only returns 0 if the k is empty, otherwise local_end_index
+       * 
+       * Called from iterator::find_impl() 
+       */
       local_index get_index(key_view k) const
       {
-         if (get_prefix() == k)
+         if (k.empty())
             return local_index(0);
-         if (get_prefix() < k)
-            return end_index();
-         return begin_index();
+         return local_end_index;
       }
       bool       has_value() const { return true; }
       bool       validate() const { return true; }

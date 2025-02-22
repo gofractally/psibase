@@ -77,11 +77,11 @@ namespace arbtrie
          return search_result::end();
       }
 
-      // Returns the index of the the branch matching k or begin_index() if no match
+      // Returns the index of the the branch matching k or end_index() if no match
       local_index get_index(key_view k) const
       {
          if (k.empty())
-            return local_index(-has_eof_value());
+            return has_eof_value() ? local_index(0) : end_index();
 
          auto pos = get_setlist().find(k.front());
 
