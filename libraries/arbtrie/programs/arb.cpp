@@ -237,6 +237,7 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
              << " kvsize: " << bn->key_val_section_size() << "\n";
 
    return;
+   /*
    for (int i = 0; i < bn->num_branches(); ++i)
    {
       //auto k = bn->get_key(i);
@@ -256,6 +257,7 @@ void print(session_rlock& state, const binary_node* bn, int depth = 0)
       //    print_hex(kvp->key());
       std::cerr << to_str(kvp->key()) << "' = '" << to_str(v) << "'\n";
    }
+   */
 }
 
 void print(session_rlock& state, const full_node* sl, int depth = 0)
@@ -263,6 +265,7 @@ void print(session_rlock& state, const full_node* sl, int depth = 0)
    std::cerr << "FULL r" << state.get(sl->address()).ref() << "   cpre\""
              << to_str(sl->get_prefix()) << "\" cps: " << sl->get_prefix().size()
              << " id: " << sl->address() << " ";
+   /**             
    if (sl->has_eof_value())
    {
       std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
@@ -282,28 +285,11 @@ void print(session_rlock& state, const full_node* sl, int depth = 0)
           std::cerr << "'" << br << "' -> ";
           print(state, bid, depth + 1);
        });
+       */
 }
-void print(session_rlock& state, const value_node* sl, int depth = 0)
-{
-   std::cerr << "KSIZE: " << sl->key().size() << " VSIZE: " << sl->value_size()
-             << " id: " << sl->address() << " key: " << bswap(*(uint64_t*)sl->key().data()) << " = "
-             << bswap(*(uint64_t*)sl->value().data()) << "\n";
-}
+void print(session_rlock& state, const value_node* sl, int depth = 0) {}
 void print(session_rlock& state, const setlist_node* sl, int depth = 0)
 {
-   std::cerr << "SLNr" << state.get(sl->address()).ref() << "   cpre\"" << to_str(sl->get_prefix())
-             << "\" cps: " << sl->get_prefix().size() << " id: " << sl->address() << " ";
-   if (sl->has_eof_value())
-   {
-      std::cerr << " = '" << to_str(state.get(sl->get_branch(0)).as<value_node>()->value())
-                << "' branches: " << std::dec << sl->num_branches() << " \n";
-   }
-   else
-   {
-      std::cerr << " branches: " << std::dec << sl->num_branches()
-                << " ref: " << state.get(sl->address()).ref() << " id: " << sl->address() << "\n";
-   }
-
    //  auto gsl = sl->get_setlist();
    //   for( auto b : gsl ) {
    //     std::cerr << int(b) <<"\n";
@@ -428,14 +414,13 @@ int  main(int argc, char** argv)
       {
          std::optional<node_handle> last_root;
          std::optional<node_handle> last_root2;
-         auto                       r      = ws.create_root();
          const int                  rounds = 3;
 
          namespace po = boost::program_options;
          // clang-format off
          po::options_description desc("Test options");
          desc.add_options()
-            ("dense-rand", po::bool_switch()->default_value(false), "Run dense random insert test")
+            ("dense-rand", po::bool_switch()->default_value(true), "Run dense random insert test")
             ("little-endian-seq", po::bool_switch()->default_value(true), "Run little endian sequential insert test")
             ("big-endian-seq", po::bool_switch()->default_value(true), "Run big endian sequential insert test")
             ("big-endian-rev", po::bool_switch()->default_value(true), "Run big endian reverse sequential insert test")
@@ -449,30 +434,26 @@ int  main(int argc, char** argv)
 
          const int count = vm["count"].as<int>();
 
+         auto tx = ws.start_transaction(0);
+
          auto iterate_all = [&]()
          {
             try
             {
                uint64_t item_count = 0;
-               auto     itr        = ws.create_iterator(r);
-               assert(not itr.valid());
 
                std::vector<char> data;
                auto              start = std::chrono::steady_clock::now();
-               if (itr.lower_bound())
+               tx.start();
+               while (tx.next())
                {
-                  itr.read_value(data);
-                  ++item_count;
-               }
-               while (itr.next())
-               {
-                  itr.key();
-                  itr.read_value(data);
+                  tx.key();
+                  tx.value(data);
                   ++item_count;
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
-               auto kc    = ws.count_keys(r);
+               auto kc    = tx.count_keys();
                std::cout << "iterated " << std::setw(12)
                          << add_comma(
                                 int64_t(item_count) /
@@ -501,15 +482,17 @@ int  main(int argc, char** argv)
                   uint64_t val = rand64();
                   ++seq;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.insert(r, kstr, kstr);
+                  tx.insert(kstr, kstr);
+                  assert(tx.valid());
 
                   if ((seq % batch_size) == (batch_size - 1))
                   {
-                     ws.set_root<sync_type::sync>(r);
+                     tx.commit_and_continue();
+                     assert(tx.valid());
                   }
                }
-               TRIEDENT_DEBUG("set root");
-               ws.set_root(r);
+               tx.commit_and_continue();
+               assert(tx.valid());
 
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
@@ -536,11 +519,15 @@ int  main(int argc, char** argv)
                   uint64_t val = ++seq3;
                   seq++;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.insert(r, kstr, kstr);
-                  if ((i % batch_size) == 0)
-                     ws.set_root<sync_type::sync>(r);
+                  tx.insert(kstr, kstr);
+                  if ((i % batch_size) == (batch_size - 1))
+                  {
+                     assert(tx.valid());
+                     tx.commit_and_continue();
+                     assert(tx.valid());
+                  }
                }
-               ws.set_root<sync_type::sync>(r);
+               tx.commit_and_continue();
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
 
@@ -564,27 +551,13 @@ int  main(int argc, char** argv)
                   uint64_t val = bswap(seq3++);
                   ++seq;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.insert(r, kstr, kstr);
-                  if ((i % batch_size) == 0)
+                  tx.insert(kstr, kstr);
+                  if ((i % batch_size) == (batch_size - 1))
                   {
-                     ws.set_root<sync_type::sync>(r);
+                     tx.commit_and_continue();
                   }
-
-                  ws.get(r, kstr,
-                         [&](bool found, const value_type& r)
-                         {
-                            if (not found)
-                            {
-                               TRIEDENT_WARN("unable to find key: ", seq3, " ro: ", ro, " i:", i);
-                               assert(!"should have found key!");
-                            }
-                            else
-                            {
-                               assert(r.view() == kstr);
-                            }
-                         });
                }
-               ws.set_root<sync_type::sync>(r);
+               tx.commit_and_continue();
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
 
@@ -609,13 +582,13 @@ int  main(int argc, char** argv)
                   uint64_t val = bswap(seq4--);
                   ++seq;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.insert(r, kstr, kstr);
+                  tx.insert(kstr, kstr);
                   if ((i % batch_size) == 0)
                   {
-                     ws.set_root<sync_type::sync>(r);
+                     tx.commit_and_continue();
                   }
                }
-               ws.set_root<sync_type::sync>(r);
+               tx.commit_and_continue();
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
 
@@ -637,13 +610,13 @@ int  main(int argc, char** argv)
                {
                   ++seq;
                   auto kstr = std::to_string(rand64());
-                  ws.insert(r, to_key_view(kstr), to_value_view(kstr));
+                  tx.insert(to_key_view(kstr), to_value_view(kstr));
                   if ((i % batch_size) == 0)
                   {
-                     ws.set_root<sync_type::sync>(r);
+                     tx.commit_and_continue();
                   }
                }
-               ws.set_root<sync_type::sync>(r);
+               tx.commit_and_continue();
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
 
@@ -667,18 +640,8 @@ int  main(int argc, char** argv)
                {
                   uint64_t val = ++seq2;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.get(r, kstr,
-                         [&](bool found, const value_type& r)
-                         {
-                            if (not found)
-                            {
-                               TRIEDENT_WARN("unable to find key: ", val, " ro: ", ro, " i:", i);
-                            }
-                            else
-                            {
-                               assert(r.view() == kstr);
-                            }
-                         });
+                  auto     s = tx.get_size(kstr);
+                  assert(s > 0);
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
@@ -700,19 +663,8 @@ int  main(int argc, char** argv)
                   uint64_t val  = (rnd % (seq2 - 1)) + 1;
                   uint64_t val2 = val;
                   key_view kstr((char*)&val, sizeof(val));
-                  ws.get(r, kstr,
-                         [&](bool found, const value_type& r)
-                         {
-                            if (not found)
-                            {
-                               TRIEDENT_WARN("unable to find key: ", val, " ", val2, "  ro: ", ro,
-                                             " i:", i, " rnd: ", rnd, " seq2: ", seq2);
-                            }
-                            else
-                            {
-                               assert(found and r.view() == kstr);
-                            }
-                         });
+                  auto     s = tx.get_size(kstr);
+                  assert(s > 0);
                }
                auto end   = std::chrono::steady_clock::now();
                auto delta = end - start;
@@ -732,20 +684,8 @@ int  main(int argc, char** argv)
             {
                uint64_t val = bswap(start_big_end++);
                key_view kstr((char*)&val, sizeof(val));
-               ws.get(r, kstr,
-                      [&](bool found, const value_type& r)
-                      {
-                         if (not found)
-                         {
-                            TRIEDENT_WARN("unable to find key: ", start_big_end, " ro: ", ro,
-                                          " i:", i);
-                            assert(!"should have found key!");
-                         }
-                         else
-                         {
-                            assert(r.view() == kstr);
-                         }
-                      });
+               auto     s = tx.get_size(kstr);
+               assert(s > 0);
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -760,13 +700,12 @@ int  main(int argc, char** argv)
          std::cerr << "lower bound random i64\n";
          for (int ro = 0; true and ro < rounds; ++ro)
          {
-            auto itr   = ws.create_iterator(r);
             auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < count; ++i)
             {
                uint64_t val = rand64();
                key_view kstr((char*)&val, sizeof(val));
-               itr.lower_bound(kstr);
+               tx.lower_bound(kstr);
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
@@ -793,26 +732,12 @@ int  main(int argc, char** argv)
             auto read_loop = [&]()
             {
                arbtrie::thread_name("read_thread");
-               auto                       rs = db.start_write_session();
-               int64_t                    tc = 0;
-               int                        cn = 0;
-               std::optional<node_handle> lr;
-               std::optional<node_handle> tmp;
+               auto    rs = db.start_read_session();
+               int64_t tc = 0;
+               int     cn = 0;
                while (not done.load(std::memory_order_relaxed))
                {
-                  {
-                     std::unique_lock lock(_lr_mutex);
-                     if (not last_root)
-                     {
-                        usleep(10);
-                        continue;
-                     }
-                     lr = rs.adopt(*last_root);
-                  }
-                  tmp = lr;
-                  lr.reset();
-
-                  auto itr    = rs.create_iterator<arbtrie::caching>(*tmp);
+                  auto rtx    = rs.start_transaction(0);
                   int  roundc = 100000;
                   int  added  = 0;
                   for (int i = 0; i < batch_size; ++i)
@@ -821,12 +746,7 @@ int  main(int argc, char** argv)
                      // uint64_t val = XXH64(&i, sizeof(i), 0);
                      uint64_t val = rand64();
                      key_view kstr((char*)&val, sizeof(val));
-                     if (not itr.lower_bound(kstr))
-                     {
-                     }
-                     else
-                     {
-                     }
+                     rtx.lower_bound(kstr);
                      if ((i & 0x4ff) == 0)
                      {
                         read_count.fetch_add(added, std::memory_order_relaxed);
@@ -848,24 +768,14 @@ int  main(int argc, char** argv)
                auto     str = std::to_string(val);
                ++seq;
                key_view kstr((char*)&val, sizeof(val));
-               ws.insert(r, kstr, kstr);
-               if (not last_root)
-                  last_root = r;
+               tx.insert(kstr, kstr);
                if (i % batch_size == 0)
-               {
-                  {
-                     std::unique_lock lock(_lr_mutex);
-                     last_root = r;
-                  }
-               }
+                  tx.commit_and_continue();
             }
             auto end   = std::chrono::steady_clock::now();
             auto delta = end - start;
 
-            {
-               std::unique_lock lock(_lr_mutex);
-               last_root = r;
-            }
+            tx.commit_and_continue();
 
             std::cout << ro << "] " << std::setw(12)
                       << add_comma(int64_t(
@@ -886,7 +796,6 @@ int  main(int argc, char** argv)
 
          while (sync_compact and db.compact_next_segment())
             ;
-         TRIEDENT_WARN("ROOT GOING OUT OF SCOPE r.id: ", r.address());
       } while (false);
       /*
       if (false)

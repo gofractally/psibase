@@ -54,8 +54,12 @@ namespace arbtrie
       // idx 1..255 = branches
       constexpr local_index next_index(local_index idx) const
       {
-         if (idx == begin_index() and has_eof_value())
-            return local_index(0);
+         if (idx == begin_index())
+         {
+            if (has_eof_value())
+               return local_index(0);
+            idx = local_index(0);
+         }
 
          const auto* br  = branches();
          const auto* bre = br + branch_count;

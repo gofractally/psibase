@@ -344,6 +344,8 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::next()
    {
+      if (not valid())
+         return false;
       ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       return next_impl(state);
@@ -406,6 +408,8 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::prev()
    {
+      if (not valid())
+         return false;
       ARBTRIE_REQUIRE_ITR_VALID();
       auto state = _rs->lock();
       if (is_end()) [[unlikely]]

@@ -16,10 +16,10 @@ namespace arbtrie
      private:
       friend class write_session;
 
-      write_transaction(write_session&                   ws,
-                        node_handle                      r,
-                        std::function<void(node_handle)> commit_callback,
-                        std::function<void()>            abort_callback = {})
+      write_transaction(write_session&                                ws,
+                        node_handle                                   r,
+                        std::function<node_handle(node_handle, bool)> commit_callback,
+                        std::function<void()>                         abort_callback = {})
           : mutable_iterator<caching>(ws, std::move(r))
       {
          assert(commit_callback);
@@ -58,8 +58,28 @@ namespace arbtrie
       void commit()
       {
          assert(_commit_callback);
-         _commit_callback(std::move(_root));
+         _commit_callback(std::move(_root), false);
          _commit_callback = {};
+      }
+
+      /**
+       * Commits the changes back to the source of the
+       * transaction, but can be called multiple times 
+       * to commit in stages. This allows for this transaction
+       * object to be reused considering it contains a 
+       * 3kb buffer. 
+       * 
+       * @note after commiting the source may block while
+       * until other writers have a chance to commit. Upon
+       * returning the state will contain anything that the
+       * source of this transaction commited. In other words,
+       * this will release and reacquire the lock on the source
+       * of this transaction.
+       */
+      void commit_and_continue()
+      {
+         assert(_commit_callback);
+         _root = _commit_callback(std::move(_root), true);
       }
 
       using mutable_iterator<caching>::get_root;
@@ -74,12 +94,16 @@ namespace arbtrie
       write_transaction start_transaction()
       {
          return write_transaction(*_ws, get_root(),
-                                  [this](node_handle commit) { set_root(std::move(commit)); });
+                                  [this](node_handle commit, bool resume)
+                                  {
+                                     set_root(resume ? commit : std::move(commit));
+                                     return commit;
+                                  });
       }
 
      private:
-      write_session*                   _ws;
-      std::function<void()>            _abort_callback;
-      std::function<void(node_handle)> _commit_callback;
+      write_session*                                _ws;
+      std::function<void()>                         _abort_callback;
+      std::function<node_handle(node_handle, bool)> _commit_callback;
    };
 }  // namespace arbtrie

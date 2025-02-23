@@ -2436,11 +2436,14 @@ namespace arbtrie
       if (top_root_node >= 0)
          return write_transaction(
              *this, get_mutable_root(top_root_node),
-             [this, top_root_node](node_handle commit)
-             { set_root(std::move(commit), top_root_node); },
+             [this, top_root_node](node_handle commit, bool resume)
+             {
+                set_root(std::move(commit), top_root_node);
+                return get_mutable_root(top_root_node);
+             },
              [this, top_root_node]() { abort_write(top_root_node); });
       else
-         return write_transaction(*this, create_root(), [this](node_handle) {});
+         return write_transaction(*this, create_root(), [this](node_handle h, bool) { return h; });
    }
 
 }  // namespace arbtrie
