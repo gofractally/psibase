@@ -17,6 +17,8 @@ namespace arbtrie
    using kv_type       = binary_node::key_index::value_type;
    using kv_index      = binary_node::key_index;
 
+   class write_transaction;
+
    struct upsert_mode
    {
       enum type : uint32_t
@@ -113,8 +115,11 @@ namespace arbtrie
       friend class root_data;
       friend class root;
       friend class node_handle;
-      read_session(database& db);
+      friend class write_session;
+      friend class write_transaction;
+
       database& _db;
+      read_session(database& db);
 
       int get(object_ref& root, key_view key, std::invocable<bool, value_type> auto&& callback);
       int get(object_ref&                             root,
@@ -131,24 +136,24 @@ namespace arbtrie
               std::invocable<bool, value_type> auto&& callback);
 
       inline uint32_t count_keys(object_ref& r, key_view from, key_view to) const;
-      inline uint32_t count_keys(object_ref&      r,
-                                 const full_node* n,
-                                 key_view         from,
-                                 key_view         to) const;
+      inline uint32_t count_keys(object_ref& r,
+                                 const auto* inner,
+                                 key_view    from,
+                                 key_view    to) const;
       inline uint32_t count_keys(object_ref&        r,
-                                 const bitset_node* n,
+                                 const binary_node* inner,
                                  key_view           from,
                                  key_view           to) const;
       inline uint32_t count_keys(object_ref&         r,
-                                 const setlist_node* n,
+                                 const setlist_node* inner,
                                  key_view            from,
                                  key_view            to) const;
-      inline uint32_t count_keys(object_ref&        r,
-                                 const binary_node* n,
-                                 key_view           from,
-                                 key_view           to) const;
+      inline uint32_t count_keys(object_ref&      r,
+                                 const full_node* inner,
+                                 key_view         from,
+                                 key_view         to) const;
       inline uint32_t count_keys(object_ref&       r,
-                                 const value_node* n,
+                                 const value_node* inner,
                                  key_view          from,
                                  key_view          to) const;
 
@@ -165,6 +170,13 @@ namespace arbtrie
       auto create_iterator(node_handle h)
       {
          return iterator<CacheMode>(*this, std::move(h));
+      }
+
+      read_transaction start_transaction(int top_root_node = 0)
+      {
+         if (top_root_node == -1)
+            return read_transaction(*this, create_root());
+         return read_transaction(*this, get_root(top_root_node));
       }
 
       /**
@@ -228,6 +240,7 @@ namespace arbtrie
        * there would be no conflict in updating the root; however, if two
        * threads attempt to get, modify, and set the same root then the last
        * write will win.
+       * 
        */
       node_handle        get_root(int root_index = 0);
       constexpr uint32_t max_roots() const { return num_top_roots; }
@@ -282,6 +295,8 @@ namespace arbtrie
    class write_session : public read_session
    {
       friend class database;
+      friend class write_transaction;
+
       write_session(database& db) : read_session(db) {}
 
       id_address upsert(session_rlock& state, id_address root, key_view key, const value_type& val);
@@ -309,17 +324,45 @@ namespace arbtrie
       std::optional<node_handle> _old_handle;
       std::optional<node_handle> _new_handle;
 
-     public:
-      ~write_session();
-
       // makes the passed node handle the official state of the
       // database and returns the old state so the caller can
       // choose when it gets released
+
+      // Designed to only be called by write_transaction objects
+      // which are created by the start_transaction().
       //
       // @returns the prior root so caller can choose when/where
       // to release it, if ignored it will be released immediately
       template <sync_type sype = sync_type::none>
       node_handle set_root(node_handle, int index = 0);
+
+      // Designed to only be called by write_transaction objects
+      // which will take a lock on the root until they either commit
+      // by calling set_root() or abort by calling abort_write().
+      node_handle get_mutable_root(int index);
+
+      void abort_write(int index);
+
+     public:
+      ~write_session();
+
+      /**
+       * The database supports up to 488 top root nodes that are 
+       * saved in the database file header. Each of these top roots
+       * can be independently written to and read from and recovered
+       * from a crash.  
+       * 
+       * It is considered an error to start two transactions on the
+       * same root at the same time because the last one to commit will overwite
+       * the first one to commit. 
+       * 
+       * If no top root index is provided, then a temporary root will be created,
+       * the temporary root will be lost unless 
+       * 
+       * @param global_root_idx 
+       * @return 
+       */
+      write_transaction start_transaction(int top_root_node = -1);
 
       template <sync_type stype = sync_type::sync>
       void sync();
@@ -493,8 +536,13 @@ namespace arbtrie
          // operated on in parallel.
          std::atomic<uint64_t> top_root[num_top_roots];
       };
+      static_assert(sizeof(database_memory) == 4096);
+
       mutable std::mutex _sync_mutex;
       mutable std::mutex _root_change_mutex[num_top_roots];
+      mutable std::mutex _modify_lock[num_top_roots];
+
+      std::mutex& modify_lock(int index) { return _modify_lock[index]; }
 
       seg_allocator    _sega;
       mapping          _dbfile;
@@ -738,6 +786,8 @@ namespace arbtrie
    }
 
    /**
+    * This method should only be called by write_transaction objects.
+    * 
     * @param r is passed by value, so it owns a reference,
     *        it gives this reference to the top root and the
     *        old top root's reference is taken over by r and
@@ -769,6 +819,7 @@ namespace arbtrie
             }
          }
       }
+      _db.modify_lock(index).unlock();
       return r.give(id_address(old_r));
    }
 

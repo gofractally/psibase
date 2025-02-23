@@ -1,9 +1,12 @@
 #pragma once
 #include <arbtrie/concepts.hpp>
 #include <arbtrie/iterator.hpp>
+#include <arbtrie/node_handle.hpp>
 #include <arbtrie/read_lock.hpp>
 #include <arbtrie/seg_alloc_session.hpp>
 #include <arbtrie/seg_allocator.hpp>
+#include <arbtrie/value_type.hpp>
+#include <type_traits>
 #include <utility>
 
 namespace arbtrie
@@ -16,17 +19,21 @@ namespace arbtrie
       {
          const Iterator& it;
          const char*     func_name;
-         validity_guard(const Iterator& i, const char* fn) : it(i), func_name(fn) { check(); }
-         ~validity_guard() { check(); }
-         void check() const
+         validity_guard(const Iterator& i, const char* fn) : it(i), func_name(fn)
+         {
+            check("before");
+         }
+         ~validity_guard() { check("after"); }
+         void check(const char* when) const
          {
             if (!it.valid())
             {
-               std::cerr << "Iterator must be valid after " << func_name << std::endl;
+               std::cerr << "Iterator must be valid " << when << " " << func_name << std::endl;
                std::abort();
             }
          }
       };
+
    }  // namespace detail
 
    template <typename Iterator>
@@ -696,26 +703,53 @@ namespace arbtrie
     * @pre Iterator must be valid (valid() == true)
     */
    template <iterator_caching_mode CacheMode>
-   auto iterator<CacheMode>::get(key_view key, std::invocable<value_type> auto&& callback)
+   auto iterator<CacheMode>::get(key_view key, std::invocable<value_type> auto&& callback) const
        -> decltype(callback(value_type()))
    {
-      ARBTRIE_REQUIRE_ITR_VALID();
-      if (not _root.address()) [[unlikely]]
+      if (not valid())
          return callback(value_type());
 
-      if (key.size() > max_key_length)
-         throw std::runtime_error("invalid key length");
+      ARBTRIE_REQUIRE_ITR_VALID();
 
       auto state = _rs->lock();
       return get_impl(state, key, std::forward<decltype(callback)>(callback));
    }
 
    template <iterator_caching_mode CacheMode>
-   auto iterator<CacheMode>::get_impl(read_lock& state, key_view key, auto&& callback)
+   int32_t iterator<CacheMode>::get(key_view key, Buffer auto* buffer) const
+   {
+      if (not valid())
+         return -1;
+      ARBTRIE_REQUIRE_ITR_VALID();
+      return get(key,
+                 [&](value_type v) -> int32_t
+                 {
+                    if (!v.is_view()) [[unlikely]]
+                       return value_nothing - v.is_subtree();
+                    auto view = v.view();
+                    buffer->resize(view.size());
+                    memcpy(buffer->data(), view.data(), view.size());
+                    return static_cast<int32_t>(view.size());
+                 });
+   }
+
+   template <iterator_caching_mode CacheMode>
+   template <ConstructibleBuffer ConstructibleBufferType>
+   std::optional<ConstructibleBufferType> iterator<CacheMode>::get(key_view key) const
+   {
+      ConstructibleBufferType buffer;
+      auto                    result = get(key, &buffer);
+      if (result >= 0)
+         return buffer;
+      return std::nullopt;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   auto iterator<CacheMode>::get_impl(read_lock& state, key_view key, auto&& callback) const
        -> decltype(callback(value_type()))
    {
       ARBTRIE_REQUIRE_ITR_VALID();
-      auto                             addr = _path_back->oid;
+      auto                             addr = _root.address();
       decltype(callback(value_type())) result;
 
       while (true)
@@ -805,7 +839,7 @@ namespace arbtrie
    }
 
    template <iterator_caching_mode CacheMode>
-   node_handle iterator<CacheMode>::root_handle() const
+   const node_handle& iterator<CacheMode>::root_handle() const
    {
       return _root;
    }
@@ -844,7 +878,7 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    bool iterator<CacheMode>::begin()
    {
-      assert(valid() && "Iterator must be valid to call begin");
+      assert(valid());
       ARBTRIE_REQUIRE_ITR_VALID();
       start();
       return next();
@@ -1001,52 +1035,65 @@ namespace arbtrie
    }
 
    template <iterator_caching_mode CacheMode>
-   int mutable_iterator<CacheMode>::upsert(key_view key, value_view val)
+   uint32_t iterator<CacheMode>::count_keys(key_view from, key_view to) const
    {
-      assert(valid());
-      auto result = _ws->upsert(root_handle(), key, val);
+      return _rs->count_keys(_root, from, to);
+   }
+
+   //==============================================================
+   // Mutable Iterator
+   //==============================================================
+
+   template <iterator_caching_mode CacheMode>
+   auto mutable_iterator<CacheMode>::upsert(key_view key, ValueViewConvertibleOrNode auto&& val)
+       -> decltype(auto)
+   {
+      auto result =
+          _ws->upsert(root_handle(), key, detail::to_value_arg(std::forward<decltype(val)>(val)));
       start();
       return result;
    }
 
    template <iterator_caching_mode CacheMode>
-   int mutable_iterator<CacheMode>::upsert_find(key_view key, value_view val)
+   auto mutable_iterator<CacheMode>::upsert_find(key_view                          key,
+                                                 ValueViewConvertibleOrNode auto&& val)
+       -> decltype(auto)
    {
-      assert(valid());
-      auto result = _ws->upsert(root_handle(), key, val);
+      auto result =
+          _ws->upsert(root_handle(), key, detail::to_value_arg(std::forward<decltype(val)>(val)));
       find(key);
       return result;
    }
 
    template <iterator_caching_mode CacheMode>
-   void mutable_iterator<CacheMode>::insert(key_view key, value_view val)
+   void mutable_iterator<CacheMode>::insert(key_view key, ValueViewConvertibleOrNode auto&& val)
    {
-      assert(valid());
-      _ws->insert(root_handle(), key, val);
+      _ws->insert(root_handle(), key, detail::to_value_arg(std::forward<decltype(val)>(val)));
       start();
    }
 
    template <iterator_caching_mode CacheMode>
-   void mutable_iterator<CacheMode>::insert_find(key_view key, value_view val)
+   void mutable_iterator<CacheMode>::insert_find(key_view                          key,
+                                                 ValueViewConvertibleOrNode auto&& val)
    {
-      assert(valid());
-      _ws->insert(root_handle(), key, val);
+      _ws->insert(root_handle(), key, detail::to_value_arg(std::forward<decltype(val)>(val)));
       find(key);
    }
 
    template <iterator_caching_mode CacheMode>
-   int mutable_iterator<CacheMode>::update(value_view val)
+   int mutable_iterator<CacheMode>::update(ValueViewConvertibleOrNode auto&& val)
    {
       assert(valid());
-      assert(!is_end());
-      assert(!is_start());
-      auto result = _ws->update(root_handle(), key(), val);
+      assert(not is_end());
+      assert(not is_start());
+      auto result =
+          _ws->update(root_handle(), key(), detail::to_value_arg(std::forward<decltype(val)>(val)));
       start();
       return result;
    }
 
    template <iterator_caching_mode CacheMode>
-   int mutable_iterator<CacheMode>::update_find(value_view val)
+   int mutable_iterator<CacheMode>::update_find(ValueViewConvertibleOrNode auto&& val)
    {
       assert(valid());
       assert(!is_end());
@@ -1064,7 +1111,8 @@ namespace arbtrie
       std::memcpy(current_key_buf, current_key.data(), current_key_size);
 #endif
 
-      auto result = _ws->update(root_handle(), key(), val);
+      auto result =
+          _ws->update(root_handle(), key(), detail::to_value_arg(std::forward<decltype(val)>(val)));
 
 #ifndef NDEBUG
       find(key_view(current_key_buf, current_key_size));
@@ -1081,9 +1129,6 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    int mutable_iterator<CacheMode>::remove_end()
    {
-      assert(valid());
-      assert(!is_end());
-      assert(!is_start());
       auto result = _ws->remove(root_handle(), key());
       start();
       return result;
@@ -1092,9 +1137,6 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    int mutable_iterator<CacheMode>::remove(key_view key)
    {
-      assert(valid());
-      assert(!is_end());
-      assert(!is_start());
       auto result = _ws->remove(root_handle(), key);
       start();
       return result;
@@ -1103,10 +1145,6 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode>
    int mutable_iterator<CacheMode>::remove_advance()
    {
-      assert(valid());
-      assert(!is_end());
-      assert(!is_start());
-
       // Save current key to VLA sized to actual key length
       auto current_key      = key();
       auto current_key_size = current_key.size();
@@ -1117,25 +1155,56 @@ namespace arbtrie
       next();
 
       // Get next key size if not at end
-      auto next_key_size = !is_end() ? key().size() : 0;
+      auto next_key_size = !is_end() ? key().size() : -1;
 
       // Store next key to VLA if we have one
-      char next_key_buf[next_key_size ? next_key_size : 1];  // Size 1 when no next key
+      char next_key_buf[next_key_size > 0 ? next_key_size : 1];  // Size 1 when no next key
       if (next_key_size > 0)
-      {
          std::memcpy(next_key_buf, key().data(), next_key_size);
-      }
 
       // Remove the original key
       auto result = _ws->remove(root_handle(), key_view(current_key_buf, current_key_size));
 
       // Find the saved next key if it exists
       if (next_key_size > 0)
-      {
          find(key_view(next_key_buf, next_key_size));
-      }
+      else
+         assert(is_end());
 
       return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   std::optional<iterator<CacheMode>> iterator<CacheMode>::get_subtree(key_view key) const
+   {
+      if (auto handle = get(key,
+                            [&](const value_type& v) -> std::optional<node_handle>
+                            {
+                               if (v.is_subtree())
+                                  return node_handle(*_rs, v.subtree_address());
+                               return std::nullopt;
+                            }))
+      {
+         return iterator<CacheMode>(*_rs, std::move(*handle));
+      }
+      return std::nullopt;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   std::optional<mutable_iterator<CacheMode>> mutable_iterator<CacheMode>::get_subtree(
+       key_view key) const
+   {
+      if (auto handle = this->get(key,
+                                  [&](const value_type& v) -> std::optional<node_handle>
+                                  {
+                                     if (v.is_subtree())
+                                        return node_handle(*this->_ws, v.subtree_address());
+                                     return std::nullopt;
+                                  }))
+      {
+         return mutable_iterator<CacheMode>(*_ws, std::move(*handle));
+      }
+      return std::nullopt;
    }
 
 }  // namespace arbtrie

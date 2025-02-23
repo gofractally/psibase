@@ -39,14 +39,20 @@ namespace arbtrie
       static value_type make_subtree(id_address i) { return make<types::subtree>(i); }
       static value_type make_value_node(id_address i) { return make<types::value_node>(i); }
 
-      uint16_t size() const
+      uint32_t size() const
       {
-         if (const value_view* vv = std::get_if<value_view>(&data))
+         switch (type())
          {
-            return vv->size();
+            case types::data:
+               return std::get<value_view>(data).size();
+            case types::subtree:
+            case types::value_node:
+               return sizeof(id_address);
+            case types::remove:
+               return -1;
          }
-         return sizeof(id_address);
       }
+
       const value_view& view() const { return std::get<value_view>(data); }
       id_address        subtree_address() const
       {

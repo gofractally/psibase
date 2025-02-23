@@ -8,14 +8,12 @@
 #include <arbtrie/value_type.hpp>
 #include <concepts>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <vector>
 
 namespace arbtrie
 {
-   class read_session;   // Forward declaration
-   class write_session;  // Forward declaration
-   struct path_entry;    // Forward declaration
 
    /**
     * In caching mode, every node that is visited is marked as
@@ -27,6 +25,13 @@ namespace arbtrie
       noncaching = 0,
       caching    = 1
    };
+
+   class read_session;
+   class write_session;
+   class write_transaction;
+   struct path_entry;
+   template <iterator_caching_mode CacheMode>
+   class mutable_iterator;
 
    // clang-format off
    /**
@@ -45,7 +50,65 @@ namespace arbtrie
     */
    template <typename T>
    concept ConstructibleBuffer = Buffer<T> && requires { T(); };
+
+
+   /**
+    * Concept for types that can be implicitly converted to a std::string_view
+    */
+   template <typename T>
+   concept ImplicitValueViewConvertible = requires(const T& t) {
+      { std::string_view{t} } -> std::same_as<std::string_view>;
+   };
+
+   /**
+    * Concept for types that provide data() and size() methods compatible with std::string_view construction
+    */
+   template <typename T>
+   concept DataSizeValueViewConvertible = requires(const T& t) {
+      { t.data() } -> std::convertible_to<const char*>;
+      { t.size() } -> std::convertible_to<std::size_t>;
+   };
+
+   /**
+    * Concept for types that can be converted to a std::string_view through either method
+    */
+   template <typename T>
+   concept ValueViewConvertible = ImplicitValueViewConvertible<T> || DataSizeValueViewConvertible<T>;
+
+   /**
+    * Concept for types that can be used as values in the trie (either convertible to value_view or a node_handle)
+    */
+   template <typename T>
+   concept ValueViewConvertibleOrNode = ValueViewConvertible<T> || std::same_as<T, node_handle>;
    // clang-format on
+
+   namespace detail
+   {
+      template <typename T>
+      value_view to_value_view(const T& val)
+      {
+         if constexpr (ImplicitValueViewConvertible<T>)
+            return std::string_view{val};
+         else
+         {
+            static_assert(DataSizeValueViewConvertible<T>);
+            return value_view(val.data(), val.size());
+         }
+      }
+      template <typename T>
+      auto to_value_arg(T&& val)
+      {
+         if constexpr (std::same_as<std::remove_cvref_t<T>, node_handle>)
+         {
+            return std::move(val);
+         }
+         else
+         {
+            static_assert(ValueViewConvertible<T>);
+            return to_value_view(std::forward<T>(val));
+         }
+      }
+   }  // namespace detail
 
    /**
        *   An iterator grabs a read-only snapshot of the database
@@ -82,6 +145,10 @@ namespace arbtrie
    class iterator
    {
       friend class arbtrie::read_session;
+      friend class arbtrie::write_session;
+      friend class arbtrie::mutable_iterator<CacheMode>;
+      friend class arbtrie::write_transaction;
+
       iterator(read_session& s, node_handle r);
 
      public:
@@ -164,8 +231,43 @@ namespace arbtrie
       // @note the read lock is held while the callback is executed, so
       // get the data you need quickly and return from the callback.
       // @return true if found, false otherwise
-      auto get(key_view key, std::invocable<value_type> auto&& callback)
+      auto get(key_view key, std::invocable<value_type> auto&& callback) const
           -> decltype(callback(value_type()));
+
+      /**
+       * Get the value at the specified key into a buffer
+       * @tparam Buffer Type that supports resize() and data() for contiguous memory access
+       * @param key The key to get the value for
+       * @param buffer Pointer to the buffer to read the value into
+       * @return 
+       *   >= 0: Number of bytes read into buffer on success
+       *   iterator::value_nothing: Value not found
+       *   iterator::value_subtree: Found subtree value (use get_subtree() instead)
+       */
+      int32_t get(key_view key, Buffer auto* buffer) const;
+
+      /**
+       * Get the value at the specified key and return it in a newly constructed buffer
+       * @tparam ConstructibleBufferType Type that supports resize(), data() and default construction
+       * @param key The key to get the value for
+       * @return std::optional containing the constructed buffer with the value if found and not a subtree,
+       *         empty optional if not found or if the value is a subtree
+       */
+      template <ConstructibleBuffer ConstructibleBufferType>
+      std::optional<ConstructibleBufferType> get(key_view key) const;
+
+      // get the size of the value at key, note if key is a subtree, size will be 4
+      // if key does not exist, size will be -1
+      int32_t get_size(key_view key) const
+      {
+         return get(key,
+                    [](value_type t)
+                    {
+                       assert(not t.is_value_node());
+                       return t.size();
+                    });
+      }
+      std::optional<iterator<CacheMode>> get_subtree(key_view key) const;
 
       // Like get(), but also positions the iterator at the found key
       // Returns true if found and positions iterator at the key
@@ -184,16 +286,21 @@ namespace arbtrie
       node_handle subtree() const;
 
       // @return a handle to the root of the tree this iterator is traversing
-      node_handle  root_handle() const;
-      node_handle& root_handle() { return _root; }
+      const node_handle& root_handle() const;
+      node_handle&       root_handle() { return _root; }
 
       // return the root this iterator is based on
       // TODO: remove redundancy
       node_handle get_root() const;
-      void        set_root(node_handle root)
+
+      // return a subtree value_type for the root node
+      value_type as_subtree() const { return value_type::make_subtree(root_handle()); }
+
+      // set the root of the iterator and moves the iterator to the start
+      void set_root(node_handle root)
       {
          _root = std::move(root);
-         clear();
+         start();
       }
 
       /**
@@ -249,7 +356,15 @@ namespace arbtrie
       // @return is_end()
       bool begin();
 
-     private:
+      /**
+       * Count the number of keys in the range [from,to)
+       * @param from The start key (inclusive)
+       * @param to The end key (exclusive)
+       * @return The number of keys in the range
+       */
+      uint32_t count_keys(key_view from = {}, key_view to = {}) const;
+
+     protected:
       template <typename... Args>
       void debug_print(const Args&... args) const;
 
@@ -295,7 +410,7 @@ namespace arbtrie
       read_session* _rs;
       node_handle   _root;
 
-      auto get_impl(read_lock& state, key_view key, auto&& callback)
+      auto get_impl(read_lock& state, key_view key, auto&& callback) const
           -> decltype(callback(value_type()));
    };
 
@@ -307,26 +422,52 @@ namespace arbtrie
    template <iterator_caching_mode CacheMode = noncaching>
    class mutable_iterator : public iterator<CacheMode>
    {
-     public:
+     protected:
+      friend class write_transaction;
       mutable_iterator(write_session& ws, node_handle r)
           : iterator<CacheMode>(ws, std::move(r)), _ws(&ws)
       {
       }
 
+     public:
       using iterator<CacheMode>::root_handle;
       using iterator<CacheMode>::key;
       using iterator<CacheMode>::start;
       using iterator<CacheMode>::next;
       using iterator<CacheMode>::find;
       using iterator<CacheMode>::is_end;
+      using iterator<CacheMode>::is_start;
+      using iterator<CacheMode>::is_rend;
+      using iterator<CacheMode>::valid;
+      using iterator<CacheMode>::count_keys;
+      using iterator<CacheMode>::subtree_iterator;
+      using iterator<CacheMode>::subtree;
+      using iterator<CacheMode>::get;
+      using iterator<CacheMode>::value;
+      using iterator<CacheMode>::get_size;
+      using iterator<CacheMode>::pretty_path;
+      using iterator<CacheMode>::end;
+      using iterator<CacheMode>::prev;
+      using iterator<CacheMode>::lower_bound;
+      using iterator<CacheMode>::upper_bound;
+      using iterator<CacheMode>::reverse_lower_bound;
+      using iterator<CacheMode>::reverse_upper_bound;
+
+      /**
+       * Get a mutable iterator to the subtree at the specified key
+       * @param key The key to get the subtree from
+       * @return An optional containing the mutable iterator if a subtree exists at the key, nullopt otherwise
+       */
+      std::optional<mutable_iterator<CacheMode>> get_subtree(key_view key) const;
 
       /**
        * Update or insert a value at the specified key, move to the start()
        * @param key The key to upsert at
-       * @param val The value to upsert
+       * @param val The value to upsert (can be a ValueViewConvertible or node_handle)
        * @return -1 on insert, otherwise the size of the old value
+       * @return if upserting a subtree, the old subtree optional<node_handle> is returned
        */
-      int upsert(key_view key, value_view val);
+      auto upsert(key_view key, ValueViewConvertibleOrNode auto&& val) -> decltype(auto);
 
       /**
        * Update or insert a value at the specified key, move to the key
@@ -334,27 +475,28 @@ namespace arbtrie
        * If you don't need the iterator at key postion, use upsert() instead
        * 
        * @param key The key to upsert at
-       * @param val The value to upsert
+       * @param val The value to upsert (can be a ValueViewConvertible or node_handle)
        * @return -1 on insert, otherwise the size of the old value
+       * @return if upserting a subtree, the old subtree optional<node_handle> is returned
        * @pre valid()
        */
-      int upsert_find(key_view key, value_view val);
+      auto upsert_find(key_view key, ValueViewConvertibleOrNode auto&& val) -> decltype(auto);
 
       /**
        * Insert a value at the specified key, move to start()
        * @param key The key to insert at
-       * @param val The value to insert
+       * @param val The value to insert (can be a ValueViewConvertible or node_handle)
        * @throws if a value already exists at this position
        */
-      void insert(key_view key, value_view val);
+      void insert(key_view key, ValueViewConvertibleOrNode auto&& val);
 
       /**
        * Insert a value at the specified key, move to the key
        * @param key The key to insert at
-       * @param val The value to insert
+       * @param val The value to insert (can be a ValueViewConvertible or node_handle)
        * @throws if a value already exists at this position
        */
-      void insert_find(key_view key, value_view val);
+      void insert_find(key_view key, ValueViewConvertibleOrNode auto&& val);
 
       /**
        * Update the value at the current iterator position, move to start()
@@ -364,11 +506,11 @@ namespace arbtrie
        * and preserve the iterator position, use update_find() instead which
        * will move back to the key after the update. 
        * 
-       * @param val The new value
+       * @param val The value to update with (can be a ValueViewConvertible or node_handle)
        * @return size of the old value
        * @pre valid(), not is_end() and not is_start()
        */
-      int update(value_view val);
+      int update(ValueViewConvertibleOrNode auto&& val);
 
       /**   
        * Update the value at the current iterator position, move to the key
@@ -377,11 +519,11 @@ namespace arbtrie
        * use update() instead which moves to start() after the update and
        * is faster.
        * 
-       * @param val The new value
+       * @param val The value to update with (can be a ValueViewConvertible or node_handle)
        * @return size of the old value
        * @pre valid(), not is_end() and not is_start()   
        */
-      int update_find(value_view val);
+      int update_find(ValueViewConvertibleOrNode auto&& val);
 
       /**
        * Remove the value at the current iterator position, move to the start()
@@ -411,3 +553,5 @@ namespace arbtrie
    };
 
 }  // namespace arbtrie
+
+#include <arbtrie/transaction.hpp>

@@ -2,6 +2,7 @@
 #include <arbtrie/database.hpp>
 #include <arbtrie/debug.hpp>
 #include <arbtrie/file_fwd.hpp>
+#include <arbtrie/transaction.hpp>
 
 #include <utility>
 
@@ -172,6 +173,26 @@ namespace arbtrie
       return cast_and_call(this, [&](const auto* t) { return t->calculate_checksum(); });
    }
 
+   node_handle write_session::get_mutable_root(int index)
+   {
+      assert(index < num_top_roots);
+      assert(index >= 0);
+
+      // prevent other threads from modifying the root while we are
+      _db.modify_lock(index).lock();
+
+      // must take the lock to prevent a race condition around
+      // retaining the current top root... otherwise we must
+      //     read the current top root address,
+      //     read / lookup the meta for the address
+      //     attempt to retain the meta while making sure the top root
+      //     hasn't changed, the lock is probably faster anyway
+      std::unique_lock lock(_db._root_change_mutex[index]);
+
+      return node_handle(
+          *this, id_address::from_int(_db._dbm->top_root[index].load(std::memory_order_relaxed)));
+   }
+
    node_handle read_session::get_root(int index)
    {
       assert(index < num_top_roots);
@@ -184,6 +205,7 @@ namespace arbtrie
       //     attempt to retain the meta while making sure the top root
       //     hasn't changed, the lock is probably faster anyway
       std::unique_lock lock(_db._root_change_mutex[index]);
+
       return node_handle(
           *this, id_address::from_int(_db._dbm->top_root[index].load(std::memory_order_relaxed)));
    }
@@ -2402,6 +2424,23 @@ namespace arbtrie
                  })
           .address();
       */
+   }
+
+   void write_session::abort_write(int index)
+   {
+      _db.modify_lock(index).unlock();
+   }
+
+   write_transaction write_session::start_transaction(int top_root_node)
+   {
+      if (top_root_node >= 0)
+         return write_transaction(
+             *this, get_mutable_root(top_root_node),
+             [this, top_root_node](node_handle commit)
+             { set_root(std::move(commit), top_root_node); },
+             [this, top_root_node]() { abort_write(top_root_node); });
+      else
+         return write_transaction(*this, create_root(), [this](node_handle) {});
    }
 
 }  // namespace arbtrie
