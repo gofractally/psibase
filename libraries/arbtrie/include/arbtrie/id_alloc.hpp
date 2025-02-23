@@ -182,7 +182,7 @@ namespace arbtrie
       {
          // TODO: allow region 0 once we have caught all places where
          // region is uninitilized and therefore overflowing region 0
-         TRIEDENT_WARN("who is alloc to region 0!\n");
+         ARBTRIE_WARN("who is alloc to region 0!\n");
       }
 
       const uint32_t ids_per_page = id_page_size / sizeof(node_meta_type);
@@ -197,7 +197,7 @@ namespace arbtrie
          // only one will actually do the work.
          if (num_pages > 3)
          {
-            TRIEDENT_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
+            ARBTRIE_WARN("growing all id regions because use count(", prior_ucount, ") of region(",
                           r.to_int(), ") exceeded cap: numpages: ", num_pages, " -> ",
                           num_pages + 1);
             // TODO: calculate a load factor before warning
@@ -206,7 +206,7 @@ namespace arbtrie
       }
       auto na = rhead.next_alloc.load(std::memory_order_relaxed);
 
-      //TRIEDENT_WARN( "num_pages: ", num_pages, "  region: ", r.to_int() ," next alloc: ", na );
+      //ARBTRIE_WARN( "num_pages: ", num_pages, "  region: ", r.to_int() ," next alloc: ", na );
       if (na < num_pages * ids_per_page)
       {
          // TODO: change to C & E
@@ -218,7 +218,7 @@ namespace arbtrie
             assert(nid != 0);
             auto nadr = r + id_index(nid);
             assert(get(nadr).ref() == 0 and get(nadr).loc().aligned_index() == 0);
-            //     TRIEDENT_WARN( "alloc: ", nadr );
+            //     ARBTRIE_WARN( "alloc: ", nadr );
             return {get(nadr), nadr};
          }
          else
@@ -226,7 +226,7 @@ namespace arbtrie
             // race condition caused attempt to allocate beyond end of page,
             // must undo the add to restore balance... then consult free list
             rhead.next_alloc.fetch_sub(1, std::memory_order_relaxed);
-            TRIEDENT_WARN(
+            ARBTRIE_WARN(
                 "id alloc race condition detected, should be fine, just letting you know");
          }
       }
@@ -247,7 +247,7 @@ namespace arbtrie
          std::unique_lock<std::mutex> l{rhead.alloc_mutex};
          ff_index = rhead.first_free.load(std::memory_order_seq_cst);
 
-         //     TRIEDENT_DEBUG("reg: ", r.to_int(), " alloc from ff_index: ", ff_index, " idx: ", (ff_index >> 18),
+         //     ARBTRIE_DEBUG("reg: ", r.to_int(), " alloc from ff_index: ", ff_index, " idx: ", (ff_index >> 18),
          //                   "  tmd: ", temp_meta_type(ff_index).loc().to_aligned(), "  eofl: ", eofl);
          uint64_t next_free = get(r + id_index(temp_meta_type(ff_index).loc().to_aligned()))
                                   .to_int(std::memory_order_seq_cst);
@@ -279,7 +279,7 @@ namespace arbtrie
 
       //     std::cerr << "   post alloc free list: ";
       //    print_free_list();
-      //      TRIEDENT_WARN( "fl alloc: ", alloced_id);
+      //      ARBTRIE_WARN( "fl alloc: ", alloced_id);
       return {*ffa, alloced_id};
    }
 

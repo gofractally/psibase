@@ -243,7 +243,7 @@ namespace arbtrie
             uint8_t last = sl.front();
             for (int i = 1; i < sl.size(); ++i)
             {
-               //TRIEDENT_DEBUG( "last: ", int(last), " < ", int(uint8_t(sl[i])) );
+               //ARBTRIE_DEBUG( "last: ", int(last), " < ", int(uint8_t(sl[i])) );
                if (uint8_t(sl[i]) <= last)
                {
                   assert(!"order invalid");

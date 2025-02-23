@@ -60,7 +60,7 @@ namespace arbtrie
  */
    void database::recover(recover_args args)
    {
-      TRIEDENT_WARN("Recovering... reset meta nodes!");
+      ARBTRIE_WARN("Recovering... reset meta nodes!");
       // all recovered nodes have a ref of 1
       _sega.reset_meta_nodes(args);
 

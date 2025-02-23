@@ -169,11 +169,11 @@ namespace arbtrie
       std::cerr<<std::dec;
       int x = bid.id;
       const int test = 103;
-      TRIEDENT_WARN( test, "a. add_branch( ", branch, ", ", bid, " ", bid.id,  " ", uint64_t(bid.id)," ", x,")");
+      ARBTRIE_WARN( test, "a. add_branch( ", branch, ", ", bid, " ", bid.id,  " ", uint64_t(bid.id)," ", x,")");
       if( bid.id == 259 ) {
          std::cerr << "break  "<<__LINE__<<"\n ";
       }
-      TRIEDENT_WARN( "b. add_branch( ", branch, ", ", bid, " ", bid.id, ")");
+      ARBTRIE_WARN( "b. add_branch( ", branch, ", ", bid, " ", bid.id, ")");
       assert(bid);
       assert(not get_branch(branch));
       assert(_num_branches < 257);

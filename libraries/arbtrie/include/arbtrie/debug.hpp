@@ -94,13 +94,13 @@ namespace arbtrie
    }
 
 #if 1  //__DEBUG__
-#define TRIEDENT_DEBUG(...) arbtrie::debug(__func__, __LINE__, __VA_ARGS__)
-#define TRIEDENT_WARN(...) arbtrie::debug(__func__, __LINE__, "\033[31m", __VA_ARGS__, "\033[0m")
-#define TRIEDENT_SCOPE arbtrie::scope __sco__##__LINE__;
+#define ARBTRIE_DEBUG(...) arbtrie::debug(__func__, __LINE__, __VA_ARGS__)
+#define ARBTRIE_WARN(...) arbtrie::debug(__func__, __LINE__, "\033[31m", __VA_ARGS__, "\033[0m")
+#define ARBTRIE_SCOPE arbtrie::scope __sco__##__LINE__;
 #else
-#define TRIEDENT_DEBUG(...)
-#define TRIEDENT_WARN(...)
-#define TRIEDENT_SCOPE
+#define ARBTRIE_DEBUG(...)
+#define ARBTRIE_WARN(...)
+#define ARBTRIE_SCOPE
 #endif
 
 }  // namespace arbtrie

@@ -597,17 +597,17 @@ namespace arbtrie
 
       if (is_end())
       {
-         //   TRIEDENT_DEBUG("reverse_lower_bound: is_end(), prev()");
+         //   ARBTRIE_DEBUG("reverse_lower_bound: is_end(), prev()");
          prev();
       }
       else if (key() != prefix)  // the key is > prefix, go back one
       {
-         //      TRIEDENT_DEBUG("reverse_lower_bound: itr.key() ", to_hex(key()), " != query ",
+         //      ARBTRIE_DEBUG("reverse_lower_bound: itr.key() ", to_hex(key()), " != query ",
          //                    to_hex(prefix), ", prev_impl");
          assert(key() > prefix);
          prev_impl(state);
          assert(is_start() or key() < prefix);
-         // TRIEDENT_DEBUG("reverse_lower_bound: prev itr.key() ", to_hex(key()), " != query ",
+         // ARBTRIE_DEBUG("reverse_lower_bound: prev itr.key() ", to_hex(key()), " != query ",
          //                to_hex(prefix), ", prev_impl is start: ", is_start());
       }
       return not is_start();
@@ -1127,6 +1127,15 @@ namespace arbtrie
       find(key());
 #endif
 
+      return result;
+   }
+
+   template <iterator_caching_mode CacheMode>
+   int mutable_iterator<CacheMode>::update(key_view key, ValueViewConvertibleOrNode auto&& val)
+   {
+      auto result =
+          _ws->update(root_handle(), key, detail::to_value_arg(std::forward<decltype(val)>(val)));
+      start();
       return result;
    }
 

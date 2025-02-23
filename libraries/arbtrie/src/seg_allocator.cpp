@@ -200,12 +200,12 @@ namespace arbtrie
    }
    void seg_allocator::compact_loop()
    {
-      TRIEDENT_WARN("compact_loop");
+      ARBTRIE_WARN("compact_loop");
       using namespace std::chrono_literals;
       if (not _compactor_session)
          _compactor_session.emplace(start_session());
 
-      TRIEDENT_WARN("compact_loop start: ", _done.load());
+      ARBTRIE_WARN("compact_loop start: ", _done.load());
       while (not _done.load())
       {
          if (not compact_next_segment())
@@ -242,8 +242,8 @@ namespace arbtrie
          }
          promote_rcache_data();
       }
-      TRIEDENT_WARN("compact_loop end: ", _done.load());
-      TRIEDENT_WARN("compact_loop done");
+      ARBTRIE_WARN("compact_loop end: ", _done.load());
+      ARBTRIE_WARN("compact_loop done");
       _compactor_session.reset();
    }
 
@@ -277,16 +277,16 @@ namespace arbtrie
                if (node_meta_type::success == obj_ref.try_move(loc, new_loc))
                {
                   _total_promoted_bytes += header->size();
-                  // TRIEDENT_WARN("moved header, total promoted: ", _total_promoted_bytes);
+                  // ARBTRIE_WARN("moved header, total promoted: ", _total_promoted_bytes);
                }
                else
                {
-                  //     TRIEDENT_DEBUG("failed to move header");
+                  //     ARBTRIE_DEBUG("failed to move header");
                }
             }
             else
             {
-               //    TRIEDENT_WARN("failed to try_move_header");
+               //    ARBTRIE_WARN("failed to try_move_header");
             }
             obj_ref.meta().end_pending_cache();
          }
@@ -338,7 +338,7 @@ namespace arbtrie
       auto state = ses.lock();
       auto s     = get_segment(seg_num);
       //  if( not s->_write_lock.try_lock() ) {
-      //     TRIEDENT_WARN( "unable to get write lock while compacting!" );
+      //     ARBTRIE_WARN( "unable to get write lock while compacting!" );
       //     abort();
       //  }
       auto*        shead = (mapped_memory::segment_header*)s;
@@ -428,12 +428,12 @@ namespace arbtrie
                if constexpr (update_checksum_on_modify)
                {
                   if (not ptr->has_checksum())
-                     TRIEDENT_WARN("missing checksum detected: ", foo_address,
+                     ARBTRIE_WARN("missing checksum detected: ", foo_address,
                                    " type: ", node_type_names[ptr->_ntype]);
                }
                if (not ptr->validate_checksum())
                {
-                  TRIEDENT_WARN("invalid checksum detected: ", foo_address,
+                  ARBTRIE_WARN("invalid checksum detected: ", foo_address,
                                 " checksum: ", foo->checksum, " != ", foo->calculate_checksum(),
                                 " type: ", node_type_names[ptr->_ntype]);
                }
@@ -467,7 +467,7 @@ namespace arbtrie
       {
          if ((char*)send - (char*)foo > 4096)
          {
-            TRIEDENT_WARN("existing compact loop earlier than expected: ",
+            ARBTRIE_WARN("existing compact loop earlier than expected: ",
                           (char*)send - (char*)foo);
          }
 
@@ -483,23 +483,23 @@ namespace arbtrie
                {
                   if (s.first == foo)
                   {
-                     TRIEDENT_WARN("obj_ref: ", obj_ref.ref());
-                     TRIEDENT_WARN("obj_type: ", node_type_names[obj_ref.type()]);
-                     TRIEDENT_WARN("obj_loc: ", current_loc.abs_index(),
+                     ARBTRIE_WARN("obj_ref: ", obj_ref.ref());
+                     ARBTRIE_WARN("obj_type: ", node_type_names[obj_ref.type()]);
+                     ARBTRIE_WARN("obj_loc: ", current_loc.abs_index(),
                                    " seg: ", current_loc.segment());
-                     TRIEDENT_WARN("ptr: ", (void*)foo);
-                     TRIEDENT_WARN("pos in segment: ", segment_size - ((char*)send - (char*)foo));
+                     ARBTRIE_WARN("ptr: ", (void*)foo);
+                     ARBTRIE_WARN("pos in segment: ", segment_size - ((char*)send - (char*)foo));
 
-                     TRIEDENT_WARN("SKIPPED BECAUSE POS DIDN'T MATCH");
-                     TRIEDENT_DEBUG("  old meta: ", s.second.to_int());
-                     TRIEDENT_DEBUG("  null_node: ", null_node.abs_index(),
+                     ARBTRIE_WARN("SKIPPED BECAUSE POS DIDN'T MATCH");
+                     ARBTRIE_DEBUG("  old meta: ", s.second.to_int());
+                     ARBTRIE_DEBUG("  null_node: ", null_node.abs_index(),
                                     " seg: ", null_node.segment());
-                     TRIEDENT_DEBUG("  old loc: ", s.second.loc().abs_index(),
+                     ARBTRIE_DEBUG("  old loc: ", s.second.loc().abs_index(),
                                     " seg: ", s.second.loc().segment());
-                     TRIEDENT_DEBUG("  old ref: ", s.second.ref());
-                     TRIEDENT_DEBUG("  old type: ", node_type_names[s.second.type()]);
-                     TRIEDENT_DEBUG("  old is_con: ", s.second.is_const());
-                     TRIEDENT_DEBUG("  old is_ch: ", s.second.is_copying());
+                     ARBTRIE_DEBUG("  old ref: ", s.second.ref());
+                     ARBTRIE_DEBUG("  old type: ", node_type_names[s.second.type()]);
+                     ARBTRIE_DEBUG("  old is_con: ", s.second.is_const());
+                     ARBTRIE_DEBUG("  old is_ch: ", s.second.is_copying());
                      assert(current_loc.to_abs() != seg_num * segment_size + foo_idx);
                   }
                }
@@ -507,14 +507,14 @@ namespace arbtrie
                {
                   if (s == foo)
                   {
-                     TRIEDENT_WARN("SKIPPED BECAUSE REF 0");
+                     ARBTRIE_WARN("SKIPPED BECAUSE REF 0");
                   }
                }
                for (auto s : skipped_try_start)
                {
                   if (s == foo)
                   {
-                     TRIEDENT_WARN("SKIPPED BECAUSE TRY START");
+                     ARBTRIE_WARN("SKIPPED BECAUSE TRY START");
                   }
                }
             }
@@ -654,7 +654,7 @@ namespace arbtrie
       }
       if (e > (1 << 20))
       {
-         TRIEDENT_WARN(
+         ARBTRIE_WARN(
              "TODO: looks like ALLOC P and END P need to be renormalized, they have wrapped the "
              "buffer too many times.");
       }
@@ -675,8 +675,8 @@ namespace arbtrie
     */
    std::pair<segment_number, mapped_memory::segment_header*> seg_allocator::get_new_segment()
    {
-      // TRIEDENT_DEBUG( " get new seg session min ptr: ", min );
-      // TRIEDENT_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
+      // ARBTRIE_DEBUG( " get new seg session min ptr: ", min );
+      // ARBTRIE_WARN( "end ptr: ", _header->end_ptr.load(), " _header: ", _header );
       auto prepare_segment = [&](segment_number sn)
       {
          auto sp = _block_alloc.get(sn);
@@ -719,17 +719,17 @@ namespace arbtrie
       auto ap  = _header->alloc_ptr.load(std::memory_order_relaxed);
       while (min - ap > 1)
       {
-         //   TRIEDENT_WARN( "REUSE SEGMENTS" );
+         //   ARBTRIE_WARN( "REUSE SEGMENTS" );
          if (_header->alloc_ptr.compare_exchange_weak(ap, ap + 1))
          {
-            //      TRIEDENT_DEBUG( "ap += 1: ", ap + 1 );
-            //   TRIEDENT_DEBUG( "     end_ptr: ", _header->end_ptr.load() );
+            //      ARBTRIE_DEBUG( "ap += 1: ", ap + 1 );
+            //   ARBTRIE_DEBUG( "     end_ptr: ", _header->end_ptr.load() );
 
             auto     apidx    = ap & (max_segment_count - 1);
             uint64_t free_seg = _header->free_seg_buffer[apidx];
             if (free_seg == segment_number(-1)) [[unlikely]]
             {
-               TRIEDENT_WARN("something bad happend!");
+               ARBTRIE_WARN("something bad happend!");
                abort();
             }
 
@@ -737,17 +737,17 @@ namespace arbtrie
 
             if (free_seg == segment_number(-1)) [[unlikely]]
             {
-               TRIEDENT_WARN("something bad happend!");
+               ARBTRIE_WARN("something bad happend!");
                abort();
             }
-            //  TRIEDENT_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
+            //  ARBTRIE_DEBUG( "prepare segment: ", free_seg, "     end_ptr: ", _header->end_ptr.load() );
             //       std::cerr << "reusing segment..." << free_seg <<"\n";
             auto sp = (mapped_memory::segment_header*)_block_alloc.get(free_seg);
             //  This lock is not needed, but just there to prove the read-lock system
             //  is working as intened. If re-enabled, it probably need to be moved to
             //  prepare segment because new segments don't end up locked... only reused ones
             //    if( not sp->_write_lock.try_lock() ) {
-            //       TRIEDENT_WARN( "write lock on get_new_segment!" );
+            //       ARBTRIE_WARN( "write lock on get_new_segment!" );
             //    }
             return prepare_segment(free_seg);
          }
@@ -789,7 +789,7 @@ namespace arbtrie
          else
          {
             total_synced += sync_bytes;
-            //           TRIEDENT_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
+            //           ARBTRIE_DEBUG( "total synced: ", add_comma(total_synced), " flag: ", msync_flag(st), " MS_SYNC: ", MS_SYNC );
          }
          _header->seg_meta[s].set_last_sync_pos(last_alloc);
       }

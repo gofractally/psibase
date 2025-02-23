@@ -68,7 +68,7 @@ std::vector<std::string> load_words(write_transaction& ws, uint32_t limit = -1)
       toupper(val);
       val.resize(64);
       if (result.size() != ws.count_keys())
-         TRIEDENT_WARN(key, " count_keys: ", ws.count_keys());
+         ARBTRIE_WARN(key, " count_keys: ", ws.count_keys());
       REQUIRE(result.size() == ws.count_keys());
 
       result.push_back(key);
@@ -126,24 +126,24 @@ TEST_CASE("binary-node")
 {
    alignas(64) char node_buffer[64 * 16];
    auto bn = new (node_buffer) binary_node(sizeof(node_buffer), id_address{}, clone_config{});
-   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
-   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
-   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
-   TRIEDENT_DEBUG("branches: ", bn->num_branches());
-   TRIEDENT_WARN("reserving 8 branches");
+   ARBTRIE_DEBUG("capacity: ", bn->data_capacity());
+   ARBTRIE_DEBUG("spare capacity: ", bn->spare_capacity());
+   ARBTRIE_DEBUG("branch capacity: ", bn->_branch_cap);
+   ARBTRIE_DEBUG("branches: ", bn->num_branches());
+   ARBTRIE_WARN("reserving 8 branches");
    bn->reserve_branch_cap(8);
-   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
-   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
-   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
-   TRIEDENT_DEBUG("branches: ", bn->num_branches());
+   ARBTRIE_DEBUG("capacity: ", bn->data_capacity());
+   ARBTRIE_DEBUG("spare capacity: ", bn->spare_capacity());
+   ARBTRIE_DEBUG("branch capacity: ", bn->_branch_cap);
+   ARBTRIE_DEBUG("branches: ", bn->num_branches());
 
    auto idx = bn->lower_bound_idx(to_key_view("hello"));
    bn->insert(kv_index(idx), to_key_view("hello"), to_value_view("world"));
 
-   TRIEDENT_DEBUG("capacity: ", bn->data_capacity());
-   TRIEDENT_DEBUG("spare capacity: ", bn->spare_capacity());
-   TRIEDENT_DEBUG("branch capacity: ", bn->_branch_cap);
-   TRIEDENT_DEBUG("branches: ", bn->num_branches());
+   ARBTRIE_DEBUG("capacity: ", bn->data_capacity());
+   ARBTRIE_DEBUG("spare capacity: ", bn->spare_capacity());
+   ARBTRIE_DEBUG("branch capacity: ", bn->_branch_cap);
+   ARBTRIE_DEBUG("branches: ", bn->num_branches());
 }
 
 TEST_CASE("update-size")
@@ -330,7 +330,7 @@ TEST_CASE("update-size-shared")
       tmp = root;
 
       env.db->print_stats(std::cerr);
-      TRIEDENT_WARN("resetting temp");
+      ARBTRIE_WARN("resetting temp");
       tmp.reset();
       env.db->print_stats(std::cerr);
    }
@@ -412,7 +412,7 @@ TEST_CASE("insert-words")
                /*
                if( fkeys->size() != data.size() or
                    0 != memcmp( fkeys->data(), data.data(), data.size() ) ) {
-                  TRIEDENT_WARN( "expected '", *fkeys, " got ", std::string(data.data(),data.size()) );
+                  ARBTRIE_WARN( "expected '", *fkeys, " got ", std::string(data.data(),data.size()) );
                }
                REQUIRE( fkeys->size() == data.size() );
                REQUIRE( 0 == memcmp( fkeys->data(), data.data(), data.size() ) );
@@ -438,22 +438,22 @@ TEST_CASE("insert-words")
             {
                assert(rkeys != keys.rend());
                REQUIRE(rkeys != keys.rend());
-               //      TRIEDENT_WARN( "checking ", *rkeys );
+               //      ARBTRIE_WARN( "checking ", *rkeys );
                tx.value(data);
                /*
                if( rkeys->size() != data.size() or
                    0 != memcmp( rkeys->data(), data.data(), data.size() ) ) {
-                  TRIEDENT_WARN( "count: ", rcount, " expected '", *rkeys, " got ", std::string(data.data(),data.size()) );
+                  ARBTRIE_WARN( "count: ", rcount, " expected '", *rkeys, " got ", std::string(data.data(),data.size()) );
                }
                REQUIRE( rkeys->size() == data.size() );
                REQUIRE( 0 == memcmp( rkeys->data(), data.data(), data.size() ) );
                */
 
-               //              TRIEDENT_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
+               //              ARBTRIE_DEBUG( rcount, "] itr.key: ", to_str(itr.key()), " = ", std::string_view(data.data(),data.size()) );
                REQUIRE(tx.key().size() == data.size());
                if (*rkeys == "zuccarino")
                {
-                  TRIEDENT_WARN("break");
+                  ARBTRIE_WARN("break");
                }
                tx.prev();
                ++rcount;
@@ -473,26 +473,26 @@ TEST_CASE("insert-words")
       std::optional<node_handle> shared_handle;
       if (shared)
          shared_handle = tx.get_root();
-      TRIEDENT_WARN("removing for keys in order, shared: ", shared);
+      ARBTRIE_WARN("removing for keys in order, shared: ", shared);
       auto cnt = tx.count_keys();
       REQUIRE(cnt == keys.size());
       for (int i = 0; i < keys.size(); ++i)
       {
-         // TRIEDENT_DEBUG( "check before remove: ", keys[i], " i: ", i, " shared: ", shared );
-         // TRIEDENT_DEBUG( "ws.count: ", ws.count_keys(root), " i: ", i );
+         // ARBTRIE_DEBUG( "check before remove: ", keys[i], " i: ", i, " shared: ", shared );
+         // ARBTRIE_DEBUG( "ws.count: ", ws.count_keys(root), " i: ", i );
          REQUIRE(cnt - i == tx.count_keys());
          auto buf = tx.get<std::string>(to_key_view(keys[i]));
          REQUIRE(buf);
          REQUIRE(*buf == values[i]);
          if (not buf)
          {
-            TRIEDENT_WARN("looking before remove: ", keys[i]);
+            ARBTRIE_WARN("looking before remove: ", keys[i]);
             abort();
          }
 
-         //TRIEDENT_DEBUG( "before remove: ", keys[i] );
+         //ARBTRIE_DEBUG( "before remove: ", keys[i] );
          tx.remove(to_key_view(keys[i]));
-         //TRIEDENT_DEBUG( "after remove: ", keys[i] );
+         //ARBTRIE_DEBUG( "after remove: ", keys[i] );
          /*{
          auto l = ws._segas.lock();
          validate_refcount( l, root.address(), int(shared+1) );
@@ -500,25 +500,25 @@ TEST_CASE("insert-words")
          */
          buf = tx.get<std::string>(to_key_view(keys[i]));
          REQUIRE(not buf);
-         //TRIEDENT_DEBUG("checking remove: ", keys[i]);
+         //ARBTRIE_DEBUG("checking remove: ", keys[i]);
       }
       REQUIRE(tx.count_keys() == 0);
       env.db->print_stats(std::cerr);
    };  // test_words
 
-   // TRIEDENT_DEBUG( "load in file order" );
-   TRIEDENT_DEBUG("forward file order unique");
+   // ARBTRIE_DEBUG( "load in file order" );
+   ARBTRIE_DEBUG("forward file order unique");
    test_words(false);
-   TRIEDENT_DEBUG("forward file order shared");
+   ARBTRIE_DEBUG("forward file order shared");
    test_words(true);
-   TRIEDENT_DEBUG("load in reverse file order");
+   ARBTRIE_DEBUG("load in reverse file order");
    std::reverse(keys.begin(), keys.end());
    std::reverse(values.begin(), values.end());
-   TRIEDENT_DEBUG("remove reverse file order shared");
+   ARBTRIE_DEBUG("remove reverse file order shared");
    test_words(true);
-   TRIEDENT_DEBUG("remove reverse file order unique");
+   ARBTRIE_DEBUG("remove reverse file order unique");
    test_words(false);
-   TRIEDENT_DEBUG("load in random order shared");
+   ARBTRIE_DEBUG("load in random order shared");
    {
       auto rng = std::default_random_engine{};
       std::shuffle(keys.begin(), keys.end(), rng);
@@ -528,7 +528,7 @@ TEST_CASE("insert-words")
       std::shuffle(values.begin(), values.end(), rng);
    }
    test_words(true);
-   TRIEDENT_DEBUG("load in random order unique");
+   ARBTRIE_DEBUG("load in random order unique");
    test_words(false);
 }
 
@@ -617,13 +617,13 @@ TEST_CASE("random-size-updates-shared")
             REQUIRE(postsize == data.size());
             tmp = tx.get_root();
             //  if( i % 1000 == 0 ) {
-            //     TRIEDENT_DEBUG( "i: ", i, " ", ws.count_ids_with_refs() );
+            //     ARBTRIE_DEBUG( "i: ", i, " ", ws.count_ids_with_refs() );
             //  }
          }
          env.db->print_stats(std::cerr);
-         TRIEDENT_DEBUG("references before release: ", ws.count_ids_with_refs());
+         ARBTRIE_DEBUG("references before release: ", ws.count_ids_with_refs());
       }
-      TRIEDENT_DEBUG("references after release: ", ws.count_ids_with_refs());
+      ARBTRIE_DEBUG("references after release: ", ws.count_ids_with_refs());
       env.db->print_stats(std::cerr);
       REQUIRE(0 == ws.count_ids_with_refs());
    }
@@ -636,7 +636,7 @@ TEST_CASE("remove")
 {
    environ env;
    auto    ws = env.db->start_write_session();
-   TRIEDENT_DEBUG("references before start: ", ws.count_ids_with_refs());
+   ARBTRIE_DEBUG("references before start: ", ws.count_ids_with_refs());
    {
       write_transaction tx    = ws.start_transaction();
       auto              words = load_words(tx);
@@ -648,9 +648,9 @@ TEST_CASE("remove")
       auto share = tx.get_root();
       r          = tx.remove(to_key_view("xcvbn"));
       REQUIRE(r == -1);
-      TRIEDENT_DEBUG("references before release: ", ws.count_ids_with_refs());
+      ARBTRIE_DEBUG("references before release: ", ws.count_ids_with_refs());
    }
-   TRIEDENT_DEBUG("references after release: ", ws.count_ids_with_refs());
+   ARBTRIE_DEBUG("references after release: ", ws.count_ids_with_refs());
    REQUIRE(ws.count_ids_with_refs() == 0);
 }
 
@@ -773,7 +773,7 @@ TEST_CASE("subtree2")
          REQUIRE(tx.lower_bound(to_key_view("version1")));
          REQUIRE(tx.subtree().is_valid());
 
-         TRIEDENT_DEBUG("output: ", std::string(value.data(), value.size()));
+         ARBTRIE_DEBUG("output: ", std::string(value.data(), value.size()));
          // auto size    = ws.get( root, to_key_view("version1"), v1 );
 
          env.db->print_stats(std::cerr);
@@ -796,14 +796,14 @@ TEST_CASE("rdtsc")
    }
    /*
    for( int i = 0; i < 16; ++i ) {
-      TRIEDENT_WARN( "counts[",i,"] = ", counts[i] );
+      ARBTRIE_WARN( "counts[",i,"] = ", counts[i] );
    }
    auto x = rdtsc();
    auto h = XXH3_64bits(&x,sizeof(x));
    auto y = rdtsc();
-   TRIEDENT_DEBUG( x );
-   TRIEDENT_DEBUG( y );
-   TRIEDENT_DEBUG( y - x );
+   ARBTRIE_DEBUG( x );
+   ARBTRIE_DEBUG( y );
+   ARBTRIE_DEBUG( y - x );
    */
 }
 
@@ -857,13 +857,13 @@ TEST_CASE("recover")
       tx.commit();
       //ws.set_root<sync_type::sync>(root);
       auto stats = v1 = ws.get_node_stats(root);
-      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
-      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
-      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
-      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      ARBTRIE_DEBUG("total nodes: ", stats.total_nodes());
+      ARBTRIE_DEBUG("max-depth: ", stats.max_depth);
+      ARBTRIE_DEBUG("avg-depth: ", stats.average_depth());
+      ARBTRIE_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
    }
 
-   TRIEDENT_WARN("RELOADING");
+   ARBTRIE_WARN("RELOADING");
    delete env.db;
    env.db = new database("arbtriedb", {.run_compact_thread = false});
    {
@@ -871,30 +871,30 @@ TEST_CASE("recover")
       auto root  = ws.get_root();
       auto stats = v2 = ws.get_node_stats(root);
       REQUIRE(v2 == v1);
-      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
-      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
-      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
-      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      ARBTRIE_DEBUG("total nodes: ", stats.total_nodes());
+      ARBTRIE_DEBUG("max-depth: ", stats.max_depth);
+      ARBTRIE_DEBUG("avg-depth: ", stats.average_depth());
+      ARBTRIE_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
       for (int i = 0; i < num_types; ++i)
-         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+         ARBTRIE_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
    }
    env.db->recover();
-   TRIEDENT_WARN("AFTER RECOVER");
+   ARBTRIE_WARN("AFTER RECOVER");
    {
       auto ws    = env.db->start_write_session();
       auto tx    = ws.start_transaction();
       auto root  = ws.get_root();
       auto stats = v3 = ws.get_node_stats(root);
-      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
-      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
-      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
-      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      ARBTRIE_DEBUG("total nodes: ", stats.total_nodes());
+      ARBTRIE_DEBUG("max-depth: ", stats.max_depth);
+      ARBTRIE_DEBUG("avg-depth: ", stats.average_depth());
+      ARBTRIE_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
       for (int i = 0; i < num_types; ++i)
-         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+         ARBTRIE_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
       REQUIRE(v3 == v1);
    }
    {
-      TRIEDENT_WARN("INSERT 1 Million Rows");
+      ARBTRIE_WARN("INSERT 1 Million Rows");
       auto ws = env.db->start_write_session();
       auto tx = ws.start_transaction();
       for (uint64_t i = 0; i < 1000'000; ++i)
@@ -905,25 +905,25 @@ TEST_CASE("recover")
       tx.commit();
       //ws.set_root<sync_type::sync>(root);
       auto stats = v4 = ws.get_node_stats(tx.get_root());
-      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
-      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
-      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
-      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      ARBTRIE_DEBUG("total nodes: ", stats.total_nodes());
+      ARBTRIE_DEBUG("max-depth: ", stats.max_depth);
+      ARBTRIE_DEBUG("avg-depth: ", stats.average_depth());
+      ARBTRIE_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
    }
    delete env.db;
    env.db = new database("arbtriedb", {.run_compact_thread = false});
    env.db->recover();
-   TRIEDENT_WARN("AFTER RECOVER 2");
+   ARBTRIE_WARN("AFTER RECOVER 2");
    {
       auto ws    = env.db->start_write_session();
       auto root  = ws.get_root();
       auto stats = v5 = ws.get_node_stats(root);
-      TRIEDENT_DEBUG("total nodes: ", stats.total_nodes());
-      TRIEDENT_DEBUG("max-depth: ", stats.max_depth);
-      TRIEDENT_DEBUG("avg-depth: ", stats.average_depth());
-      TRIEDENT_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
+      ARBTRIE_DEBUG("total nodes: ", stats.total_nodes());
+      ARBTRIE_DEBUG("max-depth: ", stats.max_depth);
+      ARBTRIE_DEBUG("avg-depth: ", stats.average_depth());
+      ARBTRIE_DEBUG("total_size: ", stats.total_size() / double(MB), " MB");
       for (int i = 0; i < num_types; ++i)
-         TRIEDENT_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
+         ARBTRIE_DEBUG(node_type_names[i], " = ", stats.node_counts[i]);
       REQUIRE(v5 == v4);
    }
 }
@@ -953,7 +953,7 @@ TEST_CASE("dense-rand-insert")
                 {
                    if (not found)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                       assert(!"should have found key!");
                    }
                    REQUIRE(found);
@@ -1024,7 +1024,7 @@ TEST_CASE("lower-bound")
          auto witr = std::lower_bound(words.begin(), words.end(), key);
          if (witr == words.end() || *witr != key)
          {
-            TRIEDENT_DEBUG("key '", key, "' from reference not found in words");
+            ARBTRIE_DEBUG("key '", key, "' from reference not found in words");
             REQUIRE(false);  // Key from reference must exist in words
          }
       }
@@ -1049,7 +1049,7 @@ TEST_CASE("lower-bound")
             REQUIRE(not itr.valid());
          if (rritr != reference.end())
          {
-            //        TRIEDENT_DEBUG("i: ", i, " q: ", qv, " ritr: ", to_key_view(rritr->first),
+            //        ARBTRIE_DEBUG("i: ", i, " q: ", qv, " ritr: ", to_key_view(rritr->first),
             //                      " =? itr: ", itr.key());
             assert(rritr->first == to_str(itr.key()));
             REQUIRE(rritr->first == to_str(itr.key()));
@@ -1061,14 +1061,14 @@ TEST_CASE("lower-bound")
          auto query = random_string(i);
          auto qv    = to_key_view(query);
 
-         //     TRIEDENT_WARN(i, "]   query: '", query, "'");
+         //     ARBTRIE_WARN(i, "]   query: '", query, "'");
          auto rritr = reference.lower_bound(query);
          itr.lower_bound(qv);
 
          auto witr = std::lower_bound(words.begin(), words.end(), query);
          if (witr != words.end())
          {
-            // TRIEDENT_DEBUG(i, "]   word: '", *witr, "'");
+            // ARBTRIE_DEBUG(i, "]   word: '", *witr, "'");
          }
 
          if (rritr == reference.end())
@@ -1113,7 +1113,7 @@ TEST_CASE("upper-bound2")
          REQUIRE(not itr.is_end());
          if (rritr->first != to_str(itr.key()))
          {
-            TRIEDENT_DEBUG("i: ", i, " q: ", to_hex(qv),
+            ARBTRIE_DEBUG("i: ", i, " q: ", to_hex(qv),
                            " ritr: ", to_hex(to_key_view(rritr->first)),
                            " =? itr: ", to_hex(itr.key()));
          }
@@ -1124,9 +1124,9 @@ TEST_CASE("upper-bound2")
       uint64_t val                         = uint64_t(rand64());
       key_view kstr                        = to_kv(val);
       reference[std::string(to_str(kstr))] = 0;
-      //   TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      //   ARBTRIE_DEBUG("upsert: ", to_hex(kstr));
       int result = ws.upsert(r, kstr, kstr);
-      //    TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      //    ARBTRIE_DEBUG("upsert: ", to_hex(kstr));
       itr.set_root(r);
       REQUIRE(reference.size() == ws.count_keys(r));
    }
@@ -1159,12 +1159,12 @@ TEST_CASE("rev-lower-bound")
       uint64_t query = uint64_t(rand64());
       auto     qv    = to_kv(query);
 
-      //   TRIEDENT_WARN(i, "  query: ", to_hex(qv));
+      //   ARBTRIE_WARN(i, "  query: ", to_hex(qv));
       itr.reverse_lower_bound(qv);
       auto rritr = map_rlb(reference, qv);
       if (rritr != reference.crend())
       {
-         //  TRIEDENT_DEBUG(i, "  reference: ", to_hex(rritr->first), " itr: ", to_hex(itr.key()),
+         //  ARBTRIE_DEBUG(i, "  reference: ", to_hex(rritr->first), " itr: ", to_hex(itr.key()),
          //                " <= ", to_hex(qv));
          assert(not itr.is_end());
          REQUIRE(not itr.is_end());
@@ -1182,7 +1182,7 @@ TEST_CASE("rev-lower-bound")
       uint64_t val                         = uint64_t(rand64());
       key_view kstr                        = to_kv(val);
       reference[std::string(to_str(kstr))] = val;
-      //TRIEDENT_DEBUG("upsert: ", to_hex(kstr));
+      //ARBTRIE_DEBUG("upsert: ", to_hex(kstr));
       int result = ws.upsert(itr.root_handle(), kstr, kstr);
       //itr.set_root(r);
       REQUIRE(reference.size() == ws.count_keys(itr.root_handle()));
@@ -1207,7 +1207,7 @@ TEST_CASE("sparse-rand-upsert")
          if (to < from)
             std::swap(to, from);
 
-         //TRIEDENT_DEBUG( from , " -> ", to );
+         //ARBTRIE_DEBUG( from , " -> ", to );
          auto itr = ws.create_iterator(n);
          itr.lower_bound(to_key_view(from));
          uint32_t count = 0;
@@ -1222,7 +1222,7 @@ TEST_CASE("sparse-rand-upsert")
             else
                break;
          }
-         //TRIEDENT_DEBUG( from , " -> ", to , " = ", count);
+         //ARBTRIE_DEBUG( from , " -> ", to , " = ", count);
          REQUIRE(ws.count_keys(n, to_key_view(from), to_key_view(to)) == count);
       };
 
@@ -1242,7 +1242,7 @@ TEST_CASE("sparse-rand-upsert")
                 {
                    if (not found)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                       assert(!"should have found key!");
                    }
                    REQUIRE(found);
@@ -1276,7 +1276,7 @@ TEST_CASE("dense-rand-upsert")
             std::swap(kto, kfrom);
 
          if (print_dbg)
-            TRIEDENT_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
+            ARBTRIE_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
          auto itr = ws.create_iterator(n);
          itr.lower_bound(kfrom);
          auto     ref_count = 0;
@@ -1288,8 +1288,8 @@ TEST_CASE("dense-rand-upsert")
             REQUIRE(not itr.is_end());
             if (to_key_view(ref_itr->first) != itr.key())
             {
-               TRIEDENT_WARN("ref: ", to_hex(to_key_view(ref_itr->first)));
-               TRIEDENT_WARN("tri: ", to_hex(itr.key()));
+               ARBTRIE_WARN("ref: ", to_hex(to_key_view(ref_itr->first)));
+               ARBTRIE_WARN("tri: ", to_hex(itr.key()));
 
                itr.lower_bound(kfrom);
             }
@@ -1302,7 +1302,7 @@ TEST_CASE("dense-rand-upsert")
             REQUIRE(ref_itr != reference.end());
             if (to_key_view(ref_itr->first) != itr.key())
             {
-               TRIEDENT_DEBUG("count: ", count);
+               ARBTRIE_DEBUG("count: ", count);
             }
             REQUIRE(to_key_view(ref_itr->first) == itr.key());
 
@@ -1310,7 +1310,7 @@ TEST_CASE("dense-rand-upsert")
             {
                ++count;
                if (print_dbg)
-                  TRIEDENT_DEBUG("\t", count, "] ", to_hex(itr.key()),
+                  ARBTRIE_DEBUG("\t", count, "] ", to_hex(itr.key()),
                                  "  ref: ", to_hex(ref_itr->first));
                itr.next();
                ++ref_itr;
@@ -1320,14 +1320,14 @@ TEST_CASE("dense-rand-upsert")
             else
             {
                if (print_dbg and not itr.is_end())
-                  TRIEDENT_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first));
+                  ARBTRIE_WARN("\t end] ", to_hex(itr.key()), "  ref: ", to_hex(ref_itr->first));
                break;
             }
          }
          if (print_dbg)
          {
-            TRIEDENT_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
-            TRIEDENT_DEBUG("count: ", count);
+            ARBTRIE_DEBUG("test count from ", to_hex(kfrom), " -> ", to_hex(kto));
+            ARBTRIE_DEBUG("count: ", count);
          }
 
          REQUIRE(ws.count_keys(n, kfrom, kto) == count);
@@ -1350,7 +1350,7 @@ TEST_CASE("dense-rand-upsert")
                 {
                    if (not found)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                       assert(!"should have found key!");
                    }
                    REQUIRE(found);
@@ -1378,7 +1378,7 @@ TEST_CASE("dense-little-seq-upsert")
                 {
                    if (not found)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                       assert(!"should have found key!");
                    }
                    REQUIRE(found);
@@ -1403,7 +1403,7 @@ TEST_CASE("thread-write")
    const int      rounds     = 2;
    auto           run_thread = [&](int num)
    {
-      TRIEDENT_WARN("start thread ", num);
+      ARBTRIE_WARN("start thread ", num);
       auto ws = env.db->start_write_session();
       auto r  = ws.create_root();
 
@@ -1419,13 +1419,13 @@ TEST_CASE("thread-write")
                    {
                       if (not found)
                       {
-                         TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                         ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                          assert(!"should have found key!");
                       }
                       REQUIRE(found);
                    });
          }
-         TRIEDENT_WARN("Thread ", num, " round: ", x);
+         ARBTRIE_WARN("Thread ", num, " round: ", x);
       }
    };
    auto        start = std::chrono::steady_clock::now();
@@ -1480,7 +1480,7 @@ TEST_CASE("dense-big-seq-upsert")
                 {
                    if (not found)
                    {
-                      TRIEDENT_WARN("unable to find key: ", val, " i:", i);
+                      ARBTRIE_WARN("unable to find key: ", val, " i:", i);
                       assert(!"should have found key!");
                    }
                    REQUIRE(found);
@@ -1602,7 +1602,7 @@ TEST_CASE("beta-iterator-dense-validation")
    {
       uint64_t k = XXH3_64bits(&i, sizeof(i));
       key_view kstr((char*)&k, sizeof(k));
-      // TRIEDENT_WARN("upserting key: ", i, " = ", to_hex(kstr));
+      // ARBTRIE_WARN("upserting key: ", i, " = ", to_hex(kstr));
       ws.upsert(r, kstr, kstr);
       keys.push_back(k);
    }
@@ -1620,12 +1620,12 @@ TEST_CASE("beta-iterator-dense-validation")
    {
       key_view kstr((char*)&keys[count], sizeof(keys[count]));
       if (oldi.key() != kstr)
-         TRIEDENT_WARN(count, "]  key mismatch: ", to_hex(oldi.key()), " != ", to_hex(kstr));
+         ARBTRIE_WARN(count, "]  key mismatch: ", to_hex(oldi.key()), " != ", to_hex(kstr));
       //  REQUIRE(oldi.key() == kstr);
       ++count;
    }
    if (count != sample_size)
-      TRIEDENT_WARN("old iterator count mismatch: ", count, " != ", sample_size);
+      ARBTRIE_WARN("old iterator count mismatch: ", count, " != ", sample_size);
       */
 
    std::cout << "testing beta iterator\n";
@@ -1635,7 +1635,7 @@ TEST_CASE("beta-iterator-dense-validation")
    {
       key_view kstr((char*)&keys[count], sizeof(keys[count]));
       if (bi.key() != kstr)
-         TRIEDENT_WARN(count, "]  key mismatch: ", to_hex(bi.key()), " != ", to_hex(kstr));
+         ARBTRIE_WARN(count, "]  key mismatch: ", to_hex(bi.key()), " != ", to_hex(kstr));
       REQUIRE(bi.key() == kstr);
       ++count;
    }
@@ -1764,7 +1764,7 @@ TEST_CASE("iterator-validation")
       REQUIRE(itr.lower_bound(key_view(word)));
       REQUIRE(itr.key() == word);
       if (not itr.find(key_view(word)))
-         TRIEDENT_WARN("find failed for: ", word);
+         ARBTRIE_WARN("find failed for: ", word);
       REQUIRE(itr.find(key_view(word)));
       REQUIRE(itr.key() == word);
    }
@@ -1896,7 +1896,7 @@ TEST_CASE("upper-bound")
       for (int i = 0; i < 100'000; ++i)
       {
          if (i == 21)
-            TRIEDENT_DEBUG("i: ", i);
+            ARBTRIE_DEBUG("i: ", i);
          // Generate random test key
          uint64_t    val = uint64_t(rand64());
          size_t      len = (val % 8) + 1;

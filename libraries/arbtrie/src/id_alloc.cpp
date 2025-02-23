@@ -10,7 +10,7 @@ namespace arbtrie
    {
       if (_ids_state_file.size() == 0)
       {
-         TRIEDENT_WARN("initializing new node_meta index");
+         ARBTRIE_WARN("initializing new node_meta index");
          _ids_state_file.resize(round_to_page(sizeof(id_alloc_state)));
          auto idh = new (_ids_state_file.data()) id_alloc_state();
          for (auto& r : idh->regions)
@@ -21,14 +21,14 @@ namespace arbtrie
             r.use_count.store(8);
             r.next_alloc.store(8);
          }
-         TRIEDENT_DEBUG("eofl: ", end_of_freelist.to_aligned());
+         ARBTRIE_DEBUG("eofl: ", end_of_freelist.to_aligned());
          //   idh->regions[0].next_alloc.store(1);
          idh->clean_shutdown = true;
       }
       _state = reinterpret_cast<id_alloc_state*>(_ids_state_file.data());
       if (not _state->clean_shutdown)
       {
-         TRIEDENT_WARN("checking node_meta index state...");
+         ARBTRIE_WARN("checking node_meta index state...");
 
          // TODO: this could be multi-threaded for faster startup
          const auto nb = _block_alloc.num_blocks();
@@ -41,7 +41,7 @@ namespace arbtrie
             {
                if (nm->ref() and nm->is_changing())
                {
-                  TRIEDENT_WARN(
+                  ARBTRIE_WARN(
                       "detected partial write in node, data may be corrupted: ",
                       id_address(id_region((nm - start) / ids_per_page),
                                  id_index((b * ids_per_page) + ((nm - start) % ids_per_page))));

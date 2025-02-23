@@ -93,7 +93,7 @@ int64_t get_test(benchmark_config   cfg,
              {
                 if (not found)
                 {
-                   TRIEDENT_WARN("seq: ", i);
+                   ARBTRIE_WARN("seq: ", i);
                    abort();
                 }
              });
@@ -128,9 +128,9 @@ std::vector<int> insert_test(benchmark_config   cfg,
    std::vector<int> result;
    result.reserve(cfg.rounds);
 
-   auto root = ws.create_root();
-   if constexpr (mode.is_update() and not mode.is_insert())
-      root = ws.get_root();
+   auto tx = ws.start_transaction(0);
+   if constexpr (not mode.is_update() or mode.is_insert())
+      tx.set_root(ws.create_root());
 
    uint64_t          seq = 0;
    std::vector<char> key;
@@ -149,14 +149,14 @@ std::vector<int> insert_test(benchmark_config   cfg,
             make_key(seq++, key);
             key_view kstr(key.data(), key.size());
             if constexpr (mode.is_upsert())
-               ws.upsert(root, kstr, vv);
+               tx.upsert(kstr, vv);
             else if constexpr (mode.is_insert())
-               ws.insert(root, kstr, vv);
+               tx.insert(kstr, vv);
             else
-               ws.update(root, kstr, vv);
+               tx.update(kstr, vv);
             ++inserted;
          }
-         ws.template set_root<sync_type::none>(root);
+         tx.commit_and_continue();
       }
 
       auto end   = std::chrono::steady_clock::now();
@@ -220,7 +220,7 @@ int main(int argc, char** argv)
    }
    if (vm.count("reset"))
    {
-      TRIEDENT_WARN("resetting database");
+      ARBTRIE_WARN("resetting database");
       std::filesystem::remove_all(db_dir);
       arbtrie::database::create(db_dir, {.run_compact_thread = false});
    }

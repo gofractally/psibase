@@ -179,7 +179,7 @@ void print_pre(session_rlock&           state,
       /*
       if (prefix.size() + kvp->key().size() > 8)
       {
-         TRIEDENT_WARN("    ERROR   ");
+         ARBTRIE_WARN("    ERROR   ");
       }
       */
       /*
@@ -406,7 +406,7 @@ int  main(int argc, char** argv)
    uint64_t seq = 0;
    try
    {
-      TRIEDENT_WARN("starting arbtrie...");
+      ARBTRIE_WARN("starting arbtrie...");
       database db("arbtriedb", {.run_compact_thread = not sync_compact});
       auto     ws = db.start_write_session();
 
@@ -463,7 +463,7 @@ int  main(int argc, char** argv)
             }
             catch (const std::exception& e)
             {
-               TRIEDENT_WARN("Caught Exception: ", e.what());
+               ARBTRIE_WARN("Caught Exception: ", e.what());
                throw;
             }
          };
@@ -817,7 +817,7 @@ int  main(int argc, char** argv)
    }
    catch (const std::exception& e)
    {
-      TRIEDENT_WARN("Caught Exception: ", e.what());
+      ARBTRIE_WARN("Caught Exception: ", e.what());
    }
    return 0;
 }
@@ -860,7 +860,7 @@ void load_words(write_session& ws, node_handle& root, uint64_t limit = -1)
                 {
                    if (key == "psych")
                    {
-                      TRIEDENT_WARN("get ", key, " =  ", to_str(r.view()));
+                      ARBTRIE_WARN("get ", key, " =  ", to_str(r.view()));
                       inserted = true;
                    }
                    assert(found);
@@ -891,7 +891,7 @@ void test_binary_node()
       std::optional<node_handle> last_root;
       auto                       cur_root = ws.create_root();
       //     auto                       state    = ws._segas.lock();
-      TRIEDENT_DEBUG("upsert hello = world");
+      ARBTRIE_DEBUG("upsert hello = world");
 
       ws.upsert(cur_root, to_key_view("hello"), to_value_view("world"));
       //     print(state, cur_root.address(), 1);

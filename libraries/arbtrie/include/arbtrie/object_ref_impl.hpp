@@ -28,7 +28,7 @@ namespace arbtrie
          auto old  = _meta.exchange(_cached = tmt, memory_order);
          if (old.loc() != clok)
          {
-            TRIEDENT_WARN(
+            ARBTRIE_WARN(
                 "stomping on location that changed from cache,"
                 " this may result in memory leak until compacted");
          }
@@ -58,7 +58,7 @@ namespace arbtrie
       {
          if (not r->validate_checksum())
          {
-            TRIEDENT_WARN("checksum: ", r->checksum);
+            ARBTRIE_WARN("checksum: ", r->checksum);
             abort();
          }
          assert(r->validate_checksum());

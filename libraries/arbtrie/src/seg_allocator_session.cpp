@@ -58,7 +58,7 @@ namespace arbtrie
          _alloc_seg_ptr  = ptr;
          //  if (not _alloc_seg_ptr->_write_lock.try_lock())
          //  {
-         //     TRIEDENT_WARN("unable to get write lock on segment");
+         //     ARBTRIE_WARN("unable to get write lock on segment");
          //  }
          //_sega._header->seg_meta[_alloc_seg_num].set_last_sync_pos(0);
          _sega._header->seg_meta[_alloc_seg_num].start_alloc_segment();

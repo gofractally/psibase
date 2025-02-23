@@ -148,7 +148,7 @@ namespace arbtrie
 
       _branch_id_region = src->_branch_id_region;
 
-      TRIEDENT_WARN("clone binary node");
+      ARBTRIE_WARN("clone binary node");
       _branch_cap = min_branch_cap(0);
 
       memcpy(key_hashes(), src->key_hashes(), num_branches());
@@ -386,7 +386,7 @@ namespace arbtrie
             if (ins.val.is_address())
             {
                auto adr = ins.val.address();
-               // TRIEDENT_DEBUG( "clone insert type: ", ins.lb_idx.val_type() );
+               // ARBTRIE_DEBUG( "clone insert type: ", ins.lb_idx.val_type() );
                ko[idx].type       = ins.lb_idx.val_type();  //key_index::obj_id;
                kvp->_val_size     = sizeof(id_address);
                kvp->value_id()    = adr;
@@ -533,7 +533,7 @@ namespace arbtrie
 
       reserve_branch_cap(num_branches() + 1);
 
-      // TRIEDENT_DEBUG( "spare cap: ", spare_capacity(), " bcap: ", _branch_cap, " kvs: ", kvs,
+      // ARBTRIE_DEBUG( "spare cap: ", spare_capacity(), " bcap: ", _branch_cap, " kvs: ", kvs,
       //                " sai: ", size_after_insert(kvs), "  nsize: ", _nsize,
       //               " asize: ", _alloc_pos, " data_cap: ", data_capacity() );
 

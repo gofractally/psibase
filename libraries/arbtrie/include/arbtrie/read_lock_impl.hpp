@@ -57,7 +57,7 @@ namespace arbtrie
 
       auto [atom, id]      = _session._sega._id_alloc.get_new_id(reg);
       auto [loc, node_ptr] = _session.alloc_data(size, id);
-      //TRIEDENT_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
+      //ARBTRIE_WARN( "alloc id: ", id, " type: " , node_type_names[type], " loc: ", loc._offset, " size: ", size);
 
       //init(node_ptr);
       init(node_ptr);
@@ -110,7 +110,7 @@ namespace arbtrie
          auto ap = segment->_alloc_pos.load(std::memory_order_relaxed);
          if (not(ap == 0 or ap > loc.abs_index()))
          {
-            TRIEDENT_WARN("ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(),
+            ARBTRIE_WARN("ap: ", ap, "  loc: ", loc.aligned_index(), " abs: ", loc.abs_index(),
                           "loc.segment: ", loc.segment());
             abort();
          }

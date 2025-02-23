@@ -526,6 +526,14 @@ namespace arbtrie
       int update_find(ValueViewConvertibleOrNode auto&& val);
 
       /**
+       * Update the value at the specified key, move to the start()
+       * @param key The key to update
+       * @param val The value to update with (can be a ValueViewConvertible or node_handle)
+       * @return size of the old value, or -1 if key not found
+       */
+      int update(key_view key, ValueViewConvertibleOrNode auto&& val);
+
+      /**
        * Remove the value at the current iterator position, move to the start()
        * @return size of the removed value
        * @throws if no value exists at this position

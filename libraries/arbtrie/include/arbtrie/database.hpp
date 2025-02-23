@@ -282,7 +282,7 @@ namespace arbtrie
                         }
                         else
                         {
-                           TRIEDENT_WARN("unknown type! ", node->type);
+                           ARBTRIE_WARN("unknown type! ", node->type);
                         }
                         if (result.max_depth < depth)
                            result.max_depth = depth;

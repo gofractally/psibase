@@ -74,7 +74,7 @@ namespace arbtrie
          prior |= sync_mask;
          while (prior != sync_mask)
          {
-            TRIEDENT_WARN("prior: ", prior, " vs sync mask: ", sync_mask);
+            ARBTRIE_WARN("prior: ", prior, " vs sync mask: ", sync_mask);
             _state.wait(prior | sync_mask);
             // this can be relaxed because we already synchronized
             // on the wait()/notify_all() from end_modify()

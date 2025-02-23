@@ -131,7 +131,7 @@ namespace arbtrie
          free_release_count.fetch_sub(1, std::memory_order_relaxed);
          ;
          assert(id);
-         //TRIEDENT_WARN( "free id: ", id );
+         //ARBTRIE_WARN( "free id: ", id );
          //std::cerr << "flist before free id: ";
          //print_free_list();
 

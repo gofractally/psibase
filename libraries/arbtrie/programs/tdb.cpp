@@ -48,7 +48,7 @@ std::string add_comma(uint64_t s)
 int main(int argc, char** argv)
 {
    triedent::set_current_thread_name("main");
-   TRIEDENT_WARN("Hello, Welcome to Triedent!");
+   ARBTRIE_WARN("Hello, Welcome to Triedent!");
    namespace po            = boost::program_options;
    uint32_t    hot_page_c  = 34;
    uint32_t    warm_page_c = 33;

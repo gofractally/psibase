@@ -647,7 +647,7 @@ namespace arbtrie
       {
          key_view hashes = to_key(key_hashes(), num_branches());
          auto     khh    = key_header_hash(khash);
-         //  TRIEDENT_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
+         //  ARBTRIE_WARN( "find key: '", key, "' with h: ", int(khh), "  nb: ", num_branches() );
 
          int base = 0;
          while (true)
@@ -675,11 +675,11 @@ namespace arbtrie
       int lower_bound_idx(key_view key) const
       {
          /*
-         TRIEDENT_WARN("lower_bound_idx: ", to_hex(key));
+         ARBTRIE_WARN("lower_bound_idx: ", to_hex(key));
          for (int i = 0; i < num_branches(); ++i)
          {
             auto k = get_key(i);
-            TRIEDENT_DEBUG("lower_bound_idx: ", i, " = ", to_hex(k), " key: ", to_hex(key));
+            ARBTRIE_DEBUG("lower_bound_idx: ", i, " = ", to_hex(k), " key: ", to_hex(key));
             if (k >= key)
                return i;
          }
@@ -732,7 +732,7 @@ namespace arbtrie
          for (int i = 0; i < nb; ++i)
          {
             auto kvp = get_key_val_ptr(i);
-            // TRIEDENT_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
+            // ARBTRIE_DEBUG( i, "] pos: ", key_offsets()[i].pos, " ", to_str( kvp->key()) );
             assert((uint8_t*)kvp < tail());
             assert(kvp->value_size() >= 0);
          }

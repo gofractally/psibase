@@ -438,12 +438,12 @@ namespace arbtrie
             temp_type meta(prior);
             if (not meta.ref()) [[unlikely]]
             {
-               //   TRIEDENT_DEBUG("try_move_location: ref count is 0");
+               //   ARBTRIE_DEBUG("try_move_location: ref count is 0");
                return std::nullopt;
             }
             if (not meta.is_pending_cache()) [[unlikely]]
             {
-               //  TRIEDENT_DEBUG("try_move_location: pending_cache bit is not set");
+               //  ARBTRIE_DEBUG("try_move_location: pending_cache bit is not set");
                return std::nullopt;
             }
 
@@ -557,7 +557,7 @@ namespace arbtrie
          if constexpr (debug_memory)
          {
             //  if (prior.ref() == 1 and prior.is_pending_cache())
-            //     TRIEDENT_WARN("release node in pending cache");
+            //     ARBTRIE_WARN("release node in pending cache");
             // no one should use meta.  Setting it to 0
             //  if (prior.ref() == 1)
             //     _meta.store(0, std::memory_order_relaxed);
