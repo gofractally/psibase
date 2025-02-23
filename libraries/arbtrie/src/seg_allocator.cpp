@@ -58,7 +58,7 @@ namespace arbtrie
       if (not _session_seg_read_stats[fs])
          _session_seg_read_stats[fs].reset(new segment_read_stat);
       if (not _rcache_queues[fs])
-         _rcache_queues[fs].reset(new circular_buffer<1024 * 1024>());
+         _rcache_queues[fs].reset(new circular_buffer<uint32_t, 1024 * 1024>());
       //    std::cerr << "   alloc session bits: " << fs << " " <<std::bitset<64>(new_fs_bits) << "\n";
       //    std::cerr << "   new fs bits: " << std::bitset<64>(new_fs_bits) << "\n";
       //    _free_sessions.store(new_fs_bits);
@@ -429,13 +429,13 @@ namespace arbtrie
                {
                   if (not ptr->has_checksum())
                      ARBTRIE_WARN("missing checksum detected: ", foo_address,
-                                   " type: ", node_type_names[ptr->_ntype]);
+                                  " type: ", node_type_names[ptr->_ntype]);
                }
                if (not ptr->validate_checksum())
                {
                   ARBTRIE_WARN("invalid checksum detected: ", foo_address,
-                                " checksum: ", foo->checksum, " != ", foo->calculate_checksum(),
-                                " type: ", node_type_names[ptr->_ntype]);
+                               " checksum: ", foo->checksum, " != ", foo->calculate_checksum(),
+                               " type: ", node_type_names[ptr->_ntype]);
                }
             }
             if (node_meta_type::success != obj_ref.try_move(obj_ref.loc(), loc))
@@ -467,8 +467,7 @@ namespace arbtrie
       {
          if ((char*)send - (char*)foo > 4096)
          {
-            ARBTRIE_WARN("existing compact loop earlier than expected: ",
-                          (char*)send - (char*)foo);
+            ARBTRIE_WARN("existing compact loop earlier than expected: ", (char*)send - (char*)foo);
          }
 
          foo = (node_header*)(foc);
@@ -486,16 +485,16 @@ namespace arbtrie
                      ARBTRIE_WARN("obj_ref: ", obj_ref.ref());
                      ARBTRIE_WARN("obj_type: ", node_type_names[obj_ref.type()]);
                      ARBTRIE_WARN("obj_loc: ", current_loc.abs_index(),
-                                   " seg: ", current_loc.segment());
+                                  " seg: ", current_loc.segment());
                      ARBTRIE_WARN("ptr: ", (void*)foo);
                      ARBTRIE_WARN("pos in segment: ", segment_size - ((char*)send - (char*)foo));
 
                      ARBTRIE_WARN("SKIPPED BECAUSE POS DIDN'T MATCH");
                      ARBTRIE_DEBUG("  old meta: ", s.second.to_int());
                      ARBTRIE_DEBUG("  null_node: ", null_node.abs_index(),
-                                    " seg: ", null_node.segment());
+                                   " seg: ", null_node.segment());
                      ARBTRIE_DEBUG("  old loc: ", s.second.loc().abs_index(),
-                                    " seg: ", s.second.loc().segment());
+                                   " seg: ", s.second.loc().segment());
                      ARBTRIE_DEBUG("  old ref: ", s.second.ref());
                      ARBTRIE_DEBUG("  old type: ", node_type_names[s.second.type()]);
                      ARBTRIE_DEBUG("  old is_con: ", s.second.is_const());
@@ -752,7 +751,122 @@ namespace arbtrie
             return prepare_segment(free_seg);
          }
       }
+      // TODO... if min-ap == 0, but the compactor has set a flag indicating
+      // that it is "sorting" a large queue of empty segments, then we wait for the
+      // compactor to complete the sorting (should be quick compared to alloc() )
+      // while the compactor is sorting, if it discovers the last segment(s) in the
+      // file it can truncate the file and return space. This is useful for workloads
+      // where the database grows and then shrinks.
       return prepare_segment(_block_alloc.alloc());
+   }
+
+   /**
+    when the compactor notices that empty free segment queue 
+    has grown past a configured amount, it pops 80% of the queue,
+    leaving some for quick allocs, it sorts the segments by
+    their position in the file with the earliest in the file
+    getting priority. It then pushes the lower 50% on to the queue,
+    then pops 80% of the queue again 
+        - this will grab the 20% left the first time + some of
+          the items just pushed back... which represent the
+          half of the queue that was earliest in the file.
+        - we then sort what remains again.
+        - at this point we should have identified the free
+          segments that are at the end of the file, we can
+          then truncate the file.
+   */
+   void seg_allocator::attempt_truncate_empty()
+   {
+      // Get the current size of the free segment queue and min read pointer
+      auto ap         = _header->alloc_ptr.load(std::memory_order_relaxed);
+      auto ep         = _header->end_ptr.load(std::memory_order_acquire);
+      auto min_read   = get_min_read_ptr();
+      auto queue_size = min_read - ap;  // Only consider segments up to min_read
+
+      // Only proceed if queue has grown past configured threshold
+      // TODO: Make this threshold configurable
+      const uint32_t QUEUE_THRESHOLD = max_segment_count / 4;  // 25% of max segments
+      if (queue_size <= QUEUE_THRESHOLD)
+      {
+         return;
+      }
+
+      // Calculate how many segments to process in this batch (80% of processable queue)
+      auto                        batch_size = (queue_size * 8) / 10;
+      std::vector<segment_number> segments_to_sort;
+      segments_to_sort.reserve(batch_size);
+
+      // Pop 80% of segments from queue, but only up to min_read
+      for (uint32_t i = 0; i < batch_size && (ap + i) < min_read; ++i)
+      {
+         auto seg_num = _header->free_seg_buffer[(ap + i) & (max_segment_count - 1)];
+         if (seg_num != segment_number(-1))
+         {
+            segments_to_sort.push_back(seg_num);
+         }
+      }
+
+      // Sort segments by their position in the file (lower segment numbers first)
+      std::sort(segments_to_sort.begin(), segments_to_sort.end());
+
+      // Push back lower 50% to the queue
+      auto segments_to_keep = segments_to_sort.size() / 2;
+      for (size_t i = 0; i < segments_to_keep; ++i)
+      {
+         _header->free_seg_buffer[(_header->alloc_ptr.load(std::memory_order_relaxed) + i) &
+                                  (max_segment_count - 1)] = segments_to_sort[i];
+      }
+      _header->alloc_ptr.fetch_add(segments_to_keep, std::memory_order_release);
+
+      // Pop 80% again to get earliest segments in file
+      auto remaining_size = min_read - _header->alloc_ptr.load(std::memory_order_relaxed);
+      batch_size          = (remaining_size * 8) / 10;
+      segments_to_sort.clear();
+      segments_to_sort.reserve(batch_size);
+
+      ap = _header->alloc_ptr.load(std::memory_order_relaxed);
+      for (uint32_t i = 0; i < batch_size && (ap + i) < min_read; ++i)
+      {
+         auto seg_num = _header->free_seg_buffer[(ap + i) & (max_segment_count - 1)];
+         if (seg_num != segment_number(-1))
+         {
+            segments_to_sort.push_back(seg_num);
+         }
+      }
+
+      // Sort again to identify segments at end of file
+      std::sort(segments_to_sort.begin(), segments_to_sort.end());
+
+      // If we have contiguous segments at the end of the file, we can truncate
+      if (!segments_to_sort.empty())
+      {
+         auto highest_seg = segments_to_sort.back();
+         auto total_segs  = _block_alloc.num_blocks();
+
+         // Check if highest segment is at the end of the file
+         if (highest_seg == total_segs - 1)
+         {
+            // Count how many contiguous segments we have from the end
+            size_t contiguous_count = 1;
+            for (int i = segments_to_sort.size() - 2; i >= 0; --i)
+            {
+               if (segments_to_sort[i] == highest_seg - contiguous_count)
+               {
+                  contiguous_count++;
+               }
+               else
+               {
+                  break;
+               }
+            }
+
+            // Truncate the file by the number of contiguous segments found
+            if (contiguous_count > 0)
+            {
+               // TODO: _block_alloc.truncate(total_segs - contiguous_count);
+            }
+         }
+      }
    }
 
    void seg_allocator::sync_segment(int s, sync_type st) noexcept

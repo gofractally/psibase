@@ -59,6 +59,6 @@ namespace arbtrie
       int                                 _nested_read_lock = 0;
 
       // Reference to the read cache queue from seg_allocator
-      circular_buffer<1024 * 1024>& _rcache_queue;
+      circular_buffer<uint32_t, 1024 * 1024>& _rcache_queue;
    };
 }  // namespace arbtrie

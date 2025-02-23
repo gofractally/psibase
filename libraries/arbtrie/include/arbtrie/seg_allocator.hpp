@@ -180,6 +180,7 @@ namespace arbtrie
       void sort_selected_segments();
       void promote_rcache_data();
       void clear_read_bits_loop();
+      void attempt_truncate_empty();
 
       /**
        * Calculate statistics about read bits in a segment
@@ -300,7 +301,7 @@ namespace arbtrie
        * Each session has its own read cache queue to track read operations
        * for promoting data during compaction.
        */
-      std::array<std::unique_ptr<circular_buffer<1024 * 1024>>, 64> _rcache_queues;
+      std::array<std::unique_ptr<circular_buffer<uint32_t, 1024 * 1024>>, 64> _rcache_queues;
 
       struct sort_meta
       {
