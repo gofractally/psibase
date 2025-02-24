@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "account-tokens"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "base64 0.22.1",
  "psibase",
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "accounts"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "base64 0.22.1",
  "psibase",
@@ -280,14 +280,14 @@ dependencies = [
 
 [[package]]
 name = "auth-any"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "wit-bindgen-rt 0.34.0",
 ]
 
 [[package]]
 name = "auth-delegate"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.34.0",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "auth-invite"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.33.0",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "auth-sig"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "p256",
  "pem",
@@ -526,7 +526,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clientdata"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.33.0",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1427,7 +1427,7 @@ dependencies = [
 
 [[package]]
 name = "invite"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "chrono",
  "fracpack",
@@ -1864,7 +1864,7 @@ dependencies = [
 
 [[package]]
 name = "producers"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.39.0",
@@ -1872,7 +1872,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1925,7 +1925,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1939,7 +1939,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1951,14 +1951,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "seahash",
 ]
@@ -2326,7 +2326,7 @@ dependencies = [
 
 [[package]]
 name = "setcode"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "wit-bindgen-rt 0.38.0",
@@ -2370,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "sites"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "brotli 6.0.0",
  "psibase",
@@ -2568,7 +2568,7 @@ dependencies = [
 
 [[package]]
 name = "test"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "wit-bindgen-rt 0.28.0",
 ]
@@ -2625,7 +2625,7 @@ dependencies = [
 
 [[package]]
 name = "tokens"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "serde",
@@ -2746,7 +2746,7 @@ dependencies = [
 
 [[package]]
 name = "transact"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -3326,7 +3326,7 @@ dependencies = [
 
 [[package]]
 name = "workshop"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "psibase",
  "serde",

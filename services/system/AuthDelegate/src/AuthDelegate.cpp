@@ -78,6 +78,13 @@ namespace SystemService
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
    {
+      auto table  = db.open<AuthDelegateTable>();
+      auto record = table.getIndex<0>().get(owner);
+      if (record.has_value())
+      {
+         check(record->owner != getSender(), "circular ownership");
+      }
+
       auto authTable = db.open<AuthDelegateTable>();
       authTable.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
    }
@@ -94,15 +101,16 @@ namespace SystemService
       return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
    }
 
-   void AuthDelegate::newAccount(psibase::AccountNumber name)
+   void AuthDelegate::newAccount(psibase::AccountNumber name, psibase::AccountNumber owner)
    {
+      check(to<Accounts>().exists(owner), "owner account does not exist");
       to<Accounts>().newAccount(name, AuthAny::service, true);
 
       Action setOwner{
           .sender  = name,
           .service = service,
           .method  = "setOwner"_m,
-          .rawData = psio::convert_to_frac(std::make_tuple(getSender()))  //
+          .rawData = psio::convert_to_frac(std::make_tuple(owner))  //
       };
 
       Action setAuth{

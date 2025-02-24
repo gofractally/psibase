@@ -362,7 +362,7 @@ include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 
-set(PSIBASE_VERSION "0.14.0")
+set(PSIBASE_VERSION "0.15.0")
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -502,8 +502,10 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
-        SERVER auth-delegate
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        SERVER r-auth-dlg
+    SERVICE r-auth-dlg
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"

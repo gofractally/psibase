@@ -21,9 +21,8 @@ namespace UserService
       {
          std::vector<psibase::AccountNumber> result;
          auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-         auto ownerIndex   = AuthDelegate::Tables(AuthDelegate::service)
-                               .open<AuthDelegate::AuthDelegateTable>()
-                               .getIndex<0>();
+         auto ownerIndex =
+             AuthDelegate::Tables(AuthDelegate::service).open<AuthDelegateTable>().getIndex<0>();
          for (auto account : accounts)
          {
             if (auto accountRow = accountIndex.get(account))
