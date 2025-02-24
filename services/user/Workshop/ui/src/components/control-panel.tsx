@@ -80,7 +80,7 @@ export const ControlPanel = () => {
     ? metadata.extraMetadata.status == Status.Enum.published
     : false;
 
-  const { mutate: setCsp } = useSetCsp();
+  const { mutateAsync: setCsp } = useSetCsp();
 
   const handleCspSubmission = async (data: {
     globalPolicy: string;
@@ -101,6 +101,10 @@ export const ControlPanel = () => {
         csp: policy.csp,
       });
     }
+
+    toast("CSP updated", {
+      description: "CSP has been updated successfully.",
+    });
 
     return data;
   };

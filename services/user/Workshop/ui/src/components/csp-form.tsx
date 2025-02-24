@@ -14,6 +14,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "./ui/input";
 import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
 const formSchema = z.object({
   globalPolicy: z.string(),
@@ -34,6 +35,9 @@ export const CspForm = ({
   initialData: z.infer<typeof formSchema>;
 }) => {
 
+
+  const [isOpen, setIsOpen] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData,
@@ -50,6 +54,7 @@ export const CspForm = ({
       const response = await onSubmit(values);
       console.log({ response }, 'is the response')
       form.reset(response);
+      setIsOpen(false);
     } catch (e) {
       console.error("Failed to submit CSP form:", e);
       form.setError("root", { message: e instanceof Error ? e.message : "An unknown error occurred" });
@@ -57,7 +62,7 @@ export const CspForm = ({
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <div className="flex flex-row items-center justify-between rounded-lg border p-4">
         <DialogContent>
           <DialogHeader>
@@ -121,7 +126,7 @@ export const CspForm = ({
           <Label className="text-base">Content Security Policy</Label>
         </div>
         <DialogTrigger asChild>
-          <Button variant="outline">Edit</Button>
+          <Button variant="outline" onClick={() => setIsOpen(true)}>Edit</Button>
         </DialogTrigger>
       </div>
     </Dialog>

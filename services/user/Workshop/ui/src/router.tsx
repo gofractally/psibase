@@ -6,6 +6,7 @@ import { Settings } from "./pages/Settings";
 import { Upload } from "./pages/Upload";
 import { Support } from "./pages/Support";
 import { Thread } from "./pages/Support/Thread";
+import { AppExists } from "./components/app-exists";
 
 export const router = createBrowserRouter([
   {
@@ -20,7 +21,9 @@ export const router = createBrowserRouter([
         path: ":appName",
         element: (
           <ProtectedRoute>
-            <Settings />
+            <AppExists>
+              <Settings />
+            </AppExists>
           </ProtectedRoute>
         ),
       },
@@ -28,7 +31,9 @@ export const router = createBrowserRouter([
         path: ":appName/upload",
         element: (
           <ProtectedRoute>
-            <Upload />
+            <AppExists>
+              <Upload />
+            </AppExists>
           </ProtectedRoute>
         ),
       },
@@ -36,7 +41,9 @@ export const router = createBrowserRouter([
         path: ":appName/support",
         element: (
           <ProtectedRoute>
-            <Support />
+            <AppExists>
+              <Support />
+            </AppExists>
           </ProtectedRoute>
         ),
       },

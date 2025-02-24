@@ -4,7 +4,6 @@ import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { ErrorCard } from "@/components/error-card";
 import { Spinner } from "@/components/ui/spinner";
-import { CreateAppAccountCard } from "@/components/create-app-account-card";
 import { MetaDataForm } from "@/components/metadata-form";
 import { Account } from "@/lib/zodTypes";
 import { ControlPanel } from "@/components/control-panel";
@@ -40,13 +39,7 @@ export const Settings = () => {
         </div>
       </div>
     );
-  } else if (accountStatus == "Available") {
-    return (
-      <div className="mx-auto p-4 max-w-screen-md">
-        <CreateAppAccountCard />
-      </div>
-    );
-  } else
+  }  else
     return (
       <div className="mx-auto w-full grid p-4 grid-cols-1 lg:grid-cols-2 gap-8 max-w-screen-xl">
         {isSuccess && (
