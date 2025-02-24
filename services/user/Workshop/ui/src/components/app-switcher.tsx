@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Plus } from "lucide-react";
+import { ChevronsUpDown,  Plus, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -26,6 +27,7 @@ import {
 } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { queryClient } from "@/queryClient";
+import { Button } from "./ui/button";
 
 const buildImageSrc = (mimeType: string, icon: string) =>
   `data:${mimeType};base64,${icon}`;
@@ -37,7 +39,7 @@ export function AppSwitcher() {
   const navigate = useNavigate();
   const selectedAppAccount = location.pathname.split("/")[2];
 
-  const { apps } = useTrackedApps();
+  const { apps, removeApp} = useTrackedApps();
 
   const { data: chainId } = useChainId();
 
@@ -57,6 +59,7 @@ export function AppSwitcher() {
         openChange={(e) => setShowCreateAppModal(e)}
         show={showCreateAppModal}
       />
+      <SidebarGroupLabel>My apps</SidebarGroupLabel>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -93,7 +96,6 @@ export function AppSwitcher() {
               Apps
             </DropdownMenuLabel>
             {apps
-              .filter((app) => app.account !== selectedAppAccount)
               .map((app) => {
                 const metadata = MetadataResponse.safeParse(
                   queryClient.getQueryData(appMetadataQueryKey(app.account))
@@ -112,13 +114,30 @@ export function AppSwitcher() {
                 return (
                   <DropdownMenuItem
                     key={app.account}
-                    onClick={() => navigate(`/app/${app.account}`)}
-                    className="gap-2 p-2"
+                    className="flex items-center justify-between gap-2 p-2"
                   >
-                    <div className="flex size-6 items-center justify-center rounded-sm border">
-                      <img src={src} />
+                    <div 
+                      className="flex items-center gap-2 flex-1"
+                      onClick={() => navigate(`/app/${app.account}`)}
+                    >
+                      <div className="flex size-6 items-center justify-center rounded-sm border">
+                        <img src={src} />
+                      </div>
+                      {displayName || app.account}
                     </div>
-                    {displayName || app.account}
+                    <Button
+                      variant="outline" 
+                      size="icon"
+                      className="size-4 hover:bg-destructive/10 p-3"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextApps = apps.filter((a) => a.account !== app.account);
+                        navigate(nextApps.length === 0 ? '/' : `/app/${nextApps[0].account}`);
+                        removeApp(app.account);
+                      }}
+                    >
+                      <X className="size-3" />
+                    </Button>
                   </DropdownMenuItem>
                 );
               })}
