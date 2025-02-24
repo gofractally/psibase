@@ -7,21 +7,22 @@ use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites, staged_tx};
+use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, method,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head,
     new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry,
-    JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin, PackageRegistry,
-    ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
-    TransactionBuilder, TransactionTrace,
+    AnyPublicKey, AutoAbort, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
+    PackageRegistry, ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec,
+    TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
@@ -961,6 +962,22 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     Ok(())
 }
 
+fn get_package_accounts(ops: &[PackageOp]) -> Vec<AccountNumber> {
+    let mut accounts = Vec::new();
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Replace(_meta, info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Remove(_meta) => {}
+        }
+    }
+    accounts
+}
+
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
@@ -969,7 +986,6 @@ async fn apply_packages<
     client: &mut reqwest::Client,
     reg: &R,
     ops: Vec<PackageOp>,
-    accounts: &mut Vec<AccountNumber>,
     out: &mut TransactionBuilder<F>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
@@ -980,7 +996,6 @@ async fn apply_packages<
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, sender, key)?;
@@ -991,7 +1006,6 @@ async fn apply_packages<
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -1036,18 +1050,18 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
 
+    let mut id = Checksum256::default();
+    getrandom::getrandom(&mut id.0)?;
+
+    let index_cell = Cell::new(0);
+
     let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-        if actions.first().unwrap().sender != args.sender.into() {
-            actions.insert(
-                0,
-                Action {
-                    sender: args.sender.into(),
-                    service: account!("nop"),
-                    method: method!("nop"),
-                    rawData: Default::default(),
-                },
-            );
-        }
+        let index = index_cell.get();
+        index_cell.set(index + 1);
+        actions.insert(
+            0,
+            packages::Wrapper::pack_from(args.sender.into()).checkOrder(id.clone(), index),
+        );
         Ok(sign_transaction(
             with_tapos(&tapos, actions, &args.sig_args.proposer),
             &args.sig_args.sign,
@@ -1057,7 +1071,15 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let action_limit: usize = 64 * 1024;
 
     let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
-    let mut new_accounts = vec![];
+    let new_accounts = get_accounts_to_create(
+        &args.node_args.api,
+        &mut client,
+        &get_package_accounts(&to_install),
+        args.sender.into(),
+    )
+    .await?;
+    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
+    let account_transactions = account_builder.finish()?;
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
@@ -1065,7 +1087,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         &mut client,
         &package_registry,
         to_install,
-        &mut new_accounts,
         &mut trx_builder,
         args.sender.into(),
         &args.key,
@@ -1073,16 +1094,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    new_accounts = get_accounts_to_create(
-        &args.node_args.api,
-        &mut client,
-        &new_accounts,
-        args.sender.into(),
-    )
-    .await?;
-    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
+    trx_builder.push(packages::Wrapper::pack_from(args.sender.into()).removeOrder(id.clone()))?;
 
-    let account_transactions = account_builder.finish()?;
     let transactions = trx_builder.finish()?;
 
     {

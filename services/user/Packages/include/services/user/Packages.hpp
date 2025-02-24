@@ -60,16 +60,39 @@ namespace UserService
    };
    PSIO_REFLECT(PackageManifest, name, owner, data)
 
+   struct TransactionOrder
+   {
+      psibase::AccountNumber owner;
+      psibase::Checksum256   id;
+      std::uint32_t          index;
+
+      auto key() const { return std::tuple(owner, id); }
+   };
+   PSIO_REFLECT(TransactionOrder, owner, id, index)
+
    using InstalledPackageTable = psibase::Table<InstalledPackage, &InstalledPackage::byName>;
    using PackageManifestTable  = psibase::Table<PackageManifest, &PackageManifest::byName>;
+   using TransactionOrderTable = psibase::Table<TransactionOrder, &TransactionOrder::key>;
 
    struct Packages : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"packages"};
-      using Tables = psibase::ServiceTables<InstalledPackageTable, PackageManifestTable>;
+      using Tables                  = psibase::
+          ServiceTables<InstalledPackageTable, PackageManifestTable, TransactionOrderTable>;
       // This should be the last action run when installing a package
       void postinstall(PackageMeta package, std::vector<char> manifest);
+
+      /// Used to ensure that the transactions that install packages
+      /// are executed in order.
+      ///
+      /// - id: A unique id that identifies the group of transactions
+      /// - index: Counter that starts at 0 and must increment by one with each call
+      void checkOrder(psibase::Checksum256 id, std::uint32_t index);
+      void removeOrder(psibase::Checksum256 id);
    };
-   PSIO_REFLECT(Packages, method(postinstall, package, manifest))
+   PSIO_REFLECT(Packages,
+                method(postinstall, package, manifest),
+                method(checkOrder, id, index),
+                method(removeOrder, id))
 
 }  // namespace UserService

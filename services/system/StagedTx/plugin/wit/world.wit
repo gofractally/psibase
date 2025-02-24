@@ -51,6 +51,8 @@ interface respondent {
     /// Parameters:
     /// * `id`: The ID of the database record containing the staged transaction
     reject: func(id: u32) -> result<_, error>;
+
+    execute: func(id: u32) -> result<_, error>;
 }
 
 world imports {

@@ -169,6 +169,17 @@ impl Respondent for StagedTxPlugin {
             .packed(),
         )
     }
+
+    fn execute(id: u32) -> Result<(), Error> {
+        add_action_to_transaction(
+            execute::ACTION_NAME,
+            &execute {
+                id,
+                txid: get_staged_txid(id)?,
+            }
+            .packed(),
+        )
+    }
 }
 
 impl HookTxTransform for StagedTxPlugin {
