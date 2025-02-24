@@ -116,7 +116,7 @@ export const CspForm = ({
                   >
                     Add Path
                   </Button>
-                  <Button type="submit">Save</Button>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>Save</Button>
                 </div>
               </form>
             </DialogDescription>
