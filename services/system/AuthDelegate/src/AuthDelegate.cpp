@@ -2,6 +2,7 @@
 
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
+#include <services/system/AuthAny.hpp>
 #include <services/system/StagedTx.hpp>
 
 using namespace psibase;
@@ -77,6 +78,13 @@ namespace SystemService
 
    void AuthDelegate::setOwner(psibase::AccountNumber owner)
    {
+      auto table  = db.open<AuthDelegateTable>();
+      auto record = table.getIndex<0>().get(owner);
+      if (record.has_value())
+      {
+         check(record->owner != getSender(), "circular ownership");
+      }
+
       auto authTable = db.open<AuthDelegateTable>();
       authTable.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
    }
@@ -91,6 +99,30 @@ namespace SystemService
    Actor<AuthInterface> AuthDelegate::authServiceOf(psibase::AccountNumber account)
    {
       return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
+   }
+
+   void AuthDelegate::newAccount(psibase::AccountNumber name, psibase::AccountNumber owner)
+   {
+      check(to<Accounts>().exists(owner), "owner account does not exist");
+      to<Accounts>().newAccount(name, AuthAny::service, true);
+
+      Action setOwner{
+          .sender  = name,
+          .service = service,
+          .method  = "setOwner"_m,
+          .rawData = psio::convert_to_frac(std::make_tuple(owner))  //
+      };
+
+      Action setAuth{
+          .sender  = name,
+          .service = Accounts::service,
+          .method  = "setAuthServ"_m,
+          .rawData = psio::convert_to_frac(std::make_tuple(service))  //
+      };
+
+      auto _ = recurse();
+      to<Transact>().runAs(std::move(setOwner), std::vector<ServiceMethod>{});
+      to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
    }
 
 }  // namespace SystemService

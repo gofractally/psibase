@@ -16,8 +16,12 @@ namespace SystemService
    {
       psibase::AccountNumber account;
       psibase::AccountNumber owner;
+
+      auto secondary() const { return std::tie(owner, account); }
    };
    PSIO_REFLECT(AuthDelegateRecord, account, owner)
+   using AuthDelegateTable = psibase::
+       Table<AuthDelegateRecord, &AuthDelegateRecord::account, &AuthDelegateRecord::secondary>;
 
    /// The `auth-delegate` service is an auth service that can be used to authenticate actions for accounts.
    ///
@@ -27,8 +31,7 @@ namespace SystemService
    {
      public:
       static constexpr auto service = psibase::AccountNumber("auth-delegate");
-      using AuthDelegateTable = psibase::Table<AuthDelegateRecord, &AuthDelegateRecord::account>;
-      using Tables            = psibase::ServiceTables<AuthDelegateTable>;
+      using Tables                  = psibase::ServiceTables<AuthDelegateTable>;
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]
       ///
@@ -86,6 +89,9 @@ namespace SystemService
       /// for the owned account will check authorization for the owner instead.
       void setOwner(psibase::AccountNumber owner);
 
+      /// Create a new account with the specified name, owned by the specified `owner` account.
+      void newAccount(psibase::AccountNumber name, psibase::AccountNumber owner);
+
      private:
       Tables                        db{psibase::getReceiver()};
       psibase::AccountNumber        getOwner(psibase::AccountNumber account);
@@ -96,7 +102,8 @@ namespace SystemService
                 method(canAuthUserSys, user),
                 method(isAuthSys, sender, authorizers, authSet),
                 method(isRejectSys, sender, rejecters, authSet),
-                method(setOwner, owner)
+                method(setOwner, owner),
+                method(newAccount, name, owner)
                 //
    )
 

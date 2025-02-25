@@ -22,7 +22,7 @@ namespace UserService
       AccountNumber getOwner(AccountNumber account)
       {
          auto db = AuthDelegate::Tables(AuthDelegate::service);
-         if (auto row = db.open<AuthDelegate::AuthDelegateTable>().getIndex<0>().get(account))
+         if (auto row = db.open<AuthDelegateTable>().getIndex<0>().get(account))
             return row->owner;
          else
             abortMessage("Cannot find owner for " + account.str());

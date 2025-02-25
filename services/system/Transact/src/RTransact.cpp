@@ -56,9 +56,69 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
    return result;
 }
 
-void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
+namespace
+{
+   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at);
+
+   InnerTrace pruneInnerTrace(psio::view<const InnerTrace> inner)
+   {
+      InnerTrace pruned;
+      if (psio::holds_alternative<ActionTrace>(inner.inner()))
+      {
+         pruned.inner = pruneActionTrace(psio::get<ActionTrace>(inner.inner()));
+      }
+      else
+      {
+         pruned.inner = inner.inner();
+      }
+      return pruned;
+   }
+
+   Action pruneAction(psio::view<const Action> action)
+   {
+      Action pruned;
+      pruned.sender  = action.sender();
+      pruned.service = action.service();
+      pruned.method  = action.method();
+      pruned.rawData = {};
+      return pruned;
+   }
+
+   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at)
+   {
+      ActionTrace pruned;
+      pruned.error     = at.error();
+      pruned.totalTime = at.totalTime();
+      pruned.rawRetval = at.rawRetval();
+      pruned.action    = pruneAction(at.action());
+      pruned.innerTraces.reserve(at.innerTraces().size());
+      for (const auto& inner : at.innerTraces())
+      {
+         pruned.innerTraces.push_back(pruneInnerTrace(inner));
+      }
+      return pruned;
+   }
+
+   TransactionTrace pruneTrace(psio::view<const TransactionTrace> trace)
+   {
+      TransactionTrace pruned;
+      pruned.error = trace.error();
+      pruned.actionTraces.reserve(trace.actionTraces().size());
+      for (const auto& at : trace.actionTraces())
+      {
+         pruned.actionTraces.push_back(pruneActionTrace(at));
+      }
+      return pruned;
+   }
+}  // namespace
+
+void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
+   printf("trace size: %zu\n", find_view_span(trace).size());
+
+   TransactionTrace pruned = pruneTrace(trace);
+
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
    bool                          json;
@@ -85,7 +145,9 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    {
       HttpReply           reply{.contentType = "application/json"};
       psio::vector_stream stream{reply.body};
-      to_json(trace, stream);
+
+      to_json(std::move(pruned), stream);
+
       for (auto client : row->clients)
          if (client.json)
             to<HttpServer>().sendReply(client.socket, reply);
@@ -94,7 +156,9 @@ void RTransact::onTrx(const Checksum256& id, const TransactionTrace& trace)
    {
       HttpReply           reply{.contentType = "application/octet-stream"};
       psio::vector_stream stream{reply.body};
-      to_frac(trace, stream);
+
+      to_frac(std::move(pruned), stream);
+
       for (auto client : row->clients)
          if (!client.json)
             to<HttpServer>().sendReply(client.socket, reply);

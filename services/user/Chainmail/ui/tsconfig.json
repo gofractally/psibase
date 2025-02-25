@@ -35,7 +35,7 @@
         "noEmit": true,
         "jsx": "react-jsx"
     },
-    "include": ["src", "./wasm-psibase/*.d.ts", "wasm-psibase"],
+    "include": ["src"],
     "references": [
         {
             "path": "./tsconfig.node.json"

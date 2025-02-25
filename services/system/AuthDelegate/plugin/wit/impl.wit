@@ -1,6 +1,9 @@
-package auth-sig:plugin;
+package auth-delegate:plugin;
 
 world impl {
     include host:common/imports;
     include transact:plugin/hook-user-auth;
+    include transact:plugin/imports;
+
+    export api;
 }

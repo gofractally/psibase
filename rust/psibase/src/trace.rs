@@ -4,8 +4,6 @@ use crate::{Action, Hex, Pack};
 use fracpack::Unpack;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
-use serde_bytes::ByteBuf;
-use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -225,15 +223,4 @@ impl TransactionTrace {
         format_transaction_error_stack(self, &mut result).unwrap();
         result
     }
-}
-
-fn js_err<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, JsValue> {
-    result.map_err(|e| JsValue::from_str(&e.to_string()))
-}
-
-#[wasm_bindgen]
-pub fn js_deserialize_trace(js_buffer: JsValue) -> Result<JsValue, JsValue> {
-    let buffer: ByteBuf = js_err(serde_wasm_bindgen::from_value(js_buffer))?;
-    let trace = js_err(TransactionTrace::unpacked(&buffer))?;
-    Ok(serde_wasm_bindgen::to_value(&trace)?)
 }

@@ -1,4 +1,4 @@
-import * as wasm from "wasm-psibase";
+import { boot } from "wasm-transpiled";
 
 import { BootState, PackageInfo } from "@/types";
 
@@ -38,6 +38,9 @@ export const bootChain = async ({
         const fetchedPackages: ArrayBuffer[] = await chain.getPackages(
             packages.map((pack) => pack.file)
         );
+        const packageBuffers = fetchedPackages.map(
+            (buf) => new Uint8Array(buf)
+        );
 
         let blockSigningPubKeyPem: string | undefined;
         let txSigningPubKeyPem: string | undefined;
@@ -64,14 +67,13 @@ export const bootChain = async ({
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
         // in a dev environment.
 
-        const [boot_transaction, transactions] =
-            wasm.js_create_boot_transactions(
-                producerName,
-                fetchedPackages,
-                blockSigningPubKeyPem,
-                txSigningPubKeyPem,
-                compression
-            );
+        const [boot_transaction, transactions] = boot.bootTransactions(
+            producerName,
+            packageBuffers,
+            blockSigningPubKeyPem,
+            txSigningPubKeyPem,
+            compression
+        );
 
         let i = 1;
         onProgressUpdate(["push", i, transactions.length + 1]);

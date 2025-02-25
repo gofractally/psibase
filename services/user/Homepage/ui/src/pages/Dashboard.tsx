@@ -1,4 +1,4 @@
-import { Book, Coins, History, Mail, MoveRight } from "lucide-react";
+import { Book, Coins, History, Mail, MoveRight, Terminal } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -21,6 +21,12 @@ const apps = [
         description: "Send mail between accounts.",
         icon: <Mail className="h-6 w-6" />,
         service: "chainmail",
+    },
+    {
+        title: "Workshop",
+        description: "A developer portal to administer apps.",
+        icon: <Terminal className="h-6 w-6" />,
+        service: "workshop",
     },
     {
         title: "Doc",
