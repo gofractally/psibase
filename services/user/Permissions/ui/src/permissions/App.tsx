@@ -42,8 +42,6 @@ export const App = () => {
                 service: thisServiceName,
                 intf: "api",
                 method: "savePermission",
-                /* TODO: WORKAROUND: logs in as boot account (assuming "myproducer" as boot account). Update this with token actual login. */
-                // params: ["myproducer"],
                 params: [params.caller, params.callee, remember],
             });
         } catch (e) {

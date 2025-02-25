@@ -139,7 +139,7 @@ impl Actions for AuthSig {
         let caller = get_sender_app().app.unwrap();
 
         if !from_auth_sig_ui() {
-            if is_permitted(&caller)? {
+            if !is_permitted(&caller)? {
                 return Err(InsufficientPermissions(String::from("set key")).into());
             }
         }

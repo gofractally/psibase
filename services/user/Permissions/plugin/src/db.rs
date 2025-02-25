@@ -22,11 +22,11 @@ struct PermissionRequest {
 pub struct AccessGrants;
 
 impl AccessGrants {
-    pub fn set(caller: String, callee: String) -> Result<(), Error> {
+    pub fn set(caller: &str, callee: &str) -> Result<(), Error> {
         let k = format!("{callee}<-{caller}");
         Keyvalue::set(&k, &"1".as_bytes())
     }
-    pub fn get(caller: String, callee: String) -> Result<Option<Vec<u8>>, Error> {
+    pub fn get(caller: &str, callee: &str) -> Result<Option<Vec<u8>>, Error> {
         let k = format!("{callee}<-{caller}");
         Ok(Keyvalue::get(&k))
     }
@@ -35,10 +35,10 @@ impl AccessGrants {
 pub struct CurrentAccessRequest;
 
 impl CurrentAccessRequest {
-    pub fn set(caller: String, callee: String) -> Result<(), Error> {
+    pub fn set(caller: &str, callee: &str) -> Result<(), Error> {
         let pr = serde_json::to_string(&PermissionRequest {
-            caller,
-            callee,
+            caller: String::from(caller),
+            callee: String::from(callee),
             expiry_timestamp: TimePointSec::from(Utc::now()),
         })
         .map_err(|err| ErrorType::SerderError(err.to_string()))?;

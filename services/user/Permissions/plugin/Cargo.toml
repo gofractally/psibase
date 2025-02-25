@@ -3,7 +3,7 @@ name = "permissions"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
-publish = false
+publish.workspace = true
 
 [dependencies]
 psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
