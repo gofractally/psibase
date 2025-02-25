@@ -511,6 +511,29 @@ namespace SystemService
       }
    }
 
+   void Sites::deleteCsp(std::string path)
+   {
+      Tables tables{};
+
+      if (path == "*")
+      {
+         auto siteTable = tables.open<SiteConfigTable>();
+         auto site = siteTable.get(getSender());
+         check(!!site, "Site not found");
+         site->globalCsp = std::nullopt;
+         siteTable.put(*site);
+      }
+      else
+      {
+         auto contentTable = tables.open<SitesContentTable>();
+         auto content      = contentTable.get(SitesContentKey{getSender(), path});
+         check(!!content, "Invalid path");
+
+         content->csp = std::nullopt;
+         contentTable.put(*content);
+      }
+   }
+
    void Sites::enableCache(bool enable)
    {
       auto table = Tables{}.open<SiteConfigTable>();
@@ -579,6 +602,12 @@ namespace SystemService
       {
          AccountNumber service;
 
+
+         auto getDefaultCsp() const -> std::string
+         {
+            return DEFAULT_CSP_HEADER;
+         }
+
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
             auto tables = Sites::Tables{service};
@@ -589,23 +618,21 @@ namespace SystemService
             return SiteConfig{.account   = record.account,
                               .spa       = record.spa,
                               .cache     = record.cache,
-                              .globalCsp = record.globalCsp.value_or(DEFAULT_CSP_HEADER)};
+                              .globalCsp = record.globalCsp.value_or("")};
          }
 
          auto getContent(AccountNumber account) const
          {
             auto tables = Sites::Tables{service};
-            auto record = tables.open<SiteConfigTable>().get(account).value_or(
-                SiteConfigRow{.account = account});
-            auto globalCsp = record.globalCsp.value_or(DEFAULT_CSP_HEADER);
-
+            
+            
             auto idx =
                 tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
 
             return TransformedConnection(idx,
-                                         [globalCsp = std::move(globalCsp)](auto&& row)
+                                         [](auto&& row)
                                          {
-                                            row.csp = row.csp.value_or(globalCsp);
+                                            row.csp = row.csp.value_or("");
                                             return row;
                                          });
          }
@@ -613,7 +640,8 @@ namespace SystemService
       PSIO_REFLECT(Query,                        //
                    method(getConfig, account),   //
                    method(getContent, account),  //
-      )
+                   method(getDefaultCsp)        //
+                   );
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSitesApp(const HttpRequest& request)

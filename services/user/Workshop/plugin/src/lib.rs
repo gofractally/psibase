@@ -61,6 +61,16 @@ impl App for WorkshopPlugin {
         setcode::plugin::api::set_service_code(&app, &code);
         Ok(())
     }
+
+    fn delete_csp(app: String, path: String) -> Result<(), Error> {
+        let _latch = ProposeLatch::new(&app);
+        sites::plugin::api::delete_csp(&path)
+    }
+
+    fn remove(app: String, path: String) -> Result<(), Error> {
+        let _latch = ProposeLatch::new(&app);
+        sites::plugin::api::remove(&path)
+    }
 }
 
 impl Mail for WorkshopPlugin {
