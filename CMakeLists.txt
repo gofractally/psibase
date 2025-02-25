@@ -250,6 +250,8 @@ set(JS_DIRS
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     services/user/Explorer/ui:Explorer_js
     services/user/Homepage/ui:Homepage_js
+    services/user/Identity/ui:Identity_js
+    services/user/Invite/ui:Invite_js
     services/user/Permissions/ui:Permissions_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Tokens/ui:Tokens_js
@@ -504,8 +506,10 @@ psibase_package(
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
-        SERVER auth-delegate
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
+        SERVER r-auth-dlg
+    SERVICE r-auth-dlg
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
@@ -556,6 +560,12 @@ psibase_package(
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS ${Homepage_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Identity.psi
+    PATH services/user/Identity
+    DEPENDS ${Identity_js_DEP}
 )
 
 psibase_package(
@@ -821,7 +831,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers 
+                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers 
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -868,7 +878,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
+    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -891,6 +901,7 @@ install(
           ${SERVICE_DIR}/Fractal.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
+          ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
@@ -906,8 +917,8 @@ install(
           ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
-          ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Tokens.psi
+          ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/Workshop.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
