@@ -18,7 +18,7 @@ struct PermissionsPlugin;
 impl Api for PermissionsPlugin {
     fn save_permission(caller: String, callee: String, _remember: bool) -> Result<(), Error> {
         verify_caller_is_this_app()?;
-        AccessGrants::set(&caller, &callee)
+        Ok(AccessGrants::set(&caller, &callee))
     }
 }
 
@@ -26,7 +26,7 @@ impl UsersApi for PermissionsPlugin {
     fn is_permitted(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
 
-        let perms_pref = AccessGrants::get(&caller, &callee)?;
+        let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
             CurrentAccessRequest::set(&caller, &callee)?;
             CommonWeb::popup(&format!("permissions.html?caller={caller}&callee={callee}"))?;
@@ -40,7 +40,7 @@ impl UsersApi for PermissionsPlugin {
 impl Admin for PermissionsPlugin {
     fn is_valid_request(caller: String, callee: String) -> Result<bool, Error> {
         verify_caller_is_this_app()?;
-        let is_valid = CurrentAccessRequest::is_valid_request(caller.clone(), callee.clone())?;
+        let is_valid = CurrentAccessRequest::is_valid_request(&caller, &callee)?;
         CurrentAccessRequest::delete()?;
         return Ok(is_valid);
     }
