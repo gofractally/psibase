@@ -1,6 +1,6 @@
 use psibase::{AccountNumber, Table, TimePointSec};
 
-use crate::service::{Attestation, AttestationStats, AttestationStatsTable};
+use crate::tables::{Attestation, AttestationStats, AttestationStatsTable};
 
 const HIGH_CONF_THRESHOLD: u8 = 75;
 
