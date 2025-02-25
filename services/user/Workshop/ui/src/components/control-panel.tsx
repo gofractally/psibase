@@ -14,11 +14,12 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { CheckCard } from "./Check-Card";
 import { ServiceUpload } from "./service-upload";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { SiteConfigResponse, useSiteConfig } from "@/hooks/useSiteConfig";
 import { CspForm } from "./csp-form";
 import { useSetCsp } from "@/hooks/useSetCsp";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
+import { useDeleteCsp } from "@/hooks/useDeleteCsp";
 
 const setStatus = (
   metadata: z.infer<typeof MetadataResponse>,
@@ -38,6 +39,26 @@ const setCacheData = (appName: string, checked: boolean) => {
     }
   });
 };
+
+const NormalisedPolicy = z.object({
+  path: z.string(),
+  csp: z.string(),
+})
+
+const NormalisedPolicyWithHash = NormalisedPolicy.extend({
+  hash: z.string(),
+})
+
+const createHash = (policy: z.infer<typeof NormalisedPolicy>) => 
+  NormalisedPolicyWithHash.parse({ 
+    ...policy, 
+    hash: policy.path + policy.csp 
+  });
+
+const normalizePolicies = (site: z.infer<typeof SiteConfigResponse>): z.infer<typeof NormalisedPolicy>[] => NormalisedPolicy.array().parse([
+  ...(site.getConfig?.globalCsp ? [{ path: "*", csp: site.getConfig.globalCsp }] : []),
+  ...(site.getContent.edges.map(edge => ({ path: edge.node.path, csp: edge.node.csp })) || []),
+]);
 
 export const ControlPanel = () => {
   const currentApp = useCurrentApp();
@@ -81,24 +102,40 @@ export const ControlPanel = () => {
     : false;
 
   const { mutateAsync: setCsp } = useSetCsp();
+  const { mutateAsync: removeCsp } = useDeleteCsp();
 
   const handleCspSubmission = async (data: {
-    globalPolicy: string;
     individualPolicies: Array<{ path: string; csp: string }>;
   }) => {
-    // Set global CSP
-    await setCsp({
-      account: Account.parse(currentApp),
-      path: "*",
-      csp: data.globalPolicy,
-    });
+    if (!site) throw new Error("Site configuration not found");
+    
+    const existingPolicies = normalizePolicies(site).map(createHash);
+    const incomingPolicies = data.individualPolicies.map(createHash);
 
-    // Set individual path CSPs
-    for (const policy of data.individualPolicies) {
+    const newPolicies = incomingPolicies.filter(policy => 
+      !existingPolicies.some(p => p.hash === policy.hash)
+    );
+    const updatedPolicies = incomingPolicies.filter(policy => 
+      existingPolicies.some(p => p.hash === policy.hash)
+    );
+    const deletedPolicies = existingPolicies.filter(policy => 
+      !incomingPolicies.some(p => p.hash === policy.hash)
+    );
+
+    console.log({newPolicies, updatedPolicies, deletedPolicies});
+    
+    for (const policy of [...newPolicies, ...updatedPolicies]) {
       await setCsp({
         account: Account.parse(currentApp),
         path: policy.path,
         csp: policy.csp,
+      });
+    }
+
+    for (const policy of deletedPolicies) {
+      await removeCsp({
+        account: Account.parse(currentApp),
+        path: policy.path,
       });
     }
 
@@ -153,8 +190,7 @@ export const ControlPanel = () => {
           <CspForm
             onSubmit={handleCspSubmission}
             initialData={{
-              globalPolicy: site.getConfig.globalCsp,
-              individualPolicies: [],
+              individualPolicies: normalizePolicies(site)
             }}
           />
         ) : (
