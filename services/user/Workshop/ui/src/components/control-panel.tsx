@@ -122,7 +122,7 @@ export const ControlPanel = () => {
       !incomingPolicies.some(p => p.hash === policy.hash)
     );
 
-    console.log({newPolicies, updatedPolicies, deletedPolicies});
+    
     
     for (const policy of [...newPolicies, ...updatedPolicies]) {
       await setCsp({

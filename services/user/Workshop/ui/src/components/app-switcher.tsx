@@ -131,8 +131,8 @@ export function AppSwitcher() {
                       className="size-4 hover:bg-destructive/10 p-3"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const nextApps = apps.filter((a) => a.account !== app.account);
-                        navigate(nextApps.length === 0 ? '/' : `/app/${nextApps[0].account}`);
+                        const nextApp = apps.find((a) => a.account !== app.account);
+                        navigate(nextApp ? `/app/${nextApp.account}` : '/');
                         removeApp(app.account);
                       }}
                     >
