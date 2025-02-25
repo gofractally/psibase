@@ -1,7 +1,7 @@
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { modifyUrlParams } from "../modifyUrlParams";
+import { modifyUrlParams } from "../lib/modifyUrlParams";
 import { siblingUrl } from "@psibase/common-lib";
 
 export const useGenerateInvite = () =>

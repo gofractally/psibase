@@ -1,4 +1,5 @@
-import { queryClient, supervisor } from "@/main";
+import { queryClient } from "@/main";
+import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";

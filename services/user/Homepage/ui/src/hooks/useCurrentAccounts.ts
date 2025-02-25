@@ -1,14 +1,12 @@
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-export const useCurrentAccounts = (enabled: boolean) =>
+export const useCurrentAccounts = () =>
     useQuery({
         queryKey: ["currentAccounts"],
-        enabled,
-        initialData: [],
         queryFn: async () => {
-            const res = z
+            return z
                 .string()
                 .array()
                 .parse(
@@ -20,6 +18,5 @@ export const useCurrentAccounts = (enabled: boolean) =>
                     })
                 );
 
-            return res;
         },
     });

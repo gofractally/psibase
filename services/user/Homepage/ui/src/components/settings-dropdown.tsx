@@ -42,41 +42,41 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-import { useSupervisor } from "@/lib/hooks/useSupervisor";
-import { useLoggedInUser } from "@/lib/hooks/useLoggedInUser";
-import { useCurrentAccounts } from "@/lib/hooks/useCurrentAccounts";
-import { useLogout } from "@/lib/hooks/useLogout";
-import { useSelectAccount } from "@/lib/hooks/useSelectAccount";
-import { useGenerateInvite } from "@/lib/hooks/useGenerateInvite";
-import { useCreateConnectionToken } from "@/lib/hooks/useCreateConnectionToken";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentAccounts } from "@/hooks/useCurrentAccounts";
+import { useLogout } from "@/hooks/useLogout";
+import { useSelectAccount } from "@/hooks/useSelectAccount";
+import { useGenerateInvite } from "@/hooks/useGenerateInvite";
+import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 
 import { ModeToggle } from "./mode-toggle";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { useCanExportAccount } from "@/lib/hooks/useCanExportAccount";
+import { useCanExportAccount } from "@/hooks/useCanExportAccount";
 
 export const SettingsDropdown = () => {
     const generateInvite = useGenerateInvite();
 
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
-    const { isSuccess: isSupervisorLoaded } = useSupervisor();
-    const { data: loggedInUser } = useLoggedInUser(isSupervisorLoaded);
-    const isLoggedIn = !!loggedInUser;
+    const { data: currentUser } = useCurrentUser();
+    const isLoggedIn = !!currentUser;
 
-    const { data: currentAccounts, isPending: isLoadingAccounts } =
-        useCurrentAccounts(isSupervisorLoaded);
+    const { data: currentAccountsData, isPending: isLoadingAccounts } =
+        useCurrentAccounts();
 
+
+    const currentAccounts = currentAccountsData || [];
     const isNoOptions = !isLoggedIn && currentAccounts.length == 0;
 
     const { mutateAsync: onLogout } = useLogout();
     const { mutateAsync: selectAccount } = useSelectAccount();
 
     const otherConnectedAccounts = currentAccounts.filter(
-        (account) => account !== loggedInUser,
+        (account) => account !== currentUser,
     );
 
-    const { data: canExportAccount } = useCanExportAccount(loggedInUser);
+    const { data: canExportAccount } = useCanExportAccount(currentUser);
 
     return (
         <Dialog>
@@ -89,7 +89,7 @@ export const SettingsDropdown = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                     <DropdownMenuLabel>
-                        {loggedInUser || "Not logged in"}
+                        {currentUser || "Not logged in"}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {isNoOptions && (
@@ -120,7 +120,7 @@ export const SettingsDropdown = () => {
                                 <DropdownMenuSubTrigger>
                                     <UserPlus className="mr-2 h-4 w-4" />
                                     <span>
-                                        {loggedInUser
+                                        {currentUser
                                             ? "Switch account"
                                             : "Select an account"}
                                     </span>
@@ -169,7 +169,7 @@ export const SettingsDropdown = () => {
                     <DropdownMenuSeparator />
                     <DialogTrigger asChild>
                         <DropdownMenuItem
-                            disabled={!loggedInUser}
+                            disabled={!currentUser}
                             onClick={() => {
                                 generateInvite.mutate();
                             }}
