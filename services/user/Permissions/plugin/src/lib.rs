@@ -16,7 +16,7 @@ use errors::ErrorType;
 struct PermissionsPlugin;
 
 impl Api for PermissionsPlugin {
-    fn save_permission(caller: String, callee: String, _remember: bool) -> Result<(), Error> {
+    fn save_permission(caller: String, callee: String) -> Result<(), Error> {
         verify_caller_is_this_app()?;
         Ok(AccessGrants::set(&caller, &callee))
     }

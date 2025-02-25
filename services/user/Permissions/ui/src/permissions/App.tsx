@@ -10,7 +10,6 @@ import { supervisor } from "./perms_main";
 
 export const App = () => {
     const thisServiceName = "permissions";
-    const [remember, setRemember] = useState<boolean>(true);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [params, setParams] = useState<any>({});
     const [isValidPermRequest, setIsValidPermRequest] = useState<any>({});
@@ -42,7 +41,7 @@ export const App = () => {
                 service: thisServiceName,
                 intf: "api",
                 method: "savePermission",
-                params: [params.caller, params.callee, remember],
+                params: [params.caller, params.callee],
             });
         } catch (e) {
             console.error("error saving permission: ", e);
@@ -77,15 +76,6 @@ export const App = () => {
             <p>
                 {`"${params.caller}" is requesting full access to "${params.callee}".`}
             </p>
-            <div className="flex items-center space-x-2">
-                <Checkbox id="remember" checked={true} />
-                <label
-                    htmlFor="remember"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                    Remember this answer.
-                </label>
-            </div>
             <Button onClick={accept}>Accept</Button>
             <Button onClick={deny}>Deny</Button>
         </div>
