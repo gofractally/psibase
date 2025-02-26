@@ -60,58 +60,125 @@ std::optional<SignedTransaction> SystemService::RTransact::next()
 
 namespace
 {
-   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at);
-
-   InnerTrace pruneInnerTrace(psio::view<const InnerTrace> inner)
+   namespace refs
    {
-      InnerTrace pruned;
-      if (psio::holds_alternative<ActionTrace>(inner.inner()))
+      struct InnerTrace;
+      struct Action
       {
-         pruned.inner = pruneActionTrace(psio::get<ActionTrace>(inner.inner()));
-      }
-      else
-      {
-         pruned.inner = inner.inner();
-      }
-      return pruned;
-   }
+         AccountNumber         sender;   ///< Account sending the action
+         AccountNumber         service;  ///< Service to execute the action
+         MethodNumber          method;   ///< Service method to execute
+         std::span<const char> rawData;  ///< Data for the method
+      };
+      PSIO_REFLECT(Action, sender, service, method, rawData)
 
-   Action pruneAction(psio::view<const Action> action)
-   {
-      Action pruned;
-      pruned.sender  = action.sender();
-      pruned.service = action.service();
-      pruned.method  = action.method();
-      pruned.rawData = {};
-      return pruned;
-   }
-
-   ActionTrace pruneActionTrace(psio::view<const ActionTrace> at)
-   {
-      ActionTrace pruned;
-      pruned.error     = at.error();
-      pruned.totalTime = at.totalTime();
-      pruned.rawRetval = at.rawRetval();
-      pruned.action    = pruneAction(at.action());
-      pruned.innerTraces.reserve(at.innerTraces().size());
-      for (const auto& inner : at.innerTraces())
+      struct ActionTrace
       {
-         pruned.innerTraces.push_back(pruneInnerTrace(inner));
-      }
-      return pruned;
-   }
+         Action                          action;
+         std::span<const char>           rawRetval;
+         std::vector<InnerTrace>         innerTraces;
+         std::chrono::nanoseconds        totalTime;
+         std::optional<std::string_view> error;
+      };
+      PSIO_REFLECT(ActionTrace, action, rawRetval, innerTraces, totalTime, error)
 
-   TransactionTrace pruneTrace(psio::view<const TransactionTrace> trace)
-   {
-      TransactionTrace pruned;
-      pruned.error = trace.error();
-      pruned.actionTraces.reserve(trace.actionTraces().size());
-      for (const auto& at : trace.actionTraces())
+      struct EventTrace
       {
-         pruned.actionTraces.push_back(pruneActionTrace(at));
+         std::string_view      name;
+         std::span<const char> data;
+      };
+      PSIO_REFLECT(EventTrace, name, data)
+
+      struct ConsoleTrace
+      {
+         std::string_view console;
+      };
+      PSIO_REFLECT(ConsoleTrace, console)
+
+      struct InnerTrace
+      {
+         std::variant<ConsoleTrace, EventTrace, ActionTrace> inner;
+      };
+      PSIO_REFLECT(InnerTrace, inner)
+
+      struct TransactionTrace
+      {
+         std::vector<ActionTrace>        actionTraces;
+         std::optional<std::string_view> error;
+      };
+      PSIO_REFLECT(TransactionTrace, actionTraces, error)
+   }  // namespace refs
+   using ActionRef           = refs::Action;
+   using ActionTraceRef      = refs::ActionTrace;
+   using EventTraceRef       = refs::EventTrace;
+   using ConsoleTraceRef     = refs::ConsoleTrace;
+   using InnerTraceRef       = refs::InnerTrace;
+   using TransactionTraceRef = refs::TransactionTrace;
+
+   struct PruneTrace
+   {
+      bool                            args = false;
+      std::optional<std::string_view> operator()(psio::view<const std::optional<std::string>> msg)
+      {
+         if (msg)
+         {
+            return static_cast<std::string_view>(*msg);
+         }
+         else
+         {
+            return {};
+         }
       }
-      return pruned;
-   }
+      ActionRef operator()(psio::view<const Action> action)
+      {
+         return {
+             .sender  = action.sender(),
+             .service = action.service(),
+             .method  = action.method(),
+             .rawData = args ? action.rawData() : std::span<const char>{},
+         };
+      }
+      auto operator()(psio::view<const ConsoleTrace> trace)
+      {
+         return ConsoleTraceRef{trace.console()};
+      }
+      auto operator()(psio::view<const EventTrace> trace)
+      {
+         return EventTraceRef{trace.name(), trace.data()};
+      }
+      auto operator()(psio::view<const ActionTrace> at)
+      {
+         ActionTraceRef pruned;
+         pruned.error     = (*this)(at.error());
+         pruned.totalTime = at.totalTime();
+         pruned.rawRetval = at.rawRetval();
+         pruned.action    = (*this)(at.action());
+         pruned.innerTraces.reserve(at.innerTraces().size());
+         for (const auto& inner : at.innerTraces())
+         {
+            pruned.innerTraces.push_back((*this)(inner));
+         }
+         return pruned;
+      }
+      InnerTraceRef operator()(psio::view<const InnerTrace> inner)
+      {
+         return psio::visit([this](const auto& trace) { return InnerTraceRef{(*this)(trace)}; },
+                            inner.inner());
+      }
+
+      auto operator()(psio::view<const TransactionTrace> trace)
+      {
+         TransactionTraceRef pruned;
+         pruned.error = (*this)(trace.error());
+         pruned.actionTraces.reserve(trace.actionTraces().size());
+         for (const auto& at : trace.actionTraces())
+         {
+            pruned.actionTraces.push_back((*this)(at));
+         }
+         return pruned;
+      }
+   };
+
 }  // namespace
 
 void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> trace)
@@ -119,7 +186,7 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    check(getSender() == AccountNumber{}, "Wrong sender");
    printf("trace size: %zu\n", find_view_span(trace).size());
 
-   TransactionTrace pruned = pruneTrace(trace);
+   TransactionTraceRef pruned = PruneTrace{true}(trace);
 
    auto                          clients = Subjective{}.open<TraceClientTable>();
    std::optional<TraceClientRow> row;
@@ -145,26 +212,34 @@ void RTransact::onTrx(const Checksum256& id, psio::view<const TransactionTrace> 
    }
    if (json)
    {
-      HttpReply           reply{.contentType = "application/json"};
-      psio::vector_stream stream{reply.body};
-
-      to_json(std::move(pruned), stream);
+      JsonHttpReply<TransactionTraceRef&> reply{.contentType = "application/json", .body{pruned}};
+      ActionViewBuilder<HttpServer>       http{getReceiver(), HttpServer::service};
+      auto                                action = http.sendReply(0, reply);
 
       for (auto client : row->clients)
          if (client.json)
-            to<HttpServer>().sendReply(client.socket, reply);
+         {
+            psio::get<0>(action->rawData().value()) = client.socket;
+            call(action.data(), action.size());
+         }
    }
    if (bin)
    {
-      HttpReply           reply{.contentType = "application/octet-stream"};
-      psio::vector_stream stream{reply.body};
-
-      to_frac(std::move(pruned), stream);
+      FracpackHttpReply<TransactionTraceRef&> reply{.contentType = "application/octet-stream",
+                                                    .body{pruned}};
+      ActionViewBuilder<HttpServer>           http{getReceiver(), HttpServer::service};
+      auto                                    action = http.sendReply(0, reply);
 
       for (auto client : row->clients)
          if (!client.json)
-            to<HttpServer>().sendReply(client.socket, reply);
+         {
+            psio::get<0>(action->rawData().value()) = client.socket;
+            call(action.data(), action.size());
+         }
    }
+#ifdef __wasm32__
+   printf("memory usage: %lu\n", __builtin_wasm_memory_size(0) * 65536);
+#endif
 }
 
 void RTransact::onBlock()

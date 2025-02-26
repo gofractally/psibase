@@ -98,6 +98,9 @@ namespace psio
       static_assert(sizeof(std::array<T, N>) == N * sizeof(T));
    };
 
+   template <typename T>
+   concept RefPackable = Packable<std::remove_cvref_t<T>>;
+
    template <>
    struct is_packable<std::string>;
 
@@ -117,7 +120,7 @@ namespace psio
    template <Packable T>
    struct is_packable<std::optional<T>>;
 
-   template <Packable... Ts>
+   template <RefPackable... Ts>
    struct is_packable<std::tuple<Ts...>>;
 
    template <Packable... Ts>
@@ -524,6 +527,12 @@ namespace psio
    template <PackableMemcpy T>
    struct is_packable<std::span<T>>
        : packable_container_memcpy_impl<std::span<T>, is_packable<std::span<T>>>
+   {
+   };
+
+   template <PackableMemcpy T>
+   struct is_packable<std::span<const T>>
+       : packable_container_memcpy_impl<std::span<const T>, is_packable<std::span<const T>>>
    {
    };
 
@@ -1015,7 +1024,7 @@ namespace psio
 
    }  // namespace detail
 
-   template <Packable... Ts>
+   template <RefPackable... Ts>
    struct is_packable<std::tuple<Ts...>>
        : base_packable_impl<std::tuple<Ts...>, is_packable<std::tuple<Ts...>>>
    {
@@ -1554,4 +1563,19 @@ namespace psio
                                                          actual.data(), pos, actual.size());
       return result;
    }
+
+   template <typename T, typename U>
+   constexpr bool packable_as_impl = std::is_same_v<T, U>;
+
+   template <typename T, typename U>
+   concept PackableAs = packable_as_impl<std::remove_cvref_t<T>, U>;
+
+   template <typename... T, typename... U>
+      requires(sizeof...(T) == sizeof...(U))
+   constexpr bool packable_as_impl<std::tuple<T...>, std::tuple<U...>> = (PackableAs<T, U> && ...);
+
+   template <typename T, typename U>
+      requires Reflected<T> && Reflected<U>
+   constexpr bool packable_as_impl<T, U> = PackableAs<struct_tuple_t<T>, struct_tuple_t<U>>;
+
 }  // namespace psio
