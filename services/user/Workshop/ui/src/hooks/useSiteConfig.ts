@@ -43,7 +43,6 @@ export const useSiteConfig = (
     queryKey: siteConfigQueryKey(account),
     enabled: !!account,
     queryFn: async () => {
-      console.log("this is running");
       try {
         const res = await graphql(
           `

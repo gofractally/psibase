@@ -1,4 +1,4 @@
-import { Settings, FolderUp } from "lucide-react";
+import { Settings, FolderUp, LifeBuoy } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -20,11 +20,11 @@ export const appMenus = [
     icon: FolderUp,
     path: "upload",
   },
-  // {
-  //   title: "Support",
-  //   icon: LifeBuoy,
-  //   path: "support",
-  // },
+  {
+    title: "Support",
+    icon: LifeBuoy,
+    path: "support",
+  },
   // {
   //   title: "Pending requests",
   //   icon: LayoutList,
@@ -36,9 +36,6 @@ export function NavMain() {
   const location = useLocation();
 
   const appName = location.pathname.split("/")[2];
-  console.log("current path", location);
-
-  console.log(location.pathname, "is pathname");
 
   return (
     <SidebarGroup>

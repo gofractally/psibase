@@ -25,8 +25,7 @@ export const useSetServiceCode = () =>
         intf: "app",
       };
 
-      const res = await supervisor.functionCall(args);
-      console.log(res, "came back on service code!!!");
+      void (await supervisor.functionCall(args));
 
       return null;
     },

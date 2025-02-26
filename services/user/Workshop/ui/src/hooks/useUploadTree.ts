@@ -1,9 +1,11 @@
 import { Account } from "@/lib/zodTypes";
+import { queryClient } from "@/queryClient";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
+import { siteConfigQueryKey, SiteConfigResponse } from "./useSiteConfig";
+import { AwaitTime } from "@/lib/globals";
 
-// const ByteObjectSchema = z.record(z.coerce.number().int().min(0).max(255));
 const u8Schema = z.number().int().min(0).max(255);
 
 const File = z.object({
@@ -32,5 +34,40 @@ export const useUploadTree = () =>
       });
 
       return z.number().parse(res);
+    },
+    onSuccess: (_, { account, files }) => {
+
+      queryClient.setQueryData(siteConfigQueryKey(account), (data: unknown) => {
+        if (data) {
+          const parsed = SiteConfigResponse.parse(data);
+          
+          const updated: z.infer<typeof SiteConfigResponse> = {
+            ...parsed,
+            getContent: {
+              ...parsed.getContent,
+              edges: [
+                ...parsed.getContent.edges,
+                ...files.map(file => ({
+                  node: {
+                    path: file.path, 
+                    contentType: file.contentType, 
+                    account: account,
+                    hash: '',
+                    contentEncoding: '',
+                    csp: ''
+                  }
+                }))
+              ]
+            }
+          };
+
+          return SiteConfigResponse.parse(updated);
+        }
+      })
+
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: siteConfigQueryKey(account) });
+      }, AwaitTime)
+    
     },
   });

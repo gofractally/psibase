@@ -135,6 +135,14 @@ impl Sites for SitesPlugin {
         )?;
         Ok(())
     }
+
+    fn delete_csp(path: String) -> Result<(), Error> {
+        Transact::add_action_to_transaction(
+            "deleteCsp",
+            &SitesService::action_structs::deleteCsp { path }.packed(),
+        )?;
+        Ok(())
+    }
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);

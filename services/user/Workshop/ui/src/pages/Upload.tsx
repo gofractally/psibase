@@ -1,5 +1,5 @@
 import { FileUploader } from "@/components/file-uploader";
-import { ChevronRight, File, Folder, Pencil } from "lucide-react";
+import { ChevronRight, File, Folder, Pencil, Trash } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -18,7 +18,9 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { EmptyBlock } from "@/components/EmptyBlock";
-import { Path } from "@/lib/zodTypes";
+import { Account, Path } from "@/lib/zodTypes";
+import { useRemovePath } from "@/hooks/use-remove-path";
+
 
 // @ts-ignore
 function Tree({
@@ -27,12 +29,14 @@ function Tree({
   path = "", // The path is passed down for folder selection
   onSelection, // Callback function for when a folder is selected
   selectedPath, // Whether this item is selected or not
+  onDelete, // Add new prop
 }: {
   item: string | any[];
   isFolder: boolean;
   path: string;
   onSelection: (selectedPath: string) => void;
   selectedPath: string;
+  onDelete?: (path: string) => void; // Add new prop type
 }) {
   const [name, ...items] = Array.isArray(item) ? item : [item];
 
@@ -52,14 +56,29 @@ function Tree({
     return (
       <SidebarMenuButton
         isActive={isSelected}
-        className={cn(`data-[active=true]:bg-transparent list-none`, {
+        className={cn(`data-[active=true]:bg-transparent list-none flex items-center justify-between`, {
           "bg-blue-500 text-white": isSelected,
           italic: isRoot,
         })}
         onClick={handleSelection}
       >
-        {isFolder ? <Folder /> : <File />}
-        {isRoot ? "Root" : name}
+        <div className="flex items-center">
+          {isFolder ? <Folder /> : <File />}
+          {isRoot ? "Root" : name}
+        </div>
+        {!isFolder && !isRoot && onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(fullPath);
+            }}
+          >
+            <Trash className="h-4 w-4" />
+          </Button>
+        )}
       </SidebarMenuButton>
     );
   }
@@ -87,6 +106,7 @@ function Tree({
                 path={`${path}/${name}`}
                 onSelection={onSelection}
                 selectedPath={selectedPath}
+                onDelete={onDelete}
               />
             ))}
           </SidebarMenuSub>
@@ -151,18 +171,11 @@ const buildTreeFoldersOnly = (paths: Path[]): Node[] => {
 export const Upload = () => {
   const currentApp = useCurrentApp();
   const { data } = useSiteConfig(currentApp);
+  const removePath = useRemovePath();
 
-  const [additionalCachedFlatPaths, setAdditionalFlatPaths] = useState<
-    string[]
-  >([]);
-
-  const requestedPaths = data
+  const paths = data
     ? data.getContent.edges.map((edge) => edge.node.path)
     : [];
-
-  const paths = [...requestedPaths, ...additionalCachedFlatPaths]
-    .filter((path, index, arr) => arr.indexOf(path) == index)
-    .sort();
 
   const isEmpty = paths.length == 0;
 
@@ -183,6 +196,15 @@ export const Upload = () => {
   useEffect(() => {
     setUploadPath(normalizedPath || "");
   }, [normalizedPath]);
+
+  const handleDelete = (path: string) => {
+    if (confirm(`Are you sure you want to delete ${path}?`)) {
+      removePath.mutate({
+        account: Account.parse(currentApp),
+        path: path,
+      });
+    }
+  };
 
   return (
     <div className="mx-auto w-full grid p-4 grid-cols-1  gap-8 max-w-screen-xl list-none">
@@ -240,7 +262,6 @@ export const Upload = () => {
                     files.length == 1 ? files[0] : `${files.length} files`
                   }`
                 );
-                setAdditionalFlatPaths(files);
                 setModal(false);
               }}
               pathPrefix={uploadPath}
@@ -279,6 +300,7 @@ export const Upload = () => {
               path="" // Start with an empty path for root items
               onSelection={handleFolderSelection} // Pass down the selection handler
               selectedPath={selectedPath || ""}
+              onDelete={handleDelete}
             />
           ))
         )}

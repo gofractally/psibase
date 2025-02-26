@@ -8,7 +8,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar,  AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -38,6 +39,7 @@ import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { Skeleton } from "./ui/skeleton";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -75,6 +77,7 @@ export function NavUser() {
 
   return (
     <SidebarMenu>
+      <SidebarGroupLabel>Acting as</SidebarGroupLabel>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -82,17 +85,24 @@ export function NavUser() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage
-                  src={generateAvatar(chainId, currentUser || "")}
-                  alt={currentUser || ""}
-                />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-              </Avatar>
+              {chainId && currentUser ? (
+                <Avatar className="h-8 w-8 rounded-lg">
+                  <AvatarImage
+                    src={generateAvatar(chainId, currentUser)}
+                    alt={currentUser}
+                  />
+                </Avatar>
+              ) : (
+                <Skeleton className="h-8 w-8 rounded-lg" />
+              )}
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">
-                  {currentUser || ""}
-                </span>
+                {currentUser ? (
+                  <span className="truncate font-semibold">
+                    {currentUser}
+                  </span>
+                ) : (
+                  <Skeleton className="h-4 w-32" />
+                )}
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
