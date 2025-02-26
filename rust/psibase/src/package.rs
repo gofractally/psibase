@@ -309,6 +309,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn store_data(
         &mut self,
         actions: &mut Vec<Action>,
+        mut uploader: Option<&mut StagedUpload>,
         compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
@@ -327,14 +328,37 @@ impl<R: Read + Seek> PackagedService<R> {
                 let (content, content_encoding) =
                     compress_content(&content, t.essence_str(), compression_level);
 
-                actions.push(
-                    sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
-                        path.to_string(),
-                        t.essence_str().to_string(),
-                        content_encoding,
-                        content.into(),
-                    ),
-                );
+                if let Some(uploader) = &mut uploader {
+                    let tmp_path = format!("/.staged/{}{}", uploader.id, path);
+                    let tmp_sender = uploader.sender;
+                    let content_hash: [u8; 32] = Sha256::digest(&content).into();
+
+                    uploader.actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE).storeSys(
+                            tmp_path,
+                            t.essence_str().to_string(),
+                            content_encoding.clone(),
+                            content.into(),
+                        ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).hardlink(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content_hash.into(),
+                        ),
+                    );
+                } else {
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content.into(),
+                        ),
+                    );
+                }
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -470,13 +494,14 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install(
         &mut self,
         actions: &mut Vec<Action>,
+        uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         install_ui: bool,
         compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
-            self.store_data(actions, compression_level)?;
+            self.store_data(actions, uploader, compression_level)?;
         }
 
         self.postinstall(actions)?;
@@ -549,6 +574,12 @@ impl ActionSink for Vec<Action> {
         act.append_to_tx(self, &mut size);
         Ok(())
     }
+}
+
+pub struct StagedUpload {
+    pub id: Checksum256,
+    pub sender: AccountNumber,
+    pub actions: Vec<Action>,
 }
 
 impl PackageManifest {

@@ -252,6 +252,71 @@ namespace SystemService
          return ifNoneMatch && *ifNoneMatch == etag;
       }
 
+      // returns true if the link target exists
+      bool linkImpl(Sites::Tables&             tables,
+                    std::string                path,
+                    std::string                contentType,
+                    std::optional<std::string> contentEncoding,
+                    psibase::Checksum256       contentHash)
+      {
+         auto table = tables.template open<SitesContentTable>();
+
+         check(path.starts_with('/'), "Path doesn't begin with /");
+
+         if (contentEncoding)
+         {
+            check(std::ranges::binary_search(validEncodings, *contentEncoding),
+                  "Unsupported content encoding");
+         }
+
+         bool exists;
+
+         // Update reference counts
+         std::optional<SitesContentRow> prev =
+             table.getIndex<0>().get(std::tuple(getSender(), path));
+         if (prev)
+         {
+            if (prev->contentHash != contentHash)
+            {
+               auto refsTable = tables.open<SitesDataRefTable>();
+               auto prevRefs  = refsTable.get(prev->contentHash);
+               check(prevRefs.has_value(), "Invariant failure: missing ref count");
+               auto refs = refsTable.get(contentHash)
+                               .value_or(SitesDataRefRow{.hash = contentHash, .refs = 0});
+               exists = refs.refs > 0;
+               --prevRefs->refs;
+               ++refs.refs;
+               refsTable.put(*prevRefs);
+               refsTable.put(refs);
+            }
+            else
+            {
+               exists = true;
+            }
+         }
+         else
+         {
+            auto            refsTable = tables.open<SitesDataRefTable>();
+            SitesDataRefRow refs      = refsTable.get(contentHash)
+                                       .value_or(SitesDataRefRow{.hash = contentHash, .refs = 0});
+            exists = refs.refs > 0;
+            ++refs.refs;
+            refsTable.put(refs);
+         }
+
+         SitesContentRow row{
+             .account         = getSender(),
+             .path            = std::move(path),
+             .contentType     = std::move(contentType),
+             .contentHash     = contentHash,
+             .contentEncoding = std::move(contentEncoding),
+             .csp             = std::nullopt,
+         };
+         table.put(row);
+
+         return exists;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -301,7 +366,7 @@ namespace SystemService
          if (content)
          {
             std::string cspHeader = getCspHeader(content, account);
-            auto        etag      = std::to_string(content->hash);
+            auto etag = psio::hex(content->contentHash.data(), content->contentHash.data() + 8);
 
             if (useCache(account) && shouldCache(request, etag))
             {
@@ -313,11 +378,23 @@ namespace SystemService
                };
             }
 
-            std::vector<HttpHeader> headers = {{
-                {"Content-Security-Policy", cspHeader},
-                {"Cache-Control", "no-cache"},
-                {"ETag", etag},
-            }};
+            auto reply = HttpReply{
+                .contentType = content->contentType,
+                .headers =
+                    {
+                        {"Content-Security-Policy", cspHeader},
+                        {"Cache-Control", "no-cache"},
+                        {"ETag", etag},
+                    },
+            };
+
+            if (request.method != "HEAD")
+            {
+               auto index = tables.open<SitesDataTable>().getIndex<0>();
+               auto body  = index.get(content->contentHash);
+               check(body.has_value(), "Invariant failure: file content missing");
+               reply.body = std::move(body->data);
+            }
 
             // RFC 7231
             // "A request without an Accept-Encoding header field implies that the
@@ -352,7 +429,7 @@ namespace SystemService
                   const auto encoding = *content->contentEncoding;
                   if (is_accepted(encoding))
                   {
-                     headers.push_back({"Content-Encoding", encoding});
+                     reply.headers.push_back({"Content-Encoding", encoding});
                   }
                   else
                   {
@@ -373,7 +450,7 @@ namespace SystemService
                               "[Fallback decompression error] Decompressor account not found");
 
                         Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
-                        content->content = decoder.decompress(content->content);
+                        reply.body = decoder.decompress(std::move(reply.body));
                      }
                   }
                }
@@ -382,18 +459,8 @@ namespace SystemService
             {
                if (content->contentEncoding)
                {
-                  headers.push_back({"Content-Encoding", *content->contentEncoding});
+                  reply.headers.push_back({"Content-Encoding", *content->contentEncoding});
                }
-            }
-
-            auto reply = HttpReply{
-                .contentType = content->contentType,
-                .headers     = std::move(headers),
-            };
-
-            if (request.method != "HEAD")
-            {
-               reply.body = content->content;
             }
 
             return reply;
@@ -414,27 +481,31 @@ namespace SystemService
                         std::vector<char>          content)
    {
       Tables tables{};
-      auto   table = tables.template open<SitesContentTable>();
 
-      check(path.starts_with('/'), "Path doesn't begin with /");
-      auto hash = psio::detail::seahash(std::string_view(content.data(), content.size()));
+      Checksum256 contentHash = sha256(content.data(), content.size());
 
-      if (contentEncoding)
+      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
+                    contentHash))
       {
-         check(std::ranges::binary_search(validEncodings, *contentEncoding),
-               "Unsupported content encoding");
+         tables.open<SitesDataTable>().put({
+             .hash = contentHash,
+             .data = std::move(content),
+         });
       }
+   }
 
-      SitesContentRow row{
-          .account         = getSender(),
-          .path            = std::move(path),
-          .contentType     = std::move(contentType),
-          .content         = std::move(content),
-          .hash            = hash,
-          .contentEncoding = std::move(contentEncoding),
-          .csp             = std::nullopt,
-      };
-      table.put(row);
+   void Sites::hardlink(std::string                path,
+                        std::string                contentType,
+                        std::optional<std::string> contentEncoding,
+                        psibase::Checksum256       contentHash)
+   {
+      Tables tables{};
+
+      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
+                    contentHash))
+      {
+         abortMessage("Content must exist to use hardlink");
+      }
    }
 
    void Sites::remove(std::string path)

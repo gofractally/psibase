@@ -15,8 +15,8 @@ use psibase::{
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, ServiceInfo, SignedTransaction, Tapos, TaposRefBlock, TimePointSec,
-    TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -981,12 +981,15 @@ fn get_package_accounts(ops: &[PackageOp]) -> Vec<AccountNumber> {
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+    G: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
 >(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     reg: &R,
     ops: Vec<PackageOp>,
+    mut uploader: StagedUpload,
     out: &mut TransactionBuilder<F>,
+    files: &mut TransactionBuilder<G>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
@@ -997,12 +1000,23 @@ async fn apply_packages<
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
+                ));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
@@ -1010,6 +1024,10 @@ async fn apply_packages<
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
+                ));
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1019,8 +1037,15 @@ async fn apply_packages<
                 package.install_accounts(&mut account_actions, sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
@@ -1077,13 +1102,30 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
     let account_transactions = account_builder.finish()?;
 
+    let uploader = StagedUpload {
+        id: id.clone(),
+        sender: args.sig_args.proposer.unwrap_or(args.sender).into(),
+        actions: Vec::new(),
+    };
+
+    let mut upload_builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &None),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
         &args.node_args.api,
         &mut client,
         &package_registry,
         to_install,
+        uploader,
         &mut trx_builder,
+        &mut upload_builder,
         args.sender.into(),
         &args.key,
         args.compression_level,
@@ -1091,6 +1133,46 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     .await?;
 
     trx_builder.push(packages::Wrapper::pack_from(args.sender.into()).removeOrder(id.clone()))?;
+
+    let upload_transactions = upload_builder.finish()?;
+    {
+        let total_size = upload_transactions
+            .iter()
+            .map(|group| {
+                group
+                    .1
+                    .iter()
+                    .map(|trx| trx.transaction.len())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        let progress = ProgressBar::new(total_size as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes}\n{msg}")?,
+        );
+        progress.set_message("Uploading files");
+        for (label, transactions, _carry) in upload_transactions {
+            progress.set_message(label);
+            for trx in transactions {
+                let len = trx.transaction.len() as u64;
+                let result = push_transaction(
+                    &args.node_args.api,
+                    client.clone(),
+                    trx.packed(),
+                    args.tx_args.trace,
+                    args.tx_args.console,
+                    Some(&progress),
+                )
+                .await;
+
+                if let Err(err) = result {
+                    progress.abandon();
+                    return Err(err);
+                }
+                progress.inc(len);
+            }
+        }
+        progress.finish();
+    }
 
     let transactions = trx_builder.finish()?;
 
