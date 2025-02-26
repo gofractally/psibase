@@ -1,9 +1,11 @@
 import { Account } from "@/lib/zod/Account";
+import { queryClient } from "@/main";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 
-export const queryKey = ["currentUser"];
+export const currentUserQueryKey = ["currentUser"];
 
 export type GetCurrentUserRes = string | null;
 
@@ -19,7 +21,12 @@ export const queryFn = async () => {
 
 export const useCurrentUser = () =>
   useQuery({
-    queryKey,
+    queryKey: currentUserQueryKey,
     queryFn,
     staleTime: 60000,
   });
+
+
+  export const setCurrentUser = (accountName: z.infer<typeof Account> | null) => {
+    queryClient.setQueryData(currentUserQueryKey, () => accountName === null ? null : Account.parse(accountName));
+  };

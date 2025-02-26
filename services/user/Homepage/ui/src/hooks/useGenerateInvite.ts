@@ -23,6 +23,6 @@ export const useGenerateInvite = () =>
                 }
             );
 
-            return res as string;
+            return z.string().parse(res);
         },
     });

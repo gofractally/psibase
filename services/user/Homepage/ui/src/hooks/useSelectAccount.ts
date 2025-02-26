@@ -1,8 +1,10 @@
+import { AwaitTime } from "@/globals";
 import { queryClient } from "@/main";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { z } from "zod";
+import { currentUserQueryKey, setCurrentUser } from "./useCurrentUser";
+import { Account } from "@/lib/zod/Account";
 
 export const useSelectAccount = () =>
     useMutation<void, Error, string>({
@@ -10,16 +12,16 @@ export const useSelectAccount = () =>
         mutationFn: async (accountName: string) => {
             void (await supervisor.functionCall({
                 method: "login",
-                params: [z.string().parse(accountName)],
+                params: [Account.parse(accountName)],
                 service: "accounts",
                 intf: "activeApp",
             }));
         },
-        onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
+        onSuccess: (_, accountName) => {
+            setCurrentUser(accountName)
             setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            }, 2000);
+                queryClient.refetchQueries({ queryKey: currentUserQueryKey });
+            }, AwaitTime);
         },
         onError: (error) => {
             toast.error(error.message);

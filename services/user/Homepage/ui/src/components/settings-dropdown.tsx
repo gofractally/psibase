@@ -43,7 +43,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useCurrentAccounts } from "@/hooks/useCurrentAccounts";
 import { useLogout } from "@/hooks/useLogout";
 import { useSelectAccount } from "@/hooks/useSelectAccount";
 import { useGenerateInvite } from "@/hooks/useGenerateInvite";
@@ -53,6 +52,7 @@ import { ModeToggle } from "./mode-toggle";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { useCanExportAccount } from "@/hooks/useCanExportAccount";
+import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 
 export const SettingsDropdown = () => {
     const generateInvite = useGenerateInvite();
@@ -62,17 +62,17 @@ export const SettingsDropdown = () => {
     const { data: currentUser } = useCurrentUser();
     const isLoggedIn = !!currentUser;
 
-    const { data: currentAccountsData, isPending: isLoadingAccounts } =
-        useCurrentAccounts();
+    const { data: connectedAccountsData, isPending: isLoadingAccounts } =
+        useConnectedAccounts();
 
 
-    const currentAccounts = currentAccountsData || [];
-    const isNoOptions = !isLoggedIn && currentAccounts.length == 0;
+    const connectedAccounts = connectedAccountsData || [];
+    const isNoOptions = !isLoggedIn && connectedAccounts.length == 0;
 
     const { mutateAsync: onLogout } = useLogout();
     const { mutateAsync: selectAccount } = useSelectAccount();
 
-    const otherConnectedAccounts = currentAccounts.filter(
+    const otherConnectedAccounts = connectedAccounts.filter(
         (account) => account !== currentUser,
     );
 

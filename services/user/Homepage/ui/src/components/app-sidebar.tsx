@@ -7,6 +7,7 @@ import {
   History,
   Terminal,
 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 import { NavApps } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useBranding } from "@/hooks/useBranding"
 import { Skeleton } from "@/components/ui/skeleton"
+import { NavMain } from "./nav-main"
 
 
 const apps = [
@@ -57,6 +59,7 @@ const moreApps = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: networkName, isLoading } = useBranding();
+  const navigate = useNavigate();
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -64,7 +67,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="#">
+              <div
+                role="button"
+                onClick={() => navigate("/")}
+                className="flex cursor-pointer"
+              >
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <Command className="size-4" />
                 </div>
@@ -75,12 +82,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <span className="truncate font-semibold">{networkName}</span>
                   )}
                 </div>
-              </a>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        <NavMain />
         <NavApps apps={apps} moreApps={moreApps} />
       </SidebarContent>
       <SidebarFooter>

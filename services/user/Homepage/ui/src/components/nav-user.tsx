@@ -80,18 +80,18 @@ export function NavUser() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-sidebar-accent border border-card data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage
-                  src={generateAvatar(chainId, currentUser || "")}
+                  src={chainId && currentUser ? generateAvatar(chainId, currentUser): undefined}
                   alt={currentUser || ""}
                 />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarFallback className="rounded-lg">?</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">
-                  {currentUser || ""}
+                <span className="truncate ">
+                  {currentUser || "Not logged in"}
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -107,12 +107,13 @@ export function NavUser() {
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage
-                    src={generateAvatar(chainId, currentUser || "")}
+                    src={chainId && currentUser ? generateAvatar(chainId, currentUser): undefined}
                   />
+                  <AvatarFallback className="rounded-lg">?</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
-                    {currentUser || ""}
+                    {currentUser || "Not logged in"}
                   </span>
                 </div>
               </div>

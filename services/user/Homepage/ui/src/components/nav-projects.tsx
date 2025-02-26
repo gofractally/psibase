@@ -3,6 +3,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 import {
   SidebarGroup,
@@ -34,17 +35,17 @@ export function NavApps({
   apps: App[]
   moreApps: App[]
 }) {
+  const navigate = useNavigate()
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Native Apps</SidebarGroupLabel>
       <SidebarMenu>
         {apps.map((item) => (
           <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild>
-              <a href={item.url}>
-                <item.icon />
-                <span>{item.name}</span>
-              </a>
+            <SidebarMenuButton onClick={() => navigate(item.url)}>
+              <item.icon />
+              <span>{item.name}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         ))}
@@ -61,11 +62,9 @@ export function NavApps({
               <SidebarMenuSub>
                 {moreApps.map((item) => (
                   <SidebarMenuSubItem key={item.name}>
-                    <SidebarMenuSubButton asChild>
-                      <a href={item.url}>
-                        <item.icon />
-                        <span>{item.name}</span>
-                      </a>
+                    <SidebarMenuSubButton onClick={() => navigate(item.url)}>
+                      <item.icon />
+                      <span>{item.name}</span>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
                 ))}
