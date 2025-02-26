@@ -104,7 +104,7 @@ pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, Ho
 //   and the actions in the transaction.
 // The auth service is therefore the only service other than transact that gets to see
 //   in full what actions are being taken by a user.
-fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, Host::types::Error> {
+pub fn get_claims(actions: &[Action], use_hooks: bool) -> Result<Vec<Claim>, Host::types::Error> {
     if actions.is_empty() {
         return Ok(vec![]);
     }
@@ -121,13 +121,31 @@ fn get_claims(actions: &[Action]) -> Result<Vec<Claim>, Host::types::Error> {
         }
     }
 
-    // Add additional claims from action hooks
-    claims.extend(ActionClaims::get_all_flat());
+    if use_hooks {
+        // Add additional claims from action hooks
+        claims.extend(ActionClaims::get_all_flat());
+    }
 
     Ok(claims)
 }
 
-pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
+pub fn get_claims_for_user(user: &String) -> Result<Vec<Claim>, Host::types::Error> {
+    let mut claims = vec![];
+
+    let auth_service_acc = get_account(user)?.unwrap().auth_service;
+    let plugin_ref =
+        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    if let Some(claim) = on_user_auth_claim(plugin_ref, &user)? {
+        claims.push(claim);
+    }
+
+    Ok(claims)
+}
+
+pub fn get_proofs(
+    tx_hash: &[u8; 32],
+    use_hooks: bool,
+) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
     let mut proofs = vec![];
 
     if let Some(user) = get_current_user()? {
@@ -139,14 +157,38 @@ pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, Host::types::
         }
     }
 
-    for claims in ActionClaims::get_all() {
-        let plugin_ref =
-            Host::types::PluginRef::new(&claims.claimant, "plugin", "transact-hook-action-auth");
-        proofs.extend(on_action_auth_proofs(plugin_ref, &claims.claims, tx_hash)?);
+    if use_hooks {
+        for claims in ActionClaims::get_all() {
+            let plugin_ref = Host::types::PluginRef::new(
+                &claims.claimant,
+                "plugin",
+                "transact-hook-action-auth",
+            );
+            proofs.extend(on_action_auth_proofs(plugin_ref, &claims.claims, tx_hash)?);
+        }
+
+        ActionAuthPlugins::clear();
+        ActionClaims::clear();
     }
 
-    ActionAuthPlugins::clear();
-    ActionClaims::clear();
+    Ok(proofs
+        .into_iter()
+        .map(|proof| Hex::from(proof.signature))
+        .collect())
+}
+
+pub fn get_proofs_for_user(
+    tx_hash: &[u8; 32],
+    user: &String,
+) -> Result<Vec<Hex<Vec<u8>>>, Host::types::Error> {
+    let mut proofs = vec![];
+
+    let auth_service_acc = get_account(user)?.unwrap().auth_service;
+    let plugin_ref =
+        Host::types::PluginRef::new(&auth_service_acc, "plugin", "transact-hook-user-auth");
+    if let Some(proof) = on_user_auth_proof(plugin_ref, &user, tx_hash)? {
+        proofs.push(proof);
+    }
 
     Ok(proofs
         .into_iter()
@@ -155,7 +197,7 @@ pub fn get_proofs(tx_hash: &[u8; 32]) -> Result<Vec<Hex<Vec<u8>>>, Host::types::
 }
 
 pub fn make_transaction(actions: Vec<Action>, expiration_seconds: u64) -> Transaction {
-    let claims = get_claims(&actions).expect("Failed to retrieve claims from auth plugin");
+    let claims = get_claims(&actions, true).expect("Failed to retrieve claims from auth plugin");
     let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
 
     let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();

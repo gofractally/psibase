@@ -226,7 +226,9 @@ int verifySignatures(std::uint32_t                  authServices,
    for (const auto& sig : footer.signatures)
    {
       psibase::VerifyArgs args{hash, sig.claim, sig.rawData};
-      psibase::Action     act{.service = sig.claim.service, .rawData = psio::to_frac(args)};
+      psibase::Action     act{.service = sig.claim.service,
+                              .method  = psibase::MethodNumber{"verifySys"},
+                              .rawData = psio::to_frac(args)};
       auto                packed = psio::to_frac(act);
       auto                size   = raw::verify(authServices, packed.data(), packed.size());
       auto trace = psio::from_frac<psibase::TransactionTrace>(psibase::getResult(size));
