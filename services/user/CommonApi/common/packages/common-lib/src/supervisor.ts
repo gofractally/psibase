@@ -47,6 +47,15 @@ const setupSupervisorIFrame = (src: string) => {
 const my = new URL(window.location.href);
 const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`;
 
+export class SupervisorFactory {
+    private static instance: Supervisor;
+
+    public static getInstance() {
+        if (this.instance) return this.instance;
+        this.instance = new Supervisor();
+        return this.instance;
+    }
+}
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
     isSupervisorInitialized = false;
