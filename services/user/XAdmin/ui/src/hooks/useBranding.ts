@@ -8,8 +8,9 @@ export const useBranding = ({ enabled = false }: { enabled?: boolean }) =>
         queryKey: [queryKeys.branding],
         queryFn: async () => {
             // supervisor is only available after the chain boots
-            const s = await import("@psibase/common-lib");
-            const supervisor = s.SupervisorFactory.getInstance();
+            const { Supervisor } = await import("@psibase/common-lib");
+            const supervisor = Supervisor.getInstance();
+
             const res = await supervisor.functionCall({
                 service: "branding",
                 intf: "queries",

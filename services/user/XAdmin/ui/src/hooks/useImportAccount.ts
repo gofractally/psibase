@@ -15,8 +15,8 @@ export const useImportAccount = () =>
             const { privateKey, account } = data;
 
             // supervisor is only available after the chain boots
-            const s = await import("@psibase/common-lib");
-            const supervisor = s.SupervisorFactory.getInstance();
+            const { Supervisor } = await import("@psibase/common-lib");
+            const supervisor = Supervisor.getInstance();
 
             if (privateKey) {
                 const key = await exportKeyToPEM(privateKey, "PRIVATE KEY");
