@@ -5,7 +5,7 @@ import { Layout } from "./layout";
 import { InviteResponse } from "./pages/InviteResponse";
 import { TokensPage } from "./apps/tokens/page";
 import { ChainmailPage } from "./apps/chainmail/page";
-
+import { WorkshopPage } from "./apps/workshop/page";
 
 export default createBrowserRouter([
     {
@@ -19,6 +19,10 @@ export default createBrowserRouter([
             {
                 path: "tokens",
                 element: <TokensPage />,
+            },
+            {
+                path: 'workshop',
+                element: <WorkshopPage />,
             },
             {
                 path: "chainmail",
