@@ -214,13 +214,16 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
             .push((label, vec![], !self.actions.is_empty()))
     }
     pub fn push<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
+        let prev_len = self.actions.len();
+        let prev_size = self.size;
         act.append_to_tx(&mut self.actions, &mut self.size);
-        if self.size >= self.action_limit {
+        if prev_len != 0 && self.size >= self.action_limit {
             self.transactions
                 .last_mut()
                 .unwrap()
                 .1
-                .push((self.f)(std::mem::take(&mut self.actions))?);
+                .push((self.f)(self.actions.drain(..prev_len).collect())?);
+            self.size -= prev_size;
         }
         Ok(())
     }
