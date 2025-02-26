@@ -139,6 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
