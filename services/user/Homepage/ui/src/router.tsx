@@ -26,14 +26,6 @@ export default createBrowserRouter([
                 })),
             })),
             {
-                path: 'workshop',
-                element: <WorkshopPage />,
-            },
-            {
-                path: "chainmail",
-                element: <ChainmailPage />,
-            },
-            {
                 path: "invite",
                 element: <Invite />,
             },
