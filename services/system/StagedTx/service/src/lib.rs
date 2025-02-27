@@ -96,15 +96,15 @@ pub mod service {
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
         if staged_tx.auto_exec {
-            let authorized =
-                staged_tx.action_list.actions.iter().all(|action| {
-                    StagedTxPolicy::new(action.sender).does_auth(staged_tx.accepters())
-                });
+            let authorized = staged_tx.senders().iter().all(|sender| {
+                StagedTxPolicy::new(*sender)
+                    .map_or(true, |policy| policy.does_auth(staged_tx.accepters()))
+            });
 
             debug_print(&format!("authorized: {}\n", authorized.to_string()));
 
             if authorized {
-                execute_impl(staged_tx, true);
+                execute_impl(staged_tx, false);
             }
         }
     }
@@ -121,10 +121,10 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::REJECTED);
 
-        let rejected =
-            staged_tx.action_list.actions.iter().any(|action| {
-                StagedTxPolicy::new(action.sender).does_reject(staged_tx.rejecters())
-            });
+        let rejected = staged_tx.senders().iter().any(|sender| {
+            StagedTxPolicy::new(*sender)
+                .map_or(false, |policy| policy.does_reject(staged_tx.rejecters()))
+        });
 
         if rejected {
             staged_tx.delete();
@@ -174,7 +174,11 @@ pub mod service {
                 ));
 
                 if !accepters.as_ref().map_or(true, |accepters| {
-                    StagedTxPolicy::new(action.sender).does_auth(accepters.clone())
+                    StagedTxPolicy::new(action.sender)
+                        .unwrap_or_else(|| {
+                            abort_message(&format!("account {} does not exist", action.sender))
+                        })
+                        .does_auth(accepters.clone())
                 }) {
                     abort_message(&format!("Authorization for {} failed", action.sender));
                 }

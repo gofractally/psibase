@@ -134,13 +134,11 @@ pub mod impls {
             );
 
             if auto_exec {
-                for action in &actions {
-                    let sender = action.sender;
-                    check(
-                        Accounts::call().getAccount(sender).is_some(),
-                        "Sender account in staged tx is invalid",
-                    );
-                }
+                let sender = actions[0].sender;
+                check(
+                    Accounts::call().getAccount(sender).is_some(),
+                    "Sender account in staged tx is invalid",
+                );
             }
 
             let monotonic_id = LastUsed::get_next_id();
@@ -177,6 +175,18 @@ pub mod impls {
             );
 
             staged_tx
+        }
+
+        pub fn senders(&self) -> Vec<AccountNumber> {
+            let mut result: Vec<_> = self
+                .action_list
+                .actions
+                .iter()
+                .map(|act| act.sender)
+                .collect();
+            result.sort_by_key(|account| account.value);
+            result.dedup();
+            result
         }
 
         pub fn accept(&self) {

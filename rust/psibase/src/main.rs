@@ -455,11 +455,13 @@ fn with_tapos(
     tapos: &TaposRefBlock,
     mut actions: Vec<Action>,
     proposer: &Option<ExactAccountNumber>,
+    auto_exec: bool,
 ) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec::from(now_plus_10secs);
     if let Some(proposer) = proposer {
-        actions = vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, false)];
+        actions =
+            vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, auto_exec)];
     }
     Transaction {
         tapos: Tapos {
@@ -498,6 +500,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -544,6 +547,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -602,6 +606,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -657,6 +662,7 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
+        true,
     );
 
     push_transaction(
@@ -926,6 +932,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         "{wide_bar} {pos}/{len} files",
     )?);
 
+    let mut multiple_transactions = false;
     while !actions.is_empty() {
         let mut n = 0;
         let mut size = 0;
@@ -935,7 +942,17 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         }
 
         let (selected_files, selected_actions) = actions.drain(..n).unzip();
-        let trx = with_tapos(&tapos, selected_actions, &args.sig_args.proposer);
+
+        if !actions.is_empty() {
+            multiple_transactions = true;
+        }
+
+        let trx = with_tapos(
+            &tapos,
+            selected_actions,
+            &args.sig_args.proposer,
+            !multiple_transactions,
+        );
         running.push(monitor_trx(
             args,
             &client,
@@ -1094,15 +1111,18 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let index_cell = Cell::new(0);
 
+    let auto_exec_cell = Cell::new(false);
+
     let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
         let index = index_cell.get();
         index_cell.set(index + 1);
+        let auto_exec = auto_exec_cell.get();
         actions.insert(
             0,
             packages::Wrapper::pack_from(args.sender.into()).checkOrder(id.clone(), index),
         );
         Ok(sign_transaction(
-            with_tapos(&tapos, actions, &args.sig_args.proposer),
+            with_tapos(&tapos, actions, &args.sig_args.proposer, auto_exec),
             &args.sig_args.sign,
         )?)
     };
@@ -1128,7 +1148,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         action_limit,
         |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
             Ok(sign_transaction(
-                with_tapos(&tapos, actions, &None),
+                with_tapos(&tapos, actions, &None, false),
                 &args.sig_args.sign,
             )?)
         },
@@ -1188,6 +1208,9 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         progress.finish_and_clear();
     }
 
+    if trx_builder.num_transactions() == 1 {
+        auto_exec_cell.set(true);
+    }
     let transactions = trx_builder.finish()?;
 
     let progress = ProgressBar::new(transactions.len() as u64).with_style(
