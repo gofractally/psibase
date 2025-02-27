@@ -336,7 +336,7 @@ impl<R: Read + Seek> PackagedService<R> {
 
                     uploader.actions.push(
                         sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE).storeSys(
-                            tmp_path,
+                            tmp_path.clone(),
                             t.essence_str().to_string(),
                             content_encoding.clone(),
                             content.into(),
@@ -349,6 +349,10 @@ impl<R: Read + Seek> PackagedService<R> {
                             content_encoding,
                             content_hash.into(),
                         ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE)
+                            .remove(tmp_path.to_string()),
                     );
                 } else {
                     actions.push(
