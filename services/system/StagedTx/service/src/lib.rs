@@ -104,7 +104,7 @@ pub mod service {
             debug_print(&format!("authorized: {}\n", authorized.to_string()));
 
             if authorized {
-                execute_impl(staged_tx, false);
+                execute_impl(staged_tx);
             }
         }
     }
@@ -151,15 +151,11 @@ pub mod service {
         emit_update(staged_tx.txid, StagedTxEvent::DELETED);
     }
 
-    fn execute_impl(staged_tx: StagedTx, authorized: bool) {
+    fn execute_impl(staged_tx: StagedTx) {
         debug_print("Executing staged tx\n");
         staged_tx.delete();
 
-        let accepters = if authorized {
-            None
-        } else {
-            Some(staged_tx.accepters())
-        };
+        let accepters = staged_tx.accepters();
 
         staged_tx
             .action_list
@@ -173,13 +169,12 @@ pub mod service {
                     &action.method.to_string()
                 ));
 
-                if !accepters.as_ref().map_or(true, |accepters| {
-                    StagedTxPolicy::new(action.sender)
-                        .unwrap_or_else(|| {
-                            abort_message(&format!("account {} does not exist", action.sender))
-                        })
-                        .does_auth(accepters.clone())
-                }) {
+                if !StagedTxPolicy::new(action.sender)
+                    .unwrap_or_else(|| {
+                        abort_message(&format!("account {} does not exist", action.sender))
+                    })
+                    .does_auth(accepters.clone())
+                {
                     abort_message(&format!("Authorization for {} failed", action.sender));
                 }
                 let act = action.packed();
@@ -199,7 +194,7 @@ pub mod service {
     #[action]
     fn execute(id: u32, txid: Checksum256) {
         let staged_tx = StagedTx::get(id, txid);
-        execute_impl(staged_tx, false);
+        execute_impl(staged_tx);
     }
 
     /// Gets a staged transaction by id.
