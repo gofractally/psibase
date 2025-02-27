@@ -467,6 +467,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install_accounts(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         key: &Option<AnyPublicKey>,
     ) -> Result<(), anyhow::Error> {
@@ -474,10 +475,28 @@ impl<R: Read + Seek> PackagedService<R> {
         for (account, index, info) in &self.services {
             let mut group = vec![];
             self.create_account(*account, key, sender, &mut group)?;
-            group.push(set_code_action(
-                *account,
-                read(&mut self.archive.by_index(*index)?)?.into(),
-            ));
+            let code = read(&mut self.archive.by_index(*index)?)?;
+            let code_hash: [u8; 32] = Sha256::digest(&code).into();
+            if let Some(uploader) = &mut uploader {
+                uploader
+                    .actions
+                    .push(setcode::Wrapper::pack_from(uploader.sender).stageCode(
+                        *account,
+                        uploader.id.clone(),
+                        0,
+                        0,
+                        code.into(),
+                    ));
+                group.push(setcode::Wrapper::pack_from(*account).setCodeStaged(
+                    uploader.sender,
+                    uploader.id.clone(),
+                    0,
+                    0,
+                    code_hash.into(),
+                ));
+            } else {
+                group.push(set_code_action(*account, code.into()));
+            }
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
                 group.push(setcode::Wrapper::pack().setFlags(*account, flags));

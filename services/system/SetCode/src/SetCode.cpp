@@ -23,6 +23,22 @@ namespace SystemService
          refsTable.put(count);
          return count.numRefs > 1;
       }
+
+      void decrementRefCount(CodeRefCountTable& refsTable,
+                             const Checksum256& codeHash,
+                             std::uint8_t       vmType,
+                             std::uint8_t       vmVersion)
+      {
+         auto prevCount = refsTable.get(std::tuple(codeHash, vmType, vmVersion));
+         check(prevCount.has_value(), "Missing reference count");
+         if (--prevCount->numRefs)
+            refsTable.put(*prevCount);
+         else
+         {
+            refsTable.remove(*prevCount);
+            kvRemove(CodeByHashRow::db, codeByHashKey(codeHash, vmType, vmVersion));
+         }
+      }
    }  // namespace
 
    void SetCode::init()
@@ -71,16 +87,7 @@ namespace SystemService
       // decrement old reference count
       if (account->codeHash != Checksum256{})
       {
-         auto prevCount =
-             refsTable.get(std::tuple(account->codeHash, account->vmType, account->vmVersion));
-         check(prevCount.has_value(), "Missing reference count");
-         if (--prevCount->numRefs)
-            refsTable.put(*prevCount);
-         else
-         {
-            refsTable.remove(*prevCount);
-            kvRemove(codeByHashKey(account->codeHash, account->vmType, account->vmVersion));
-         }
+         decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
       }
 
       account->codeHash  = codeHash;
@@ -103,6 +110,102 @@ namespace SystemService
          }
       }
    }  // setCode
+
+   void SetCode::stageCode(psibase::AccountNumber service,
+                           Checksum256            id,
+                           uint8_t                vmType,
+                           uint8_t                vmVersion,
+                           std::vector<char>      code)
+   {
+      auto sender     = getSender();
+      auto tables     = Tables{};
+      auto refsTable  = tables.open<CodeRefCountTable>();
+      auto stagedCode = tables.open<StagedCodeTable>();
+
+      check(!code.empty(), "Cannot stage empty code");
+      check(vmType == 0 && vmVersion == 0, "unsupported type or version");
+
+      Checksum256 codeHash = sha256(code.data(), code.size());
+
+      auto row = StagedCodeRow{
+          .from      = sender,
+          .service   = service,
+          .id        = id,
+          .codeHash  = codeHash,
+          .vmType    = vmType,
+          .vmVersion = vmVersion,
+      };
+      check(!stagedCode.get(row.key()), "staged code id must be unique");
+
+      if (!incrementRefCount(refsTable, codeHash, vmType, vmVersion))
+      {
+         CodeByHashRow code_obj{.codeHash  = codeHash,
+                                .vmType    = vmType,
+                                .vmVersion = vmVersion,
+                                .code{code.begin(), code.end()}};
+         kvPut(code_obj.db, code_obj.key(), code_obj);
+      }
+      stagedCode.put(row);
+   }
+
+   void SetCode::unstageCode(psibase::AccountNumber service, Checksum256 id)
+   {
+      auto sender     = getSender();
+      auto tables     = Tables{};
+      auto refsTable  = tables.open<CodeRefCountTable>();
+      auto stagedCode = tables.open<StagedCodeTable>();
+
+      auto row = stagedCode.get(std::tuple(sender, id, service));
+      check(row.has_value(), "staged code does not exist");
+
+      decrementRefCount(refsTable, row->codeHash, row->vmType, row->vmVersion);
+      stagedCode.remove(*row);
+   }
+
+   void SetCode::setCodeStaged(psibase::AccountNumber from,
+                               Checksum256            id,
+                               uint8_t                vmType,
+                               uint8_t                vmVersion,
+                               psibase::Checksum256   codeHash)
+   {
+      auto sender     = getSender();
+      auto service    = sender;
+      auto tables     = Tables{};
+      auto refsTable  = tables.open<CodeRefCountTable>();
+      auto stagedCode = tables.open<StagedCodeTable>();
+
+      check(vmType == 0 && vmVersion == 0, "unsupported type or version");
+
+      // Verify and remove the staged code record
+      auto staged = stagedCode.get(std::tuple(from, id, service));
+      check(staged.has_value(), "staged code does not exist");
+      check(staged->codeHash == codeHash && staged->vmType == vmType &&
+                staged->vmVersion == vmVersion,
+            "staged code does not match");
+      stagedCode.remove(*staged);
+
+      auto account = kvGet<CodeRow>(CodeRow::db, codeKey(service));
+      if (!account)
+      {
+         account.emplace();
+         account->codeNum = service;
+      }
+
+      if (vmType == account->vmType && vmVersion == account->vmVersion &&
+          codeHash == account->codeHash)
+         return;
+
+      // decrement old reference count
+      if (account->codeHash != Checksum256{})
+      {
+         decrementRefCount(refsTable, account->codeHash, account->vmType, account->vmVersion);
+      }
+
+      account->codeHash  = codeHash;
+      account->vmType    = vmType;
+      account->vmVersion = vmVersion;
+      kvPut(account->db, account->key(), *account);
+   }
 
    void SetCode::setFlags(psibase::AccountNumber service, uint64_t flags)
    {

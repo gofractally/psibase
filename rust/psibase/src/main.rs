@@ -1023,7 +1023,7 @@ async fn apply_packages<
                     &info.name, &info.version
                 ));
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
@@ -1052,7 +1052,7 @@ async fn apply_packages<
                 old_manifest.upgrade(package.manifest(), out)?;
                 // Install the new package
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
