@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/block.hpp>
+#include <psio/nested.hpp>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,8 @@ namespace psibase
       std::string name;
       std::string value;
       PSIO_REFLECT(HttpHeader, definitionWillNotChange(), name, value)
+
+      bool matches(std::string_view h) const;
    };
 
    /// An HTTP Request
@@ -59,6 +62,14 @@ namespace psibase
       ///
       // %XX escapes are decoded.
       std::string path() const;
+
+      /// Searches for a cookie by name
+      ///
+      /// The value returned is not validated or decoded
+      std::optional<std::string_view> getCookie(std::string_view name) const;
+
+      /// Removes a cookie
+      void removeCookie(std::string_view name);
    };
 
    struct URIPath
@@ -90,13 +101,22 @@ namespace psibase
    /// An HTTP reply
    ///
    /// Services return this from their `serveSys` action.
-   struct HttpReply
+   template <typename T>
+   struct BasicHttpReply
    {
       HttpStatus              status = HttpStatus::ok;
       std::string             contentType;  ///< "application/json", "text/html", ...
-      std::vector<char>       body;         ///< Response body
+      T                       body;         ///< Response body
       std::vector<HttpHeader> headers;      ///< HTTP Headers
-      PSIO_REFLECT(HttpReply, status, contentType, body, headers)
+      PSIO_REFLECT(BasicHttpReply, status, contentType, body, headers)
    };
+
+   using HttpReply = BasicHttpReply<std::vector<char>>;
+
+   template <typename T>
+   using FracpackHttpReply = BasicHttpReply<psio::nested<T>>;
+
+   template <typename T>
+   using JsonHttpReply = BasicHttpReply<psio::nested_json<T>>;
 
 }  // namespace psibase

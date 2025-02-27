@@ -128,6 +128,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Deletes the Content Security Policy for the specified path (or "*" for the global CSP).
+    #[action]
+    fn deleteCsp(path: String) {
+        unimplemented!()
+    }
+
     /// Enables/disables caching of responses (Enabled by default)
     /// Cache strategy:
     /// - `If-None-Match` header is checked against the hash of the content

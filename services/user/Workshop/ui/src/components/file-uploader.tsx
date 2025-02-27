@@ -14,8 +14,6 @@ export const FileUploader = ({ pathPrefix, onSuccess }: Props) => {
 
   const { mutateAsync: uploadFiles, isPending } = useUploadTree();
 
-  console.log({ pathPrefix });
-
   const handleFileChange = async (
     selectedFiles: {
       name: string;

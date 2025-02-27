@@ -114,6 +114,9 @@ namespace SystemService
       /// If no specific or global CSP is set, a default CSP is used.
       void setCsp(std::string path, std::string csp);
 
+      /// Deletes the Content Security Policy for the specified path (or "*" for the global CSP).
+      void deleteCsp(std::string path);
+
       /// Enables/disables HTTP caching of responses (Enabled by default)
       /// Cache strategy:
       /// - `If-None-Match` header is checked against the hash of the content
@@ -139,5 +142,6 @@ namespace SystemService
                 method(isValidPath, site, path),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
+                method(deleteCsp, path),
                 method(enableCache, enable))
 }  // namespace SystemService

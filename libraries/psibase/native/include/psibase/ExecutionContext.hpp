@@ -65,7 +65,6 @@ namespace psibase
 
       void execProcessTransaction(ActionContext& actionContext);
       void execCalled(uint64_t callerFlags, ActionContext& actionContext);
-      void execVerify(ActionContext& actionContext);
       void execServe(ActionContext& actionContext);
       void exec(ActionContext& actionContext, std::string_view fn);
 

@@ -18,7 +18,6 @@ export const graphql = async <T>(query: string, url?: string): Promise<T> => {
     body: JSON.stringify({ query }),
   }).then((x) => x.json())) as GraphqlResponse<T>;
 
-  console.log(response, "was the raw response");
   if (response.errors) {
     throw new Error(response.errors[0].message);
   }

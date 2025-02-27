@@ -418,6 +418,9 @@ namespace psio
       using type = std::tuple<std::remove_cvref_t<decltype(psio::result_of_member(F))>...>;
    };
 
+   template <typename T>
+   using struct_tuple_t = get_struct_tuple_impl<typename reflect<T>::data_members>::type;
+
    template <auto... M, typename F>
    constexpr decltype(auto) apply_members(MemberList<M...>*, F&& f)
    {

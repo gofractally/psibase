@@ -62,6 +62,9 @@ interface api {
     /// If no specific or global CSP is set, a default CSP is used.
     set-csp: func(path: string, csp: string) -> result<_, error>;
 
+    /// Delete the Content Security Policy for the specified path (or "*" for the global CSP).
+    delete-csp: func(path: string) -> result<_, error>;
+
     /// Enable or disable caching of responses.
     /// Cache strategy:
     /// - `If-None-Match` header is checked against the hash of the content

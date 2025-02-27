@@ -397,6 +397,12 @@ impl<'a> DepGraph<'a> {
             for (meta, var) in packages.values() {
                 for dep in &meta.depends {
                     let group = self.get_matching(dep)?;
+                    if group.is_empty() {
+                        eprintln!(
+                            "warning: dependency {}-{} -> {} {} not found",
+                            meta.name, meta.version, dep.name, dep.version
+                        );
+                    }
                     any_if(&mut self.solver, *var, group);
                 }
             }

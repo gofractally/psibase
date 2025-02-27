@@ -11,9 +11,10 @@ using namespace psibase;
 using namespace Botan;
 
 // The supported algorithms depend on how Botan was built. See the root CMakeLists.txt.
-extern "C" [[clang::export_name("verify")]] void verify()
+extern "C" void called(AccountNumber thisService, AccountNumber sender)
 {
-   auto act  = getCurrentAction();
+   auto act = getCurrentAction();
+   check(act.method == MethodNumber{"verifySys"}, "Unknown action");
    auto data = psio::from_frac<VerifyArgs>(act.rawData);
 
    auto ber_pubkey = std::span{reinterpret_cast<const std::uint8_t*>(data.claim.rawData.data()),
@@ -35,11 +36,6 @@ extern "C" [[clang::export_name("prestart")]] void prestart()
    // Loading an EC_Group for the first time is very expensive
    EC_Group{"secp256k1"};
    EC_Group{"secp256r1"};
-}
-
-extern "C" void called(AccountNumber thisService, AccountNumber sender)
-{
-   abortMessage("this service has no actions");
 }
 
 // Caution! Don't replace with version in dispatcher!

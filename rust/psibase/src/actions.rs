@@ -1,5 +1,6 @@
 use crate::services::{accounts, auth_sig, http_server, setcode};
-use crate::{account_raw, AccountNumber, Action, AnyPublicKey};
+use crate::{account_raw, method_raw, AccountNumber, Action, AnyPublicKey, MethodNumber};
+use fracpack::Pack;
 
 macro_rules! account {
     ($name:expr) => {
@@ -29,4 +30,13 @@ pub fn set_code_action(account: AccountNumber, wasm: Vec<u8>) -> Action {
 
 pub fn reg_server(service: AccountNumber, server_service: AccountNumber) -> Action {
     http_server::Wrapper::pack_from(service).registerServer(server_service)
+}
+
+pub fn login_action(user: AccountNumber, app: AccountNumber, root_host: &str) -> Action {
+    Action {
+        sender: user,
+        service: app,
+        method: MethodNumber::new(method_raw!("loginSys")),
+        rawData: (root_host,).packed().into(),
+    }
 }
