@@ -1109,7 +1109,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let action_limit: usize = 64 * 1024;
 
-    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     let new_accounts = get_accounts_to_create(
         &args.node_args.api,
         &mut client,
@@ -1117,8 +1117,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         args.sender.into(),
     )
     .await?;
-    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
-    let account_transactions = account_builder.finish()?;
+    create_accounts(new_accounts, &mut trx_builder, args.sender.into())?;
 
     let uploader = StagedUpload::new(
         id.clone(),
@@ -1134,7 +1133,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             )?)
         },
     );
-    let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     apply_packages(
         &args.node_args.api,
         &mut client,
@@ -1166,7 +1164,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         let progress = ProgressBar::new(total_size as u64).with_style(
             ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes}\n{msg}")?,
         );
-        progress.set_message("Uploading files");
         for (label, transactions, _carry) in upload_transactions {
             progress.set_message(label);
             for trx in transactions {
@@ -1192,22 +1189,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     }
 
     let transactions = trx_builder.finish()?;
-
-    {
-        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
-            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
-        );
-        push_transactions(
-            &args.node_args.api,
-            client.clone(),
-            account_transactions,
-            args.tx_args.trace,
-            args.tx_args.console,
-            &progress,
-        )
-        .await?;
-        progress.finish_and_clear();
-    }
 
     let progress = ProgressBar::new(transactions.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
