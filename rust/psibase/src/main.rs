@@ -1185,7 +1185,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
                 progress.inc(len);
             }
         }
-        progress.finish();
+        progress.finish_and_clear();
     }
 
     let transactions = trx_builder.finish()?;
@@ -1193,6 +1193,8 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let progress = ProgressBar::new(transactions.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
     );
+
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
     push_transactions(
         &args.node_args.api,
@@ -1205,7 +1207,15 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     .await?;
 
     if !args.tx_args.suppress_ok {
-        progress.finish_with_message("Ok");
+        if args.sig_args.proposer.is_some() {
+            progress.finish_with_message(format!(
+                "Proposed {} transaction{}",
+                num_transactions,
+                if num_transactions == 1 { "" } else { "s" }
+            ));
+        } else {
+            progress.finish_with_message("Ok");
+        }
     } else {
         progress.finish_and_clear();
     }
