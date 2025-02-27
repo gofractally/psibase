@@ -13,6 +13,7 @@ members = [
     "user/Invite/plugin_AuthInvite",
     "user/Sites/plugin",
     "user/Supervisor/plugin",
+    "user/Permissions/plugin",
     "user/Tokens/plugin",
     "user/Workshop/plugin",
 ]
