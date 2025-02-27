@@ -329,7 +329,8 @@ impl<R: Read + Seek> PackagedService<R> {
                     compress_content(&content, t.essence_str(), compression_level);
 
                 if let Some(uploader) = &mut uploader {
-                    let tmp_path = format!("/.staged/{}{}", uploader.id, path);
+                    let index = uploader.next_file_index();
+                    let tmp_path = format!("/.staged/{}/{}", uploader.id, index);
                     let tmp_sender = uploader.sender;
                     let content_hash: [u8; 32] = Sha256::digest(&content).into();
 
@@ -580,6 +581,23 @@ pub struct StagedUpload {
     pub id: Checksum256,
     pub sender: AccountNumber,
     pub actions: Vec<Action>,
+    file_index: u32,
+}
+
+impl StagedUpload {
+    pub fn new(id: Checksum256, sender: AccountNumber) -> Self {
+        StagedUpload {
+            id,
+            sender,
+            actions: Vec::new(),
+            file_index: 0,
+        }
+    }
+    fn next_file_index(&mut self) -> u32 {
+        let result = self.file_index;
+        self.file_index += 1;
+        result
+    }
 }
 
 impl PackageManifest {

@@ -1102,11 +1102,10 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
     let account_transactions = account_builder.finish()?;
 
-    let uploader = StagedUpload {
-        id: id.clone(),
-        sender: args.sig_args.proposer.unwrap_or(args.sender).into(),
-        actions: Vec::new(),
-    };
+    let uploader = StagedUpload::new(
+        id.clone(),
+        args.sig_args.proposer.unwrap_or(args.sender).into(),
+    );
 
     let mut upload_builder = TransactionBuilder::new(
         action_limit,
