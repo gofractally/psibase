@@ -93,7 +93,7 @@ namespace SystemService
 
       if (!code.empty())
       {
-         if (incrementRefCount(refsTable, codeHash, vmType, vmVersion))
+         if (!incrementRefCount(refsTable, codeHash, vmType, vmVersion))
          {
             CodeByHashRow code_obj{.codeHash  = account->codeHash,
                                    .vmType    = account->vmType,
