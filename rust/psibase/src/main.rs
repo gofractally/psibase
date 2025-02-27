@@ -1107,7 +1107,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         )?)
     };
 
-    let action_limit: usize = 64 * 1024;
+    let action_limit: usize = 1024 * 1024;
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     let new_accounts = get_accounts_to_create(
