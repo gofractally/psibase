@@ -3,9 +3,10 @@ import Dashboard from "./pages/Dashboard";
 import { Invite } from "./pages/Invite";
 import { Layout } from "./layout";
 import { InviteResponse } from "./pages/InviteResponse";
-import { TokensPage } from "./apps/tokens/page";
 import { ChainmailPage } from "./apps/chainmail/page";
 import { WorkshopPage } from "./apps/workshop/page";
+import { configuredApps } from "./configuredApps";
+
 
 export default createBrowserRouter([
     {
@@ -16,10 +17,14 @@ export default createBrowserRouter([
                 path: "/",
                 element: <Dashboard />,
             },
-            {
-                path: "tokens",
-                element: <TokensPage />,
-            },
+            ...configuredApps.map(app => ({
+                path: app.service,
+                element: app.element,
+                children: app.children.map(child => ({
+                    path: child.path,
+                    element: child.element,
+                })),
+            })),
             {
                 path: 'workshop',
                 element: <WorkshopPage />,

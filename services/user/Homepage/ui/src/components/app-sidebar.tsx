@@ -1,15 +1,11 @@
 import * as React from "react"
 import {
-  Book,
-  Coins,
   Command,
-  Mail,
-  History,
-  Terminal,
+
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
-import { NavApps } from "@/components/nav-projects"
+import { NavApps } from "@/components/nav-apps"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -23,39 +19,8 @@ import {
 import { useBranding } from "@/hooks/useBranding"
 import { Skeleton } from "@/components/ui/skeleton"
 import { NavMain } from "./nav-main"
+import { NavSubNav } from "./nav-sub-nav"
 
-
-const apps = [
-  {
-    name: "Tokens",
-    url: "/tokens",
-    icon: Coins,
-  },
-  // TODO: Improve explorer or decommision, it's a little how ya goin
-  // {
-  //   name: "Explorer",
-  //   url: "/explorer", 
-  //   icon: History,
-  // },
-  {
-    name: "Chain mail",
-    url: "/chainmail",
-    icon: Mail,
-  },
-];
-
-const moreApps = [
-  {
-    name: "Workshop", 
-    url: "/workshop",
-    icon: Terminal,
-  },
-  {
-    name: "Doc",
-    url: "/docs",
-    icon: Book,
-  },
-];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: networkName, isLoading } = useBranding();
@@ -89,7 +54,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain />
-        <NavApps apps={apps} moreApps={moreApps} />
+        <NavApps />
+        <NavSubNav  />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

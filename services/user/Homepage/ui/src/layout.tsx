@@ -1,5 +1,4 @@
-import { Outlet } from "react-router-dom";
-import { Nav } from "./components/nav";
+import { Outlet, useNavigate, useParams,  useMatch, useLocation } from "react-router-dom";
 import { AppSidebar } from "@/components/app-sidebar"
 import {
     Breadcrumb,
@@ -15,10 +14,17 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar"
-
+import { useNavLocation } from "@/hooks/useNavLocation";
 
 
 export const Layout = () => {
+    
+    const navigate = useNavigate();
+    const { currentApp, currentChild, } = useNavLocation();
+    
+    const primaryNavLabel = currentApp?.name ?? 'Dashboard';
+    const secondaryNavLabel = currentChild?.name;
+
     return (
         <SidebarProvider>
             <AppSidebar />
@@ -29,15 +35,15 @@ export const Layout = () => {
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="#">
-                                        Building Your Application
+                                <BreadcrumbItem onClick={() => navigate(`/${currentApp?.service}`)} className="hidden md:block">
+                                    <BreadcrumbLink>
+                                        {primaryNavLabel}
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-                                </BreadcrumbItem>
+                                {secondaryNavLabel && <BreadcrumbSeparator className="hidden md:block" />}
+                                {secondaryNavLabel && <BreadcrumbItem>
+                                    <BreadcrumbPage>{secondaryNavLabel}</BreadcrumbPage>
+                                </BreadcrumbItem>}
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>

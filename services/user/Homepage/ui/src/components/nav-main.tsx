@@ -1,6 +1,5 @@
 import { Home } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-
+import { NavLink, } from "react-router-dom"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -10,20 +9,23 @@ import {
 } from "@/components/ui/sidebar"
 
 export function NavMain() {
-  const navigate = useNavigate()
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton 
-            onClick={() => navigate('/')} 
-            tooltip={'Home'}
-          >
-            <Home />
-            <span>Home</span>
-          </SidebarMenuButton>
+          <NavLink to="/">
+            {({ isActive }) => (
+              <SidebarMenuButton
+                data-active={isActive}
+                className="data-[active=true]:bg-accent"
+              >
+                <Home />
+                <span>Dashboard</span>
+              </SidebarMenuButton>
+            )}
+          </NavLink>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
