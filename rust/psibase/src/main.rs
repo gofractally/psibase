@@ -932,7 +932,6 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         "{wide_bar} {pos}/{len} files",
     )?);
 
-    let mut multiple_transactions = false;
     while !actions.is_empty() {
         let mut n = 0;
         let mut size = 0;
@@ -943,16 +942,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
 
         let (selected_files, selected_actions) = actions.drain(..n).unzip();
 
-        if !actions.is_empty() {
-            multiple_transactions = true;
-        }
-
-        let trx = with_tapos(
-            &tapos,
-            selected_actions,
-            &args.sig_args.proposer,
-            !multiple_transactions,
-        );
+        let trx = with_tapos(&tapos, selected_actions, &args.sig_args.proposer, true);
         running.push(monitor_trx(
             args,
             &client,
