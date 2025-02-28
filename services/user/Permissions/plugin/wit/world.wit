@@ -1,0 +1,16 @@
+package permissions:plugin;
+
+interface api {
+    use host:common/types.{error};
+    save-permission: func(caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
+}
+
+interface users {
+    use host:common/types.{error};
+    is-permitted: func(caller: string) -> result<bool, error>;
+}
+
+world imports {
+    import api;
+    import users;
+}

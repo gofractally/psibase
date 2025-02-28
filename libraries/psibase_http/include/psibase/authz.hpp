@@ -3,11 +3,47 @@
 #include <psibase/jwt.hpp>
 
 #include <boost/asio/ip/address.hpp>
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <variant>
 
 namespace psibase::http
 {
+   struct token_data
+   {
+      std::uint64_t exp;
+      std::string   mode;  // "r", "rw"
+   };
+   PSIO_REFLECT(token_data, exp, mode);
+   struct token_key
+   {
+     public:
+      token_key(std::string_view k) : impl(k)
+      {
+         for (auto ch : k)
+         {
+            psibase::check(ch != '\r' && ch != '\n', "Unexpected newline in key");
+         }
+      }
+      operator std::string_view() const { return impl; }
+      operator std::span<const char>() const { return impl; }
+      const char* data() const { return impl.data(); }
+      int         size() const { return static_cast<int>(impl.size()); }
+      std::string str() const { return impl; }
+
+     private:
+      std::string impl;
+   };
+
+   struct token_response
+   {
+      std::string   accessToken;
+      std::uint64_t exp;
+      std::string   mode;
+   };
+   PSIO_REFLECT(token_response, accessToken, exp, mode)
+
    struct authz_any
    {
       authz_any() = default;

@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 mod stats;
 #[cfg(test)]
 mod tests;
@@ -5,10 +7,19 @@ mod tests;
 #[psibase::service_tables]
 mod tables {
     use async_graphql::*;
-    use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
+    use core::fmt;
     use psibase::*;
     use serde::{Deserialize, Serialize};
-    #[table(name = "AttestationTable", index = 0)]
+
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {}
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "AttestationTable", index = 1)]
     #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct Attestation {
         /// The attesting account / the issuer
@@ -45,7 +56,7 @@ mod tables {
         }
     }
 
-    #[table(name = "AttestationStatsTable", index = 1)]
+    #[table(name = "AttestationStatsTable", index = 2)]
     #[derive(Debug, Fracpack, ToSchema, Serialize, Deserialize, SimpleObject)]
     pub struct AttestationStats {
         /// The credential subject, in this case, the subject/subject
@@ -80,20 +91,35 @@ mod tables {
 #[psibase::service(name = "identity")]
 #[allow(non_snake_case)]
 mod service {
-    use core::fmt;
-
     use async_graphql::*;
     use psibase::services::{accounts::Wrapper as AccountsSvc, transact};
     use psibase::*;
-    use serde::{Deserialize, Serialize};
 
     use crate::stats::update_attestation_stats;
+    use crate::tables::*;
+
+    #[action]
+    fn init() {
+        let table = InitTable::new();
+        table.put(&InitRow {}).unwrap();
+        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
+        services::http_server::Wrapper::call().registerServer(SERVICE);
+    }
+
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        let table = InitTable::new();
+        check(
+            table.get_index_pk().get(&()).is_some(),
+            "service not initialized",
+        );
+    }
 
     #[action]
     pub fn attest(subject: AccountNumber, value: u8) {
         check(value <= 100, "bad confidence score");
         let attester = get_sender();
-        let issued = transact::Wrapper::call().currentBlock().time;
+        let issued = transact::Wrapper::call().currentBlock().time.seconds();
 
         let attestation_table = AttestationTable::new();
 
@@ -212,10 +238,6 @@ mod service {
             subject: AccountNumber,
         ) -> async_graphql::Result<Option<AttestationStats>, async_graphql::Error> {
             Ok(AttestationStatsTable::new().get_index_pk().get(&subject))
-        }
-
-        async fn event(&self, id: u64) -> Result<event_structs::HistoryEvents, anyhow::Error> {
-            get_event(id)
         }
     }
 

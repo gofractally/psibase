@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = ["service", "plugin"]
+
+[workspace.package]
+version = "0.15.0"
+rust-version = "1.64"
+edition = "2021"
+publish = false
+
+[package]
+name = "identity-pkg"                                         # Crate name
+description = "Tools for exploring and confirming identities"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[profile.release]
+codegen-units = 1
+opt-level = "s"
+debug = false
+strip = true
+lto = true
+
+[package.metadata.psibase]
+package-name = "Identity"
+services = ["identity"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.15.0"
+Sites = "0.15.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+identity = { path = "service", version = "0.15.0" }
+plugin = { path = "plugin", version = "0.15.0" }

@@ -139,6 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/Sites.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
@@ -245,13 +246,17 @@ ExternalProject_Add(
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
     services/system/AuthSig/ui:AuthSig_js
-    services/user/Homepage/ui:Homepage_js
-    services/user/Workshop/ui:Workshop_js
-    services/user/Supervisor/ui:Supervisor_js
-    services/user/Explorer/ui:Explorer_js
     services/user/Branding/ui:Branding_js
     services/user/Chainmail/ui:Chainmail_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
+    services/user/Explorer/ui:Explorer_js
+    services/user/Homepage/ui:Homepage_js
+    services/user/Identity/ui:Identity_js
+    services/user/Invite/ui:Invite_js
+    services/user/Permissions/ui:Permissions_js
+    services/user/Supervisor/ui:Supervisor_js
+    services/user/Tokens/ui:Tokens_js
+    services/user/Workshop/ui:Workshop_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
@@ -308,6 +313,7 @@ add_rs_component_workspace(services/:Plugins
     setcode
     clientdata
     invite
+    permissions
     sites
     test
     tokens
@@ -458,7 +464,7 @@ psibase_package(
     DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Permissions(^${PSIBASE_VERSION})"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi)
@@ -555,6 +561,12 @@ psibase_package(
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Homepage/postinstall.json
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
     DEPENDS ${Homepage_js_DEP}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Identity.psi
+    PATH services/user/Identity
+    DEPENDS ${Identity_js_DEP}
 )
 
 psibase_package(
@@ -700,6 +712,19 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Permissions.psi
+    NAME Permissions
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Handler for client-side permissions"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE permissions
+        DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /
+    DEPENDS ${Permissions_js_DEP}
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/SupervisorTests.psi
     NAME SupervisorTests
     DESCRIPTION "Plugin functions for testing Supervisor functionality"
@@ -805,7 +830,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers 
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -815,7 +840,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal Invite Nft Packages Producers HttpServer
+                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers 
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -852,7 +877,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Invite Nft Nop Minimal Packages Producers TestDefault HttpServer
+    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -870,29 +895,31 @@ install(
           ${SERVICE_DIR}/ProdDefault.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Docs.psi
-          ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
+          ${SERVICE_DIR}/HttpServer.psi
+          ${SERVICE_DIR}/Homepage.psi
+          ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/Packages.psi
+          ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/Producers.psi
-          ${SERVICE_DIR}/TestDefault.psi
-          ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Registry.psi
-          ${SERVICE_DIR}/Workshop.psi
-          ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi
-          ${SERVICE_DIR}/TokenUsers.psi
+          ${SERVICE_DIR}/TestDefault.psi
           ${SERVICE_DIR}/Tokens.psi
+          ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/Workshop.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
 

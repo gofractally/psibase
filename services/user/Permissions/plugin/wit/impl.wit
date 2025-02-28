@@ -1,0 +1,16 @@
+package permissions:plugin;
+
+interface admin {
+    use host:common/types.{error};
+
+    is-valid-request: func(caller: string, callee: string) -> result<bool, error>;
+}
+
+world impl {
+    include host:common/imports;
+    include clientdata:plugin/imports;
+
+    export api;
+    export users;
+    export admin;
+}

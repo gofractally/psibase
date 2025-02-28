@@ -7,4 +7,5 @@ plugin_error! {
     NotLoggedIn(msg: &'a str) => "Requires a logged-in user: {msg}",
     TransactionError(msg: String) => "Transaction error: {msg}",
     ClaimProofMismatch => "Number of proofs does not match number of claims",
+    WrongOrigin(origin: &'a str) => "Cannot be called by {origin}",
 }

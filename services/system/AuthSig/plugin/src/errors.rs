@@ -7,4 +7,5 @@ plugin_error! {
     Unauthorized(msg: &'a str) => "Unauthorized: {msg}",
     JsonDecodeError(msg: String) => "JSON decode error: {msg}",
     KeyNotFound(msg: &'a str) => "Key not found: {msg}",
+    InsufficientPermissions(privileged_action: String) => "Insufficient access for {privileged_action}"
 }

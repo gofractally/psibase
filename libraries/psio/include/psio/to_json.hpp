@@ -355,6 +355,18 @@ template <typename S> void to_json(float value, S& stream)              { return
    }
 
    template <typename S>
+   void to_json(const std::span<char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
+   }
+
+   template <typename S>
+   void to_json(const std::span<const char>& obj, S& stream)
+   {
+      to_json_hex(obj.data(), obj.size(), stream);
+   }
+
+   template <typename S>
    void to_json(const std::vector<char>& obj, S& stream)
    {
       to_json_hex(obj.data(), obj.size(), stream);

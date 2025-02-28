@@ -11,7 +11,9 @@ use types::*;
 
 // Other plugins
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
+use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
+use bindings::permissions::plugin::users::is_permitted;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -134,10 +136,12 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), CommonTypes::Error> {
-        // TODO: check if sender authorizes caller app to set key
-        // Currently only an AuthSig app would be able to set a user's key
+        let caller = get_sender_app().app.unwrap();
+
         if !from_auth_sig_ui() {
-            return Err(Unauthorized("set_key").into());
+            if !is_permitted(&caller)? {
+                return Err(InsufficientPermissions(String::from("set key")).into());
+            }
         }
 
         Transact::add_action_to_transaction(
