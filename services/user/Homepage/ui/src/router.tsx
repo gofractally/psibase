@@ -3,8 +3,6 @@ import Dashboard from "./pages/Dashboard";
 import { Invite } from "./pages/Invite";
 import { Layout } from "./layout";
 import { InviteResponse } from "./pages/InviteResponse";
-import { ChainmailPage } from "./apps/chainmail/page";
-import { WorkshopPage } from "./apps/workshop/page";
 import { configuredApps } from "./configuredApps";
 
 
