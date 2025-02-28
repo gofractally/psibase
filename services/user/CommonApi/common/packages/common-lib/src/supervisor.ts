@@ -50,15 +50,33 @@ const myOrigin = `${my.protocol}//${my.hostname}${my.port ? ":" + my.port : ""}`
 // Convenient library for users to interact with the supervisor.
 export class Supervisor {
     private static instance: Supervisor;
-
-    public static getInstance() {
-        if (this.instance) return this.instance;
-        this.instance = new Supervisor();
-        return this.instance;
-    }
-
     isSupervisorInitialized = false;
     private supervisorSrc: string;
+
+    constructor(options?: Options) {
+        this.supervisorSrc =
+            options?.supervisorSrc || siblingUrl(undefined, "supervisor");
+        this.listenToRawMessages();
+        setupSupervisorIFrame(this.supervisorSrc);
+    }
+
+    public static getInstance(options?: Options) {
+        if (!Supervisor.instance) {
+            Supervisor.instance = new Supervisor(options);
+            return Supervisor.instance;
+        }
+
+        if (
+            options?.supervisorSrc &&
+            Supervisor.instance.supervisorSrc !== options.supervisorSrc
+        ) {
+            console.warn(
+                "Supervisor has already been instantiated with different options. New options have been ignored.",
+            );
+        }
+
+        return Supervisor.instance;
+    }
 
     private pendingRequests: {
         id: string;
@@ -76,13 +94,6 @@ export class Supervisor {
     }
 
     private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
-
-    constructor(public options?: Options) {
-        this.supervisorSrc =
-            options?.supervisorSrc || siblingUrl(undefined, "supervisor");
-        this.listenToRawMessages();
-        setupSupervisorIFrame(this.supervisorSrc);
-    }
 
     private listenToRawMessages() {
         window.addEventListener("message", (event) =>
@@ -224,3 +235,5 @@ export class Supervisor {
         iframe.contentWindow.postMessage(message, this.supervisorSrc);
     }
 }
+
+export const getSupervisor = Supervisor.getInstance;
