@@ -105,6 +105,8 @@ std::function<void(const std::string& peer, connect_handler&&)> make_connect_one
          conn->stream.next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
          conn->stream.next_layer().set_verify_callback(
              boost::asio::ssl::host_name_verification(std::string(host)));
+         auto ssl_conn = conn->stream.next_layer().native_handle();
+         SSL_set_tlsext_host_name(ssl_conn, std::string(host).c_str());
          do_connect(std::move(conn));
 #else
          PSIBASE_LOG(psibase::loggers::generic::get(), warning)
