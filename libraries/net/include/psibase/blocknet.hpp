@@ -815,9 +815,12 @@ namespace psibase::net
                for (auto& trx : transactions)
                {
                   if (!trx.proofs.empty())
+                  {
                      // Proofs execute as of the state at the beginning of a block.
                      // That state is empty, so there are no proof services installed.
                      trace.error = "Transactions in boot block may not have proofs";
+                     return result;
+                  }
                   else
                      bc.pushTransaction(std::move(trx), trace, std::nullopt);
                }
@@ -834,6 +837,11 @@ namespace psibase::net
                   // on_fork_switch is responsible for cleaning up any
                   // pointers that will become dangling.
                   do_gc();
+               }
+               else
+               {
+                  trace.error = "Failed to produce boot block";
+                  return result;
                }
             }
          }
