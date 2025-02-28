@@ -255,7 +255,6 @@ set(JS_DIRS
     services/user/Invite/ui:Invite_js
     services/user/Permissions/ui:Permissions_js
     services/user/Supervisor/ui:Supervisor_js
-    services/user/Tokens/ui:Tokens_js
     services/user/Workshop/ui:Workshop_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
