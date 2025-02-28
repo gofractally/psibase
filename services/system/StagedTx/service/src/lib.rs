@@ -153,9 +153,9 @@ pub mod service {
 
     fn execute_impl(staged_tx: StagedTx) {
         debug_print("Executing staged tx\n");
-        staged_tx.delete();
 
         let accepters = staged_tx.accepters();
+        staged_tx.delete();
 
         staged_tx
             .action_list
