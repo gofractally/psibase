@@ -53,7 +53,7 @@ export class Supervisor {
     isSupervisorInitialized = false;
     private supervisorSrc: string;
 
-    constructor(options?: Options) {
+    private constructor(options?: Options) {
         this.supervisorSrc =
             options?.supervisorSrc || siblingUrl(undefined, "supervisor");
         this.listenToRawMessages();
