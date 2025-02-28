@@ -84,10 +84,12 @@ pub fn solve_dependencies(
     packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
     existing: Vec<(Meta, PackageDisposition)>,
+    preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut graph = DepGraph::new();
     graph.reinstall = reinstall;
+    graph.preferred_order = preferred_order;
     for package in packages {
         graph.add(package);
     }
@@ -104,6 +106,7 @@ pub struct DepGraph<'a> {
     packages: HashMap<String, HashMap<String, (PackageInfo, Lit)>>,
     request: HashMap<String, String>,
     existing: HashMap<String, (Meta, PackageDisposition, bool)>,
+    preferred_order: Vec<String>,
     solver: Solver<'a>,
     upgrade_all: bool,
     reinstall: bool,
@@ -172,6 +175,7 @@ fn evaluate_changes(
     mut packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     request: HashMap<String, String>,
+    preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let existing_refs: Vec<_> = existing
@@ -191,8 +195,10 @@ fn evaluate_changes(
     );
     result.reverse();
 
-    let installed_refs: Vec<_> = packages
-        .keys()
+    let installed_refs: Vec<_> = preferred_order
+        .iter()
+        .filter(|name| packages.contains_key(*name))
+        .chain(packages.keys())
         .map(|name| PackageRef {
             name: name.clone(),
             version: String::new(),
@@ -228,6 +234,7 @@ impl<'a> DepGraph<'a> {
             request: HashMap::new(),
             existing: HashMap::new(),
             solver: Solver::new(),
+            preferred_order: Vec::new(),
             upgrade_all: false,
             reinstall: false,
         }
@@ -291,7 +298,13 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return evaluate_changes(result, self.existing, self.request, self.reinstall);
+                    return evaluate_changes(
+                        result,
+                        self.existing,
+                        self.request,
+                        self.preferred_order,
+                        self.reinstall,
+                    );
                 }
             }
         }
