@@ -4,10 +4,10 @@ import { Button } from "@shadcn/button";
 import { Label } from "@shadcn/label";
 import { Input } from "@shadcn/input";
 
-import { siblingUrl, Supervisor } from "@psibase/common-lib";
+import { siblingUrl, getSupervisor } from "@psibase/common-lib";
 import { Nav } from "@components/nav";
 
-const supervisor = new Supervisor();
+const supervisor = getSupervisor();
 
 export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);

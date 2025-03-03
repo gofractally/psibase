@@ -1,3 +1,3 @@
-import { Supervisor } from "@psibase/common-lib";
+import { getSupervisor } from "@psibase/common-lib";
 
-export const supervisor = new Supervisor();
+export const supervisor = getSupervisor();
