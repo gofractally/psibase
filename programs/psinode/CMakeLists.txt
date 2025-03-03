@@ -31,6 +31,12 @@ set_target_properties(psinode PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_
 
 find_package(Python COMPONENTS Interpreter)
 if(Python_Interpreter_FOUND)
+    function(add_psinode_test name)
+        add_test(
+            NAME psinode_${name}
+            COMMAND ${Python_EXECUTABLE} ${name}.py --psinode=$<TARGET_FILE:psinode>
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    endfunction()
     add_test(
         NAME py_test_fracpack
         COMMAND ${Python_EXECUTABLE} test_fracpack.py
@@ -43,42 +49,20 @@ if(Python_Interpreter_FOUND)
         NAME py_test_psibase_types
         COMMAND ${Python_EXECUTABLE} test_psibase_types.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(
-        NAME psinode_test_routing
-        COMMAND ${Python_EXECUTABLE} test_routing.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_psinode_test(test_routing)
     set_tests_properties(psinode_test_routing PROPERTIES PROCESSORS 7)
-    add_test(
-        NAME psinode_test_crash
-        COMMAND ${Python_EXECUTABLE} test_crash.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_psinode_test(test_crash)
     set_tests_properties(psinode_test_crash PROPERTIES PROCESSORS 4)
-    add_test(
-        NAME psinode_test_psibase
-        COMMAND ${Python_EXECUTABLE} test_psibase.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(
-        NAME psinode_test_subjective
-        COMMAND ${Python_EXECUTABLE} test_subjective.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_psinode_test(test_psibase)
+    add_psinode_test(test_subjective)
     set_tests_properties(psinode_test_subjective PROPERTIES PROCESSORS 4)
-    add_test(
-        NAME psinode_test_txqueue
-        COMMAND ${Python_EXECUTABLE} test_txqueue.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(
-        NAME psinode_test_query
-        COMMAND ${Python_EXECUTABLE} test_query.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(
-        NAME psinode_test_exception_exit
-        COMMAND ${Python_EXECUTABLE} test_exception_exit.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    add_test(
-        NAME psinode_test_snapshot
-        COMMAND ${Python_EXECUTABLE} test_snapshot.py --psinode=$<TARGET_FILE:psinode>
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    add_psinode_test(test_txqueue)
+    add_psinode_test(test_query)
+    add_psinode_test(test_exception_exit)
+    add_psinode_test(test_snapshot)
     set_tests_properties(psinode_test_snapshot PROPERTIES PROCESSORS 4)
+    add_psinode_test(test_block_signing)
+    set_tests_properties(psinode_test_block_signing PROPERTIES PROCESSORS 4)
 endif()
 
 include(GNUInstallDirs)

@@ -1198,7 +1198,16 @@ namespace psibase
                check(id == state->blockId(), "blockId does not match");
                state->revision = newRevision;
 
-               on_accept_block(state);
+               try
+               {
+                  on_accept_block(state);
+               }
+               catch (std::exception& e)
+               {
+                  PSIBASE_LOG(blockLogger, error)
+                      << "on_accept_block needs to handle any errors, but it failed with: "
+                      << e.what();
+               }
                PSIBASE_LOG(blockLogger, info) << "Accepted block";
             }
             catch (std::exception& e)
