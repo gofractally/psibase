@@ -212,7 +212,7 @@ export class PluginHost implements HostInterface {
     }
 
     // Web interface
-    popup(url_path: string): Result<void, PluginError> {
+    promptUser(url_path: string): Result<void, PluginError> {
         let url = this.self.origin;
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
         url = url + url_path;
@@ -221,5 +221,6 @@ export class PluginHost implements HostInterface {
             "_blank",
             "popup=true,menubar=false,width=640,height=480,left=100,top=100,location=false,toolbar=false",
         );
+        throw new Error("id=524");
     }
 }

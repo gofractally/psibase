@@ -717,6 +717,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Handler for client-side permissions"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/postinstall.json
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Permissions/ui/dist/* /

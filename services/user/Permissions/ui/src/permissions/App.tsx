@@ -20,13 +20,17 @@ export const App = () => {
         const qps = getQueryParams();
         setParams(qps);
 
-        const isValidRequest = await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "admin",
-            method: "isValidRequest",
-            params: [qps.caller, qps.callee],
-        });
-        setIsValidPermRequest(isValidRequest);
+        try {
+            const isValidRequest = await supervisor.functionCall({
+                service: thisServiceName,
+                intf: "admin",
+                method: "isValidRequest",
+                params: [qps.caller, qps.callee],
+            });
+            setIsValidPermRequest(isValidRequest);
+        } catch (e) {
+            console.error(e);
+        }
 
         setIsLoading(false);
     };
@@ -67,15 +71,18 @@ export const App = () => {
 
     if (!isValidPermRequest) {
         console.error("Forged request detected.");
-        return <div>Forged request detected.</div>;
     }
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <Nav title="Grant access?" />
-            <p>
-                {`"${params.caller}" is requesting full access to "${params.callee}".`}
-            </p>
+            {isValidPermRequest ? (
+                <p>
+                    {`"${params.caller}" is requesting full access to "${params.callee}".`}
+                </p>
+            ) : (
+                <div>Forged request detected.</div>
+            )}
             <Button onClick={accept}>Accept</Button>
             <Button onClick={deny}>Deny</Button>
         </div>

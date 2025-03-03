@@ -34,10 +34,8 @@ export const client = {
     myServiceOrigin() {
         return host.myServiceOrigin();
     },
-};
-
-export const web = {
-    popup(url_path) {
-        return host.popup(url_path)
+    
+    promptUser(url_path) {
+        return host.promptUser(url_path)
     }
-}
+};

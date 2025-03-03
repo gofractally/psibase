@@ -48,22 +48,28 @@ impl CurrentAccessRequest {
     }
 
     pub fn is_valid_request(caller: &str, callee: &str) -> Result<bool, Error> {
+        println!("1");
         let perms_req = Keyvalue::get(PERM_OAUTH_REQ_KEY).map(|p| {
             PermissionRequest::unpacked(&p).expect("Failed to unpack current access request")
         });
+        println!("2");
         if perms_req.is_some() {
+            println!("3");
             // let perms_req = serde_json::from_str::<PermissionRequest>(
             //     &String::from_utf8(perms_req.unwrap()).unwrap(),
             // )
             // .map_err(|err| ErrorType::SerderError(err.to_string()))?;
             let perms_req = perms_req.unwrap();
+            println!("4");
 
             let is_expired = (TimePointSec::from(Utc::now()).seconds
                 - perms_req.expiry_timestamp.seconds)
                 >= PERM_REQUEST_EXPIRATION;
+            println!("5");
 
             return Ok(perms_req.caller == caller && perms_req.callee == callee && !is_expired);
         }
+        println!("6");
         Ok(false)
     }
     pub fn delete() -> Result<(), Error> {

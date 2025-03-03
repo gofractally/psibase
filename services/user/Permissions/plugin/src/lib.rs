@@ -5,7 +5,7 @@ use authority::verify_caller_is_this_app;
 use bindings::exports::permissions::plugin::{
     admin::Guest as Admin, api::Guest as Api, users::Guest as UsersApi,
 };
-use bindings::host::common::{client as HostClient, types::Error, web as CommonWeb};
+use bindings::host::common::{client as HostClient, types::Error};
 
 mod authority;
 mod db;
@@ -29,7 +29,7 @@ impl UsersApi for PermissionsPlugin {
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
             CurrentAccessRequest::set(&caller, &callee)?;
-            CommonWeb::popup(&format!("permissions.html?caller={caller}&callee={callee}"))?;
+            HostClient::prompt_user(&format!("permissions.html?caller={caller}&callee={callee}"))?;
             return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
         } else {
             Ok(true)

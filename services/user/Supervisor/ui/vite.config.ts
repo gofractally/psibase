@@ -1,5 +1,5 @@
-import path from "path";
-import { defineConfig } from "vite";
+import path, { resolve } from "path";
+import { defineConfig} from "vite";
 
 // TODO: This currently bundles common-lib. This is easier while we're developing. It should ultimately reference common-lib as an external resource.
 export default defineConfig({
@@ -16,5 +16,10 @@ export default defineConfig({
     build: {
         target: "esnext",
         minify: false,
+        // rollupOptions: {
+        //     input: {
+        //         perms: resolve(__dirname, "perms_oauth.html"),
+        //     }
+        // }
     },
 });

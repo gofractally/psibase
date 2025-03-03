@@ -99,17 +99,12 @@ interface client {
     /// Gets the full domain origin of the service from which the
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
-}
-
-interface web {
-    use types.{error};
-
-    popup: func(url-path: string) -> result<_, error>;
+    
+    prompt-user: func(url-path: string) -> result<_, error>;
 }
 
 world imports {
     import types;
     import server;
     import client;
-    import web;
 }

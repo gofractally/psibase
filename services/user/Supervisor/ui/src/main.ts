@@ -14,11 +14,34 @@ import {
     registerCallHandlers,
 } from "./windowMessaging";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-  <div>
-    Supervisor here
-  </div>
-`;
+const urlParams = new URLSearchParams(window.location.search);
+const id = urlParams.get('id');
+const returnUrl = urlParams.get('returnUrl');
+const caller = urlParams.get('caller');
+
+const appDiv = document.querySelector<HTMLDivElement>("#app")!;
+
+if (id && returnUrl && caller) {
+    // Create the iframe programmatically to have more control
+    const iframe = document.createElement('iframe');
+    
+    // Set up the iframe URL
+    const iframeUrl = new URL('http://permissions.psibase.localhost:8080/permissions.html');
+    iframeUrl.searchParams.set('caller', 'caller');
+    iframeUrl.searchParams.set('callee', 'callee');
+    
+    // Set up the iframe with minimal attributes
+    iframe.src = iframeUrl.toString();
+    iframe.style.width = '50%';
+    iframe.style.height = '50vh';
+    iframe.style.border = 'none';
+    
+    // Clear and append
+    appDiv.innerHTML = '';
+    appDiv.appendChild(iframe);
+} else {
+    appDiv.innerHTML = `<div>Supervisor here</div>`;
+}
 
 const supervisor: AppInterface = new Supervisor();
 const callHandlers: CallHandler[] = [];
