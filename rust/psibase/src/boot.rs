@@ -1,8 +1,8 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, GenesisActionData, MethodNumber, PackagedService,
-    Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
+    AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
+    PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -47,8 +47,14 @@ fn genesis_transaction<R: Read + Seek>(
     service_packages: &mut [PackagedService<R>],
 ) -> Result<SignedTransaction, anyhow::Error> {
     let mut services = vec![];
+    let mut essential = EssentialServices::new();
     for s in service_packages {
-        s.get_genesis(&mut services)?
+        s.get_genesis(&mut services)?;
+        // Only install the transact service and its dependencies
+        essential.remove(s.get_accounts());
+        if essential.is_empty() {
+            break;
+        }
     }
 
     let genesis_action_data = GenesisActionData {
@@ -109,6 +115,15 @@ pub fn get_initial_actions<R: Read + Seek>(
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
     let has_packages = true;
+
+    let mut essential = EssentialServices::new();
+    for s in &mut service_packages[..] {
+        if essential.is_empty() {
+            s.install_code(&mut actions)?;
+        } else {
+            essential.remove(s.get_accounts());
+        }
+    }
 
     for s in &mut service_packages[..] {
         for account in s.get_accounts() {
