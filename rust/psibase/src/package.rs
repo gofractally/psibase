@@ -1,5 +1,6 @@
 use crate::services::{
-    accounts, auth_delegate, http_server, packages, psi_brotli::brotli_impl, setcode, sites,
+    accounts, auth_delegate, http_server, packages, producers, psi_brotli::brotli_impl, setcode,
+    sites, transact,
 };
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
@@ -295,6 +296,22 @@ impl<R: Read + Seek> PackagedService<R> {
                 vmVersion: 0,
                 code: read(&mut self.archive.by_index(*index)?)?.into(),
             })
+        }
+        Ok(())
+    }
+    // This does the same work as get_genesis, for services that
+    // don't need to be installed in the boot block.
+    pub fn install_code(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        // service accounts
+        for (account, index, info) in &self.services {
+            actions.push(set_code_action(
+                *account,
+                read(&mut self.archive.by_index(*index)?)?.into(),
+            ));
+            let flags = translate_flags(&info.flags)?;
+            if flags != 0 {
+                actions.push(setcode::Wrapper::pack().setFlags(*account, flags));
+            }
         }
         Ok(())
     }
@@ -659,6 +676,50 @@ pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> 
     Ok(refs)
 }
 
+// services that should be installed first
+pub struct EssentialServices {
+    remaining: Vec<AccountNumber>,
+}
+
+impl EssentialServices {
+    pub fn new() -> Self {
+        Self {
+            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+        }
+    }
+    pub fn remove(&mut self, accounts: &[AccountNumber]) {
+        for account in accounts {
+            if let Some(idx) = self.remaining.iter().position(|a| a == account) {
+                self.remaining.swap_remove(idx);
+            }
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.remaining.is_empty()
+    }
+    pub fn intersects(&self, accounts: &[AccountNumber]) -> bool {
+        for account in accounts {
+            if self.remaining.iter().find(|a| *a == account).is_some() {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+pub fn get_essential_packages(
+    packages: &Vec<PackageInfo>,
+    essential_services: &EssentialServices,
+) -> Vec<String> {
+    let mut result = Vec::new();
+    for info in packages {
+        if essential_services.intersects(&info.accounts) {
+            result.push(info.name.clone());
+        }
+    }
+    result
+}
+
 #[async_trait(?Send)]
 pub trait PackageRegistry {
     type R: Read + Seek;
@@ -674,7 +735,9 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
+        let index = self.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        for op in solve_dependencies(index, make_refs(packages)?, vec![], essential, false)? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -1092,10 +1155,13 @@ impl PackageList {
         packages: &[String],
         reinstall: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
         solve_dependencies(
-            reg.index()?,
+            index,
             make_refs(packages)?,
             self.as_upgradable(),
+            essential,
             reinstall,
         )
     }

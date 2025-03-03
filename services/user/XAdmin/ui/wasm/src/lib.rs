@@ -98,8 +98,10 @@ impl Packages for XAdminPlugin {
         let index = serde_json::from_str(&index_json_str).map_err(|e| e.to_string())?;
         let pinned: Vec<(Meta, PackageDisposition)> = vec![];
         let refs = make_refs(&packages).map_err(|e| e.to_string())?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
 
-        let solved = solve_dependencies(index, refs, pinned, false).map_err(|e| e.to_string())?;
+        let solved =
+            solve_dependencies(index, refs, pinned, essential, false).map_err(|e| e.to_string())?;
 
         Ok(serde_json::to_string(&solved).map_err(|e| e.to_string())?)
     }
