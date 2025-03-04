@@ -19,6 +19,12 @@ pub struct InviteRecord {
     /// The creator of the invite object
     inviter: AccountNumber,
 
+    /// The application that created the invite
+    app: Option<AccountNumber>,
+
+    /// The domain of the application that created the invite
+    appDomain: Option<String>,
+
     /// The last account to accept or reject the invite
     actor: AccountNumber,
 
@@ -59,7 +65,11 @@ mod service {
     }
 
     #[action]
-    fn createInvite(inviteKey: SubjectPublicKeyInfo) {
+    fn createInvite(
+        inviteKey: SubjectPublicKeyInfo,
+        app: Option<AccountNumber>,
+        appDomain: Option<String>,
+    ) {
         unimplemented!()
     }
 

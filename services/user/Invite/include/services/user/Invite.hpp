@@ -41,8 +41,16 @@ namespace UserService
          /// 3. Creates the "invites-sys" system account used to create new accounts
          void init();
 
-         /// Creates and stores an invite object with the specified public key
-         void createInvite(Spki inviteKey);
+         /// Creates and stores a new invite object that can be used to create a new account
+         ///
+         /// Parameters:
+         /// - `inviteKey` is the public key of the invite.
+         /// - `app` is the account responsible for creating the invite. It is optional because it may
+         ///   not be able to be determined.
+         /// - `appDomain` is the domain of the app that created the invite.
+         void createInvite(Spki                                  inviteKey,
+                           std::optional<psibase::AccountNumber> app,
+                           std::optional<std::string>            appDomain);
 
          /// Called by existing Psibase accounts to accept an invite without creating
          /// a new Psibase account
@@ -127,7 +135,7 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(createInvite, inviteKey, inviter),
+         method(createInvite, inviteKey, app, appDomain),
          method(accept, inviteKey),
          method(acceptCreate, inviteKey, acceptedBy, newAccountKey),
          method(reject, inviteKey),

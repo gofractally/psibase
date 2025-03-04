@@ -24,8 +24,11 @@ pub trait TryParseGqlResponse: Sized {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InviteRecordSubset {
     pub inviter: psibase::AccountNumber,
+    pub app: Option<psibase::AccountNumber>,
+    pub app_domain: Option<String>,
     pub actor: psibase::AccountNumber,
     pub expiry: String,
     pub state: u8,

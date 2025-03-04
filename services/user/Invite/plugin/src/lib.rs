@@ -107,6 +107,8 @@ impl Invitee for InvitePlugin {
             r#"query {{
                 getInvite(pubkey: """{pubkey}""") {{
                     inviter,
+                    app,
+                    appDomain,
                     actor,
                     expiry,
                     state,
@@ -128,11 +130,22 @@ impl Invitee for InvitePlugin {
             }
         };
 
-        println!("Successfully decoded");
+        let app = invite.app.map(|app| app.to_string());
+
+        let app_domain = if invite.app_domain.is_none() {
+            if app.is_none() {
+                return Err(InvalidInvite("decode_invite").into());
+            } else {
+                Client::get_app_url(&app.clone().unwrap())
+            }
+        } else {
+            invite.app_domain.unwrap().to_string()
+        };
+
         Ok(Invite {
             inviter: invite.inviter.to_string(),
-            app: invite_token.app,
-            app_domain: invite_token.app_domain,
+            app,
+            app_domain,
             state: state,
             actor: invite.actor.to_string(),
             expiry,
@@ -144,19 +157,26 @@ impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, CommonTypes::Error> {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
+        let sender_app = Client::get_sender_app();
+        let app = match sender_app.app {
+            Some(app_str) => match psibase::AccountNumber::from_exact(&app_str) {
+                Ok(account) => Some(account),
+                Err(_) => return Err(InvalidAccount(&app_str).into()),
+            },
+            None => None,
+        };
+
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
                 inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
+                app,
+                appDomain: Some(sender_app.origin),
             }
             .packed(),
         )?;
 
-        let sender_app = Client::get_sender_app();
-
         let invite_token = InviteToken {
-            app: sender_app.app,
-            app_domain: sender_app.origin,
             pk: keypair.private_key,
         };
 

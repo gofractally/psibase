@@ -63,7 +63,9 @@ void Invite::init()
    to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "inviteAccepted"_m, 1);
 }
 
-void Invite::createInvite(Spki inviteKey)
+void Invite::createInvite(Spki                         inviteKey,
+                          std::optional<AccountNumber> app,
+                          std::optional<std::string>   appDomain)
 {
    auto inviteTable = Tables().open<InviteTable>();
    check(not inviteTable.get(inviteKey).has_value(), inviteAlreadyExists.data());
@@ -74,24 +76,24 @@ void Invite::createInvite(Spki inviteKey)
 
    if (settings.whitelist.size() > 0)
    {
-      bool whitelisted = find(settings.whitelist.begin(), settings.whitelist.end(), inviter)
-                         != settings.whitelist.end();
+      bool whitelisted = std::ranges::find(settings.whitelist, inviter) != settings.whitelist.end();
       check(whitelisted, onlyWhitelisted.data());
    }
    else if (settings.blacklist.size() > 0)
    {
-      bool blacklisted = find(settings.blacklist.begin(), settings.blacklist.end(), inviter)
-                         != settings.blacklist.end();
+      bool blacklisted = std::ranges::find(settings.blacklist, inviter) != settings.blacklist.end();
       check(not blacklisted, noBlacklisted.data());
    }
 
    // Add invite
    Seconds      secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
-       .pubkey  = inviteKey,
-       .inviter = inviter,
-       .expiry  = std::chrono::time_point_cast<Seconds>(to<Transact>().currentBlock().time)
-                 + secondsInWeek,
+       .pubkey    = inviteKey,
+       .inviter   = inviter,
+       .app       = app,
+       .appDomain = appDomain,
+       .expiry    = std::chrono::time_point_cast<Seconds>(to<Transact>().currentBlock().time) +
+                 secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
    };

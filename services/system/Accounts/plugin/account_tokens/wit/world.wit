@@ -4,8 +4,6 @@ interface types {
     use host:common/types.{origination-data};
 
     record invite-token {
-        app: option<string>,
-        app-domain: string,
         pk: string,
     }
 

@@ -37,6 +37,12 @@ namespace UserService
          /// The creator of the invite object
          psibase::AccountNumber inviter;
 
+         /// The app responsible for creating the invite
+         std::optional<psibase::AccountNumber> app;
+
+         /// The domain of the app responsible for creating the invite
+         std::optional<std::string> appDomain;
+
          /// The last account to accept or reject the invite
          psibase::AccountNumber actor;
 
@@ -53,11 +59,19 @@ namespace UserService
          ///  - rejected (2)
          uint8_t state;
 
-         auto secondary() const { return std::tie(inviter, pubkey); }
+         auto byInviter() const { return std::tie(inviter, pubkey); }
       };
-      PSIO_REFLECT(InviteRecord, pubkey, inviter, actor, expiry, newAccountToken, state);
+      PSIO_REFLECT(InviteRecord,
+                   pubkey,
+                   inviter,
+                   app,
+                   appDomain,
+                   actor,
+                   expiry,
+                   newAccountToken,
+                   state);
       using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::secondary>;
+          psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::byInviter>;
 
       struct NewAccountRecord
       {
