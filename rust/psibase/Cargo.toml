@@ -59,6 +59,7 @@ reqwest = { version = "0.11", default-features = false, features = [
     "rustls-tls",
     "gzip",
 ] }
+ring = { version = "0.17", features = ["std"] }
 rpassword = "7.2"
 secp256k1 = { version = "0.27", features = [
     "global-context",
