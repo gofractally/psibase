@@ -43,9 +43,10 @@ namespace SystemService
 
    void SetCode::init()
    {
-      auto refsTable = SetCode::Tables{}.open<CodeRefCountTable>();
+      auto refsTable = Tables{}.open<CodeRefCountTable>();
       auto codeTable =
           Table<CodeRow, &CodeRow::codeNum>{CodeRow::db, psio::convert_to_key(codePrefix())};
+      auto stagedTable = Tables{}.open<StagedCodeTable>();
       // clear ref counts table
       for (auto row : refsTable.getIndex<0>())
       {
@@ -53,6 +54,11 @@ namespace SystemService
       }
       // scan code table and increment ref counts
       for (auto row : codeTable.getIndex<0>())
+      {
+         incrementRefCount(refsTable, row.codeHash, row.vmType, row.vmVersion);
+      }
+      // scan staged code
+      for (auto row : stagedTable.getIndex<0>())
       {
          incrementRefCount(refsTable, row.codeHash, row.vmType, row.vmVersion);
       }
