@@ -65,6 +65,7 @@ custom_error! { pub K1Error
 #[derive(Debug, Clone)]
 struct PKCS8PrivateKeyK1 {
     key: secp256k1::SecretKey,
+    pubkey: Vec<u8>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -83,20 +84,9 @@ const OID_NIST_P256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10
 #[cfg(not(target_family = "wasm"))]
 impl Signer for PKCS8PrivateKeyK1 {
     fn get_claim(&self) -> crate::Claim {
-        let algid = spki::AlgorithmIdentifier {
-            oid: OID_ECDSA,
-            parameters: Some(OID_SECP256K1),
-        };
-        let pubkey =
-            secp256k1::PublicKey::from_secret_key(secp256k1::SECP256K1, &self.key).serialize();
-        let keydata = Encode::to_der(&SubjectPublicKeyInfo {
-            algorithm: algid,
-            subject_public_key: BitStringRef::from_bytes(&pubkey).unwrap(),
-        })
-        .unwrap();
         crate::Claim {
             service: AccountNumber::new(account_raw!("verify-sig")),
-            rawData: crate::Hex::from(keydata),
+            rawData: self.pubkey.clone().into(),
         }
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
@@ -569,16 +559,12 @@ pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
     let data = read_key_file(key, "PRIVATE KEY", Error::ExpectedPrivateKey)?;
     let pkcs8_key = data.decode_msg::<pkcs8::PrivateKeyInfo>()?;
     match pkcs8_key.algorithm.oids()? {
-        (OID_ECDSA, Some(OID_SECP256K1)) => Ok(Arc::new(PKCS8PrivateKeyK1 {
-            key: secp256k1::SecretKey::from_slice(
-                sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
-            )?,
-        })),
-        (OID_ECDSA, Some(OID_NIST_P256)) => {
+        (OID_ECDSA, Some(oid)) => {
             let algid = spki::AlgorithmIdentifier {
                 oid: OID_ECDSA,
-                parameters: Some(OID_NIST_P256),
+                parameters: Some(oid),
             };
+
             let pubkey = sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.public_key;
             let pubkey_info = Encode::to_der(&SubjectPublicKeyInfo {
                 algorithm: algid,
@@ -586,14 +572,23 @@ pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
                     &pubkey.ok_or(Error::PublicKeyRequired)?,
                 )?,
             })?;
-            Ok(Arc::new(EcdsaPrivateKey {
-                key_pair: ring::signature::EcdsaKeyPair::from_pkcs8(
-                    &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
-                    data.as_bytes(),
-                    get_system_random(),
-                )?,
-                pubkey: pubkey_info,
-            }))
+            match oid {
+                OID_SECP256K1 => Ok(Arc::new(PKCS8PrivateKeyK1 {
+                    key: secp256k1::SecretKey::from_slice(
+                        sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
+                    )?,
+                    pubkey: pubkey_info,
+                })),
+                OID_NIST_P256 => Ok(Arc::new(EcdsaPrivateKey {
+                    key_pair: ring::signature::EcdsaKeyPair::from_pkcs8(
+                        &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+                        data.as_bytes(),
+                        get_system_random(),
+                    )?,
+                    pubkey: pubkey_info,
+                })),
+                _ => Err(Error::KeyTypeNotSupported.into()),
+            }
         }
         _ => Err(Error::KeyTypeNotSupported.into()),
     }
