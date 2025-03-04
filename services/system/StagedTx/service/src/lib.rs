@@ -96,7 +96,7 @@ pub mod service {
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
         if staged_tx.auto_exec {
-            let authorized = staged_tx.senders().iter().all(|sender| {
+            let authorized = staged_tx.parties().iter().all(|sender| {
                 StagedTxPolicy::new(*sender)
                     .map_or(true, |policy| policy.does_auth(staged_tx.accepters()))
             });
@@ -121,7 +121,7 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::REJECTED);
 
-        let rejected = staged_tx.senders().iter().any(|sender| {
+        let rejected = staged_tx.parties().iter().any(|sender| {
             StagedTxPolicy::new(*sender)
                 .map_or(false, |policy| policy.does_reject(staged_tx.rejecters()))
         });

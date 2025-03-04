@@ -177,7 +177,7 @@ pub mod impls {
             staged_tx
         }
 
-        pub fn senders(&self) -> Vec<AccountNumber> {
+        pub fn parties(&self) -> Vec<AccountNumber> {
             let mut result: Vec<_> = self
                 .action_list
                 .actions
