@@ -252,6 +252,21 @@ namespace SystemService
          return ifNoneMatch && *ifNoneMatch == etag;
       }
 
+      void decRef(Sites::Tables& tables, SitesDataRefTable& refsTable, const Checksum256& hash)
+      {
+         auto prevRefs = refsTable.get(hash);
+         check(prevRefs.has_value(), "Invariant failure: missing ref count");
+         if (--prevRefs->refs == 0)
+         {
+            tables.open<SitesDataTable>().erase(hash);
+            refsTable.remove(*prevRefs);
+         }
+         else
+         {
+            refsTable.put(*prevRefs);
+         }
+      }
+
       // returns true if the link target exists
       bool linkImpl(Sites::Tables&             tables,
                     std::string                path,
@@ -279,14 +294,11 @@ namespace SystemService
             if (prev->contentHash != contentHash)
             {
                auto refsTable = tables.open<SitesDataRefTable>();
-               auto prevRefs  = refsTable.get(prev->contentHash);
-               check(prevRefs.has_value(), "Invariant failure: missing ref count");
+               decRef(tables, refsTable, prev->contentHash);
                auto refs = refsTable.get(contentHash)
                                .value_or(SitesDataRefRow{.hash = contentHash, .refs = 0});
                exists = refs.refs > 0;
-               --prevRefs->refs;
                ++refs.refs;
-               refsTable.put(*prevRefs);
                refsTable.put(refs);
             }
             else
@@ -512,7 +524,13 @@ namespace SystemService
    {
       Tables tables{};
       auto   table = tables.open<SitesContentTable>();
-      table.erase(SitesContentKey{getSender(), path});
+      if (auto existing = table.get(SitesContentKey{getSender(), path}))
+      {
+         table.remove(*existing);
+
+         auto refsTable = tables.open<SitesDataRefTable>();
+         decRef(tables, refsTable, existing->contentHash);
+      }
    }
 
    bool Sites::isValidPath(AccountNumber site, std::string path)
@@ -589,7 +607,7 @@ namespace SystemService
       if (path == "*")
       {
          auto siteTable = tables.open<SiteConfigTable>();
-         auto site = siteTable.get(getSender());
+         auto site      = siteTable.get(getSender());
          check(!!site, "Site not found");
          site->globalCsp = std::nullopt;
          siteTable.put(*site);
@@ -673,11 +691,7 @@ namespace SystemService
       {
          AccountNumber service;
 
-
-         auto getDefaultCsp() const -> std::string
-         {
-            return DEFAULT_CSP_HEADER;
-         }
+         auto getDefaultCsp() const -> std::string { return DEFAULT_CSP_HEADER; }
 
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
@@ -695,8 +709,7 @@ namespace SystemService
          auto getContent(AccountNumber account) const
          {
             auto tables = Sites::Tables{service};
-            
-            
+
             auto idx =
                 tables.open<SitesContentTable>().getIndex<0>().subindex<std::string>(account);
 
@@ -711,8 +724,8 @@ namespace SystemService
       PSIO_REFLECT(Query,                        //
                    method(getConfig, account),   //
                    method(getContent, account),  //
-                   method(getDefaultCsp)        //
-                   );
+                   method(getDefaultCsp)         //
+      );
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSitesApp(const HttpRequest& request)
