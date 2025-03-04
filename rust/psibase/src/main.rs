@@ -13,10 +13,10 @@ use psibase::{
     get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
     new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp,
-    PackageOrigin, PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
+    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1096,8 +1096,9 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
 
-    let mut id = Checksum256::default();
-    getrandom::getrandom(&mut id.0)?;
+    let mut id_bytes = <[u8; 8]>::default();
+    getrandom::getrandom(&mut id_bytes)?;
+    let id = u64::from_ne_bytes(id_bytes);
 
     let index_cell = Cell::new(0);
 

@@ -63,7 +63,7 @@ namespace UserService
                  .owner       = sender});
    }
 
-   void Packages::checkOrder(Checksum256 id, std::uint32_t index)
+   void Packages::checkOrder(std::uint64_t id, std::uint32_t index)
    {
       auto sender = getSender();
       auto table  = Tables(psibase::getReceiver()).open<TransactionOrderTable>();
@@ -77,7 +77,7 @@ namespace UserService
       table.put(row);
    }
 
-   void Packages::removeOrder(Checksum256 id)
+   void Packages::removeOrder(std::uint64_t id)
    {
       auto sender = getSender();
       auto table  = Tables(psibase::getReceiver()).open<TransactionOrderTable>();

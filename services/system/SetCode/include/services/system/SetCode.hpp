@@ -21,7 +21,7 @@ namespace SystemService
    {
       psibase::AccountNumber from;
       psibase::AccountNumber service;
-      psibase::Checksum256   id;
+      std::uint64_t          id;
       psibase::Checksum256   codeHash;
       std::uint8_t           vmType    = 0;
       std::uint8_t           vmVersion = 0;
@@ -66,13 +66,13 @@ namespace SystemService
       /// * `vmVersion` - Specifies the version of the WebAssembly VM. Currently must be equal to 0.
       /// * `code`      - A byte array containing the compiled code to upload
       void stageCode(psibase::AccountNumber service,
-                     psibase::Checksum256   id,
+                     std::uint64_t          id,
                      std::uint8_t           vmType,
                      std::uint8_t           vmVersion,
                      std::vector<char>      code);
 
       /// Removes previously staged code.
-      void unstageCode(psibase::AccountNumber service, psibase::Checksum256 id);
+      void unstageCode(psibase::AccountNumber service, std::uint64_t id);
 
       /// Loads compiled service code that was previously uploaded by stageCode
       ///
@@ -82,7 +82,7 @@ namespace SystemService
       /// * `vmVersion` - Specifies the version of the WebAssembly VM. Currently must be equal to 0.
       /// * `codeHash`  - SHA256 of the compiled code
       void setCodeStaged(psibase::AccountNumber from,
-                         psibase::Checksum256   id,
+                         std::uint64_t          id,
                          std::uint8_t           vmType,
                          std::uint8_t           vmVersion,
                          psibase::Checksum256   codeHash);

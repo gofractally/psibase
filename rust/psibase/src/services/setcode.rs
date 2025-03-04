@@ -10,25 +10,19 @@ mod service {
     }
 
     #[action]
-    fn stageCode(
-        service: AccountNumber,
-        id: Checksum256,
-        vmType: u8,
-        vmVersion: u8,
-        code: Hex<Vec<u8>>,
-    ) {
+    fn stageCode(service: AccountNumber, id: u64, vmType: u8, vmVersion: u8, code: Hex<Vec<u8>>) {
         unimplemented!();
     }
 
     #[action]
-    fn unstageCode(service: AccountNumber, id: Checksum256) {
+    fn unstageCode(service: AccountNumber, id: u64) {
         unimplemented!();
     }
 
     #[action]
     fn setCodeStaged(
         from: AccountNumber,
-        id: Checksum256,
+        id: u64,
         vmType: u8,
         vmVersion: u8,
         codeHash: Checksum256,

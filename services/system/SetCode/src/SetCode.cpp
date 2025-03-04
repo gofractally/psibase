@@ -112,7 +112,7 @@ namespace SystemService
    }  // setCode
 
    void SetCode::stageCode(psibase::AccountNumber service,
-                           Checksum256            id,
+                           std::uint64_t          id,
                            uint8_t                vmType,
                            uint8_t                vmVersion,
                            std::vector<char>      code)
@@ -148,7 +148,7 @@ namespace SystemService
       stagedCode.put(row);
    }
 
-   void SetCode::unstageCode(psibase::AccountNumber service, Checksum256 id)
+   void SetCode::unstageCode(psibase::AccountNumber service, std::uint64_t id)
    {
       auto sender     = getSender();
       auto tables     = Tables{};
@@ -163,7 +163,7 @@ namespace SystemService
    }
 
    void SetCode::setCodeStaged(psibase::AccountNumber from,
-                               Checksum256            id,
+                               std::uint64_t          id,
                                uint8_t                vmType,
                                uint8_t                vmVersion,
                                psibase::Checksum256   codeHash)

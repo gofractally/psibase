@@ -63,7 +63,7 @@ namespace UserService
    struct TransactionOrder
    {
       psibase::AccountNumber owner;
-      psibase::Checksum256   id;
+      std::uint64_t          id;
       std::uint32_t          index;
 
       auto key() const { return std::tuple(owner, id); }
@@ -87,8 +87,8 @@ namespace UserService
       ///
       /// - id: A unique id that identifies the group of transactions
       /// - index: Counter that starts at 0 and must increment by one with each call
-      void checkOrder(psibase::Checksum256 id, std::uint32_t index);
-      void removeOrder(psibase::Checksum256 id);
+      void checkOrder(std::uint64_t id, std::uint32_t index);
+      void removeOrder(std::uint64_t id);
    };
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),

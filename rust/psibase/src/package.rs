@@ -330,7 +330,7 @@ impl<R: Read + Seek> PackagedService<R> {
 
                 if let Some(uploader) = &mut uploader {
                     let index = uploader.next_file_index();
-                    let tmp_path = format!("/.staged/{}/{}", uploader.id, index);
+                    let tmp_path = format!("/.staged/{:016X}/{}", uploader.id, index);
                     let tmp_sender = uploader.sender;
                     let content_hash: [u8; 32] = Sha256::digest(&content).into();
 
@@ -601,14 +601,14 @@ impl ActionSink for Vec<Action> {
 }
 
 pub struct StagedUpload {
-    pub id: Checksum256,
+    pub id: u64,
     pub sender: AccountNumber,
     pub actions: Vec<Action>,
     file_index: u32,
 }
 
 impl StagedUpload {
-    pub fn new(id: Checksum256, sender: AccountNumber) -> Self {
+    pub fn new(id: u64, sender: AccountNumber) -> Self {
         StagedUpload {
             id,
             sender,
