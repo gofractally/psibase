@@ -1,0 +1,10 @@
+package rand:plugin;
+
+interface api {
+    rand-bytes: func(nr-bytes: u32) -> list<u8>;
+    rand-u32: func() -> u32;
+}
+
+world imports {
+    import api;
+}

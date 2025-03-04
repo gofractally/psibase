@@ -1,0 +1,5 @@
+package rand:plugin;
+
+world impl {
+    export api;
+}

@@ -315,6 +315,7 @@ add_rs_component_workspace(services/:Plugins
     clientdata
     invite
     permissions
+    rand
     sites
     test
     tokens
@@ -417,6 +418,17 @@ psibase_package(
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})"
     SERVICE base64
         DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Rand.psi
+    NAME Rand
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Random number generator"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})"
+    SERVICE rand
+        DATA ${Plugins_OUTPUT_FILE_rand} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 
@@ -844,7 +856,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers Registry
+                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers Rand Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -854,7 +866,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
     PACKAGE_DEPENDS Accounts AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers Registry
+                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers Rand Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -891,7 +903,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AuthAny AuthDelegate AuthSig Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
+    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers Rand TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -923,6 +935,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/Producers.psi
+          ${SERVICE_DIR}/Rand.psi
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Sites.psi
