@@ -246,6 +246,7 @@ ExternalProject_Add(
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
     services/system/AuthSig/ui:AuthSig_js
+    services/system/Producers/ui:Producers_js
     services/user/Branding/ui:Branding_js
     services/user/Chainmail/ui:Chainmail_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
@@ -603,11 +604,13 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-producers
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/ui/dist/* /
     SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
+    DEPENDS ${Producers_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})"
 )
 

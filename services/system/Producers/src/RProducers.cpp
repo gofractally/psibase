@@ -64,7 +64,7 @@ std::optional<HttpReply> RProducers::serveSys(HttpRequest request)
    if (auto result = serveGraphQL(request, ProducerQuery{}))
       return result;
 
-   if (auto result = serveSimpleUI<Producers, true>(request))
+   if (auto result = serveSimpleUI<Producers, false>(request))
       return result;
 
    return {};
