@@ -15,7 +15,7 @@
 #include "unix_http_session.hpp"
 
 #include <boost/asio/bind_executor.hpp>
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio/strand.hpp>
@@ -87,7 +87,7 @@ namespace psibase::http
 
    struct server_impl : server_state
    {
-      net::io_service          ioc;
+      net::io_context          ioc;
       std::vector<std::thread> threads = {};
       shutdown_tracker         thread_count;
 
