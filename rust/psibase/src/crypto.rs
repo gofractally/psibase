@@ -52,6 +52,7 @@ custom_error! {
     PublicKeyNotFound   = "Public key not found",
     KeyTypeNotSupported = "Key type not supported",
     BadPinSource        = "Cannot interpret pin-source",
+    PublicKeyRequired   = "Private key does not include public key",
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -76,6 +77,8 @@ pub trait Signer: std::fmt::Debug + Sync + Send {
 const OID_ECDSA: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.2.1");
 #[cfg(not(target_family = "wasm"))]
 const OID_SECP256K1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.132.0.10");
+#[cfg(not(target_family = "wasm"))]
+const OID_NIST_P256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.3.1.7");
 
 #[cfg(not(target_family = "wasm"))]
 impl Signer for PKCS8PrivateKeyK1 {
@@ -102,6 +105,36 @@ impl Signer for PKCS8PrivateKeyK1 {
             .sign_ecdsa(&digest, &self.key)
             .serialize_compact()
             .into()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[derive(Debug)]
+struct EcdsaPrivateKey {
+    key_pair: ring::signature::EcdsaKeyPair,
+    pubkey: Vec<u8>,
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn get_system_random() -> &'static ring::rand::SystemRandom {
+    static INSTANCE: OnceLock<ring::rand::SystemRandom> = OnceLock::new();
+    INSTANCE.get_or_init(|| ring::rand::SystemRandom::new())
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl Signer for EcdsaPrivateKey {
+    fn get_claim(&self) -> crate::Claim {
+        crate::Claim {
+            service: AccountNumber::new(account_raw!("verify-sig")),
+            rawData: crate::Hex::from(self.pubkey.clone()),
+        }
+    }
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
+        self.key_pair
+            .sign(get_system_random(), data)
+            .expect("Failed to sign")
+            .as_ref()
+            .to_vec()
     }
 }
 
@@ -541,6 +574,27 @@ pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
                 sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
             )?,
         })),
+        (OID_ECDSA, Some(OID_NIST_P256)) => {
+            let algid = spki::AlgorithmIdentifier {
+                oid: OID_ECDSA,
+                parameters: Some(OID_NIST_P256),
+            };
+            let pubkey = sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.public_key;
+            let pubkey_info = Encode::to_der(&SubjectPublicKeyInfo {
+                algorithm: algid,
+                subject_public_key: BitStringRef::from_bytes(
+                    &pubkey.ok_or(Error::PublicKeyRequired)?,
+                )?,
+            })?;
+            Ok(Arc::new(EcdsaPrivateKey {
+                key_pair: ring::signature::EcdsaKeyPair::from_pkcs8(
+                    &ring::signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+                    data.as_bytes(),
+                    get_system_random(),
+                )?,
+                pubkey: pubkey_info,
+            }))
+        }
         _ => Err(Error::KeyTypeNotSupported.into()),
     }
 }
