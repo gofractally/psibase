@@ -19,8 +19,9 @@ namespace SystemService
       psibase::TimePointUSec propose_date;
       psibase::AccountNumber proposer;
       ActionList             action_list;
+      bool                   auto_exec;
    };
-   PSIO_REFLECT(StagedTx, id, txid, propose_block, propose_date, proposer, action_list)
+   PSIO_REFLECT(StagedTx, id, txid, propose_block, propose_date, proposer, action_list, auto_exec)
 
    struct Response
    {
@@ -53,7 +54,8 @@ namespace SystemService
       /// Returns the ID of the database record containing the staged transaction.
       ///
       /// * `actions` - The actions to be staged
-      uint32_t propose(const std::vector<psibase::Action>& actions);
+      /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
+      uint32_t propose(const std::vector<psibase::Action>& actions, bool auto_exec);
 
       /// Removes (deletes) a staged transaction
       ///
@@ -78,6 +80,14 @@ namespace SystemService
       /// * `txid`: The unique txid of the staged transaction
       void reject(uint32_t id, psibase::Checksum256 txid);
 
+      /// Executes a transaction
+      ///
+      /// This is only needed when automatic execution is disabled
+      ///
+      /// * `id`: The ID of the database record containing the staged transaction
+      /// * `txid`: The unique txid of the staged transaction
+      void execute(uint32_t id, psibase::Checksum256 txid);
+
       /// Gets a staged transaction by id.
       ///
       /// * `id`: The ID of the database record containing the staged transaction
@@ -87,10 +97,11 @@ namespace SystemService
    // clang-format off
    PSIO_REFLECT(StagedTxService,
       method(init),
-      method(propose, actions),
+      method(propose, actions, auto_exec),
       method(remove, id, txid),
       method(accept, id, txid),
       method(reject, id, txid),
+      method(execute, id, txid),
       method(get_staged_tx, id),
    );
    // clang-format on

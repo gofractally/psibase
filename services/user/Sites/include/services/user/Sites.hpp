@@ -11,15 +11,32 @@ namespace SystemService
       psibase::AccountNumber     account         = {};
       std::string                path            = {};
       std::string                contentType     = {};
-      std::vector<char>          content         = {};
-      uint64_t                   hash            = 0;
+      psibase::Checksum256       contentHash     = {};
       std::optional<std::string> contentEncoding = std::nullopt;
       std::optional<std::string> csp             = std::nullopt;
 
       SitesContentKey key() const { return SitesContentKey{account, path}; }
    };
-   PSIO_REFLECT(SitesContentRow, account, path, contentType, content, hash, contentEncoding, csp)
+   PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
    using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
+
+   struct SitesDataRow
+   {
+      psibase::Checksum256 hash;
+      std::vector<char>    data;
+   };
+   PSIO_REFLECT(SitesDataRow, hash, data)
+
+   using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
+
+   struct SitesDataRefRow
+   {
+      psibase::Checksum256 hash;
+      std::uint32_t        refs;
+   };
+   PSIO_REFLECT(SitesDataRefRow, hash, refs)
+
+   using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
 
    struct SiteConfigRow
    {
@@ -61,7 +78,8 @@ namespace SystemService
    {
      public:
       static constexpr auto service = psibase::AccountNumber("sites");
-      using Tables                  = psibase::ServiceTables<SitesContentTable, SiteConfigTable>;
+      using Tables                  = psibase::
+          ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
@@ -71,6 +89,12 @@ namespace SystemService
                     std::string                contentType,
                     std::optional<std::string> contentEncoding,
                     std::vector<char>          content);
+
+      /// Adds a hard-link to a file. The file must already exist.
+      void hardlink(std::string                path,
+                    std::string                contentType,
+                    std::optional<std::string> contentEncoding,
+                    psibase::Checksum256       contentHash);
 
       /// Removes content from the caller's subdomain
       void remove(std::string path);
@@ -113,6 +137,7 @@ namespace SystemService
    PSIO_REFLECT(Sites,
                 method(serveSys, request),
                 method(storeSys, path, contentType, contentEncoding, content),
+                method(hardlink, path, contentType, contentEncoding, contentHash),
                 method(remove, path),
                 method(isValidPath, site, path),
                 method(enableSpa, enable),

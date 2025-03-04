@@ -13,14 +13,14 @@ pub struct StagedTxPolicy {
     service_caller: ServiceCaller,
 }
 impl StagedTxPolicy {
-    pub fn new(user: AccountNumber) -> Self {
-        StagedTxPolicy {
+    pub fn new(user: AccountNumber) -> Option<Self> {
+        Some(StagedTxPolicy {
             user,
             service_caller: ServiceCaller {
                 sender: Wrapper::SERVICE,
-                service: get_auth_service(user).unwrap(),
+                service: get_auth_service(user)?,
             },
-        }
+        })
     }
 
     pub fn does_auth(&self, accepters: Vec<AccountNumber>) -> bool {

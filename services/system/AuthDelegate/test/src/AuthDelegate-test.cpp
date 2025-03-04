@@ -115,7 +115,7 @@ SCENARIO("AuthDelegate")
       }
       THEN("Bob can stage a tx for alice, which auto-executes")
       {
-         auto propose = bob.to<StagedTxService>().propose(proposed);
+         auto propose = bob.to<StagedTxService>().propose(proposed, true);
          REQUIRE(propose.succeeded());
          REQUIRE(aliceNfts() == 1);
       }
@@ -125,13 +125,13 @@ SCENARIO("AuthDelegate")
 
          THEN("Charlie can stage a tx for alice, which does not auto-execute")
          {
-            auto propose = charlie.to<StagedTxService>().propose(proposed);
+            auto propose = charlie.to<StagedTxService>().propose(proposed, true);
             REQUIRE(propose.succeeded());
             REQUIRE(aliceNfts() == 0);
          }
          WHEN("Charlie stages a tx for alice")
          {
-            auto id   = charlie.to<StagedTxService>().propose(proposed).returnVal();
+            auto id   = charlie.to<StagedTxService>().propose(proposed, true).returnVal();
             auto txid = charlie.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
 
             THEN("Bob can accept it, executing it")
@@ -157,13 +157,13 @@ SCENARIO("AuthDelegate")
 
          THEN("Charlie can stage a tx for alice, which does not auto-execute")
          {
-            auto propose = charlie.to<StagedTxService>().propose(proposed);
+            auto propose = charlie.to<StagedTxService>().propose(proposed, true);
             REQUIRE(propose.succeeded());
             REQUIRE(aliceNfts() == 0);
          }
          WHEN("Charlie stages a tx for alice")
          {
-            auto id   = charlie.to<StagedTxService>().propose(proposed).returnVal();
+            auto id   = charlie.to<StagedTxService>().propose(proposed, true).returnVal();
             auto txid = charlie.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
 
             THEN("Dana can accept it, executing it")

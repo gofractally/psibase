@@ -7,4 +7,14 @@ mod service {
     fn postinstall(package: Meta, manifest: Hex<Vec<u8>>) {
         unimplemented!()
     }
+
+    #[action]
+    fn checkOrder(id: u64, index: u32) {
+        unimplemented!();
+    }
+
+    #[action]
+    fn removeOrder(id: u64) {
+        unimplemented!();
+    }
 }

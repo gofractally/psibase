@@ -214,12 +214,12 @@ SCENARIO("Producers")
 
          THEN("Anyone can stage a tx for alice/bob")
          {
-            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id));
+            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id), true);
             REQUIRE(proposeBob.succeeded());
             REQUIRE(getNfts(t, bob.id) == 0);
             auto proposeBobId = proposeBob.returnVal();
 
-            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id));
+            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id), true);
             REQUIRE(proposeAlice.succeeded());
             REQUIRE(getNfts(t, alice.id) == 0);
             auto proposeAliceId = proposeAlice.returnVal();
@@ -291,12 +291,12 @@ SCENARIO("Producers")
 
          THEN("Anyone can stage a tx for alice/bob")
          {
-            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id));
+            auto proposeBob = rando.to<StagedTxService>().propose(proposed(bob.id), true);
             REQUIRE(proposeBob.succeeded());
             REQUIRE(getNfts(t, bob.id) == 0);
             auto proposeBobId = proposeBob.returnVal();
 
-            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id));
+            auto proposeAlice = rando.to<StagedTxService>().propose(proposed(alice.id), true);
             REQUIRE(proposeAlice.succeeded());
             REQUIRE(getNfts(t, alice.id) == 0);
             auto proposeAliceId = proposeAlice.returnVal();
