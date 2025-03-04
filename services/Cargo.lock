@@ -16,7 +16,6 @@ dependencies = [
 name = "account-tokens"
 version = "0.15.0"
 dependencies = [
- "base64 0.22.1",
  "psibase",
  "wit-bindgen-rt 0.34.0",
 ]
@@ -25,7 +24,6 @@ dependencies = [
 name = "accounts"
 version = "0.15.0"
 dependencies = [
- "base64 0.22.1",
  "psibase",
  "serde",
  "serde_json",
@@ -347,6 +345,14 @@ name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+
+[[package]]
+name = "base64"
+version = "0.15.0"
+dependencies = [
+ "base64 0.22.1",
+ "wit-bindgen-rt 0.39.0",
+]
 
 [[package]]
 name = "base64"

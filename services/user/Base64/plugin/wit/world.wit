@@ -1,0 +1,11 @@
+package base64:plugin;
+
+interface api {
+    use host:common/types.{error};
+    encode: func(input: list<u8>) -> string;
+    decode: func(input: string) -> result<list<u8>, error>;
+}
+
+world imports {
+    import api;
+}
