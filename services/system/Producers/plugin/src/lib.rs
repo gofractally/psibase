@@ -83,8 +83,7 @@ impl Api for ProducersPlugin {
         staged_tx::plugin::proposer::set_propose_latch(Some(
             &services::producers::SERVICE.to_string(),
         ))?;
-
-        add_action_to_transaction(Actions::setConsensus::ACTION_NAME, &set_prods.packed())
+        add_action_to_transaction(Actions::setProducers::ACTION_NAME, &set_prods.packed())
     }
 }
 
