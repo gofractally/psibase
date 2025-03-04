@@ -1,3 +1,4 @@
+import { Account } from "@/lib/zod/Account";
 import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -12,13 +13,13 @@ export const useCanExportAccount = (account?: string | null) =>
                 plugin: "plugin",
                 intf: "api",
                 method: "getAccount",
-                params: [account] as any,
+                params: [Account.parse(account)],
             });
 
             const accountInfo = z
                 .object({
                     accountNum: z.string(),
-                    authService: z.string(),
+                    authService: Account,
                     resourceBalance: z.bigint(),
                 })
                 .parse(response);
