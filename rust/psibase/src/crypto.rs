@@ -541,7 +541,7 @@ pub fn load_private_key(key: &str) -> Result<Arc<dyn Signer>, anyhow::Error> {
                 sec1::EcPrivateKey::from_der(pkcs8_key.private_key)?.private_key,
             )?,
         })),
-        _ => Err(Error::ExpectedPrivateKey.into()),
+        _ => Err(Error::KeyTypeNotSupported.into()),
     }
 }
 
