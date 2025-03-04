@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { FunctionCallArgs, Supervisor, siblingUrl } from "@psibase/common-lib";
+import {
+  FunctionCallArgs,
+  siblingUrl,
+  type Supervisor,
+} from "@psibase/common-lib";
 
 function withArgs(
   service: string,

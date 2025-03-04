@@ -1,7 +1,9 @@
-import { SchemaFunction } from "../types";
-import { camelCase, withArgs } from "../utils";
-import { Supervisor } from "@psibase/common-lib";
+import type { Supervisor } from "@psibase/common-lib";
+import type { SchemaFunction } from "../types";
+
 import { useState } from "react";
+
+import { camelCase, withArgs } from "../utils";
 import { TabControl } from "./TabControl";
 
 interface ExecutionTabsProps {

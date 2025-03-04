@@ -1,9 +1,9 @@
 import "./App.css";
-import { Supervisor } from "@psibase/common-lib";
+import { getSupervisor } from "@psibase/common-lib";
 import { PluginLoader } from "./PluginLoader";
 import { LoginBar } from "./LoginBar";
 
-const supervisor = new Supervisor();
+const supervisor = getSupervisor();
 
 export default function App() {
   return (

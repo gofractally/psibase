@@ -1,6 +1,7 @@
+import type { Supervisor } from "@psibase/common-lib";
+import type { SchemaFunction } from "./types";
+
 import { useState, useEffect } from "react";
-import { Supervisor } from "@psibase/common-lib";
-import { SchemaFunction } from "./types";
 import { ServiceInput } from "./components/ServiceInput";
 import { ExecutionTabs } from "./components/ExecutionTabs";
 import { FunctionSelector } from "./components/FunctionSelector";

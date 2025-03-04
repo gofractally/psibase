@@ -1,6 +1,7 @@
+import type { Supervisor } from "@psibase/common-lib";
+import type { Schema } from "../types";
+
 import { useState, useEffect, useCallback } from "react";
-import { Supervisor } from "@psibase/common-lib";
-import { Schema } from "../types";
 
 export function usePluginSchema(supervisor: Supervisor) {
   const [schemaText, setSchemaText] = useState("");
