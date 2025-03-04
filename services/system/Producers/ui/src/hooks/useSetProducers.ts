@@ -2,7 +2,25 @@ import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-const PubKeyPem = z
+export const Account = z
+  .string()
+  .min(1, { message: "Account must be at least 1 character." })
+  .max(18, { message: "Account must be at most 18 characters." })
+  .regex(/^[a-z][a-z0-9-]*$/, {
+    message:
+      "Account must start with a letter and contain only lowercase letters, numbers, and hyphens.",
+  })
+  .refine((val) => !val.endsWith("-"), {
+    message: "Account may not end with a hyphen.",
+  })
+  .refine((val) => !val.startsWith("-"), {
+    message: "Account may not start with a hyphen.",
+  })
+  .refine((val) => !val.startsWith("x-"), {
+    message: "Account may not start with 'x-'.",
+  });
+
+export const PubKeyPem = z
   .string()
   .regex(/-----BEGIN PUBLIC KEY-----[\s\S]*-----END PUBLIC KEY-----/, {
     message: "Invalid PEM key format",
@@ -28,7 +46,7 @@ const AuthClaim = z.discriminatedUnion("tag", [
 
 const Producer = z.object({
   authClaim: AuthClaim,
-  name: z.string(),
+  name: Account,
 });
 
 export const Modes = z.enum(["cft", "bft", "existing"]);

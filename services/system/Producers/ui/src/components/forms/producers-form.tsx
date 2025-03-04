@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Params } from "@/hooks/useSetProducers";
+import { siblingUrl } from "@psibase/common-lib";
 
 export type ProducersFormData = z.infer<typeof Params>;
 
@@ -107,12 +108,20 @@ export const ProducersForm = ({
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            CFT has a tolerance of N / 2 node failures but requires{" "}
-            <span className="text-foreground">all nodes</span> to be honest.
+            <a
+              className="hover:text-primary underline underline-offset-2"
+              href={siblingUrl(
+                undefined,
+                "docs",
+                "/specifications/blockchain/peer-consensus"
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              BFT vs CFT - What's the difference?
+            </a>
           </p>
-          <p className="text-sm text-muted-foreground">
-            BFT can tolerate N / 3 nodes acting maliciously.
-          </p>
+
           {form.formState.errors.mode && (
             <p className="text-sm text-destructive">
               {form.formState.errors.mode.message}
