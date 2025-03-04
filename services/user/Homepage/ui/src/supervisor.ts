@@ -1,7 +1,5 @@
-import { Supervisor, siblingUrl } from "@psibase/common-lib";   
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 
-const supervisorSrc = siblingUrl(undefined, "supervisor", undefined, false);
-
-export const supervisor = new Supervisor({
-    supervisorSrc,
+export const supervisor = getSupervisor({
+    supervisorSrc: siblingUrl(undefined, "supervisor", undefined, false),
 });
