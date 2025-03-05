@@ -379,6 +379,16 @@ namespace psibase
          self.result_value.assign(o->value.pos, o->value.end);
          return self.result_value.size();
       }
+
+      KvResourceDelta& getDelta(KvResourceMap& deltas, const KvResourceKey& key)
+      {
+         auto pos = std::ranges::lower_bound(deltas, key, {}, &KvResourcePair::first);
+         if (pos == deltas.end())
+         {
+            pos = deltas.insert(pos, KvResourcePair{key, {}});
+         }
+         return pos->second;
+      }
    }  // namespace
 
    uint32_t NativeFunctions::getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -541,7 +551,8 @@ namespace psibase
              auto w = getDbWrite(*this, db, {key.data(), key.size()});
              if (w.chargeable)
              {
-                auto& delta = transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
+                auto& delta =
+                    getDelta(transactionContext.kvResourceDeltas, KvResourceKey{code.codeNum, db});
                 delta.records += 1;
                 delta.keyBytes += key.size();
                 delta.valueBytes += value.size();
@@ -620,8 +631,8 @@ namespace psibase
                     {
                        if (auto existing = database.kvGetRaw(w.db, {key.data(), key.size()}))
                        {
-                          auto& delta =
-                              transactionContext.kvResourceDeltas[KvResourceKey{code.codeNum, db}];
+                          auto& delta = getDelta(transactionContext.kvResourceDeltas,
+                                                 KvResourceKey{code.codeNum, db});
                           delta.records -= 1;
                           delta.keyBytes -= key.size();
                           delta.valueBytes -= existing->remaining();
@@ -713,10 +724,7 @@ namespace psibase
    //       maybe include intrinsic usage so transact can veto?
    uint32_t NativeFunctions::kvGetTransactionUsage()
    {
-      auto seq  = transactionContext.kvResourceDeltas.extract_sequence();
-      auto size = setResult(*this, psio::convert_to_frac(seq));
-      transactionContext.kvResourceDeltas.adopt_sequence(boost::container::ordered_unique_range,
-                                                         std::move(seq));
+      auto size = setResult(*this, psio::convert_to_frac(transactionContext.kvResourceDeltas));
       return size;
    }
 
