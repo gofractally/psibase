@@ -31,29 +31,54 @@ mod service {
 
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
+    ///
+    /// * `actions`: The actions to be staged
+    /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
     #[action]
-    fn propose(actions: Vec<Action>) -> u32 {
+    fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
         unimplemented!()
     }
 
     /// Removes (deletes) a staged transaction
+    ///
     /// A staged transaction can only be removed by its proposer.
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn remove(id: u32, txid: Checksum256) {
         unimplemented!()
     }
 
     /// Indicates that the caller accepts the specified staged transaction
+    ///
     /// Depending on the staging rules enforced by the auth service of the sender
     /// of the staged transaction, this could result in the execution of the transaction.
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn accept(id: u32, txid: Checksum256) {
         unimplemented!()
     }
 
     /// Indicates that the caller rejects the staged transaction
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
     #[action]
     fn reject(id: u32, txid: Checksum256) {
+        unimplemented!()
+    }
+
+    /// Executes a transaction
+    ///
+    /// This is only needed when automatic execution is disabled
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
+    #[action]
+    fn execute(id: u32, txid: Checksum256) {
         unimplemented!()
     }
 

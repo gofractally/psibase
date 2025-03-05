@@ -240,6 +240,16 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
         }
         Ok(result)
     }
+    // Returns the number of transactions that would be created if the
+    // builder were finished now.
+    pub fn num_transactions(&self) -> usize {
+        let complete = self.transactions.iter().map(|group| group.1.len()).sum();
+        if !self.actions.is_empty() {
+            return complete + 1;
+        } else {
+            return complete;
+        }
+    }
 }
 
 impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink

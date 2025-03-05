@@ -140,19 +140,19 @@ SCENARIO("AuthSig")
       }
       THEN("Alice can self-stage a tx, which auto-executes")
       {
-         auto propose = alice.to<StagedTxService>().propose(proposedMint);
+         auto propose = alice.to<StagedTxService>().propose(proposedMint, true);
          REQUIRE(propose.succeeded());
          REQUIRE(getNfts(t, alice.id).size() == 1);
       }
       THEN("Bob can stage a tx for alice, which does not auto-execute")
       {
-         auto propose = bob.to<StagedTxService>().propose(proposedMint);
+         auto propose = bob.to<StagedTxService>().propose(proposedMint, true);
          REQUIRE(propose.succeeded());
          REQUIRE(getNfts(t, alice.id).size() == 0);
       }
       WHEN("Bob stages a tx for alice")
       {
-         auto id   = bob.to<StagedTxService>().propose(proposedMint).returnVal();
+         auto id   = bob.to<StagedTxService>().propose(proposedMint, true).returnVal();
          auto txid = bob.to<StagedTxService>().get_staged_tx(id).returnVal().txid;
 
          THEN("Alice can accept it, executing it")
@@ -189,10 +189,12 @@ SCENARIO("AuthSig")
 
          AND_WHEN("Alice proposes a swap")
          {
-            auto proposed = alice.to<StagedTxService>().propose(std::vector<Action>{
-                creditNft(alice.id, bob.id, aliceNftId),  //
-                creditNft(bob.id, alice.id, bobNftId)     //
-            });
+            auto proposed = alice.to<StagedTxService>().propose(
+                std::vector<Action>{
+                    creditNft(alice.id, bob.id, aliceNftId),  //
+                    creditNft(bob.id, alice.id, bobNftId)     //
+                },
+                true);
             REQUIRE(proposed.succeeded());
             auto id = proposed.returnVal();
 

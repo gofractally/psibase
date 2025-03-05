@@ -638,6 +638,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-setcode
+        INIT
     SERVICE r-setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
     DEPENDS wasm

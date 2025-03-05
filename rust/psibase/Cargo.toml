@@ -24,7 +24,7 @@ form_urlencoded = "1.2.1"
 fracpack = { version = "0.15.0", path = "../fracpack" }
 flate2 = "1.0"
 futures = "0.3"
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.2", features = ["js", "std"] }
 include_dir = "0.7.3"
 indexmap = { version = "2.2.6", features = ["std", "serde"] }
 sha2 = "0.10"

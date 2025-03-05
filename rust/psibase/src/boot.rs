@@ -134,7 +134,7 @@ pub fn get_initial_actions<R: Read + Seek>(
 
         if install_ui {
             s.reg_server(&mut actions)?;
-            s.store_data(&mut actions, compression_level)?;
+            s.store_data(&mut actions, None, compression_level)?;
         }
 
         s.postinstall(&mut actions)?;

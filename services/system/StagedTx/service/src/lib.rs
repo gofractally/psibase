@@ -66,10 +66,11 @@ pub mod service {
     /// Proposes a new staged transaction containing the specified actions.
     /// Returns the ID of the database record containing the staged transaction.
     ///
-    /// * `actions` - The actions to be staged
+    /// * `actions`: The actions to be staged
+    /// * `auto_exec`: Enables automatic execution as soon as the transaction has enough approvals
     #[action]
-    fn propose(actions: Vec<Action>) -> u32 {
-        let new_tx = StagedTx::add(actions);
+    fn propose(actions: Vec<Action>, auto_exec: bool) -> u32 {
+        let new_tx = StagedTx::add(actions, auto_exec);
 
         emit_update(new_tx.txid.clone(), StagedTxEvent::PROPOSED);
 
@@ -94,16 +95,17 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
-        let authorized = staged_tx
-            .action_list
-            .actions
-            .iter()
-            .all(|action| StagedTxPolicy::new(action.sender).does_auth(staged_tx.accepters()));
+        if staged_tx.auto_exec {
+            let authorized = staged_tx.parties().iter().all(|sender| {
+                StagedTxPolicy::new(*sender)
+                    .map_or(true, |policy| policy.does_auth(staged_tx.accepters()))
+            });
 
-        debug_print(&format!("authorized: {}\n", authorized.to_string()));
+            debug_print(&format!("authorized: {}\n", authorized.to_string()));
 
-        if authorized {
-            execute(staged_tx);
+            if authorized {
+                execute_impl(staged_tx);
+            }
         }
     }
 
@@ -119,10 +121,10 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::REJECTED);
 
-        let rejected =
-            staged_tx.action_list.actions.iter().any(|action| {
-                StagedTxPolicy::new(action.sender).does_reject(staged_tx.rejecters())
-            });
+        let rejected = staged_tx.parties().iter().any(|sender| {
+            StagedTxPolicy::new(*sender)
+                .map_or(false, |policy| policy.does_reject(staged_tx.rejecters()))
+        });
 
         if rejected {
             staged_tx.delete();
@@ -149,8 +151,10 @@ pub mod service {
         emit_update(staged_tx.txid, StagedTxEvent::DELETED);
     }
 
-    fn execute(staged_tx: StagedTx) {
+    fn execute_impl(staged_tx: StagedTx) {
         debug_print("Executing staged tx\n");
+
+        let accepters = staged_tx.accepters();
         staged_tx.delete();
 
         staged_tx
@@ -165,12 +169,32 @@ pub mod service {
                     &action.method.to_string()
                 ));
 
+                if !StagedTxPolicy::new(action.sender)
+                    .unwrap_or_else(|| {
+                        abort_message(&format!("account {} does not exist", action.sender))
+                    })
+                    .does_auth(accepters.clone())
+                {
+                    abort_message(&format!("Authorization for {} failed", action.sender));
+                }
                 let act = action.packed();
                 unsafe { native_raw::call(act.as_ptr(), act.len() as u32) };
             });
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::EXECUTED);
         emit_update(staged_tx.txid, StagedTxEvent::DELETED);
+    }
+
+    /// Executes a transaction
+    ///
+    /// This is only needed when automatic execution is disabled
+    ///
+    /// * `id`: The ID of the database record containing the staged transaction
+    /// * `txid`: The unique txid of the staged transaction
+    #[action]
+    fn execute(id: u32, txid: Checksum256) {
+        let staged_tx = StagedTx::get(id, txid);
+        execute_impl(staged_tx);
     }
 
     /// Gets a staged transaction by id.
