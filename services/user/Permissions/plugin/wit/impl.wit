@@ -3,7 +3,7 @@ package permissions:plugin;
 interface admin {
     use host:common/types.{error};
 
-    is-valid-request: func(caller: string, callee: string) -> result<bool, error>;
+    is-valid-request: func(id: string, caller: string, callee: string) -> result<bool, error>;
 }
 
 world impl {

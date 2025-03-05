@@ -294,21 +294,17 @@ export class Supervisor implements AppInterface {
                     plugin: args.plugin,
                 },
             ]);
-
             this.context = new CallContext();
-
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.
             assertTruthy(
                 this.parentOrigination,
                 "Parent origination corrupted",
             );
-
             // Starts the tx context.
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
-
             const result = this.call(this.parentOrigination, args);
 
             // Closes the current tx context. If actions were added, tx is submitted.

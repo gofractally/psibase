@@ -18,6 +18,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const id = urlParams.get('id');
 const returnUrl = urlParams.get('returnUrl');
 const caller = urlParams.get('caller');
+// const callee = urlParams.get('callee');
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 
@@ -27,8 +28,10 @@ if (id && returnUrl && caller) {
     
     // Set up the iframe URL
     const iframeUrl = new URL('http://permissions.psibase.localhost:8080/permissions.html');
-    iframeUrl.searchParams.set('caller', 'caller');
-    iframeUrl.searchParams.set('callee', 'callee');
+    iframeUrl.searchParams.set('id', id);
+    iframeUrl.searchParams.set('caller', caller);
+    // iframeUrl.searchParams.set('callee', callee);
+    iframeUrl.searchParams.set('returnUrl', returnUrl);
     
     // Set up the iframe with minimal attributes
     iframe.src = iframeUrl.toString();
@@ -48,18 +51,24 @@ const callHandlers: CallHandler[] = [];
 
 const shouldHandleMessage = (message: MessageEvent) => {
     const isTop = message.source == window.top;
+    const isTopSupervisor = !isTop && window.top?.location.origin == siblingUrl(null, "supervisor", null, true);
     const isParent = message.source == window.parent;
     const protocol = new URL(message.origin).protocol + "//";
     const urlSuffix = siblingUrl().slice(protocol.length);
     const isSameRootDomain = message.origin.endsWith(urlSuffix);
 
-    return isTop && isParent && isSameRootDomain;
+    const shouldRespond = (isTop || isTopSupervisor) && isParent && isSameRootDomain;
+    if (!shouldRespond) {
+        console.error("Supervisor rejected postMessage()");
+    }
+    return shouldRespond;
 };
 
 // When the supervisor is first loaded, all it does is register some handlers for
 //   calls from the parent window, and also tells the parent window that it's ready.
-addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
-    supervisor.entry(msg.origin, msg.data.id, msg.data.args),
+addCallHandler(callHandlers, isFunctionCallRequest, (msg) => {
+    supervisor.entry(msg.origin, msg.data.id, msg.data.args);
+}
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
     supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),

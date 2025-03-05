@@ -28,20 +28,30 @@ impl UsersApi for PermissionsPlugin {
 
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
-            CurrentAccessRequest::set(&caller, &callee)?;
-            HostClient::prompt_user(&format!("permissions.html?caller={caller}&callee={callee}"))?;
-            return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
+            println!("is_permitted().accessGrant.is_none(); setting a current access request");
+            let req_id = CurrentAccessRequest::set(&caller, &callee)?;
+            // HostClient::prompt_user(&format!("permissions.html?caller={caller}&c`allee={callee}"))?;
+            return Err(ErrorType::RequestRedirect(format!("{}", req_id).to_string()).into());
+            // return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
         } else {
+            println!("is_permitted().accessGrant.is_some()");
             Ok(true)
         }
     }
 }
 
 impl Admin for PermissionsPlugin {
-    fn is_valid_request(caller: String, callee: String) -> Result<bool, Error> {
+    fn is_valid_request(id: String, caller: String, callee: String) -> Result<bool, Error> {
+        println!("permissions::plugin.is_valid_request().id: {}", id);
         verify_caller_is_this_app()?;
-        let is_valid = CurrentAccessRequest::is_valid_request(&caller, &callee)?;
+        println!("permissions::plugin.is_valid_request().2");
+        let is_valid = CurrentAccessRequest::is_valid_request(&id, &caller, &callee)?;
+        println!(
+            "permissions::plugin.is_valid_request().3.is_valid: {}",
+            is_valid
+        );
         CurrentAccessRequest::delete()?;
+        println!("permissions::plugin.is_valid_request().4");
         return Ok(is_valid);
     }
 }
