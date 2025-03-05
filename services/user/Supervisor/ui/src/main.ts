@@ -27,8 +27,6 @@ if (id && returnUrl) {
     // Set up the iframe URL
     const iframeUrl = new URL('http://permissions.psibase.localhost:8080/permissions.html');
     iframeUrl.searchParams.set('id', id);
-    // iframeUrl.searchParams.set('caller', caller);
-    // iframeUrl.searchParams.set('callee', callee);
     iframeUrl.searchParams.set('returnUrl', returnUrl);
     
     // Set up the iframe with minimal attributes

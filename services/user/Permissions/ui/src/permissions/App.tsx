@@ -6,7 +6,6 @@ import { supervisor } from "./perms_main";
 import { useQuery } from "@tanstack/react-query";
 
 export const App = () => {
-    console.info("Permissions::App.tsx...");
     const thisServiceName = "permissions";
     const [params, setParams] = useState<any>({});
 
@@ -17,7 +16,6 @@ export const App = () => {
     } = useQuery({
         queryKey: ["validPermRequest"],
         queryFn: async () => {
-            console.log("validPermRequest.queryFn().top...");
             await supervisor.onLoaded();
 
             const qps = getQueryParams();
@@ -46,7 +44,7 @@ export const App = () => {
 
         try {
             // Method 1: Try window.top navigation
-            console.log("Method 1");
+            console.log("followReturnRedirect().retUrl: ", params.returnUrl);
             if (window.top) {
                 window.top.location.href = retUrl;
             }
@@ -76,8 +74,6 @@ export const App = () => {
         } catch (e) {
             console.error("error saving permission: ", e);
         }
-        console.log("accept().params.returnUrl: ", params.returnUrl);
-
         followReturnRedirect();
     };
     const deny = () => {
@@ -89,18 +85,9 @@ export const App = () => {
         return Object.fromEntries(urlParams.entries());
     };
 
-    // if (error) {
-    //     return <div>Error...</div>;
-    // }
-
     if (isLoading) {
         return <div>Loading...</div>;
     } else {
-        // if (!isLoading) {
-        // if (!params.caller || !params.callee) {
-        //     console.error("Malformed query params: ", window.location.href);
-        // }
-
         if (!validPermRequest) {
             console.error("Forged request detected.");
         }
@@ -108,11 +95,7 @@ export const App = () => {
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            {/* <Nav title="Grant access?" /> */}
             <h2 style={{ textAlign: "center" }}>Grant access?</h2>
-            {<div>Params: {JSON.stringify(params)}</div>}
-            {error && <div>Error: {JSON.stringify(error)}</div>}
-            {<div>Loading: {isLoading ? "true" : "false"}</div>}
             {!!validPermRequest ? (
                 <p>
                     {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}

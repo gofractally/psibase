@@ -36,7 +36,6 @@ impl AccessGrants {
             .expect("Failed to set access grant")
     }
     pub fn get(caller: &str, callee: &str) -> Option<Vec<u8>> {
-        println!("AccessGrants::get().caller: {}, callee: {}", caller, callee);
         Keyvalue::get(&format!("{callee}<-{caller}"))
     }
 }
@@ -55,49 +54,30 @@ impl CurrentAccessRequest {
                 expiry_timestamp: TimePointSec::from(Utc::now()),
             }
             .packed(),
-        )?;
-        // .expect("Failed to set current access request")
+        )
+        .expect("Failed to set current access request");
         Ok(req_id)
     }
 
-    pub fn get_valid_perm_request(
-        id: &str,
-        // caller: &str,
-        // callee: &str,
-    ) -> Result<Option<ValidPermissionRequest>, Error> {
-        println!("get_valid_perm_request().id: {}", id);
+    pub fn get_valid_perm_request(id: &str) -> Result<Option<ValidPermissionRequest>, Error> {
         let perms_req = Keyvalue::get(PERM_OAUTH_REQ_KEY).map(|p| {
             PermissionRequest::unpacked(&p).expect("Failed to unpack current access request")
         });
-        println!("get_valid_perm_request().2.perms_req: {:?}", perms_req);
         if perms_req.is_some() {
-            println!("get_valid_perm_request().3");
-            // let perms_req = serde_json::from_str::<PermissionRequest>(
-            //     &String::from_utf8(perms_req.unwrap()).unwrap(),
-            // )
-            // .map_err(|err| ErrorType::SerderError(err.to_string()))?;
             let perms_req = perms_req.unwrap();
-            println!("get_valid_perm_request().4.id: {}", perms_req.id);
 
             let is_expired = (TimePointSec::from(Utc::now()).seconds
                 - perms_req.expiry_timestamp.seconds)
                 >= PERM_REQUEST_EXPIRATION;
-            println!("get_valid_perm_request().5");
 
-            // return Ok(perms_req.id == id
-            //     && perms_req.caller == caller
-            //     // && perms_req.callee == callee
-            //     && !is_expired);
-            if is_expired {
-                return Ok(None);
+            if !is_expired && id == perms_req.id {
+                return Ok(Some(ValidPermissionRequest {
+                    id: perms_req.id,
+                    caller: perms_req.caller,
+                    callee: perms_req.callee,
+                }));
             }
-            return Ok(Some(ValidPermissionRequest {
-                id: perms_req.id,
-                caller: perms_req.caller,
-                callee: perms_req.callee,
-            }));
         }
-        println!("get_valid_perm_request().6");
         Ok(None)
     }
     pub fn delete() -> Result<(), Error> {
