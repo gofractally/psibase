@@ -204,7 +204,7 @@ TEST_CASE("joint consensus crash", "[combined]")
    runFor(ctx, 2min);
    timer.cancel();
    ctx.poll();
-   ctx.reset();
+   ctx.restart();
 
    nodes.connect_all();
    runFor(ctx, 30s);
@@ -241,7 +241,7 @@ TEST_CASE("fork at commit consensus change", "[combined]")
    {
       nodes[1].sendto(AccountNumber{"a"}, message);
       ctx.poll();
-      ctx.reset();
+      ctx.restart();
    };
    auto boot_block = nodes.nodes[0]->head();
 

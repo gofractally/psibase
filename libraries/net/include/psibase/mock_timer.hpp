@@ -1,5 +1,7 @@
 #pragma once
 
+#include <boost/asio/executor_work_guard.hpp>
+#include <boost/asio/post.hpp>
 #include <chrono>
 #include <deque>
 #include <functional>
@@ -43,8 +45,10 @@ namespace psibase::test
       {
          _impl->bind = [&ctx](const auto& f)
          {
-            return [&ctx, f, work = typename ExecutionContext::work{ctx}](const std::error_code& ec)
-            { ctx.post([f, ec] { f(ec); }); };
+            using work_type =
+                boost::asio::executor_work_guard<typename ExecutionContext::executor_type>;
+            return [f, work = work_type{ctx.get_executor()}](const std::error_code& ec)
+            { boost::asio::post(work.get_executor(), [f, ec] { f(ec); }); };
          };
       }
       ~mock_timer();
