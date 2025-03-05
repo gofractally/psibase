@@ -7,6 +7,7 @@ import tempfile
 import time
 import datetime
 import calendar
+from hashlib import sha256
 from collections import namedtuple
 import psibase
 from psibase import MethodNumber, Action, Transaction, SignedTransaction, ServiceSchema
@@ -169,18 +170,21 @@ class PrivateKey:
         from cryptography.hazmat.primitives.hashes import SHA256
         from cryptography.hazmat.primitives.asymmetric import ec, utils
         result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
-        (r, s) = utils.decode_dss_signature(signature)
+        (r, s) = utils.decode_dss_signature(result)
         return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
     def claim(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
         pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
-        return {"service": "auth-sig", "rawData": pub}
+        return {"service": "verify-sig", "rawData": pub}
     def pkcs8(self):
         from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
         return self.private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
     def spki(self):
         from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
         return self.private.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
+    def spki_der(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        return self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
 
 class API:
     '''Provides an interface to the HTTP API of a psinode server based on requests'''
@@ -244,9 +248,9 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        trx.claims += [key.claim for key in keys]
+        trx.claims += [key.claim() for key in keys]
         trx = self.pack_transaction(trx)
-        digest = sha256().digest(trx)
+        digest = sha256(trx).digest()
         signatures = [key.sign_prehashed(digest) for key in keys]
         packed = self.pack_signed_transaction(trx, signatures)
         with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
@@ -255,13 +259,13 @@ class API:
             if trace['error'] is not None:
                 raise TransactionError(trace)
             return trace
-    def push_action(self, sender, service, method, data):
+    def push_action(self, sender, service, method, data, keys=[]):
         '''
         Push a transaction consisting of a single action to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]))
+        return self.push_transaction(Transaction(self.get_tapos(), actions=[Action(sender, service, method, data)], claims=[]), keys=keys)
 
     # Transactions for key system services
     def set_producers(self, prods, algorithm=None):
@@ -374,13 +378,13 @@ class Service(object):
         '''HTTP DELETE request'''
         return self.request('DELETE', path, **kw)
 
-    def push_action(self, sender, method, data):
+    def push_action(self, sender, method, data, keys=[]):
         '''
         Push a transaction consisting of a single action to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        return self.api.push_action(sender, self.service, method, data)
+        return self.api.push_action(sender, self.service, method, data, keys)
     def graphql(self, query):
         '''
         Sends a GraphQL query to a service and returns the result as json

@@ -2,11 +2,13 @@
 
 from psinode import Cluster, PrivateKey
 from predicates import *
+from services import *
 import testutil
 import time
 import json
 import zipfile
 import tempfile
+import requests
 import hashlib
 import unittest
 import os
@@ -140,6 +142,35 @@ class TestPsibase(unittest.TestCase):
         a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
         a.wait(new_block())
         a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
+
+    @testutil.psinode_test
+    def test_staged_install(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        accounts = Accounts(a)
+        auth_sig = AuthSig(a)
+        staged_tx = StagedTx(a)
+
+        key = PrivateKey()
+        key_file = os.path.join(a.dir, 'key')
+
+        accounts.new_account('b')
+        auth_sig.set_key('a', key)
+        a.wait(new_block())
+
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'b'])
+        a.wait(new_block())
+
+        # This should fail because the transaction was only proposed
+        with self.assertRaises(requests.HTTPError):
+            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
+
+        for tx in staged_tx.get_staged(proposer='b'):
+            staged_tx.accept('a', tx, keys=[key])
+
+        a.wait(new_block())
+        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
