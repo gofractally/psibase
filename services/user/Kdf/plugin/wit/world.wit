@@ -9,8 +9,16 @@ interface types {
 interface api {
     use types.{keytype};
  
-    /// Derive a key from a password and a salt.
-    derive-key: func(%type: keytype , seed: u64, salt: string) -> list<u8>;
+    /// Derive a key
+    /// 
+    /// Arguments:
+    /// - type: The type of key to derive
+    /// - seed: The seed from which to derive the key
+    /// - salt: The salt from which to derive the key
+    /// 
+    /// Returns:
+    /// - The derived key
+    derive-key: func(%type: keytype , seed: list<u8>, salt: string) -> list<u8>;
 }
 
 world imports {
