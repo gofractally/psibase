@@ -1763,6 +1763,7 @@ dependencies = [
  "psibase_names",
  "regex",
  "reqwest",
+ "ring",
  "ripemd",
  "rpassword",
  "scopeguard",
