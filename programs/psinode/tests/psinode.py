@@ -152,6 +152,36 @@ class GraphQLError(Exception):
         super().__init__(json['errors']['message'])
         self.json = json
 
+class PrivateKey:
+    def __init__(self, data=None):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding, load_pem_private_key, load_der_private_key
+        if data is None:
+            self.private = ec.generate_private_key(ec.SECP256R1)
+        else:
+            try:
+                self.private = load_pem_private_key(data)
+            except ValueError:
+                self.private = load_der_public_key(data)
+            if not isinstance(self.private, ec.EllipticCurvePrivateKey) or self.private.curve != ec.SECP256R1:
+                raise Exception("Only P-256 keys are supported")
+    def sign_prehashed(self, digest):
+        from cryptography.hazmat.primitives.hashes import SHA256
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+        result = self.private.sign(digest, ec.ECDSA(utils.Prehashed(SHA256())))
+        (r, s) = utils.decode_dss_signature(signature)
+        return r.to_bytes(32, byteorder='big') + s.to_bytes(32, byteorder='big')
+    def claim(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        pub = self.private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        return {"service": "auth-sig", "rawData": pub}
+    def pkcs8(self):
+        from cryptography.hazmat.primitives.serialization import PrivateFormat, Encoding, NoEncryption
+        return self.private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()).decode()
+    def spki(self):
+        from cryptography.hazmat.primitives.serialization import PublicFormat, Encoding
+        return self.private.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
+
 class API:
     '''Provides an interface to the HTTP API of a psinode server based on requests'''
     def __init__(self, url, session=None):
@@ -208,13 +238,17 @@ class API:
         elif isinstance(trx, Transaction):
             trx = self.pack_transaction(trx).hex()
         return SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
-    def push_transaction(self, trx):
+    def push_transaction(self, trx, keys=[]):
         '''
         Push a transaction to the chain and return the transaction trace
 
         Raise TransactionError if the transaction fails
         '''
-        packed = self.pack_signed_transaction(trx)
+        trx.claims += [key.claim for key in keys]
+        trx = self.pack_transaction(trx)
+        digest = sha256().digest(trx)
+        signatures = [key.sign_prehashed(digest) for key in keys]
+        packed = self.pack_signed_transaction(trx, signatures)
         with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()

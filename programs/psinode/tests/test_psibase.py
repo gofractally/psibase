@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from psinode import Cluster
+from psinode import Cluster, PrivateKey
 from predicates import *
 import testutil
 import time
@@ -124,6 +124,22 @@ class TestPsibase(unittest.TestCase):
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    @testutil.psinode_test
+    def test_sign(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        key = PrivateKey()
+        key_file = os.path.join(a.dir, 'key')
+        pubkey_file = os.path.join(a.dir, 'key.pub')
+        with open(key_file, 'w') as f:
+            f.write(key.pkcs8())
+        with open(pubkey_file, 'w') as f:
+            f.write(key.spki())
+        a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
+        a.wait(new_block())
+        a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
 
     def assertResponse(self, response, expected):
         response.raise_for_status()
