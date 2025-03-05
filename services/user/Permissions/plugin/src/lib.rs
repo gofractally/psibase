@@ -7,6 +7,8 @@ use bindings::exports::permissions::plugin::{
 };
 use bindings::host::common::{client as HostClient, types::Error};
 
+use bindings::exports::permissions::plugin::types::ValidPermissionsRequest;
+
 mod authority;
 mod db;
 mod errors;
@@ -41,18 +43,26 @@ impl UsersApi for PermissionsPlugin {
 }
 
 impl Admin for PermissionsPlugin {
-    fn is_valid_request(id: String, caller: String, callee: String) -> Result<bool, Error> {
-        println!("permissions::plugin.is_valid_request().id: {}", id);
+    fn get_valid_perm_request(
+        id: String,
+        // caller: String,
+        // callee: String,
+    ) -> Result<Option<ValidPermissionsRequest>, Error> {
+        println!("permissions::plugin.get_valid_perm_request().id: {}", id);
         verify_caller_is_this_app()?;
-        println!("permissions::plugin.is_valid_request().2");
-        let is_valid = CurrentAccessRequest::is_valid_request(&id, &caller, &callee)?;
+        println!("permissions::plugin.get_valid_perm_request().2");
+        let valid_perm_req = CurrentAccessRequest::get_valid_perm_request(&id)?; // , &caller, &callee)?;
         println!(
-            "permissions::plugin.is_valid_request().3.is_valid: {}",
-            is_valid
+            "permissions::plugin.get_valid_perm_request().3.valid_perm_req: {:?}",
+            valid_perm_req
         );
         CurrentAccessRequest::delete()?;
-        println!("permissions::plugin.is_valid_request().4");
-        return Ok(is_valid);
+        println!("permissions::plugin.get_valid_perm_request().4");
+        return Ok(valid_perm_req.map(|v| ValidPermissionsRequest {
+            id: v.id,
+            caller: v.caller,
+            callee: v.callee,
+        }));
     }
 }
 

@@ -1,15 +1,25 @@
 package permissions:plugin;
 
+interface types {
+    record valid-permissions-request {
+        id: string,
+        caller: string,
+        callee: string,
+    }
+}
+
 interface admin {
     use host:common/types.{error};
+    use types.{valid-permissions-request};
 
-    is-valid-request: func(id: string, caller: string, callee: string) -> result<bool, error>;
+    get-valid-perm-request: func(id: string) -> result<option<valid-permissions-request>, error>;
 }
 
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
 
+    export types;
     export api;
     export users;
     export admin;

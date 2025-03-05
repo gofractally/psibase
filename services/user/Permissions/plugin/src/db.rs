@@ -21,6 +21,13 @@ struct PermissionRequest {
     expiry_timestamp: TimePointSec,
 }
 
+#[derive(Serialize, Deserialize, Debug, Pack, Unpack)]
+pub struct ValidPermissionRequest {
+    pub id: String,
+    pub caller: String,
+    pub callee: String,
+}
+
 pub struct AccessGrants;
 
 impl AccessGrants {
@@ -53,36 +60,45 @@ impl CurrentAccessRequest {
         Ok(req_id)
     }
 
-    pub fn is_valid_request(id: &str, caller: &str, callee: &str) -> Result<bool, Error> {
-        println!(
-            "is_valid_request().id: {}, caller: {}, callee: {}",
-            id, caller, callee
-        );
+    pub fn get_valid_perm_request(
+        id: &str,
+        // caller: &str,
+        // callee: &str,
+    ) -> Result<Option<ValidPermissionRequest>, Error> {
+        println!("get_valid_perm_request().id: {}", id);
         let perms_req = Keyvalue::get(PERM_OAUTH_REQ_KEY).map(|p| {
             PermissionRequest::unpacked(&p).expect("Failed to unpack current access request")
         });
-        println!("is_valid_request().2.perms_req: {:?}", perms_req);
+        println!("get_valid_perm_request().2.perms_req: {:?}", perms_req);
         if perms_req.is_some() {
-            println!("is_valid_request().3");
+            println!("get_valid_perm_request().3");
             // let perms_req = serde_json::from_str::<PermissionRequest>(
             //     &String::from_utf8(perms_req.unwrap()).unwrap(),
             // )
             // .map_err(|err| ErrorType::SerderError(err.to_string()))?;
             let perms_req = perms_req.unwrap();
-            println!("is_valid_request().4.id: {}", perms_req.id);
+            println!("get_valid_perm_request().4.id: {}", perms_req.id);
 
             let is_expired = (TimePointSec::from(Utc::now()).seconds
                 - perms_req.expiry_timestamp.seconds)
                 >= PERM_REQUEST_EXPIRATION;
-            println!("is_valid_request().5");
+            println!("get_valid_perm_request().5");
 
-            return Ok(perms_req.id == id
-                && perms_req.caller == caller
-                // && perms_req.callee == callee
-                && !is_expired);
+            // return Ok(perms_req.id == id
+            //     && perms_req.caller == caller
+            //     // && perms_req.callee == callee
+            //     && !is_expired);
+            if is_expired {
+                return Ok(None);
+            }
+            return Ok(Some(ValidPermissionRequest {
+                id: perms_req.id,
+                caller: perms_req.caller,
+                callee: perms_req.callee,
+            }));
         }
-        println!("is_valid_request().6");
-        Ok(false)
+        println!("get_valid_perm_request().6");
+        Ok(None)
     }
     pub fn delete() -> Result<(), Error> {
         Ok(Keyvalue::delete(PERM_OAUTH_REQ_KEY))

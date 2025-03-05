@@ -17,19 +17,17 @@ import {
 const urlParams = new URLSearchParams(window.location.search);
 const id = urlParams.get('id');
 const returnUrl = urlParams.get('returnUrl');
-const caller = urlParams.get('caller');
-// const callee = urlParams.get('callee');
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 
-if (id && returnUrl && caller) {
+if (id && returnUrl) {
     // Create the iframe programmatically to have more control
     const iframe = document.createElement('iframe');
     
     // Set up the iframe URL
     const iframeUrl = new URL('http://permissions.psibase.localhost:8080/permissions.html');
     iframeUrl.searchParams.set('id', id);
-    iframeUrl.searchParams.set('caller', caller);
+    // iframeUrl.searchParams.set('caller', caller);
     // iframeUrl.searchParams.set('callee', callee);
     iframeUrl.searchParams.set('returnUrl', returnUrl);
     
