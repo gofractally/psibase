@@ -1,0 +1,18 @@
+package kdf:plugin;
+
+interface types {
+    enum keytype {
+        aes,
+    }
+}
+
+interface api {
+    use types.{keytype};
+ 
+    /// Derive a key from a password and a salt.
+    derive-key: func(%type: keytype , seed: u64, salt: string) -> list<u8>;
+}
+
+world imports {
+    import api;
+}

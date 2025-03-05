@@ -12,6 +12,7 @@ members = [
     "user/ClientData/plugin",
     "user/Invite/plugin",
     "user/Invite/plugin_AuthInvite",
+    "user/Kdf/plugin",
     "user/Sites/plugin",
     "user/Supervisor/plugin",
     "user/Permissions/plugin",
