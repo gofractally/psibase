@@ -62,6 +62,27 @@ namespace UserService
                  .accounts    = std::move(package.accounts),
                  .owner       = sender});
    }
+
+   void Packages::checkOrder(std::uint64_t id, std::uint32_t index)
+   {
+      auto sender = getSender();
+      auto table  = Tables(psibase::getReceiver()).open<TransactionOrderTable>();
+      auto row =
+          table.getIndex<0>().get(std::tuple(sender, id)).value_or(TransactionOrder{sender, id, 0});
+      if (index != row.index)
+      {
+         abortMessage("Index should be " + std::to_string(row.index));
+      }
+      ++row.index;
+      table.put(row);
+   }
+
+   void Packages::removeOrder(std::uint64_t id)
+   {
+      auto sender = getSender();
+      auto table  = Tables(psibase::getReceiver()).open<TransactionOrderTable>();
+      table.erase(std::tuple(sender, id));
+   }
 }  // namespace UserService
 
 PSIBASE_DISPATCH(UserService::Packages)

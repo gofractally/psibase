@@ -8,13 +8,13 @@ import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { Archived, Drafts, Editor, Home, Sent, Saved, Viewer } from "@routes";
 import { TooltipProvider } from "@shadcn/tooltip";
 
-import { Supervisor } from "@psibase/common-lib";
+import { getSupervisor } from "@psibase/common-lib";
 
 import DefaultLayout from "./layouts/default";
 
 import "./styles/globals.css";
 
-export const supervisor = new Supervisor();
+export const supervisor = getSupervisor();
 const queryClient = new QueryClient();
 
 const router = createBrowserRouter([

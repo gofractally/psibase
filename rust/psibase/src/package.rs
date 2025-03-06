@@ -1,5 +1,6 @@
 use crate::services::{
-    accounts, auth_delegate, http_server, packages, psi_brotli::brotli_impl, setcode, sites,
+    accounts, auth_delegate, http_server, packages, producers, psi_brotli::brotli_impl, setcode,
+    sites, transact,
 };
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
@@ -298,6 +299,22 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    // This does the same work as get_genesis, for services that
+    // don't need to be installed in the boot block.
+    pub fn install_code(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        // service accounts
+        for (account, index, info) in &self.services {
+            actions.push(set_code_action(
+                *account,
+                read(&mut self.archive.by_index(*index)?)?.into(),
+            ));
+            let flags = translate_flags(&info.flags)?;
+            if flags != 0 {
+                actions.push(setcode::Wrapper::pack().setFlags(*account, flags));
+            }
+        }
+        Ok(())
+    }
     pub fn has_service(&self, service: AccountNumber) -> bool {
         for (account, _, _) in &self.services {
             if *account == service {
@@ -309,6 +326,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn store_data(
         &mut self,
         actions: &mut Vec<Action>,
+        mut uploader: Option<&mut StagedUpload>,
         compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
@@ -327,14 +345,42 @@ impl<R: Read + Seek> PackagedService<R> {
                 let (content, content_encoding) =
                     compress_content(&content, t.essence_str(), compression_level);
 
-                actions.push(
-                    sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
-                        path.to_string(),
-                        t.essence_str().to_string(),
-                        content_encoding,
-                        content.into(),
-                    ),
-                );
+                if let Some(uploader) = &mut uploader {
+                    let index = uploader.next_file_index();
+                    let tmp_path = format!("/.staged/{:016X}/{}", uploader.id, index);
+                    let tmp_sender = uploader.sender;
+                    let content_hash: [u8; 32] = Sha256::digest(&content).into();
+
+                    uploader.actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE).storeSys(
+                            tmp_path.clone(),
+                            t.essence_str().to_string(),
+                            content_encoding.clone(),
+                            content.into(),
+                        ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).hardlink(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content_hash.into(),
+                        ),
+                    );
+                    actions.push(
+                        sites::Wrapper::pack_from_to(tmp_sender, sites::SERVICE)
+                            .remove(tmp_path.to_string()),
+                    );
+                } else {
+                    actions.push(
+                        sites::Wrapper::pack_from_to(*sender, sites::SERVICE).storeSys(
+                            path.to_string(),
+                            t.essence_str().to_string(),
+                            content_encoding,
+                            content.into(),
+                        ),
+                    );
+                }
             } else {
                 Err(Error::UnknownFileType {
                     path: file.name().to_string(),
@@ -438,6 +484,7 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install_accounts(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         key: &Option<AnyPublicKey>,
     ) -> Result<(), anyhow::Error> {
@@ -445,10 +492,28 @@ impl<R: Read + Seek> PackagedService<R> {
         for (account, index, info) in &self.services {
             let mut group = vec![];
             self.create_account(*account, key, sender, &mut group)?;
-            group.push(set_code_action(
-                *account,
-                read(&mut self.archive.by_index(*index)?)?.into(),
-            ));
+            let code = read(&mut self.archive.by_index(*index)?)?;
+            let code_hash: [u8; 32] = Sha256::digest(&code).into();
+            if let Some(uploader) = &mut uploader {
+                uploader
+                    .actions
+                    .push(setcode::Wrapper::pack_from(uploader.sender).stageCode(
+                        *account,
+                        uploader.id.clone(),
+                        0,
+                        0,
+                        code.into(),
+                    ));
+                group.push(setcode::Wrapper::pack_from(*account).setCodeStaged(
+                    uploader.sender,
+                    uploader.id.clone(),
+                    0,
+                    0,
+                    code_hash.into(),
+                ));
+            } else {
+                group.push(set_code_action(*account, code.into()));
+            }
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
                 group.push(setcode::Wrapper::pack().setFlags(*account, flags));
@@ -470,13 +535,14 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn install(
         &mut self,
         actions: &mut Vec<Action>,
+        uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
         install_ui: bool,
         compression_level: u32,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
-            self.store_data(actions, compression_level)?;
+            self.store_data(actions, uploader, compression_level)?;
         }
 
         self.postinstall(actions)?;
@@ -548,6 +614,29 @@ impl ActionSink for Vec<Action> {
         let mut size = 0;
         act.append_to_tx(self, &mut size);
         Ok(())
+    }
+}
+
+pub struct StagedUpload {
+    pub id: u64,
+    pub sender: AccountNumber,
+    pub actions: Vec<Action>,
+    file_index: u32,
+}
+
+impl StagedUpload {
+    pub fn new(id: u64, sender: AccountNumber) -> Self {
+        StagedUpload {
+            id,
+            sender,
+            actions: Vec::new(),
+            file_index: 0,
+        }
+    }
+    fn next_file_index(&mut self) -> u32 {
+        let result = self.file_index;
+        self.file_index += 1;
+        result
     }
 }
 
@@ -659,6 +748,50 @@ pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> 
     Ok(refs)
 }
 
+// services that should be installed first
+pub struct EssentialServices {
+    remaining: Vec<AccountNumber>,
+}
+
+impl EssentialServices {
+    pub fn new() -> Self {
+        Self {
+            remaining: vec![transact::SERVICE, producers::SERVICE, setcode::SERVICE],
+        }
+    }
+    pub fn remove(&mut self, accounts: &[AccountNumber]) {
+        for account in accounts {
+            if let Some(idx) = self.remaining.iter().position(|a| a == account) {
+                self.remaining.swap_remove(idx);
+            }
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.remaining.is_empty()
+    }
+    pub fn intersects(&self, accounts: &[AccountNumber]) -> bool {
+        for account in accounts {
+            if self.remaining.iter().find(|a| *a == account).is_some() {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+pub fn get_essential_packages(
+    packages: &Vec<PackageInfo>,
+    essential_services: &EssentialServices,
+) -> Vec<String> {
+    let mut result = Vec::new();
+    for info in packages {
+        if essential_services.intersects(&info.accounts) {
+            result.push(info.name.clone());
+        }
+    }
+    result
+}
+
 #[async_trait(?Send)]
 pub trait PackageRegistry {
     type R: Read + Seek;
@@ -674,7 +807,9 @@ pub trait PackageRegistry {
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
-        for op in solve_dependencies(self.index()?, make_refs(packages)?, vec![], false)? {
+        let index = self.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        for op in solve_dependencies(index, make_refs(packages)?, vec![], essential, false)? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -1092,10 +1227,13 @@ impl PackageList {
         packages: &[String],
         reinstall: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
         solve_dependencies(
-            reg.index()?,
+            index,
             make_refs(packages)?,
             self.as_upgradable(),
+            essential,
             reinstall,
         )
     }

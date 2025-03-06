@@ -169,6 +169,17 @@ impl Respondent for StagedTxPlugin {
             .packed(),
         )
     }
+
+    fn execute(id: u32) -> Result<(), Error> {
+        add_action_to_transaction(
+            execute::ACTION_NAME,
+            &execute {
+                id,
+                txid: get_staged_txid(id)?,
+            }
+            .packed(),
+        )
+    }
 }
 
 impl HookTxTransform for StagedTxPlugin {
@@ -205,7 +216,11 @@ fn propose_wrap(sender: String, actions: Vec<Action>) -> Action {
         sender,
         service: psibase::services::staged_tx::SERVICE.to_string(),
         method: propose::ACTION_NAME.to_string(),
-        raw_data: propose { actions }.packed(),
+        raw_data: propose {
+            actions,
+            auto_exec: true,
+        }
+        .packed(),
     }
 }
 
