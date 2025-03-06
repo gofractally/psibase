@@ -67,7 +67,7 @@ namespace
 
 // Helper functions for tests
 auto createInvite = [](auto& user, const auto& pubKey)
-{ return user.createInvite(pubKey, std::nullopt, std::nullopt); };
+{ return user.createInvite(pubKey, std::nullopt, std::nullopt, std::nullopt, std::nullopt); };
 
 // - Auth
 //    - Alice cannot use AuthInvite
