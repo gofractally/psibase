@@ -64,6 +64,8 @@ void Invite::init()
 }
 
 void Invite::createInvite(Spki                         inviteKey,
+                          std::optional<uint32_t>      id,
+                          std::optional<std::string>   secret,
                           std::optional<AccountNumber> app,
                           std::optional<std::string>   appDomain)
 {
@@ -89,6 +91,7 @@ void Invite::createInvite(Spki                         inviteKey,
    Seconds      secondsInWeek{60 * 60 * 24 * 7};
    InviteRecord newInvite{
        .pubkey    = inviteKey,
+       .id        = id,
        .inviter   = inviter,
        .app       = app,
        .appDomain = appDomain,
@@ -96,6 +99,7 @@ void Invite::createInvite(Spki                         inviteKey,
                  secondsInWeek,
        .newAccountToken = true,
        .state           = InviteStates::pending,
+       .secret          = secret,
    };
    inviteTable.put(newInvite);
 
@@ -346,6 +350,17 @@ struct Queries
           .get(Spki{AuthSig::parseSubjectPublicKeyInfo(pubkey)});
    }
 
+   auto getInviteById(uint32_t id) const -> std::optional<InviteRecord>
+   {
+      auto idx = Invite::Tables(Invite::service)
+                     .open<InviteTable>()
+                     .getIndex<2>()
+                     .subindex(std::optional<uint32_t>{id});
+      if (idx.begin() == idx.end())
+         return std::nullopt;
+      return std::optional<InviteRecord>{*idx.begin()};
+   }
+
    // This is called getInviter because it's used to look up the new account `user`
    //    in a table that tracks their original inviter.
    auto getInviter(psibase::AccountNumber user) const
@@ -357,6 +372,7 @@ PSIO_REFLECT(Queries,
              method(allCreatedInv),
              method(getAllInvites),
              method(getInvite, pubkey),
+             method(getInviteById, id),
              method(getInviter, user))
 
 auto Invite::serveSys(HttpRequest request) -> std::optional<HttpReply>

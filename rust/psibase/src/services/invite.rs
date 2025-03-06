@@ -16,6 +16,9 @@ pub struct InviteRecord {
     ///   may also used to authenticate the transaction accepting the invite.
     pubkey: SubjectPublicKeyInfo,
 
+    /// An optional secondary identifier for the invite
+    id: Option<u32>,
+
     /// The creator of the invite object
     inviter: AccountNumber,
 
@@ -40,6 +43,9 @@ pub struct InviteRecord {
     ///  - accepted (1)
     ///  - rejected (2)
     state: u8,
+
+    /// Encrypted invite secret
+    secret: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject)]
@@ -67,6 +73,8 @@ mod service {
     #[action]
     fn createInvite(
         inviteKey: SubjectPublicKeyInfo,
+        id: Option<u32>,
+        secret: Option<String>,
         app: Option<AccountNumber>,
         appDomain: Option<String>,
     ) {

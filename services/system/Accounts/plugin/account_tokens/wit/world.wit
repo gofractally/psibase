@@ -3,8 +3,12 @@ package accounts:account-tokens;
 interface types {
     use host:common/types.{origination-data};
 
+    /// A token that contains the private "key" of an invite.
+    /// The key is really a seed to generate an AES key to decrypt 
+    ///   the secret stored in the invite.
     record invite-token {
-        pk: string,
+        pk: u64,
+        id: u32,
     }
 
     type connection-token = origination-data;

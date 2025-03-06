@@ -1,17 +1,11 @@
 use crate::errors::ErrorType::*;
-use crate::{bindings, InviteToken};
+use crate::{bindings::*, InviteToken};
 
-use bindings::accounts::account_tokens::api::deserialize_token;
-use bindings::accounts::account_tokens::types::*;
-use bindings::host::common::types as CommonTypes;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-pub struct InviteParams {
-    pub app: Option<String>,
-    pub app_domain: String,
-    pub pk: String,
-}
+use accounts::account_tokens::api::deserialize_token;
+use accounts::account_tokens::types::*;
+use host::common::types as CommonTypes;
+use psibase::fracpack::{Pack, Unpack};
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct ResponseRoot<T> {
@@ -23,28 +17,30 @@ pub trait TryParseGqlResponse: Sized {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InviteRecordSubset {
+    pub pubkey: String,
     pub inviter: psibase::AccountNumber,
     pub app: Option<psibase::AccountNumber>,
     pub app_domain: Option<String>,
     pub actor: psibase::AccountNumber,
     pub expiry: String,
     pub state: u8,
+    pub secret: Option<String>,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 pub struct GetInviteResponse {
-    pub getInvite: Option<InviteRecordSubset>,
+    pub getInviteById: Option<InviteRecordSubset>,
 }
 
 impl TryParseGqlResponse for InviteRecordSubset {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
         let response_root: ResponseRoot<GetInviteResponse> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
-        Ok(response_root.data.getInvite.ok_or_else(|| {
+        Ok(response_root.data.getInviteById.ok_or_else(|| {
             QueryError("Unable to extract InviteRecordSubset from query response".to_string())
         })?)
     }

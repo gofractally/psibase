@@ -45,10 +45,14 @@ namespace UserService
          ///
          /// Parameters:
          /// - `inviteKey` is the public key of the invite.
+         /// - `id` is an optional secondary identifier for the invite.
+         /// - `secret` is an optional secret for the invite.
          /// - `app` is the account responsible for creating the invite. It is optional because it may
          ///   not be able to be determined.
          /// - `appDomain` is the domain of the app that created the invite.
          void createInvite(Spki                                  inviteKey,
+                           std::optional<uint32_t>               id,
+                           std::optional<std::string>            secret,
                            std::optional<psibase::AccountNumber> app,
                            std::optional<std::string>            appDomain);
 
@@ -135,7 +139,7 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(createInvite, inviteKey, app, appDomain),
+         method(createInvite, inviteKey, id, secret, app, appDomain),
          method(accept, inviteKey),
          method(acceptCreate, inviteKey, acceptedBy, newAccountKey),
          method(reject, inviteKey),
