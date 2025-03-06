@@ -78,12 +78,12 @@ void Invite::createInvite(Spki                         inviteKey,
 
    if (settings.whitelist.size() > 0)
    {
-      bool whitelisted = std::ranges::find(settings.whitelist, inviter) != settings.whitelist.end();
+      bool whitelisted = std::ranges::contains(settings.whitelist, inviter);
       check(whitelisted, onlyWhitelisted.data());
    }
    else if (settings.blacklist.size() > 0)
    {
-      bool blacklisted = std::ranges::find(settings.blacklist, inviter) != settings.blacklist.end();
+      bool blacklisted = std::ranges::contains(settings.blacklist, inviter);
       check(not blacklisted, noBlacklisted.data());
    }
 
