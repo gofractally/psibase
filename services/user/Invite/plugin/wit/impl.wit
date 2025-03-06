@@ -8,7 +8,6 @@ world impl {
     include accounts:account-tokens/imports;
     include auth-invite:plugin/imports;
     include transact:plugin/hook-actions-sender;
-    include rand:plugin/imports;
     include aes:plugin/imports;
     include clientdata:plugin/imports;
 

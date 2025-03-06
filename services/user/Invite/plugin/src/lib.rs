@@ -35,7 +35,7 @@ use psibase::{
     fracpack::Pack,
     services::invite::{self as InviteService, action_structs::*},
 };
-use rand::plugin::api as rand;
+use rand::Rng;
 use transact::plugin::{hooks::*, intf as Transact};
 
 /* TODO:
@@ -45,6 +45,13 @@ use transact::plugin::{hooks::*, intf as Transact};
     /// can be deleted by calling this action
     void delExpired(uint32_t maxDeleted);
 */
+
+fn rand_bytes(nr_bytes: u32) -> Vec<u8> {
+    let mut result = vec![0u8; nr_bytes as usize];
+    let mut rng = rand::rng();
+    rng.fill(&mut result[..]);
+    result
+}
 
 struct InvitePlugin;
 
@@ -194,7 +201,7 @@ impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, CommonTypes::Error> {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
-        let seed = rand::rand_bytes(8);
+        let seed = rand_bytes(8);
         let encrypted_private_key =
             aes::with_password::encrypt(&seed, keypair.private_key.as_bytes());
         let encrypted_private_key_hex = hex::encode(&encrypted_private_key);
@@ -208,7 +215,7 @@ impl Inviter for InvitePlugin {
             None => None,
         };
 
-        let id = rand::rand_u32();
+        let id: u32 = rand::rng().random();
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
