@@ -8,6 +8,7 @@ members = [
     "system/Transact/plugin/",
     "system/SetCode/plugin/",
     "system/Producers/plugin/",
+    "user/Aes/plugin",
     "user/Base64/plugin",
     "user/ClientData/plugin",
     "user/Invite/plugin",
