@@ -116,24 +116,20 @@ SCENARIO("Creating an invite")
 
       THEN("Alice can create an invite")
       {
-         auto result = createInvite(a, invPub);
-         CHECK(result.succeeded());
+         CHECK(createInvite(a, invPub).succeeded());
 
          AND_THEN("Alice cannot create another invite with the same key")
          {
-            auto result2 = createInvite(a, invPub);
-            CHECK(result2.failed(inviteAlreadyExists));
+            CHECK(createInvite(a, invPub).failed(inviteAlreadyExists));
          }
          AND_THEN("Alice can create another invite with a different key")
          {
-            auto result2 = createInvite(a, thrdPub);
-            CHECK(result2.succeeded());
+            CHECK(createInvite(a, thrdPub).succeeded());
          }
       }
       THEN("Invited-sys cannot create an invite")
       {
-         auto result = createInvite(i, userPub);
-         CHECK(result.failed(restrictedActions));
+         CHECK(createInvite(i, userPub).failed(restrictedActions));
       }
    }
 }
@@ -165,7 +161,7 @@ SCENARIO("Rejecting an invite")
       t.setAuth<AuthSig::AuthSig>(bob.id, userPub);
 
       auto a = alice.with(userKeyList).to<Invite>();
-      auto b = bob.with(userKeyList).to<Invite>();
+      auto b = bob.with(combinedKeyList).to<Invite>();
       auto i = invited.with(invKeyList).to<Invite>();
 
       WHEN("Alice creates an invite")
@@ -192,7 +188,7 @@ SCENARIO("Rejecting an invite")
          }
          THEN("Reject fails if transaction isn't signed with the invite public key")
          {
-            auto reject = bob.with({}).to<Invite>().reject(invPub);
+            auto reject = bob.with(userKeyList).to<Invite>().reject(invPub);
             CHECK(reject.failed(missingInviteSig));
 
             auto reject2 = invited.with({}).to<Invite>().reject(invPub);
@@ -544,7 +540,7 @@ SCENARIO("Accepting an invite")
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey claim")
          {
-            CHECK(b.accept(invPub).failed(missingInviteSig));
+            CHECK(bob.with(userKeys).to<Invite>().accept(invPub).failed(missingInviteSig));
          }
          THEN("Accepting fails if the transaction is missing the specified invite pubkey proof")
          {
