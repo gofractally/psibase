@@ -67,9 +67,14 @@ interface intf {
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 }
 
+interface query {
+    get-chain-id: func() -> string;
+}
+
 // Include this world to import the most common transact:plugin imports
 world imports {
     import intf;
+    import query;
 }
 
 //      HOOK WORLDS

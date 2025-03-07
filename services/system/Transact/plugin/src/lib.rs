@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 #[allow(warnings)]
 mod bindings;
+use bindings::*;
+
 mod errors;
 use errors::ErrorType::*;
 mod helpers;
@@ -9,18 +11,19 @@ mod db;
 mod types;
 use db::*;
 
-use crate::bindings::transact::plugin::hook_handlers::*;
+use transact::plugin::hook_handlers::*;
 
 // Other plugins
 // Other plugins
-use bindings::host::common::{
+use host::common::{
     self as Host, server as Server,
     types::{self as CommonTypes},
 };
 
 // Exported interfaces/types
-use bindings::exports::transact::plugin::{
+use exports::transact::plugin::{
     admin::Guest as Admin, hooks::Guest as Hooks, intf::Guest as Intf, login::Guest as Login,
+    query::Guest as Query,
 };
 
 // Third-party crates
@@ -196,6 +199,43 @@ impl Admin for TransactPlugin {
                 Ok(())
             }
         }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ResponseRoot<T> {
+    pub data: T,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChainIdResponse {
+    pub chain_id: String,
+}
+
+pub trait TryParseGqlResponse: Sized {
+    fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
+}
+
+impl TryParseGqlResponse for ChainIdResponse {
+    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+        let response_root: ResponseRoot<ChainIdResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
+
+        Ok(response_root.data)
+    }
+}
+
+impl Query for TransactPlugin {
+    fn get_chain_id() -> String {
+        let query = r#"
+        query {
+            chainId
+        }
+        "#;
+        let response = Server::post_graphql_get_json(&query).unwrap();
+        let chainId = ChainIdResponse::from_gql(response).unwrap();
+        chainId.chain_id
     }
 }
 
