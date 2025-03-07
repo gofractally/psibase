@@ -286,6 +286,11 @@ namespace psibase
 
    using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
 
+   inline auto get_gql_name(SocketInfo*)
+   {
+      return "SocketInfo";
+   }
+
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;
    auto socketKey(std::int32_t fd) -> SocketKeyType;

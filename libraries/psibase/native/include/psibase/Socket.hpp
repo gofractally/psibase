@@ -43,7 +43,7 @@ namespace psibase
    struct SocketAutoCloseSet
    {
       std::set<std::shared_ptr<AutoCloseSocket>> sockets;
-      void close(const std::optional<std::string>& message = {});
+      void close(Writer& writer, Sockets& sockets, const std::optional<std::string>& message = {});
       bool owns(Sockets& sockets, const AutoCloseSocket& sock);
       ~SocketAutoCloseSet();
    };

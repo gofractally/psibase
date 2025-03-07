@@ -25,17 +25,30 @@ bool AutoCloseSocket::canAutoClose() const
    return true;
 }
 
-void SocketAutoCloseSet::close(const std::optional<std::string>& message)
+void SocketAutoCloseSet::close(Writer&                           writer,
+                               Sockets&                          parent,
+                               const std::optional<std::string>& message)
 {
    for (const auto& socket : sockets)
    {
       socket->autoClose(message);
    }
+
+   {
+      std::lock_guard l{parent.mutex};
+      for (const auto& socket : sockets)
+      {
+         auto key = socketKey(socket->id);
+         parent.sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
+         socket->closed = true;
+         parent.sockets[static_cast<std::size_t>(socket->id)].reset();
+      }
+   }
    sockets.clear();
 }
 SocketAutoCloseSet::~SocketAutoCloseSet()
 {
-   close();
+   assert(sockets.empty() && "SocketAutoCloseSet must be explicitly closed before being destroyed");
 }
 
 bool SocketAutoCloseSet::owns(Sockets& sockets, const AutoCloseSocket& sock)
