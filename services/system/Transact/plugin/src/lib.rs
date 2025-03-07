@@ -228,14 +228,8 @@ impl TryParseGqlResponse for ChainIdResponse {
 
 impl Query for TransactPlugin {
     fn get_chain_id() -> String {
-        let query = r#"
-        query {
-            chainId
-        }
-        "#;
-        let response = Server::post_graphql_get_json(&query).unwrap();
-        let chainId = ChainIdResponse::from_gql(response).unwrap();
-        chainId.chain_id
+        let response = Server::post_graphql_get_json("query { chainId }").unwrap();
+        ChainIdResponse::from_gql(response).unwrap().chain_id
     }
 }
 
