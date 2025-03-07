@@ -203,7 +203,7 @@ impl Inviter for InvitePlugin {
 
         let seed = rand_bytes(8);
         let encrypted_private_key =
-            aes::with_password::encrypt(&seed, keypair.private_key.as_bytes());
+            aes::with_password::encrypt(&seed, keypair.private_key.as_bytes(), &keypair.public_key);
         let encrypted_private_key_hex = hex::encode(&encrypted_private_key);
 
         let sender_app = Client::get_sender_app();
@@ -261,8 +261,11 @@ impl Advanced for InvitePlugin {
             .ok_or_else(|| DecodeInviteError("No secret in invite record"))?;
         let encrypted_private_key = hex::decode(&encrypted_private_key_hex).unwrap();
 
-        let private_key_pem_bytes =
-            aes::with_password::decrypt(&invite_token.pk.to_le_bytes(), &encrypted_private_key)?;
+        let private_key_pem_bytes = aes::with_password::decrypt(
+            &invite_token.pk.to_le_bytes(),
+            &encrypted_private_key,
+            &invite.pubkey,
+        )?;
         let private_key_pem = String::from_utf8(private_key_pem_bytes)
             .map_err(|_| DecodeInviteError("Failed to decode encrypted private key"))?;
 

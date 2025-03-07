@@ -63,13 +63,13 @@ fn decrypt_with_aes(key: &[u8; AES_KEY_SIZE], encrypted_data: &[u8]) -> Result<V
 
 struct AesPlugin;
 impl WithPassword for AesPlugin {
-    fn encrypt(password: Vec<u8>, data: Vec<u8>) -> Vec<u8> {
-        let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, "psibase-aes-salt");
+    fn encrypt(password: Vec<u8>, data: Vec<u8>, salt: String) -> Vec<u8> {
+        let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, &salt);
         encrypt_with_aes(&aes_key.as_slice().try_into().unwrap(), &data)
     }
 
-    fn decrypt(password: Vec<u8>, encrypted: Vec<u8>) -> Result<Vec<u8>, Error> {
-        let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, "psibase-aes-salt");
+    fn decrypt(password: Vec<u8>, encrypted: Vec<u8>, salt: String) -> Result<Vec<u8>, Error> {
+        let aes_key = Kdf::derive_key(Kdf::Keytype::Aes, &password, &salt);
         Ok(decrypt_with_aes(
             &aes_key.as_slice().try_into().unwrap(),
             &encrypted,

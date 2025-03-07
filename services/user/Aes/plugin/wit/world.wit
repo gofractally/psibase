@@ -8,20 +8,22 @@ interface with-password {
     /// Arguments:
     /// - password: The password to use for encryption
     /// - data: The data to encrypt
+    /// - salt: The salt to use for encryption
     /// 
     /// Returns:
     /// - The encrypted data
-    encrypt: func(password: list<u8>, data: list<u8>) -> list<u8>;
+    encrypt: func(password: list<u8>, data: list<u8>, salt: string) -> list<u8>;
 
     /// Decrypts data using a password
     /// 
     /// Arguments:
     /// - password: The password to use for decryption
     /// - encrypted: The encrypted data to decrypt
+    /// - salt: The salt to use for decryption
     /// 
     /// Returns:
     /// - The decrypted data
-    decrypt: func(password: list<u8>, encrypted: list<u8>) -> result<list<u8>, error>;
+    decrypt: func(password: list<u8>, encrypted: list<u8>, salt: string) -> result<list<u8>, error>;
 }
 
 world imports {
