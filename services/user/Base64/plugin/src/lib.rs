@@ -3,7 +3,7 @@ mod bindings;
 use bindings::*;
 
 use base64::{engine::general_purpose::URL_SAFE, Engine};
-use exports::base64::plugin::api::Guest as Api;
+use exports::base64::plugin::url::Guest as Url;
 use host::common::types::{Error, PluginId};
 
 struct Base64Plugin;
@@ -21,7 +21,7 @@ impl From<String> for Error {
     }
 }
 
-impl Api for Base64Plugin {
+impl Url for Base64Plugin {
     fn encode(input: Vec<u8>) -> String {
         URL_SAFE.encode(input)
     }

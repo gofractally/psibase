@@ -10,11 +10,11 @@ struct AccountTokens;
 
 impl API for AccountTokens {
     fn serialize_token(token: Token) -> String {
-        base64::plugin::api::encode(&token.packed())
+        base64::plugin::url::encode(&token.packed())
     }
 
     fn deserialize_token(token: String) -> Option<Token> {
-        let decoded = base64::plugin::api::decode(&token).ok()?;
+        let decoded = base64::plugin::url::decode(&token).ok()?;
         Token::unpacked(&decoded).ok()
     }
 }
