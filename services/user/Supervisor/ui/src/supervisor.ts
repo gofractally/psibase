@@ -3,7 +3,6 @@ import {
     QualifiedFunctionCallArgs,
     siblingUrl,
     buildFunctionCallResponse,
-    PluginError,
     assertTruthy,
 } from "@psibase/common-lib";
 
@@ -15,6 +14,7 @@ import { getCallArgs } from "@psibase/common-lib/messaging/FunctionCallRequest";
 import { pluginId } from "@psibase/common-lib/messaging/PluginId";
 import { Plugins } from "./plugin/plugins";
 import { PluginLoader } from "./plugin/pluginLoader";
+import { PluginErrorObject, RedirectErrorObject } from "@psibase/common-lib/messaging";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -29,6 +29,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
 ];
 
+const REDIRECT_ERROR_CODE = 999999999;
 interface Account {
     accountNum: string;
     authService: string;
@@ -105,8 +106,9 @@ export class Supervisor implements AppInterface {
 
     private replyToParent(id: string, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
+        const b = buildFunctionCallResponse(id, result);
         window.parent.postMessage(
-            buildFunctionCallResponse(id, result),
+            b,
             this.parentOrigination.origin,
         );
     }
@@ -242,7 +244,27 @@ export class Supervisor implements AppInterface {
         let ret: any;
         try {
             ret = p.plugin.call(intf, method, params);
-        } finally {
+        } 
+        // catch(e: any) {
+        //     if (e.payload && e.payload.code === REDIRECT_ERROR_CODE) {
+        //         const dataObj = JSON.parse(e.payload.message);
+                
+        //         // Create a RedirectError with the merged payload
+        //         console.log("Constructing RedirectError");
+        //         const redirectError = new RedirectError(
+        //             e.message || "Redirect",
+        //             {
+        //                 ...e.payload,
+        //                 ...dataObj,
+        //             }
+        //         // )
+                
+        //         throw redirectError;
+        //     } else {
+        //         throw e;
+        //     }
+        // }
+        finally {
             this.context.stack.pop();
         }
 
@@ -327,9 +349,15 @@ export class Supervisor implements AppInterface {
                 // It is only recoverable at intermediate steps in the callstack.
                 // Since it is the final return value, it is no longer recoverable and is
                 //   converted to a PluginError to be handled by the client.
+                let newError;
+                if (e.payload.code === REDIRECT_ERROR_CODE) {
+                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message, JSON.parse(e.payload.message));
+                } else {
+                    newError = new PluginErrorObject(e.payload.producer, e.payload.message);
+                }
                 this.replyToParent(
                     id,
-                    new PluginError(e.payload.producer, e.payload.message),
+                    newError
                 );
             } else {
                 this.replyToParent(id, e);
