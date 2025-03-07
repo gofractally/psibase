@@ -96,9 +96,9 @@ export class Supervisor {
     private onLoadPromiseResolvers: ((value?: unknown) => void)[] = [];
 
     private listenToRawMessages() {
-        window.addEventListener("message", (event) => {
-            this.handleRawEvent(event);
-        });
+        window.addEventListener("message", (event) =>
+            this.handleRawEvent(event),
+        );
     }
 
     private handleRawEvent(messageEvent: MessageEvent) {
@@ -184,6 +184,7 @@ export class Supervisor {
     private async sendRequest(description: string, request: any): Promise<any> {
         await this.onLoaded();
         const iframe = this.getSupervisorIframe();
+
         return new Promise((resolve, reject) => {
             this.pendingRequests.push({
                 id: request.id,

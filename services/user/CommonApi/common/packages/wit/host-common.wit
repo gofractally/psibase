@@ -17,7 +17,7 @@ interface types {
     record error {
         code: u32,
         producer: plugin-id,
-        message: string
+        message: string,
     }
 
     /// An object that uniquely identifies a plugin

@@ -1,6 +1,6 @@
 use psibase::plugin_error;
 
-// const NOT_EXACTLY_MAX_INT: u32 = 999999999;
+// const REDIRECT_ERROR_CODE: u32 = 999999999;
 
 plugin_error! {
     pub ErrorType

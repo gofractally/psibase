@@ -16,18 +16,20 @@ import {
 
 const urlParams = new URLSearchParams(window.location.search);
 const id = urlParams.get('id');
-const returnUrl = urlParams.get('returnUrl');
+const returnUrlPath = urlParams.get('returnUrlPath');
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 
-if (id && returnUrl) {
+if (id && returnUrlPath) {
     // Create the iframe programmatically to have more control
     const iframe = document.createElement('iframe');
     
     // Set up the iframe URL
-    const iframeUrl = new URL('http://permissions.psibase.localhost:8080/permissions.html');
+    const url = siblingUrl(null, "permissions", null, true) + "/permissions.html";
+    console.log("Supervisor main.ts url: ", url);
+    const iframeUrl = new URL(url);
     iframeUrl.searchParams.set('id', id);
-    iframeUrl.searchParams.set('returnUrl', returnUrl);
+    iframeUrl.searchParams.set('returnUrlPath', returnUrlPath);
     
     // Set up the iframe with minimal attributes
     iframe.src = iframeUrl.toString();

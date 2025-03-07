@@ -4,6 +4,7 @@ import { Button } from "@shadcn/button";
 
 import { supervisor } from "./perms_main";
 import { useQuery } from "@tanstack/react-query";
+import { siblingUrl } from "@psibase/common-lib";
 
 export const App = () => {
     const thisServiceName = "permissions";
@@ -40,13 +41,18 @@ export const App = () => {
     });
 
     const followReturnRedirect = async () => {
-        let retUrl = decodeURIComponent(params.returnUrl);
+        let retUrl = decodeURIComponent(params.returnUrlPath);
 
         try {
             // Method 1: Try window.top navigation
-            console.log("followReturnRedirect().retUrl: ", params.returnUrl);
+
+            const url =
+                siblingUrl(null, validPermRequest.caller, null, true) +
+                "/" +
+                retUrl;
+            console.log("followReturnRedirect().retUrl: ", url);
             if (window.top) {
-                window.top.location.href = retUrl;
+                window.top.location.href = url;
             }
         } catch (e) {
             console.log("Top navigation failed, trying other methods...");
