@@ -283,7 +283,7 @@ struct test_chain
                                  state.shared_wasm_cache,
                                     {},
                                  state.watchdogManager,
-                                 std::make_shared<psibase::Sockets>()});
+                                 std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
       head = this->db.getHead();
    }
@@ -644,7 +644,8 @@ struct HttpSocket : psibase::AutoCloseSocket
       if (chain)
          logResponse();
    }
-   void logResponse()
+   psibase::SocketInfo info() const override { return psibase::HttpSocketInfo{}; }
+   void                logResponse()
    {
       auto view    = psio::view<const psibase::HttpReply>(psio::prevalidated{response});
       auto endTime = std::chrono::steady_clock::now();
@@ -1371,7 +1372,7 @@ struct callbacks
       std::int32_t fd;
 
       auto socket = std::make_shared<HttpSocket>();
-      chain.sys->sockets->add(socket, &tc.ownedSockets);
+      chain.sys->sockets->add(*chain.writer, socket, &tc.ownedSockets);
       if (auto pos = std::ranges::find(state.sockets, nullptr); pos != state.sockets.end())
       {
          *pos = socket;

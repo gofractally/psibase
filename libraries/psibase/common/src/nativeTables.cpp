@@ -137,4 +137,17 @@ namespace psibase
    {
       return logTruncateKey();
    }
+
+   auto socketPrefix() -> KeyPrefixType
+   {
+      return std::tuple{socketTable, nativeTablePrimaryIndex};
+   }
+   auto socketKey(std::int32_t fd) -> SocketKeyType
+   {
+      return std::tuple{socketTable, nativeTablePrimaryIndex, fd};
+   }
+   auto SocketRow::key() const -> SocketKeyType
+   {
+      return socketKey(fd);
+   }
 }  // namespace psibase
