@@ -18,6 +18,27 @@ export class InvalidUrl extends Error {
     }
 }
 
+// export class ExtendedError extends PluginError {
+//     constructor(
+//         pluginId: QualifiedPluginId,
+//     ) {
+//         super(
+//             pluginId,
+//             `Unrecognized call: ${intf ? `${intf}:${method}` : method}`,
+//         );
+//     }
+// }
+// export class RedirectRequired extends PluginError {
+//     constructor(
+//         pluginId: QualifiedPluginId,
+//         id: string,
+//     ) {
+//         super(
+//             pluginId,
+//             `Unrecognized call: ${intf ? `${intf}:${method}` : method}`,
+//         );
+//     }
+// }
 export class InvalidCall extends PluginError {
     constructor(
         pluginId: QualifiedPluginId,

@@ -14,9 +14,9 @@ import {
     isFunctionCallResponse,
     FunctionCallResponse,
     FunctionCallArgs,
-    isPluginError,
-    isGenericError,
     buildGetJsonRequest,
+    isPluginErrorObject,
+    isGenericErrorObject,
 } from "./messaging";
 import { assertTruthy } from "./utils";
 
@@ -150,7 +150,7 @@ export class Supervisor {
         const resolved = this.removePendingRequestById(response.id);
         assertTruthy(resolved, "Resolved pending request");
 
-        if (isPluginError(result)) {
+        if (isPluginErrorObject(result)) {
             const { service, plugin } = result.pluginId;
 
             console.error(`Call to ${resolved.details} failed`);
@@ -159,7 +159,7 @@ export class Supervisor {
             return;
         }
 
-        if (isGenericError(result)) {
+        if (isGenericErrorObject(result)) {
             console.error(`Call to ${resolved.details} failed`);
             console.error(result.message);
             pendingRequest.reject(result);
