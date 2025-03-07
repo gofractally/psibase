@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { siblingUrl } from "@psibase/common-lib";
 
 export const App = () => {
-    // const [id, setId] = useState<string | null>(null);
-    // const [returnUrlPath, setReturnUrlPath] = useState<string | null>(null);
     const [hasRequiredQueryParams, setHasRequiredQueryParams] =
         useState<boolean>(false);
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -14,14 +12,6 @@ export const App = () => {
         const idParam = urlParams.get("id");
         const returnUrlPathParam = urlParams.get("returnUrlPath");
 
-        // setId(idParam);
-        // setReturnUrlPath(returnUrlPathParam);
-
-        console.log(
-            "returnUrlPath specified? ",
-            urlParams.has("returnUrlPath"),
-        );
-        console.log("returnUrlPath keys(): ", urlParams.keys());
         const requiredQueryParams =
             urlParams.has("id") && urlParams.has("returnUrlPath");
         setHasRequiredQueryParams(requiredQueryParams);
@@ -30,7 +20,6 @@ export const App = () => {
             const url =
                 siblingUrl(null, "permissions", null, true) +
                 "/permissions.html";
-            console.log("Permissions URL: ", url);
             const newIframeUrl = new URL(url);
             newIframeUrl.searchParams.set("id", idParam || "");
             newIframeUrl.searchParams.set(
