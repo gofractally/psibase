@@ -3,8 +3,8 @@ mod bindings;
 mod errors;
 use errors::ErrorType::*;
 
-use bindings::exports::brotli::plugin::api::{Error, Guest as API};
-use psibase::services::psi_brotli::brotli_impl;
+use bindings::exports::brotli_codec::plugin::api::{Error, Guest as API};
+use psibase::services::brotli_codec::brotli_impl;
 
 struct BrotliPlugin;
 

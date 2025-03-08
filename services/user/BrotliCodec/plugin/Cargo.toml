@@ -5,24 +5,25 @@ rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition.workspace = true
-publish = false
+publish.workspace = true
 
 [dependencies]
+brotli-codec = { path = "../service", version = "0.15.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/" }
 brotli = { version = "7.0.0" }
-
-[dev-dependencies]
-brotli_package = { path = "..", version = "0.15.0" }
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "brotli:plugin"
+package = "brotli-codec:plugin"
 
 [package.metadata.component.target]
 world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
+
+[dev-dependencies]
+brotli-codec-pkg = { path = "..", version = "0.15.0" }

@@ -469,8 +469,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/Brotli.psi
-    PATH services/user/Brotli
+    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
+    PATH services/user/BrotliCodec
 )
 
 cargo_psibase_package(
@@ -871,9 +871,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers BrotliCodec
+                    Registry Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -881,9 +881,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Kdf Nft Packages Permissions Producers Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Invite Kdf Nft Packages Permissions Producers BrotliCodec
+                    Registry Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
 
@@ -901,7 +901,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Services used in the tester"
-    PACKAGE_DEPENDS Minimal AuthSig Brotli Events Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS Minimal AuthSig Events Nft BrotliCodec Sites StagedTx Supervisor Symbol Tokens
 )
 
 function(write_package_index target dir)
@@ -918,8 +918,8 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
+    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers BrotliCodec TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -931,7 +931,6 @@ install(
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
-          ${SERVICE_DIR}/Brotli.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
@@ -953,6 +952,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/Producers.psi
+          ${SERVICE_DIR}/BrotliCodec.psi
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Sites.psi

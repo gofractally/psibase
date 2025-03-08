@@ -11,7 +11,7 @@ namespace UserService
    /// It implements the `Sites` DecompressorInterface
    struct Brotli
    {
-      static constexpr auto service = psibase::AccountNumber("psi-brotli");
+      static constexpr auto service = psibase::AccountNumber("brotli-codec");
 
       /// Decompresses a Brotli-compressed byte array
       std::vector<char> decompress(const std::vector<char>& content);
