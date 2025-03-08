@@ -34,10 +34,14 @@ export const client = {
     myServiceOrigin() {
         return host.myServiceOrigin();
     },
+
+    getAppUrl(app) {
+        return host.getAppUrl(app);
+    },
 };
 
 export const web = {
     popup(url_path) {
-        return host.popup(url_path)
-    }
-}
+        return host.popup(url_path);
+    },
+};

@@ -1,0 +1,23 @@
+[package]
+name = "aes"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
+aes-gcm = "0.10.3"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "aes:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"kdf:plugin" = { path = "../../Kdf/plugin/wit/world.wit" }
+"host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }

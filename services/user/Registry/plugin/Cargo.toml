@@ -12,7 +12,6 @@ registry = { path = "../service", version = "0.15.0" }
 serde = "1.0"
 serde_json = "1.0"
 chrono = "0.4"
-# base64 = "0.22"
 
 [lib]
 crate-type = ["cdylib"]

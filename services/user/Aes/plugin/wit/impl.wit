@@ -1,0 +1,7 @@
+package aes:plugin;
+
+world impl {
+    include kdf:plugin/imports;
+
+    export with-password;
+}

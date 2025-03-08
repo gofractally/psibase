@@ -89,7 +89,7 @@ void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
    auto fracRecord   = fractalTable.get(fractal);
    check(fracRecord.has_value(), "fractal DNE");
 
-   to<InviteNs::Invite>().createInvite(pubkey);
+   to<InviteNs::Invite>().createInvite(pubkey, std::nullopt, std::nullopt, service, std::nullopt);
 
    auto inviteTable = Tables().open<InviteTable>();
    auto invite      = inviteTable.get(pubkey);

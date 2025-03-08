@@ -1,29 +1,80 @@
 {
-    "search.exclude": {
-        "**/target": true
-    },
-    "rust-analyzer.linkedProjects": [
-        "rust/Cargo.toml"
-    ],
-    "[markdown]": {
-        "files.trimTrailingWhitespace": false
-    },
-    "[cpp]": {
-        "editor.defaultFormatter": "seaube.clangformat",
-        "editor.tabSize": 3,
-        "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "file",
-    },
-    "[javascript, typescript, typescriptreact]": {
-        "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-        "editor.formatOnPaste": false,
-        "editor.formatOnType": false,
-        "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "file",
-    },
-    "[rust]": {
-        "editor.defaultFormatter": "rust-lang.rust-analyzer",
-        "editor.formatOnSave": true,
-    },
-    "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+  "search.exclude": {
+    "**/target": true
+  },
+  "rust-analyzer.linkedProjects": ["rust/Cargo.toml"],
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "seaube.clangformat",
+    "editor.tabSize": 3,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "[javascript, typescript, typescriptreact]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "editor.formatOnPaste": false,
+    "editor.formatOnType": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "files.associations": {
+    "optional": "cpp",
+    "bitset": "cpp",
+    "string": "cpp",
+    "vector": "cpp",
+    "memory": "cpp",
+    "string_view": "cpp",
+    "rope": "cpp",
+    "system_error": "cpp",
+    "typeindex": "cpp",
+    "variant": "cpp",
+    "__locale": "cpp",
+    "cstddef": "cpp",
+    "cstdio": "cpp",
+    "cstdlib": "cpp",
+    "cstring": "cpp",
+    "cwchar": "cpp",
+    "array": "cpp",
+    "atomic": "cpp",
+    "*.tcc": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "cstdint": "cpp",
+    "exception": "cpp",
+    "algorithm": "cpp",
+    "functional": "cpp",
+    "iterator": "cpp",
+    "memory_resource": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp",
+    "utility": "cpp",
+    "initializer_list": "cpp",
+    "iosfwd": "cpp",
+    "limits": "cpp",
+    "new": "cpp",
+    "span": "cpp",
+    "stdexcept": "cpp",
+    "typeinfo": "cpp",
+    "__bit_reference": "cpp",
+    "__split_buffer": "cpp",
+    "*.ipp": "cpp",
+    "ranges": "cpp",
+    "forward_list": "cpp",
+    "future": "cpp",
+    "list": "cpp",
+    "regex": "cpp",
+    "scoped_allocator": "cpp"
+  }
 }

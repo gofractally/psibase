@@ -13,9 +13,8 @@ const ConnectionToken = z.object({
 const InviteToken = z.object({
   tag: z.literal("invite-token"),
   val: z.object({
-    app: z.string(),
-    appDomain: z.string().url(),
-    pk: z.string(),
+    pk: z.bigint(),
+    id: z.number(),
   }),
 });
 

@@ -1,0 +1,20 @@
+[package]
+name = "kdf"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
+pbkdf2 = "0.12.2"
+sha2 = "0.10.8"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "kdf:plugin"
+
+[package.metadata.component.target]
+world = "impl"

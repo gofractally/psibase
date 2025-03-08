@@ -99,6 +99,9 @@ interface client {
     /// Gets the full domain origin of the service from which the
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
+
+    /// Gets the URL of the specified app on the current root domain.
+    get-app-url: func(app: string) -> string;
 }
 
 interface web {

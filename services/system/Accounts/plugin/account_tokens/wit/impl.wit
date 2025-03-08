@@ -2,6 +2,7 @@ package accounts:account-tokens;
 
 world impl {
     include host:common/imports;
+    include base64:plugin/imports;
 
     export api;
 }
