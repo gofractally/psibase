@@ -11,6 +11,18 @@ interface url {
     decode: func(input: string) -> result<list<u8>, error>;
 }
 
+/// Uses the standard base64 encoding scheme.
+interface standard {
+    use host:common/types.{error};
+
+    /// Encodes a list of bytes into a standard base64 string.
+    encode: func(input: list<u8>) -> string;
+
+    /// Decodes a standard base64 string into a list of bytes.
+    decode: func(input: string) -> result<list<u8>, error>;
+}
+
 world imports {
     import url;
+    import standard;
 }

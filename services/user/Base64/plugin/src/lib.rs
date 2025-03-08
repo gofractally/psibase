@@ -2,7 +2,11 @@
 mod bindings;
 use bindings::*;
 
-use base64::{engine::general_purpose::URL_SAFE, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE},
+    Engine,
+};
+use exports::base64::plugin::standard::Guest as Standard;
 use exports::base64::plugin::url::Guest as Url;
 use host::common::types::{Error, PluginId};
 
@@ -28,6 +32,18 @@ impl Url for Base64Plugin {
 
     fn decode(input: String) -> Result<Vec<u8>, Error> {
         URL_SAFE
+            .decode(input)
+            .map_err(|e| Error::from(e.to_string()))
+    }
+}
+
+impl Standard for Base64Plugin {
+    fn encode(input: Vec<u8>) -> String {
+        STANDARD.encode(input)
+    }
+
+    fn decode(input: String) -> Result<Vec<u8>, Error> {
+        STANDARD
             .decode(input)
             .map_err(|e| Error::from(e.to_string()))
     }
