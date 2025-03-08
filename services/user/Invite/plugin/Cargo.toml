@@ -34,3 +34,4 @@ world = "impl"
 "auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
