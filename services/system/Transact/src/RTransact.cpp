@@ -5,7 +5,6 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
-#include <psibase/serveGraphQL.hpp>
 #include <psibase/serveSchema.hpp>
 
 using namespace psibase;
@@ -623,18 +622,6 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
    return {};
 }
 
-struct Query
-{
-   auto chainId() const
-   {
-      const auto status =
-          psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
-      psibase::check(status.has_value(), "missing status record");
-      return status->chainId;
-   }
-};
-PSIO_REFLECT(Query, method(chainId))
-
 std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request,
                                              std::optional<std::int32_t> socket)
 {
@@ -706,10 +693,6 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
       }
    }
    else if (auto res = serveSchema<Transact>(request))
-   {
-      return res;
-   }
-   else if (auto res = serveGraphQL(request, Query{}))
    {
       return res;
    }
