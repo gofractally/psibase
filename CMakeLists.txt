@@ -307,10 +307,13 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component_workspace(services/:Plugins 
     accounts
     account-tokens
+    aes
     auth-any
     auth-delegate
     auth-invite
     auth-sig
+    base64
+    kdf
     setcode
     clientdata
     invite
@@ -410,11 +413,44 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Base64.psi
+    NAME Base64
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Base64 encoding and decoding"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE base64
+        DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Kdf.psi
+    NAME Kdf
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Key Derivation Function"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE kdf
+        DATA ${Plugins_OUTPUT_FILE_kdf} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Aes.psi
+    NAME Aes
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "AES encryption"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE aes
+        DATA ${Plugins_OUTPUT_FILE_aes} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/ClientData.psi
     NAME ClientData
     DESCRIPTION "Plugin for enabling simpler interactions with client-side data storage"
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
     SERVICE clientdata
         DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -835,8 +871,8 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers 
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -845,8 +881,8 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers 
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Invite Kdf Nft Packages Permissions Producers Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -882,16 +918,18 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
+    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers TestDefault HttpServer
     Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
           ${SERVICE_DIR}/Accounts.psi
+          ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
+          ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/Brotli.psi
           ${SERVICE_DIR}/Chainmail.psi
@@ -908,6 +946,7 @@ install(
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
+          ${SERVICE_DIR}/Kdf.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi

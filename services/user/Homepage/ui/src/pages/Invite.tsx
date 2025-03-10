@@ -30,8 +30,8 @@ dayjs.extend(relativeTime);
 
 const inviteObject = z.object({
     actor: z.string(),
-    app: z.string(),
-    callback: z.string(),
+    app: z.string().optional(),
+    appDomain: z.string(),
     expiry: z.string(),
     inviter: z.string(),
     state: z.enum(["pending", "accepted", "rejected"]),
@@ -120,7 +120,7 @@ export const Invite = () => {
 
         const description = isExpired
             ? `This invitation expired ${dayjs().to(invite!.expiry)} (${dayjs(
-                  invite!.expiry
+                  invite!.expiry,
               ).format("YYYY/MM/DD HH:mm")}).`
             : `${inviter} has invited you to create an account
         on the ${chainName} platform.`;
@@ -130,7 +130,7 @@ export const Invite = () => {
             undefined,
             undefined,
             "invite-response",
-            false
+            false,
         );
 
         const link = modifyUrlParams(accountsUrl, {

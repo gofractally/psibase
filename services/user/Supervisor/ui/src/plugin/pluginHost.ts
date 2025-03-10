@@ -2,6 +2,7 @@ import {
     assertTruthy,
     PluginError,
     QualifiedFunctionCallArgs,
+    siblingUrl,
 } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
@@ -209,6 +210,10 @@ export class PluginHost implements HostInterface {
 
     myServiceOrigin(): string {
         return this.self.origin;
+    }
+
+    getAppUrl(app: string): string {
+        return `${siblingUrl(null, app)}`;
     }
 
     // Web interface
