@@ -37,7 +37,7 @@ class TestQuery(unittest.TestCase):
     def test_(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
-        a.install(sources=[testutil.test_packages()], packages=['AsyncQuery'])
+        a.install(sources=[testutil.test_packages()], packages=['AsyncQuery', 'SocketList'])
         a.wait(new_block())
 
         # Basic normal usage
@@ -89,6 +89,23 @@ class TestQuery(unittest.TestCase):
         (r0, r1) = post_parallel(a, ('/send_async_with_contention?delay=1', {"i":8}), ('/send_async_with_contention?delay=1', {"i":9}))
         self.assertEqual(r0, {"i":8})
         self.assertEqual(r1, {"i":9})
+
+        # Check that all sockets were cleaned up
+        sockets = a.graphql(service='s-sock-list', query='''
+            query {
+                sockets {
+                    edges {
+                        node {
+                            fd
+                        }
+                    }
+                }
+            }
+        ''')
+        sockets = [edge['node']['fd'] for edge in sockets['sockets']['edges']]
+        # 0 = producer multicast
+        # 1 = current request
+        self.assertEqual(sockets, [0, 1])
 
 if __name__ == '__main__':
     testutil.main()

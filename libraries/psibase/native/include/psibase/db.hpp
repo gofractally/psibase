@@ -2,7 +2,6 @@
 
 #include_next <psibase/db.hpp>
 
-#include <psibase/Socket.hpp>
 #include <psibase/blob.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psio/fracpack.hpp>
@@ -22,6 +21,11 @@ namespace triedent
 
 namespace psibase
 {
+   struct SocketAutoCloseSet;
+   struct Sockets;
+   struct SocketChange;
+   using SocketChangeSet = std::vector<SocketChange>;
+
    struct Revision;
    using ConstRevisionPtr = std::shared_ptr<const Revision>;
 
@@ -100,6 +104,7 @@ namespace psibase
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
       void kvPutSubjective(Writer& writer, std::span<const char> key, std::span<const char> value);
+      void kvRemoveSubjective(Writer& writer, std::span<const char> key);
       std::optional<std::vector<char>> kvGetSubjective(Writer& writer, std::span<const char> key);
 
       IndependentRevision getSubjective();
