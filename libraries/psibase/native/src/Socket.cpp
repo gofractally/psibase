@@ -32,14 +32,13 @@ void SocketAutoCloseSet::close(Writer&                           writer,
    for (const auto& socket : sockets)
    {
       socket->autoClose(message);
+      auto key = socketKey(socket->id);
+      parent.sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
    }
-
    {
       std::lock_guard l{parent.mutex};
       for (const auto& socket : sockets)
       {
-         auto key = socketKey(socket->id);
-         parent.sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
          socket->closed = true;
          parent.sockets[static_cast<std::size_t>(socket->id)].reset();
       }
@@ -73,7 +72,7 @@ namespace
       virtual SocketInfo info() const override { return HttpSocketInfo{}; }
    };
 
-   void doRemoveSocket(std::shared_ptr<Socket>& socket, SharedDatabase& sharedDb, Writer& writer)
+   void doRemoveSocket(std::shared_ptr<Socket>& socket, SharedDatabase& sharedDb)
    {
       assert(!socket->closed);
       if (socket->canAutoClose())
@@ -81,10 +80,6 @@ namespace
          auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
          if (sockptr->owner)
             sockptr->owner->sockets.erase(sockptr);
-      }
-      {
-         auto key = socketKey(socket->id);
-         sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
       }
       socket->closed = true;
       socket.reset();
@@ -157,8 +152,14 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
          return wasi_errno_badf;
       if (p->once)
       {
-         doRemoveSocket(sockets[fd], sharedDb, writer);
+         doRemoveSocket(sockets[fd], sharedDb);
       }
+   }
+
+   if (p->closed)
+   {
+      auto key = socketKey(p->id);
+      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
    }
 
    p->send(buf);
@@ -166,71 +167,91 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
 }
 void Sockets::add(Writer& writer, const std::shared_ptr<Socket>& socket, SocketAutoCloseSet* owner)
 {
-   std::lock_guard l{mutex};
-   check(!stopped, "Shutting down");
-   if (auto pos = available.find_first(); pos != boost::dynamic_bitset<>::npos)
    {
-      socket->id   = pos;
-      sockets[pos] = socket;
-      available.reset(pos);
-   }
-   else
-   {
-      check(sockets.size() <= static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()),
-            "Too many open sockets");
+      std::lock_guard l{mutex};
+      check(!stopped, "Shutting down");
+      if (auto pos = available.find_first(); pos != boost::dynamic_bitset<>::npos)
+      {
+         socket->id   = pos;
+         sockets[pos] = socket;
+         available.reset(pos);
+      }
+      else
+      {
+         check(
+             sockets.size() <= static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()),
+             "Too many open sockets");
 
-      // TODO: exception safety
-      socket->id = sockets.size();
-      sockets.push_back(socket);
-      available.push_back(false);
+         // TODO: exception safety
+         socket->id = sockets.size();
+         sockets.push_back(socket);
+         available.push_back(false);
+      }
+      if (owner)
+      {
+         assert(socket->canAutoClose());
+         auto sockptr   = std::static_pointer_cast<AutoCloseSocket>(socket);
+         sockptr->owner = owner;
+         owner->sockets.insert(sockptr);
+      }
+      socket->weak_sockets = shared_from_this();
    }
+
    {
       SocketRow row{socket->id, socket->info()};
       sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
    }
-   if (owner)
-   {
-      assert(socket->canAutoClose());
-      auto sockptr   = std::static_pointer_cast<AutoCloseSocket>(socket);
-      sockptr->owner = owner;
-      owner->sockets.insert(sockptr);
-   }
-   socket->weak_sockets = shared_from_this();
 }
 void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket)
 {
-   std::lock_guard l{mutex};
-   check(!stopped, "Shutting down");
-   check(fd >= 0, "invalid fd");
-   auto pos = static_cast<std::size_t>(fd);
-   if (pos + 1 > available.size())
+   bool existing = false;
    {
-      available.resize(pos + 1, true);
-      sockets.resize(pos + 1);
+      std::lock_guard l{mutex};
+      check(!stopped, "Shutting down");
+      check(fd >= 0, "invalid fd");
+      auto pos = static_cast<std::size_t>(fd);
+      if (pos + 1 > available.size())
+      {
+         available.resize(pos + 1, true);
+         sockets.resize(pos + 1);
+      }
+      if (!available[pos])
+      {
+         check(sockets[pos]->info() == socket->info(), "Replacing socket does not match");
+         sockets[pos]->weak_sockets.reset();
+         sockets[pos] = socket;
+         existing     = true;
+      }
+      else
+      {
+         socket->id   = fd;
+         sockets[pos] = socket;
+         available.reset(pos);
+      }
+
+      socket->weak_sockets = shared_from_this();
    }
-   if (!available[pos])
+   if (!existing)
    {
-      check(sockets[pos]->info() == socket->info(), "Replacing socket does not match");
-      sockets[pos]->weak_sockets.reset();
-      sockets[pos] = socket;
-   }
-   else
-   {
-      socket->id   = fd;
-      sockets[pos] = socket;
-      available.reset(pos);
       SocketRow row{socket->id, socket->info()};
       sharedDb.kvPutSubjective(writer, psio::convert_to_key(row.key()), psio::to_frac(row));
    }
-
-   socket->weak_sockets = shared_from_this();
 }
 void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket)
 {
-   std::lock_guard l{mutex};
-   if (socket->id >= 0 && socket->id < sockets.size() && sockets[socket->id] == socket)
+   bool matched = false;
    {
-      doRemoveSocket(sockets[socket->id], sharedDb, writer);
+      std::lock_guard l{mutex};
+      if (socket->id >= 0 && socket->id < sockets.size() && sockets[socket->id] == socket)
+      {
+         doRemoveSocket(sockets[socket->id], sharedDb);
+         matched = true;
+      }
+   }
+   if (matched)
+   {
+      auto key = socketKey(socket->id);
+      sharedDb.kvRemoveSubjective(writer, psio::convert_to_key(key));
    }
 }
 std::int32_t Sockets::autoClose(std::int32_t               fd,
