@@ -3,4 +3,5 @@ package base64:plugin;
 world impl {
     include host:common/imports;
     export url;
+    export standard;
 }

@@ -19,6 +19,7 @@ use accounts::{
 use aes::plugin as aes;
 use auth_invite::plugin::intf as AuthInvite;
 use auth_sig::plugin::keyvault;
+use base64::plugin as base64;
 use bindings::invite::plugin::types::{Invite, InviteState};
 use chrono::{DateTime, SecondsFormat};
 use exports::{
@@ -202,8 +203,9 @@ impl Inviter for InvitePlugin {
         let keypair = keyvault::generate_unmanaged_keypair()?;
 
         let seed = rand_bytes(8);
+        let pub_b64 = base64::standard::encode(&keyvault::to_der(&keypair.public_key)?);
         let encrypted_private_key =
-            aes::with_password::encrypt(&seed, keypair.private_key.as_bytes(), &keypair.public_key);
+            aes::with_password::encrypt(&seed, keypair.private_key.as_bytes(), &pub_b64);
         let encrypted_private_key_hex = hex::encode(&encrypted_private_key);
 
         let sender_app = Client::get_sender_app();
@@ -261,10 +263,11 @@ impl Advanced for InvitePlugin {
             .ok_or_else(|| DecodeInviteError("No secret in invite record"))?;
         let encrypted_private_key = hex::decode(&encrypted_private_key_hex).unwrap();
 
+        let pub_b64 = base64::standard::encode(&keyvault::to_der(&invite.pubkey)?);
         let private_key_pem_bytes = aes::with_password::decrypt(
             &invite_token.pk.to_le_bytes(),
             &encrypted_private_key,
-            &invite.pubkey,
+            &pub_b64,
         )?;
         let private_key_pem = String::from_utf8(private_key_pem_bytes)
             .map_err(|_| DecodeInviteError("Failed to decode encrypted private key"))?;
