@@ -25,24 +25,24 @@ export function InboxList({
                         }`}
                         onClick={() => onSelectMessage(message.id)}
                     >
-                        <Avatar className="h-10 w-10">
+                        <Avatar className="h-10 w-10 flex-shrink-0">
                             <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground">
                                 {message.sender.name.charAt(0)}
                             </div>
                         </Avatar>
-                        <div className="flex-1 space-y-1 overflow-hidden">
+                        <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-center justify-between">
-                                <p className="font-medium">
+                                <p className="truncate font-medium">
                                     {message.sender.name}
                                 </p>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="ml-2 whitespace-nowrap text-xs text-muted-foreground">
                                     {formatDistanceToNow(message.date)}
                                 </span>
                             </div>
-                            <p className="text-sm font-medium">
+                            <p className="truncate text-sm font-medium">
                                 {message.subject}
                             </p>
-                            <p className="truncate text-sm text-muted-foreground">
+                            <p className="line-clamp-2 text-sm text-muted-foreground">
                                 {message.preview}
                             </p>
                         </div>
