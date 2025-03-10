@@ -25,7 +25,7 @@ flowchart TD
 
 [SystemService::Sites] provides web hosting for non-service accounts or service accounts that did not [register](#registration) for HTTP handling.
 
-`psinode` directly handles requests which start with `/native`, e.g. `/native/push_boot`. Services don't serve these.
+`psinode` directly handles requests which start with `/native`, e.g. `/native/p2p`. Services don't serve these.
 
 ## Registration
 

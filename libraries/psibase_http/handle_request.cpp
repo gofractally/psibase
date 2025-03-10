@@ -863,10 +863,19 @@ namespace psibase::http
                   PSIBASE_LOG(logger, info) << proxyServiceNum.str() << "::serve succeeded";
             }
          }  // !native
-         else if (req_target == "/native/push_boot" && server.http_config->push_boot_async)
+         else if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
          {
             if (!server.http_config->enable_transactions)
                return send(not_found(req.target()));
+
+            if (!is_admin(*server.http_config, req_host))
+            {
+               return send(not_found(req.target()));
+            }
+            if (!check_admin_auth(authz::mode_type::write))
+            {
+               return;
+            }
 
             if (req.method() != bhttp::verb::post)
             {
