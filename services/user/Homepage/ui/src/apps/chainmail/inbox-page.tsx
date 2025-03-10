@@ -4,7 +4,7 @@ import {
     ResizablePanel,
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { InboxList } from "@/apps/chainmail/components/inbox-list";
 import { MessageDetail } from "@/apps/chainmail/components/message-detail";
 import { messages } from "@/apps/chainmail/data";
@@ -13,7 +13,7 @@ export default function InboxPage() {
     const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
         null,
     );
-    const isDesktop = !useIsMobile();
+    const isDesktop = useMediaQuery("(min-width: 768px)");
 
     const selectedMessage = selectedMessageId
         ? messages.find((message) => message.id === selectedMessageId)
