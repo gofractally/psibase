@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 #[allow(warnings)]
 mod bindings;
+use bindings::*;
+
 mod errors;
 use errors::ErrorType::*;
 mod helpers;
@@ -9,17 +11,17 @@ mod db;
 mod types;
 use db::*;
 
-use crate::bindings::transact::plugin::hook_handlers::*;
+use transact::plugin::hook_handlers::*;
 
 // Other plugins
 // Other plugins
-use bindings::host::common::{
+use host::common::{
     self as Host, server as Server,
     types::{self as CommonTypes},
 };
 
 // Exported interfaces/types
-use bindings::exports::transact::plugin::{
+use exports::transact::plugin::{
     admin::Guest as Admin, hooks::Guest as Hooks, intf::Guest as Intf, login::Guest as Login,
 };
 
