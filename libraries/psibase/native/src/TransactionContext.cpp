@@ -49,8 +49,11 @@ namespace psibase
 
    TransactionContext::~TransactionContext()
    {
-      ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
-      blockContext.db.clearTemporary();
+      if (!blockContext.isReadOnly)
+      {
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
+         blockContext.db.clearTemporary();
+      }
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
