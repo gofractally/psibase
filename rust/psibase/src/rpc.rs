@@ -196,6 +196,7 @@ pub struct TransactionBuilder<F: Fn(Vec<Action>) -> Result<SignedTransaction, an
     action_limit: usize,
     actions: Vec<Action>,
     transactions: Vec<(String, Vec<SignedTransaction>, bool)>,
+    index: usize,
     f: F,
 }
 
@@ -206,25 +207,29 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
             action_limit,
             actions: vec![],
             transactions: vec![],
+            index: 0,
             f,
         }
     }
     pub fn set_label(&mut self, label: String) {
         self.transactions
-            .push((label, vec![], !self.actions.is_empty()))
+            .push((label, vec![], !self.transactions.is_empty()))
     }
     pub fn push<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
         let prev_len = self.actions.len();
         let prev_size = self.size;
         act.append_to_tx(&mut self.actions, &mut self.size);
-        if prev_len != 0 && self.size >= self.action_limit {
-            self.transactions
-                .last_mut()
-                .unwrap()
+        if prev_len != 0 && self.size > self.action_limit {
+            // If we just saw a set_label, then there is no carry over
+            for new_group in &mut self.transactions[(self.index + 1)..] {
+                new_group.2 = false;
+            }
+            self.transactions[self.index]
                 .1
                 .push((self.f)(self.actions.drain(..prev_len).collect())?);
             self.size -= prev_size;
         }
+        self.index = self.transactions.len() - 1;
         Ok(())
     }
     pub fn push_all<T: ActionGroup>(&mut self, actions: Vec<T>) -> Result<(), anyhow::Error> {
@@ -233,12 +238,21 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
         }
         Ok(())
     }
-    pub fn finish(self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
-        let mut result = self.transactions;
-        if !self.actions.is_empty() {
-            result.last_mut().unwrap().1.push((self.f)(self.actions)?);
+    // Returns transactions grouped by label
+    // - Only the first transaction in a group can contain actions from
+    //   previous labels.
+    // - If the carry bit is set, then previous labels had some actions
+    //   that are in this (or a later) group.
+    pub fn finish(mut self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
+        for new_group in &mut self.transactions[(self.index + 1)..] {
+            new_group.2 = false;
         }
-        Ok(result)
+        if !self.actions.is_empty() {
+            self.transactions[self.index]
+                .1
+                .push((self.f)(self.actions)?);
+        }
+        Ok(self.transactions)
     }
     // Returns the number of transactions that would be created if the
     // builder were finished now.
@@ -347,4 +361,121 @@ pub async fn gql_query<T: DeserializeOwned>(
         Err(Error::GraphQLWrongResponse)?
     };
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Tapos, Transaction};
+    fn mkact(size: usize) -> Action {
+        let mut result = Action::default();
+        result.rawData.0.resize(size, 0u8);
+        result
+    }
+    fn mktx(actions: Vec<Action>) -> Result<SignedTransaction, anyhow::Error> {
+        Ok(SignedTransaction {
+            transaction: Transaction {
+                tapos: Tapos::default(),
+                actions,
+                claims: Vec::new(),
+            }
+            .packed()
+            .into(),
+            proofs: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn test_tx_builder_exact() -> Result<(), anyhow::Error> {
+        let mut builder = TransactionBuilder::new(64, mktx);
+        builder.set_label("1".to_string());
+        builder.push(mkact(32))?;
+        builder.push(mkact(32))?;
+        builder.push(mkact(64))?;
+        let tx = builder.finish()?;
+        assert_eq!(
+            tx,
+            vec![(
+                "1".to_string(),
+                vec![mktx(vec![mkact(32), mkact(32)])?, mktx(vec![mkact(64)])?],
+                false
+            )]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_tx_builder_exact_label() -> Result<(), anyhow::Error> {
+        let mut builder = TransactionBuilder::new(64, mktx);
+        builder.set_label("1".to_string());
+        builder.push(mkact(32))?;
+        builder.push(mkact(32))?;
+        builder.set_label("2".to_string());
+        builder.push(mkact(64))?;
+        let tx = builder.finish()?;
+        assert_eq!(
+            tx,
+            vec![
+                (
+                    "1".to_string(),
+                    vec![mktx(vec![mkact(32), mkact(32)])?],
+                    false
+                ),
+                ("2".to_string(), vec![mktx(vec![mkact(64)])?], false)
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_tx_builder_carry() -> Result<(), anyhow::Error> {
+        let mut builder = TransactionBuilder::new(64, mktx);
+        builder.set_label("1".to_string());
+        builder.push(mkact(32))?;
+        builder.set_label("2".to_string());
+        builder.push(mkact(32))?;
+        builder.push(mkact(64))?;
+        builder.set_label("3".to_string());
+        let tx = builder.finish()?;
+        assert_eq!(
+            tx,
+            vec![
+                ("1".to_string(), vec![], false),
+                (
+                    "2".to_string(),
+                    vec![mktx(vec![mkact(32), mkact(32)])?, mktx(vec![mkact(64)])?],
+                    true
+                ),
+                ("3".to_string(), vec![], false)
+            ]
+        );
+        Ok(())
+    }
+    #[test]
+    fn test_tx_builder_carry_chain() -> Result<(), anyhow::Error> {
+        let mut builder = TransactionBuilder::new(64, mktx);
+        builder.set_label("1".to_string());
+        builder.push(mkact(16))?;
+        builder.set_label("2".to_string());
+        builder.push(mkact(16))?;
+        builder.set_label("3".to_string());
+        builder.push(mkact(16))?;
+        builder.set_label("4".to_string());
+        builder.push(mkact(16))?;
+        let tx = builder.finish()?;
+        assert_eq!(
+            tx,
+            vec![
+                ("1".to_string(), vec![], false),
+                ("2".to_string(), vec![], true),
+                ("3".to_string(), vec![], true),
+                (
+                    "4".to_string(),
+                    vec![mktx(vec![mkact(16), mkact(16), mkact(16), mkact(16)])?],
+                    true
+                ),
+            ]
+        );
+        Ok(())
+    }
 }
