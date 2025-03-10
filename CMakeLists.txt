@@ -256,7 +256,6 @@ set(JS_DIRS
     services/user/Invite/ui:Invite_js
     services/user/Permissions/ui:Permissions_js
     services/user/Supervisor/ui:Supervisor_js
-    services/user/Tokens/ui:Tokens_js
     services/user/Workshop/ui:Workshop_js
 )
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
@@ -783,13 +782,11 @@ psibase_package(
     PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Events(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
     SERVICE tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Tokens.wasm
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_tokens} /plugin.wasm
         SERVER r-tokens
         INIT
     SERVICE r-tokens
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTokens.wasm
-    DEPENDS ${Tokens_js_DEP} ${CMAKE_CURRENT_SOURCE_DIR}/services/user/Tokens/ui/dist/index.html
     DEPENDS ${Plugins_DEP}
     DEPENDS wasm
 )

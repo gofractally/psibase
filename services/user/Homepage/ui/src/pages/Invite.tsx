@@ -21,10 +21,10 @@ import {
     TicketCheck,
     TriangleAlert,
 } from "lucide-react";
-import { Supervisor, siblingUrl } from "@psibase/common-lib";
+import {  siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "@/lib/modifyUrlParams";
 import { z } from "zod";
-import { supervisor } from "@/main";
+import { supervisor } from "@/supervisor";
 
 dayjs.extend(relativeTime);
 
@@ -38,7 +38,6 @@ const inviteObject = z.object({
 });
 
 const fetchInvite = async (token: string) => {
-    await supervisor.onLoaded();
 
     const tokenRes = await supervisor.functionCall({
         service: "invite",
