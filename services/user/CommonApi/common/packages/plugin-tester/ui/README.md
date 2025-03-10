@@ -47,16 +47,6 @@ The Plugin Tester is a development tool designed to help developers test and int
 - `RpcUtils.ts`: Utilities for RPC calls
 - `StringUtils.ts`: String manipulation utilities
 
-## Data Flow
-
-1. The application loads the current service information on startup
-2. Users can specify a service and plugin to load
-3. The schema is fetched using the `usePluginSchema` hook
-4. Available functions are displayed in the `FunctionSelector`
-5. When a function is selected, parameter inputs are generated based on the function's schema
-6. Users can fill in parameter values using type-appropriate input components
-7. The `ExecutionTabs` component handles function execution and displays results
-
 ## Key Concepts
 
 ### Schema Structure
@@ -77,6 +67,35 @@ The application includes a sophisticated type system that:
 - Supports complex types (records, variants, tuples, etc.)
 - Provides appropriate input components for each type
 - Generates default values based on type information
+
+### Parameter Handling and Data Flow
+
+The application processes parameters through several layers before sending them to the plugin:
+
+1. **Parameter Initialization**:
+
+   - When a function is selected in `PluginLoader`, parameters are initialized using the schema
+   - Parameter names from the schema (e.g., `"public-key"`) are converted to camelCase (e.g., `"publicKey"`)
+   - Initial values are generated based on parameter types using the `getTypeInfo` function
+
+2. **User Input Handling**:
+
+   - Input components (e.g., `StringInput`) capture user input via their `onChange` handlers
+   - Changes flow to `RichParameterEditor.handleRichEdit()` which:
+     - Updates the parameter values in the state object
+     - Special handling exists for bytelist parameters (storing both bytes and rawInput)
+
+3. **Parameter Storage**:
+
+   - All parameter values are stored in the `paramValues` state in `PluginLoader`
+   - Parameter keys are consistently in camelCase format
+   - For bytelist parameters, additional entries with `*RawInput` suffixes store raw input values
+
+4. **Parameter Processing for Execution**:
+
+   - When executing a function, `ExecutionTabs.getCleanValues()` filters out any entries ending with `RawInput`
+   - The `parseParams()` function converts the object to an array using `Object.values()`
+   - Parameters are sent to the plugin function in the order they appear in the array
 
 ### Supervisor Integration
 
