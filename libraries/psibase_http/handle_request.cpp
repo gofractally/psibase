@@ -244,9 +244,8 @@ namespace psibase::http
    }
 
    // Returns the host and path for the request. See RFC 9112 § 3.2 and 3.3
-   template <typename Body, typename Allocator>
    std::pair<beast::string_view, beast::string_view> parse_request_target(
-       const bhttp::request<Body, bhttp::basic_fields<Allocator>>& request)
+       const http_session_base::request_type& request)
    {
       auto target = request.target();
       if (target.starts_with('/') || target == "*")

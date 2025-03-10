@@ -8,6 +8,8 @@ using std::chrono::steady_clock;
 
 namespace psibase::http
 {
+   std::pair<beast::string_view, beast::string_view> parse_request_target(
+       const http_session_base::request_type& request);
 
    void handle_request(server_state&                     server,
                        http_session_base::request_type&& req,
@@ -74,17 +76,17 @@ namespace psibase::http
       }
 
       {
-         const auto& req = parser->get();
+         const auto& req             = parser->get();
+         auto [req_host, req_target] = parse_request_target(req);
          request_attrs.emplace(std::tuple{
              boost::log::add_scoped_logger_attribute(
                  logger, "RequestMethod",
                  boost::log::attributes::constant{std::string(req.method_string())}),
              boost::log::add_scoped_logger_attribute(
                  logger, "RequestTarget",
-                 boost::log::attributes::constant{std::string(req.target())}),
+                 boost::log::attributes::constant{std::string(req_target)}),
              boost::log::add_scoped_logger_attribute(
-                 logger, "RequestHost",
-                 boost::log::attributes::constant{std::string(req[bhttp::field::host])})});
+                 logger, "RequestHost", boost::log::attributes::constant{std::string(req_host)})});
          PSIBASE_LOG(logger, debug) << "Received HTTP request";
       }
 
