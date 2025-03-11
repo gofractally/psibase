@@ -3,12 +3,12 @@ import { useEffect } from "react";
 import { Mailbox } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
-import { useIncomingMessages } from "@/apps/chainmail/hooks";
+import { useDraftMessages } from "@/apps/chainmail/hooks";
 
-export default function InboxPage() {
+export default function DraftsPage() {
     const isDesktop = useMediaQuery("(min-width: 1440px)");
-    const { query, selectedMessage, setSelectedMessageId } =
-        useIncomingMessages();
+    const { drafts, selectedMessage, setSelectedMessageId } =
+        useDraftMessages();
 
     useEffect(() => {
         setSelectedMessageId("");
@@ -17,13 +17,13 @@ export default function InboxPage() {
     return (
         <div className="flex h-screen flex-col">
             <header className="border-b p-4">
-                <h1 className="text-xl font-bold">Inbox</h1>
+                <h1 className="text-xl font-bold">Drafts</h1>
             </header>
 
             <Mailbox
                 isDesktop={isDesktop}
-                mailbox="inbox"
-                messages={query.data ?? []}
+                mailbox="drafts"
+                messages={drafts ?? []}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />

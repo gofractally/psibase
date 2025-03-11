@@ -1,8 +1,13 @@
-import { Account } from "@/lib/zod/Account";
 import { Mail, PencilLine, Send, Inbox, Archive, Pin } from "lucide-react";
 
-import InboxPage from "./inbox-page";
+import { Account } from "@/lib/zod/Account";
 import { AppConfigType } from "@/configuredApps";
+
+import InboxPage from "./inbox-page";
+import DraftsPage from "./drafts-page";
+import SentPage from "./sent-page";
+import ArchivePage from "./archive-page";
+import SavedPage from "./saved-page";
 
 export const chainMailConfig: AppConfigType = {
     service: Account.parse("chainmail"),
@@ -19,25 +24,25 @@ export const chainMailConfig: AppConfigType = {
         },
         {
             path: "drafts",
-            element: <div>Drafts page</div>,
+            element: <DraftsPage />,
             name: "Drafts",
             icon: <PencilLine className="h-6 w-6" />,
         },
         {
             path: "saved",
-            element: <div>Saved page</div>,
+            element: <SavedPage />,
             name: "Saved",
             icon: <Pin className="h-6 w-6" />,
         },
         {
             path: "sent",
-            element: <div>Sent page</div>,
+            element: <SentPage />,
             name: "Sent",
             icon: <Send className="h-6 w-6" />,
         },
         {
             path: "archived",
-            element: <div>Archived page</div>,
+            element: <ArchivePage />,
             name: "Archived",
             icon: <Archive className="h-6 w-6" />,
         },
