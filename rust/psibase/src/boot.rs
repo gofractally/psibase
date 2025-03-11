@@ -118,7 +118,6 @@ pub fn get_initial_actions<
     compression_level: u32,
     builder: &mut TransactionBuilder<F>,
 ) -> Result<(), anyhow::Error> {
-    let mut actions = Vec::new();
     let has_packages = true;
 
     let mut essential = EssentialServices::new();
@@ -196,10 +195,14 @@ pub fn get_initial_actions<
 
     builder.set_label("Finalizing installation".to_string());
 
+    let mut actions = Vec::new();
     if has_packages {
         for s in &mut service_packages[..] {
             s.commit_install(producers::ROOT, &mut actions)?;
         }
+    }
+    for act in actions {
+        builder.push(act)?;
     }
 
     builder.push(transact::Wrapper::pack().finishBoot())?;
