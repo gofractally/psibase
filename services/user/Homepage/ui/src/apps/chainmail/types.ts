@@ -3,12 +3,4 @@ export interface Sender {
     email: string;
 }
 
-export interface Message {
-    id: string;
-    subject: string;
-    sender: Sender;
-    date: string;
-    preview: string;
-    content: string;
-    read: boolean;
-}
+export type Mailbox = "inbox" | "sent" | "drafts" | "archived" | "saved";

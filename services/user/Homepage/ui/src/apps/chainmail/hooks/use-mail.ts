@@ -1,10 +1,9 @@
 import { atom, useAtom } from "jotai";
-
-import { useCurrentUser } from "./useCurrentUser";
 import { useQuery } from "@tanstack/react-query";
-import { useLocalStorage } from "./useLocalStorage";
 
 import { supervisor } from "@/supervisor";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 const composeAtom = atom(false);
 export function useCompose() {

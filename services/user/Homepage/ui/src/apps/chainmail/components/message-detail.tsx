@@ -1,17 +1,28 @@
+import type { Message } from "@/apps/chainmail/hooks";
+import type { Mailbox } from "@/apps/chainmail/types";
+
 import { ArrowLeft, Flag, MoreHorizontal, Reply, Trash } from "lucide-react";
+
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { formatDate } from "@/apps/chainmail/utils";
-import { Message } from "@/apps/chainmail/types";
 
 interface MessageDetailProps {
     message: Message | null;
+    mailbox: Mailbox;
     onBack?: () => void;
 }
 
-export function MessageDetail({ message, onBack }: MessageDetailProps) {
+export function MessageDetail({
+    message,
+    mailbox,
+    onBack,
+}: MessageDetailProps) {
     if (!message) return null;
+
+    const account = mailbox === "inbox" ? message.from : message.to;
 
     return (
         <div className="flex h-full w-full flex-col">
@@ -45,18 +56,13 @@ export function MessageDetail({ message, onBack }: MessageDetailProps) {
                         <div className="flex gap-3">
                             <Avatar className="h-10 w-10">
                                 <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground">
-                                    {message.sender.name.charAt(0)}
+                                    {account.charAt(0)}
                                 </div>
                             </Avatar>
                             <div>
-                                <p className="font-medium">
-                                    {message.sender.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {message.sender.email}
-                                </p>
+                                <p className="font-medium">{account}</p>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    {formatDate(message.date)}
+                                    {formatDate(message.datetime)}
                                 </p>
                             </div>
                         </div>
@@ -67,7 +73,7 @@ export function MessageDetail({ message, onBack }: MessageDetailProps) {
                     </div>
 
                     <div className="prose dark:prose-invert max-w-none">
-                        {message.content.split("\n\n").map((paragraph, i) => (
+                        {message.body.split("\n\n").map((paragraph, i) => (
                             <p key={i}>{paragraph}</p>
                         ))}
                     </div>

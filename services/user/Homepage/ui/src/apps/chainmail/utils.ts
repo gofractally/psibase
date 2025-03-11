@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export function formatDistanceToNow(dateString: string): string {
+export function formatDistanceToNow(dateString: string | number): string {
     const date = new Date(dateString);
     const now = new Date();
 
@@ -25,7 +25,7 @@ export function formatDistanceToNow(dateString: string): string {
     }
 }
 
-export function formatDate(dateString: string, short = false): string {
+export function formatDate(dateString: string | number, short = false): string {
     const date = new Date(dateString);
 
     if (short) {

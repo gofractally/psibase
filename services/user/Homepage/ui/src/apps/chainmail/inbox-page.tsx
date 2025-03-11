@@ -1,23 +1,29 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
+
+import {
+    EmptyBox,
+    MessageDetail,
+    NoMessageSelected,
+    MailList,
+} from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { InboxList } from "@/apps/chainmail/components/inbox-list";
-import { MessageDetail } from "@/apps/chainmail/components/message-detail";
-import { messages } from "@/apps/chainmail/data";
+
+import { useIncomingMessages } from "@/apps/chainmail/hooks";
 
 export default function InboxPage() {
-    const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
-        null,
-    );
-    const isDesktop = useMediaQuery("(min-width: 768px)");
+    const isDesktop = useMediaQuery("(min-width: 1440px)");
+    const { query, selectedMessage, setSelectedMessageId } =
+        useIncomingMessages();
 
-    const selectedMessage = selectedMessageId
-        ? messages.find((message) => message.id === selectedMessageId)
-        : null;
+    useEffect(() => {
+        setSelectedMessageId("");
+    }, []);
+    const messages = query.data ?? [];
 
     return (
         <div className="flex h-screen flex-col">
@@ -27,41 +33,52 @@ export default function InboxPage() {
 
             <main className="flex-1 overflow-hidden">
                 {/* On mobile, show either the inbox list or the message detail */}
-                {!isDesktop && selectedMessageId ? (
+                {!isDesktop && selectedMessage ? (
                     <MessageDetail
                         message={selectedMessage ?? null}
-                        onBack={() => setSelectedMessageId(null)}
+                        mailbox="inbox"
+                        onBack={() => setSelectedMessageId("")}
                     />
                 ) : isDesktop ? (
                     <ResizablePanelGroup direction="horizontal">
                         <ResizablePanel
-                            defaultSize={25}
-                            minSize={15}
+                            defaultSize={40}
+                            minSize={20}
                             maxSize={40}
                             className="border-r"
                         >
-                            <InboxList
-                                messages={messages}
-                                selectedId={selectedMessageId}
-                                onSelectMessage={setSelectedMessageId}
-                            />
+                            {messages.length ? (
+                                <MailList
+                                    mailbox="inbox"
+                                    messages={messages}
+                                    onSelectMessage={setSelectedMessageId}
+                                    selectedMessage={selectedMessage}
+                                />
+                            ) : (
+                                <EmptyBox>No messages</EmptyBox>
+                            )}
                         </ResizablePanel>
                         <ResizableHandle withHandle />
                         <ResizablePanel defaultSize={75}>
                             {selectedMessage ? (
-                                <MessageDetail message={selectedMessage} />
+                                <MessageDetail
+                                    message={selectedMessage}
+                                    mailbox="inbox"
+                                    onBack={() => setSelectedMessageId("")}
+                                />
                             ) : (
-                                <div className="flex h-full items-center justify-center text-muted-foreground">
-                                    Select a message to view
-                                </div>
+                                <NoMessageSelected>
+                                    Select a message
+                                </NoMessageSelected>
                             )}
                         </ResizablePanel>
                     </ResizablePanelGroup>
                 ) : (
-                    <InboxList
+                    <MailList
+                        mailbox="inbox"
                         messages={messages}
-                        selectedId={selectedMessageId}
                         onSelectMessage={setSelectedMessageId}
+                        selectedMessage={selectedMessage}
                     />
                 )}
             </main>
