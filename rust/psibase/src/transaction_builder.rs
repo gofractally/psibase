@@ -21,6 +21,10 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
         }
     }
     pub fn set_label(&mut self, label: String) {
+        // If the previous label had no actions, drop it
+        if self.index + 1 < self.transactions.len() {
+            self.transactions.pop();
+        }
         self.transactions
             .push((label, vec![], !self.transactions.is_empty()))
     }
