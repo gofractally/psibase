@@ -3,6 +3,7 @@ use crate::{
     method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
     AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
     PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
+    TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -106,75 +107,94 @@ fn genesis_block_actions<R: Read + Seek>(
 ///
 /// This returns all actions that need to be packed into the transactions pushed after the
 /// boot block.
-pub fn get_initial_actions<R: Read + Seek>(
+pub fn get_initial_actions<
+    R: Read + Seek,
+    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+>(
     tx_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
     compression_level: u32,
-) -> Result<Vec<Action>, anyhow::Error> {
+    builder: &mut TransactionBuilder<F>,
+) -> Result<(), anyhow::Error> {
     let mut actions = Vec::new();
     let has_packages = true;
 
     let mut essential = EssentialServices::new();
     for s in &mut service_packages[..] {
         if essential.is_empty() {
+            builder.set_label(format!("Installing code for {}", s.name()));
+            let mut actions = Vec::new();
             s.install_code(&mut actions)?;
+            for act in actions {
+                builder.push(act)?;
+            }
         } else {
             essential.remove(s.get_accounts());
         }
     }
 
+    // If a package sets an auth service for an account, we should not override it
+    let mut accounts_with_auth = HashSet::new();
+
     for s in &mut service_packages[..] {
+        builder.set_label(format!("Installing {}", s.name()));
         for account in s.get_accounts() {
             if !s.has_service(*account) {
-                actions.push(new_account_action(accounts::SERVICE, *account))
+                builder.push(new_account_action(accounts::SERVICE, *account))?
             }
         }
 
+        let mut actions = Vec::new();
         if install_ui {
             s.reg_server(&mut actions)?;
             s.store_data(&mut actions, None, compression_level)?;
         }
 
         s.postinstall(&mut actions)?;
+        for act in &actions {
+            if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
+                accounts_with_auth.insert(act.sender);
+            }
+        }
+        for act in actions {
+            builder.push(act)?;
+        }
     }
 
+    builder.set_label("Creating system accounts".to_string());
+
     // Create producer account
-    actions.push(new_account_action(accounts::SERVICE, initial_producer));
+    builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
 
     if let Some(key) = tx_signing_key {
         // Set transaction signing key for producer
-        actions.push(set_key_action(initial_producer, &key));
-        actions.push(set_auth_service_action(initial_producer, auth_sig::SERVICE));
+        builder.push(set_key_action(initial_producer, &key))?;
+        builder.push(set_auth_service_action(initial_producer, auth_sig::SERVICE))?;
     }
 
-    actions.push(new_account_action(accounts::SERVICE, producers::ROOT));
-    actions.push(
+    builder.push(new_account_action(accounts::SERVICE, producers::ROOT))?;
+    builder.push(
         auth_delegate::Wrapper::pack_from(producers::ROOT)
             .setOwner(producers::PRODUCER_ACCOUNT_STRONG),
-    );
-    actions.push(set_auth_service_action(
+    )?;
+    builder.push(set_auth_service_action(
         producers::ROOT,
         auth_delegate::SERVICE,
-    ));
-
-    // If a package sets an auth service for an account, we should not override it
-    let mut accounts_with_auth = HashSet::new();
-    for act in &actions {
-        if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
-            accounts_with_auth.insert(act.sender);
-        }
-    }
+    ))?;
 
     for s in &service_packages[..] {
         for account in s.get_accounts() {
             if !accounts_with_auth.contains(account) {
-                actions.push(auth_delegate::Wrapper::pack_from(*account).setOwner(producers::ROOT));
-                actions.push(set_auth_service_action(*account, auth_delegate::SERVICE));
+                builder
+                    .push(auth_delegate::Wrapper::pack_from(*account).setOwner(producers::ROOT))?;
+                builder.push(set_auth_service_action(*account, auth_delegate::SERVICE))?;
             }
         }
     }
+
+    builder.set_label("Finalizing installation".to_string());
 
     if has_packages {
         for s in &mut service_packages[..] {
@@ -182,9 +202,9 @@ pub fn get_initial_actions<R: Read + Seek>(
         }
     }
 
-    actions.push(transact::Wrapper::pack().finishBoot());
+    builder.push(transact::Wrapper::pack().finishBoot())?;
 
-    Ok(actions)
+    Ok(())
 }
 
 /// Create boot transactions
@@ -212,34 +232,33 @@ pub fn create_boot_transactions<R: Read + Seek>(
     expiration: TimePointSec,
     service_packages: &mut [PackagedService<R>],
     compression_level: u32,
-) -> Result<(Vec<SignedTransaction>, Vec<SignedTransaction>), anyhow::Error> {
+) -> Result<
+    (
+        Vec<SignedTransaction>,
+        Vec<(String, Vec<SignedTransaction>, bool)>,
+    ),
+    anyhow::Error,
+> {
     validate_dependencies(service_packages)?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
-    let mut actions = get_initial_actions(
+
+    const TARGET_SIZE: usize = 1024 * 1024;
+    let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| {
+        Ok(SignedTransaction {
+            transaction: without_tapos(actions, expiration).packed().into(),
+            proofs: vec![],
+        })
+    });
+    get_initial_actions(
         tx_signing_key,
         initial_producer,
         install_ui,
         service_packages,
         compression_level,
+        &mut builder,
     )?;
-    let mut transactions = Vec::new();
-    const TARGET_SIZE: usize = 1024 * 1024;
 
-    while !actions.is_empty() {
-        let mut size = actions[0].rawData.len();
-        let mut n = 1;
-
-        while n < actions.len() && size + actions[n].rawData.len() <= TARGET_SIZE {
-            size += actions[n].rawData.len();
-            n += 1;
-        }
-        transactions.push(SignedTransaction {
-            transaction: without_tapos(actions.drain(..n).collect(), expiration)
-                .packed()
-                .into(),
-            proofs: vec![],
-        });
-    }
+    let transaction_groups = builder.finish()?;
 
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
@@ -252,10 +271,12 @@ pub fn create_boot_transactions<R: Read + Seek>(
     });
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
-    for trx in &transactions {
-        transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
-            &trx.transaction,
-        ))))
+    for (_, transactions, _) in &transaction_groups {
+        for trx in transactions {
+            transaction_ids.push(crate::Checksum256::from(<[u8; 32]>::from(Sha256::digest(
+                &trx.transaction,
+            ))))
+        }
     }
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
@@ -266,5 +287,5 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .into(),
         proofs: vec![],
     });
-    Ok((boot_transactions, transactions))
+    Ok((boot_transactions, transaction_groups))
 }

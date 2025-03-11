@@ -67,16 +67,19 @@ export const bootChain = async ({
         // Something is wrong with the Vite proxy configuration that causes boot to intermittently (but often) fail
         // in a dev environment.
 
-        const [boot_transaction, transactions] = boot.bootTransactions(
-            producerName,
-            packageBuffers,
-            blockSigningPubKeyPem,
-            txSigningPubKeyPem,
-            compression
-        );
+        const [boot_transaction, transactions, txlabels] =
+            boot.bootTransactions(
+                producerName,
+                packageBuffers,
+                blockSigningPubKeyPem,
+                txSigningPubKeyPem,
+                compression
+            );
+
+        let labels = ["Initializing chain", ...txlabels];
 
         let i = 1;
-        onProgressUpdate(["push", i, transactions.length + 1]);
+        onProgressUpdate(["push", 0, 1, labels]);
         const trace = await chain.pushArrayBufferBoot(boot_transaction.buffer);
         if (trace.error) {
             onProgressUpdate(trace);
@@ -85,8 +88,8 @@ export const bootChain = async ({
         }
         i++;
 
-        for (const t of transactions) {
-            onProgressUpdate(["push", i + 1, transactions.length + 1]);
+        for (const [t, completed, started] of transactions) {
+            onProgressUpdate(["push", completed + 1, started + 1, labels]);
             let trace = await chain.pushArrayBufferTransaction(t.buffer);
             if (trace.error) {
                 onProgressUpdate(trace);
@@ -94,6 +97,7 @@ export const bootChain = async ({
             }
             i++;
         }
+        onProgressUpdate(["push", labels.length, labels.length, labels]);
         onProgressUpdate({ type: "BootComplete", success: true });
     } catch (e) {
         onProgressUpdate({ type: "BootComplete", success: false });

@@ -843,7 +843,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     };
     add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
-    let (boot_transactions, transactions) = create_boot_transactions(
+    let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
         args.producer.into(),
@@ -853,26 +853,35 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
-    let progress = ProgressBar::new((transactions.len() + 1) as u64)
-        .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+    let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
+    let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
+        .with_style(ProgressStyle::with_template(
+            "{wide_bar} {pos}/{len}\n{msg}",
+        )?);
 
+    progress.set_message("Initializing chain");
     push_boot(args, &client, boot_transactions.packed(), &progress).await?;
-    progress.inc(1);
-    for transaction in transactions {
-        push_transaction(
-            &args.node_args.api,
-            client.clone(),
-            transaction.packed(),
-            args.tx_args.trace,
-            args.tx_args.console,
-            Some(&progress),
-        )
-        .await?;
-        progress.inc(1)
+    progress.inc(boot_transactions.len() as u64);
+    for (label, transactions, _) in groups {
+        progress.set_message(label);
+        for trx in transactions {
+            push_transaction(
+                &args.node_args.api,
+                client.clone(),
+                trx.packed(),
+                args.tx_args.trace,
+                args.tx_args.console,
+                Some(&progress),
+            )
+            .await?;
+            progress.inc(1)
+        }
     }
 
     if !args.tx_args.suppress_ok {
-        println!("Successfully booted {}", args.node_args.api);
+        progress.finish_with_message(format!("Successfully booted {}", args.node_args.api));
+    } else {
+        progress.finish_and_clear();
     }
     Ok(())
 }

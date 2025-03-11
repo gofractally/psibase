@@ -26,12 +26,18 @@ export interface ProducerType {
     producer: string;
 }
 
-export type RequestUpdate = [type: string, current: number, total: number];
+export type RequestUpdate = [
+    type: string,
+    completed: number,
+    started: number,
+    labels: string[]
+];
 
 export const RequestUpdateSchema = z.tuple([
     z.string(),
     z.number(),
     z.number(),
+    z.string().array(),
 ]);
 
 export const BootCompleteSchema = z.object({

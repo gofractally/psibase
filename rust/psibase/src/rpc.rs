@@ -223,6 +223,7 @@ pub async fn push_transactions(
         }
         n += 1;
     }
+    progress.inc(n);
     Ok(())
 }
 
