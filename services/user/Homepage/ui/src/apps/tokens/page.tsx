@@ -5,7 +5,10 @@ import FormTransfer from "@/apps/tokens/components/forms/form-transfer";
 import { ModalCreateToken } from "@/apps/tokens/components/modal-create-token";
 import { Tab, useTab } from "@/apps/tokens/hooks/useTab";
 import { useTokenForm } from "@/apps/tokens/hooks/useTokenForm";
-import { updateBalanceCache, useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
+import {
+    updateBalanceCache,
+    useBalances,
+} from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { wait } from "@/lib/wait";
 import { useEffect, useState } from "react";
 import { useBurn } from "@/apps/tokens/hooks/tokensPlugin/useBurn";
@@ -47,6 +50,7 @@ export const TokensPage = () => {
     const [isTransferModalOpen, setTransferModal] = useState(false);
 
     function onSubmit() {
+        console.log("onSubmit");
         if (isTransfer) {
             setTransferModal(true);
         } else {
@@ -56,7 +60,7 @@ export const TokensPage = () => {
 
     const selectedTokenId = form.watch("token");
     const selectedToken = tokens.find(
-        (balance) => balance.id == Number(selectedTokenId)
+        (balance) => balance.id == Number(selectedTokenId),
     );
 
     useEffect(() => {
@@ -109,12 +113,14 @@ export const TokensPage = () => {
                 Account.parse(currentUser),
                 tokenId,
                 amount,
-                "Subtract"
+                "Subtract",
             );
         } catch (e) {
             toast("Error", {
                 description:
-                    e instanceof Error ? e.message : `Unrecognised error, see logs.`,
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
             });
         } finally {
             wait(AwaitTime).then(() => {
@@ -124,25 +130,38 @@ export const TokensPage = () => {
     };
 
     const performTx = async () => {
+        console.log("performTx");
         if (!currentUser) throw new Error("Expected current user");
         const tokenId = form.watch("token");
         const amount = form.watch("amount");
         const memo = form.watch("memo")!;
 
         try {
-            const token = tokens.find((token) => token.id.toString() === tokenId);
+            const token = tokens.find(
+                (token) => token.id.toString() === tokenId,
+            );
             if (!token) throw new Error("Failed to find token");
 
             if (isBurning) {
                 const burningFrom = form.watch("from");
-                await burn({ tokenId, amount, account: burningFrom || "", memo });
+                await burn({
+                    tokenId,
+                    amount,
+                    account: burningFrom || "",
+                    memo,
+                });
                 toast("Burned", {
                     description: `Burned ${amount} ${
                         token.balance?.getDisplayLabel() || ""
                     } tokens${burningFrom ? ` from ${burningFrom}` : ""}`,
                 });
                 if (!burningFrom) {
-                    updateBalanceCache(currentUser, tokenId, amount, "Subtract");
+                    updateBalanceCache(
+                        currentUser,
+                        tokenId,
+                        amount,
+                        "Subtract",
+                    );
                 }
                 setConfirmationModalOpen(false);
                 onSuccessfulTx();
@@ -162,7 +181,9 @@ export const TokensPage = () => {
         } catch (e) {
             toast("Error", {
                 description:
-                    e instanceof Error ? e.message : `Unrecognised error, see logs.`,
+                    e instanceof Error
+                        ? e.message
+                        : `Unrecognised error, see logs.`,
             });
         } finally {
             wait(AwaitTime).then(() => {
@@ -176,9 +197,7 @@ export const TokensPage = () => {
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            
-
-            <div className="max-w-screen-lg mx-auto p-4 flex flex-col gap-3">
+            <div className="mx-auto flex max-w-screen-lg flex-col gap-3 p-4">
                 {isNoTokens && (
                     <NoTokensWarning
                         onContinue={() => {
@@ -227,7 +246,7 @@ export const TokensPage = () => {
                     selectedToken={selectedToken}
                     setMode={setTab}
                     setNewTokenModalOpen={setNewTokenModalOpen}
-                    onSubmit={onSubmit}
+                    onSubmit={() => onSubmit()}
                 />
                 <div className="my-4">
                     <CreditTable
