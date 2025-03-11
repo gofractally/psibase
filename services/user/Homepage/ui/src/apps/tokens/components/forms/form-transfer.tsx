@@ -119,8 +119,6 @@ const FormTransfer: FC<Props> = ({
         },
     ];
 
-    console.log(form.formState.errors, "are the errors");
-
     return (
         <Form {...form}>
             <form className="mx-auto w-full  space-y-8">
