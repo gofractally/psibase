@@ -1,10 +1,11 @@
 type QueryKeyGenerator<Prefix extends string = string> = (
-  ...args: any[]
+    ...args: any[]
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 const QueryKey = {
-  tokenBalances: (user: string | undefined) => ["balances", user] as const,
-  ui: (user: string | undefined) => ["ui", user] as const,
+    tokenBalances: (user: string | undefined) => ["balances", user] as const,
+    ui: (user: string | undefined) => ["ui", user] as const,
+    contacts: (user: string | undefined | null) => ["contacts", user] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
