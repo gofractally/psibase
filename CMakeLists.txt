@@ -157,6 +157,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -1029,7 +1030,20 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketList.psi
+    NAME SocketList
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Lists active sockets"
+    SERVICE s-sock-list
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
+        SERVER s-sock-list
+        FLAGS allowNativeSubjective
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
 
 ExternalProject_Add(
     rust

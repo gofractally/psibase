@@ -739,7 +739,8 @@ namespace psibase
       check(code.flags & CodeRow::isSubjective || allowDbReadSubjective,
             "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
-      return transactionContext.blockContext.systemContext.sockets->send(fd, msg);
+      return transactionContext.blockContext.systemContext.sockets->send(
+          *transactionContext.blockContext.writer, fd, msg);
    }
 
    int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
