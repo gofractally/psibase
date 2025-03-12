@@ -27,8 +27,9 @@ The [common-api service](../../../default-apps/common-api.md) endpoints which st
 
 | Method | URL                              | Description                                                                                                              |
 | ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `GET`  | `/common/tapos/head`             | Returns [TaPoS](#tapos) for the current head block                                                                       | 
-| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"common-api"` |
+| `GET`  | `/common/chainid`                | Returns the unique identifier for the chain (Chain ID)                                                                   |
+| `GET`  | `/common/tapos/head`             | Returns [TaPoS](#tapos) for the current head block                                                                       |
+| `GET`  | `/common/thisservice`            | Returns a JSON string containing the service associated with the domain. If it's the root domain, returns `"homepage"`   |
 | `GET`  | `/common/rootdomain`             | Returns a JSON string containing the root domain, e.g. `"psibase.127.0.0.1.sslip.io"`                                    |
 | `POST` | `/common/pack/Transaction`       | [Packs a transaction](#pack-transaction)                                                                                 |
 | `POST` | `/common/pack/SignedTransaction` | [Packs a signed transaction](#pack-signed-transaction)                                                                   |
