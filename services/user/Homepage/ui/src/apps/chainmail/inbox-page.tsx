@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 
 import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-
 import { useIncomingMessages } from "@/apps/chainmail/hooks";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function InboxPage() {
     const isDesktop = useMediaQuery("(min-width: 1440px)");

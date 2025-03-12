@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, SquarePen, X } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,6 @@ import { FormField } from "@/components/ui/form";
 import { supervisor } from "@/supervisor";
 import { useDraftMessages } from "../hooks/use-mail";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { toast } from "sonner";
 
 interface SupervisorError {
     code: number;
