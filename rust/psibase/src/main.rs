@@ -894,7 +894,11 @@ async fn push_boot(
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
-            .post(args.node_args.api.join("native/push_boot")?)
+            .post(
+                account!("x-admin")
+                    .url(&args.node_args.api)?
+                    .join("native/admin/push_boot")?,
+            )
             .body(packed),
     )
     .await?;
