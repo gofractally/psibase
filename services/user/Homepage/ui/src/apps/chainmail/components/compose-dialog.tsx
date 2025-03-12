@@ -72,7 +72,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
 
     const id = useRef<string>();
 
-    const createDraft = (value: string) => {
+    const createDraft = () => {
         const draft = {
             id: id.current,
             from: user,
@@ -81,22 +81,22 @@ export function ComposeDialog({ message }: { message?: Message }) {
             status: "draft",
             inReplyTo: null,
             subject: form.getValues().subject || "subject here",
-            body: value,
+            body: form.getValues().message ?? "",
         } as Message;
         setDrafts([...(drafts ?? []), draft]);
     };
 
-    const updateDraft = (value: string) => {
+    const updateDraft = () => {
         // using getDrafts() here instead of messages prevents stale closure
         const data = getDrafts() ?? [];
         let draft = data.find((msg) => msg.id === id.current);
         if (!draft) {
-            createDraft(value);
+            createDraft();
         } else {
             draft.datetime = Date.now();
             draft.to = form.getValues().to ?? "";
             draft.subject = form.getValues().subject ?? "";
-            draft.body = value;
+            draft.body = form.getValues().message ?? "";
             setDrafts(data);
         }
     };
@@ -196,6 +196,10 @@ export function ComposeDialog({ message }: { message?: Message }) {
                                             <Input
                                                 placeholder="Recipient account name"
                                                 {...field}
+                                                onChange={(e) => {
+                                                    field.onChange(e);
+                                                    updateDraft();
+                                                }}
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -211,6 +215,10 @@ export function ComposeDialog({ message }: { message?: Message }) {
                                             <Input
                                                 placeholder="Subject"
                                                 {...field}
+                                                onChange={(e) => {
+                                                    field.onChange(e);
+                                                    updateDraft();
+                                                }}
                                             />
                                         </FormControl>
                                         <FormMessage />
@@ -228,8 +236,8 @@ export function ComposeDialog({ message }: { message?: Message }) {
                                                 className="h-full resize-none text-sm sm:min-h-[200px]"
                                                 {...field}
                                                 onChange={(e) => {
-                                                    updateDraft(e.target.value);
                                                     field.onChange(e);
+                                                    updateDraft();
                                                 }}
                                             />
                                         </FormControl>
