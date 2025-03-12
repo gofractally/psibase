@@ -2,12 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Contact } from "./types";
 import { useContacts } from "./hooks/useContacts";
 import { useDeleteContact } from "./hooks/useDeleteContact";
 import { useUpdateContact } from "./hooks/useUpdateContact";
-import { Edit, Mail, Phone, Wallet } from "lucide-react";
-import { NewContactDialog } from "./components/new-contact-dialog";
+import { Edit, Mail, Phone, Plus, Wallet } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
     randEmail,
@@ -33,6 +31,86 @@ const contacts = Array.from({ length: 30 }, () => ({
     phone: randPhoneNumber(),
 }));
 
+interface Contact {
+    account: string;
+    displayName: string;
+    jobTitle: string;
+    company: string;
+    avatarUrl: string | undefined;
+    email: string;
+    phone: string;
+}
+
+const ContactListSection = ({
+    setSelectedContact,
+    selectedContactId,
+    contacts,
+    letter,
+}: {
+    setSelectedContact: (account: string) => void;
+    selectedContactId: string | undefined;
+    contacts: Contact[];
+    letter: string;
+}) => {
+    return (
+        <div className="flex flex-col gap-2 p-4">
+            <div className="text-sm text-muted-foreground">{letter}</div>
+            {contacts.map((contact) => (
+                <div
+                    key={contact.account}
+                    onClick={() => {
+                        setSelectedContact(contact.account);
+                    }}
+                    className={cn(
+                        "flex w-full cursor-pointer justify-between rounded-sm border p-4",
+                        {
+                            "bg-muted": selectedContactId === contact.account,
+                        },
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        <Avatar
+                            className={cn(!contact.avatarUrl && "rounded-none")}
+                        >
+                            <AvatarImage
+                                src={
+                                    contact?.avatarUrl ??
+                                    createIdenticon(
+                                        selectedContactId ?? "blank",
+                                    )
+                                }
+                            />
+                            <AvatarFallback>
+                                {contact.displayName.charAt(0)}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col">
+                            <p className="text-md font-medium">
+                                {contact.displayName}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {contact.jobTitle}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col justify-center">
+                        <div>
+                            <p className="text-right text-xs text-muted-foreground">
+                                {contact.account}
+                            </p>
+                            <p className="text-right text-xs text-muted-foreground">
+                                {contact.email}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+import { useMediaQuery } from "usehooks-ts";
+
 export const ContactsPage = () => {
     const { data: currentUser } = useCurrentUser();
     // const { data: contacts, isLoading } = useContacts(currentUser);
@@ -45,6 +123,10 @@ export const ContactsPage = () => {
     const [selectedContactId, setSelectedContact] = useState<string>();
 
     const [editingContact, setEditingContactName] = useState<string>();
+
+    const isDesktop = useMediaQuery("(min-width: 768px)");
+
+    console.log({ isDesktop });
 
     const setEditingContact = (contact: string | undefined) => {
         console.log({ contact });
@@ -75,66 +157,48 @@ export const ContactsPage = () => {
         });
     };
 
-    console.log({ handleDelete });
-
-    console.log({ contacts }, "are the contacts");
     const selectedContact = contacts.find(
         (contact) => contact.account === selectedContactId,
     );
 
+    const sectionsLetters = [
+        ...new Set(contacts.map((contact) => contact.displayName.charAt(0))),
+    ];
+
+    const sections = sectionsLetters
+        .map((letter) => ({
+            letter,
+            contacts: contacts.filter(
+                (contact) => contact.displayName.charAt(0) === letter,
+            ),
+        }))
+        .sort((a, b) => a.letter.localeCompare(b.letter));
+
     return (
         <div className="mx-auto grid h-full w-full grid-cols-1 overflow-auto sm:grid-cols-2">
-            <div className="flex h-full flex-col gap-2 overflow-y-auto  p-4">
-                {contacts.map((contact) => (
-                    <div
-                        key={contact.account}
-                        onClick={() => {
-                            setSelectedContact(contact.account);
-                        }}
-                        className={cn(
-                            "flex w-full cursor-pointer justify-between rounded-sm border p-4",
-                            {
-                                "bg-muted":
-                                    selectedContactId === contact.account,
-                            },
-                        )}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Avatar>
-                                <AvatarImage
-                                    src={
-                                        selectedContact?.avatarUrl ??
-                                        createIdenticon(
-                                            selectedContactId ?? "blank",
-                                        )
-                                    }
-                                />
-                                <AvatarFallback>
-                                    {contact.displayName.charAt(0)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                                <p className="text-sm font-medium">
-                                    {contact.displayName}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {contact.jobTitle}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col items-end">
-                            <p className="text-xs text-muted-foreground">
-                                {contact.account}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {contact.email}
-                            </p>
-                        </div>
+            <div className="overflow-y-auto">
+                <div className="flex items-center justify-between px-2">
+                    <div className="text-lg font-medium">Contacts</div>
+                    <div className="flex items-center gap-2">
+                        <Button>
+                            Create contact
+                            <Plus />
+                        </Button>
                     </div>
-                ))}
+                </div>
+                <div className="overflow-y-auto">
+                    {sections.map((section) => (
+                        <ContactListSection
+                            key={section.letter}
+                            letter={section.letter}
+                            setSelectedContact={setSelectedContact}
+                            selectedContactId={selectedContactId}
+                            contacts={section.contacts}
+                        />
+                    ))}
+                </div>
             </div>
-            <div className="">
+            <div>
                 <div className="mx-auto flex w-full items-center justify-center gap-4  p-4">
                     <Avatar
                         className={cn(
