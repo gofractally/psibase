@@ -9,13 +9,13 @@ import {
 
 import {
     EmptyBox,
-    MessageDetail,
-    NoMessageSelected,
+    LoadingBox,
     MailList as MailListComponent,
     type MailListProps,
-    LoadingBox,
+    MessageDetail,
+    NoMessageSelected,
 } from "@/apps/chainmail/components";
-import { LoaderCircle } from "lucide-react";
+
 interface MailboxProps {
     isDesktop: boolean;
     mailbox: MailboxType;

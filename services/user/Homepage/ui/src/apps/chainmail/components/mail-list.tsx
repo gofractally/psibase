@@ -1,5 +1,5 @@
-import type { Mailbox } from "@/apps/chainmail/types";
 import type { Message } from "@/apps/chainmail/hooks";
+import type { Mailbox } from "@/apps/chainmail/types";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";

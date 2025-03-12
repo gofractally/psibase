@@ -1,15 +1,7 @@
 import type { Message } from "@/apps/chainmail/hooks";
 import type { Mailbox } from "@/apps/chainmail/types";
 
-import {
-    Archive,
-    ArrowLeft,
-    Flag,
-    MoreHorizontal,
-    Pin,
-    Reply,
-    Trash,
-} from "lucide-react";
+import { Archive, ArrowLeft, Pin, Reply } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";

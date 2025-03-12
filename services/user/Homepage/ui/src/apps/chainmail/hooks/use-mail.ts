@@ -1,7 +1,8 @@
-import { atom, useAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
+import { atom, useAtom } from "jotai";
 
 import { supervisor } from "@/supervisor";
+
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 

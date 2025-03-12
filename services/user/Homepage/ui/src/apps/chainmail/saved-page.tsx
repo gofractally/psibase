@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 
-import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
+import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useSavedMessages } from "@/apps/chainmail/hooks";
 
 export default function SavedPage() {

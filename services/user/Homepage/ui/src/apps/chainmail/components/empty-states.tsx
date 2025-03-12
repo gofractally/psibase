@@ -1,4 +1,4 @@
-import { Inbox, Mail, LoaderCircle } from "lucide-react";
+import { Inbox, LoaderCircle, Mail } from "lucide-react";
 
 export const EmptyBox = ({ children }: { children: string }) => {
     return (

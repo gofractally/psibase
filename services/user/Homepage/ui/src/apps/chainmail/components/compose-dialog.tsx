@@ -1,11 +1,14 @@
-import type { PluginId } from "@psibase/common-lib";
 import type { Message } from "../hooks/use-mail";
+import type { PluginId } from "@psibase/common-lib";
 
-import { useState, useRef, useEffect } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Send, SquarePen, X } from "lucide-react";
-import { z } from "zod";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
+
+import { supervisor } from "@/supervisor";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +20,13 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Form } from "@/components/ui/form";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -25,14 +34,11 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Account } from "@/lib/zod/Account";
-import { FormControl, FormMessage } from "@/components/ui/form";
-import { FormItem } from "@/components/ui/form";
-import { FormField } from "@/components/ui/form";
-import { supervisor } from "@/supervisor";
-import { useDraftMessages } from "../hooks/use-mail";
+
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { Account } from "@/lib/zod/Account";
+
+import { useDraftMessages } from "../hooks/use-mail";
 
 interface SupervisorError {
     code: number;
