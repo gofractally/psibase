@@ -229,7 +229,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
                                 control={form.control}
                                 name="message"
                                 render={({ field }) => (
-                                    <FormItem className="flex-1">
+                                    <FormItem className="flex flex-1 flex-col">
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Message"
