@@ -15,7 +15,7 @@ export default function InboxPage() {
     }, []);
 
     return (
-        <div className="flex h-screen flex-col">
+        <div className="flex flex-1 flex-col">
             <MailboxHeader>Inbox</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}
