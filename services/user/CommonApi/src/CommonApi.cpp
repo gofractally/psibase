@@ -51,10 +51,7 @@ namespace SystemService
          }
          if (request.target == "/common/chainid")
          {
-            const auto status =
-                psibase::kvGet<psibase::StatusRow>(psibase::StatusRow::db, psibase::statusKey());
-            psibase::check(status.has_value(), "missing status record");
-            return to_json(status->chainId);
+            return to_json(getStatus().chainId);
          }
       }
 
