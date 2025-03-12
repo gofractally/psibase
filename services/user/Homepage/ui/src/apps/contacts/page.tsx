@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "./hooks/useContacts";
 import { useDeleteContact } from "./hooks/useDeleteContact";
 import { useUpdateContact } from "./hooks/useUpdateContact";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,8 @@ import { useMediaQuery } from "usehooks-ts";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ContactDetails } from "./components/contact-details";
 import { NewContactDialog } from "./components/new-contact-dialog";
+import { Input } from "@/components/ui/input";
+
 interface Contact {
     account: string;
     displayName: string;
@@ -35,7 +37,7 @@ const ContactListSection = ({
     letter: string;
 }) => {
     return (
-        <div className="flex flex-col gap-2 p-4">
+        <div className="flex flex-col gap-2 px-4 py-2">
             <div className="text-sm text-muted-foreground">{letter}</div>
             {contacts.map((contact) => (
                 <div
@@ -96,18 +98,48 @@ export const ContactsPage = () => {
     const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
     const { data: contactsData, isLoading: isLoadingContacts } =
         useContacts(currentUser);
-    const contacts = contactsData ?? [];
+
+    const [search, setSearch] = useState("");
+
+    const contacts = contactsData
+        ? contactsData.filter(
+              (contact) =>
+                  contact.displayName
+                      .toLowerCase()
+                      .includes(search.toLowerCase()) ||
+                  contact.account.toLowerCase().includes(search.toLowerCase()),
+          )
+        : [];
 
     const updateContact = useUpdateContact();
     const deleteContact = useDeleteContact();
 
     const [newContactModal, setNewContactModal] = useState(false);
-
-    const [selectedContactId, setSelectedContact] = useState<string>();
-
+    const [selectedContactAccount, setSelectedAccount] = useState<string>();
     const [editingContact, setEditingContactName] = useState<string>();
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+    const updateSearch = (value: string) => {
+        setSearch(value);
+    };
+
+    useEffect(() => {
+        if (isDesktop) {
+            const misMatch =
+                contacts.length == 1 &&
+                contacts[0].account !== selectedContactAccount;
+
+            const isSelectedContactNoLongerInList = !contacts.some(
+                (contact) => contact.account === selectedContactAccount,
+            );
+            if (misMatch) {
+                setSelectedAccount(contacts[0].account);
+            } else if (isSelectedContactNoLongerInList) {
+                setSelectedAccount(undefined);
+            }
+        }
+    }, [isDesktop, search, contacts, selectedContactAccount]);
 
     const setEditingContact = (contact: string | undefined) => {
         toast.error("Not implemented: Editing contact");
@@ -137,7 +169,7 @@ export const ContactsPage = () => {
     };
 
     const selectedContact = contacts.find(
-        (contact) => contact.account === selectedContactId,
+        (contact) => contact.account === selectedContactAccount,
     );
 
     const sectionsLetters = [
@@ -153,7 +185,7 @@ export const ContactsPage = () => {
         }))
         .sort((a, b) => a.letter.localeCompare(b.letter));
 
-    const openModal = !!(!isDesktop && selectedContactId);
+    const openModal = !!(!isDesktop && selectedContactAccount);
 
     if (isLoadingUser || isLoadingContacts) {
         return <div>Loading...</div>;
@@ -164,47 +196,61 @@ export const ContactsPage = () => {
     }
 
     return (
-        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-auto lg:grid-cols-2">
+        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-y-scroll lg:grid-cols-2">
             <NewContactDialog
                 open={newContactModal}
                 onOpenChange={setNewContactModal}
             />
 
             <div className="overflow-y-auto">
-                <div className="flex items-center justify-between px-2">
+                <div className="flex items-center justify-between px-4">
                     <div className="text-lg font-medium">Contacts</div>
                     <div className="flex items-center gap-2">
-                        <Button onClick={() => setNewContactModal(true)}>
+                        <Button
+                            size="sm"
+                            onClick={() => setNewContactModal(true)}
+                        >
                             Create contact
                             <Plus />
                         </Button>
                     </div>
                 </div>
-                {contacts.length === 0 && (
+
+                <div className="relative flex items-center px-4 py-2">
+                    <Input
+                        placeholder="Search contacts..."
+                        value={search}
+                        onChange={(e) => updateSearch(e.target.value)}
+                        className="pl-10"
+                    />
+                    <Search className="absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+                {!contactsData || contactsData.length === 0 ? (
                     <div className="flex h-full items-center justify-center">
                         <p className="text-muted-foreground">
                             No contacts. Create one!
                         </p>
                     </div>
+                ) : (
+                    <div>
+                        {sections.map((section) => (
+                            <ContactListSection
+                                key={section.letter}
+                                letter={section.letter}
+                                setSelectedContact={setSelectedAccount}
+                                selectedContactId={selectedContactAccount}
+                                contacts={section.contacts}
+                            />
+                        ))}
+                    </div>
                 )}
-                <div className="overflow-y-auto">
-                    {sections.map((section) => (
-                        <ContactListSection
-                            key={section.letter}
-                            letter={section.letter}
-                            setSelectedContact={setSelectedContact}
-                            selectedContactId={selectedContactId}
-                            contacts={section.contacts}
-                        />
-                    ))}
-                </div>
             </div>
 
             <Dialog
                 open={openModal}
                 onOpenChange={(e) => {
                     if (!e) {
-                        setSelectedContact(undefined);
+                        setSelectedAccount(undefined);
                     }
                 }}
             >
