@@ -60,7 +60,7 @@ export function ContactDetails({
                     </div>
                     <div className="flex flex-col gap-1">
                         <div className="text-sm text-muted-foreground">
-                            @{contact.account}
+                            @{contact.account.toLowerCase()}
                         </div>
                         <div className="text-sm text-muted-foreground">
                             {contact.jobTitle}
@@ -95,14 +95,18 @@ export function ContactDetails({
                 </div>
             </div>
             <div className="mx-auto grid max-w-screen-md grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
-                    <Phone />
-                    {contact.phone}
-                </div>
-                <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
-                    <Mail />
-                    {contact.email}
-                </div>
+                {contact.phone && (
+                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
+                        <Phone />
+                        {contact.phone}
+                    </div>
+                )}
+                {contact.email && (
+                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
+                        <Mail />
+                        {contact.email}
+                    </div>
+                )}
             </div>
         </div>
     );
