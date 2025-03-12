@@ -11,7 +11,8 @@ import {
     EmptyBox,
     MessageDetail,
     NoMessageSelected,
-    MailList,
+    MailList as MailListComponent,
+    type MailListProps,
 } from "@/apps/chainmail/components";
 
 interface MailboxProps {
@@ -45,16 +46,12 @@ export function Mailbox({
                         maxSize={40}
                         className="border-r"
                     >
-                        {messages?.length ? (
-                            <MailList
-                                mailbox={mailbox}
-                                messages={messages}
-                                onSelectMessage={setSelectedMessageId}
-                                selectedMessage={selectedMessage}
-                            />
-                        ) : (
-                            <EmptyBox>No messages</EmptyBox>
-                        )}
+                        <MailList
+                            mailbox={mailbox}
+                            messages={messages}
+                            onSelectMessage={setSelectedMessageId}
+                            selectedMessage={selectedMessage}
+                        />
                     </ResizablePanel>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={75}>
@@ -74,7 +71,7 @@ export function Mailbox({
             ) : (
                 <MailList
                     mailbox={mailbox}
-                    messages={messages ?? []}
+                    messages={messages}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
                 />
@@ -84,3 +81,22 @@ export function Mailbox({
 }
 
 export default Mailbox;
+
+const MailList = ({
+    mailbox,
+    messages,
+    onSelectMessage,
+    selectedMessage,
+}: MailListProps) => {
+    if (messages.length) {
+        return (
+            <MailListComponent
+                mailbox={mailbox}
+                messages={messages}
+                onSelectMessage={onSelectMessage}
+                selectedMessage={selectedMessage}
+            />
+        );
+    }
+    return <EmptyBox>No messages</EmptyBox>;
+};

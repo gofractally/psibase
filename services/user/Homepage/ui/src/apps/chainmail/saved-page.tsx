@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { Mailbox } from "@/apps/chainmail/components";
+import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import { useSavedMessages } from "@/apps/chainmail/hooks";
@@ -15,10 +15,7 @@ export default function SavedPage() {
 
     return (
         <div className="flex h-screen flex-col">
-            <header className="border-b p-4">
-                <h1 className="text-xl font-bold">Saved Messages</h1>
-            </header>
-
+            <MailboxHeader>Saved Messages</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}
                 mailbox="saved"

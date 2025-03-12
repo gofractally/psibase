@@ -12,7 +12,7 @@ interface SharedProps {
     onSelectMessage: (id: string) => void;
 }
 
-interface MailListProps extends SharedProps {
+export interface MailListProps extends SharedProps {
     messages: Message[];
 }
 

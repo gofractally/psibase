@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { Mailbox } from "@/apps/chainmail/components";
+import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import { useArchivedMessages } from "@/apps/chainmail/hooks";
@@ -16,10 +16,7 @@ export default function ArchivePage() {
 
     return (
         <div className="flex h-screen flex-col">
-            <header className="border-b p-4">
-                <h1 className="text-xl font-bold">Archived Messages</h1>
-            </header>
-
+            <MailboxHeader>Archived Messages</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}
                 mailbox="archived"

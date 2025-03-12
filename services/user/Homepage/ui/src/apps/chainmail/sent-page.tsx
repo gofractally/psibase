@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { Mailbox } from "@/apps/chainmail/components";
+import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import { useSentMessages } from "@/apps/chainmail/hooks";
@@ -15,10 +15,7 @@ export default function SentPage() {
 
     return (
         <div className="flex h-screen flex-col">
-            <header className="border-b p-4">
-                <h1 className="text-xl font-bold">Sent Messages</h1>
-            </header>
-
+            <MailboxHeader>Sent Messages</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}
                 mailbox="sent"

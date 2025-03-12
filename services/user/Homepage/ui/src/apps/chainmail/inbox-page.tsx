@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 
-import { Mailbox } from "@/apps/chainmail/components";
+import {
+    ComposeDialog,
+    Mailbox,
+    MailboxHeader,
+} from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import { useIncomingMessages } from "@/apps/chainmail/hooks";
@@ -16,10 +20,7 @@ export default function InboxPage() {
 
     return (
         <div className="flex h-screen flex-col">
-            <header className="border-b p-4">
-                <h1 className="text-xl font-bold">Inbox</h1>
-            </header>
-
+            <MailboxHeader>Inbox</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}
                 mailbox="inbox"
