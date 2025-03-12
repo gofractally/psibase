@@ -6,15 +6,32 @@ import { wait } from "@/lib/wait";
 import { getContacts } from "../store";
 import QueryKey from "@/lib/queryKeys";
 import { queryClient } from "@/main";
+import { randPhoneNumber } from "@ngneat/falso";
+import { randEmail } from "@ngneat/falso";
+import { randCompanyName } from "@ngneat/falso";
+import { randJobTitle, randUserName } from "@ngneat/falso";
+import { randFullName } from "@ngneat/falso";
+import { randAvatar } from "@ngneat/falso";
+import { Contact } from "../components/contact-details";
+
+const contacts = Array.from({ length: 30 }, () => ({
+    account: randUserName(),
+    displayName: randFullName(),
+    jobTitle: randJobTitle(),
+    company: randCompanyName(),
+    avatarUrl: Math.random() > 0.5 ? randAvatar() : undefined,
+    email: randEmail(),
+    phone: randPhoneNumber(),
+}));
 
 export const useContacts = (
     username?: z.infer<typeof Account> | null | undefined,
 ) =>
-    useQuery<z.infer<typeof ContactSchema>[]>({
+    useQuery<Contact[]>({
         queryKey: QueryKey.contacts(username),
         queryFn: async () => {
             await wait(500);
-            return ContactSchema.array().parse(getContacts(username));
+            return contacts;
         },
         enabled: !!username,
     });

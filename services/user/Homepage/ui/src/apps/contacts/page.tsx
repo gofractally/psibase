@@ -1,36 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { useContacts } from "./hooks/useContacts";
 import { useDeleteContact } from "./hooks/useDeleteContact";
 import { useUpdateContact } from "./hooks/useUpdateContact";
-import { Edit, Mail, Phone, Plus, Wallet } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import {
-    randEmail,
-    randFullName,
-    randJobTitle,
-    randCompanyName,
-    randAvatar,
-    randPhoneNumber,
-    randUserName,
-} from "@ngneat/falso";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { toast } from "sonner";
-
-const contacts = Array.from({ length: 30 }, () => ({
-    account: randUserName(),
-    displayName: randFullName(),
-    jobTitle: randJobTitle(),
-    company: randCompanyName(),
-    avatarUrl: Math.random() > 0.5 ? randAvatar() : undefined,
-    email: randEmail(),
-    phone: randPhoneNumber(),
-}));
-
+import { useMediaQuery } from "usehooks-ts";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ContactDetails } from "./components/contact-details";
+import { NewContactDialog } from "./components/new-contact-dialog";
 interface Contact {
     account: string;
     displayName: string;
@@ -109,11 +91,12 @@ const ContactListSection = ({
         </div>
     );
 };
-import { useMediaQuery } from "usehooks-ts";
 
 export const ContactsPage = () => {
-    const { data: currentUser } = useCurrentUser();
-    // const { data: contacts, isLoading } = useContacts(currentUser);
+    const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
+    const { data: contactsData, isLoading: isLoadingContacts } =
+        useContacts(currentUser);
+    const contacts = contactsData ?? [];
 
     const updateContact = useUpdateContact();
     const deleteContact = useDeleteContact();
@@ -124,19 +107,15 @@ export const ContactsPage = () => {
 
     const [editingContact, setEditingContactName] = useState<string>();
 
-    const isDesktop = useMediaQuery("(min-width: 768px)");
-
-    console.log({ isDesktop });
+    const isDesktop = useMediaQuery("(min-width: 1024px)");
 
     const setEditingContact = (contact: string | undefined) => {
-        console.log({ contact });
         toast.error("Not implemented: Editing contact");
 
         setEditingContactName(contact);
     };
 
     const handleTransferFunds = (contact: string | undefined) => {
-        console.log({ contact });
         toast.error("Not implemented: Transfer funds");
     };
 
@@ -174,18 +153,40 @@ export const ContactsPage = () => {
         }))
         .sort((a, b) => a.letter.localeCompare(b.letter));
 
+    const openModal = !!(!isDesktop && selectedContactId);
+
+    if (isLoadingUser || isLoadingContacts) {
+        return <div>Loading...</div>;
+    }
+
+    if (currentUser === null) {
+        return <div>Login to continue</div>;
+    }
+
     return (
-        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-auto sm:grid-cols-2">
+        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-auto lg:grid-cols-2">
+            <NewContactDialog
+                open={newContactModal}
+                onOpenChange={setNewContactModal}
+            />
+
             <div className="overflow-y-auto">
                 <div className="flex items-center justify-between px-2">
                     <div className="text-lg font-medium">Contacts</div>
                     <div className="flex items-center gap-2">
-                        <Button>
+                        <Button onClick={() => setNewContactModal(true)}>
                             Create contact
                             <Plus />
                         </Button>
                     </div>
                 </div>
+                {contacts.length === 0 && (
+                    <div className="flex h-full items-center justify-center">
+                        <p className="text-muted-foreground">
+                            No contacts. Create one!
+                        </p>
+                    </div>
+                )}
                 <div className="overflow-y-auto">
                     {sections.map((section) => (
                         <ContactListSection
@@ -198,76 +199,33 @@ export const ContactsPage = () => {
                     ))}
                 </div>
             </div>
-            <div>
-                <div className="mx-auto flex w-full items-center justify-center gap-4  p-4">
-                    <Avatar
-                        className={cn(
-                            "h-36 w-36",
-                            !selectedContact?.avatarUrl && "rounded-none",
-                        )}
-                    >
-                        <AvatarImage
-                            src={
-                                selectedContact?.avatarUrl ??
-                                createIdenticon(selectedContactId ?? "blank")
-                            }
-                        />
-                        <AvatarFallback>
-                            {selectedContact?.displayName.charAt(0)}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex w-72 flex-col gap-2">
-                        <div className="text-lg font-medium">
-                            {selectedContact?.displayName}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                            {selectedContact?.jobTitle}
-                        </div>
-                        <div className="flex gap-2 text-muted-foreground ">
-                            <Button
-                                onClick={() => {
-                                    handleTransferFunds(selectedContactId);
-                                }}
-                                size="icon"
-                                variant="outline"
-                                className="hover:text-primary"
-                            >
-                                <Wallet />
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    setEditingContact(selectedContactId);
-                                }}
-                                size="icon"
-                                variant="outline"
-                                className="hover:text-primary"
-                            >
-                                <Edit />
-                            </Button>
-                            <Button
-                                onClick={() => {
-                                    chainMailUser(selectedContactId!);
-                                }}
-                                size="icon"
-                                variant="outline"
-                                className="hover:text-primary"
-                            >
-                                <Mail />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-                <div className="mx-auto grid max-w-screen-lg grid-cols-2 gap-3 p-4">
-                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
-                        <Phone />
-                        {selectedContact?.phone}
-                    </div>
-                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
-                        <Mail />
-                        {selectedContact?.email}
-                    </div>
-                </div>
-            </div>
+
+            <Dialog
+                open={openModal}
+                onOpenChange={(e) => {
+                    if (!e) {
+                        setSelectedContact(undefined);
+                    }
+                }}
+            >
+                <DialogContent className="w-full max-w-screen-2xl">
+                    <ContactDetails
+                        contact={selectedContact}
+                        onTransferFunds={handleTransferFunds}
+                        onEditContact={setEditingContact}
+                        onChainMailUser={chainMailUser}
+                    />
+                </DialogContent>
+            </Dialog>
+
+            {isDesktop && (
+                <ContactDetails
+                    contact={selectedContact}
+                    onTransferFunds={handleTransferFunds}
+                    onEditContact={setEditingContact}
+                    onChainMailUser={chainMailUser}
+                />
+            )}
         </div>
     );
 };
