@@ -807,6 +807,8 @@ namespace psibase
    template <DbId Db, typename... Tables>
    struct DbTables
    {
+      static constexpr DbId db = Db;
+
       /// Default constructor
       ///
       /// Assumes the desired service is running on the current action receiver account.
@@ -839,25 +841,11 @@ namespace psibase
       /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<MyTable>();`
       ///
       /// Returns a [Table].
-      template <TableType T>
+      template <TableType T, typename I = boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>>
+         requires(I::value < sizeof...(Tables))
       auto open() const
       {
-         return open<boost::mp11::mp_find<boost::mp11::mp_list<Tables...>, T>::value>();
-      }
-
-      /// Open by record type
-      ///
-      /// This gets a table by the record type contained by the table.
-      ///
-      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<TableRecord>();`
-      ///
-      /// Returns a [Table].
-      template <typename RecordType>
-      auto open() const
-      {
-         return open<
-             boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
-                                     InnerType<RecordType>::template is_contained_by>::value>();
+         return open<I::value>();
       }
 
       template <typename RecordType>
@@ -866,6 +854,23 @@ namespace psibase
          template <TableType T>
          using is_contained_by = std::is_same<typename T::value_type, RecordType>;
       };
+
+      /// Open by record type
+      ///
+      /// This gets a table by the record type contained by the table.
+      ///
+      /// e.g. `auto table = MyServiceTables{myServiceAccount}.open<TableRecord>();`
+      ///
+      /// Returns a [Table].
+      template <
+          typename RecordType,
+          typename I = boost::mp11::mp_find_if<boost::mp11::mp_list<Tables...>,
+                                               InnerType<RecordType>::template is_contained_by>>
+         requires(I::value < sizeof...(Tables))
+      auto open() const
+      {
+         return open<I::value>();
+      }
 
       AccountNumber account;  ///< the service runs on this account
    };

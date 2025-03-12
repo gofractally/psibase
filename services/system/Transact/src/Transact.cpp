@@ -22,8 +22,7 @@ namespace SystemService
 {
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
-      auto tables      = Transact::Tables(Transact::service);
-      auto statusTable = tables.open<TransactStatusTable>();
+      auto statusTable = open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
       statusTable.put({.enforceAuth = false, .bootTransactions = bootTransactions});

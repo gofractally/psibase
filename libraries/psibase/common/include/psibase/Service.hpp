@@ -36,12 +36,65 @@ namespace psibase
       ~RecursiveActor() { RecursionGuard<Service>::running = prevRunning; }
    };
 
+   namespace detail
+   {
+      template <typename T>
+      struct CanOpenTable
+      {
+         template <typename U>
+         using fn = std::bool_constant<requires(U&& u) { u.template open<T>(); }>;
+      };
+
+      template <DbId db, typename T>
+      struct CanOpenTableDb
+      {
+         template <typename U>
+         using fn = std::bool_constant<db == U::db&& requires(U&& u) { u.template open<T>(); }>;
+      };
+
+      template <DbId db>
+      struct IsDb
+      {
+         template <typename U>
+         using fn = std::bool_constant<db == U::db>;
+      };
+   };  // namespace detail
+
    /// Services may optionally inherit from this to gain the [emit] and [events] convenience methods
    ///
    class Service
    {
      public:
 #ifdef __wasm32__
+
+      template <DbId db, std::uint16_t table, typename DerivedService>
+      auto open(this const DerivedService&)
+      {
+         using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
+         constexpr auto index =
+             boost::mp11::mp_find_if<AllTables, detail::IsDb<db>::template fn>::value;
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service)
+             .template open<table>();
+      }
+
+      template <DbId db, typename T, typename DerivedService>
+      auto open(this const DerivedService&)
+      {
+         using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
+         constexpr auto index =
+             boost::mp11::mp_find_if<AllTables, detail::CanOpenTableDb<db, T>::template fn>::value;
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service).template open<T>();
+      }
+
+      template <typename T, typename DerivedService>
+      auto open(this const DerivedService&)
+      {
+         using AllTables = decltype(psibase_get_tables((DerivedService*)nullptr));
+         constexpr auto index =
+             boost::mp11::mp_find_if<AllTables, detail::CanOpenTable<T>::template fn>::value;
+         return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service).template open<T>();
+      }
+
       /// Emit events
       ///
       /// The following examples use the example definitions in [Defining Events](#defining-events). After you have defined your events, you can use `emit` to emit them. Examples:
