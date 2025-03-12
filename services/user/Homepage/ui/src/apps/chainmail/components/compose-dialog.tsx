@@ -1,5 +1,10 @@
-import { useState } from "react";
+import type { PluginId } from "@psibase/common-lib";
+import type { Message } from "../hooks/use-mail";
+
+import { useState, useRef, useEffect } from "react";
 import { Send, SquarePen, X } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +16,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -18,32 +24,136 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Account } from "@/lib/zod/Account";
+import { FormControl, FormMessage } from "@/components/ui/form";
+import { FormItem } from "@/components/ui/form";
+import { FormField } from "@/components/ui/form";
+import { supervisor } from "@/supervisor";
+import { useDraftMessages } from "../hooks/use-mail";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { toast } from "sonner";
 
-export function ComposeDialog() {
+interface SupervisorError {
+    code: number;
+    producer: PluginId;
+    message: string;
+}
+
+const formSchema = z.object({
+    to: Account,
+    subject: z.string(),
+    message: z.string(),
+});
+
+export function ComposeDialog({ message }: { message?: Message }) {
     const [open, setOpen] = useState(false);
-    const [recipient, setRecipient] = useState("");
-    const [subject, setSubject] = useState("");
-    const [message, setMessage] = useState("");
+    const isSent = useRef(false);
+    const { data: user } = useCurrentUser();
+    const { drafts, setDrafts, getDrafts, deleteDraftById } =
+        useDraftMessages();
 
-    const handleSend = () => {
-        console.log({ recipient, subject, message });
-        resetForm();
-        setOpen(false);
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+    });
+
+    useEffect(() => {
+        if (!message) {
+            return form.reset();
+        }
+        if (message.status === "draft") {
+            form.setValue("to", message.to);
+            form.setValue("subject", message.subject);
+        } else {
+            form.setValue("to", message.from);
+            form.setValue("subject", `RE: ${message.subject}`);
+        }
+    }, [message]);
+
+    const id = useRef<string>();
+
+    const createDraft = (value: string) => {
+        const draft = {
+            id: id.current,
+            from: user,
+            to: form.getValues().to || "recipient",
+            datetime: Date.now(),
+            status: "draft",
+            inReplyTo: null,
+            subject: form.getValues().subject || "subject here",
+            body: value,
+        } as Message;
+        setDrafts([...(drafts ?? []), draft]);
     };
 
-    const resetForm = () => {
-        setRecipient("");
-        setSubject("");
-        setMessage("");
+    const updateDraft = (value: string) => {
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
+        let draft = data.find((msg) => msg.id === id.current);
+        if (!draft) {
+            createDraft(value);
+        } else {
+            draft.datetime = Date.now();
+            draft.to = form.getValues().to ?? "";
+            draft.subject = form.getValues().subject ?? "";
+            draft.body = value;
+            setDrafts(data);
+        }
     };
 
-    const handleClose = () => {
-        resetForm();
-        setOpen(false);
+    const sendMessage = async (values: z.infer<typeof formSchema>) => {
+        // using getDrafts() here instead of messages prevents stale closure
+        const data = getDrafts() ?? [];
+        let draft = data.find((msg) => msg.id === id.current);
+        if (!draft) {
+            return console.error("No message found to send");
+        }
+
+        try {
+            // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
+            await supervisor.functionCall({
+                service: "chainmail",
+                intf: "api",
+                method: "send",
+                params: [draft.to, draft.subject, draft.body],
+            });
+            if (!id.current) return;
+            deleteDraftById(id.current);
+            isSent.current = true;
+            form.reset();
+            toast.success("Your message has been sent");
+            setOpen(false);
+        } catch (e: unknown) {
+            toast.error(`${(e as SupervisorError).message}`);
+            console.error(`${(e as SupervisorError).message}`);
+        }
+    };
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        toast("Sending...");
+        await sendMessage(values);
+    }
+
+    const onOpenChange = (open: boolean) => {
+        setOpen(open);
+        if (!open) {
+            // if closing
+            if (isSent.current) return;
+            return toast.success("Your draft has been saved");
+        }
+
+        // the ID should be (re)set each time this opens; remember, it stays mounted
+        isSent.current = false;
+        if (message?.status === "draft") {
+            id.current = message.id;
+        } else {
+            id.current =
+                window.crypto.randomUUID?.() ?? Math.random().toString();
+        }
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <Tooltip>
                 <TooltipTrigger asChild>
                     <DialogTrigger asChild>
@@ -55,53 +165,95 @@ export function ComposeDialog() {
                 </TooltipTrigger>
                 <TooltipContent>Compose</TooltipContent>
             </Tooltip>
-            <DialogContent className="flex h-[100dvh] max-w-full flex-col rounded-none px-4 py-8 sm:grid sm:h-auto sm:max-w-[600px] sm:p-6">
-                <DialogHeader>
-                    <DialogTitle>Compose New Message</DialogTitle>
-                    <DialogDescription>
-                        Send a message to other accounts on chain. This is for
-                        demo purposes only. All messages are stored on chain
-                        unencrypted and are publicly readable.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-grow flex-col gap-4 py-4 sm:grid">
-                    <Input
-                        id="recipient"
-                        placeholder="Recipient account name"
-                        value={recipient}
-                        onChange={(e) => setRecipient(e.target.value)}
-                        aria-label="Recipient"
-                    />
-                    <Input
-                        id="subject"
-                        placeholder="Subject"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        aria-label="Subject"
-                    />
-                    <Textarea
-                        id="message"
-                        placeholder="Message"
-                        className="flex-1 sm:min-h-[200px]"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        aria-label="Message"
-                    />
-                </div>
-                <DialogFooter className="flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-between sm:space-x-2 sm:pb-0">
-                    <Button
-                        variant="outline"
-                        onClick={handleClose}
-                        className="w-full sm:w-auto"
+            <DialogContent
+                className="h-[100dvh] max-w-full rounded-none px-4 py-8 sm:h-auto sm:max-w-[600px] sm:p-6"
+                onCloseAutoFocus={(e) => {
+                    // This helps in not focusing on the trigger after closing the modal
+                    e.preventDefault();
+                }}
+            >
+                <Form {...form}>
+                    <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="flex h-full flex-col"
                     >
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel
-                    </Button>
-                    <Button onClick={handleSend} className="w-full sm:w-auto">
-                        <Send className="mr-2 h-4 w-4" />
-                        Send Message
-                    </Button>
-                </DialogFooter>
+                        <DialogHeader>
+                            <DialogTitle>Compose New Message</DialogTitle>
+                            <DialogDescription>
+                                Send a message to other accounts on chain. This
+                                is for demo purposes only. All messages are
+                                stored on chain unencrypted and are publicly
+                                readable.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-grow flex-col gap-4 py-4 sm:grid">
+                            <FormField
+                                control={form.control}
+                                name="to"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Recipient account name"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="subject"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Subject"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="message"
+                                render={({ field }) => (
+                                    <FormItem className="flex-1">
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="Message"
+                                                className="h-full resize-none text-sm sm:min-h-[200px]"
+                                                {...field}
+                                                onChange={(e) => {
+                                                    updateDraft(e.target.value);
+                                                    field.onChange(e);
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <DialogFooter className="flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-between sm:space-x-2 sm:pb-0">
+                            <Button
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                                className="w-full sm:w-auto"
+                            >
+                                <X className="mr-2 h-4 w-4" />
+                                Cancel
+                            </Button>
+                            <Button className="w-full sm:w-auto" type="submit">
+                                <Send className="mr-2 h-4 w-4" />
+                                Send Message
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );
