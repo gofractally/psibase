@@ -21,6 +21,7 @@ export default function DraftsPage() {
                 isDesktop={isDesktop}
                 mailbox="drafts"
                 messages={drafts ?? []}
+                isLoading={false}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />

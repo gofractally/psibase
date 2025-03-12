@@ -20,6 +20,7 @@ export default function SavedPage() {
                 isDesktop={isDesktop}
                 mailbox="saved"
                 messages={query.data ?? []}
+                isLoading={query.isLoading}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />

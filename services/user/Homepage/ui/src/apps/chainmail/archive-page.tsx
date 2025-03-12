@@ -21,6 +21,7 @@ export default function ArchivePage() {
                 isDesktop={isDesktop}
                 mailbox="archived"
                 messages={query.data ?? []}
+                isLoading={query.isLoading}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />

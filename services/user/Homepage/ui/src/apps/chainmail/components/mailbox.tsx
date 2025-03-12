@@ -13,12 +13,14 @@ import {
     NoMessageSelected,
     MailList as MailListComponent,
     type MailListProps,
+    LoadingBox,
 } from "@/apps/chainmail/components";
-
+import { LoaderCircle } from "lucide-react";
 interface MailboxProps {
     isDesktop: boolean;
     mailbox: MailboxType;
     messages: Message[];
+    isLoading: boolean;
     selectedMessage?: Message;
     setSelectedMessageId: (id: string) => void;
 }
@@ -27,6 +29,7 @@ export function Mailbox({
     isDesktop,
     mailbox,
     messages,
+    isLoading,
     selectedMessage,
     setSelectedMessageId,
 }: MailboxProps) {
@@ -51,6 +54,7 @@ export function Mailbox({
                             messages={messages}
                             onSelectMessage={setSelectedMessageId}
                             selectedMessage={selectedMessage}
+                            isLoading={isLoading}
                         />
                     </ResizablePanel>
                     <ResizableHandle withHandle />
@@ -74,6 +78,7 @@ export function Mailbox({
                     messages={messages}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
+                    isLoading={isLoading}
                 />
             )}
         </main>
@@ -87,16 +92,22 @@ const MailList = ({
     messages,
     onSelectMessage,
     selectedMessage,
-}: MailListProps) => {
-    if (messages.length) {
-        return (
-            <MailListComponent
-                mailbox={mailbox}
-                messages={messages}
-                onSelectMessage={onSelectMessage}
-                selectedMessage={selectedMessage}
-            />
-        );
+    isLoading,
+}: MailListProps & { isLoading: boolean }) => {
+    if (isLoading) {
+        return <LoadingBox />;
     }
-    return <EmptyBox>No messages</EmptyBox>;
+
+    if (!messages.length) {
+        return <EmptyBox>No messages</EmptyBox>;
+    }
+
+    return (
+        <MailListComponent
+            mailbox={mailbox}
+            messages={messages}
+            onSelectMessage={onSelectMessage}
+            selectedMessage={selectedMessage}
+        />
+    );
 };

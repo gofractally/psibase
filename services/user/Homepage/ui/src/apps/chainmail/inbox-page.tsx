@@ -1,10 +1,6 @@
 import { useEffect } from "react";
 
-import {
-    ComposeDialog,
-    Mailbox,
-    MailboxHeader,
-} from "@/apps/chainmail/components";
+import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 import { useIncomingMessages } from "@/apps/chainmail/hooks";
@@ -25,6 +21,7 @@ export default function InboxPage() {
                 isDesktop={isDesktop}
                 mailbox="inbox"
                 messages={query.data ?? []}
+                isLoading={query.isLoading}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />
