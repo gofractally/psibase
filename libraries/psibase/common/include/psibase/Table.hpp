@@ -501,7 +501,7 @@ namespace psibase
       ///
       /// If a matching key is found, then it returns a fresh object;
       /// it does not cache.
-      template <compatible_key<K> K2>
+      template <compatible_key<K> K2 = K>
       std::optional<T> get(K2&& k) const
       {
          KeyView key_base{{prefix.data(), prefix.size()}};
@@ -547,6 +547,14 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
+   template <auto... K>
+   struct CompositeKey
+   {
+      friend auto operator<=>(const CompositeKey&, const CompositeKey&) = default;
+      // TODO: remove once porting is finished
+      PSIO_REFLECT(CompositeKey)
+   };
+
    namespace detail
    {
       template <typename T, typename C>
@@ -558,6 +566,11 @@ namespace psibase
       decltype(auto) invoke(R (C::*f)(A...) const, const C& value, A&&... a)
       {
          return (value.*f)(static_cast<A&&>(a)...);
+      }
+      template <typename C, auto... K>
+      decltype(auto) invoke(CompositeKey<K...> f, const C& value)
+      {
+         return std::tuple(detail::invoke(K, value)...);
       }
    }  // namespace detail
 
@@ -741,8 +754,15 @@ namespace psibase
          return TableIndex<T, key_type>(db, std::move(index_prefix), Idx > 0);
       }
 
+      using primary_key_type =
+          std::remove_cvref_t<decltype(detail::invoke(Primary, std::declval<T>()))>;
+
       /// Look up table object by key using the first table index by default
-      auto get(auto key) const { return getIndex<0>().get(key); }
+      template <compatible_key<primary_key_type> K = primary_key_type>
+      auto get(K&& key) const
+      {
+         return getIndex<0>().get(std::forward<K>(key));
+      }
 
      private:
       std::vector<char> serialize_key(uint8_t idx, auto&& k)
@@ -867,9 +887,6 @@ namespace psibase
    using TemporaryTables = DbTables<DbId::temporary, Tables...>;
 
    // An empty key that can be used for any singleton table
-   struct SingletonKey
-   {
-      PSIO_REFLECT(SingletonKey);
-   };
+   using SingletonKey = CompositeKey<>;
 
 }  // namespace psibase

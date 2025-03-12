@@ -95,7 +95,7 @@ namespace SystemService
       }
 
       auto snap    = tables.open<SnapshotInfoTable>();
-      auto snapRow = snap.get(SingletonKey{});
+      auto snapRow = snap.get({});
       if (snapRow)
       {
          if (snapRow->snapshotInterval != psibase::Seconds{0} &&
@@ -121,7 +121,7 @@ namespace SystemService
       auto& stat = getStatus();
 
       auto table = tables.open<SnapshotInfoTable>();
-      auto row   = table.get(SingletonKey{});
+      auto row   = table.get({});
       if (!row)
          row = {.lastSnapshot     = stat.head ? stat.head->header.time : stat.current.time,
                 .snapshotInterval = seconds};

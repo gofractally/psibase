@@ -4,6 +4,7 @@
 #include <optional>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/MethodNumber.hpp>
+#include <psibase/Table.hpp>
 #include <psibase/db.hpp>
 #include <psio/reflect.hpp>
 #include <psio/schema.hpp>
@@ -23,6 +24,30 @@ namespace psibase
       }
    };
 
+   struct FieldId
+   {
+      std::vector<std::uint32_t> path;
+   };
+   PSIO_REFLECT(FieldId, path)
+
+   using IndexInfo = std::vector<FieldId>;
+
+   struct TableInfo
+   {
+      std::optional<std::string>  name;
+      std::uint16_t               table;
+      psio::schema_types::AnyType type;
+      std::vector<IndexInfo>      indexes;
+   };
+   PSIO_REFLECT(TableInfo, name, table, type, indexes)
+
+   using ServiceDatabaseSchema = std::vector<TableInfo>;
+
+   template <auto X, auto Y>
+   constexpr bool is_equal_member = false;
+   template <auto X>
+   constexpr bool is_equal_member<X, X> = true;
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
@@ -35,6 +60,8 @@ namespace psibase
       EventMap ui;
       EventMap history;
       EventMap merkle;
+
+      std::optional<std::map<std::string, ServiceDatabaseSchema>> database;
 
      private:
       template <typename M>
@@ -120,6 +147,90 @@ namespace psibase
                                     });
       }
 
+      template <auto K, auto... M>
+      static constexpr std::uint32_t get_member_index(psio::MemberList<M...>*)
+      {
+         std::uint32_t i = 0;
+         for (bool found : {is_equal_member<M, K>...})
+         {
+            if (found)
+               return i;
+            ++i;
+         }
+         return i;
+      }
+
+      template <typename T, auto K, typename M>
+      static IndexInfo makeKey(M T::*)
+      {
+         if constexpr (std::is_function_v<M>)
+         {
+            static_assert(false, "Member function keys not supported. Use CompositeKey instead.");
+         }
+         else
+         {
+            return {
+                {.path{get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr)}}};
+         }
+      }
+
+      template <typename T, auto K, auto... KN>
+      static IndexInfo makeKey(CompositeKey<KN...>)
+      {
+         return {
+             {.path{get_member_index<KN>((typename psio::reflect<T>::data_members*)nullptr)}}...};
+      }
+
+      template <typename T, auto... K>
+      static std::vector<IndexInfo> makeIndexes(Table<T, K...>*)
+      {
+         return std::vector<IndexInfo>{makeKey<T, K>(K)...};
+      }
+
+      template <typename T>
+      static TableInfo makeTable(psio::SchemaBuilder& builder, std::uint16_t table)
+      {
+         return TableInfo{.name    = psio::get_type_name<T>(),
+                          .table   = table,
+                          .type    = builder.insert<typename T::value_type>(),
+                          .indexes = makeIndexes((T*)nullptr)};
+      }
+
+      static constexpr const char* dbName(DbId db)
+      {
+         if (db == DbId::service)
+            return "service";
+         else
+            abortMessage("db cannot be used in schema");
+      }
+
+      template <DbId db, typename... T>
+      static void makeDatabase(psio::SchemaBuilder&                       builder,
+                               ServiceSchema&                             out,
+                               std::vector<psio::schema_types::AnyType*>& rowTypes,
+                               DbTables<db, T...>*)
+      {
+         if (!out.database)
+            out.database.emplace();
+         constexpr auto name   = dbName(db);
+         auto&          tables = (*out.database)[name];
+         std::uint16_t  i      = 0;
+         (tables.push_back(makeTable<T>(builder, i++)), ...);
+         for (auto& t : tables)
+         {
+            rowTypes.push_back(&t.type);
+         }
+      }
+
+      template <typename... T>
+      static void makeDatabases(psio::SchemaBuilder&                       builder,
+                                ServiceSchema&                             out,
+                                std::vector<psio::schema_types::AnyType*>& rowTypes,
+                                boost::mp11::mp_list<T...>*)
+      {
+         (makeDatabase(builder, out, rowTypes, (T*)nullptr), ...);
+      }
+
      public:
       template <typename T>
       static ServiceSchema make()
@@ -145,6 +256,11 @@ namespace psibase
          if constexpr (requires { typename T::Events::Merkle; })
          {
             makeEvents<typename T::Events::Merkle>(builder, result.merkle, typeRefs);
+         }
+         if constexpr (requires { psibase_get_tables((T*)nullptr); })
+         {
+            makeDatabases(builder, result, typeRefs,
+                          (decltype(psibase_get_tables((T*)nullptr))*)nullptr);
          }
          result.types = std::move(builder).build(typeRefs);
          return result;
@@ -186,7 +302,7 @@ namespace psibase
          }
          return result;
       }
-      PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle)
+      PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle, database)
    };
 
    psio::schema_types::CustomTypes psibase_types();

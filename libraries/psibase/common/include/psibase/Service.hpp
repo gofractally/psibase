@@ -155,3 +155,6 @@ namespace psibase
 #define PSIBASE_REFLECT_MERKLE_EVENTS(SERVICE, ...)         \
    using SERVICE##_EventsMerkle = SERVICE ::Events::Merkle; \
    PSIO_REFLECT(SERVICE##_EventsMerkle, __VA_ARGS__)
+
+#define PSIBASE_REFLECT_TABLES(SERVICE, ...) \
+   boost::mp11::mp_list<__VA_ARGS__> psibase_get_tables(SERVICE*);
