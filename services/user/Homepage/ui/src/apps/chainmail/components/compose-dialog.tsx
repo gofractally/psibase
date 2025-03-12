@@ -12,7 +12,6 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
     Tooltip,
@@ -49,7 +48,7 @@ export function ComposeDialog() {
                 <TooltipTrigger asChild>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="icon">
-                            <SquarePen className="h-4 w-4" />
+                            <SquarePen className="h-5 w-5" />
                             <span className="sr-only">Compose</span>
                         </Button>
                     </DialogTrigger>

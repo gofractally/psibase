@@ -1,7 +1,15 @@
 import type { Message } from "@/apps/chainmail/hooks";
 import type { Mailbox } from "@/apps/chainmail/types";
 
-import { ArrowLeft, Flag, MoreHorizontal, Reply, Trash } from "lucide-react";
+import {
+    Archive,
+    ArrowLeft,
+    Flag,
+    MoreHorizontal,
+    Pin,
+    Reply,
+    Trash,
+} from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -38,13 +46,10 @@ export function MessageDetail({
                 </h2>
                 <div className="flex gap-1">
                     <Button variant="ghost" size="icon">
-                        <Flag className="h-5 w-5" />
+                        <Pin className="h-5 w-5" />
                     </Button>
                     <Button variant="ghost" size="icon">
-                        <Trash className="h-5 w-5" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-5 w-5" />
+                        <Archive className="h-5 w-5" />
                     </Button>
                 </div>
             </div>
