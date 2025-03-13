@@ -20,12 +20,13 @@ pub mod tables {
     }
 
     #[table(name = "ProfileTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Profile {
         #[primary_key]
         pub account: AccountNumber,
 
-        pub displayName: String,
+        pub display_name: String,
+        pub bio: String,
     }
 
     impl ExampleThing {
@@ -90,20 +91,21 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn setProfile(displayName: String) {
-        let caller = get_sender();
-
+    fn setProfile(display_name: String, bio: String) {
         let table = ProfileTable::new();
-        table
-            .put(&Profile {
-                account: caller,
-                displayName: displayName.clone(),
-            })
-            .unwrap();
+
+        let caller = get_sender();
+        let new_profile = Profile {
+            account: caller,
+            display_name: display_name.clone(),
+            bio: bio.clone(),
+        };
+
+        table.put(&new_profile).unwrap();
 
         Wrapper::emit()
             .history()
-            .profileSet(caller, get_sender().to_string() + &displayName.clone());
+            .profileSet(caller, get_sender().to_string() + &display_name.clone());
     }
 
     #[action]

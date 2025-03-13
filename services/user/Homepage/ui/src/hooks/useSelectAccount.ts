@@ -3,8 +3,9 @@ import { queryClient } from "@/main";
 import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { currentUserQueryKey, setCurrentUser } from "./useCurrentUser";
+import { setCurrentUser } from "./useCurrentUser";
 import { Account } from "@/lib/zod/Account";
+import QueryKey from "@/lib/queryKeys";
 
 export const useSelectAccount = () =>
     useMutation<void, Error, string>({
@@ -18,9 +19,11 @@ export const useSelectAccount = () =>
             }));
         },
         onSuccess: (_, accountName) => {
-            setCurrentUser(accountName)
+            setCurrentUser(accountName);
             setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: currentUserQueryKey });
+                queryClient.refetchQueries({
+                    queryKey: QueryKey.currentUser(),
+                });
             }, AwaitTime);
         },
         onError: (error) => {

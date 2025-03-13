@@ -1,19 +1,45 @@
+import QueryKey from "@/lib/queryKeys";
+import { queryClient } from "@/main";
 import { supervisor } from "@/supervisor";
-
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { z } from "zod";
+import { ProfileResponse } from "./useProfile";
+import { Account } from "@/lib/zod/Account";
+
+const Params = z.object({
+    displayName: z.string().optional(),
+    bio: z.string().optional(),
+});
 
 export const useSetProfile = () =>
-    useMutation({
-        mutationFn: async (displayName: string) =>
+    useMutation<void, Error, z.infer<typeof Params>>({
+        mutationFn: async (params) =>
             supervisor.functionCall({
                 method: "setProfile",
-                params: [displayName],
+                params: [params],
                 service: "profiles",
                 intf: "api",
             }),
-        onSuccess: () => {
+        onSuccess: async (_, params) => {
             toast.success("Profile set");
+
+            const currentUser = Account.parse(
+                await queryClient.getQueryData(QueryKey.currentUser()),
+            );
+            if (!currentUser) throw new Error("No current user");
+
+            queryClient.setQueryData(QueryKey.profile(currentUser), () => {
+                const newData: z.infer<typeof ProfileResponse> = {
+                    profile: {
+                        account: currentUser,
+                        bio: params.bio || "",
+                        displayName: params.displayName || "",
+                    },
+                };
+                console.log(newData, "truck");
+                return newData;
+            });
         },
         onError: () => {
             toast.error("Failed to set profile");

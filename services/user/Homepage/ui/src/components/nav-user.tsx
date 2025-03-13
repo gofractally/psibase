@@ -10,6 +10,7 @@ import {
     User,
     Copy,
     RefreshCcw,
+    Contact,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,7 +53,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
@@ -60,6 +60,46 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { type UseMutationResult } from "@tanstack/react-query";
 import { siblingUrl } from "@psibase/common-lib";
+import { useState } from "react";
+import { useSetProfile } from "@/apps/contacts/hooks/useSetProfile";
+import { FormProfile } from "./form-profile";
+import { useProfile } from "@/apps/contacts/hooks/useProfile";
+
+const EditProfileDialogContent = () => {
+    const { mutateAsync: setProfile } = useSetProfile();
+
+    const { data: currentUser } = useCurrentUser();
+    const {
+        data: profile,
+        isSuccess,
+        isError,
+        isLoading,
+        error,
+    } = useProfile(currentUser);
+
+    return (
+        <DialogContent>
+            <DialogTitle>Edit profile</DialogTitle>
+            <DialogDescription>All information is public.</DialogDescription>
+            {isLoading && <div>Loading...</div>}
+            {isSuccess && (
+                <FormProfile
+                    initialData={profile?.profile || undefined}
+                    onSubmit={async (data) => {
+                        await setProfile({
+                            bio: data.bio,
+                            displayName: data.displayName,
+                        });
+                        return data;
+                    }}
+                />
+            )}
+            {isError && (
+                <div className="text-destructive">{error?.message}</div>
+            )}
+        </DialogContent>
+    );
+};
 
 export function NavUser() {
     const { isMobile } = useSidebar();
@@ -71,9 +111,21 @@ export function NavUser() {
     const { mutateAsync: logout } = useLogout();
     const navigate = useNavigate();
 
+    const { data: profile } = useProfile(currentUser);
+
     const onLogout = async () => {
         await logout();
         navigate("/");
+    };
+
+    const [modalType, setModalType] = useState<
+        "editProfile" | "generateInvite"
+    >("editProfile");
+    const [showModal, setShowModal] = useState(false);
+
+    const onEditProfile = () => {
+        setModalType("editProfile");
+        setShowModal(true);
     };
 
     const { setTheme } = useTheme();
@@ -88,6 +140,12 @@ export function NavUser() {
     const generateInvite = useGenerateInvite();
     const { data: canExportAccount } = useCanExportAccount(currentUser);
 
+    const onGenerateInvite = () => {
+        generateInvite.mutate();
+        setModalType("generateInvite");
+        setShowModal(true);
+    };
+
     const isNoOptions = connectedAccounts.length == 0;
     const isUsingOnlyOption =
         connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
@@ -99,8 +157,11 @@ export function NavUser() {
         ) || isConnectingToAccount;
 
     return (
-        <Dialog>
-            <InviteDialogContent generateInvite={generateInvite} />
+        <Dialog open={showModal} onOpenChange={setShowModal}>
+            {modalType == "generateInvite" && (
+                <InviteDialogContent generateInvite={generateInvite} />
+            )}
+            {modalType == "editProfile" && <EditProfileDialogContent />}
             <SidebarMenu>
                 <SidebarMenuItem>
                     <DropdownMenu>
@@ -127,7 +188,9 @@ export function NavUser() {
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate ">
-                                        {currentUser || "Not logged in"}
+                                        {profile?.profile?.displayName ||
+                                            currentUser ||
+                                            "Not logged in"}
                                     </span>
                                 </div>
                                 <ChevronsUpDown className="ml-auto size-4" />
@@ -158,7 +221,16 @@ export function NavUser() {
                                     </Avatar>
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-semibold">
-                                            {currentUser || "Not logged in"}
+                                            {profile?.profile?.displayName ||
+                                                currentUser ||
+                                                "Not logged in"}{" "}
+                                            {profile?.profile?.displayName ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {`(${currentUser})`}
+                                                </span>
+                                            ) : (
+                                                ""
+                                            )}
                                         </span>
                                     </div>
                                 </div>
@@ -279,17 +351,25 @@ export function NavUser() {
                                 </DropdownMenuSub>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem
-                                    disabled={!currentUser}
-                                    onClick={() => {
-                                        generateInvite.mutate();
-                                    }}
-                                >
-                                    <User className="mr-2 h-4 w-4" />
-                                    Create invite
-                                </DropdownMenuItem>
-                            </DialogTrigger>
+                            <DropdownMenuItem
+                                disabled={!currentUser}
+                                onClick={() => {
+                                    onGenerateInvite();
+                                }}
+                            >
+                                <User className="mr-2 h-4 w-4" />
+                                Create invite
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                disabled={!currentUser}
+                                onClick={() => {
+                                    onEditProfile();
+                                }}
+                            >
+                                <Contact className="mr-2 h-4 w-4" />
+                                Edit profile
+                            </DropdownMenuItem>
 
                             <DropdownMenuItem
                                 disabled={!canExportAccount}

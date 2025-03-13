@@ -14,9 +14,6 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ContactDetails } from "./components/contact-details";
 import { NewContactDialog } from "./components/new-contact-dialog";
 import { Input } from "@/components/ui/input";
-import { z } from "zod";
-import { useProfile } from "@/apps/contacts/hooks/useProfile";
-import { useSetProfile } from "./hooks/useSetProfile";
 
 interface Contact {
     account: string;
@@ -101,12 +98,6 @@ export const ContactsPage = () => {
     const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
     const { data: contactsData, isLoading: isLoadingContacts } =
         useContacts(currentUser);
-
-    const { mutateAsync: setProfile } = useSetProfile();
-
-    const { data: profile } = useProfile(currentUser);
-
-    console.log({ profile });
 
     const [search, setSearch] = useState("");
 
@@ -205,7 +196,7 @@ export const ContactsPage = () => {
     }
 
     return (
-        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-y-scroll lg:grid-cols-2">
+        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-y-auto lg:grid-cols-2">
             <NewContactDialog
                 open={newContactModal}
                 onOpenChange={setNewContactModal}
@@ -221,23 +212,6 @@ export const ContactsPage = () => {
                         >
                             Create contact
                             <Plus />
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={() =>
-                                setProfile(
-                                    z
-                                        .string()
-                                        .min(1)
-                                        .parse(
-                                            window.prompt(
-                                                "Enter your display name",
-                                            ),
-                                        ),
-                                )
-                            }
-                        >
-                            Set profile - {JSON.stringify(profile)}
                         </Button>
                     </div>
                 </div>

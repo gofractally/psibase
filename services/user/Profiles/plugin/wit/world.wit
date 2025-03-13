@@ -1,17 +1,22 @@
 package profiles:plugin;
 
+interface types {
+ 
+    record profile {
+        display-name: option<string>,
+        bio: option<string>,
+    }
+
+}
+
 interface api {
-    set-example-thing: func(thing: string);
+    
+    use types.{profile};
 
-    set-profile: func(display-name: string);
+    set-profile: func(profile: profile);
 }
 
-interface queries {
-    use host:common/types.{error};
-    get-example-thing: func() -> result<string, error>;
-}
 
 world imports {
     import api;
-    import queries;
 }
