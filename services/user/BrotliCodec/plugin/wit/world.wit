@@ -1,4 +1,4 @@
-package brotli:plugin;
+package brotli-codec:plugin;
 
 interface api {
     use host:common/types.{error};

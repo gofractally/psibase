@@ -362,6 +362,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli-codec"
+version = "0.15.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "brotli",
+ "brotli-codec-pkg",
+ "psibase",
+ "serde",
+]
+
+[[package]]
+name = "brotli-codec-pkg"
+version = "0.15.0"
+dependencies = [
+ "brotli-codec",
+ "plugin",
+ "serde",
+]
+
+[[package]]
 name = "brotli-decompressor"
 version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -369,15 +390,6 @@ checksum = "9a45bd2e4095a8b518033b128020dd4a55aab1c0a381ba4404a472630f4bc362"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
-]
-
-[[package]]
-name = "brotli_package"
-version = "0.15.0"
-dependencies = [
- "plugin",
- "psi-brotli",
- "serde",
 ]
 
 [[package]]
@@ -1664,7 +1676,8 @@ name = "plugin"
 version = "0.15.0"
 dependencies = [
  "brotli",
- "brotli_package",
+ "brotli-codec",
+ "brotli-codec-pkg",
  "psibase",
  "wit-bindgen-rt",
 ]
@@ -1715,18 +1728,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "psi-brotli"
-version = "0.15.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "brotli",
- "brotli_package",
- "psibase",
- "serde",
 ]
 
 [[package]]

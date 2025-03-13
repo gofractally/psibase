@@ -28,7 +28,7 @@ if(DEFINED IS_WASM)
     install(DIRECTORY system/Transact/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/VerifySig/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     
-    install(DIRECTORY user/Brotli/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
+    install(DIRECTORY user/BrotliCodec/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/CommonApi/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Events/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/Explorer/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")

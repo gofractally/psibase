@@ -1,4 +1,4 @@
-package brotli:plugin;
+package brotli-codec:plugin;
 
 world impl {
     include host:common/imports;

@@ -96,7 +96,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'Brotli'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
         foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
