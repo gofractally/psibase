@@ -2,7 +2,7 @@ import type { Message } from "../hooks/use-mail";
 import type { PluginId } from "@psibase/common-lib";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Send, SquarePen, X } from "lucide-react";
+import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -56,7 +56,13 @@ const formSchema = z.object({
     message: z.string(),
 });
 
-export function ComposeDialog({ message }: { message?: Message }) {
+export function ComposeDialog({
+    trigger,
+    message,
+}: {
+    trigger: React.ReactNode;
+    message?: Message;
+}) {
     const [open, setOpen] = useState(false);
     const isSent = useRef(false);
     const { data: user } = useCurrentUser();
@@ -75,6 +81,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
         if (message.isDraft) {
             form.setValue("to", message.to);
             form.setValue("subject", message.subject);
+            form.setValue("message", message.body);
         } else {
             form.setValue("to", message.from);
             form.setValue("subject", `RE: ${message.subject}`);
@@ -157,7 +164,9 @@ export function ComposeDialog({ message }: { message?: Message }) {
         if (!open) {
             // if closing
             if (isSent.current) return;
-            toast.success("Your draft has been saved");
+            if (form.getValues().message.length) {
+                toast.success("Your draft has been saved");
+            }
             form.reset();
         }
 
@@ -173,17 +182,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <SquarePen className="h-5 w-5" />
-                            <span className="sr-only">Compose</span>
-                        </Button>
-                    </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Compose</TooltipContent>
-            </Tooltip>
+            {trigger}
             <DialogContent
                 className="h-[100dvh] max-w-full rounded-none px-4 py-8 sm:h-auto sm:max-w-[600px] sm:p-6"
                 onCloseAutoFocus={(e) => {
@@ -287,3 +286,56 @@ export function ComposeDialog({ message }: { message?: Message }) {
 }
 
 export default ComposeDialog;
+
+export const ComposeDialogTrigger = ({
+    disabled = false,
+}: {
+    disabled?: boolean;
+}) => {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={disabled}>
+                        <SquarePen className="h-5 w-5" />
+                    </Button>
+                </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Compose</TooltipContent>
+        </Tooltip>
+    );
+};
+
+export const ReplyDialogTrigger = ({
+    disabled = false,
+}: {
+    disabled?: boolean;
+}) => {
+    return (
+        <DialogTrigger asChild>
+            <Button variant="outline" disabled={disabled}>
+                <Reply className="mr-2 h-5 w-5" />
+                Reply
+            </Button>
+        </DialogTrigger>
+    );
+};
+
+export const EditSendDialogTrigger = ({
+    disabled = false,
+}: {
+    disabled?: boolean;
+}) => {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={disabled}>
+                        <PencilIcon className="h-5 w-5" />
+                    </Button>
+                </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Edit &amp; Send</TooltipContent>
+        </Tooltip>
+    );
+};

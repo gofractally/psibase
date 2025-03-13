@@ -1,7 +1,7 @@
 import type { Message } from "@/apps/chainmail/hooks";
 import type { Mailbox } from "@/apps/chainmail/types";
 
-import { Archive, ArrowLeft, Pin, Reply, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, Pin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supervisor } from "@/supervisor";
@@ -23,6 +23,12 @@ import {
     useInvalidateMailboxQueries,
 } from "@/apps/chainmail/hooks";
 import { formatDate } from "@/apps/chainmail/utils";
+
+import {
+    ComposeDialog,
+    EditSendDialogTrigger,
+    ReplyDialogTrigger,
+} from "./compose-dialog";
 
 interface MessageDetailProps {
     message: Message | null;
@@ -149,19 +155,25 @@ export function MessageDetail({
                         </Tooltip>
                     )}
                     {mailbox === "drafts" ? (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={!message}
-                                    onClick={onDeleteDraft}
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete draft</TooltipContent>
-                        </Tooltip>
+                        <>
+                            <ComposeDialog
+                                trigger={<EditSendDialogTrigger />}
+                                message={message}
+                            />
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={!message}
+                                        onClick={onDeleteDraft}
+                                    >
+                                        <Trash2 className="h-5 w-5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete draft</TooltipContent>
+                            </Tooltip>
+                        </>
                     ) : null}
                 </div>
             </div>
@@ -183,10 +195,12 @@ export function MessageDetail({
                                 </p>
                             </div>
                         </div>
-                        <Button variant="outline">
-                            <Reply className="mr-2 h-5 w-5" />
-                            Reply
-                        </Button>
+                        {mailbox !== "drafts" && mailbox !== "sent" && (
+                            <ComposeDialog
+                                trigger={<ReplyDialogTrigger />}
+                                message={message}
+                            />
+                        )}
                     </div>
 
                     <div className="prose dark:prose-invert max-w-none">

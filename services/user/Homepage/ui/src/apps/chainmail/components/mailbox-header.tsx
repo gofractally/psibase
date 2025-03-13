@@ -1,4 +1,4 @@
-import { ComposeDialog } from "./compose-dialog";
+import { ComposeDialog, ComposeDialogTrigger } from "./compose-dialog";
 
 export const MailboxHeader = ({ children }: { children: string }) => {
     return (
@@ -6,7 +6,7 @@ export const MailboxHeader = ({ children }: { children: string }) => {
             <div className="flex-1">
                 <h1 className="text-xl font-bold">{children}</h1>
             </div>
-            <ComposeDialog />
+            <ComposeDialog trigger={<ComposeDialogTrigger />} />
         </header>
     );
 };
