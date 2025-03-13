@@ -19,6 +19,7 @@ namespace UserService
       };
       PSIO_REFLECT(InviteSettingsRecord, key, whitelist, blacklist);
       using InviteSettingsTable = psibase::Table<InviteSettingsRecord, &InviteSettingsRecord::key>;
+      PSIO_REFLECT_TYPENAME(InviteSettingsTable)
 
       enum InviteStates
       {
@@ -65,8 +66,8 @@ namespace UserService
          /// Encrypted invite secret
          std::optional<std::string> secret;
 
-         auto byInviter() const { return std::tie(inviter, pubkey); }
-         auto byId() const { return std::tie(id, pubkey); }
+         using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::pubkey>;
+         using ById      = psibase::CompositeKey<&InviteRecord::id, &InviteRecord::pubkey>;
       };
       PSIO_REFLECT(InviteRecord,
                    pubkey,
@@ -79,8 +80,11 @@ namespace UserService
                    newAccountToken,
                    state,
                    secret);
-      using InviteTable = psibase::
-          Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::byInviter, &InviteRecord::byId>;
+      using InviteTable = psibase::Table<InviteRecord,
+                                         &InviteRecord::pubkey,
+                                         InviteRecord::ByInviter{},
+                                         InviteRecord::ById{}>;
+      PSIO_REFLECT_TYPENAME(InviteTable)
 
       struct NewAccountRecord
       {
@@ -89,6 +93,7 @@ namespace UserService
       };
       PSIO_REFLECT(NewAccountRecord, name, inviter);
       using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
+      PSIO_REFLECT_TYPENAME(NewAccTable)
 
    }  // namespace InviteNs
 }  // namespace UserService

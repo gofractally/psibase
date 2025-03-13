@@ -32,7 +32,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 }
@@ -40,7 +40,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
 void Invite::init()
 {
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.get(SingletonKey{}));
+   auto init      = (initTable.get({}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 
@@ -74,7 +74,7 @@ void Invite::createInvite(Spki                         inviteKey,
 
    auto inviter       = getSender();
    auto settingsTable = Tables().open<InviteSettingsTable>();
-   auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
+   auto settings      = settingsTable.get({}).value_or(InviteSettingsRecord{});
 
    if (settings.whitelist.size() > 0)
    {
@@ -237,7 +237,7 @@ void Invite::setWhitelist(vector<AccountNumber> accounts)
 
    // Check that no blacklisted accounts are being whitelisted
    auto settingsTable = Tables().open<InviteSettingsTable>();
-   auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
+   auto settings      = settingsTable.get({}).value_or(InviteSettingsRecord{});
    for (const auto& acc : settings.blacklist)
    {
       bool blacklisted = find(begin(accounts), end(accounts), acc) != end(accounts);
@@ -279,7 +279,7 @@ void Invite::setBlacklist(vector<AccountNumber> accounts)
 
    // Check that no whitelisted accounts are being blacklisted
    auto settingsTable = Tables().open<InviteSettingsTable>();
-   auto settings      = settingsTable.get(SingletonKey{}).value_or(InviteSettingsRecord{});
+   auto settings      = settingsTable.get({}).value_or(InviteSettingsRecord{});
    check(settings.whitelist.empty(), whitelistIsSet.data());
 
    // Detect invalid accounts

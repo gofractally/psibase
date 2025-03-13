@@ -160,31 +160,69 @@ namespace psibase
          return i;
       }
 
-      template <typename T, auto K, typename M>
-      static IndexInfo makeKey(M T::*)
+      template <bool Last, auto K, typename T, typename M>
+      static void makeKeyImpl(M T::*, FieldId&& prefix, IndexInfo& out)
       {
-         if constexpr (std::is_function_v<M>)
+         static_assert(!std::is_function_v<M>,
+                       "Member function keys not supported. Use CompositeKey instead.");
+         prefix.path.push_back(
+             get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr));
+         if constexpr (Last)
          {
-            static_assert(false, "Member function keys not supported. Use CompositeKey instead.");
-         }
-         else
-         {
-            return {
-                {.path{get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr)}}};
+            out.push_back(std::move(prefix));
          }
       }
 
-      template <typename T, auto K, auto... KN>
-      static IndexInfo makeKey(CompositeKey<KN...>)
+      template <bool Last, auto K>
+      static void makeNestedKeyImpl(NestedKey<>, FieldId&& prefix, IndexInfo& out)
       {
-         return {
-             {.path{get_member_index<KN>((typename psio::reflect<T>::data_members*)nullptr)}}...};
+         if constexpr (Last)
+         {
+            out.push_back(std::move(prefix));
+         }
+      }
+
+      template <bool Last, auto K, auto K0>
+      static void makeKeyImpl(CompositeKey<K0>, FieldId&& prefix, IndexInfo& out)
+      {
+         makeKeyImpl<Last, K0>(K0, std::move(prefix), out);
+      }
+
+      template <bool Last, auto K, auto... KN>
+      static void makeKeyImpl(CompositeKey<KN...>, FieldId&& prefix, IndexInfo& out)
+      {
+         static_assert(Last, "CompositeKey can only appear at the end of a NestedKey");
+
+         std::size_t prefixLen = prefix.path.size();
+
+         (makeKeyImpl<true, KN>(KN, FieldId(prefix), out), ...);
+      }
+
+      template <bool Last, auto K, auto K0>
+      static void makeKeyImpl(NestedKey<K0>, FieldId&& prefix, IndexInfo& out)
+      {
+         makeKeyImpl<Last, K0>(K0, std::move(prefix), out);
+      }
+
+      template <bool Last, auto K, auto K0, auto... KN>
+      static void makeKeyImpl(NestedKey<K0, KN...>, FieldId&& prefix, IndexInfo& out)
+      {
+         makeKeyImpl<false, K0>(K0, std::move(prefix), out);
+         makeKeyImpl<Last, NestedKey<KN...>{}>(NestedKey<KN...>{}, std::move(prefix), out);
+      }
+
+      template <typename T, auto K>
+      static IndexInfo makeKey()
+      {
+         IndexInfo result;
+         makeKeyImpl<true, K>(K, {}, result);
+         return result;
       }
 
       template <typename T, auto... K>
       static std::vector<IndexInfo> makeIndexes(Table<T, K...>*)
       {
-         return std::vector<IndexInfo>{makeKey<T, K>(K)...};
+         return std::vector<IndexInfo>{makeKey<T, K>()...};
       }
 
       template <typename T>
@@ -200,6 +238,8 @@ namespace psibase
       {
          if (db == DbId::service)
             return "service";
+         else if (db == DbId::subjective)
+            return "subjective";
          else
             abortMessage("db cannot be used in schema");
       }

@@ -550,13 +550,26 @@ namespace psibase
    template <auto... K>
    struct CompositeKey
    {
+      auto        operator()(const auto& value) const;
       friend auto operator<=>(const CompositeKey&, const CompositeKey&) = default;
       // TODO: remove once porting is finished
       PSIO_REFLECT(CompositeKey)
    };
 
+   template <auto... K>
+   struct NestedKey
+   {
+      auto        operator()(const auto& value) const;
+      friend auto operator<=>(const NestedKey&, const NestedKey&) = default;
+   };
+
    namespace detail
    {
+      template <typename C, auto K0, auto... K>
+      decltype(auto) invoke(NestedKey<K0, K...> f, const C& value);
+      template <typename C, auto... K>
+      decltype(auto) invoke(CompositeKey<K...> f, const C& value);
+
       template <typename T, typename C>
       decltype(auto) invoke(T C::*f, const C& value)
       {
@@ -567,12 +580,39 @@ namespace psibase
       {
          return (value.*f)(static_cast<A&&>(a)...);
       }
+      template <typename C>
+      decltype(auto) invoke(NestedKey<> f, const C& value)
+      {
+         return value;
+      }
+      template <typename C, auto K0>
+      decltype(auto) invoke(NestedKey<K0> f, const C& value)
+      {
+         return detail::invoke(K0, value);
+      }
+      template <typename C, auto K0, auto... K>
+      decltype(auto) invoke(NestedKey<K0, K...> f, const C& value)
+      {
+         return detail::invoke(NestedKey<K...>{}, value.*K0);
+      }
       template <typename C, auto... K>
       decltype(auto) invoke(CompositeKey<K...> f, const C& value)
       {
          return std::tuple(detail::invoke(K, value)...);
       }
    }  // namespace detail
+
+   template <auto... K>
+   auto CompositeKey<K...>::operator()(const auto& value) const
+   {
+      return detail::invoke(*this, value);
+   }
+
+   template <auto... K>
+   auto NestedKey<K...>::operator()(const auto& value) const
+   {
+      return detail::invoke(*this, value);
+   }
 
    /// Stores objects in the key-value database
    ///

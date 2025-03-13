@@ -123,6 +123,8 @@ namespace UserService
       );
       PSIBASE_REFLECT_UI_EVENTS(Fractal);
       PSIBASE_REFLECT_MERKLE_EVENTS(Fractal);
+
+      PSIBASE_REFLECT_TABLES(Fractal, Fractal::Tables)
       // clang-format on
 
    }  // namespace FractalNs

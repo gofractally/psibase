@@ -12,10 +12,14 @@ namespace SystemService
       std::uint8_t         vmVersion = 0;
       std::uint32_t        numRefs   = 0;
 
-      auto key() const { return std::tuple{codeHash, vmType, vmVersion}; }
+      using Key = psibase::CompositeKey<&CodeRefCountRow::codeHash,
+                                        &CodeRefCountRow::vmType,
+                                        &CodeRefCountRow::vmVersion>;
+      auto key() const { return Key{}(*this); }
       PSIO_REFLECT(CodeRefCountRow, codeHash, vmType, vmVersion)
    };
-   using CodeRefCountTable = psibase::Table<CodeRefCountRow, &CodeRefCountRow::key>;
+   using CodeRefCountTable = psibase::Table<CodeRefCountRow, CodeRefCountRow::Key{}>;
+   PSIO_REFLECT_TYPENAME(CodeRefCountTable)
 
    struct StagedCodeRow
    {
@@ -25,10 +29,14 @@ namespace SystemService
       psibase::Checksum256   codeHash;
       std::uint8_t           vmType    = 0;
       std::uint8_t           vmVersion = 0;
-      auto                   key() const { return std::tuple(from, id, service); }
+
+      using Key =
+          psibase::CompositeKey<&StagedCodeRow::from, &StagedCodeRow::id, &StagedCodeRow::service>;
+      auto key() const { return Key{}(*this); }
       PSIO_REFLECT(StagedCodeRow, from, service, id, codeHash, vmType, vmVersion)
    };
-   using StagedCodeTable = psibase::Table<StagedCodeRow, &StagedCodeRow::key>;
+   using StagedCodeTable = psibase::Table<StagedCodeRow, StagedCodeRow::Key{}>;
+   PSIO_REFLECT_TYPENAME(StagedCodeTable)
 
    /// All compiled code is uploaded to the chain through this service
    struct SetCode : psibase::Service
@@ -97,4 +105,6 @@ namespace SystemService
                 method(unstageCode, service, id),
                 method(setCodeStaged, from, id, vmType, vmVersion, codeHash),
                 method(setFlags, service, flags))
+
+   PSIBASE_REFLECT_TABLES(SetCode, SetCode::Tables)
 }  // namespace SystemService

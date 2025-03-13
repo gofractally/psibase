@@ -19,6 +19,7 @@ struct SubjectiveCounterRow
 PSIO_REFLECT(SubjectiveCounterRow, key, value)
 
 using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
+PSIO_REFLECT_TYPENAME(SubjectiveCounterTable)
 
 struct SubjectiveCounterService : psibase::Service
 {
@@ -30,6 +31,7 @@ struct SubjectiveCounterService : psibase::Service
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
 PSIO_REFLECT(SubjectiveCounterService, method(inc, key, id), method(serveSys, req))
+PSIBASE_REFLECT_TABLES(SubjectiveCounterService, SubjectiveCounterService::Tables)
 
 std::uint32_t SubjectiveCounterService::inc(std::string key, std::uint32_t id)
 {

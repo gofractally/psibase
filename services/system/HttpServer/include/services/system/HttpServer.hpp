@@ -13,6 +13,7 @@ namespace SystemService
    };
    PSIO_REFLECT(PendingRequestRow, socket, owner)
    using PendingRequestTable = psibase::Table<PendingRequestRow, &PendingRequestRow::socket>;
+   PSIO_REFLECT_TYPENAME(PendingRequestTable)
 
    struct RegisteredServiceRow
    {
@@ -21,6 +22,7 @@ namespace SystemService
    };
    PSIO_REFLECT(RegisteredServiceRow, service, server)
    using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
+   PSIO_REFLECT_TYPENAME(RegServTable)
 
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
@@ -42,10 +44,10 @@ namespace SystemService
    /// routing service instead.
    struct HttpServer : psibase::Service
    {
-      static constexpr auto service = psibase::proxyServiceNum;
+      static constexpr auto service          = psibase::proxyServiceNum;
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
-      static constexpr auto homepageService = psibase::AccountNumber("homepage");
-      using Tables                  = psibase::ServiceTables<RegServTable>;
+      static constexpr auto homepageService  = psibase::AccountNumber("homepage");
+      using Tables                           = psibase::ServiceTables<RegServTable>;
 
       using Subjective = psibase::SubjectiveTables<PendingRequestTable>;
 
@@ -78,4 +80,6 @@ namespace SystemService
                 method(claimReply, socket),
                 method(sendReply, socket, response),
                 method(registerServer, server))
+
+   PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Subjective)
 }  // namespace SystemService

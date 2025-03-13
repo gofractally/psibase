@@ -15,10 +15,11 @@ namespace SystemService
       std::optional<std::string> contentEncoding = std::nullopt;
       std::optional<std::string> csp             = std::nullopt;
 
-      SitesContentKey key() const { return SitesContentKey{account, path}; }
+      using Key = psibase::CompositeKey<&SitesContentRow::account, &SitesContentRow::path>;
    };
    PSIO_REFLECT(SitesContentRow, account, path, contentType, contentHash, contentEncoding, csp)
-   using SitesContentTable = psibase::Table<SitesContentRow, &SitesContentRow::key>;
+   using SitesContentTable = psibase::Table<SitesContentRow, SitesContentRow::Key{}>;
+   PSIO_REFLECT_TYPENAME(SitesContentTable)
 
    struct SitesDataRow
    {
@@ -28,6 +29,7 @@ namespace SystemService
    PSIO_REFLECT(SitesDataRow, hash, data)
 
    using SitesDataTable = psibase::Table<SitesDataRow, &SitesDataRow::hash>;
+   PSIO_REFLECT_TYPENAME(SitesDataTable)
 
    struct SitesDataRefRow
    {
@@ -37,6 +39,7 @@ namespace SystemService
    PSIO_REFLECT(SitesDataRefRow, hash, refs)
 
    using SitesDataRefTable = psibase::Table<SitesDataRefRow, &SitesDataRefRow::hash>;
+   PSIO_REFLECT_TYPENAME(SitesDataRefTable)
 
    struct SiteConfigRow
    {
@@ -47,6 +50,7 @@ namespace SystemService
    };
    PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
+   PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
    /// Decompress content
    ///
@@ -144,4 +148,6 @@ namespace SystemService
                 method(setCsp, path, csp),
                 method(deleteCsp, path),
                 method(enableCache, enable))
+
+   PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService
