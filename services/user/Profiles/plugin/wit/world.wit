@@ -1,0 +1,17 @@
+package profiles:plugin;
+
+interface api {
+    set-example-thing: func(thing: string);
+
+    set-profile: func(display-name: string);
+}
+
+interface queries {
+    use host:common/types.{error};
+    get-example-thing: func() -> result<string, error>;
+}
+
+world imports {
+    import api;
+    import queries;
+}
