@@ -36,9 +36,13 @@ import {
 } from "@/components/ui/tooltip";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 
-import { useDraftMessages } from "../hooks/use-mail";
+import {
+    useDraftMessages,
+    useInvalidateMailboxQueries,
+} from "../hooks/use-mail";
 
 interface SupervisorError {
     code: number;
@@ -58,6 +62,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
     const { data: user } = useCurrentUser();
     const { drafts, setDrafts, getDrafts, deleteDraftById } =
         useDraftMessages();
+    const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -67,7 +72,7 @@ export function ComposeDialog({ message }: { message?: Message }) {
         if (!message) {
             return form.reset();
         }
-        if (message.status === "draft") {
+        if (message.isDraft) {
             form.setValue("to", message.to);
             form.setValue("subject", message.subject);
         } else {
@@ -79,16 +84,21 @@ export function ComposeDialog({ message }: { message?: Message }) {
     const id = useRef<string>();
 
     const createDraft = () => {
-        const draft = {
+        if (!id.current || !user) return;
+        const draft: Message = {
             id: id.current,
+            msgId: id.current,
             from: user,
             to: form.getValues().to || "recipient",
             datetime: Date.now(),
-            status: "draft",
+            isDraft: true,
+            type: "outgoing",
+            read: true,
+            saved: true,
             inReplyTo: null,
             subject: form.getValues().subject || "subject here",
             body: form.getValues().message ?? "",
-        } as Message;
+        };
         setDrafts([...(drafts ?? []), draft]);
     };
 
@@ -138,6 +148,8 @@ export function ComposeDialog({ message }: { message?: Message }) {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         toast("Sending...");
         await sendMessage(values);
+        await wait(3000);
+        invalidateMailboxQueries(["sent"]);
     }
 
     const onOpenChange = (open: boolean) => {
@@ -145,12 +157,13 @@ export function ComposeDialog({ message }: { message?: Message }) {
         if (!open) {
             // if closing
             if (isSent.current) return;
-            return toast.success("Your draft has been saved");
+            toast.success("Your draft has been saved");
+            form.reset();
         }
 
         // the ID should be (re)set each time this opens; remember, it stays mounted
         isSent.current = false;
-        if (message?.status === "draft") {
+        if (message?.isDraft) {
             id.current = message.id;
         } else {
             id.current =
