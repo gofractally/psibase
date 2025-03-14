@@ -10,6 +10,7 @@ namespace company
    };
 
    PSIO_REFLECT(MinService, method(hello))
+   PSIBASE_REFLECT_TABLES(MinService)
 }  // namespace company
 
 PSIBASE_DISPATCH(company::MinService)

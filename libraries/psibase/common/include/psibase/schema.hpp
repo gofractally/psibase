@@ -238,6 +238,8 @@ namespace psibase
       {
          if (db == DbId::service)
             return "service";
+         else if (db == DbId::writeOnly)
+            return "writeOnly";
          else if (db == DbId::subjective)
             return "subjective";
          else

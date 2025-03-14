@@ -15,4 +15,5 @@ namespace SystemService
                      std::vector<char>    proof);
    };
    PSIO_REFLECT(VerifySig, method(verifySys, transactionHash, claim, proof))
+   PSIBASE_REFLECT_TABLES(VerifySig)
 }  // namespace SystemService

@@ -23,5 +23,6 @@ struct GetUser : psibase::Service
    }
 };
 PSIO_REFLECT(GetUser, method(serveSys, req, socket, user))
+PSIBASE_REFLECT_TABLES(GetUser)
 
 PSIBASE_DISPATCH(GetUser)

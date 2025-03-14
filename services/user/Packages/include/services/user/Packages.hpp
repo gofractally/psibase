@@ -37,7 +37,7 @@ namespace UserService
       std::vector<psibase::AccountNumber> accounts;
       psibase::AccountNumber              owner;
 
-      auto byName() const { return PackageKey(name, owner); }
+      using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
    PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, owner)
 
@@ -56,7 +56,7 @@ namespace UserService
       // gzipped json vector<PackageDataFile>
       std::vector<char> data;
 
-      auto byName() const { return std::tuple(name, owner); }
+      using ByName = psibase::CompositeKey<&PackageManifest::name, &PackageManifest::owner>;
    };
    PSIO_REFLECT(PackageManifest, name, owner, data)
 
@@ -66,13 +66,16 @@ namespace UserService
       std::uint64_t          id;
       std::uint32_t          index;
 
-      auto key() const { return std::tuple(owner, id); }
+      using Key = psibase::CompositeKey<&TransactionOrder::owner, &TransactionOrder::id>;
    };
    PSIO_REFLECT(TransactionOrder, owner, id, index)
 
-   using InstalledPackageTable = psibase::Table<InstalledPackage, &InstalledPackage::byName>;
-   using PackageManifestTable  = psibase::Table<PackageManifest, &PackageManifest::byName>;
-   using TransactionOrderTable = psibase::Table<TransactionOrder, &TransactionOrder::key>;
+   using InstalledPackageTable = psibase::Table<InstalledPackage, InstalledPackage::ByName{}>;
+   PSIO_REFLECT_TYPENAME(InstalledPackageTable)
+   using PackageManifestTable = psibase::Table<PackageManifest, PackageManifest::ByName{}>;
+   PSIO_REFLECT_TYPENAME(PackageManifestTable)
+   using TransactionOrderTable = psibase::Table<TransactionOrder, TransactionOrder::Key{}>;
+   PSIO_REFLECT_TYPENAME(TransactionOrderTable)
 
    struct Packages : psibase::Service
    {
@@ -94,5 +97,6 @@ namespace UserService
                 method(postinstall, package, manifest),
                 method(checkOrder, id, index),
                 method(removeOrder, id))
+   PSIBASE_REFLECT_TABLES(Packages, Packages::Tables)
 
 }  // namespace UserService
