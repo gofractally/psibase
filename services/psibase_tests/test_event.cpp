@@ -11,7 +11,7 @@ using namespace std::literals::string_literals;
 
 struct Query
 {
-   auto events() const { return EventQuery<EventService::Events>{EventService::service}; }
+   auto events() const { return LegacyEventQuery<EventService::Events>{EventService::service}; }
 };
 PSIO_REFLECT(Query, method(events))
 

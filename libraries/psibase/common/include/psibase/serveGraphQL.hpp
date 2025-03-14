@@ -962,7 +962,7 @@ namespace psibase
    /// }
    /// ```
    template <EventType Events>
-   struct EventQuery
+   struct LegacyEventQuery
    {
       AccountNumber service;
 
@@ -996,9 +996,12 @@ namespace psibase
          return result;
       }
 
-      PSIO_REFLECT(EventQuery, method(history, ids), method(ui, ids), method(merkle, ids))
+      PSIO_REFLECT(LegacyEventQuery, method(history, ids), method(ui, ids), method(merkle, ids))
 
-      friend auto get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
+      friend auto get_type_name(LegacyEventQuery*) { return psio::get_type_name<Events>(); }
+   };  // EventQuery
+
+
    };  // EventQuery
 
 }  // namespace psibase
