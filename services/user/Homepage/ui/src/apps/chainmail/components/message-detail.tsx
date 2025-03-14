@@ -203,11 +203,11 @@ export function MessageDetail({
                         )}
                     </div>
 
-                    <div className="prose dark:prose-invert max-w-none">
+                    <article className="prose dark:prose-invert max-w-none">
                         {message.body.split("\n\n").map((paragraph, i) => (
                             <p key={i}>{paragraph}</p>
                         ))}
-                    </div>
+                    </article>
                 </div>
             </ScrollArea>
         </div>
