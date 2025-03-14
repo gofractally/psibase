@@ -15,7 +15,7 @@ export default function DraftsPage() {
     }, []);
 
     return (
-        <div className="flex h-screen flex-col">
+        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
             <MailboxHeader>Drafts</MailboxHeader>
             <Mailbox
                 isDesktop={isDesktop}

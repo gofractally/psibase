@@ -1,7 +1,7 @@
 import type { Message } from "@/apps/chainmail/hooks";
 import type { Mailbox } from "@/apps/chainmail/types";
 
-import { Archive, ArrowLeft, Pin, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supervisor } from "@/supervisor";
@@ -122,7 +122,7 @@ export function MessageDetail({
                     {message.subject}
                 </h2>
                 <div className="flex gap-1">
-                    {(mailbox === "inbox" || mailbox === "saved") && (
+                    {/* {(mailbox === "inbox" || mailbox === "saved") && (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
@@ -153,7 +153,7 @@ export function MessageDetail({
                                 Keep message and move to Saved mailbox
                             </TooltipContent>
                         </Tooltip>
-                    )}
+                    )} */}
                     {mailbox === "drafts" ? (
                         <>
                             <ComposeDialog
