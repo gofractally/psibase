@@ -60,6 +60,16 @@ namespace UserService
    };
    PSIO_REFLECT(PackageManifest, name, owner, data)
 
+   struct InstalledSchema
+   {
+      psibase::AccountNumber account;
+      psibase::ServiceSchema schema;
+   };
+   PSIO_REFLECT(InstalledSchema, account, schema)
+
+   using InstalledSchemaTable = psibase::Table<InstalledSchema, &InstalledSchema::account>;
+   PSIO_REFLECT_TYPENAME(InstalledSchemaTable)
+
    struct TransactionOrder
    {
       psibase::AccountNumber owner;
@@ -80,10 +90,13 @@ namespace UserService
    struct Packages : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"packages"};
-      using Tables                  = psibase::
-          ServiceTables<InstalledPackageTable, PackageManifestTable, TransactionOrderTable>;
+      using Tables                  = psibase::ServiceTables<InstalledPackageTable,
+                                                             PackageManifestTable,
+                                                             TransactionOrderTable,
+                                                             InstalledSchemaTable>;
       // This should be the last action run when installing a package
       void postinstall(PackageMeta package, std::vector<char> manifest);
+      void setSchema(psibase::ServiceSchema schema);
 
       /// Used to ensure that the transactions that install packages
       /// are executed in order.
@@ -95,6 +108,7 @@ namespace UserService
    };
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
+                method(setSchema, account, schema),
                 method(checkOrder, id, index),
                 method(removeOrder, id))
    PSIBASE_REFLECT_TABLES(Packages, Packages::Tables)

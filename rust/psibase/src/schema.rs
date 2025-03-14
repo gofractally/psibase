@@ -7,7 +7,25 @@ type EventMap = IndexMap<String, AnyType>;
 
 type ActionMap = IndexMap<String, FunctionType>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[fracpack(fracpack_mod = "fracpack")]
+struct FieldId {
+    path: Vec<u32>,
+}
+
+type IndexInfo = Vec<FieldId>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct TableInfo {
+    name: Option<String>,
+    table: u16,
+    #[serde(rename = "type")]
+    type_: AnyType,
+    indexes: Vec<IndexInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Schema {
     pub service: AccountNumber,
@@ -16,6 +34,7 @@ pub struct Schema {
     pub ui: EventMap,
     pub history: EventMap,
     pub merkle: EventMap,
+    pub database: Option<IndexMap<String, Vec<TableInfo>>>,
 }
 
 impl ToSchema for Schema {
@@ -52,6 +71,8 @@ pub trait ToServiceSchema {
             ui,
             history,
             merkle,
+            // TODO: fill in database
+            database: None,
         }
     }
     fn actions_schema() -> Schema {
@@ -65,6 +86,7 @@ pub trait ToServiceSchema {
             ui: Default::default(),
             history: Default::default(),
             merkle: Default::default(),
+            database: Default::default(),
         }
     }
 }

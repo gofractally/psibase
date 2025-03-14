@@ -5,7 +5,7 @@ use crate::services::{
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, ToSchema, Unpack, Version,
+    GenesisService, Pack, PackageDisposition, PackageOp, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -186,6 +186,7 @@ pub struct PackageManifest {
 pub struct ServiceInfo {
     pub flags: Vec<String>,
     pub server: Option<AccountNumber>,
+    pub schema: Option<Schema>,
 }
 
 pub struct PackagedService<R: Read + Seek> {
@@ -265,6 +266,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 None => ServiceInfo {
                     flags: vec![],
                     server: None,
+                    schema: None,
                 },
             };
             services.push((account, file, info));
@@ -453,6 +455,11 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
+        for (service, _, info) in &self.services {
+            if let Some(schema) = &info.schema {
+                actions.push(packages::Wrapper::pack_from(*service).setSchema(schema.clone()))
+            }
+        }
         let manifest = self.manifest();
         let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
         serde_json::to_writer(&mut manifest_encoder, &manifest)?;

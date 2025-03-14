@@ -63,6 +63,54 @@ namespace UserService
                  .owner       = sender});
    }
 
+   void Packages::setSchema(ServiceSchema schema)
+   {
+      auto service = getSender();
+      auto tables  = Tables(getReceiver());
+      auto schemas = tables.open<InstalledSchemaTable>();
+      if (auto existing = schemas.get(service))
+      {
+         if (existing->schema.database && !existing->schema.database->empty())
+         {
+            std::vector<TableInfo> nullTables;
+            std::vector<std::pair<psio::schema_types::AnyType, psio::schema_types::AnyType>>
+                tableRows;
+            for (const auto& [db, existingTables] : *existing->schema.database)
+            {
+               const auto* currentTables = &nullTables;
+               if (schema.database)
+               {
+                  auto pos = schema.database->find(db);
+                  if (pos != schema.database->end())
+                  {
+                     currentTables = &pos->second;
+                  }
+               }
+               for (const TableInfo& prev : existingTables)
+               {
+                  auto pos = std::ranges::find_if(*currentTables,
+                                                  [&](auto& t) { return t.table == prev.table; });
+                  if (pos == currentTables->end())
+                  {
+                     // TODO: It's okay as long as the table is empty
+                     abortMessage("Cannot remove table " + std::to_string(prev.table));
+                  }
+                  else
+                  {
+                     tableRows.push_back({prev.type, pos->type});
+                  }
+               }
+            }
+            auto difference = match(existing->schema.types, schema.types, tableRows);
+            if (!(difference >= 0))
+               abortMessage("Incompatible tables");
+            // TODO: Check events
+            // TOOD: Should actions be checked?
+         }
+      }
+      schemas.put({service, std::move(schema)});
+   }
+
    void Packages::checkOrder(std::uint64_t id, std::uint32_t index)
    {
       auto sender = getSender();

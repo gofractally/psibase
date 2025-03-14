@@ -1,1 +1,14 @@
-{"actions":{"nop":{"params":{"Object":{}}}}}
+{
+   "service": "nop",
+   "types": {},
+   "actions": {
+      "nop": {
+         "params": {
+            "Object": {}
+         }
+      }
+   },
+   "ui": {},
+   "history": {},
+   "merkle": {}
+}

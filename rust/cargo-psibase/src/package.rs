@@ -282,6 +282,8 @@ pub async fn build_package(
             let mut info = ServiceInfo {
                 flags: pmeta.flags,
                 server: None,
+                // TODO: generate schema
+                schema: None,
             };
             if let Some(server) = pmeta.server {
                 info.server = Some(server.parse()?);

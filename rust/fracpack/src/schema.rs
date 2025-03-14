@@ -14,7 +14,7 @@ use std::{
 
 pub use indexmap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "crate")]
 pub struct Schema(IndexMap<String, AnyType>);
 
@@ -24,7 +24,7 @@ impl Schema {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "crate")]
 pub enum AnyType {
     Struct(IndexMap<String, AnyType>),
@@ -74,7 +74,7 @@ impl AnyType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack)]
+#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "crate")]
 pub struct FunctionType {
     pub params: AnyType,

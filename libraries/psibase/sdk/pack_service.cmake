@@ -374,6 +374,7 @@ function(psibase_schema target)
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        DEPENDS ${target}
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
         COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
     )
