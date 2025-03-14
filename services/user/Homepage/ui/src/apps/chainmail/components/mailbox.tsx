@@ -1,5 +1,4 @@
-import type { Mailbox as MailboxType } from "../types";
-import type { Message } from "@/apps/chainmail/hooks";
+import type { Mailbox as MailboxType, Message } from "../types";
 
 import {
     ResizableHandle,

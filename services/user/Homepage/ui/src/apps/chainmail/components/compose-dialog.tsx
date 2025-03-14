@@ -1,4 +1,4 @@
-import type { Message } from "../hooks/use-mail";
+import type { Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
 import { zodResolver } from "@hookform/resolvers/zod";

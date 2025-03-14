@@ -1,5 +1,4 @@
-import type { Message } from "@/apps/chainmail/hooks";
-import type { Mailbox } from "@/apps/chainmail/types";
+import type { Mailbox, Message } from "@/apps/chainmail/types";
 
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";

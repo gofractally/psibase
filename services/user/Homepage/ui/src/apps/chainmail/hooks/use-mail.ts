@@ -7,43 +7,17 @@ import { supervisor } from "@/supervisor";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-import { Mailbox } from "../types";
+import { Mailbox, Message, RawMessage } from "../types";
 
 const composeAtom = atom(false);
 export function useCompose() {
     return useAtom(composeAtom);
 }
 
-export type Message = {
-    id: string;
-    msgId: string;
-    from: string;
-    to: string;
-    datetime: number;
-    isDraft: boolean;
-    type: "incoming" | "outgoing";
-    read: boolean;
-    saved: boolean;
-    inReplyTo: string | null;
-    subject: string;
-    body: string;
-};
-
-type RawMessage = {
-    body: string;
-    datetime: string;
-    isSavedMsg: boolean;
-    msgId: string;
-    receiver: string;
-    sender: string;
-    subject: string;
-};
-
 const transformRawMessagesToMessages = (
     rawMessages: RawMessage[],
     currentUser: string,
 ) => {
-    console.log(rawMessages);
     return rawMessages.reverse().map(
         (msg, i) =>
             ({
