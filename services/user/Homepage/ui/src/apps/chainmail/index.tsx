@@ -9,7 +9,7 @@ import SentPage from "./sent-page";
 
 export const chainMailConfig: AppConfigType = {
     service: Account.parse("chainmail"),
-    name: "Chainmail",
+    name: "Chain mail",
     description: "Send mail between accounts.",
     icon: <Mail className="h-6 w-6" />,
     isMore: false,

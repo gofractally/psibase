@@ -21,7 +21,7 @@ export default function InboxPage() {
                 isDesktop={isDesktop}
                 mailbox="inbox"
                 messages={query.data ?? []}
-                isLoading={query.isLoading}
+                isLoading={query.isPending}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />
