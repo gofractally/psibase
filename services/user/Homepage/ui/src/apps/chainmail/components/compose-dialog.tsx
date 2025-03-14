@@ -10,6 +10,17 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -267,16 +278,53 @@ export function ComposeDialog({
                         <DialogFooter className="flex flex-col-reverse gap-2 pb-4 sm:flex-row sm:justify-between sm:space-x-2 sm:pb-0">
                             <Button
                                 variant="outline"
-                                onClick={() => onOpenChange(false)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    onOpenChange(false);
+                                }}
                                 className="w-full sm:w-auto"
+                                type="button"
                             >
                                 <X className="mr-2 h-4 w-4" />
                                 Cancel
                             </Button>
-                            <Button className="w-full sm:w-auto" type="submit">
-                                <Send className="mr-2 h-4 w-4" />
-                                Send Message
-                            </Button>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button className="w-full sm:w-auto">
+                                        <Send className="mr-2 h-4 w-4" />
+                                        Send Message
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                            Messages are not private
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Chain Mail is for demonstration
+                                            purposes only. Messages are not
+                                            currently encrypted and are
+                                            permanently stored on a publicly
+                                            accessible blockchain, visible to
+                                            anyone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={async () => {
+                                                await form.trigger();
+                                                if (form.formState.isValid)
+                                                    onSubmit(form.getValues());
+                                            }}
+                                        >
+                                            Send
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
                         </DialogFooter>
                     </form>
                 </Form>
