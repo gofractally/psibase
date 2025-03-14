@@ -1,5 +1,8 @@
 #pragma once
 
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
@@ -1328,256 +1331,52 @@ namespace psibase
          return rows;
       }
 
-      static std::tuple<bool, uint64_t, std::string> extract_rowid(const std::string& jsonObj)
+      static std::tuple<bool, uint64_t, std::string> extract_rowid(const std::string& json_obj)
       {
-         std::string             jsonCopy = jsonObj;
-         psio::json_token_stream stream(jsonCopy.data());
-         uint64_t                rowid       = 0;
-         bool                    found_rowid = false;
+         rapidjson::Document doc;
+         doc.Parse(json_obj.c_str());
 
-         printf("extract_rowid processing: %s\n", jsonObj.c_str());
+         if (!doc.IsObject())
+            return {false, 0, json_obj};
 
-         if (stream.peek_token().get().type != psio::json_token_type::type_start_object)
-         {
-            printf("extract_rowid - not a valid JSON object\n");
-            return {false, 0, jsonObj};
-         }
+         if (!doc.HasMember("rowid"))
+            return {false, 0, json_obj};
 
-         std::map<std::string, std::string> fields;
+         std::string rowid_str = doc["rowid"].GetString();
+         uint64_t    rowid     = 0;
+         auto [ptr, ec] =
+             std::from_chars(rowid_str.data(), rowid_str.data() + rowid_str.size(), rowid);
+         if (ec != std::errc{})
+            return {false, 0, json_obj};
 
-         stream.get_start_object();
-         while (!stream.get_end_object_pred())
-         {
-            auto key = stream.get_key();
-            printf("extract_rowid - found key: %.*s\n", (int)key.size(), key.data());
-            std::string key_str(key.data(), key.size());
+         doc.RemoveMember("rowid");
 
-            if (key_str == "rowid")
-            {
-               auto rowidStr = stream.get_string();
-               printf("extract_rowid - rowid value: %.*s\n", (int)rowidStr.size(), rowidStr.data());
+         rapidjson::StringBuffer                    buffer;
+         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+         doc.Accept(writer);
 
-               auto [ptr, ec] =
-                   std::from_chars(rowidStr.data(), rowidStr.data() + rowidStr.size(), rowid);
-               if (ec != std::errc{} || ptr != rowidStr.data() + rowidStr.size())
-               {
-                  printf("extract_rowid - failed to parse rowid\n");
-                  return {false, 0, jsonObj};
-               }
-               found_rowid = true;
-            }
-            else
-            {
-               auto token = stream.peek_token();
-
-               if (token.get().type == psio::json_token_type::type_string)
-               {
-                  auto str_val    = stream.get_string();
-                  fields[key_str] = "\"" + std::string(str_val.data(), str_val.size()) + "\"";
-               }
-               else if (token.get().type == psio::json_token_type::type_bool)
-               {
-                  bool val        = stream.get_bool();
-                  fields[key_str] = val ? "true" : "false";
-               }
-               else if (token.get().type == psio::json_token_type::type_null)
-               {
-                  stream.get_null();
-                  fields[key_str] = "null";
-               }
-               else if (token.get().type == psio::json_token_type::type_start_object ||
-                        token.get().type == psio::json_token_type::type_start_array)
-               {
-                  if (token.get().type == psio::json_token_type::type_start_object)
-                  {
-                     fields[key_str] = "{";
-                     stream.get_start_object();
-                     bool first = true;
-
-                     while (!stream.get_end_object_pred())
-                     {
-                        if (!first)
-                           fields[key_str] += ",";
-                        first = false;
-
-                        auto nested_key = stream.get_key();
-                        fields[key_str] +=
-                            "\"" + std::string(nested_key.data(), nested_key.size()) + "\":";
-
-                        auto nested_val = stream.get_string();
-                        fields[key_str] +=
-                            "\"" + std::string(nested_val.data(), nested_val.size()) + "\"";
-                     }
-                     fields[key_str] += "}";
-                  }
-                  else
-                  {
-                     fields[key_str] = "[";
-                     stream.get_start_array();
-                     bool first = true;
-                     while (!stream.get_end_array_pred())
-                     {
-                        if (!first)
-                           fields[key_str] += ",";
-                        first = false;
-
-                        auto arr_val = stream.get_string();
-                        fields[key_str] +=
-                            "\"" + std::string(arr_val.data(), arr_val.size()) + "\"";
-                     }
-                     fields[key_str] += "]";
-                  }
-               }
-               else
-               {
-                  auto value_str  = stream.get_string();
-                  fields[key_str] = std::string(value_str.data(), value_str.size());
-               }
-            }
-         }
-
-         if (!found_rowid)
-         {
-            printf("extract_rowid - rowid field not found\n");
-            return {false, 0, jsonObj};
-         }
-
-         std::string result = "{";
-         bool        first  = true;
-
-         for (const auto& [key, value] : fields)
-         {
-            if (!first)
-               result += ",";
-            first = false;
-
-            result += "\"" + key + "\":" + value;
-         }
-
-         result += "}";
-         printf("extract_rowid - constructed JSON: %s\n", result.c_str());
-
-         return {true, rowid, result};
+         return {true, rowid, buffer.GetString()};
       }
 
       static std::vector<std::string> extract_objects(const std::string& json_arr)
       {
          std::vector<std::string> result;
-         if (json_arr.empty())
-            return result;
 
-         printf("extract_objects input JSON: %s\n", json_arr.c_str());
+         rapidjson::Document doc;
+         doc.Parse(json_arr.c_str());
 
-         if (json_arr[0] == '[' && json_arr[json_arr.size() - 1] == ']')
+         if (doc.IsArray())
          {
-            printf("JSON appears to be an array, proceeding with parsing\n");
-
-            size_t pos            = 0;
-            int    fallback_count = 0;
-            while ((pos = json_arr.find('{', pos)) != std::string::npos)
+            for (auto& element : doc.GetArray())
             {
-               size_t end_pos = json_arr.find('}', pos);
-               if (end_pos != std::string::npos)
+               if (element.IsObject())
                {
-                  std::string obj = json_arr.substr(pos, end_pos - pos + 1);
-                  printf("Direct extraction found object #%d: %s\n", fallback_count++, obj.c_str());
-                  result.push_back(obj);
-                  pos = end_pos + 1;
-               }
-               else
-               {
-                  printf("Direct extraction: no matching closing brace\n");
-                  break;
+                  rapidjson::StringBuffer                    buffer;
+                  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+                  element.Accept(writer);
+                  result.push_back(buffer.GetString());
                }
             }
-
-            if (!result.empty())
-            {
-               printf("Direct extraction complete, found %zu objects\n", result.size());
-               return result;
-            }
-
-            printf("Trying token-based extraction...\n");
-            std::string             json_copy(json_arr);
-            psio::json_token_stream stream(json_copy.data());
-
-            auto token = stream.peek_token();
-            printf("Initial token type: %d\n", (int)token.get().type);
-
-            if (token.get().type != psio::json_token_type::type_start_array)
-            {
-               printf("Error: First token is not start-array\n");
-               return result;
-            }
-
-            stream.get_start_array();
-            printf("Start array token consumed\n");
-
-            int obj_count = 0;
-            while (!stream.get_end_array_pred())
-            {
-               token = stream.peek_token();
-               printf("Array element token type: %d\n", (int)token.get().type);
-
-               if (token.get().type != psio::json_token_type::type_start_object)
-               {
-                  printf("Skipping non-object element\n");
-                  psio::from_json_skip_value(stream);
-                  continue;
-               }
-
-               printf("Found object #%d\n", obj_count++);
-
-               std::string obj = "{";
-               stream.get_start_object();
-               bool first_field = true;
-
-               while (!stream.get_end_object_pred())
-               {
-                  if (!first_field)
-                     obj += ",";
-                  first_field = false;
-
-                  auto key = stream.get_key();
-                  printf("  Key: %.*s\n", (int)key.size(), key.data());
-                  obj += "\"" + std::string(key.data(), key.size()) + "\":";
-
-                  auto value_token = stream.peek_token();
-                  printf("  Value type: %d\n", (int)value_token.get().type);
-
-                  if (value_token.get().type == psio::json_token_type::type_string)
-                  {
-                     auto str_val = stream.get_string();
-                     obj += "\"" + std::string(str_val.data(), str_val.size()) + "\"";
-                  }
-                  else if (value_token.get().type == psio::json_token_type::type_bool)
-                  {
-                     bool val = stream.get_bool();
-                     obj += val ? "true" : "false";
-                  }
-                  else if (value_token.get().type == psio::json_token_type::type_null)
-                  {
-                     stream.get_null();
-                     obj += "null";
-                  }
-                  else
-                  {
-                     auto value_str = stream.get_string();
-                     obj += std::string(value_str.data(), value_str.size());
-                  }
-               }
-
-               obj += "}";
-               printf("  Constructed object: %s\n", obj.c_str());
-               result.push_back(obj);
-            }
-
-            printf("Token-based extraction complete, found %zu objects\n", result.size());
-         }
-         else
-         {
-            printf("JSON is not an array (first char: %c, last char: %c)\n", json_arr[0],
-                   json_arr[json_arr.size() - 1]);
          }
 
          return result;
