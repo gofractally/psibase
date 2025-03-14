@@ -1,8 +1,10 @@
-import { Book, Coins, History, Mail, MoveRight, Terminal } from "lucide-react";
 import { motion } from "framer-motion";
+import { Book, Coins, History, Mail, MoveRight, Terminal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
+
 import { siblingUrl } from "@psibase/common-lib";
+
 import { Account } from "@/lib/zod/Account";
 
 const AppSchema = z
@@ -31,7 +33,7 @@ const apps: App[] = [
         title: "Chain mail",
         description: "Send mail between accounts.",
         icon: <Mail className="h-6 w-6" />,
-        href: siblingUrl(null, "chainmail", null, false),
+        service: Account.parse("chainmail"),
     },
     {
         title: "Workshop",

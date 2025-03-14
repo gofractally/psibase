@@ -102,7 +102,7 @@ impl Query for ChainmailPlugin {
         // lib: construct gql query from types; generate schema
         // - generate obj based on gql schema with query methods on it
         let graphql_str = format!(
-            "query {{ getSavedMsgs(receiver:\"{}\") {{ nodes {{ msgId, receiver, sender, subject, body, datetime {{ seconds }} }} }} }}",
+            "query {{ getSavedMsgs(receiver:\"{}\") {{ nodes {{ msgId, receiver, sender, subject, body, datetime }} }} }}",
             rcvr
         );
 
