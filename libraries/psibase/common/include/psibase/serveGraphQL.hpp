@@ -1136,14 +1136,9 @@ namespace psibase
             printf("EventQuery::query() Raw JSON response: %s\n", json_str.c_str());
          }
 
-         auto rows = parse_sql_rows(json_str);
-
-         printf("Rows size: %zu\n", rows.size());
+         auto rows          = parse_sql_rows(json_str);
          auto has_next_page = has_next(rows, _before, _first, _last);
          auto has_prev_page = has_previous(rows, _after);
-
-         printf("has_next_page: %d\n", has_next_page);
-         printf("has_prev_page: %d\n", has_prev_page);
 
          if (_first.has_value() || _last.has_value())
          {
@@ -1311,20 +1306,13 @@ namespace psibase
             return rows;
 
          std::vector<std::string> objects = extract_objects(json_str);
-         printf("EventQuery::parse_sql_rows() Found %zu objects\n", objects.size());
 
          for (const auto& obj_json : objects)
          {
-            printf("Object: %s\n", obj_json.c_str());
             auto [success, rowid, cleaned_json] = extract_rowid(obj_json);
             if (!success)
                check(false, "Invalid event row: unable to extract rowid");
-
-            printf("Cleaned JSON: %s\n", cleaned_json.c_str());
-            printf("Rowid: %llu\n", rowid);
-
             T data = psio::convert_from_json<T>(cleaned_json);
-            printf("Parsed into object\n");
             rows.push_back(SqlRow{rowid, std::move(data)});
          }
 
