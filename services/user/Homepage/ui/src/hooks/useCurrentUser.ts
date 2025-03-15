@@ -5,7 +5,6 @@ import { supervisor } from "@/supervisor";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-
 export type GetCurrentUserRes = string | null;
 
 export const queryFn = async () => {

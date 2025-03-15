@@ -7,13 +7,12 @@ import { Plus, Search } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { createIdenticon } from "@/lib/createIdenticon";
 import { toast } from "sonner";
 import { useMediaQuery } from "usehooks-ts";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ContactDetails } from "./components/contact-details";
 import { NewContactDialog } from "./components/new-contact-dialog";
 import { Input } from "@/components/ui/input";
+import { useAvatar } from "@/hooks/useAvatar";
 
 interface Contact {
     account: string;
@@ -24,6 +23,55 @@ interface Contact {
     email: string;
     phone: string;
 }
+
+const ContactItem = ({
+    contact,
+    isSelected,
+    onSelect,
+}: {
+    contact: Contact;
+    isSelected: boolean;
+    onSelect: () => void;
+}) => {
+    const avatarSrc = useAvatar(contact.account);
+    return (
+        <div
+            onClick={onSelect}
+            className={cn(
+                "flex w-full cursor-pointer justify-between rounded-sm border p-4",
+                {
+                    "bg-muted": isSelected,
+                },
+            )}
+        >
+            <div className="flex items-center gap-2">
+                <Avatar className={cn("rounded-none")}>
+                    <AvatarImage src={avatarSrc} />
+                    <AvatarFallback>
+                        {contact.displayName.charAt(0)}
+                    </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                    <p className="text-md font-medium">{contact.displayName}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {contact.jobTitle}
+                    </p>
+                </div>
+            </div>
+
+            <div className="flex flex-col justify-center">
+                <div>
+                    <p className="text-right text-xs text-muted-foreground">
+                        {contact.account}
+                    </p>
+                    <p className="text-right text-xs text-muted-foreground">
+                        {contact.email}
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ContactListSection = ({
     setSelectedContact,
@@ -40,55 +88,12 @@ const ContactListSection = ({
         <div className="flex flex-col gap-2 px-4 py-2">
             <div className="text-sm text-muted-foreground">{letter}</div>
             {contacts.map((contact) => (
-                <div
+                <ContactItem
                     key={contact.account}
-                    onClick={() => {
-                        setSelectedContact(contact.account);
-                    }}
-                    className={cn(
-                        "flex w-full cursor-pointer justify-between rounded-sm border p-4",
-                        {
-                            "bg-muted": selectedContactId === contact.account,
-                        },
-                    )}
-                >
-                    <div className="flex items-center gap-2">
-                        <Avatar
-                            className={cn(!contact.avatarUrl && "rounded-none")}
-                        >
-                            <AvatarImage
-                                src={
-                                    contact?.avatarUrl ??
-                                    createIdenticon(
-                                        selectedContactId ?? "blank",
-                                    )
-                                }
-                            />
-                            <AvatarFallback>
-                                {contact.displayName.charAt(0)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                            <p className="text-md font-medium">
-                                {contact.displayName}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {contact.jobTitle}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col justify-center">
-                        <div>
-                            <p className="text-right text-xs text-muted-foreground">
-                                {contact.account}
-                            </p>
-                            <p className="text-right text-xs text-muted-foreground">
-                                {contact.email}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                    contact={contact}
+                    isSelected={selectedContactId === contact.account}
+                    onSelect={() => setSelectedContact(contact.account)}
+                />
             ))}
         </div>
     );

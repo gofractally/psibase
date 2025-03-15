@@ -4,8 +4,9 @@ import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ProfileResponse } from "./useProfile";
+import { ProfileResponse } from "../../../hooks/useProfile";
 import { Account } from "@/lib/zod/Account";
+import { AwaitTime } from "@/globals";
 
 const Params = z.object({
     displayName: z.string(),
@@ -23,25 +24,30 @@ export const useSetProfile = () =>
                 intf: "api",
             }),
         onSuccess: async (_, params) => {
-            toast.success("Profile set");
+            toast.success("Profile updated");
 
             const currentUser = Account.parse(
                 await queryClient.getQueryData(QueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 
-            queryClient.setQueryData(QueryKey.profile(currentUser), () => {
-                const newData: z.infer<typeof ProfileResponse> = {
+            queryClient.setQueryData(
+                QueryKey.profile(currentUser),
+                (): z.infer<typeof ProfileResponse> => ({
                     profile: {
                         account: currentUser,
                         bio: params.bio,
                         displayName: params.displayName,
                         avatar: params.avatar,
                     },
-                };
+                }),
+            );
 
-                return newData;
-            });
+            setTimeout(() => {
+                queryClient.invalidateQueries({
+                    queryKey: QueryKey.profile(currentUser),
+                });
+            }, AwaitTime);
         },
         onError: () => {
             toast.error("Failed to set profile");

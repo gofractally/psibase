@@ -12,15 +12,6 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import { Trash, Upload } from "lucide-react";
-import { createIdenticon } from "@/lib/createIdenticon";
-import { useState } from "react";
-import { useProfile } from "@/apps/contacts/hooks/useProfile";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useUploadAvatar } from "@/apps/contacts/hooks/useUploadAvatar";
-import { AwaitTime } from "@/globals";
-import { useChainId } from "@/hooks/useChainId";
-import { siblingUrl } from "@psibase/common-lib";
 
 const formSchema = z.object({
     displayName: z

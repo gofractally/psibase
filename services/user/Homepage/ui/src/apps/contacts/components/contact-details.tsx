@@ -1,8 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { createIdenticon } from "@/lib/createIdenticon";
 import { ArrowLeft, Edit, Mail, Phone, Wallet } from "lucide-react";
+import { useAvatar } from "@/hooks/useAvatar";
 
 export interface Contact {
     account: string;
@@ -37,6 +36,8 @@ export function ContactDetails({
         );
     }
 
+    const avatarSrc = useAvatar(contact.account);
+
     return (
         <div>
             {onBack && (
@@ -47,18 +48,8 @@ export function ContactDetails({
                 </div>
             )}
             <div className="mx-auto flex w-full flex-col items-center justify-center gap-4 p-4 sm:flex-row">
-                <Avatar
-                    className={cn(
-                        "h-32 w-32",
-                        !contact.avatarUrl && "rounded-none",
-                    )}
-                >
-                    <AvatarImage
-                        src={
-                            contact.avatarUrl ??
-                            createIdenticon(contact.account)
-                        }
-                    />
+                <Avatar className="h-32 w-32 rounded-none">
+                    <AvatarImage src={avatarSrc} />
                     <AvatarFallback>
                         {contact.displayName.charAt(0)}
                     </AvatarFallback>

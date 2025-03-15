@@ -34,7 +34,6 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 import { useChainId } from "@/hooks/useChainId";
 import { useLogout } from "@/hooks/useLogout";
 import { useTheme } from "./theme-provider";
@@ -61,8 +60,35 @@ import { toast } from "sonner";
 import { type UseMutationResult } from "@tanstack/react-query";
 import { siblingUrl } from "@psibase/common-lib";
 import { useState } from "react";
-import { useProfile } from "@/apps/contacts/hooks/useProfile";
+import { useProfile } from "@/hooks/useProfile";
 import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
+import { useAvatar } from "@/hooks/useAvatar";
+
+import { Account } from "@/lib/zod/Account";
+import { z } from "zod";
+
+function AccountMenuItem({
+    account,
+    isConnectingToAccount,
+    connectToAccount,
+}: {
+    account: z.infer<typeof Account>;
+    isConnectingToAccount: boolean;
+    connectToAccount: (account: string) => void;
+}) {
+    const avatarSrc = useAvatar(account);
+
+    return (
+        <DropdownMenuItem
+            disabled={isConnectingToAccount}
+            key={account}
+            onClick={() => connectToAccount(account)}
+        >
+            <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />
+            <span>{account}</span>
+        </DropdownMenuItem>
+    );
+}
 
 export function NavUser() {
     const { isMobile } = useSidebar();
@@ -75,6 +101,7 @@ export function NavUser() {
     const navigate = useNavigate();
 
     const { data: profile } = useProfile(currentUser);
+    const avatarSrc = useAvatar(currentUser);
 
     const onLogout = async () => {
         await logout();
@@ -135,14 +162,7 @@ export function NavUser() {
                             >
                                 <Avatar className="h-8 w-8 rounded-lg">
                                     <AvatarImage
-                                        src={
-                                            chainId && currentUser
-                                                ? generateAvatar(
-                                                      chainId,
-                                                      currentUser,
-                                                  )
-                                                : undefined
-                                        }
+                                        src={avatarSrc}
                                         alt={currentUser || ""}
                                     />
                                     <AvatarFallback className="rounded-lg">
@@ -168,16 +188,7 @@ export function NavUser() {
                             <DropdownMenuLabel className="p-0 font-normal">
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                     <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage
-                                            src={
-                                                chainId && currentUser
-                                                    ? generateAvatar(
-                                                          chainId,
-                                                          currentUser,
-                                                      )
-                                                    : undefined
-                                            }
-                                        />
+                                        <AvatarImage src={avatarSrc} />
                                         <AvatarFallback className="rounded-lg">
                                             ?
                                         </AvatarFallback>
@@ -236,32 +247,20 @@ export function NavUser() {
                                             <DropdownMenuSubContent>
                                                 {connectedAccounts.map(
                                                     (connectedAccount) => (
-                                                        <DropdownMenuItem
-                                                            disabled={
-                                                                isConnectingToAccount
-                                                            }
+                                                        <AccountMenuItem
                                                             key={
                                                                 connectedAccount
                                                             }
-                                                            onClick={() =>
-                                                                connectToAccount(
-                                                                    connectedAccount,
-                                                                )
+                                                            account={
+                                                                connectedAccount
                                                             }
-                                                        >
-                                                            <img
-                                                                className="mr-2 h-4 w-4 rounded-none"
-                                                                src={createIdenticon(
-                                                                    chainId +
-                                                                        connectedAccount,
-                                                                )}
-                                                            />
-                                                            <span>
-                                                                {
-                                                                    connectedAccount
-                                                                }
-                                                            </span>
-                                                        </DropdownMenuItem>
+                                                            isConnectingToAccount={
+                                                                isConnectingToAccount
+                                                            }
+                                                            connectToAccount={
+                                                                connectToAccount
+                                                            }
+                                                        />
                                                     ),
                                                 )}
                                                 <DropdownMenuSeparator />

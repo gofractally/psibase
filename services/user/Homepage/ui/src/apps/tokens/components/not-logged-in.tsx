@@ -6,24 +6,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { createIdenticon } from "@/lib/createIdenticon";
-import { useChainId } from "@/hooks/useChainId";
 import { Button } from "@/components/ui/button";
 import { useSelectAccount } from "@/hooks/useSelectAccount";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+import { useAvatar } from "@/hooks/useAvatar";
 
 interface Props {}
 
 export const NotLoggedIn = ({}: Props) => {
   const { mutate: login } = useCreateConnectionToken();
   const { data: connectedAccounts } = useConnectedAccounts();
-  const { data: chainId } = useChainId();
 
   const { mutate: connectToAccount, isPending: isConnectingToAccount } =
     useSelectAccount();
 
   const isOptions = connectedAccounts && connectedAccounts.length > 0;
+
+  const avatarSrc = useAvatar();
 
   return (
     <div className="relative w-full rounded-lg border p-4 flex justify-between">
@@ -53,7 +53,7 @@ export const NotLoggedIn = ({}: Props) => {
                 >
                   <img
                     className="mr-2 h-4 w-4 rounded-none"
-                    src={createIdenticon(chainId + connectedAccount)}
+                    src={avatarSrc}
                   />
                   <span>{connectedAccount}</span>
                 </DropdownMenuItem>

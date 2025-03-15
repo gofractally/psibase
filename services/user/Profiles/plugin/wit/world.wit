@@ -20,6 +20,7 @@ interface api {
 
 
     upload-avatar: func(file: file, compression-quality: u8) -> result<_, error>;
+    remove-avatar: func() -> result<_, error>;
 
     set-profile: func(profile: profile);
 }

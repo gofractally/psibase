@@ -2,27 +2,31 @@ import { FormProfile } from "@/components/form-profile";
 
 import { Trash, Upload } from "lucide-react";
 
-import { createIdenticon } from "@/lib/createIdenticon";
-
 import { DialogDescription } from "@/components/ui/dialog";
 
 import { DialogTitle } from "@/components/ui/dialog";
 
-import { useChainId } from "@/hooks/useChainId";
-import { useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUploadAvatar } from "../hooks/useUploadAvatar";
-import { useProfile } from "../hooks/useProfile";
 import { useSetProfile } from "../hooks/useSetProfile";
 import { Button } from "@/components/ui/button";
 import { AwaitTime } from "@/globals";
 import { DialogContent } from "@/components/ui/dialog";
-import { siblingUrl } from "@psibase/common-lib";
 import { Input } from "@/components/ui/input";
+import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
+import { useAvatar } from "@/hooks/useAvatar";
+import { useProfile } from "@/hooks/useProfile";
+import { useCacheBust } from "@/hooks/useCacheBust";
+import { toast } from "sonner";
 
 export const EditProfileDialogContent = () => {
     const { mutateAsync: setProfile, isPending: isSettingProfile } =
         useSetProfile();
+
+    const { mutateAsync: removeAvatar, isPending: isRemovingAvatar } =
+        useRemoveAvatar();
+
+    const { setBustedUser, bustData, bustedUser } = useCacheBust();
 
     const { data: currentUser } = useCurrentUser();
     const {
@@ -32,11 +36,10 @@ export const EditProfileDialogContent = () => {
         isLoading,
         error,
     } = useProfile(currentUser);
-    const { mutateAsync: uploadAvatar } = useUploadAvatar();
+    const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
+        useUploadAvatar();
 
-    const { data: chainId } = useChainId();
-
-    const [tickImage, setTickImage] = useState(0);
+    const isPending = isSettingProfile || isRemovingAvatar || isUploadingAvatar;
 
     const handleImageChange = async (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -52,31 +55,36 @@ export const EditProfileDialogContent = () => {
                     content: new Uint8Array(buffer),
                 },
             });
+            toast.success("Avatar uploaded");
 
             const isAvatar = !!profile?.profile?.avatar;
-            if (!isAvatar) {
-                setProfile({
-                    avatar: true,
-                    displayName: profile?.profile?.displayName ?? "",
-                    bio: profile?.profile?.bio ?? "",
-                });
-            }
-
-            setTimeout(() => {
-                setTickImage(tickImage + 1);
+            setTimeout(async () => {
+                if (currentUser) {
+                    setBustedUser(currentUser);
+                }
+                if (!isAvatar) {
+                    await setProfile({
+                        avatar: true,
+                        displayName: profile?.profile?.displayName ?? "",
+                        bio: profile?.profile?.bio ?? "",
+                    });
+                }
             }, AwaitTime);
         }
     };
 
     const removeImage = async () => {
-        // TODO: remove image from sites
-
-        await setProfile({
-            avatar: false,
-            displayName: profile?.profile?.displayName ?? "",
-            bio: profile?.profile?.bio ?? "",
-        });
+        await Promise.all([
+            removeAvatar(),
+            setProfile({
+                avatar: false,
+                displayName: profile?.profile?.displayName ?? "",
+                bio: profile?.profile?.bio ?? "",
+            }),
+        ]);
     };
+
+    const avatarSrc = useAvatar(currentUser);
 
     return (
         <DialogContent>
@@ -84,25 +92,13 @@ export const EditProfileDialogContent = () => {
             <DialogDescription>All information is public.</DialogDescription>
             <div className="flex items-center justify-between space-x-4">
                 <img
-                    key={tickImage}
-                    src={
-                        profile?.profile?.avatar
-                            ? siblingUrl(
-                                  null,
-                                  currentUser,
-                                  `/profile/avatar?v=${tickImage}`,
-                                  false,
-                              )
-                            : createIdenticon(
-                                  chainId ?? "a" + currentUser ?? "b",
-                              )
-                    }
-                    alt="Icon preview"
-                    className="h-24 w-24 rounded-lg object-cover"
+                    src={avatarSrc}
+                    alt={`Avatar of ${currentUser}`}
+                    className={`h-24 w-24 rounded-lg object-cover transition-opacity duration-200 ${isUploadingAvatar || isRemovingAvatar ? "opacity-50" : ""}`}
                 />
                 <div className="flex flex-1 flex-col justify-center gap-2">
                     <div>
-                        <Button variant="outline" asChild>
+                        <Button asChild disabled={isPending}>
                             <label
                                 htmlFor="icon-upload"
                                 className="cursor-pointer"
@@ -123,11 +119,11 @@ export const EditProfileDialogContent = () => {
                         {profile?.profile?.avatar && (
                             <Button
                                 type="button"
-                                disabled={isSettingProfile}
+                                disabled={isPending}
                                 onClick={() => {
                                     removeImage();
                                 }}
-                                variant="outline"
+                                variant="destructive"
                             >
                                 <Trash className="mr-2 h-5 w-5" />
                                 Delete avatar

@@ -30,9 +30,4 @@ export const useUploadAvatar = () =>
 
             console.log(res, "was the res");
         },
-        onSuccess: (_, { file }) => {
-            // TODO: set the image here?
-
-            console.log({ file }, "is the file");
-        },
     });

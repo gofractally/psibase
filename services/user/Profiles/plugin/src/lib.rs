@@ -32,6 +32,10 @@ impl Api for ProfilesPlugin {
     fn upload_avatar(file: File, compression_quality: u8) -> Result<(), Error> {
         bindings::sites::plugin::api::upload(&file, compression_quality)
     }
+
+    fn remove_avatar() -> Result<(), Error> {
+        bindings::sites::plugin::api::remove("/profile/avatar")
+    }
 }
 
 #[derive(serde::Deserialize, Debug)]
