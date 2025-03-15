@@ -70,7 +70,7 @@ namespace
       }
 
       transactor<Producers> psys{Producers::service, Producers::service};
-      std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
+      std::vector<Producer> producerConfig = {{"prod"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
