@@ -1,7 +1,4 @@
-use crate::{
-    services::transact, AccountNumber, Action, ActionGroup, ActionSink, SignedTransaction,
-    TransactionTrace,
-};
+use crate::{services::transact, AccountNumber, SignedTransaction, TransactionTrace};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
 use custom_error::custom_error;
@@ -191,75 +188,6 @@ pub async fn push_transaction(
     Ok(())
 }
 
-pub struct TransactionBuilder<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> {
-    size: usize,
-    action_limit: usize,
-    actions: Vec<Action>,
-    transactions: Vec<(String, Vec<SignedTransaction>, bool)>,
-    f: F,
-}
-
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> TransactionBuilder<F> {
-    pub fn new(action_limit: usize, f: F) -> Self {
-        TransactionBuilder {
-            size: 0,
-            action_limit,
-            actions: vec![],
-            transactions: vec![],
-            f,
-        }
-    }
-    pub fn set_label(&mut self, label: String) {
-        self.transactions
-            .push((label, vec![], !self.actions.is_empty()))
-    }
-    pub fn push<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
-        let prev_len = self.actions.len();
-        let prev_size = self.size;
-        act.append_to_tx(&mut self.actions, &mut self.size);
-        if prev_len != 0 && self.size >= self.action_limit {
-            self.transactions
-                .last_mut()
-                .unwrap()
-                .1
-                .push((self.f)(self.actions.drain(..prev_len).collect())?);
-            self.size -= prev_size;
-        }
-        Ok(())
-    }
-    pub fn push_all<T: ActionGroup>(&mut self, actions: Vec<T>) -> Result<(), anyhow::Error> {
-        for act in actions {
-            self.push(act)?;
-        }
-        Ok(())
-    }
-    pub fn finish(self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
-        let mut result = self.transactions;
-        if !self.actions.is_empty() {
-            result.last_mut().unwrap().1.push((self.f)(self.actions)?);
-        }
-        Ok(result)
-    }
-    // Returns the number of transactions that would be created if the
-    // builder were finished now.
-    pub fn num_transactions(&self) -> usize {
-        let complete = self.transactions.iter().map(|group| group.1.len()).sum();
-        if !self.actions.is_empty() {
-            return complete + 1;
-        } else {
-            return complete;
-        }
-    }
-}
-
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink
-    for TransactionBuilder<F>
-{
-    fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
-        self.push(act)
-    }
-}
-
 pub async fn push_transactions(
     base_url: &Url,
     client: reqwest::Client,
@@ -295,6 +223,7 @@ pub async fn push_transactions(
         }
         n += 1;
     }
+    progress.inc(n);
     Ok(())
 }
 

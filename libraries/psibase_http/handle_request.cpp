@@ -325,6 +325,7 @@ namespace psibase::http
                    session->do_read();
              });
       }
+      virtual SocketInfo                 info() const override { return HttpSocketInfo{}; }
       std::shared_ptr<http_session_base> session;
       F                                  callback;
       E                                  err;
@@ -813,7 +814,7 @@ namespace psibase::http
                 },
                 [error](const std::string& message)
                 { return error(bhttp::status::internal_server_error, message); });
-            system->sockets->add(socket, &tc.ownedSockets);
+            system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
 
             auto setStatus = psio::finally(
                 [&]

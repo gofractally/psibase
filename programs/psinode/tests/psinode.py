@@ -95,7 +95,8 @@ class Cluster(object):
         nodes = [self.make_node(name, **kw) for name in names]
         for a in nodes:
             for b in nodes:
-                a.connect(b)
+                if a.dir < b.dir:
+                    a.connect(b)
         return tuple(nodes)
     def line(self, *names, **kw):
         '''Creates nodes connected in a line'''
@@ -237,10 +238,8 @@ class API:
         return ChainPackContext(self).pack(trx, Transaction)
     def pack_signed_transaction(self, trx, signatures=[]):
         '''Pack a signed transactions and return the result as bytes'''
-        if isinstance(trx, bytes):
-            trx = trx.hex()
-        elif isinstance(trx, Transaction):
-            trx = self.pack_transaction(trx).hex()
+        if isinstance(trx, Transaction):
+            trx = self.pack_transaction(trx)
         return SignedTransaction.packed({'transaction': trx, 'proofs':signatures})
     def push_transaction(self, trx, keys=[]):
         '''
@@ -248,11 +247,22 @@ class API:
 
         Raise TransactionError if the transaction fails
         '''
-        trx.claims += [key.claim() for key in keys]
-        trx = self.pack_transaction(trx)
-        digest = sha256(trx).digest()
-        signatures = [key.sign_prehashed(digest) for key in keys]
-        packed = self.pack_signed_transaction(trx, signatures)
+        if isinstance(trx, Transaction):
+            if keys is not None:
+                trx.claims += [key.claim() for key in keys]
+            trx = self.pack_transaction(trx)
+            digest = sha256(trx).digest()
+            signatures = [key.sign_prehashed(digest) for key in keys]
+            packed = self.pack_signed_transaction(trx, signatures)
+        else:
+            if len(keys) != 0:
+                raise Exception("Transaction is already signed")
+            if isinstance(trx, SignedTransaction):
+                packed = trx.packed()
+            elif isinstance(trx, str):
+                packed = bytes.fromhex(trx)
+            else:
+                packed = trx
         with self.post('/push_transaction', service='transact', headers={'Content-Type': 'application/octet-stream'}, data=packed) as result:
             result.raise_for_status()
             trace = result.json()
@@ -499,9 +509,9 @@ class Node(API):
 
         if hasattr(self, 'tempdir'):
             self.tempdir.cleanup()
-    def shutdown(self):
+    def shutdown(self, force=False):
         '''Stop the server and wait for the server process to exit'''
-        with self.post('/native/admin/shutdown', service='x-admin', json={}):
+        with self.post('/native/admin/shutdown', service='x-admin', json={"force":force}):
             pass
         self.session.close()
         try:

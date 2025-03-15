@@ -43,7 +43,7 @@ impl Boot for XAdminPlugin {
         block_signing_key: Option<Pem>,
         tx_signing_key: Option<Pem>,
         compression_level: u32,
-    ) -> Result<(Tx, Vec<Tx>), String> {
+    ) -> Result<(Tx, Vec<(Tx, u32, u32)>, Vec<String>), String> {
         let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
         for s in &js_packages[..] {
             services.push(PackagedService::new(Cursor::new(&s[..])).map_err(|e| e.to_string())?);
@@ -56,7 +56,7 @@ impl Boot for XAdminPlugin {
         let initial_key = parse_public_key_pem(block_signing_key)?;
         let tx_key = parse_public_key_pem(tx_signing_key)?;
 
-        let (boot_transactions, transactions) = create_boot_transactions(
+        let (boot_transactions, groups) = create_boot_transactions(
             &initial_key,
             &tx_key,
             prod.into(),
@@ -69,20 +69,33 @@ impl Boot for XAdminPlugin {
 
         if DEBUG_PRINT {
             let mut tx_sizes: Vec<String> = Vec::new();
-            for tx in &transactions {
-                tx_sizes.push(format!("{:?} kb", tx.packed().len() / 1024));
+            for (_, transactions, _) in &groups {
+                for tx in transactions {
+                    tx_sizes.push(format!("{:?} kb", tx.packed().len() / 1024));
+                }
             }
             println!("{:?}", tx_sizes);
         }
 
         let boot_transactions = boot_transactions.packed();
 
-        let transactions: Vec<Tx> = transactions
-            .into_iter()
-            .map(|tx| Tx::from(tx.packed()))
-            .collect();
+        let mut labels = Vec::new();
+        let mut transactions = Vec::new();
+        let mut completed: u32 = 0;
+        let mut idx: u32 = 0;
+        for (label, group, carry) in groups {
+            labels.push(label);
+            if !carry {
+                completed = idx;
+            }
+            for tx in group {
+                transactions.push((Tx::from(tx.packed()), completed, idx + 1));
+                completed = idx;
+            }
+            idx += 1;
+        }
 
-        Ok((boot_transactions, transactions))
+        Ok((boot_transactions, transactions, labels))
     }
 }
 

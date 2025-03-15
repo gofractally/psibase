@@ -263,6 +263,7 @@ namespace psibase::net
                    }
                 });
          }
+         SocketInfo info() const { return ProducerMulticastSocketInfo{}; }
       };
 
       producer_id                  self = null_producer;
@@ -554,7 +555,7 @@ namespace psibase::net
       // TODO: rename this function to a more generic init routine
       void load_producers()
       {
-         chain().addSocket(prods_socket);
+         chain().setSocket(SocketRow::producer_multicast, prods_socket);
          chain().onChangeNextTransaction(
              [this]
              {
