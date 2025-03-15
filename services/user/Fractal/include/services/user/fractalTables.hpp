@@ -8,6 +8,14 @@ namespace UserService
    {
       using PublicKey = SystemService::AuthSig::SubjectPublicKeyInfo;
 
+      struct InviteEventType
+      {
+         static constexpr std::string_view created  = "created";
+         static constexpr std::string_view claimed  = "claimed";
+         static constexpr std::string_view accepted = "accepted";
+         static constexpr std::string_view rejected = "rejected";
+      };
+
       // Implemented by fractal types in order to be compatible with this parent service
       struct FractalInterface
       {
@@ -63,7 +71,7 @@ namespace UserService
          psibase::AccountNumber inviter;
          uint64_t               rewardShares;
 
-         auto byAccount() const { return std::tuple{key.account, key.fractal}; }
+         auto byAccount() const { return std::tie(key.account, key.fractal); }
 
          auto operator<=>(const MembershipRecord&) const = default;
       };
@@ -73,6 +81,7 @@ namespace UserService
 
       struct InviteRecord
       {
+         uint32_t               inviteId;
          PublicKey              key;
          psibase::AccountNumber creator;
          psibase::AccountNumber fractal;
@@ -80,9 +89,9 @@ namespace UserService
 
          auto secondary() const { return std::tie(recipient, key); }
       };
-      PSIO_REFLECT(InviteRecord, key, creator, fractal, recipient);
+      PSIO_REFLECT(InviteRecord, inviteId, key, creator, fractal, recipient);
       using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::key, &InviteRecord::secondary>;
+          psibase::Table<InviteRecord, &InviteRecord::inviteId, &InviteRecord::secondary>;
 
       // Identity in the fractal service, does not necessarily mean you joined a fractal
       // TODO: rename to ProfileRecord
