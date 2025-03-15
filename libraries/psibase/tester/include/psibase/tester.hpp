@@ -307,7 +307,7 @@ namespace psibase
       {
          return {.host     = account.str() + ".psibase.io",
                  .rootHost = "psibase.io",
-                 .method   = "POST",
+                 .method   = "GET",
                  .target{target}};
       }
 
