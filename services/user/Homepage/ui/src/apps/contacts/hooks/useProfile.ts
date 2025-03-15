@@ -10,6 +10,7 @@ export const ProfileResponse = z.object({
             account: Account,
             displayName: z.string(),
             bio: z.string(),
+            avatar: z.boolean(),
         })
         .or(z.null()),
 });
@@ -26,6 +27,7 @@ export const useProfile = (account: string | undefined | null) =>
                         displayName
                         account
                         bio
+                        avatar
                     }
                 }
             `,

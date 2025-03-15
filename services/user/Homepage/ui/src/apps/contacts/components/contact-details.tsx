@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { createIdenticon } from "@/lib/createIdenticon";
-import { Edit, Mail, Phone, Wallet } from "lucide-react";
+import { ArrowLeft, Edit, Mail, Phone, Wallet } from "lucide-react";
 
 export interface Contact {
     account: string;
@@ -19,6 +19,7 @@ interface ContactDetailsProps {
     onTransferFunds: (contactId: string) => void;
     onEditContact: (contactId: string) => void;
     onChainMailUser: (contactId: string) => void;
+    onBack?: () => void;
 }
 
 export function ContactDetails({
@@ -26,6 +27,7 @@ export function ContactDetails({
     onTransferFunds,
     onEditContact,
     onChainMailUser,
+    onBack,
 }: ContactDetailsProps) {
     if (!contact) {
         return (
@@ -37,10 +39,17 @@ export function ContactDetails({
 
     return (
         <div>
+            {onBack && (
+                <div className="pl-4">
+                    <Button onClick={onBack} variant="outline" size="icon">
+                        <ArrowLeft />
+                    </Button>
+                </div>
+            )}
             <div className="mx-auto flex w-full flex-col items-center justify-center gap-4 p-4 sm:flex-row">
                 <Avatar
                     className={cn(
-                        "h-36 w-36",
+                        "h-32 w-32",
                         !contact.avatarUrl && "rounded-none",
                     )}
                 >
@@ -96,13 +105,13 @@ export function ContactDetails({
             </div>
             <div className="mx-auto grid max-w-screen-md grid-cols-1 gap-3 p-4 sm:grid-cols-2">
                 {contact.phone && (
-                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
+                    <div className="flex items-center gap-2 truncate  rounded-sm bg-muted p-3">
                         <Phone />
                         {contact.phone}
                     </div>
                 )}
                 {contact.email && (
-                    <div className="flex items-center gap-2 rounded-sm bg-muted p-3">
+                    <div className="flex items-center gap-2 truncate rounded-sm bg-muted p-3">
                         <Mail />
                         {contact.email}
                     </div>

@@ -5,13 +5,21 @@ interface types {
     record profile {
         display-name: option<string>,
         bio: option<string>,
+        avatar: bool,
     }
+
 
 }
 
 interface api {
     
+    use host:common/types.{error};
     use types.{profile};
+    use sites:plugin/types.{file};
+
+
+
+    upload-avatar: func(file: file, compression-quality: u8) -> result<_, error>;
 
     set-profile: func(profile: profile);
 }

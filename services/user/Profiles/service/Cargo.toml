@@ -19,5 +19,9 @@ async-graphql = "7.0.7"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.120"
 
+[package.metadata.component.target.dependencies]
+"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+
+
 [dev-dependencies]
 profiles-pkg = { path = "..", version = "0.15.0" }

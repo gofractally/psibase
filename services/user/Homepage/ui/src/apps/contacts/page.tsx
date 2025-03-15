@@ -185,8 +185,6 @@ export const ContactsPage = () => {
         }))
         .sort((a, b) => a.letter.localeCompare(b.letter));
 
-    const openModal = !!(!isDesktop && selectedContactAccount);
-
     if (isLoadingUser || isLoadingContacts) {
         return <div>Loading...</div>;
     }
@@ -202,67 +200,61 @@ export const ContactsPage = () => {
                 onOpenChange={setNewContactModal}
             />
 
-            <div className="overflow-y-auto">
-                <div className="flex items-center justify-between px-4">
-                    <div className="text-lg font-medium">Contacts</div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            size="sm"
-                            onClick={() => setNewContactModal(true)}
-                        >
-                            Create contact
-                            <Plus />
-                        </Button>
+            {!isDesktop && selectedContactAccount ? (
+                <ContactDetails
+                    contact={selectedContact}
+                    onTransferFunds={handleTransferFunds}
+                    onEditContact={setEditingContact}
+                    onChainMailUser={chainMailUser}
+                    onBack={() => setSelectedAccount(undefined)}
+                />
+            ) : (
+                <div className="overflow-y-auto">
+                    <div className="flex items-center justify-between px-4 py-2">
+                        <div className="text-lg font-medium">Contacts</div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                className="text-sm"
+                                variant="outline"
+                                onClick={() => setNewContactModal(true)}
+                            >
+                                Create contact
+                                <Plus />
+                            </Button>
+                        </div>
                     </div>
-                </div>
 
-                <div className="relative flex items-center px-4 py-2">
-                    <Input
-                        placeholder="Search contacts..."
-                        value={search}
-                        onChange={(e) => updateSearch(e.target.value)}
-                        className="pl-10"
-                    />
-                    <Search className="absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <div className="relative flex items-center px-4 py-2">
+                        <Input
+                            placeholder="Search contacts..."
+                            value={search}
+                            onChange={(e) => updateSearch(e.target.value)}
+                            className="pl-10"
+                        />
+                        <Search className="absolute left-8 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    {!contactsData || contactsData.length === 0 ? (
+                        <div className="flex h-full items-center justify-center">
+                            <p className="text-muted-foreground">
+                                No contacts. Create one!
+                            </p>
+                        </div>
+                    ) : (
+                        <div>
+                            {sections.map((section) => (
+                                <ContactListSection
+                                    key={section.letter}
+                                    letter={section.letter}
+                                    setSelectedContact={setSelectedAccount}
+                                    selectedContactId={selectedContactAccount}
+                                    contacts={section.contacts}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
-                {!contactsData || contactsData.length === 0 ? (
-                    <div className="flex h-full items-center justify-center">
-                        <p className="text-muted-foreground">
-                            No contacts. Create one!
-                        </p>
-                    </div>
-                ) : (
-                    <div>
-                        {sections.map((section) => (
-                            <ContactListSection
-                                key={section.letter}
-                                letter={section.letter}
-                                setSelectedContact={setSelectedAccount}
-                                selectedContactId={selectedContactAccount}
-                                contacts={section.contacts}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <Dialog
-                open={openModal}
-                onOpenChange={(e) => {
-                    if (!e) {
-                        setSelectedAccount(undefined);
-                    }
-                }}
-            >
-                <DialogContent className="w-full max-w-screen-2xl">
-                    <ContactDetails
-                        contact={selectedContact}
-                        onTransferFunds={handleTransferFunds}
-                        onEditContact={setEditingContact}
-                        onChainMailUser={chainMailUser}
-                    />
-                </DialogContent>
-            </Dialog>
+            )}
 
             {isDesktop && (
                 <ContactDetails

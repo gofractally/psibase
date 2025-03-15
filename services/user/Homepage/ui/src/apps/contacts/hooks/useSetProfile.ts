@@ -8,8 +8,9 @@ import { ProfileResponse } from "./useProfile";
 import { Account } from "@/lib/zod/Account";
 
 const Params = z.object({
-    displayName: z.string().optional(),
-    bio: z.string().optional(),
+    displayName: z.string(),
+    bio: z.string(),
+    avatar: z.boolean(),
 });
 
 export const useSetProfile = () =>
@@ -33,11 +34,12 @@ export const useSetProfile = () =>
                 const newData: z.infer<typeof ProfileResponse> = {
                     profile: {
                         account: currentUser,
-                        bio: params.bio || "",
-                        displayName: params.displayName || "",
+                        bio: params.bio,
+                        displayName: params.displayName,
+                        avatar: params.avatar,
                     },
                 };
-                console.log(newData, "truck");
+
                 return newData;
             });
         },

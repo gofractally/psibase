@@ -61,45 +61,8 @@ import { toast } from "sonner";
 import { type UseMutationResult } from "@tanstack/react-query";
 import { siblingUrl } from "@psibase/common-lib";
 import { useState } from "react";
-import { useSetProfile } from "@/apps/contacts/hooks/useSetProfile";
-import { FormProfile } from "./form-profile";
 import { useProfile } from "@/apps/contacts/hooks/useProfile";
-
-const EditProfileDialogContent = () => {
-    const { mutateAsync: setProfile } = useSetProfile();
-
-    const { data: currentUser } = useCurrentUser();
-    const {
-        data: profile,
-        isSuccess,
-        isError,
-        isLoading,
-        error,
-    } = useProfile(currentUser);
-
-    return (
-        <DialogContent>
-            <DialogTitle>Edit profile</DialogTitle>
-            <DialogDescription>All information is public.</DialogDescription>
-            {isLoading && <div>Loading...</div>}
-            {isSuccess && (
-                <FormProfile
-                    initialData={profile?.profile || undefined}
-                    onSubmit={async (data) => {
-                        await setProfile({
-                            bio: data.bio,
-                            displayName: data.displayName,
-                        });
-                        return data;
-                    }}
-                />
-            )}
-            {isError && (
-                <div className="text-destructive">{error?.message}</div>
-            )}
-        </DialogContent>
-    );
-};
+import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 
 export function NavUser() {
     const { isMobile } = useSidebar();

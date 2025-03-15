@@ -4,6 +4,8 @@ mod bindings;
 use bindings::exports::profiles::plugin::api::Guest as Api;
 use bindings::profiles::plugin::types::Profile as PluginProfile;
 
+use bindings::exports::profiles::plugin::api::File;
+
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -20,10 +22,15 @@ impl Api for ProfilesPlugin {
         let packed_profile_args = profiles::action_structs::setProfile {
             display_name: profile.display_name.unwrap_or_default(),
             bio: profile.bio.unwrap_or_default(),
+            avatar: profile.avatar,
         }
         .packed();
 
         add_action_to_transaction("setProfile", &packed_profile_args).unwrap();
+    }
+
+    fn upload_avatar(file: File, compression_quality: u8) -> Result<(), Error> {
+        bindings::sites::plugin::api::upload(&file, compression_quality)
     }
 }
 

@@ -36,5 +36,6 @@ crate-type = ["rlib"]
 
 [dependencies]
 profiles = { path = "service", version = "0.15.0" }
+
 r-profiles = { path = "query-service", version = "0.15.0" }
 plugin = { path = "plugin", version = "0.15.0" }
