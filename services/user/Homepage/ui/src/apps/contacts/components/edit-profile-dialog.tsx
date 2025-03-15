@@ -82,22 +82,7 @@ export const EditProfileDialogContent = () => {
         <DialogContent>
             <DialogTitle>Edit profile</DialogTitle>
             <DialogDescription>All information is public.</DialogDescription>
-            <div className="flex items-center space-x-4">
-                <div className="flex-1">
-                    <label htmlFor="icon-upload" className="cursor-pointer">
-                        <div className="flex h-10 w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                            <Upload className="mr-2 h-5 w-5" />
-                            Upload avatar
-                        </div>
-                    </label>
-                    <Input
-                        id="icon-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        className="hidden"
-                    />
-                </div>
+            <div className="flex items-center justify-between space-x-4">
                 <img
                     key={tickImage}
                     src={
@@ -113,21 +98,43 @@ export const EditProfileDialogContent = () => {
                               )
                     }
                     alt="Icon preview"
-                    className="h-10 w-10 rounded-lg object-cover"
+                    className="h-24 w-24 rounded-lg object-cover"
                 />
-                {profile?.profile?.avatar && (
-                    <Button
-                        type="button"
-                        disabled={isSettingProfile}
-                        onClick={() => {
-                            removeImage();
-                        }}
-                        variant="outline"
-                        size="icon"
-                    >
-                        <Trash className="h-4 w-4" />
-                    </Button>
-                )}
+                <div className="flex flex-1 flex-col justify-center gap-2">
+                    <div>
+                        <Button variant="outline" asChild>
+                            <label
+                                htmlFor="icon-upload"
+                                className="cursor-pointer"
+                            >
+                                <Upload className="mr-2 h-5 w-5" />
+                                Upload avatar
+                            </label>
+                        </Button>
+                        <Input
+                            id="icon-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                        />
+                    </div>
+                    <div>
+                        {profile?.profile?.avatar && (
+                            <Button
+                                type="button"
+                                disabled={isSettingProfile}
+                                onClick={() => {
+                                    removeImage();
+                                }}
+                                variant="outline"
+                            >
+                                <Trash className="mr-2 h-5 w-5" />
+                                Delete avatar
+                            </Button>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {isLoading && <div>Loading...</div>}
