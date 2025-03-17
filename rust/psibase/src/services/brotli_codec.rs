@@ -20,7 +20,7 @@ pub mod brotli_impl {
 }
 
 /// A service that offers server-side Brotli decompression
-#[crate::service(name = "psi-brotli", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "brotli-codec", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     /// Decompresses a Brotli-compressed byte array

@@ -1,5 +1,5 @@
 use crate::services::{
-    accounts, auth_delegate, http_server, packages, producers, psi_brotli::brotli_impl, setcode,
+    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
 };
 use crate::{

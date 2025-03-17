@@ -119,7 +119,7 @@ namespace SystemService
       // The account that holds the service code implementing the DecompressorInterface
       using decompressor_account                                              = std::string;
       const std::array<std::pair<cci, decompressor_account>, 1> decompressors = {
-          {{"br", "psi-brotli"}}  //
+          {{"br", "brotli-codec"}}  //
       };
 
       // Parses the encoding into a pair of encoding identifier and quality
