@@ -27,6 +27,7 @@ const supervisorOrigination = {
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("transact", "plugin"),
+    pluginId("clientdata", "plugin"),
 ];
 
 export const REDIRECT_ERROR_CODE = 999999999;

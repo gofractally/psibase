@@ -214,22 +214,27 @@ export class PluginHost implements HostInterface {
         return this.self.origin;
     }
 
-    setCurrentPermRequest(caller: string, callee: string): Result<string, RecoverableErrorPayload> {
+    setCurrentPermRequest(
+        caller: string,
+        callee: string,
+    ): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
+        let value = new TextEncoder().encode(
+            JSON.stringify({
+                id: req_id,
+                caller,
+                callee,
+                expiry_timestamp: new Date().getUTCSeconds(),
+            }),
+        );
         this.supervisor.supervisorCall({
             service: "clientdata",
+            plugin: "plugin",
             intf: "keyvalue",
-            method: "setKey",
-            params: [
-                PERM_OAUTH_REQ_KEY,
-                {
-                    id: req_id,
-                    caller,
-                    callee,
-                    expiry_timestamp: new Date().getUTCSeconds(),
-                }
-            ]} as QualifiedFunctionCallArgs);
-        return req_id
+            method: "set",
+            params: [PERM_OAUTH_REQ_KEY, value],
+        } as QualifiedFunctionCallArgs);
+        return req_id;
     }
     // Web interface
     async promptUser(url_path: string): Promise<Result<void, PluginError>> {
