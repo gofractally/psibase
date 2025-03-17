@@ -20,7 +20,7 @@ export default function SentPage() {
                 isDesktop={isDesktop}
                 mailbox="sent"
                 messages={query.data ?? []}
-                isLoading={query.isLoading}
+                isLoading={query.isPending}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}
             />

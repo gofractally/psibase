@@ -36,10 +36,10 @@ export function Mailbox({
     selectedMessage,
     setSelectedMessageId,
 }: MailboxProps) {
-    const { data: currentUser } = useCurrentUser();
-    const isNotLoggedIn = !currentUser && !isLoading;
+    const { data: currentUser, isPending: isPendingCurrentUser } =
+        useCurrentUser();
 
-    if (isNotLoggedIn) {
+    if (!currentUser && !isPendingCurrentUser) {
         return (
             <main className="flex-1">
                 <div className="mx-auto max-w-lg px-4 pt-8">
