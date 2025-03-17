@@ -126,6 +126,10 @@ pub fn get_initial_actions<R: Read + Seek>(
     }
 
     for s in &mut service_packages[..] {
+        s.set_schema(&mut actions)?;
+    }
+
+    for s in &mut service_packages[..] {
         for account in s.get_accounts() {
             if !s.has_service(*account) {
                 actions.push(new_account_action(accounts::SERVICE, *account))

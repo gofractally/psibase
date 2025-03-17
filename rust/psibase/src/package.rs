@@ -317,6 +317,14 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    pub fn set_schema(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if let Some(schema) = &info.schema {
+                actions.push(packages::Wrapper::pack_from(*account).setSchema(schema.clone()))
+            }
+        }
+        Ok(())
+    }
     pub fn has_service(&self, service: AccountNumber) -> bool {
         for (account, _, _) in &self.services {
             if *account == service {
@@ -455,11 +463,6 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        for (service, _, info) in &self.services {
-            if let Some(schema) = &info.schema {
-                actions.push(packages::Wrapper::pack_from(*service).setSchema(schema.clone()))
-            }
-        }
         let manifest = self.manifest();
         let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
         serde_json::to_writer(&mut manifest_encoder, &manifest)?;
@@ -524,6 +527,9 @@ impl<R: Read + Seek> PackagedService<R> {
             let flags = translate_flags(&info.flags)?;
             if flags != 0 {
                 group.push(setcode::Wrapper::pack().setFlags(*account, flags));
+            }
+            if let Some(schema) = &info.schema {
+                group.push(packages::Wrapper::pack_from(*account).setSchema(schema.clone()))
             }
             actions.push(group);
         }
