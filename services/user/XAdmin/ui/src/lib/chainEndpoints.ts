@@ -165,7 +165,7 @@ class Chain {
     }
 
     public pushArrayBufferBoot(buffer: ArrayBufferLike) {
-        return postArrayBufferGetJson("/native/push_boot", buffer);
+        return postArrayBufferGetJson("/native/admin/push_boot", buffer);
     }
 
     public async pushArrayBufferTransaction(buffer: ArrayBufferLike) {
