@@ -303,10 +303,9 @@ export function ComposeDialog({
                                         <AlertDialogDescription>
                                             Chain Mail is for demonstration
                                             purposes only. Messages are not
-                                            currently encrypted and are
-                                            permanently stored on a publicly
-                                            accessible blockchain, visible to
-                                            anyone.
+                                            currently encrypted and are stored
+                                            on a publicly accessible blockchain,
+                                            visible to anyone.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
