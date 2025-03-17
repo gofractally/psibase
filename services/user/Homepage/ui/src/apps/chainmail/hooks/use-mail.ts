@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
+import { useLocalStorage } from "usehooks-ts";
 
 import { supervisor } from "@/supervisor";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 import { Mailbox, Message, RawMessage } from "../types";
 
@@ -167,27 +167,24 @@ const draftMsgAtom = atom<Message["id"]>("");
 export function useDraftMessages() {
     const { data: user } = useCurrentUser();
 
-    const [allDrafts, setDrafts, getDrafts] = useLocalStorage<Message[]>(
-        "drafts",
-        [],
-    );
+    const [allDrafts, setDrafts] = useLocalStorage<Message[]>("drafts", []);
 
     const deleteDraftById = (id: string) => {
-        // using getDrafts() here instead of messages prevents stale closure
-        const data = getDrafts() ?? [];
-        const remainingDrafts = data.filter((d) => d.id !== id);
+        const remainingDrafts = allDrafts.filter((d) => d.id !== id);
         setDrafts(remainingDrafts);
     };
 
-    const drafts = allDrafts?.filter((d) => d.from === user);
+    const userDrafts = allDrafts?.filter((d) => d.from === user);
 
     const [selectedMessageId, setSelectedMessageId] = useAtom(draftMsgAtom);
-    const selectedMessage = drafts?.find((msg) => msg.id === selectedMessageId);
+    const selectedMessage = userDrafts?.find(
+        (msg) => msg.id === selectedMessageId,
+    );
 
     return {
-        drafts,
+        allDrafts,
+        userDrafts,
         setDrafts,
-        getDrafts,
         deleteDraftById,
         selectedMessage,
         setSelectedMessageId,

@@ -6,7 +6,7 @@ import { useDraftMessages } from "@/apps/chainmail/hooks";
 
 export default function DraftsPage() {
     const isDesktop = useMediaQuery("(min-width: 1440px)");
-    const { drafts, selectedMessage, setSelectedMessageId } =
+    const { userDrafts, selectedMessage, setSelectedMessageId } =
         useDraftMessages();
 
     useEffect(() => {
@@ -19,7 +19,7 @@ export default function DraftsPage() {
             <Mailbox
                 isDesktop={isDesktop}
                 mailbox="drafts"
-                messages={drafts ?? []}
+                messages={userDrafts ?? []}
                 isLoading={false}
                 selectedMessage={selectedMessage}
                 setSelectedMessageId={setSelectedMessageId}

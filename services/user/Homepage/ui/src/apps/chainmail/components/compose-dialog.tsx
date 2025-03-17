@@ -77,8 +77,7 @@ export function ComposeDialog({
     const [open, setOpen] = useState(false);
     const isSent = useRef(false);
     const { data: user } = useCurrentUser();
-    const { drafts, setDrafts, getDrafts, deleteDraftById } =
-        useDraftMessages();
+    const { allDrafts, setDrafts, deleteDraftById } = useDraftMessages();
     const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -117,13 +116,11 @@ export function ComposeDialog({
             subject: form.getValues().subject || "subject here",
             body: form.getValues().message ?? "",
         };
-        setDrafts([...(drafts ?? []), draft]);
+        setDrafts([...(allDrafts ?? []), draft]);
     };
 
     const updateDraft = () => {
-        // using getDrafts() here instead of messages prevents stale closure
-        const data = getDrafts() ?? [];
-        let draft = data.find((msg) => msg.id === id.current);
+        let draft = allDrafts.find((msg) => msg.id === id.current);
         if (!draft) {
             createDraft();
         } else {
@@ -131,14 +128,12 @@ export function ComposeDialog({
             draft.to = form.getValues().to ?? "";
             draft.subject = form.getValues().subject ?? "";
             draft.body = form.getValues().message ?? "";
-            setDrafts(data);
+            setDrafts(allDrafts);
         }
     };
 
     const sendMessage = async (values: z.infer<typeof formSchema>) => {
-        // using getDrafts() here instead of messages prevents stale closure
-        const data = getDrafts() ?? [];
-        let draft = data.find((msg) => msg.id === id.current);
+        let draft = allDrafts.find((msg) => msg.id === id.current);
         if (!draft) {
             return console.error("No message found to send");
         }
