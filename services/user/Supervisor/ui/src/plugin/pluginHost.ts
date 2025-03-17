@@ -237,7 +237,7 @@ export class PluginHost implements HostInterface {
         return req_id;
     }
     // Web interface
-    async promptUser(url_path: string): Promise<Result<void, PluginError>> {
+    promptUser(url_path: string): Promise<Result<void, PluginError>> {
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
         // const url = this.self.origin + url_path;
 
