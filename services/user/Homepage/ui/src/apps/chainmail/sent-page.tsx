@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useMediaQuery } from "usehooks-ts";
 
 import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
 import { useSentMessages } from "@/apps/chainmail/hooks";
