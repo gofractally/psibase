@@ -7,7 +7,7 @@ interface api {
 
 interface users {
     use host:common/types.{error};
-    is-permitted: func(caller: string) -> result<_, error>;
+    is-permitted: func(caller: string) -> result<bool, error>;
 }
 
 world imports {
