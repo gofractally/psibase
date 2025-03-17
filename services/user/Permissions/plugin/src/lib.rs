@@ -21,15 +21,21 @@ impl Api for PermissionsPlugin {
 
 impl UsersApi for PermissionsPlugin {
     // --> is_auth_or_prompt()
-    fn is_permitted(caller: String) -> Result<(), Error> {
+    fn is_auth_or_prompt(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
 
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
-            HostClient::prompt_user("fake-redirect-url-path")
+            let _ = HostClient::prompt_user("fake-redirect-url-path");
+            return Ok(AccessGrants::get(&caller, &callee).is_some());
         } else {
-            Ok(())
+            Ok(true)
         }
+    }
+
+    fn is_auth(caller: String) -> Result<bool, Error> {
+        let callee = HostClient::get_sender_app().app.unwrap();
+        Ok(AccessGrants::get(&caller, &callee).is_some())
     }
 }
 
