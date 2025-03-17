@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { siblingUrl } from "@psibase/common-lib";
+import { CurrentAccessRequest } from "../db";
 
 export const App = () => {
     const [hasRequiredQueryParams, setHasRequiredQueryParams] =
         useState<boolean>(false);
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
 
-    useEffect(() => {
+    const initApp = async () => {
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const idParam = urlParams.get("id");
@@ -17,6 +18,11 @@ export const App = () => {
         setHasRequiredQueryParams(requiredQueryParams);
         if (requiredQueryParams) {
             // Set up the iframe URL
+            if (!idParam) {
+                throw new Error("Access Request error: No id provided");
+            }
+            const perms_req = await CurrentAccessRequest.get(idParam);
+            console.error("Unused perms_req:", perms_req);
             const url =
                 siblingUrl(null, "permissions", null, true) +
                 "/permissions.html";
@@ -29,6 +35,9 @@ export const App = () => {
 
             setIframeUrl(newIframeUrl.toString());
         }
+    };
+    useEffect(() => {
+        initApp();
     }, []);
 
     return (

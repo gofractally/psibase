@@ -4,9 +4,12 @@ import {
     QualifiedFunctionCallArgs,
 } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
-import { Supervisor } from "../supervisor";
+import { REDIRECT_ERROR_CODE, Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
+import { PERM_OAUTH_REQ_KEY } from "../db";
+
+import { v4 as uuidv4 } from 'uuid';
 
 interface HttpRequest {
     uri: string;
@@ -211,16 +214,50 @@ export class PluginHost implements HostInterface {
         return this.self.origin;
     }
 
+    setCurrentPermRequest(caller: string, callee: string): Result<string, RecoverableErrorPayload> {
+        let req_id = uuidv4();
+        this.supervisor.supervisorCall({
+            service: "clientdata",
+            intf: "keyvalue",
+            method: "setKey",
+            params: [
+                PERM_OAUTH_REQ_KEY,
+                {
+                    id: req_id,
+                    caller,
+                    callee,
+                    expiry_timestamp: new Date().getUTCSeconds(),
+                }
+            ]} as QualifiedFunctionCallArgs);
+        return req_id
+    }
     // Web interface
-    promptUser(url_path: string): Result<void, PluginError> {
-        let url = this.self.origin;
+    async promptUser(url_path: string): Promise<Result<void, PluginError>> {
         if (!url_path.startsWith("/")) url_path = "/" + url_path;
-        url = url + url_path;
-        window.open(
-            url,
-            "_blank",
-            "popup=true,menubar=false,width=640,height=480,left=100,top=100,location=false,toolbar=false",
-        );
-        throw new Error("id=524");
+        // const url = this.self.origin + url_path;
+
+        // "You're already in the iframe"
+
+        // Rust code from is_permitted() where this formerly lived;
+        // Now it has to store the request details (permissions, /permissions) according to the doc
+        // and then throw the redirect directive back to the app
+        // Task 1: move CurrentAccessRequest code into Supervisor (from Permissions)
+        const senderApp = this.getSenderApp().app;
+        if (!senderApp) {
+            throw Error("No sender app");
+        }
+
+        // TASK: replace this call with a non-encapsulated call to set the thing (use supervisorCall())
+        // let req_id = await CurrentAccessRequest.set(senderApp, url_path);
+        // won't do iframe/plugin boundary
+        // this.supervisor.supervisorCall(...);
+        const req_id = this.setCurrentPermRequest(senderApp, url_path);
+
+        // Tasks 2: how do I throw this error in JS land?
+        // return Err(ErrorType::RequestRedirect(format!("{}", req_id).to_string()).into());
+        const re = this.recoverableError(JSON.stringify({id: req_id}));
+        re.code = REDIRECT_ERROR_CODE;
+        throw re;
+
     }
 }

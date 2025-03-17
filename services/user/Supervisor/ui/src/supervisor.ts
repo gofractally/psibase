@@ -29,7 +29,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
 ];
 
-const REDIRECT_ERROR_CODE = 999999999;
+export const REDIRECT_ERROR_CODE = 999999999;
 interface Account {
     accountNum: string;
     authService: string;
@@ -113,7 +113,7 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    private supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
+    public supervisorCall(callArgs: QualifiedFunctionCallArgs): any {
         let newContext = false;
         if (!this.context) {
             newContext = true;

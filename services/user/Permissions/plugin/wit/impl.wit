@@ -8,19 +8,10 @@ interface types {
     }
 }
 
-interface admin {
-    use host:common/types.{error};
-    use types.{valid-permissions-request};
-
-    get-valid-perm-request: func(id: string) -> result<option<valid-permissions-request>, error>;
-}
-
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
 
-    export types;
     export api;
     export users;
-    export admin;
 }
