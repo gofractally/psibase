@@ -101,6 +101,9 @@ interface client {
     my-service-origin: func() -> string;
     
     prompt-user: func(url-path: string) -> result<_, error>;
+
+    /// Gets the URL of the specified app on the current root domain.
+    get-app-url: func(app: string) -> string;
 }
 
 world imports {

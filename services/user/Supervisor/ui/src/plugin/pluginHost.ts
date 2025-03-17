@@ -2,6 +2,7 @@ import {
     assertTruthy,
     PluginError,
     QualifiedFunctionCallArgs,
+    siblingUrl,
 } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { REDIRECT_ERROR_CODE, Supervisor } from "../supervisor";
@@ -214,6 +215,10 @@ export class PluginHost implements HostInterface {
         return this.self.origin;
     }
 
+    getAppUrl(app: string): string {
+        return `${siblingUrl(null, app)}`;
+    }
+    
     setCurrentPermRequest(caller: string, callee: string): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
         const value = new TextEncoder().encode(
@@ -235,6 +240,7 @@ export class PluginHost implements HostInterface {
                 PERM_OAUTH_REQ_KEY, value]} as QualifiedFunctionCallArgs);
         return req_id
     }
+
     // Web interface
     promptUser(url_path: string): Result<void, PluginError> {
         if (!url_path.startsWith("/")) url_path = "/" + url_path;

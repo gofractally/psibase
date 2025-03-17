@@ -244,9 +244,8 @@ namespace psibase::http
    }
 
    // Returns the host and path for the request. See RFC 9112 § 3.2 and 3.3
-   template <typename Body, typename Allocator>
    std::pair<beast::string_view, beast::string_view> parse_request_target(
-       const bhttp::request<Body, bhttp::basic_fields<Allocator>>& request)
+       const http_session_base::request_type& request)
    {
       auto target = request.target();
       if (target.starts_with('/') || target == "*")
@@ -326,6 +325,7 @@ namespace psibase::http
                    session->do_read();
              });
       }
+      virtual SocketInfo                 info() const override { return HttpSocketInfo{}; }
       std::shared_ptr<http_session_base> session;
       F                                  callback;
       E                                  err;
@@ -814,7 +814,7 @@ namespace psibase::http
                 },
                 [error](const std::string& message)
                 { return error(bhttp::status::internal_server_error, message); });
-            system->sockets->add(socket, &tc.ownedSockets);
+            system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
 
             auto setStatus = psio::finally(
                 [&]

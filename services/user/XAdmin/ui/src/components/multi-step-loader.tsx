@@ -41,35 +41,41 @@ type LoadingState = {
 
 const LoaderCore = ({
     loadingStates,
-    value = 0,
+    completed = 0,
+    started = 0,
 }: {
     loadingStates: LoadingState[];
-    value?: number;
+    completed?: number;
+    started?: number;
 }) => {
     return (
         <div className="relative mx-auto mt-40 flex max-w-xl flex-col justify-start">
             {loadingStates.map((loadingState, index) => {
-                const distance = Math.abs(index - value);
+                const distance = Math.max(
+                    completed - index,
+                    index - started + 1,
+                    0
+                );
                 const opacity = Math.max(1 - distance * 0.2, 0); // Minimum opacity is 0, keep it 0.2 if you're sane.
+                const isPending = index >= completed && index < started;
 
                 return (
                     <motion.div
                         key={index}
                         className={cn("mb-4 flex gap-2 text-left")}
-                        initial={{ opacity: 0, y: -(value * 40) }}
-                        animate={{ opacity: opacity, y: -(value * 40) }}
+                        initial={{ opacity: 0, y: -(completed * 40) }}
+                        animate={{ opacity: opacity, y: -(completed * 40) }}
                         transition={{ duration: 0.5 }}
                     >
                         <div>
-                            {index > value && (
+                            {index >= completed && (
                                 <CheckIcon className="text-primary" />
                             )}
-                            {index <= value && (
+                            {index < completed && (
                                 <CheckFilled
                                     className={cn(
                                         "text-primary",
-                                        value === index &&
-                                            "text-primary opacity-100 "
+                                        isPending && "text-primary opacity-100 "
                                     )}
                                 />
                             )}
@@ -77,7 +83,7 @@ const LoaderCore = ({
                         <span
                             className={cn(
                                 "text-primary ",
-                                value === index && "text-primary opacity-100 "
+                                isPending && "text-primary opacity-100 "
                             )}
                         >
                             {loadingState.text}
@@ -92,9 +98,11 @@ const LoaderCore = ({
 export const MultiStepLoader = ({
     loadingStates,
     loading,
-    currentState,
+    completed,
+    started,
 }: {
-    currentState: number;
+    completed: number;
+    started: number;
     loadingStates: LoadingState[];
     loading?: boolean;
 }) => {
@@ -115,7 +123,8 @@ export const MultiStepLoader = ({
                 >
                     <div className="relative  h-96">
                         <LoaderCore
-                            value={currentState}
+                            completed={completed}
+                            started={started}
                             loadingStates={loadingStates}
                         />
                     </div>

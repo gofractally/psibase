@@ -5,7 +5,18 @@ interface boot {
     type pem = string;
     type tx = list<u8>;
 
-    boot-transactions: func(producer: string, js-packages: list<package-contents>, block-signing-key: option<pem>, tx-signing-key: option<pem>, compression-level: u32) -> result<tuple<list<u8>, list<tx>>, string>;
+    // The result contains:
+    // - packed boot transactions
+    // - list of
+    //   - packed transaction
+    //   - number of labels completed before this transaction
+    //   - number of labels started at or before this transaction
+    // - list of labels
+    //
+    // The labels are used for diplaying progress. While any transaction is
+    // being pushed, labels in the range [completed, started) are in progress.
+    //
+    boot-transactions: func(producer: string, js-packages: list<package-contents>, block-signing-key: option<pem>, tx-signing-key: option<pem>, compression-level: u32) -> result<tuple<list<u8>, list<tuple<tx, u32, u32>>, list<string>>, string>;
 }
 
 interface packages {

@@ -1,0 +1,5 @@
+package kdf:plugin;
+
+world impl {
+    export api;
+}

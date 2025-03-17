@@ -37,5 +37,9 @@ export const client = {
     
     promptUser(url_path) {
         return host.promptUser(url_path)
-    }
+    },
+
+    getAppUrl(app) {
+        return host.getAppUrl(app);
+    },
 };

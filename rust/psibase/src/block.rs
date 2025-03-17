@@ -116,6 +116,8 @@ pub struct SharedGenesisService<'a> {
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
+    Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -159,6 +161,8 @@ pub struct Claim {
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
+    Eq,
 )]
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -187,6 +191,8 @@ impl Tapos {
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
+    Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
@@ -209,6 +215,8 @@ pub struct Transaction {
     Deserialize,
     SimpleObject,
     InputObject,
+    PartialEq,
+    Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]

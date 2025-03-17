@@ -20,7 +20,8 @@ namespace psibase
    static constexpr NativeTableNum consensusChangeTable       = 10;  // subjective
    static constexpr NativeTableNum snapshotTable              = 11;  // subjective
    static constexpr NativeTableNum scheduledSnapshotTable     = 12;  // both
-   static constexpr NativeTableNum logTruncateTable           = 13;
+   static constexpr NativeTableNum logTruncateTable           = 13;  // subjective
+   static constexpr NativeTableNum socketTable                = 14;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -269,6 +270,41 @@ namespace psibase
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> LogTruncateKeyType;
       PSIO_REFLECT(LogTruncateRow, start)
+   };
+
+   struct ProducerMulticastSocketInfo
+   {
+      PSIO_REFLECT(ProducerMulticastSocketInfo)
+      friend bool operator==(const ProducerMulticastSocketInfo&,
+                             const ProducerMulticastSocketInfo&) = default;
+   };
+   struct HttpSocketInfo
+   {
+      PSIO_REFLECT(HttpSocketInfo)
+      friend bool operator==(const HttpSocketInfo&, const HttpSocketInfo&) = default;
+   };
+
+   using SocketInfo = std::variant<ProducerMulticastSocketInfo, HttpSocketInfo>;
+
+   inline auto get_gql_name(SocketInfo*)
+   {
+      return "SocketInfo";
+   }
+
+   using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
+   auto socketPrefix() -> KeyPrefixType;
+   auto socketKey(std::int32_t fd) -> SocketKeyType;
+   struct SocketRow
+   {
+      // Well-known fds
+      static constexpr std::int32_t producer_multicast = 0;
+
+      std::int32_t fd;
+      SocketInfo   info;
+
+      static const auto db = psibase::DbId::nativeSubjective;
+      auto              key() const -> SocketKeyType;
+      PSIO_REFLECT(SocketRow, fd, info)
    };
 
 }  // namespace psibase

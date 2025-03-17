@@ -7,7 +7,7 @@ import { ExecutionTabs } from "./components/ExecutionTabs";
 import { FunctionSelector } from "./components/FunctionSelector";
 import { ParametersSection } from "./components/ParametersSection";
 import { usePluginSchema } from "./hooks/usePluginSchema";
-import { getTypeInfo } from "./utils";
+import { getTypeInfo, camelCase } from "./utils";
 
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
   const [service, setService] = useState("");
@@ -39,7 +39,7 @@ export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {
       const initialValues = selectedFunction.params.reduce(
         (acc, param) => ({
           ...acc,
-          [param.name]: getTypeInfo(param.type, schema).defaultValue,
+          [camelCase(param.name)]: getTypeInfo(param.type, schema).defaultValue,
         }),
         {}
       );

@@ -34,8 +34,17 @@ namespace UserService
          ///   may also used to authenticate the transaction accepting the invite.
          Spki pubkey;
 
+         /// An optional secondary identifier for the invite
+         std::optional<uint32_t> id;
+
          /// The creator of the invite object
          psibase::AccountNumber inviter;
+
+         /// The app responsible for creating the invite
+         std::optional<psibase::AccountNumber> app;
+
+         /// The domain of the app responsible for creating the invite
+         std::optional<std::string> appDomain;
 
          /// The last account to accept or reject the invite
          psibase::AccountNumber actor;
@@ -53,11 +62,25 @@ namespace UserService
          ///  - rejected (2)
          uint8_t state;
 
-         auto secondary() const { return std::tie(inviter, pubkey); }
+         /// Encrypted invite secret
+         std::optional<std::string> secret;
+
+         auto byInviter() const { return std::tie(inviter, pubkey); }
+         auto byId() const { return std::tie(id, pubkey); }
       };
-      PSIO_REFLECT(InviteRecord, pubkey, inviter, actor, expiry, newAccountToken, state);
-      using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::secondary>;
+      PSIO_REFLECT(InviteRecord,
+                   pubkey,
+                   id,
+                   inviter,
+                   app,
+                   appDomain,
+                   actor,
+                   expiry,
+                   newAccountToken,
+                   state,
+                   secret);
+      using InviteTable = psibase::
+          Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::byInviter, &InviteRecord::byId>;
 
       struct NewAccountRecord
       {
