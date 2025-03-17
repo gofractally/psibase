@@ -56,7 +56,6 @@ const shouldHandleMessage = (message: MessageEvent) => {
     const isSameRootDomain = message.origin.endsWith(urlSuffix);
 
     const shouldRespond = (isTop || isTopSupervisor) && isParent && isSameRootDomain;
-    console.log("Supervisor shouldRespond: ", shouldRespond);
     if (!shouldRespond) {
         console.error("Supervisor rejected postMessage()");
     }

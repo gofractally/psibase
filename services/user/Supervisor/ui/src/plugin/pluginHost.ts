@@ -8,9 +8,9 @@ import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { REDIRECT_ERROR_CODE, Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
-import { PERM_OAUTH_REQ_KEY } from "../db";
 
 import { v4 as uuidv4 } from 'uuid';
+import { PERM_OAUTH_REQ_KEY } from "../constants";
 
 interface HttpRequest {
     uri: string;
