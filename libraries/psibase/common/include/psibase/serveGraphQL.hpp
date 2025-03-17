@@ -1026,12 +1026,6 @@ namespace psibase
    class EventQuery
    {
      public:
-      struct SqlRow
-      {
-         uint64_t rowid;
-         T        data;
-      };
-
       /// Create a new query for the given table
       explicit EventQuery(std::string table_name) : _table_name(std::format("\"{}\"", table_name))
       {
@@ -1180,6 +1174,12 @@ namespace psibase
       }
 
      private:
+      struct SqlRow
+      {
+         uint64_t rowid;
+         T        data;
+      };
+
       bool has_row_after(const std::string& cursor) const
       {
          auto next_query = generate_sql_query(1, false, std::nullopt, cursor);
