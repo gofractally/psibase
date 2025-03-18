@@ -36,5 +36,6 @@ export const zRawMessage = z.object({
 });
 
 export type Mailbox = z.infer<typeof zMailbox>;
+export type QueryableMailbox = Exclude<Mailbox, "drafts">;
 export type Message = z.infer<typeof zMessage>;
 export type RawMessage = z.infer<typeof zRawMessage>;

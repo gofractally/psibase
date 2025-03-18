@@ -60,6 +60,9 @@ export function MessageDetail({
                 "Archiving sent messages is currently not supported.",
             );
         }
+
+        const loadingId = toast.loading("Archiving message");
+
         try {
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
@@ -74,6 +77,8 @@ export function MessageDetail({
             invalidateMailboxQueries();
         } catch (error) {
             toast.error("There was a problem archiving this message.");
+        } finally {
+            toast.dismiss(loadingId);
         }
     };
 
@@ -87,6 +92,9 @@ export function MessageDetail({
                 "Saving sent messages is currently not supported.",
             );
         }
+
+        const loadingId = toast.loading("Saving message");
+
         try {
             await supervisor.functionCall({
                 service: "chainmail",
@@ -99,6 +107,8 @@ export function MessageDetail({
             invalidateMailboxQueries();
         } catch (error) {
             toast.error("There was a problem. Your message was not saved.");
+        } finally {
+            toast.dismiss(loadingId);
         }
     };
 

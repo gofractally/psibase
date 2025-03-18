@@ -6,8 +6,9 @@ import { useLocalStorage } from "usehooks-ts";
 import { supervisor } from "@/supervisor";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import QueryKey from "@/lib/queryKeys";
 
-import { Mailbox, Message, RawMessage } from "../types";
+import { Message, QueryableMailbox, RawMessage } from "../types";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -21,7 +22,7 @@ const transformRawMessagesToMessages = (
     return rawMessages.reverse().map(
         (msg, i) =>
             ({
-                id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.body}`,
+                id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.datetime}`,
                 msgId: msg.msgId,
                 from: msg.sender,
                 to: msg.receiver,
@@ -51,7 +52,7 @@ const incomingMsgAtom = atom<Message["id"]>("");
 export function useIncomingMessages() {
     const { data: user } = useCurrentUser();
     const query = useQuery({
-        queryKey: ["inbox", user],
+        queryKey: QueryKey.mailbox("inbox", user!),
         queryFn: () => getIncomingMessages(user!),
         enabled: Boolean(user),
     });
@@ -82,7 +83,7 @@ const archivedMsgAtom = atom<Message["id"]>("");
 export function useArchivedMessages() {
     const { data: user } = useCurrentUser();
     const query = useQuery({
-        queryKey: ["archived", user],
+        queryKey: QueryKey.mailbox("archived", user!),
         queryFn: () => getArchivedMessages(user!),
         enabled: Boolean(user),
     });
@@ -114,7 +115,7 @@ const savedMsgAtom = atom<Message["id"]>("");
 export function useSavedMessages() {
     const { data: user } = useCurrentUser();
     const query = useQuery({
-        queryKey: ["saved", user],
+        queryKey: QueryKey.mailbox("saved", user!),
         queryFn: () => getSavedMessages(user!),
         enabled: Boolean(user),
     });
@@ -146,7 +147,7 @@ const sentMsgAtom = atom<Message["id"]>("");
 export function useSentMessages() {
     const { data: user } = useCurrentUser();
     const query = useQuery({
-        queryKey: ["sent", user],
+        queryKey: QueryKey.mailbox("sent", user!),
         queryFn: () => getSentMessages(user!),
         enabled: Boolean(user),
     });
@@ -195,18 +196,13 @@ export const useInvalidateMailboxQueries = () => {
     const queryClient = useQueryClient();
     const { data: user } = useCurrentUser();
 
+    const all = ["inbox", "archived", "sent", "saved"] as QueryableMailbox[];
     const invalidate = useCallback(
-        (
-            mailboxes: Omit<Mailbox, "drafts">[] = [
-                "inbox",
-                "archived",
-                "sent",
-                "saved",
-            ],
-        ) => {
+        (mailboxes = all) => {
+            if (!user) return;
             mailboxes.forEach((mailbox) => {
                 queryClient.invalidateQueries({
-                    queryKey: [mailbox, user],
+                    queryKey: QueryKey.mailbox(mailbox, user),
                 });
             });
         },

@@ -139,6 +139,8 @@ export function ComposeDialog({
             return console.error("No message found to send");
         }
 
+        const loadingId = toast.loading("Sending message");
+
         try {
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
             await supervisor.functionCall({
@@ -156,6 +158,8 @@ export function ComposeDialog({
         } catch (e: unknown) {
             toast.error(`${(e as SupervisorError).message}`);
             console.error(`${(e as SupervisorError).message}`);
+        } finally {
+            toast.dismiss(loadingId);
         }
     };
 
