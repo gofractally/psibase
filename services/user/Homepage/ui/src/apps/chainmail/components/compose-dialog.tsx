@@ -49,6 +49,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 
+import { zMessage } from "@/apps/chainmail/types";
+
 import {
     useDraftMessages,
     useInvalidateMailboxQueries,
@@ -103,7 +105,7 @@ export function ComposeDialog({
 
     const createDraft = () => {
         if (!id.current || !user) return;
-        const draft: Message = {
+        const draft = zMessage.parse({
             id: id.current,
             msgId: id.current,
             from: user,
@@ -116,7 +118,7 @@ export function ComposeDialog({
             inReplyTo: null,
             subject: form.getValues().subject || "subject here",
             body: form.getValues().message ?? "",
-        };
+        });
         setDrafts([...(allDrafts ?? []), draft]);
     };
 

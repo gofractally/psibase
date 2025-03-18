@@ -1,3 +1,5 @@
+import type { Message, QueryableMailbox, RawMessage } from "../types";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
@@ -10,7 +12,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import QueryKey from "@/lib/queryKeys";
 
 import { zSendMessageSchema } from "../components/compose-dialog";
-import { Message, QueryableMailbox, RawMessage } from "../types";
+import { zMailbox, zRawMessage } from "../types";
 
 const composeAtom = atom(false);
 export function useCompose() {
@@ -22,7 +24,7 @@ const transformRawMessagesToMessages = (
     currentUser: string,
 ) => {
     return rawMessages.reverse().map(
-        (msg, i) =>
+        (msg) =>
             ({
                 id: `${msg.sender}-${msg.receiver}-${msg.subject}-${msg.datetime}`,
                 msgId: msg.msgId,
@@ -41,12 +43,14 @@ const transformRawMessagesToMessages = (
 };
 
 const getIncomingMessages = async (account: string) => {
-    let rawMessages = (await supervisor.functionCall({
-        service: "chainmail",
-        intf: "queries",
-        method: "getMsgs",
-        params: [, account],
-    })) as RawMessage[];
+    let rawMessages = zRawMessage.array().parse(
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "queries",
+            method: "getMsgs",
+            params: [, account],
+        }),
+    );
     return transformRawMessagesToMessages(rawMessages, account);
 };
 
@@ -72,12 +76,14 @@ export function useIncomingMessages() {
 }
 
 const getArchivedMessages = async (account: string) => {
-    let rawMessages = (await supervisor.functionCall({
-        service: "chainmail",
-        intf: "queries",
-        method: "getArchivedMsgs",
-        params: [, account],
-    })) as RawMessage[];
+    let rawMessages = zRawMessage.array().parse(
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "queries",
+            method: "getArchivedMsgs",
+            params: [, account],
+        }),
+    );
     return transformRawMessagesToMessages(rawMessages, account);
 };
 
@@ -103,12 +109,14 @@ export function useArchivedMessages() {
 }
 
 const getSavedMessages = async (account: string) => {
-    let rawMessages = (await supervisor.functionCall({
-        service: "chainmail",
-        intf: "queries",
-        method: "getSavedMsgs",
-        params: [account],
-    })) as RawMessage[];
+    let rawMessages = zRawMessage.array().parse(
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "queries",
+            method: "getSavedMsgs",
+            params: [account],
+        }),
+    );
 
     return transformRawMessagesToMessages(rawMessages, account);
 };
@@ -135,12 +143,14 @@ export function useSavedMessages() {
 }
 
 const getSentMessages = async (account: string) => {
-    let rawMessages = (await supervisor.functionCall({
-        service: "chainmail",
-        intf: "queries",
-        method: "getMsgs",
-        params: [account],
-    })) as RawMessage[];
+    let rawMessages = zRawMessage.array().parse(
+        await supervisor.functionCall({
+            service: "chainmail",
+            intf: "queries",
+            method: "getMsgs",
+            params: [account],
+        }),
+    );
 
     return transformRawMessagesToMessages(rawMessages, account);
 };
@@ -198,7 +208,13 @@ export const useInvalidateMailboxQueries = () => {
     const queryClient = useQueryClient();
     const { data: user } = useCurrentUser();
 
-    const all = ["inbox", "archived", "sent", "saved"] as QueryableMailbox[];
+    const all = [
+        zMailbox.Values.inbox,
+        zMailbox.Values.archived,
+        zMailbox.Values.sent,
+        zMailbox.Values.saved,
+    ] as QueryableMailbox[];
+
     const invalidate = useCallback(
         (mailboxes = all) => {
             if (!user) return;
