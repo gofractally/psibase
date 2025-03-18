@@ -1,7 +1,5 @@
 use psibase::plugin_error;
 
-// const REDIRECT_ERROR_CODE: u32 = 999999999;
-
 plugin_error! {
     pub ErrorType
     QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",

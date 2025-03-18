@@ -107,9 +107,8 @@ export class Supervisor implements AppInterface {
 
     private replyToParent(id: string, result: any) {
         assertTruthy(this.parentOrigination, "Unknown reply target");
-        const b = buildFunctionCallResponse(id, result);
         window.parent.postMessage(
-            b,
+            buildFunctionCallResponse(id, result),
             this.parentOrigination.origin,
         );
     }
@@ -245,27 +244,7 @@ export class Supervisor implements AppInterface {
         let ret: any;
         try {
             ret = p.plugin.call(intf, method, params);
-        } 
-        // catch(e: any) {
-        //     if (e.payload && e.payload.code === REDIRECT_ERROR_CODE) {
-        //         const dataObj = JSON.parse(e.payload.message);
-                
-        //         // Create a RedirectError with the merged payload
-        //         console.log("Constructing RedirectError");
-        //         const redirectError = new RedirectError(
-        //             e.message || "Redirect",
-        //             {
-        //                 ...e.payload,
-        //                 ...dataObj,
-        //             }
-        //         // )
-                
-        //         throw redirectError;
-        //     } else {
-        //         throw e;
-        //     }
-        // }
-        finally {
+        } finally {
             this.context.stack.pop();
         }
 
@@ -317,17 +296,21 @@ export class Supervisor implements AppInterface {
                     plugin: args.plugin,
                 },
             ]);
+
             this.context = new CallContext();
+
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.
             assertTruthy(
                 this.parentOrigination,
                 "Parent origination corrupted",
             );
+
             // Starts the tx context.
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
+
             const result = this.call(this.parentOrigination, args);
 
             // Closes the current tx context. If actions were added, tx is submitted.

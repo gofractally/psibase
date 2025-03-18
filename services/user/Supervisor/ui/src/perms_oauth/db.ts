@@ -1,7 +1,3 @@
-// // Task 3: implement get_valid_perm_request() here in JS/Supervisor territory (was in Permissions.plugin)
-// use chrono::Utc;
-// use uuid::Uuid;
-// import { v4 as uuidv4 } from 'uuid';
 import { Result } from '../hostInterface';
 import { RecoverableErrorPayload } from '../plugin/errors';
 import { PERM_OAUTH_REQ_KEY, PERM_REQUEST_EXPIRATION } from '../constants';
@@ -19,7 +15,6 @@ export interface ValidPermissionRequest {
 }
 
 export class CurrentAccessRequest {
-
     static async get(id: string): Promise<Result<ValidPermissionRequest, RecoverableErrorPayload>> {
         const perms_req_bytes = await supervisor.functionCall({
             service: "clientdata",
@@ -55,13 +50,4 @@ export class CurrentAccessRequest {
             method: "delete",
             params: [PERM_OAUTH_REQ_KEY]});
     }
-
-    // Came from admin .wit interface
-    static async get_valid_perm_request(id: string): Promise<Result<ValidPermissionRequest, RecoverableErrorPayload>> {
-        // TODO: verify_caller_is_this_app()?;
-        let valid_perm_req = await CurrentAccessRequest.get(id); // , &caller, &callee)?;
-        CurrentAccessRequest.delete();
-        return valid_perm_req;
-    }
-
 }

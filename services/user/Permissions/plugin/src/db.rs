@@ -1,26 +1,4 @@
-use crate::bindings;
-
-use serde::{Deserialize, Serialize};
-
-use psibase::fracpack::{Pack, Unpack};
-use psibase::TimePointSec;
-
-use bindings::clientdata::plugin::keyvalue as Keyvalue;
-
-#[derive(Serialize, Deserialize, Debug, Pack, Unpack)]
-struct PermissionRequest {
-    id: String,
-    caller: String,
-    callee: String,
-    expiry_timestamp: TimePointSec,
-}
-
-#[derive(Serialize, Deserialize, Debug, Pack, Unpack)]
-pub struct ValidPermissionRequest {
-    pub id: String,
-    pub caller: String,
-    pub callee: String,
-}
+use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 
 pub struct AccessGrants;
 
