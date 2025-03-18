@@ -1,11 +1,10 @@
 import { useEffect } from "react";
-import { useMediaQuery } from "usehooks-ts";
 
 import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
-import { useSentMessages } from "@/apps/chainmail/hooks";
+import { useIsDesktop, useSentMessages } from "@/apps/chainmail/hooks";
 
 export default function SentPage() {
-    const isDesktop = useMediaQuery("(min-width: 1440px)");
+    const isDesktop = useIsDesktop();
     const { query, selectedMessage, setSelectedMessageId } = useSentMessages();
 
     useEffect(() => {

@@ -14,6 +14,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { AwaitTime } from "@/globals";
 import { wait } from "@/lib/wait";
 
 import {
@@ -69,7 +70,7 @@ export function MessageDetail({
             });
             setInboxMessageId("");
             toast.success("Your message has been archived");
-            await wait(3000);
+            await wait(AwaitTime);
             invalidateMailboxQueries();
         } catch (error) {
             toast.error("There was a problem archiving this message.");
@@ -94,7 +95,7 @@ export function MessageDetail({
                 params: [parseInt(message.msgId)],
             });
             toast.success("This message will be kept");
-            await wait(3000);
+            await wait(AwaitTime);
             invalidateMailboxQueries();
         } catch (error) {
             toast.error("There was a problem. Your message was not saved.");
@@ -202,7 +203,7 @@ export function MessageDetail({
                         )}
                     </div>
 
-                    <article className="prose dark:prose-invert max-w-none">
+                    <article className="prose max-w-none dark:prose-invert">
                         {message.body.split("\n\n").map((paragraph, i) => (
                             <p key={i}>{paragraph}</p>
                         ))}

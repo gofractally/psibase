@@ -46,6 +46,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { AwaitTime } from "@/globals";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
@@ -161,7 +162,7 @@ export function ComposeDialog({
     async function onSubmit(values: z.infer<typeof formSchema>) {
         toast("Sending...");
         await sendMessage(values);
-        await wait(3000);
+        await wait(AwaitTime);
         invalidateMailboxQueries(["sent"]);
     }
 
