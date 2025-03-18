@@ -2,44 +2,32 @@
 // use chrono::Utc;
 // use uuid::Uuid;
 // import { v4 as uuidv4 } from 'uuid';
-import { supervisor } from './perms_oauth/main';
-import { Result } from './hostInterface';
-import { RecoverableErrorPayload } from './plugin/errors';
-import { PERM_OAUTH_REQ_KEY, PERM_REQUEST_EXPIRATION } from './constants';
+import { Result } from '../hostInterface';
+import { RecoverableErrorPayload } from '../plugin/errors';
+import { PERM_OAUTH_REQ_KEY, PERM_REQUEST_EXPIRATION } from '../constants';
+import { getSupervisor } from "@psibase/common-lib";
 
-interface ValidPermissionRequest {
+export const supervisor = getSupervisor();
+export interface ValidPermissionRequest {
     id: string,
-    caller: string,
-    callee: string,
+    permsUrlPath: string,
+    returnUrlPath: string,
+    payload: {
+        caller: string,
+        callee: string,
+    }
 }
 
 export class CurrentAccessRequest {
 
-    // static async set(caller: string, callee: string): Promise<Result<string, RecoverableErrorPayload>> {
-    //     let req_id = uuidv4();
-    //     await supervisor.functionCall({
-    //         service: "clientdata",
-    //         intf: "keyvalue",
-    //         method: "setKey",
-    //         params: [
-    //             PERM_OAUTH_REQ_KEY,
-    //             {
-    //                 id: req_id,
-    //                 caller,
-    //                 callee,
-    //                 expiry_timestamp: new Date().getUTCSeconds(),
-    //             }
-    //         ]});
-    //     return req_id
-    // }
-
     static async get(id: string): Promise<Result<ValidPermissionRequest, RecoverableErrorPayload>> {
-        const perms_req = await supervisor.functionCall({
+        const perms_req_bytes = await supervisor.functionCall({
             service: "clientdata",
             intf: "keyvalue",
-            method: "getKey",
+            method: "get",
             params: [PERM_OAUTH_REQ_KEY]});
 
+        const perms_req = JSON.parse(new TextDecoder().decode(perms_req_bytes));
         if (perms_req) {
             let is_expired = (new Date().getUTCSeconds()
                 - perms_req.expiry_timestamp.seconds)
@@ -48,9 +36,13 @@ export class CurrentAccessRequest {
             if (!is_expired && id == perms_req.id) {
                 return {
                     id: perms_req.id,
-                    caller: perms_req.caller,
-                    callee: perms_req.callee,
-                };
+                    permsUrlPath: perms_req.permsUrlPath,
+                    returnUrlPath: perms_req.returnUrlPath,
+                    payload: {
+                        caller: perms_req.payload.caller,
+                        callee: perms_req.payload.callee,
+                    }
+                } as ValidPermissionRequest;
             }
         }
         return perms_req;
@@ -60,14 +52,13 @@ export class CurrentAccessRequest {
         await supervisor.functionCall({
             service: "clientdata",
             intf: "keyvalue",
-            method: "deleteKey",
+            method: "delete",
             params: [PERM_OAUTH_REQ_KEY]});
-
     }
 
     // Came from admin .wit interface
     static async get_valid_perm_request(id: string): Promise<Result<ValidPermissionRequest, RecoverableErrorPayload>> {
-        // verify_caller_is_this_app()?;
+        // TODO: verify_caller_is_this_app()?;
         let valid_perm_req = await CurrentAccessRequest.get(id); // , &caller, &callee)?;
         CurrentAccessRequest.delete();
         return valid_perm_req;

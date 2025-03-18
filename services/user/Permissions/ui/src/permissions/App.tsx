@@ -20,62 +20,32 @@ export const App = () => {
             await supervisor.onLoaded();
 
             const qps = getQueryParams();
+            const payload = JSON.parse(decodeURIComponent(qps.payload));
             setParams(qps);
 
-            try {
-                // translate id to caller/callee
-                const validRequest = await supervisor.functionCall({
-                    service: thisServiceName,
-                    intf: "admin",
-                    method: "getValidPermRequest",
-                    params: [qps.id],
-                });
-                console.info("perm ui.validRequest: ", validRequest);
-
-                return validRequest;
-            } catch (e) {
-                console.error("Error: ", e);
-                return {};
-            }
+            return payload;
         },
     });
 
     const followReturnRedirect = async () => {
-        let retUrl = decodeURIComponent(params.returnUrlPath);
+        let retUrl = validPermRequest?.returnUrlPath;
 
-        try {
-            // Method 1: Try window.top navigation
-
-            const url =
-                siblingUrl(null, validPermRequest.caller, null, true) +
-                "/" +
-                retUrl;
-            console.log("followReturnRedirect().retUrl: ", url);
-            if (window.top) {
-                window.top.location.href = url;
-            }
-        } catch (e) {
-            console.log("Top navigation failed, trying other methods...");
+        const redirectPath = retUrl ? "/" + retUrl : "";
+        const url =
+            siblingUrl(null, validPermRequest?.caller, null, true) +
+            redirectPath;
+        if (window.top) {
+            window.top.location.href = url;
         }
-
-        // try {
-        //     console.log("Method 2");
-        //     // Method 2: Try parent window navigation
-        //     if (window.parent) {
-        //         window.parent.location.href = retUrl;
-        //     }
-        // } catch (e) {
-        //     console.log("Parent navigation failed, trying other methods...");
-        // }
     };
 
-    const accept = async () => {
+    const approve = async () => {
         try {
             await supervisor.functionCall({
                 service: thisServiceName,
                 intf: "api",
                 method: "savePermission",
-                params: [validPermRequest.caller, validPermRequest.callee],
+                params: [validPermRequest?.caller, validPermRequest?.callee],
             });
         } catch (e) {
             console.error("error saving permission: ", e);
@@ -103,14 +73,18 @@ export const App = () => {
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <h2 style={{ textAlign: "center" }}>Grant access?</h2>
             {!!validPermRequest ? (
-                <p>
-                    {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
-                </p>
+                <>
+                    <p>
+                        {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
+                    </p>
+                    <div className="flex justify-center gap-4">
+                        <Button onClick={approve}>Approve</Button>
+                        <Button onClick={deny}>Deny</Button>
+                    </div>
+                </>
             ) : (
                 <div>Forged request detected.</div>
             )}
-            <Button onClick={accept}>Accept</Button>
-            <Button onClick={deny}>Deny</Button>
         </div>
     );
 };

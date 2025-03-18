@@ -34,9 +34,13 @@ export const client = {
     myServiceOrigin() {
         return host.myServiceOrigin();
     },
-    
-    promptUser(url_path) {
-        return host.promptUser(url_path)
+
+    getCurrentPermRequest(id) {
+        return host.getCurrentPermRequest(id);
+    },
+
+    promptUser(caller, permsUrlPath, returnUrlPath) {
+        return host.promptUser(caller, permsUrlPath, returnUrlPath);
     },
 
     getAppUrl(app) {
