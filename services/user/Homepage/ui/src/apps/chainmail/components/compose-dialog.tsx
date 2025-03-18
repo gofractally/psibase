@@ -3,8 +3,8 @@ import type { PluginId } from "@psibase/common-lib";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import { type UseFormReturn, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -64,8 +64,8 @@ interface SupervisorError {
 
 const formSchema = z.object({
     to: Account,
-    subject: z.string(),
-    message: z.string(),
+    subject: z.string().min(1),
+    message: z.string().min(1),
 });
 
 export function ComposeDialog({
@@ -133,7 +133,7 @@ export function ComposeDialog({
         }
     };
 
-    const sendMessage = async (values: z.infer<typeof formSchema>) => {
+    const sendMessage = async () => {
         let draft = allDrafts.find((msg) => msg.id === id.current);
         if (!draft) {
             return console.error("No message found to send");
@@ -163,9 +163,9 @@ export function ComposeDialog({
         }
     };
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit() {
         toast("Sending...");
-        await sendMessage(values);
+        await sendMessage();
         await wait(AwaitTime);
         invalidateMailboxQueries(["sent"]);
     }
@@ -290,10 +290,7 @@ export function ComposeDialog({
                             </Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <Button className="w-full sm:w-auto">
-                                        <Send className="mr-2 h-4 w-4" />
-                                        Send Message
-                                    </Button>
+                                    <SendTriggerButton formReturn={form} />
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -313,11 +310,9 @@ export function ComposeDialog({
                                             Cancel
                                         </AlertDialogCancel>
                                         <AlertDialogAction
-                                            onClick={async () => {
-                                                await form.trigger();
-                                                if (form.formState.isValid)
-                                                    onSubmit(form.getValues());
-                                            }}
+                                            onClick={form.handleSubmit(
+                                                onSubmit,
+                                            )}
                                         >
                                             Send
                                         </AlertDialogAction>
@@ -333,6 +328,35 @@ export function ComposeDialog({
 }
 
 export default ComposeDialog;
+
+interface SendTriggerButtonProps extends ButtonProps {
+    formReturn: UseFormReturn<z.infer<typeof formSchema>>;
+}
+
+const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
+    (props, ref) => {
+        const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+            props.formReturn.trigger();
+            if (props.formReturn.formState.isValid) {
+                props.onClick?.(e);
+            }
+        };
+
+        return (
+            <Button
+                className="w-full sm:w-auto"
+                {...props}
+                ref={ref}
+                onClick={onClick}
+            >
+                <Send className="mr-2 h-4 w-4" />
+                Send Message
+            </Button>
+        );
+    },
+);
+
+SendTriggerButton.displayName = "SendTriggerButton";
 
 export const ComposeDialogTrigger = ({
     disabled = false,
