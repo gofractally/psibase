@@ -1,4 +1,4 @@
-import type { Mailbox as MailboxType, Message } from "../types";
+import type { DraftMessage, Mailbox as MailboxType, Message } from "../types";
 
 import {
     ResizableHandle,
@@ -22,9 +22,9 @@ import {
 interface MailboxProps {
     isDesktop: boolean;
     mailbox: MailboxType;
-    messages: Message[];
+    messages: Message[] | DraftMessage[];
     isLoading: boolean;
-    selectedMessage?: Message;
+    selectedMessage?: Message | DraftMessage;
     setSelectedMessageId: (id: string) => void;
 }
 

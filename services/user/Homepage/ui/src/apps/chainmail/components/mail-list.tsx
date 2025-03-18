@@ -1,4 +1,4 @@
-import type { Mailbox, Message } from "@/apps/chainmail/types";
+import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,12 +7,12 @@ import { formatDistanceToNow } from "@/apps/chainmail/utils";
 
 interface SharedProps {
     mailbox: Mailbox;
-    selectedMessage?: Message;
+    selectedMessage?: Message | DraftMessage;
     onSelectMessage: (id: string) => void;
 }
 
 export interface MailListProps extends SharedProps {
-    messages: Message[];
+    messages: Message[] | DraftMessage[];
 }
 
 export function MailList({

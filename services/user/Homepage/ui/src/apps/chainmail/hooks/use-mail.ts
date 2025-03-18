@@ -1,4 +1,9 @@
-import type { Message, QueryableMailbox, RawMessage } from "../types";
+import type {
+    DraftMessage,
+    Message,
+    QueryableMailbox,
+    RawMessage,
+} from "../types";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { atom, useAtom } from "jotai";
@@ -176,11 +181,14 @@ export function useSentMessages() {
     };
 }
 
-const draftMsgAtom = atom<Message["id"]>("");
+const draftMsgAtom = atom<DraftMessage["id"]>("");
 export function useDraftMessages() {
     const { data: user } = useCurrentUser();
 
-    const [allDrafts, setDrafts] = useLocalStorage<Message[]>("drafts", []);
+    const [allDrafts, setDrafts] = useLocalStorage<DraftMessage[]>(
+        "drafts",
+        [],
+    );
 
     const deleteDraftById = (id: string) => {
         const remainingDrafts = allDrafts.filter((d) => d.id !== id);
@@ -245,9 +253,9 @@ export const useSendMessage = () => {
 };
 
 export const useArchiveMessage = () => {
-    return useMutation<void, Error, string | number>({
+    return useMutation<void, Error, string | number | bigint>({
         mutationFn: async (id) => {
-            const messageId = z.coerce.number().parse(id);
+            const messageId = z.coerce.bigint().parse(id);
             await supervisor.functionCall({
                 service: "chainmail",
                 intf: "api",
@@ -259,9 +267,9 @@ export const useArchiveMessage = () => {
 };
 
 export const useSaveMessage = () => {
-    return useMutation<void, Error, string | number>({
+    return useMutation<void, Error, string | number | bigint>({
         mutationFn: async (id) => {
-            const messageId = z.coerce.number().parse(id);
+            const messageId = z.coerce.bigint().parse(id);
             await supervisor.functionCall({
                 service: "chainmail",
                 intf: "api",

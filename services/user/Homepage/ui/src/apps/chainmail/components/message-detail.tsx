@@ -1,4 +1,4 @@
-import type { Mailbox, Message } from "@/apps/chainmail/types";
+import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ import {
 } from "./compose-dialog";
 
 interface MessageDetailProps {
-    message: Message | null;
+    message: Message | DraftMessage | null;
     mailbox: Mailbox;
     onBack?: () => void;
 }

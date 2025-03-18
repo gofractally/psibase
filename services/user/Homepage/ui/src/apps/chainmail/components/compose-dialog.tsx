@@ -1,4 +1,4 @@
-import type { Message } from "@/apps/chainmail/types";
+import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,7 +49,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 
-import { zMessage } from "@/apps/chainmail/types";
+import { zDraftMessage } from "@/apps/chainmail/types";
 
 import {
     useDraftMessages,
@@ -74,7 +74,7 @@ export function ComposeDialog({
     message,
 }: {
     trigger: React.ReactNode;
-    message?: Message;
+    message?: Message | DraftMessage;
 }) {
     const [open, setOpen] = useState(false);
     const isSent = useRef(false);
@@ -105,9 +105,8 @@ export function ComposeDialog({
 
     const createDraft = () => {
         if (!id.current || !user) return;
-        const draft = zMessage.parse({
+        const draft = zDraftMessage.parse({
             id: id.current,
-            msgId: id.current,
             from: user,
             to: form.getValues().to || "recipient",
             datetime: Date.now(),
