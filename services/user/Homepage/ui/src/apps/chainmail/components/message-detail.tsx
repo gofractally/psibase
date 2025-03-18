@@ -3,8 +3,6 @@ import type { Mailbox, Message } from "@/apps/chainmail/types";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { supervisor } from "@/supervisor";
-
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,9 +16,11 @@ import { AwaitTime } from "@/globals";
 import { wait } from "@/lib/wait";
 
 import {
+    useArchiveMessage,
     useDraftMessages,
     useIncomingMessages,
     useInvalidateMailboxQueries,
+    useSaveMessage,
 } from "@/apps/chainmail/hooks";
 import { formatDate } from "@/apps/chainmail/utils";
 
@@ -53,6 +53,8 @@ export function MessageDetail({
         setSelectedMessageId: setDraftMessageId,
         deleteDraftById,
     } = useDraftMessages();
+    const { mutateAsync: archiveMessage } = useArchiveMessage();
+    const { mutateAsync: saveMessage } = useSaveMessage();
 
     const onArchive = async (message: Message) => {
         if (message.type === "outgoing") {
@@ -65,12 +67,7 @@ export function MessageDetail({
 
         try {
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "archive",
-                params: [parseInt(message.msgId)],
-            });
+            await archiveMessage(message.msgId);
             setInboxMessageId("");
             toast.success("Your message has been archived");
             await wait(AwaitTime);
@@ -96,12 +93,7 @@ export function MessageDetail({
         const loadingId = toast.loading("Saving message");
 
         try {
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "save",
-                params: [parseInt(message.msgId)],
-            });
+            await saveMessage(message.msgId);
             toast.success("This message will be kept");
             await wait(AwaitTime);
             invalidateMailboxQueries();

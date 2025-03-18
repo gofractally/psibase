@@ -1,13 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import QueryKey from "@/lib/queryKeys";
 
+import { zSendMessageSchema } from "../components/compose-dialog";
 import { Message, QueryableMailbox, RawMessage } from "../types";
 
 const composeAtom = atom(false);
@@ -210,4 +212,46 @@ export const useInvalidateMailboxQueries = () => {
     );
 
     return invalidate;
+};
+
+export const useSendMessage = () => {
+    return useMutation<void, Error, z.infer<typeof zSendMessageSchema>>({
+        mutationFn: async (vars) => {
+            const { to, subject, message } = zSendMessageSchema.parse(vars);
+            await supervisor.functionCall({
+                service: "chainmail",
+                intf: "api",
+                method: "send",
+                params: [to, subject, message],
+            });
+        },
+    });
+};
+
+export const useArchiveMessage = () => {
+    return useMutation<void, Error, string | number>({
+        mutationFn: async (id) => {
+            const messageId = z.coerce.number().parse(id);
+            await supervisor.functionCall({
+                service: "chainmail",
+                intf: "api",
+                method: "archive",
+                params: [messageId],
+            });
+        },
+    });
+};
+
+export const useSaveMessage = () => {
+    return useMutation<void, Error, string | number>({
+        mutationFn: async (id) => {
+            const messageId = z.coerce.number().parse(id);
+            await supervisor.functionCall({
+                service: "chainmail",
+                intf: "api",
+                method: "save",
+                params: [messageId],
+            });
+        },
+    });
 };

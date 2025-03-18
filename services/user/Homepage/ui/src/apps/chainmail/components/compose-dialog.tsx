@@ -8,8 +8,6 @@ import { type UseFormReturn, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import {
     AlertDialog,
     AlertDialogAction,
@@ -54,6 +52,7 @@ import { Account } from "@/lib/zod/Account";
 import {
     useDraftMessages,
     useInvalidateMailboxQueries,
+    useSendMessage,
 } from "../hooks/use-mail";
 
 interface SupervisorError {
@@ -62,7 +61,7 @@ interface SupervisorError {
     message: string;
 }
 
-const formSchema = z.object({
+export const zSendMessageSchema = z.object({
     to: Account,
     subject: z.string().min(1),
     message: z.string().min(1),
@@ -79,10 +78,11 @@ export function ComposeDialog({
     const isSent = useRef(false);
     const { data: user } = useCurrentUser();
     const { allDrafts, setDrafts, deleteDraftById } = useDraftMessages();
+    const { mutateAsync } = useSendMessage();
     const invalidateMailboxQueries = useInvalidateMailboxQueries();
 
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
+    const form = useForm<z.infer<typeof zSendMessageSchema>>({
+        resolver: zodResolver(zSendMessageSchema),
     });
 
     useEffect(() => {
@@ -143,11 +143,10 @@ export function ComposeDialog({
 
         try {
             // TODO: Improve error detection. This promise resolves with success before the transaction is pushed.
-            await supervisor.functionCall({
-                service: "chainmail",
-                intf: "api",
-                method: "send",
-                params: [draft.to, draft.subject, draft.body],
+            await mutateAsync({
+                to: draft.to,
+                subject: draft.subject,
+                message: draft.body,
             });
             if (!id.current) return;
             deleteDraftById(id.current);
@@ -164,7 +163,6 @@ export function ComposeDialog({
     };
 
     async function onSubmit() {
-        toast("Sending...");
         await sendMessage();
         await wait(AwaitTime);
         invalidateMailboxQueries(["sent"]);
@@ -330,7 +328,7 @@ export function ComposeDialog({
 export default ComposeDialog;
 
 interface SendTriggerButtonProps extends ButtonProps {
-    formReturn: UseFormReturn<z.infer<typeof formSchema>>;
+    formReturn: UseFormReturn<z.infer<typeof zSendMessageSchema>>;
 }
 
 const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
