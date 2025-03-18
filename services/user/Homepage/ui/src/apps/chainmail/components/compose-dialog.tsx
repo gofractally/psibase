@@ -334,8 +334,8 @@ interface SendTriggerButtonProps extends ButtonProps {
 
 const SendTriggerButton = forwardRef<HTMLButtonElement, SendTriggerButtonProps>(
     (props, ref) => {
-        const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-            props.formReturn.trigger();
+        const onClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+            await props.formReturn.trigger();
             if (props.formReturn.formState.isValid) {
                 props.onClick?.(e);
             }
