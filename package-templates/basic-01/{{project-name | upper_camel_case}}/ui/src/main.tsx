@@ -6,9 +6,6 @@ import "./styles/globals.css";
 import { App } from "./App";
 import { ThemeProvider } from "@components/theme-provider";
 
-import { getSupervisor } from "@psibase/common-lib";
-
-export const supervisor = getSupervisor();
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
