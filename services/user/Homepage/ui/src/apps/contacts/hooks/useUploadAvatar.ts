@@ -21,13 +21,11 @@ export const useUploadAvatar = () =>
         mutationFn: async (params) => {
             const { compressionQuality, file } = Params.parse(params);
 
-            const res = await supervisor.functionCall({
+            void (await supervisor.functionCall({
                 method: "uploadAvatar",
                 params: [file, compressionQuality],
                 service: "profiles",
                 intf: "api",
-            });
-
-            console.log(res, "was the res");
+            }));
         },
     });

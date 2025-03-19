@@ -62,7 +62,6 @@ export const ContactsPage = () => {
     };
 
     const chainMailUser = (contactId: string) => {
-        console.log({ contactId });
         toast.error("Not implemented: Chain mail user");
     };
 
