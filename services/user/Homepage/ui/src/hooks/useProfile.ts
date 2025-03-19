@@ -15,10 +15,13 @@ export const ProfileResponse = z.object({
         .or(z.null()),
 });
 
-export const useProfile = (account: string | undefined | null) =>
+export const useProfile = (
+    account: string | undefined | null,
+    lookupProfile = true,
+) =>
     useQuery({
         queryKey: QueryKey.profile(account),
-        enabled: !!account,
+        enabled: !!account && lookupProfile,
         queryFn: async () => {
             const res = await graphql(
                 `

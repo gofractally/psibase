@@ -1,19 +1,28 @@
 #[allow(warnings)]
 mod bindings;
 
+use std::str::FromStr;
+
+use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::profiles::plugin::api::Guest as Api;
+use bindings::profiles::plugin::types::Contact;
 use bindings::profiles::plugin::types::Profile as PluginProfile;
 
 use bindings::exports::profiles::plugin::api::File;
 
+use bindings::accounts::plugin::api::get_current_user;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::fracpack::Pack;
+use psibase::fracpack::{Pack, Unpack};
+
+use psibase::AccountNumber;
 
 mod errors;
 use errors::ErrorType;
+
+mod contact_table;
 
 struct ProfilesPlugin;
 
@@ -36,17 +45,68 @@ impl Api for ProfilesPlugin {
     fn remove_avatar() -> Result<(), Error> {
         bindings::sites::plugin::api::remove("/profile/avatar")
     }
-}
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
+    fn get_contacts() -> Result<Vec<Contact>, Error> {
+        let current_user = get_current_user()
+            .expect("Failed to get current user status")
+            .expect("No user logged in");
+
+        let user_table = contact_table::ContactTable::new(current_user.as_str());
+        let contacts = user_table.get_contacts();
+
+        Ok(contacts
+            .into_iter()
+            .map(|c| Contact {
+                account: c.account.to_string(),
+                nickname: c.nickname,
+                email: c.email,
+                phone: c.phone,
+            })
+            .collect())
+    }
+
+    fn add_contact(new_contact: Contact) -> Result<(), Error> {
+        let current_user = get_current_user()
+            .expect("Failed to get current user status")
+            .expect("No user logged in");
+
+        let user_table = contact_table::ContactTable::new(current_user.as_str());
+        let contact = contact_table::ContactEntry::new(
+            new_contact.account,
+            new_contact.nickname,
+            new_contact.email,
+            new_contact.phone,
+        );
+        user_table.add(contact)
+    }
+
+    fn update_contact(updated_contact: Contact) -> Result<(), Error> {
+        let current_user = get_current_user()
+            .expect("Failed to get current user status")
+            .expect("No user logged in");
+
+        let contact_table = contact_table::ContactTable::new(current_user.as_str());
+        let contact = contact_table::ContactEntry::new(
+            updated_contact.account,
+            updated_contact.nickname,
+            updated_contact.email,
+            updated_contact.phone,
+        );
+        contact_table.update_contact(contact)
+    }
+
+    fn remove_contact(account: String) -> Result<(), Error> {
+        let account_number = AccountNumber::from_str(&account)
+            .map_err(|_| ErrorType::InvalidAccountNumber(account))?;
+
+        let current_user = get_current_user()
+            .expect("Failed to get current user status")
+            .expect("No user logged in");
+
+        let user_table = contact_table::ContactTable::new(current_user.as_str());
+
+        user_table.remove(account_number)
+    }
 }
 
 bindings::export!(ProfilesPlugin with_types_in bindings);

@@ -1,27 +1,27 @@
 import { Account } from "@/lib/zod/Account";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-import { wait } from "@/lib/wait";
-import { ContactsDb } from "../store";
-import { getContacts } from "../store";
+import { supervisor } from "@/supervisor";
+import { removeUserFromCache } from "./useContacts";
+import { queryClient } from "@/main";
+import QueryKey from "@/lib/queryKeys";
+import { toast } from "sonner";
 
-export const useDeleteContact = (loggedInUser?: z.infer<typeof Account>) => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: async (username: z.infer<typeof Account>) => {
-            if (!loggedInUser) {
-                throw new Error("Logged in user not found");
-            }
-            await wait(500);
-            ContactsDb.set(
-                loggedInUser,
-                getContacts(username).filter((c) => c.account !== username),
-            );
-            return true;
+export const useDeleteContact = () =>
+    useMutation({
+        mutationFn: async (account: z.infer<typeof Account>) => {
+            await supervisor.functionCall({
+                service: Account.parse("profiles"),
+                method: "removeContact",
+                params: [Account.parse(account)],
+                intf: "api",
+            });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["contacts"] });
+        onSuccess: (_, account) => {
+            toast.success(`Contact removed: ${account}`);
+            const currentUser = Account.parse(
+                queryClient.getQueryData(QueryKey.currentUser()),
+            );
+            removeUserFromCache(currentUser, account);
         },
     });
-};

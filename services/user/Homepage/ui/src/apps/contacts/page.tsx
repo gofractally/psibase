@@ -1,103 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "./hooks/useContacts";
-import { useDeleteContact } from "./hooks/useDeleteContact";
-import { useUpdateContact } from "./hooks/useUpdateContact";
 import { Plus, Search } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { useMediaQuery } from "usehooks-ts";
 import { ContactDetails } from "./components/contact-details";
 import { NewContactDialog } from "./components/new-contact-dialog";
 import { Input } from "@/components/ui/input";
-import { useAvatar } from "@/hooks/useAvatar";
-
-interface Contact {
-    account: string;
-    displayName: string;
-    jobTitle: string;
-    company: string;
-    avatarUrl: string | undefined;
-    email: string;
-    phone: string;
-}
-
-const ContactItem = ({
-    contact,
-    isSelected,
-    onSelect,
-}: {
-    contact: Contact;
-    isSelected: boolean;
-    onSelect: () => void;
-}) => {
-    const avatarSrc = useAvatar(contact.account);
-    return (
-        <div
-            onClick={onSelect}
-            className={cn(
-                "flex w-full cursor-pointer justify-between rounded-sm border p-4",
-                {
-                    "bg-muted": isSelected,
-                },
-            )}
-        >
-            <div className="flex items-center gap-2">
-                <Avatar className={cn("rounded-none")}>
-                    <AvatarImage src={avatarSrc} />
-                    <AvatarFallback>
-                        {contact.displayName.charAt(0)}
-                    </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                    <p className="text-md font-medium">{contact.displayName}</p>
-                    <p className="text-sm text-muted-foreground">
-                        {contact.jobTitle}
-                    </p>
-                </div>
-            </div>
-
-            <div className="flex flex-col justify-center">
-                <div>
-                    <p className="text-right text-xs text-muted-foreground">
-                        {contact.account}
-                    </p>
-                    <p className="text-right text-xs text-muted-foreground">
-                        {contact.email}
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const ContactListSection = ({
-    setSelectedContact,
-    selectedContactId,
-    contacts,
-    letter,
-}: {
-    setSelectedContact: (account: string) => void;
-    selectedContactId: string | undefined;
-    contacts: Contact[];
-    letter: string;
-}) => {
-    return (
-        <div className="flex flex-col gap-2 px-4 py-2">
-            <div className="text-sm text-muted-foreground">{letter}</div>
-            {contacts.map((contact) => (
-                <ContactItem
-                    key={contact.account}
-                    contact={contact}
-                    isSelected={selectedContactId === contact.account}
-                    onSelect={() => setSelectedContact(contact.account)}
-                />
-            ))}
-        </div>
-    );
-};
+import { ContactListSection } from "./components/contact-list-section";
 
 export const ContactsPage = () => {
     const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
@@ -109,19 +20,15 @@ export const ContactsPage = () => {
     const contacts = contactsData
         ? contactsData.filter(
               (contact) =>
-                  contact.displayName
-                      .toLowerCase()
+                  contact.nickname
+                      ?.toLowerCase()
                       .includes(search.toLowerCase()) ||
                   contact.account.toLowerCase().includes(search.toLowerCase()),
           )
         : [];
 
-    const updateContact = useUpdateContact();
-    const deleteContact = useDeleteContact();
-
     const [newContactModal, setNewContactModal] = useState(false);
     const [selectedContactAccount, setSelectedAccount] = useState<string>();
-    const [editingContact, setEditingContactName] = useState<string>();
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
 
@@ -146,20 +53,8 @@ export const ContactsPage = () => {
         }
     }, [isDesktop, search, contacts, selectedContactAccount]);
 
-    const setEditingContact = (contact: string | undefined) => {
-        toast.error("Not implemented: Editing contact");
-
-        setEditingContactName(contact);
-    };
-
     const handleTransferFunds = (contact: string | undefined) => {
         toast.error("Not implemented: Transfer funds");
-    };
-
-    const handleUpdate = (contact: Contact) => {
-        updateContact.mutate(contact, {
-            onSuccess: () => setEditingContact(undefined),
-        });
     };
 
     const chainMailUser = (contactId: string) => {
@@ -167,25 +62,19 @@ export const ContactsPage = () => {
         toast.error("Not implemented: Chain mail user");
     };
 
-    const handleDelete = (contact: Contact) => {
-        deleteContact.mutate(contact.account, {
-            onSuccess: () => setEditingContact(undefined),
-        });
-    };
-
     const selectedContact = contacts.find(
         (contact) => contact.account === selectedContactAccount,
     );
 
     const sectionsLetters = [
-        ...new Set(contacts.map((contact) => contact.displayName.charAt(0))),
+        ...new Set(contacts.map((contact) => contact.account.charAt(0))),
     ];
 
     const sections = sectionsLetters
         .map((letter) => ({
             letter,
             contacts: contacts.filter(
-                (contact) => contact.displayName.charAt(0) === letter,
+                (contact) => contact.account.charAt(0) === letter,
             ),
         }))
         .sort((a, b) => a.letter.localeCompare(b.letter));
@@ -199,22 +88,25 @@ export const ContactsPage = () => {
     }
 
     return (
-        <div className="mx-auto grid h-full w-full grid-cols-1 overflow-y-auto lg:grid-cols-2">
+        <div className="mx-auto grid h-full w-full grid-cols-1 gap-2 overflow-y-auto lg:grid-cols-2">
             <NewContactDialog
                 open={newContactModal}
                 onOpenChange={setNewContactModal}
+                onNewAccount={(newAccount) => {
+                    setSelectedAccount(newAccount);
+                }}
             />
 
+            {/* Column 1 */}
             {!isDesktop && selectedContactAccount ? (
                 <ContactDetails
                     contact={selectedContact}
                     onTransferFunds={handleTransferFunds}
-                    onEditContact={setEditingContact}
                     onChainMailUser={chainMailUser}
                     onBack={() => setSelectedAccount(undefined)}
                 />
             ) : (
-                <div className="overflow-y-auto">
+                <div className="overflow-y-auto border-r bg-sidebar/60">
                     <div className="flex items-center justify-between px-4 py-2">
                         <div className="text-lg font-medium">Contacts</div>
                         <div className="flex items-center gap-2">
@@ -261,11 +153,11 @@ export const ContactsPage = () => {
                 </div>
             )}
 
+            {/* Column 2 */}
             {isDesktop && (
                 <ContactDetails
                     contact={selectedContact}
                     onTransferFunds={handleTransferFunds}
-                    onEditContact={setEditingContact}
                     onChainMailUser={chainMailUser}
                 />
             )}

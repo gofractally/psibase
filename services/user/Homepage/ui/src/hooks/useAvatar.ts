@@ -6,12 +6,15 @@ import { useProfile } from "./useProfile";
 
 import { useCacheBust } from "./useCacheBust";
 
-export const useAvatar = (user?: string | null | undefined): string => {
+export const useAvatar = (
+    user?: string | null | undefined,
+    lookupProfile = true,
+): string => {
     const { data: currentUser } = useCurrentUser();
     const focusedUser = user || currentUser;
 
     const { data: chainId } = useChainId();
-    const { data: profile } = useProfile(focusedUser);
+    const { data: profile } = useProfile(focusedUser, lookupProfile);
     const { bustData, bustedUser } = useCacheBust();
 
     if (profile?.profile?.avatar && focusedUser) {

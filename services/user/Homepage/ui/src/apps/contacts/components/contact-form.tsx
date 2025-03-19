@@ -12,11 +12,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ContactSchema } from "../types";
+import { LocalContact } from "../types";
 
 interface Props {
-    initialValues?: z.infer<typeof ContactSchema>;
-    onSubmit: (data: z.infer<typeof ContactSchema>) => Promise<void>;
+    initialValues?: z.infer<typeof LocalContact>;
+    onSubmit: (data: z.infer<typeof LocalContact>) => Promise<void>;
 }
 
 const toastError = (error: unknown): void => {
@@ -31,17 +31,18 @@ const toastError = (error: unknown): void => {
 };
 
 export function ContactForm({ initialValues, onSubmit }: Props) {
-    const form = useForm<z.infer<typeof ContactSchema>>({
-        resolver: zodResolver(ContactSchema),
+    const form = useForm<z.infer<typeof LocalContact>>({
+        resolver: zodResolver(LocalContact),
         defaultValues: initialValues,
     });
 
-    const handleSubmit = async (data: z.infer<typeof ContactSchema>) => {
+    const handleSubmit = async (data: z.infer<typeof LocalContact>) => {
         let id = toast.loading("Creating contact...");
         try {
-            console.log({ data });
             await onSubmit(data);
-            toast.success("Created contact.");
+            toast.success(
+                `Saved contact ${data.nickname || `@${data.account}`}`,
+            );
         } catch (e) {
             toastError(e);
         }
@@ -52,7 +53,7 @@ export function ContactForm({ initialValues, onSubmit }: Props) {
         <Form {...form}>
             <form
                 onSubmit={form.handleSubmit(handleSubmit)}
-                className="space-y-4"
+                className="space-y-4 py-4"
             >
                 <FormField
                     control={form.control}
@@ -61,7 +62,11 @@ export function ContactForm({ initialValues, onSubmit }: Props) {
                         <FormItem>
                             <FormLabel>Account</FormLabel>
                             <FormControl>
-                                <Input placeholder="Account name" {...field} />
+                                <Input
+                                    disabled={!!initialValues}
+                                    placeholder="Account name"
+                                    {...field}
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -70,12 +75,12 @@ export function ContactForm({ initialValues, onSubmit }: Props) {
 
                 <FormField
                     control={form.control}
-                    name="displayName"
+                    name="nickname"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>Nickname</FormLabel>
                             <FormControl>
-                                <Input placeholder="John Doe" {...field} />
+                                <Input placeholder="Johnny" {...field} />
                             </FormControl>
 
                             <FormMessage />

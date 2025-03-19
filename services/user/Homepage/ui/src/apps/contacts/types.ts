@@ -1,11 +1,16 @@
 import { Account } from "@/lib/zod/Account";
 import { z } from "zod";
 
-export const ContactSchema = z.object({
+export const LocalContact = z.object({
     account: Account,
-    displayName: z.string().optional(),
-    email: z.string().email().optional(),
+    nickname: z.string().optional(),
+    email: z.string().optional(),
     phone: z.string().optional(),
 });
 
-export type Contact = z.infer<typeof ContactSchema>;
+export const ProcessedContact = LocalContact.extend({
+    avatar: z.string(),
+});
+
+export type LocalContactType = z.infer<typeof LocalContact>;
+export type ProcessedContactType = z.infer<typeof ProcessedContact>;

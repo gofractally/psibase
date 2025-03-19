@@ -25,6 +25,8 @@ world = "impl"
 "host:common" = { path = "../../CommonApi/common/packages/wit/host-common.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 
 [dev-dependencies]
 profiles-pkg = { path = "..", version = "0.15.0" }
