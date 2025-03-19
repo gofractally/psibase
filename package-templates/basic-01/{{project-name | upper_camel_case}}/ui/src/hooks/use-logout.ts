@@ -1,6 +1,8 @@
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 
-import { supervisor } from "src/main";
+import { getSupervisor } from "@psibase/common-lib";
+
+const supervisor = getSupervisor();
 
 export const useLogout = () => {
     const queryClient = useQueryClient();

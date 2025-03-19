@@ -1,7 +1,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::*;
+    use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
 
@@ -20,11 +20,20 @@ mod service {
             {{project-name | snake_case}}::Wrapper::call().getExampleThing()
         }
 
-        /// This query gets the historical updates of the Example Thing.
-        async fn historical_updates(&self) -> Vec<HistoricalUpdate> {
-            let json_str = services::r_events::Wrapper::call()
-                .sqlQuery("SELECT * FROM \"history.{{project-name | kebab_case}}.updated\" ORDER BY ROWID".to_string());
-            serde_json::from_str(&json_str).unwrap_or_default()
+        /// This query gets paginated historical updates of the Example Thing.
+        async fn historical_updates(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
+            EventQuery::new("history.{{project-name | kebab_case}}.updated")
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
         }
     }
 
