@@ -3,7 +3,6 @@ mod bindings;
 
 use std::str::FromStr;
 
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::profiles::plugin::api::Guest as Api;
 use bindings::profiles::plugin::types::Contact;
 use bindings::profiles::plugin::types::Profile as PluginProfile;
