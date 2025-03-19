@@ -10,10 +10,10 @@ export const StringInput = ({ value, onChange, label }: StringInputProps) => {
   return (
     <div className="input-field">
       {label && <label>{label}</label>}
-      <input
-        type="text"
+      <textarea
         className="common-input"
         value={value}
+        rows={1}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>

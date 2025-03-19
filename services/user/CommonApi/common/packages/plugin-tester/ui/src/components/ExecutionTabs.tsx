@@ -70,12 +70,13 @@ export function ExecutionTabs({
 
   const generateEmbedCode = (): string => {
     const cleanValues = getCleanValues();
+    const paramValues = Object.values(cleanValues);
     return `const response = await supervisor.functionCall({
   service: "${service}",
   plugin: "${plugin}",
   intf: "${camelCase(selectedInterfaceName)}",
   method: "${camelCase(selectedFunction.name)}",
-  params: ${JSON.stringify(cleanValues, null, 2)}
+  params: ${JSON.stringify(paramValues)}
 });`;
   };
 

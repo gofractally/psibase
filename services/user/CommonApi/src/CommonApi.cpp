@@ -34,7 +34,7 @@ namespace SystemService
                serviceName.assign(request.host.begin(),
                                   request.host.end() - request.rootHost.size() - 1);
             else
-               serviceName = "common-api";
+               serviceName = HttpServer::homepageService.str();
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")
@@ -48,6 +48,10 @@ namespace SystemService
                 .contentType = "application/json",
                 .body        = {json.begin(), json.end()},
             };
+         }
+         if (request.target == "/common/chainid")
+         {
+            return to_json(getStatus().chainId);
          }
       }
 

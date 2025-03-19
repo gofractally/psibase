@@ -1,12 +1,14 @@
 #!/usr/bin/python
 
-from psinode import Cluster
+from psinode import Cluster, PrivateKey
 from predicates import *
+from services import *
 import testutil
 import time
 import json
 import zipfile
 import tempfile
+import requests
 import hashlib
 import unittest
 import os
@@ -94,7 +96,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'Brotli'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
         foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
@@ -124,6 +126,51 @@ class TestPsibase(unittest.TestCase):
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    @testutil.psinode_test
+    def test_sign(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        key = PrivateKey()
+        key_file = os.path.join(a.dir, 'key')
+        pubkey_file = os.path.join(a.dir, 'key.pub')
+        with open(key_file, 'w') as f:
+            f.write(key.pkcs8())
+        with open(pubkey_file, 'w') as f:
+            f.write(key.spki())
+        a.run_psibase(['create', 'alice', '-k', pubkey_file] + a.node_args())
+        a.wait(new_block())
+        a.run_psibase(['modify', 'alice', '-i', '--sign', key_file] + a.node_args())
+
+    @testutil.psinode_test
+    def test_staged_install(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer'])
+
+        accounts = Accounts(a)
+        auth_sig = AuthSig(a)
+        staged_tx = StagedTx(a)
+
+        key = PrivateKey()
+        key_file = os.path.join(a.dir, 'key')
+
+        accounts.new_account('b')
+        auth_sig.set_key('a', key)
+        a.wait(new_block())
+
+        a.run_psibase(['install'] + a.node_args() + ['Symbol', 'Tokens', 'TokenUsers', '--proposer', 'b'])
+        a.wait(new_block())
+
+        # This should fail because the transaction was only proposed
+        with self.assertRaises(requests.HTTPError):
+            a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
+
+        for tx in staged_tx.get_staged(proposer='b'):
+            staged_tx.accept('a', tx, keys=[key])
+
+        a.wait(new_block())
+        a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
     def assertResponse(self, response, expected):
         response.raise_for_status()

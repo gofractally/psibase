@@ -7,21 +7,22 @@ use hmac::{Hmac, Mac};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use jwt::SignWithKey;
-use psibase::services::{accounts, auth_delegate, sites, transact};
+use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
     get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
-    method, new_account_action, push_transaction, push_transactions, reg_server,
-    set_auth_service_action, set_code_action, set_key_action, sign_transaction, AccountNumber,
-    Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry,
-    ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
-    PackageList, PackageOp, PackageOrigin, PackageRegistry, ServiceInfo, SignedTransaction, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
+    AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
+    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
@@ -89,6 +90,10 @@ struct SigArgs {
     /// Sign with this key (repeatable)
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
+
+    /// Stages transactions instead of executing them immediately
+    #[clap(long, value_name = "ACCOUNT")]
+    proposer: Option<ExactAccountNumber>,
 }
 
 #[derive(Args, Debug)]
@@ -446,9 +451,18 @@ fn store_sys(
     )
 }
 
-fn with_tapos(tapos: &TaposRefBlock, actions: Vec<Action>) -> Transaction {
+fn with_tapos(
+    tapos: &TaposRefBlock,
+    mut actions: Vec<Action>,
+    proposer: &Option<ExactAccountNumber>,
+    auto_exec: bool,
+) -> Transaction {
     let now_plus_10secs = Utc::now() + Duration::seconds(10);
     let expiration = TimePointSec::from(now_plus_10secs);
+    if let Some(proposer) = proposer {
+        actions =
+            vec![staged_tx::Wrapper::pack_from((*proposer).into()).propose(actions, auto_exec)];
+    }
     Transaction {
         tapos: Tapos {
             expiration,
@@ -485,6 +499,8 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -530,6 +546,8 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -587,6 +605,8 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
     push_transaction(
         &args.node_args.api,
@@ -641,6 +661,8 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
+        &args.sig_args.proposer,
+        true,
     );
 
     push_transaction(
@@ -821,7 +843,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     };
     add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
     let mut packages = package_registry.resolve(&package_names).await?;
-    let (boot_transactions, transactions) = create_boot_transactions(
+    let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
         args.producer.into(),
@@ -831,26 +853,35 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
-    let progress = ProgressBar::new((transactions.len() + 1) as u64)
-        .with_style(ProgressStyle::with_template("{wide_bar} {pos}/{len}")?);
+    let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
+    let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
+        .with_style(ProgressStyle::with_template(
+            "{wide_bar} {pos}/{len}\n{msg}",
+        )?);
 
+    progress.set_message("Initializing chain");
     push_boot(args, &client, boot_transactions.packed(), &progress).await?;
-    progress.inc(1);
-    for transaction in transactions {
-        push_transaction(
-            &args.node_args.api,
-            client.clone(),
-            transaction.packed(),
-            args.tx_args.trace,
-            args.tx_args.console,
-            Some(&progress),
-        )
-        .await?;
-        progress.inc(1)
+    progress.inc(boot_transactions.len() as u64);
+    for (label, transactions, _) in groups {
+        progress.set_message(label);
+        for trx in transactions {
+            push_transaction(
+                &args.node_args.api,
+                client.clone(),
+                trx.packed(),
+                args.tx_args.trace,
+                args.tx_args.console,
+                Some(&progress),
+            )
+            .await?;
+            progress.inc(1)
+        }
     }
 
     if !args.tx_args.suppress_ok {
-        println!("Successfully booted {}", args.node_args.api);
+        progress.finish_with_message(format!("Successfully booted {}", args.node_args.api));
+    } else {
+        progress.finish_and_clear();
     }
     Ok(())
 }
@@ -863,7 +894,11 @@ async fn push_boot(
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
-            .post(args.node_args.api.join("native/push_boot")?)
+            .post(
+                account!("x-admin")
+                    .url(&args.node_args.api)?
+                    .join("native/admin/push_boot")?,
+            )
             .body(packed),
     )
     .await?;
@@ -919,7 +954,8 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         }
 
         let (selected_files, selected_actions) = actions.drain(..n).unzip();
-        let trx = with_tapos(&tapos, selected_actions);
+
+        let trx = with_tapos(&tapos, selected_actions, &args.sig_args.proposer, true);
         running.push(monitor_trx(
             args,
             &client,
@@ -964,16 +1000,34 @@ fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error
     Ok(())
 }
 
+fn get_package_accounts(ops: &[PackageOp]) -> Vec<AccountNumber> {
+    let mut accounts = Vec::new();
+    for op in ops {
+        match op {
+            PackageOp::Install(info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Replace(_meta, info) => {
+                accounts.extend_from_slice(&info.accounts);
+            }
+            PackageOp::Remove(_meta) => {}
+        }
+    }
+    accounts
+}
+
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+    G: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
 >(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     reg: &R,
     ops: Vec<PackageOp>,
-    accounts: &mut Vec<AccountNumber>,
+    mut uploader: StagedUpload,
     out: &mut TransactionBuilder<F>,
+    files: &mut TransactionBuilder<G>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
@@ -983,33 +1037,53 @@ async fn apply_packages<
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
+                ));
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
-                accounts.extend_from_slice(package.get_accounts());
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
                     &meta.name, &meta.version, &info.name, &info.version
+                ));
+                files.set_label(format!(
+                    "Uploading files for {}-{}",
+                    &info.name, &info.version
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
                 old_manifest.upgrade(package.manifest(), out)?;
                 // Install the new package
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
-                package.install(&mut actions, sender, true, compression_level)?;
+                package.install(
+                    &mut actions,
+                    Some(&mut uploader),
+                    sender,
+                    true,
+                    compression_level,
+                )?;
                 out.push_all(actions)?;
+                files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
@@ -1035,74 +1109,119 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
 
+    let mut id_bytes = <[u8; 8]>::default();
+    getrandom::getrandom(&mut id_bytes)?;
+    let id = u64::from_ne_bytes(id_bytes);
+
+    let index_cell = Cell::new(0);
+
+    let auto_exec_cell = Cell::new(false);
+
     let build_transaction = |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-        if actions.first().unwrap().sender != args.sender.into() {
-            actions.insert(
-                0,
-                Action {
-                    sender: args.sender.into(),
-                    service: account!("nop"),
-                    method: method!("nop"),
-                    rawData: Default::default(),
-                },
-            );
-        }
+        let index = index_cell.get();
+        index_cell.set(index + 1);
+        let auto_exec = auto_exec_cell.get();
+        actions.insert(
+            0,
+            packages::Wrapper::pack_from(args.sender.into()).checkOrder(id.clone(), index),
+        );
         Ok(sign_transaction(
-            with_tapos(&tapos, actions),
+            with_tapos(&tapos, actions, &args.sig_args.proposer, auto_exec),
             &args.sig_args.sign,
         )?)
     };
 
-    let action_limit: usize = 64 * 1024;
-
-    let mut account_builder = TransactionBuilder::new(action_limit, build_transaction);
-    let mut new_accounts = vec![];
+    let action_limit: usize = 1024 * 1024;
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
+    let new_accounts = get_accounts_to_create(
+        &args.node_args.api,
+        &mut client,
+        &get_package_accounts(&to_install),
+        args.sender.into(),
+    )
+    .await?;
+    create_accounts(new_accounts, &mut trx_builder, args.sender.into())?;
+
+    let uploader = StagedUpload::new(
+        id.clone(),
+        args.sig_args.proposer.unwrap_or(args.sender).into(),
+    );
+
+    let mut upload_builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &None, false),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
     apply_packages(
         &args.node_args.api,
         &mut client,
         &package_registry,
         to_install,
-        &mut new_accounts,
+        uploader,
         &mut trx_builder,
+        &mut upload_builder,
         args.sender.into(),
         &args.key,
         args.compression_level,
     )
     .await?;
 
-    new_accounts = get_accounts_to_create(
-        &args.node_args.api,
-        &mut client,
-        &new_accounts,
-        args.sender.into(),
-    )
-    .await?;
-    create_accounts(new_accounts, &mut account_builder, args.sender.into())?;
+    trx_builder.push(packages::Wrapper::pack_from(args.sender.into()).removeOrder(id.clone()))?;
 
-    let account_transactions = account_builder.finish()?;
-    let transactions = trx_builder.finish()?;
-
+    let upload_transactions = upload_builder.finish()?;
     {
-        let progress = ProgressBar::new(account_transactions.len() as u64).with_style(
-            ProgressStyle::with_template("{wide_bar} {pos}/{len} accounts\n{msg}")?,
+        let total_size = upload_transactions
+            .iter()
+            .map(|group| {
+                group
+                    .1
+                    .iter()
+                    .map(|trx| trx.transaction.len())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        let progress = ProgressBar::new(total_size as u64).with_style(
+            ProgressStyle::with_template("{wide_bar} {bytes}/{total_bytes}\n{msg}")?,
         );
-        push_transactions(
-            &args.node_args.api,
-            client.clone(),
-            account_transactions,
-            args.tx_args.trace,
-            args.tx_args.console,
-            &progress,
-        )
-        .await?;
+        for (label, transactions, _carry) in upload_transactions {
+            progress.set_message(label);
+            for trx in transactions {
+                let len = trx.transaction.len() as u64;
+                let result = push_transaction(
+                    &args.node_args.api,
+                    client.clone(),
+                    trx.packed(),
+                    args.tx_args.trace,
+                    args.tx_args.console,
+                    Some(&progress),
+                )
+                .await;
+
+                if let Err(err) = result {
+                    progress.abandon();
+                    return Err(err);
+                }
+                progress.inc(len);
+            }
+        }
         progress.finish_and_clear();
     }
+
+    if trx_builder.num_transactions() == 1 {
+        auto_exec_cell.set(true);
+    }
+    let transactions = trx_builder.finish()?;
 
     let progress = ProgressBar::new(transactions.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len} packages\n{msg}")?,
     );
+
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
     push_transactions(
         &args.node_args.api,
@@ -1115,7 +1234,15 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     .await?;
 
     if !args.tx_args.suppress_ok {
-        progress.finish_with_message("Ok");
+        if args.sig_args.proposer.is_some() {
+            progress.finish_with_message(format!(
+                "Proposed {} transaction{}",
+                num_transactions,
+                if num_transactions == 1 { "" } else { "s" }
+            ));
+        } else {
+            progress.finish_with_message("Ok");
+        }
     } else {
         progress.finish_and_clear();
     }

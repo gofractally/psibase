@@ -17,6 +17,7 @@ export const AppConfig = z.object({
             path: z.string(),
             element: z.any(),
             name: z.string(),
+            icon: z.any().optional(),
         }),
     ),
 });

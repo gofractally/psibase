@@ -49,7 +49,11 @@ namespace psibase
 
    TransactionContext::~TransactionContext()
    {
-      blockContext.db.clearTemporary();
+      if (!blockContext.isReadOnly)
+      {
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
+         blockContext.db.clearTemporary();
+      }
    }
 
    static void execGenesisAction(TransactionContext& self, const Action& action);
@@ -155,7 +159,8 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         self.ownedSockets.close(atrace.error);
+         self.ownedSockets.close(*self.blockContext.writer,
+                                 *self.blockContext.systemContext.sockets, atrace.error);
          throw;
       }
    }
@@ -204,7 +209,8 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(atrace.error);
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
+                            atrace.error);
          throw;
       }
    }
@@ -230,7 +236,8 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(atrace.error);
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
+                            atrace.error);
          throw;
       }
    }
@@ -273,7 +280,8 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(atrace.error);
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
+                            atrace.error);
          throw;
       }
    }
@@ -299,7 +307,8 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(atrace.error);
+         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
+                            atrace.error);
          throw;
       }
    }

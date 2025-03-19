@@ -8,12 +8,13 @@ edition.workspace = true
 pem = "3.0.4"
 spki = "0.7.3"
 wit-bindgen-rt = { version = "0.26.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/" }
+psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
 urlencoding = "2.1.3"
-fracpack = { path = "../../../../rust/fracpack" }
 serde = "1.0"
 serde_json = "1.0"
 chrono = "0.4"
+rand = "0.9.0"
+hex = "0.4.3"
 
 [lib]
 crate-type = ["cdylib"]
@@ -31,3 +32,6 @@ world = "impl"
 "accounts:account-tokens" = { path = "../../../system/Accounts/plugin/account_tokens/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "auth-invite:plugin" = { path = "../plugin_AuthInvite/wit/world.wit" }
+"aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
+"clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
+"base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }

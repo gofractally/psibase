@@ -888,10 +888,17 @@ namespace psibase::net
          for_each_key(
              [&](const auto& k)
              {
-                view_change.signer = k;
-                auto msg           = network().sign_message(view_change);
-                set_producer_view(msg);
-                network().multicast(msg);
+                try
+                {
+                   view_change.signer = k;
+                   auto msg           = network().sign_message(view_change);
+                   set_producer_view(msg);
+                   network().multicast(msg);
+                }
+                catch (std::exception& e)
+                {
+                   PSIBASE_LOG(logger, warning) << "Failed to send update view: " << e.what();
+                }
              });
       }
 
@@ -1201,10 +1208,17 @@ namespace psibase::net
          for_each_key(state,
                       [&](const auto& key)
                       {
-                         auto message = network().sign_message(
-                             PrepareMessage{.block_id = id, .producer = self, .signer = key});
-                         on_prepare(state, self, message);
-                         network().multicast_producers(id, message);
+                         try
+                         {
+                            auto message = network().sign_message(
+                                PrepareMessage{.block_id = id, .producer = self, .signer = key});
+                            on_prepare(state, self, message);
+                            network().multicast_producers(id, message);
+                         }
+                         catch (std::exception& e)
+                         {
+                            PSIBASE_LOG(logger, warning) << "Failed to prepare: " << e.what();
+                         }
                       });
       }
       void save_commit_data(const BlockHeaderState* state)
@@ -1288,10 +1302,17 @@ namespace psibase::net
          for_each_key(state,
                       [&](const auto& key)
                       {
-                         auto message = network().sign_message(
-                             CommitMessage{.block_id = id, .producer = self, .signer = key});
-                         on_commit(state, self, message);
-                         network().multicast_producers(id, message);
+                         try
+                         {
+                            auto message = network().sign_message(
+                                CommitMessage{.block_id = id, .producer = self, .signer = key});
+                            on_commit(state, self, message);
+                            network().multicast_producers(id, message);
+                         }
+                         catch (std::exception& e)
+                         {
+                            PSIBASE_LOG(logger, warning) << "Failed to commit: " << e.what();
+                         }
                       });
       }
       std::optional<std::vector<char>> makeBlockData(const BlockHeaderState* state)

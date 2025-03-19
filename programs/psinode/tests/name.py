@@ -567,6 +567,7 @@ def is_hash_name(h):
     return (h & (0x01 << (64 - 8))) > 0
 
 def method_to_number(input):
+    input = input.replace('_', '')
     if len(input) == 0:
         return 0;
 

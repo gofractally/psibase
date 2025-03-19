@@ -73,7 +73,9 @@ class TestSubjective(unittest.TestCase):
             for t in threads:
                 t.start()
             for t in threads:
-                t.join()
+                t.join(10)
+                if t.is_alive():
+                    raise TimeoutError()
 
             launcher.check()
 
@@ -134,7 +136,9 @@ class TestSubjective(unittest.TestCase):
         done.set()
 
         for t in threads:
-            t.join()
+            t.join(timeout=10)
+            if t.is_alive():
+                raise TimeoutError()
         launcher.check()
 
         all_values = []

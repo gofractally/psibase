@@ -157,6 +157,7 @@ if(DEFINED WASI_SDK_PREFIX)
                          ${CMAKE_CURRENT_BINARY_DIR}/AsyncQueryService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/SubjectiveCounterService.wasm
                          ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
+                         ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
     ExternalProject_Add_StepTargets(wasm test)
@@ -246,8 +247,8 @@ ExternalProject_Add(
 set(JS_DIRS
     services/system/Accounts/ui:Accounts_js
     services/system/AuthSig/ui:AuthSig_js
+    services/system/Producers/ui:Producers_js
     services/user/Branding/ui:Branding_js
-    services/user/Chainmail/ui:Chainmail_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     services/user/Explorer/ui:Explorer_js
     services/user/Homepage/ui:Homepage_js
@@ -305,10 +306,13 @@ add_dependencies(CommonApiCommonLib_js ComponentParser)
 add_rs_component_workspace(services/:Plugins 
     accounts
     account-tokens
+    aes
     auth-any
     auth-delegate
     auth-invite
     auth-sig
+    base64
+    kdf
     setcode
     clientdata
     invite
@@ -408,11 +412,44 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Base64.psi
+    NAME Base64
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Base64 encoding and decoding"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE base64
+        DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Kdf.psi
+    NAME Kdf
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Key Derivation Function"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE kdf
+        DATA ${Plugins_OUTPUT_FILE_kdf} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Aes.psi
+    NAME Aes
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "AES encryption"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})"
+    SERVICE aes
+        DATA ${Plugins_OUTPUT_FILE_aes} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/ClientData.psi
     NAME ClientData
     DESCRIPTION "Plugin for enabling simpler interactions with client-side data storage"
     VERSION ${PSIBASE_VERSION}
-    PACKAGE_DEPENDS "Nft(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "CommonApi(^${PSIBASE_VERSION})" "Supervisor(^${PSIBASE_VERSION})"
     SERVICE clientdata
         DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -421,7 +458,6 @@ psibase_package(
 cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Chainmail.psi
     PATH services/user/Chainmail
-    DEPENDS ${Chainmail_js_DEP}
 )
 
 cargo_psibase_package(
@@ -436,8 +472,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/Brotli.psi
-    PATH services/user/Brotli
+    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
+    PATH services/user/BrotliCodec
 )
 
 cargo_psibase_package(
@@ -607,11 +643,13 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-producers
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/ui/dist/* /
     SERVICE r-producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Producers/src/postinstall.json
     DEPENDS wasm
+    DEPENDS ${Producers_js_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})" "Accounts(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "StagedTx(^${PSIBASE_VERSION})" "Transact(^${PSIBASE_VERSION})"
 )
 
@@ -639,6 +677,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS allowWriteNative
         SERVER r-setcode
+        INIT
     SERVICE r-setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
     DEPENDS wasm
@@ -833,8 +872,8 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
-    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Identity Invite Nft Packages Permissions Producers Profiles
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -843,8 +882,8 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All production services"
-    PACKAGE_DEPENDS Accounts Registry AuthAny AuthSig AuthDelegate Branding Brotli Chainmail ClientData CommonApi CpuLimit 
-                    Docs Events Explorer Fractal HttpServer Invite Nft Packages Permissions Producers Profiles
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
+                    Docs Events Explorer Fractal HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop
 )
 
@@ -863,7 +902,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "Services used in the tester"
-    PACKAGE_DEPENDS Minimal AuthSig Brotli Events Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 function(write_package_index target dir)
@@ -880,18 +919,20 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AuthAny AuthDelegate AuthSig Branding Brotli Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Explorer Fractal Identity Invite Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer
-    Registry Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop )
+    Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
+    Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
           ${SERVICE_DIR}/Accounts.psi
+          ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
+          ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
-          ${SERVICE_DIR}/Brotli.psi
+          ${SERVICE_DIR}/BrotliCodec.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
@@ -906,6 +947,7 @@ install(
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
+          ${SERVICE_DIR}/Kdf.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi
@@ -992,7 +1034,20 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/SocketList.psi
+    NAME SocketList
+    VERSION ${PSIBASE_VERSION}
+    DESCRIPTION "Lists active sockets"
+    SERVICE s-sock-list
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/SocketListService.wasm
+        SERVER s-sock-list
+        FLAGS allowNativeSubjective
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION})"
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket SocketList)
 
 ExternalProject_Add(
     rust

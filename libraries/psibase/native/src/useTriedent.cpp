@@ -1,6 +1,7 @@
 #include <psibase/db.hpp>
 
 #include <boost/filesystem/operations.hpp>
+#include <psibase/Socket.hpp>
 #include <triedent/database.hpp>
 
 namespace psibase
@@ -358,6 +359,15 @@ namespace psibase
    {
       std::lock_guard l{impl->subjectiveMutex};
       writer.upsert(impl->subjective[independentIndex(DbId::nativeSubjective)], key, value);
+      std::lock_guard lock{impl->topMutex};
+      writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
+      writer.set_top_root(impl->topRoot);
+   }
+
+   void SharedDatabase::kvRemoveSubjective(Writer& writer, std::span<const char> key)
+   {
+      std::lock_guard l{impl->subjectiveMutex};
+      writer.remove(impl->subjective[independentIndex(DbId::nativeSubjective)], key);
       std::lock_guard lock{impl->topMutex};
       writer.upsert(impl->topRoot, subjectiveKey, impl->subjective);
       writer.set_top_root(impl->topRoot);
