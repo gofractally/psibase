@@ -56,8 +56,6 @@ PSIO_REFLECT(FooEventRecord, s, i);
 
 struct Query
 {
-   auto events() const { return LegacyEventQuery<EventService::Events>{EventService::service}; }
-
    auto foo2Events(std::optional<int32_t>     first,
                    std::optional<int32_t>     last,
                    std::optional<std::string> before,
@@ -85,7 +83,6 @@ struct Query
    }
 };
 PSIO_REFLECT(Query,  //
-             method(events),
              method(foo2Events, first, last, before, after),
              method(exampleRecords, first, last, before, after))
 
