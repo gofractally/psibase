@@ -14,7 +14,20 @@ export interface ValidPermissionRequest {
     }
 }
 
-export class CurrentAccessRequest {
+export const isTypeValidPermissionRequest = (
+    perms_req_res: ValidPermissionRequest | RecoverableErrorPayload,
+): perms_req_res is ValidPermissionRequest => {
+    return (
+        "id" in perms_req_res &&
+        "payload" in perms_req_res &&
+        "callee" in perms_req_res.payload &&
+        "caller" in perms_req_res.payload &&
+        "permsUrlPath" in perms_req_res &&
+        "returnUrlPath" in perms_req_res
+    );
+};
+
+export class ActiveAccessRequest {
     static async get(id: string): Promise<Result<ValidPermissionRequest, RecoverableErrorPayload>> {
         const perms_req_bytes = await supervisor.functionCall({
             service: "clientdata",

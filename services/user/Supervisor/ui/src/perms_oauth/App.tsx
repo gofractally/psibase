@@ -1,19 +1,10 @@
 import { useState, useEffect } from "react";
 import { siblingUrl } from "@psibase/common-lib";
-import { CurrentAccessRequest, ValidPermissionRequest } from "./db";
-import { RecoverableErrorPayload } from "../plugin/errors";
-
-const isTypeValidPermissionRequest = (
-    perms_req_res: ValidPermissionRequest | RecoverableErrorPayload,
-): perms_req_res is ValidPermissionRequest => {
-    return (
-        "id" in perms_req_res &&
-        "payload" in perms_req_res &&
-        "callee" in perms_req_res.payload &&
-        "permsUrlPath" in perms_req_res &&
-        "returnUrlPath" in perms_req_res
-    );
-};
+import {
+    ActiveAccessRequest,
+    isTypeValidPermissionRequest,
+    ValidPermissionRequest,
+} from "./db";
 
 const buildIframeUrl = (perms_req: ValidPermissionRequest) => {
     let subdomain = "permissions";
@@ -44,22 +35,22 @@ export const App = () => {
 
     const initApp = async () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const idParam = urlParams.get("id");
-
         const requiredQueryParams = urlParams.has("id");
         setHasRequiredQueryParams(requiredQueryParams);
+
         if (requiredQueryParams) {
+            const idParam = urlParams.get("id");
             if (!idParam) {
                 throw new Error("Access Request error: No id provided");
             }
 
-            const perms_req_res = await CurrentAccessRequest.get(idParam);
-            // const senderApp = getSenderApp().app;
+            const perms_req_res = await ActiveAccessRequest.get(idParam);
+            // TODO: is caller being gotten at the right time from the right place? ==> const senderApp = getSenderApp().app;
             if (isTypeValidPermissionRequest(perms_req_res)) {
                 const perms_req = perms_req_res as ValidPermissionRequest;
                 setIframeUrl(buildIframeUrl(perms_req));
 
-                CurrentAccessRequest.delete();
+                ActiveAccessRequest.delete();
             } else {
                 throw perms_req_res;
             }

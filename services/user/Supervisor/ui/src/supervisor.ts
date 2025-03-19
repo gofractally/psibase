@@ -15,6 +15,7 @@ import { pluginId } from "@psibase/common-lib/messaging/PluginId";
 import { Plugins } from "./plugin/plugins";
 import { PluginLoader } from "./plugin/pluginLoader";
 import { PluginErrorObject, RedirectErrorObject } from "@psibase/common-lib/messaging";
+import { REDIRECT_ERROR_CODE } from "./constants";
 
 const supervisorDomain = siblingUrl(null, "supervisor");
 const supervisorOrigination = {
@@ -29,8 +30,6 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("transact", "plugin"),
     pluginId("clientdata", "plugin"),
 ];
-
-export const REDIRECT_ERROR_CODE = 999999999;
 interface Account {
     accountNum: string;
     authService: string;

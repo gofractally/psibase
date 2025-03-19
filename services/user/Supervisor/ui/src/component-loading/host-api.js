@@ -35,15 +35,15 @@ export const client = {
         return host.myServiceOrigin();
     },
 
-    getCurrentPermRequest(id) {
-        return host.getCurrentPermRequest(id);
+    getAppUrl(app) {
+        return host.getAppUrl(app);
+    },
+
+    getActivePermRequest(id) {
+        return host.getActivePermRequest(id);
     },
 
     promptUser(caller, permsUrlPath, returnUrlPath) {
         return host.promptUser(caller, permsUrlPath, returnUrlPath);
-    },
-
-    getAppUrl(app) {
-        return host.getAppUrl(app);
     },
 };

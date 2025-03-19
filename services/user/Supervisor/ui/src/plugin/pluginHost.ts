@@ -5,12 +5,12 @@ import {
     siblingUrl,
 } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
-import { REDIRECT_ERROR_CODE, Supervisor } from "../supervisor";
+import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 import { v4 as uuidv4 } from 'uuid';
-import { PERM_OAUTH_REQ_KEY } from "../constants";
+import { PERM_OAUTH_REQ_KEY, REDIRECT_ERROR_CODE } from "../constants";
 
 interface HttpRequest {
     uri: string;
@@ -219,9 +219,10 @@ export class PluginHost implements HostInterface {
         return `${siblingUrl(null, app)}`;
     }
     
-    private setCurrentPermRequest(caller: string, callee: string, urlPath: string, returnUrlPath: string): Result<string, RecoverableErrorPayload> {
+    private setActivePermRequest(caller: string, callee: string, urlPath: string, returnUrlPath: string): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
-        const perm_req = {
+        const perm_req = new TextEncoder().encode(
+            JSON.stringify({
             id: req_id,
             permsUrlPath: urlPath,
             returnUrlPath: returnUrlPath,
@@ -230,17 +231,14 @@ export class PluginHost implements HostInterface {
                 caller,
                 callee,
             }
-        };
-        const value = new TextEncoder().encode(
-            JSON.stringify(perm_req)
-        );
+        }));
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
             method: "set",
             params: [
-                PERM_OAUTH_REQ_KEY, value]} as QualifiedFunctionCallArgs);
+                PERM_OAUTH_REQ_KEY, perm_req]} as QualifiedFunctionCallArgs);
         return req_id
     }
 
@@ -253,7 +251,7 @@ export class PluginHost implements HostInterface {
             throw Error("No sender app");
         }
 
-        const req_id = this.setCurrentPermRequest(caller, senderApp, urlPath, returnUrlPath);
+        const req_id = this.setActivePermRequest(caller, senderApp, urlPath, returnUrlPath);
 
         const re = this.recoverableError(JSON.stringify({id: req_id}));
         re.code = REDIRECT_ERROR_CODE;
