@@ -1,13 +1,5 @@
 package permissions:plugin;
 
-interface types {
-    record valid-permissions-request {
-        id: string,
-        caller: string,
-        callee: string,
-    }
-}
-
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
