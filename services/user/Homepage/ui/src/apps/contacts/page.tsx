@@ -128,7 +128,11 @@ export const ContactsPage = () => {
                     contact={selectedContact}
                     onTransferFunds={handleTransferFunds}
                     onChainMailUser={chainMailUser}
-                    onBack={() => setSelectedAccount(undefined)}
+                    onBack={
+                        display === "right"
+                            ? () => setSelectedAccount(undefined)
+                            : undefined
+                    }
                 />
             }
             header={
