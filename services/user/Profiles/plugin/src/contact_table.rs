@@ -36,14 +36,12 @@ impl ContactEntry {
 }
 
 pub struct ContactTable {
-    user: String,
+    user: AccountNumber,
 }
 
 impl ContactTable {
-    pub fn new(user: &str) -> Self {
-        Self {
-            user: user.to_string(),
-        }
+    pub fn new(user: AccountNumber) -> Self {
+        Self { user }
     }
 
     fn key(&self) -> String {

@@ -50,7 +50,7 @@ impl Api for ProfilesPlugin {
             .expect("Failed to get current user status")
             .expect("No user logged in");
 
-        let user_table = contact_table::ContactTable::new(current_user.as_str());
+        let user_table = contact_table::ContactTable::new(AccountNumber::from_str(current_user.as_str()).unwrap());
         let contacts = user_table.get_contacts();
 
         Ok(contacts
@@ -69,7 +69,7 @@ impl Api for ProfilesPlugin {
             .expect("Failed to get current user status")
             .expect("No user logged in");
 
-        let user_table = contact_table::ContactTable::new(current_user.as_str());
+        let user_table = contact_table::ContactTable::new(AccountNumber::from_str(current_user.as_str()).unwrap());
         let contact = contact_table::ContactEntry::new(
             new_contact.account,
             new_contact.nickname,
@@ -84,7 +84,7 @@ impl Api for ProfilesPlugin {
             .expect("Failed to get current user status")
             .expect("No user logged in");
 
-        let contact_table = contact_table::ContactTable::new(current_user.as_str());
+        let contact_table = contact_table::ContactTable::new(AccountNumber::from_str(current_user.as_str()).unwrap());
         let contact = contact_table::ContactEntry::new(
             updated_contact.account,
             updated_contact.nickname,
@@ -102,7 +102,7 @@ impl Api for ProfilesPlugin {
             .expect("Failed to get current user status")
             .expect("No user logged in");
 
-        let user_table = contact_table::ContactTable::new(current_user.as_str());
+        let user_table = contact_table::ContactTable::new(AccountNumber::from_str(current_user.as_str()).unwrap());
 
         user_table.remove(account_number)
     }
