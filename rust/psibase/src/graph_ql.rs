@@ -595,8 +595,8 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         }
 
         let (limit_plus_one, descending) = match (self.first, self.last) {
-            (Some(n), None) => (Some(n + 1), false),
-            (None, Some(n)) => (Some(n + 1), true),
+            (Some(n), None) => (n.checked_add(1), false),
+            (None, Some(n)) => (n.checked_add(1), true),
             (None, None) => (None, false),
             _ => unreachable!(),
         };

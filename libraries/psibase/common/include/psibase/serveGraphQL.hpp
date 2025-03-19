@@ -975,11 +975,13 @@ namespace psibase
 
          if (_first.has_value())
          {
+            check(_first.value() < std::numeric_limits<int32_t>::max(), "first value too large");
             limit_plus_one = _first.value() + 1;
             descending     = false;
          }
          else if (_last.has_value())
          {
+            check(_last.value() < std::numeric_limits<int32_t>::max(), "last value too large");
             limit_plus_one = _last.value() + 1;
             descending     = true;
          }
