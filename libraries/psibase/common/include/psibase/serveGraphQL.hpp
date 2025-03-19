@@ -897,9 +897,7 @@ namespace psibase
    {
      public:
       /// Create a new query for the given table
-      explicit EventQuery(std::string table_name) : _table_name(std::format("\"{}\"", table_name))
-      {
-      }
+      explicit EventQuery(std::string table_name) : _table_name(std::move(table_name)) {}
 
       /// Enable debug output printing
       EventQuery& with_debug_output()
@@ -1138,7 +1136,7 @@ namespace psibase
          }
 
          auto order = descending ? "DESC" : "ASC";
-         auto query = std::format("SELECT ROWID, * FROM {}", _table_name);
+         auto query = std::format("SELECT ROWID, * FROM \"{}\"", _table_name);
 
          if (!filters.empty())
          {
