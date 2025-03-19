@@ -876,7 +876,7 @@ namespace psibase
 
    struct EventQueryInterface
    {
-      std::vector<char> sqlQuery(const std::string& squery);
+      std::string sqlQuery(const std::string& squery);
    };
    PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query))
 
@@ -1165,8 +1165,7 @@ namespace psibase
 
       static std::string call_sql_query(const std::string& query)
       {
-         auto response = to<EventQueryInterface>("r-events"_a).sqlQuery(query);
-         return std::string{response.begin(), response.end()};
+         return to<EventQueryInterface>("r-events"_a).sqlQuery(query);
       }
 
       static std::vector<SqlRow> parse_sql_rows(const std::string& json_str)
