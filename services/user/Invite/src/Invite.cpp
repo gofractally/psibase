@@ -65,7 +65,7 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    auto inviteTable = Tables().open<InviteTable>();
    auto isNew       = inviteTable.getIndex<3>()
                     .subindex<uint32_t>(SystemService::AuthSig::keyFingerprint(inviteKey))
-                    .isEmpty();
+                    .empty();
    check(isNew, inviteAlreadyExists.data());
    auto inviter = getSender();
 
@@ -73,7 +73,7 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    auto    now = to<Transact>().currentBlock().time;
 
    auto     idx      = inviteTable.getIndex<0>();
-   uint32_t inviteId = (idx.isEmpty()) ? 0 : (*(--idx.end())).inviteId + 1;
+   uint32_t inviteId = (idx.empty()) ? 0 : (*(--idx.end())).inviteId + 1;
 
    InviteRecord newInvite{
        .inviteId        = inviteId,

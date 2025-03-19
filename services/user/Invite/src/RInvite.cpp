@@ -38,7 +38,7 @@ namespace UserService
                            .open<InviteTable>()
                            .getIndex<2>()
                            .subindex(std::optional<uint32_t>{secondaryId});
-            if (idx.isEmpty())
+            if (idx.empty())
                return std::nullopt;
             return std::optional<InviteRecord>{*idx.begin()};
          }
