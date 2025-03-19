@@ -11,6 +11,8 @@ export const workshopConfig: AppConfigType = {
     description: "Create and manage workshops.",
     icon: <Terminal className="h-6 w-6" />,
     isMore: false,
+    showLoginLoadingSpinner: true,
+    isLoginRequired: true,
     children: [
         {
             path: '',

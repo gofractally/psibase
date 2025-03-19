@@ -9,6 +9,8 @@ export const contactsConfig: AppConfigType = {
     description: "Manage your contacts.",
     icon: <BookUser className="h-6 w-6" />,
     isMore: false,
+    isLoginRequired: true,
+    showLoginLoadingSpinner: true,
     children: [
         {
             path: "",

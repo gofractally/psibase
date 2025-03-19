@@ -1,28 +1,47 @@
-import { useEffect } from "react";
-
-import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
+import {
+    Mailbox,
+    MailboxHeader,
+    MailList,
+    MessageDetail,
+} from "@/apps/chainmail/components";
 import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
+import { TwoColumnSelect } from "@/components/TwoColumnSelect";
 
 export default function InboxPage() {
     const isDesktop = useIsDesktop();
+
     const { query, selectedMessage, setSelectedMessageId } =
         useIncomingMessages();
 
-    useEffect(() => {
-        setSelectedMessageId("");
-    }, []);
+    // useEffect(() => {
+    //     setSelectedMessageId("");
+    // }, []);
+
+    const display = isDesktop ? "both" : selectedMessage ? "right" : "left";
 
     return (
-        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
-            <MailboxHeader>Inbox</MailboxHeader>
-            <Mailbox
-                isDesktop={isDesktop}
-                mailbox="inbox"
-                messages={query.data ?? []}
-                isLoading={query.isPending}
-                selectedMessage={selectedMessage}
-                setSelectedMessageId={setSelectedMessageId}
-            />
-        </div>
+        <TwoColumnSelect
+            left={
+                <MailList
+                    mailbox="inbox"
+                    messages={query.data ?? []}
+                    onSelectMessage={setSelectedMessageId}
+                    selectedMessage={selectedMessage}
+                />
+            }
+            right={
+                <MessageDetail
+                    message={selectedMessage ?? null}
+                    mailbox={"inbox"}
+                    onBack={
+                        display === "right"
+                            ? () => setSelectedMessageId("")
+                            : undefined
+                    }
+                />
+            }
+            header={<MailboxHeader>Inbox</MailboxHeader>}
+            displayMode={display}
+        />
     );
 }

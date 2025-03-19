@@ -21,6 +21,45 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useNavLocation } from "@/hooks/useNavLocation";
+import { useCurrentUser } from "./hooks/useCurrentUser";
+import { LoadingBox } from "./apps/chainmail/components/empty-states";
+import {
+    Card,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "./components/ui/card";
+import { LoginButton } from "./login-button";
+
+const SplashScreen = () => {
+    const { currentApp } = useNavLocation();
+
+    return (
+        <div className="mx-auto mt-4 w-[350px]">
+            {/* Main app info card */}
+            <Card className="rounded-b-none border-b-0 shadow-sm">
+                <CardHeader>
+                    <div className="mx-auto">{currentApp?.icon}</div>
+                    <CardTitle>{currentApp?.name}</CardTitle>
+                    <CardDescription>{currentApp?.description}</CardDescription>
+                </CardHeader>
+            </Card>
+
+            {/* Login prompt card */}
+            <Card className="rounded-t-none border-t-0 bg-muted/50">
+                <CardHeader className="pb-2 pt-4">
+                    <CardDescription className="text-center font-medium">
+                        {`Please log in to access ${currentApp?.name}`}
+                    </CardDescription>
+                </CardHeader>
+                <CardFooter className="flex justify-center pb-4">
+                    <LoginButton />
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
 
 export const Layout = () => {
     const navigate = useNavigate();
@@ -28,6 +67,16 @@ export const Layout = () => {
 
     const primaryNavLabel = currentApp?.name ?? "Dashboard";
     const secondaryNavLabel = currentChild?.name;
+
+    const { data: currentUser, isPending: isPendingCurrentUser } =
+        useCurrentUser();
+
+    const isAppRequiringLogin =
+        currentApp?.isLoginRequired || currentChild?.isLoginRequired;
+
+    const isNotLoggedIn = !currentUser && !isPendingCurrentUser;
+
+    const isLoginRequired = isAppRequiringLogin && isNotLoggedIn;
 
     return (
         <SidebarProvider>
@@ -66,7 +115,20 @@ export const Layout = () => {
                         </Breadcrumb>
                     </div>
                 </header>
-                <Outlet />
+                {isLoginRequired ? (
+                    <div className="flex flex-1 items-center justify-center">
+                        <div className="w-full max-w-screen-sm px-4">
+                            <SplashScreen />
+                        </div>
+                    </div>
+                ) : isPendingCurrentUser &&
+                  currentApp?.showLoginLoadingSpinner ? (
+                    <div className="flex-1">
+                        <LoadingBox />
+                    </div>
+                ) : (
+                    <Outlet />
+                )}
             </SidebarInset>
         </SidebarProvider>
     );

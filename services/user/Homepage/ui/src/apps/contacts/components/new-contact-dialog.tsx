@@ -15,18 +15,21 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onNewAccount: (account: z.infer<typeof Account>) => void;
+    trigger: React.ReactNode;
 }
 
 export const NewContactDialog = ({
     open,
     onOpenChange,
     onNewAccount,
+    trigger,
 }: Props) => {
     const { data: currentUser } = useCurrentUser();
     const { mutateAsync: createContact } = useCreateContact(currentUser);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
+            {trigger}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create contact</DialogTitle>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useContacts } from "./hooks/useContacts";
-import { Plus, Search } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
 import { useMediaQuery } from "usehooks-ts";
@@ -9,9 +9,13 @@ import { ContactDetails } from "./components/contact-details";
 import { NewContactDialog } from "./components/new-contact-dialog";
 import { Input } from "@/components/ui/input";
 import { ContactListSection } from "./components/contact-list-section";
+import { TwoColumnSelect } from "@/components/TwoColumnSelect";
+import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DialogTrigger } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export const ContactsPage = () => {
-    const { data: currentUser, isLoading: isLoadingUser } = useCurrentUser();
+    const { data: currentUser } = useCurrentUser();
     const { data: contactsData, isLoading: isLoadingContacts } =
         useContacts(currentUser);
 
@@ -79,49 +83,16 @@ export const ContactsPage = () => {
         }))
         .sort((a, b) => a.letter.localeCompare(b.letter));
 
-    if (isLoadingUser || isLoadingContacts) {
+    if (isLoadingContacts) {
         return <div>Loading...</div>;
     }
 
-    if (currentUser === null) {
-        return <div>Login to continue</div>;
-    }
+    const display = isDesktop ? "both" : selectedContact ? "right" : "left";
 
     return (
-        <div className="mx-auto grid h-full w-full grid-cols-1 gap-2 overflow-y-auto lg:grid-cols-2">
-            <NewContactDialog
-                open={newContactModal}
-                onOpenChange={setNewContactModal}
-                onNewAccount={(newAccount) => {
-                    setSelectedAccount(newAccount);
-                }}
-            />
-
-            {/* Column 1 */}
-            {!isDesktop && selectedContactAccount ? (
-                <ContactDetails
-                    contact={selectedContact}
-                    onTransferFunds={handleTransferFunds}
-                    onChainMailUser={chainMailUser}
-                    onBack={() => setSelectedAccount(undefined)}
-                />
-            ) : (
+        <TwoColumnSelect
+            left={
                 <div className="overflow-y-auto border-r bg-sidebar/60">
-                    <div className="flex items-center justify-between px-4 py-2">
-                        <div className="text-lg font-medium">Contacts</div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                className="text-sm"
-                                variant="outline"
-                                onClick={() => setNewContactModal(true)}
-                            >
-                                Create contact
-                                <Plus />
-                            </Button>
-                        </div>
-                    </div>
-
                     <div className="relative flex items-center px-4 py-2">
                         <Input
                             placeholder="Search contacts..."
@@ -151,16 +122,42 @@ export const ContactsPage = () => {
                         </div>
                     )}
                 </div>
-            )}
-
-            {/* Column 2 */}
-            {isDesktop && (
+            }
+            right={
                 <ContactDetails
                     contact={selectedContact}
                     onTransferFunds={handleTransferFunds}
                     onChainMailUser={chainMailUser}
+                    onBack={() => setSelectedAccount(undefined)}
                 />
-            )}
-        </div>
+            }
+            header={
+                <header className="flex items-center justify-between border-b px-4 py-2.5">
+                    <div className="flex-1">
+                        <h1 className="text-xl font-bold">Contacts</h1>
+                    </div>
+                    <NewContactDialog
+                        open={newContactModal}
+                        onOpenChange={setNewContactModal}
+                        onNewAccount={(newAccount) => {
+                            setSelectedAccount(newAccount);
+                        }}
+                        trigger={
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="icon">
+                                            <UserPlus className="h-5 w-5" />
+                                        </Button>
+                                    </DialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>Create contact</TooltipContent>
+                            </Tooltip>
+                        }
+                    />
+                </header>
+            }
+            displayMode={display}
+        />
     );
 };
