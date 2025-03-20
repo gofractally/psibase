@@ -214,8 +214,7 @@ TEST_CASE("graphql")
    auto query = [](std::string query_name, std::string params, std::string fields) {  //
       if (!params.empty())
          params = "(" + params + ")";
-      return std::string{"query { " + query_name + params + " { edges { node { " + fields +
-                         " } cursor } } }"};
+      return "query { " + query_name + params + " { edges { node { " + fields + " } cursor } } }";
    };
 
    auto foo_query = [&](std::string params) {  //
