@@ -6,7 +6,7 @@ use proc_macro_error::{abort, emit_error};
 use quote::quote;
 use std::{collections::HashMap, str::FromStr};
 use syn::{Ident, Item, ItemMod, Type};
-use tables::{is_table_attr, process_service_tables};
+use tables::{is_table_attr, process_service_tables, process_table_schema_root};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
@@ -52,6 +52,7 @@ pub fn service_tables_macro_impl(attr: TokenStream, item: TokenStream) -> TokenS
 fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) -> TokenStream {
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
+        let mut table_names = Vec::new();
 
         // collect all tables
         for (item_index, item) in items.iter_mut().enumerate() {
@@ -78,11 +79,13 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
         // Transform table attributes into expanded code
         let mut processed_tables = Vec::new();
         for (tb_name, items_idxs) in table_structs.iter() {
-            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs);
+            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs, &mut table_names);
             if table_idx.is_ok() {
                 processed_tables.push((tb_name, table_idx.unwrap()));
             }
         }
+
+        process_table_schema_root(psibase_mod, items, table_names);
 
         // Validate table indexes
         processed_tables.sort_by_key(|t| t.1);

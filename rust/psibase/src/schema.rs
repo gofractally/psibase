@@ -1,5 +1,5 @@
-use crate::AccountNumber;
-use fracpack::{AnyType, FunctionType, Pack, SchemaBuilder, ToSchema, Unpack};
+use crate::{AccountNumber, DbId};
+use fracpack::{AnyType, FunctionType, Pack, SchemaBuilder, ToSchema, Unpack, VisitTypes};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ type ActionMap = IndexMap<String, FunctionType>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
-struct FieldId {
+pub struct FieldId {
     path: Vec<u32>,
 }
 
@@ -18,11 +18,26 @@ type IndexInfo = Vec<FieldId>;
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct TableInfo {
-    name: Option<String>,
-    table: u16,
+    pub name: Option<String>,
+    pub table: u16,
     #[serde(rename = "type")]
-    type_: AnyType,
-    indexes: Vec<IndexInfo>,
+    pub type_: AnyType,
+    pub indexes: Vec<IndexInfo>,
+}
+
+impl VisitTypes for TableInfo {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        self.type_.visit_types(f)
+    }
+}
+
+pub fn db_name(db: DbId) -> String {
+    match db {
+        DbId::Service => "service".to_string(),
+        DbId::Subjective => "subjective".to_string(),
+        DbId::WriteOnly => "writeOnly".to_string(),
+        _ => panic!("Unsupported db"),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
@@ -51,11 +66,28 @@ pub trait ToEventsSchema {
     fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<String, AnyType>;
 }
 
+pub trait ToTableSchema {
+    fn to_schema(builder: &mut SchemaBuilder) -> TableInfo;
+}
+
+pub trait ToDatabaseSchema {
+    fn to_schema(builder: &mut SchemaBuilder) -> Option<IndexMap<String, Vec<TableInfo>>>;
+}
+
+pub struct EmptyDatabase;
+
+impl ToDatabaseSchema for EmptyDatabase {
+    fn to_schema(_builder: &mut SchemaBuilder) -> Option<IndexMap<String, Vec<TableInfo>>> {
+        Some(IndexMap::new())
+    }
+}
+
 pub trait ToServiceSchema {
     type UiEvents: ToEventsSchema;
     type HistoryEvents: ToEventsSchema;
     type MerkleEvents: ToEventsSchema;
     type Actions: ToActionsSchema;
+    type Database: ToDatabaseSchema;
     const SERVICE: AccountNumber;
     fn schema() -> Schema {
         let mut builder = SchemaBuilder::new();
@@ -63,7 +95,14 @@ pub trait ToServiceSchema {
         let mut ui = Self::UiEvents::to_schema(&mut builder);
         let mut history = Self::HistoryEvents::to_schema(&mut builder);
         let mut merkle = Self::MerkleEvents::to_schema(&mut builder);
-        let types = builder.build_ext(&mut (&mut actions, &mut ui, &mut history, &mut merkle));
+        let mut database = Self::Database::to_schema(&mut builder);
+        let types = builder.build_ext(&mut (
+            &mut actions,
+            &mut ui,
+            &mut history,
+            &mut merkle,
+            &mut database,
+        ));
         Schema {
             service: Self::SERVICE,
             types,
@@ -71,8 +110,7 @@ pub trait ToServiceSchema {
             ui,
             history,
             merkle,
-            // TODO: fill in database
-            database: None,
+            database,
         }
     }
     fn actions_schema() -> Schema {

@@ -2,7 +2,7 @@ mod constants;
 mod tables;
 mod utils;
 
-#[psibase::service(name = "registry")]
+#[psibase::service(name = "registry", tables = "tables::tables")]
 #[allow(non_snake_case)]
 pub mod service {
     use crate::constants::*;

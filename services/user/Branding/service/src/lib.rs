@@ -25,16 +25,19 @@ mod tables {
     }
 }
 
-#[psibase::service(name = "branding")]
+#[psibase::service(name = "branding", tables = "tables")]
 mod service {
+    use crate::tables::*;
     use async_graphql::Object;
     use psibase::*;
-    use crate::tables::*;
 
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
-        check(get_sender() == SERVICE, "Only the 'branding' account is authorized to set network branding");
+        check(
+            get_sender() == SERVICE,
+            "Only the 'branding' account is authorized to set network branding",
+        );
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();

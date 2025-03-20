@@ -83,6 +83,7 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
+    let tables = options.tables.as_ref().map(|tables| proc_macro2::TokenStream::from_str(tables.as_str()).unwrap());
     let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
@@ -458,12 +459,15 @@ fn process_mod(
             }
         });
 
+        let database_wrapper = tables.as_ref().map_or(quote!{ #psibase_mod::EmptyDatabase }, |tables| quote!{ super::#tables::TablesWrapper });
+
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {
                 type Actions = #actions<#psibase_mod::JustSchema>;
                 type UiEvents = #ui_events;
                 type HistoryEvents = #history_events;
                 type MerkleEvents = #merkle_events;
+                type Database = #database_wrapper;
                 const SERVICE: #psibase_mod::AccountNumber = Self::#constant;
             }
         });
@@ -685,6 +689,15 @@ fn process_mod(
                     pub unsafe extern "C" fn start(this_service: u64) {
                         __wasm_call_ctors();
                         #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
+                    }
+                }
+            });
+        }
+        if let Some(tables) = tables {
+            items.push(parse_quote! {
+                impl #psibase_mod::ServiceTablesWrapper for super::#tables::TablesWrapper {
+                    fn get_service() -> #psibase_mod::AccountNumber {
+                        #constant
                     }
                 }
             });

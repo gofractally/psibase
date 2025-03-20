@@ -23,7 +23,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 /// This can be used, for example, to propose a transaction on behalf of an account
 /// that is only authorized by the combined authorization of multiple other accounts
 /// (a.k.a. a "multi-sig" or multi-signature transaction), among many other uses.
-#[psibase::service(recursive = true)]
+#[psibase::service(recursive = true, tables = "db::tables")]
 pub mod service {
     pub use crate::db::tables::*;
     pub use crate::event::StagedTxEvent;

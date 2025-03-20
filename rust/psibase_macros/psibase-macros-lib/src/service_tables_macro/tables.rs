@@ -73,6 +73,7 @@ pub fn process_service_tables(
     table_record_struct_name: &Ident,
     items: &mut Vec<Item>,
     table_idxs: &Vec<usize>,
+    table_names: &mut Vec<(proc_macro2::TokenStream, proc_macro2::TokenStream)>,
 ) -> Result<u16, ()> {
     let mut pk_data: Option<PkIdentData> = None;
     let mut secondary_keys = Vec::new();
@@ -194,6 +195,8 @@ pub fn process_service_tables(
         (table_name, table_record_struct_name.clone())
     };
 
+    table_names.push((quote!{ #table_name_id }, quote!{ #record_name_id }));
+
     // TODO: This specific naming convention is a bit of a hack. Figure out a way of using an associated type
     let table_record_type_id = Ident::new(
         format!("{}Record", table_name_id).as_str(),
@@ -220,6 +223,10 @@ pub fn process_service_tables(
             fn db_id(&self) -> #psibase_mod::DbId {
                 self.db_id
             }
+
+            fn new() -> Self {
+                Self::with_service(<TablesWrapper as #psibase_mod::ServiceTablesWrapper>::get_service())
+            }
         }
     };
     items.push(parse_quote! {#table_impl});
@@ -231,6 +238,36 @@ pub fn process_service_tables(
     };
     items.push(parse_quote! {#table_struct_impl});
     Ok(table_options.index)
+}
+
+pub fn process_table_schema_root(
+    psibase_mod: &proc_macro2::TokenStream,
+    items: &mut Vec<Item>,
+    tables: Vec<(proc_macro2::TokenStream, proc_macro2::TokenStream)>) {
+    let mut schema_init = proc_macro2::TokenStream::new();
+    for (table, record) in tables {
+        let name = format!("{}", table);
+        schema_init = quote!{
+            #schema_init
+            // TODO: reflect indexes
+            let table = <#table as #psibase_mod::Table<#record>>::TABLE_INDEX;
+            let type_ = <#record as #psibase_mod::fracpack::ToSchema>::schema(builder);
+            let info = #psibase_mod::TableInfo{name: Some(#name.to_string()), table, type_, indexes: Vec::new()};
+            result.entry(#psibase_mod::db_name(<#record as #psibase_mod::TableRecord>::DB)).or_insert(Vec::new()).push(info);
+        }
+    }
+    items.push(parse_quote! {
+        pub struct TablesWrapper;
+    });
+    items.push(parse_quote! {
+        impl #psibase_mod::ToDatabaseSchema for TablesWrapper {
+            fn to_schema(builder: &mut #psibase_mod::fracpack::SchemaBuilder) -> Option<#psibase_mod::fracpack::indexmap::IndexMap<String, Vec<#psibase_mod::TableInfo>>> {
+                let mut result = #psibase_mod::fracpack::indexmap::IndexMap::new();
+                #schema_init
+                Some(result)
+            }
+        }
+    });
 }
 
 fn process_table_attrs(

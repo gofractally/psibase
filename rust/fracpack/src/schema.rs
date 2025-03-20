@@ -184,6 +184,14 @@ impl<T: VisitTypes> VisitTypes for [&mut T] {
     }
 }
 
+impl<T: VisitTypes> VisitTypes for Vec<T> {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        for t in self {
+            t.visit_types(f);
+        }
+    }
+}
+
 impl<K, T: VisitTypes> VisitTypes for IndexMap<K, T> {
     fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
         for (_k, t) in self {
