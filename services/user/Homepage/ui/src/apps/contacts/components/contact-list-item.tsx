@@ -5,7 +5,7 @@ import { useAvatar } from "@/hooks/useAvatar";
 import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
 
-import { LocalContactType } from "../types";
+import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";
 
 export const ContactItem = ({
@@ -13,7 +13,7 @@ export const ContactItem = ({
     isSelected,
     onSelect,
 }: {
-    contact: LocalContactType;
+    contact: LocalContact;
     isSelected: boolean;
     onSelect: () => void;
 }) => {

@@ -1,10 +1,13 @@
-import { Account } from "@/lib/zod/Account";
+import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import QueryKey from "@/lib/queryKeys";
-import { queryClient } from "@/main";
+
 import { supervisor } from "@/supervisor";
-import { LocalContact } from "../types";
+
+import QueryKey from "@/lib/queryKeys";
+import { Account } from "@/lib/zod/Account";
+
+import { LocalContact, zLocalContact } from "../types";
 
 export const useContacts = (
     username?: z.infer<typeof Account> | null | undefined,
@@ -19,18 +22,18 @@ export const useContacts = (
                 intf: "api",
             });
 
-            return LocalContact.array().parse(res);
+            return zLocalContact.array().parse(res);
         },
         enabled: !!username,
     });
 
 export const upsertUserToCache = (
     username: z.infer<typeof Account>,
-    contact: z.infer<typeof LocalContact>,
+    contact: LocalContact,
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {
-            const parsed = LocalContact.array().parse(data);
+            const parsed = zLocalContact.array().parse(data);
             const isExisting = parsed.some(
                 (c) => c.account === contact.account,
             );
@@ -51,7 +54,7 @@ export const removeUserFromCache = (
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {
-            const parsed = LocalContact.array().parse(data);
+            const parsed = zLocalContact.array().parse(data);
             return parsed.filter((c) => c.account !== account);
         }
         return [];

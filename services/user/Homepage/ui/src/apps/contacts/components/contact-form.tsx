@@ -1,3 +1,7 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -8,15 +12,12 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { z } from "zod";
-import { LocalContact } from "../types";
+
+import { LocalContact, zLocalContact } from "../types";
 
 interface Props {
-    initialValues?: z.infer<typeof LocalContact>;
-    onSubmit: (data: z.infer<typeof LocalContact>) => Promise<void>;
+    initialValues?: LocalContact;
+    onSubmit: (data: LocalContact) => Promise<void>;
 }
 
 const toastError = (error: unknown): void => {
@@ -31,12 +32,12 @@ const toastError = (error: unknown): void => {
 };
 
 export function ContactForm({ initialValues, onSubmit }: Props) {
-    const form = useForm<z.infer<typeof LocalContact>>({
-        resolver: zodResolver(LocalContact),
+    const form = useForm<LocalContact>({
+        resolver: zodResolver(zLocalContact),
         defaultValues: initialValues,
     });
 
-    const handleSubmit = async (data: z.infer<typeof LocalContact>) => {
+    const handleSubmit = async (data: LocalContact) => {
         let id = toast.loading("Creating contact...");
         try {
             await onSubmit(data);

@@ -1,4 +1,4 @@
-import { LocalContactType } from "../types";
+import { LocalContact } from "../types";
 import { ContactItem } from "./contact-list-item";
 
 export const ContactListSection = ({
@@ -9,7 +9,7 @@ export const ContactListSection = ({
 }: {
     setSelectedContact: (account: string) => void;
     selectedContactId: string | undefined;
-    contacts: LocalContactType[];
+    contacts: LocalContact[];
     title: string;
 }) => {
     return (

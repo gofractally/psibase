@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
@@ -8,15 +7,15 @@ import { AwaitTime } from "@/globals";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
-import { LocalContact, LocalContactType } from "../types";
+import { LocalContact, zLocalContact } from "../types";
 import { upsertUserToCache } from "./useContacts";
 
 export const useCreateContact = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (newContact: LocalContactType) => {
-            const parsed = LocalContact.parse(newContact);
+        mutationFn: async (newContact: LocalContact) => {
+            const parsed = zLocalContact.parse(newContact);
             let toastId = toast.loading("Creating contact...");
             void (await supervisor.functionCall({
                 service: Account.parse("profiles"),

@@ -40,7 +40,7 @@ import { ContactForm } from "./contact-form";
 import { EditProfileDialogContent } from "./edit-profile-dialog";
 
 interface ContactDetailsProps {
-    contact: z.infer<typeof LocalContact> | undefined;
+    contact: LocalContact | undefined;
     onTransferFunds: (contactId: string) => void;
     onChainMailUser: (contactId: string) => void;
     onBack?: () => void;
