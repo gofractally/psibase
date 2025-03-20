@@ -1,8 +1,8 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
     Form,
     FormControl,
@@ -12,12 +12,14 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
     displayName: z
         .string()
-        .min(2, "Display name must be at least 2 characters"),
-    bio: z.string().max(40, "Bio must be less than 40 characters"),
+        .min(2, "Display name must be at least 2 characters")
+        .max(50, "Display name must be less than 50 characters"),
+    bio: z.string().max(160, "Bio must be less than 160 characters"),
 });
 
 type ProfileFormValues = z.infer<typeof formSchema>;
