@@ -59,7 +59,7 @@ export const useSiteConfig = (
                 account
                 path
                 contentType
-                hash
+                // hash
                 contentEncoding
                 csp
               }

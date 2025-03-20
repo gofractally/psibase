@@ -1,23 +1,50 @@
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useContacts } from "./hooks/useContacts";
 import { Search, UserPlus } from "lucide-react";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useMediaQuery } from "usehooks-ts";
-import { ContactDetails } from "./components/contact-details";
-import { NewContactDialog } from "./components/new-contact-dialog";
-import { Input } from "@/components/ui/input";
-import { ContactListSection } from "./components/contact-list-section";
-import { TwoColumnSelect } from "@/components/TwoColumnSelect";
-import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { Button } from "@/components/ui/button";
 import { DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tooltip } from "@/components/ui/tooltip";
+
+import { TwoColumnSelect } from "@/components/TwoColumnSelect";
+
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+
+import { ContactDetails } from "./components/contact-details";
+import { ContactListSection } from "./components/contact-list-section";
+import { NewContactDialog } from "./components/new-contact-dialog";
+import { useContacts } from "./hooks/useContacts";
+import { useCreateContact } from "./hooks/useCreateContact";
 
 export const ContactsPage = () => {
     const { data: currentUser } = useCurrentUser();
-    const { data: contactsData, isLoading: isLoadingContacts } =
-        useContacts(currentUser);
+    const {
+        data: contactsData,
+        isLoading: isLoadingContacts,
+        isSuccess: isSuccessContacts,
+    } = useContacts(currentUser);
+
+    const { mutate: createContact, isPending: isCreatingContact } =
+        useCreateContact();
+
+    useEffect(() => {
+        console.log({ isSuccessContacts, currentUser, isCreatingContact });
+        if (isSuccessContacts && currentUser && !isCreatingContact) {
+            const isSelfIncluded = contactsData.some(
+                (contact) => contact.account === currentUser,
+            );
+            console.log({ isSelfIncluded });
+            if (!isSelfIncluded) {
+                createContact({
+                    account: currentUser,
+                });
+            }
+        }
+    }, [contactsData, currentUser, createContact, isCreatingContact]);
 
     const [search, setSearch] = useState("");
 
@@ -70,17 +97,31 @@ export const ContactsPage = () => {
     );
 
     const sectionsLetters = [
-        ...new Set(contacts.map((contact) => contact.account.charAt(0))),
+        ...new Set(
+            contacts
+                .filter((contact) => contact.account !== currentUser)
+                .map((contact) => contact.account.charAt(0)),
+        ),
     ];
 
-    const sections = sectionsLetters
+    const contactsSections = sectionsLetters
         .map((letter) => ({
-            letter,
+            title: letter.toUpperCase(),
             contacts: contacts.filter(
                 (contact) => contact.account.charAt(0) === letter,
             ),
         }))
-        .sort((a, b) => a.letter.localeCompare(b.letter));
+        .sort((a, b) => a.title.localeCompare(b.title));
+
+    const sections = [
+        {
+            title: "Myself",
+            contacts: contacts.filter(
+                (contact) => contact.account === currentUser,
+            ),
+        },
+        ...contactsSections,
+    ];
 
     if (isLoadingContacts) {
         return <div>Loading...</div>;
@@ -91,7 +132,7 @@ export const ContactsPage = () => {
     return (
         <TwoColumnSelect
             left={
-                <div className="overflow-y-auto border-r bg-sidebar/60">
+                <ScrollArea className="h-full w-full bg-sidebar/60">
                     <div className="relative flex items-center px-4 py-2">
                         <Input
                             placeholder="Search contacts..."
@@ -108,11 +149,11 @@ export const ContactsPage = () => {
                             </p>
                         </div>
                     ) : (
-                        <div>
+                        <div className="flex h-full flex-col gap-2 pb-16">
                             {sections.map((section) => (
                                 <ContactListSection
-                                    key={section.letter}
-                                    letter={section.letter}
+                                    key={section.title}
+                                    title={section.title}
                                     setSelectedContact={setSelectedAccount}
                                     selectedContactId={selectedContactAccount}
                                     contacts={section.contacts}
@@ -120,7 +161,7 @@ export const ContactsPage = () => {
                             ))}
                         </div>
                     )}
-                </div>
+                </ScrollArea>
             }
             right={
                 <ContactDetails

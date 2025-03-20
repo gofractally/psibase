@@ -15,30 +15,26 @@ export const TwoColumnSelect = ({
     displayMode: DisplayMode;
 }) => {
     return (
-        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
+        <div className="flex h-full flex-col">
             {header}
-            <div className="flex-1 overflow-hidden">
-                {displayMode === "right" ? (
-                    right
-                ) : displayMode === "left" ? (
-                    left
-                ) : (
-                    <ResizablePanelGroup direction="horizontal">
-                        <ResizablePanel
-                            defaultSize={40}
-                            minSize={20}
-                            maxSize={40}
-                            className="border-r"
-                        >
-                            {left}
-                        </ResizablePanel>
-                        <ResizableHandle withHandle />
-                        <ResizablePanel defaultSize={75}>
-                            {right}
-                        </ResizablePanel>
-                    </ResizablePanelGroup>
-                )}
-            </div>
+            {displayMode === "right" ? (
+                right
+            ) : displayMode === "left" ? (
+                left
+            ) : (
+                <ResizablePanelGroup direction="horizontal">
+                    <ResizablePanel
+                        defaultSize={40}
+                        minSize={20}
+                        maxSize={40}
+                        className="overflow-y-auto border-r"
+                    >
+                        {left}
+                    </ResizablePanel>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={75}>{right}</ResizablePanel>
+                </ResizablePanelGroup>
+            )}
         </div>
     );
 };

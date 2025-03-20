@@ -1,8 +1,10 @@
 import { AvatarImage } from "@/components/ui/avatar";
 import { Avatar } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+
 import { useAvatar } from "@/hooks/useAvatar";
 import { useProfile } from "@/hooks/useProfile";
+import { cn } from "@/lib/utils";
+
 import { LocalContactType } from "../types";
 import { formatNames } from "../utils/formatNames";
 
@@ -36,7 +38,7 @@ export const ContactItem = ({
         >
             <div className="flex items-center gap-2">
                 <Avatar className={cn("rounded-none")}>
-                    <AvatarImage src={avatarSrc} />
+                    <AvatarImage src={avatarSrc} className="object-cover" />
                 </Avatar>
                 <div className="flex flex-col">
                     <p className="text-md font-medium">{primaryName}</p>

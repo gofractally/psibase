@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { ConfirmationModal, NotLoggedIn } from "@/components";
+import { ConfirmationModal } from "@/components";
 
 import { AwaitTime } from "@/globals";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -195,7 +195,6 @@ export const TokensPage = () => {
     };
 
     const isNoTokens = currentUser && tokens.length == 0;
-    const isNotLoggedIn = !currentUser && !isLoading;
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
@@ -207,7 +206,6 @@ export const TokensPage = () => {
                         }}
                     />
                 )}
-                {isNotLoggedIn && <NotLoggedIn />}
                 <ModalCreateToken
                     open={isNewTokenModalOpen}
                     onOpenChange={(e) => setNewTokenModalOpen(e)}

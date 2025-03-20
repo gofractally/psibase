@@ -6,10 +6,6 @@ import {
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
 
-import { NotLoggedIn } from "@/components";
-
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-
 import {
     EmptyBox,
     LoadingBox,
@@ -36,19 +32,6 @@ export function Mailbox({
     selectedMessage,
     setSelectedMessageId,
 }: MailboxProps) {
-    const { data: currentUser, isPending: isPendingCurrentUser } =
-        useCurrentUser();
-
-    if (!currentUser && !isPendingCurrentUser) {
-        return (
-            <main className="flex-1">
-                <div className="mx-auto max-w-lg px-4 pt-8">
-                    <NotLoggedIn />
-                </div>
-            </main>
-        );
-    }
-
     return (
         <main className="flex-1 overflow-hidden">
             {!isDesktop && selectedMessage ? (

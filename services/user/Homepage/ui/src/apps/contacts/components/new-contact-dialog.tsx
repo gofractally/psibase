@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
     Dialog,
     DialogContent,
@@ -5,11 +7,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { ContactForm } from "./contact-form";
-import { useCreateContact } from "../hooks/useCreateContact";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { z } from "zod";
+
 import { Account } from "@/lib/zod/Account";
+
+import { useCreateContact } from "../hooks/useCreateContact";
+import { ContactForm } from "./contact-form";
 
 interface Props {
     open: boolean;
@@ -24,8 +26,7 @@ export const NewContactDialog = ({
     onNewAccount,
     trigger,
 }: Props) => {
-    const { data: currentUser } = useCurrentUser();
-    const { mutateAsync: createContact } = useCreateContact(currentUser);
+    const { mutateAsync: createContact } = useCreateContact();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

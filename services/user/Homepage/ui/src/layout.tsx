@@ -1,11 +1,5 @@
-import {
-    Outlet,
-    useNavigate,
-    useParams,
-    useMatch,
-    useLocation,
-} from "react-router-dom";
-import { AppSidebar } from "@/components/app-sidebar";
+import { Outlet, useNavigate } from "react-router-dom";
+
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -20,8 +14,11 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar";
+
+import { AppSidebar } from "@/components/app-sidebar";
+
 import { useNavLocation } from "@/hooks/useNavLocation";
-import { useCurrentUser } from "./hooks/useCurrentUser";
+
 import { LoadingBox } from "./apps/chainmail/components/empty-states";
 import {
     Card,
@@ -30,6 +27,7 @@ import {
     CardHeader,
     CardTitle,
 } from "./components/ui/card";
+import { useCurrentUser } from "./hooks/useCurrentUser";
 import { LoginButton } from "./login-button";
 
 const SplashScreen = () => {

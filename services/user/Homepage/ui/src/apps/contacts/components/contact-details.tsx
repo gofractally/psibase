@@ -1,5 +1,3 @@
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
     ArrowLeft,
     Copy,
@@ -10,11 +8,11 @@ import {
     Trash,
     Wallet,
 } from "lucide-react";
-import { useAvatar } from "@/hooks/useAvatar";
+import { useState } from "react";
 import { z } from "zod";
-import { LocalContact } from "../types";
-import { useProfile } from "@/hooks/useProfile";
-import { useDeleteContact } from "../hooks/useDeleteContact";
+
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -23,17 +21,23 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { useState } from "react";
-
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ContactForm } from "./contact-form";
+
+import { useAvatar } from "@/hooks/useAvatar";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useProfile } from "@/hooks/useProfile";
+
+import { useDeleteContact } from "../hooks/useDeleteContact";
 import { useUpdateContact } from "../hooks/useUpdateContact";
+import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";
+import { ContactForm } from "./contact-form";
+import { EditProfileDialogContent } from "./edit-profile-dialog";
 
 interface ContactDetailsProps {
     contact: z.infer<typeof LocalContact> | undefined;
@@ -41,6 +45,13 @@ interface ContactDetailsProps {
     onChainMailUser: (contactId: string) => void;
     onBack?: () => void;
 }
+
+const modalPages = z.enum([
+    "editProfile",
+    "editContact",
+    "deleteContact",
+    "closed",
+]);
 
 export function ContactDetails({
     contact,
@@ -56,6 +67,9 @@ export function ContactDetails({
         );
     }
 
+    const { data: currentUser } = useCurrentUser();
+
+    const isSelf = contact.account === currentUser;
     const { data: profile } = useProfile(contact.account);
 
     const avatarSrc = useAvatar(contact.account);
@@ -66,47 +80,106 @@ export function ContactDetails({
         contact.account,
     );
 
-    console.log({
-        primaryName,
-        secondaryName,
-        nickname: contact.nickname,
-        displayName: profile?.profile?.displayName,
-        account: contact.account,
-    });
+    const { mutateAsync: deleteContact } = useDeleteContact();
 
-    const { mutate: deleteContact } = useDeleteContact();
-    const [showModal, setShowModal] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
+    const [modalPage, setModalPage] = useState<z.infer<typeof modalPages>>(
+        modalPages.Values.closed,
+    );
+
+    const closeModal = () => {
+        setModalPage(modalPages.Values.closed);
+    };
 
     const { mutateAsync: updateContact } = useUpdateContact();
+    const showModal = modalPage !== modalPages.Values.closed;
 
     return (
-        <div>
-            {onBack && (
-                <div className="pl-4">
-                    <Button onClick={onBack} variant="outline" size="icon">
-                        <ArrowLeft />
+        <div className="flex h-full w-full flex-col">
+            {/* Header with back button on mobile */}
+            <div className="flex items-center gap-2 border-b p-4">
+                {onBack && (
+                    <Button variant="ghost" size="icon" onClick={onBack}>
+                        <ArrowLeft className="h-5 w-5" />
                     </Button>
+                )}
+                <div className="flex flex-1 justify-between text-lg font-semibold">
+                    <h2 className="text-lg">{primaryName}</h2>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Button variant="ghost" size="icon">
+                                <MoreVertical />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setModalPage(modalPages.Values.editContact);
+                                }}
+                            >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => {
+                                    setModalPage(
+                                        modalPages.Values.deleteContact,
+                                    );
+                                }}
+                            >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
-            )}
-            <Dialog open={showModal} onOpenChange={setShowModal}>
-                {isEditing ? (
+            </div>
+            <Dialog
+                open={showModal}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeModal();
+                    }
+                }}
+            >
+                {modalPage === modalPages.Values.editContact ? (
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Edit contact</DialogTitle>
                             <DialogDescription>
+                                <div className="py-2">
+                                    These details are stored locally and not
+                                    sent to the network.
+                                </div>
+                                {isSelf && (
+                                    <div className="py-2">
+                                        Edit your{" "}
+                                        <button
+                                            className="underline hover:text-primary focus:outline-none"
+                                            onClick={() =>
+                                                setModalPage(
+                                                    modalPages.Values
+                                                        .editProfile,
+                                                )
+                                            }
+                                        >
+                                            profile
+                                        </button>{" "}
+                                        to update your public information.
+                                    </div>
+                                )}
+
                                 <ContactForm
                                     initialValues={contact}
                                     onSubmit={async (data) => {
                                         await updateContact(data);
-                                        setShowModal(false);
-                                        setIsEditing(false);
+                                        closeModal();
                                     }}
                                 />
                             </DialogDescription>
                         </DialogHeader>
                     </DialogContent>
-                ) : (
+                ) : modalPage === modalPages.Values.deleteContact ? (
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Delete contact</DialogTitle>
@@ -119,55 +192,31 @@ export function ContactDetails({
                         </DialogHeader>
                         <DialogFooter>
                             <Button
-                                onClick={() => {
-                                    deleteContact(contact.account);
-                                    setShowModal(false);
+                                onClick={async () => {
+                                    await deleteContact(contact.account);
+                                    closeModal();
                                 }}
                             >
                                 Confirm
                             </Button>
                         </DialogFooter>
                     </DialogContent>
+                ) : modalPage === modalPages.Values.editProfile ? (
+                    <EditProfileDialogContent />
+                ) : (
+                    <DialogContent>
+                        <div>Error: Unrecognised modal page</div>
+                    </DialogContent>
                 )}
             </Dialog>
             <div className="mx-auto flex w-full max-w-screen-md flex-col items-center justify-center gap-4 p-4">
-                <div className="flex w-full justify-between">
-                    <div className="invisible w-8"></div>
+                <div className="flex w-full justify-center">
                     <Avatar className="h-32 w-32 rounded-none">
                         <AvatarImage src={avatarSrc} />
                     </Avatar>
-                    <div className="flex flex-col items-start">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger>
-                                <Button variant="ghost" size="icon">
-                                    <MoreVertical />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setIsEditing(true);
-                                        setShowModal(true);
-                                    }}
-                                >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setShowModal(true);
-                                        setIsEditing(false);
-                                    }}
-                                >
-                                    <Trash className="mr-2 h-4 w-4" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
                 </div>
                 <div className="flex flex-col gap-2 text-center">
-                    <div className="text-lg font-medium">{primaryName} </div>
+                    <div className="text-lg font-medium">{primaryName}</div>
                     {secondaryName && (
                         <div className="flex flex-col gap-1">
                             <div className="text-sm text-muted-foreground">

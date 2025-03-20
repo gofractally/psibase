@@ -1,19 +1,35 @@
+import { type UseMutationResult } from "@tanstack/react-query";
 import {
     ChevronsUpDown,
+    Contact,
+    Copy,
+    Download,
     LogIn,
     LogOut,
     Moon,
     PlusCircle,
-    Sun,
-    UserPlus,
-    Download,
-    User,
-    Copy,
     RefreshCcw,
-    Contact,
+    Sun,
+    User,
+    UserPlus,
 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { siblingUrl } from "@psibase/common-lib";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,39 +49,26 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+
+import { useAvatar } from "@/hooks/useAvatar";
+import { useCanExportAccount } from "@/hooks/useCanExportAccount";
 import { useChainId } from "@/hooks/useChainId";
-import { useLogout } from "@/hooks/useLogout";
-import { useTheme } from "./theme-provider";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import { useSelectAccount } from "@/hooks/useSelectAccount";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useGenerateInvite } from "@/hooks/useGenerateInvite";
-import { useCanExportAccount } from "@/hooks/useCanExportAccount";
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { toast } from "sonner";
-import { type UseMutationResult } from "@tanstack/react-query";
-import { siblingUrl } from "@psibase/common-lib";
-import { useState } from "react";
+import { useLogout } from "@/hooks/useLogout";
 import { useProfile } from "@/hooks/useProfile";
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
-import { useAvatar } from "@/hooks/useAvatar";
-
+import { useSelectAccount } from "@/hooks/useSelectAccount";
+import { cn } from "@/lib/utils";
 import { Account } from "@/lib/zod/Account";
-import { z } from "zod";
+
+import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
+
+import { useTheme } from "./theme-provider";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 function AccountMenuItem({
     account,
@@ -162,6 +165,7 @@ export function NavUser() {
                             >
                                 <Avatar className="h-8 w-8 rounded-lg">
                                     <AvatarImage
+                                        className="object-cover"
                                         src={avatarSrc}
                                         alt={currentUser || ""}
                                     />
@@ -188,7 +192,10 @@ export function NavUser() {
                             <DropdownMenuLabel className="p-0 font-normal">
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                     <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage src={avatarSrc} />
+                                        <AvatarImage
+                                            src={avatarSrc}
+                                            className="object-cover"
+                                        />
                                         <AvatarFallback className="rounded-lg">
                                             ?
                                         </AvatarFallback>

@@ -1,11 +1,13 @@
+import { useEffect } from "react";
+
+import { TwoColumnSelect } from "@/components/TwoColumnSelect";
+
 import {
-    Mailbox,
-    MailboxHeader,
     MailList,
+    MailboxHeader,
     MessageDetail,
 } from "@/apps/chainmail/components";
 import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
-import { TwoColumnSelect } from "@/components/TwoColumnSelect";
 
 export default function InboxPage() {
     const isDesktop = useIsDesktop();
@@ -13,9 +15,9 @@ export default function InboxPage() {
     const { query, selectedMessage, setSelectedMessageId } =
         useIncomingMessages();
 
-    // useEffect(() => {
-    //     setSelectedMessageId("");
-    // }, []);
+    useEffect(() => {
+        setSelectedMessageId("");
+    }, []);
 
     const display = isDesktop ? "both" : selectedMessage ? "right" : "left";
 

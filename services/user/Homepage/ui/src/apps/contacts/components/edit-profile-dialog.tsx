@@ -1,23 +1,23 @@
-import { FormProfile } from "@/components/form-profile";
-
 import { Trash, Upload } from "lucide-react";
+import { toast } from "sonner";
 
-import { DialogDescription } from "@/components/ui/dialog";
-
-import { DialogTitle } from "@/components/ui/dialog";
-
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useUploadAvatar } from "../hooks/useUploadAvatar";
-import { useSetProfile } from "../hooks/useSetProfile";
 import { Button } from "@/components/ui/button";
-import { AwaitTime } from "@/globals";
+import { DialogDescription } from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import { DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
+
+import { FormProfile } from "@/components/form-profile";
+
+import { AwaitTime } from "@/globals";
 import { useAvatar } from "@/hooks/useAvatar";
-import { useProfile } from "@/hooks/useProfile";
 import { useCacheBust } from "@/hooks/useCacheBust";
-import { toast } from "sonner";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useProfile } from "@/hooks/useProfile";
+
+import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
+import { useSetProfile } from "../hooks/useSetProfile";
+import { useUploadAvatar } from "../hooks/useUploadAvatar";
 
 export const EditProfileDialogContent = () => {
     const { mutateAsync: setProfile, isPending: isSettingProfile } =
@@ -26,7 +26,7 @@ export const EditProfileDialogContent = () => {
     const { mutateAsync: removeAvatar, isPending: isRemovingAvatar } =
         useRemoveAvatar();
 
-    const { setBustedUser, bustData, bustedUser } = useCacheBust();
+    const { setBustedUser } = useCacheBust();
 
     const { data: currentUser } = useCurrentUser();
     const {
