@@ -1081,6 +1081,7 @@ namespace psibase
          std::string_view c = *cursor;
          auto [ptr, ec]     = std::from_chars(c.data(), c.data() + c.size(), b);
          check(ec == std::errc{}, "Invalid cursor");
+         check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
          return b;
       }
 
