@@ -928,10 +928,18 @@ namespace psibase
       /// This replaces the current value. Returns error if n is negative.
       EventQuery& first(std::optional<int32_t> n)
       {
-         if (n.has_value() && n.value() < 0)
+         if (n.has_value())
          {
-            check(false, "'first' cannot be negative");
+            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
+            {
+               check(false, "'first' value out of range");
+            }
+            if (_last.has_value())
+            {
+               check(false, "Cannot specify both 'first' and 'last'");
+            }
          }
+
          _first = n;
          return *this;
       }
@@ -941,10 +949,18 @@ namespace psibase
       /// This replaces the current value. Returns error if n is negative.
       EventQuery& last(std::optional<int32_t> n)
       {
-         if (n.has_value() && n.value() < 0)
+         if (n.has_value())
          {
-            check(false, "'last' cannot be negative");
+            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
+            {
+               check(false, "'last' value out of range");
+            }
+            if (_first.has_value())
+            {
+               check(false, "Cannot specify both 'first' and 'last'");
+            }
          }
+
          _last = n;
          return *this;
       }
@@ -975,66 +991,7 @@ namespace psibase
       Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge"> query()
           const
       {
-         check(!(_first.has_value() && _last.has_value()),
-               "Cannot specify both 'first' and 'last'");
-
-         std::optional<int32_t> limit_plus_one;
-         bool                   descending = false;
-
-         if (_first.has_value())
-         {
-            check(_first.value() < std::numeric_limits<int32_t>::max(), "first value too large");
-            limit_plus_one = _first.value() + 1;
-            descending     = false;
-         }
-         else if (_last.has_value())
-         {
-            check(_last.value() < std::numeric_limits<int32_t>::max(), "last value too large");
-            limit_plus_one = _last.value() + 1;
-            descending     = true;
-         }
-
-         auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
-
-         if (_debug)
-         {
-            printf("EventQuery::query() SQL query str: %s\n", query_str.c_str());
-         }
-
-         auto json_str = sql_query(query_str);
-         if (_debug)
-         {
-            printf("EventQuery::query() Raw JSON response: %s\n", json_str.c_str());
-         }
-
-         auto rows = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
-
-         if (_debug)
-         {
-            printf("EventQuery::query() Rows: %zu\n", rows.size());
-            for (const auto& row : rows)
-            {
-               printf("EventQuery::query() Row %llu: %s\n", row.rowid,
-                      psio::convert_to_json(row.data).c_str());
-            }
-         }
-
-         auto has_next_page = has_next(rows, _before, _first, _last);
-         auto has_prev_page = has_previous(rows, _after);
-
-         if (_first.has_value() || _last.has_value())
-         {
-            auto user_limit = _first.has_value() ? _first.value() : _last.value();
-            if (rows.size() > static_cast<size_t>(user_limit))
-            {
-               rows.resize(user_limit);
-            }
-         }
-
-         if (_last.has_value())
-         {
-            std::reverse(rows.begin(), rows.end());
-         }
+         auto [rows, has_next_page, has_prev_page] = all_edges();
 
          using EdgeType = Edge<T, psio::reflect<T>::name + "Edge">;
          using ConnType =
@@ -1062,60 +1019,60 @@ namespace psibase
       }
 
      private:
-      bool has_row_after(const std::string& cursor) const
+      std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const
       {
-         auto next_query = generate_sql_query(1, false, std::nullopt, cursor);
-         return has_rows(next_query);
-      }
+         std::optional<int32_t> limit_plus_one;
+         bool                   descending = false;
 
-      bool has_row_before(const std::string& cursor) const
-      {
-         auto prev_query = generate_sql_query(1, false, cursor, std::nullopt);
-         return has_rows(prev_query);
-      }
-
-      static bool has_rows(const std::string& query)
-      {
-         auto json_str = sql_query(query);
-         auto rows     = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
-         return !rows.empty();
-      }
-
-      bool has_next(const std::vector<SqlRow<T>>&     rows,
-                    const std::optional<std::string>& before_opt,
-                    const std::optional<int32_t>&     first_opt,
-                    const std::optional<int32_t>&     last_opt) const
-      {
-         if (before_opt.has_value())
+         if (_first.has_value())
          {
-            return has_row_after(*before_opt);
+            limit_plus_one = _first.value() + 1;
          }
-         else
+         else if (_last.has_value())
          {
-            auto limit = first_opt.has_value() ? first_opt : last_opt;
-            if (limit.has_value())
+            limit_plus_one = _last.value() + 1;
+            descending     = true;
+         }
+
+         auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
+         auto json_str  = sql_query(query_str, _debug);
+         auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
+
+         if (_debug)
+         {
+            printf("EventQuery::query() Deserialized %zu rows\n", rows.size());
+         }
+
+         bool                   has_next_page = false;
+         bool                   has_prev_page = false;
+         std::optional<int32_t> user_limit;
+
+         if (_first.has_value())
+         {
+            has_next_page = rows.size() > static_cast<size_t>(_first.value());
+            user_limit    = _first;
+         }
+         else if (_last.has_value())
+         {
+            has_prev_page = rows.size() > static_cast<size_t>(_last.value());
+            user_limit    = _last;
+         }
+
+         if (user_limit.has_value())
+         {
+            auto limit = static_cast<size_t>(user_limit.value());
+            if (rows.size() > limit)
             {
-               return rows.size() > static_cast<size_t>(limit.value());
+               rows.resize(limit);
             }
-            return false;
          }
-      }
 
-      bool has_previous(const std::vector<SqlRow<T>>&     rows,
-                        const std::optional<std::string>& after_opt) const
-      {
-         if (after_opt.has_value())
+         if (_last.has_value())
          {
-            return has_row_before(*after_opt);
+            std::reverse(rows.begin(), rows.end());
          }
-         else if (!rows.empty())
-         {
-            return has_row_before(std::to_string(rows.front().rowid));
-         }
-         else
-         {
-            return false;
-         }
+
+         return {rows, has_next_page, has_prev_page};
       }
 
       uint64_t extract_cursor(std::optional<std::string> cursor) const
@@ -1175,9 +1132,21 @@ namespace psibase
          return query;
       }
 
-      static std::string sql_query(const std::string& query)
+      static std::string sql_query(const std::string& query, bool debug)
       {
-         return to<EventQueryInterface>("r-events"_a).sqlQuery(query);
+         if (debug)
+         {
+            printf("[EventQuery] SQL query str: %s\n", query.c_str());
+         }
+
+         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query);
+
+         if (debug)
+         {
+            printf("[EventQuery] Raw JSON response: %s\n", json_str.c_str());
+         }
+
+         return json_str;
       }
 
       std::string                _table_name;

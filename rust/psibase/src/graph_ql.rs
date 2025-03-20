@@ -463,10 +463,14 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
     /// This replaces the current value. Returns error if n is negative.
     pub fn first(mut self, first: Option<i32>) -> Self {
         if let Some(n) = first {
-            if n < 0 {
-                crate::abort_message("'first' cannot be negative");
+            if n < 0 || n == i32::MAX {
+                crate::abort_message("'first' value out of range");
+            }
+            if self.last.is_some() {
+                crate::abort_message("Cannot specify both 'first' and 'last'");
             }
         }
+
         self.first = first;
         self
     }
@@ -476,10 +480,14 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
     /// This replaces the current value. Returns error if n is negative.
     pub fn last(mut self, last: Option<i32>) -> Self {
         if let Some(n) = last {
-            if n < 0 {
-                crate::abort_message("'last' cannot be negative");
+            if n < 0 || n == i32::MAX {
+                crate::abort_message("'last' value out of range");
+            }
+            if self.first.is_some() {
+                crate::abort_message("Cannot specify both 'first' and 'last'");
             }
         }
+
         self.last = last;
         self
     }
@@ -504,49 +512,6 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
     pub fn after(mut self, after: Option<String>) -> Self {
         self.after = after;
         self
-    }
-
-    fn has_row_after(&self, cursor: &str) -> bool {
-        let next_query = self.generate_sql_query(Some(1), false, None, Some(cursor.to_string()));
-        Self::has_rows(next_query)
-    }
-
-    fn has_row_before(&self, cursor: &str) -> bool {
-        let prev_query = self.generate_sql_query(Some(1), false, Some(cursor.to_string()), None);
-        Self::has_rows(prev_query)
-    }
-
-    fn has_rows(query: String) -> bool {
-        let json = crate::services::r_events::Wrapper::call().sqlQuery(query);
-        let rows: Vec<SqlRow> = serde_json::from_str(&json).unwrap_or_default();
-        !rows.is_empty()
-    }
-
-    fn has_next(
-        &self,
-        rows: &[SqlRow],
-        before: Option<&String>,
-        first: Option<i32>,
-        last: Option<i32>,
-    ) -> bool {
-        if let Some(before_cursor) = before {
-            self.has_row_after(before_cursor)
-        } else {
-            match first.or(last) {
-                Some(n) => rows.len() > n as usize,
-                None => false,
-            }
-        }
-    }
-
-    fn has_previous(&self, rows: &[SqlRow], after: Option<&String>) -> bool {
-        if let Some(after_cursor) = after {
-            self.has_row_before(after_cursor)
-        } else if let Some(first_row) = rows.first() {
-            self.has_row_before(&first_row.rowid.to_string())
-        } else {
-            false
-        }
     }
 
     fn generate_sql_query(
@@ -586,20 +551,30 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         query
     }
 
-    /// Execute the query and return a Connection containing the results
-    ///
-    /// Returns error if both first and last are specified.
-    pub fn query(&self) -> async_graphql::Result<Connection<u64, T>> {
-        if self.first.is_some() && self.last.is_some() {
-            crate::abort_message("Cannot specify both 'first' and 'last'");
+    fn sql_query(&self, query: String) -> String {
+        if self.debug {
+            println!("[EventQuery] SQL query str: {}", query);
         }
 
-        let (limit_plus_one, descending) = match (self.first, self.last) {
-            (Some(n), None) => (n.checked_add(1), false),
-            (None, Some(n)) => (n.checked_add(1), true),
-            (None, None) => (None, false),
-            _ => unreachable!(),
-        };
+        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query);
+
+        if self.debug {
+            println!("[EventQuery] Raw JSON response: {}", json_str);
+        }
+
+        json_str
+    }
+
+    fn all_edges(&self) -> (Vec<SqlRow>, bool, bool) {
+        let mut limit_plus_one: Option<i32> = None;
+        let mut descending: bool = false;
+
+        if let Some(n) = self.first {
+            limit_plus_one = Some(n + 1);
+        } else if let Some(n) = self.last {
+            limit_plus_one = Some(n + 1);
+            descending = true;
+        }
 
         let query = self.generate_sql_query(
             limit_plus_one,
@@ -608,25 +583,27 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             self.after.clone(),
         );
 
-        if self.debug {
-            println!("EventQuery::query() SQL query str: {}", query);
-        }
-
-        let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query);
-        if self.debug {
-            println!("EventQuery::query() Raw JSON response: {}", json_str);
-        }
+        let json_str = self.sql_query(query);
         let mut rows: Vec<SqlRow> = serde_json::from_str(&json_str).unwrap_or_else(|e| {
             if self.debug {
-                println!("EventQuery::query() Failed to deserialize rows: {}", e);
+                println!("[EventQuery] Failed to deserialize rows: {}", e);
             }
             crate::abort_message(&format!("Failed to deserialize rows: {}", e))
         });
 
-        let has_next = self.has_next(&rows, self.before.as_ref(), self.first, self.last);
-        let has_previous = self.has_previous(&rows, self.after.as_ref());
+        let mut has_next_page = false;
+        let mut has_previous_page = false;
+        let mut user_limit: Option<i32> = None;
 
-        if let Some(user_limit) = self.first.or(self.last) {
+        if let Some(n) = self.first {
+            has_next_page = rows.len() > n as usize;
+            user_limit = Some(n);
+        } else if let Some(n) = self.last {
+            has_previous_page = rows.len() > n as usize;
+            user_limit = Some(n);
+        }
+
+        if let Some(user_limit) = user_limit {
             if rows.len() > user_limit as usize {
                 rows.truncate(user_limit as usize);
             }
@@ -636,31 +613,34 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             rows.reverse();
         }
 
-        let mut connection = Connection::new(has_previous, has_next);
-        for row in rows {
+        (rows, has_previous_page, has_next_page)
+    }
+
+    /// Execute the query and return a Connection containing the results
+    ///
+    /// Returns error if both first and last are specified.
+    pub fn query(&self) -> async_graphql::Result<Connection<u64, T>> {
+        let (edges, has_previous_page, has_next_page) = self.all_edges();
+
+        let mut connection = Connection::new(has_previous_page, has_next_page);
+        for edge in edges {
             if self.debug {
-                println!("Row data: {}", row.data);
+                println!("Edge data: {}", edge.data);
             }
-            match serde_json::from_value(row.data) {
+            match serde_json::from_value(edge.data) {
                 Ok(data) => {
-                    connection.edges.push(Edge::new(row.rowid, data));
+                    connection.edges.push(Edge::new(edge.rowid, data));
                 }
                 Err(e) => {
-                    if self.debug {
-                        println!("Failed to deserialize row {}: {}", row.rowid, e);
-                    }
                     crate::abort_message(&format!(
                         "Failed to deserialize row {}: {}",
-                        row.rowid, e
+                        edge.rowid, e
                     ));
                 }
             }
         }
 
-        if !connection.edges.is_empty() {
-            connection.has_previous_page = has_previous;
-            connection.has_next_page = has_next;
-        }
+        // PageInfo object is a dynamic resolver on the Connection type.
 
         Ok(connection)
     }
