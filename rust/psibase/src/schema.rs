@@ -10,10 +10,10 @@ type ActionMap = IndexMap<String, FunctionType>;
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct FieldId {
-    path: Vec<u32>,
+    pub path: Vec<u32>,
 }
 
-type IndexInfo = Vec<FieldId>;
+pub type IndexInfo = Vec<FieldId>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, PartialEq, Eq)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -66,8 +66,8 @@ pub trait ToEventsSchema {
     fn to_schema(builder: &mut SchemaBuilder) -> IndexMap<String, AnyType>;
 }
 
-pub trait ToTableSchema {
-    fn to_schema(builder: &mut SchemaBuilder) -> TableInfo;
+pub trait ToIndexSchema {
+    fn to_schema(builder: &mut SchemaBuilder) -> Vec<IndexInfo>;
 }
 
 pub trait ToDatabaseSchema {

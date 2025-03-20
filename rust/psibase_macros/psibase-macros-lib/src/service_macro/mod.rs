@@ -83,7 +83,10 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
-    let tables = options.tables.as_ref().map(|tables| proc_macro2::TokenStream::from_str(tables.as_str()).unwrap());
+    let tables = options
+        .tables
+        .as_ref()
+        .map(|tables| proc_macro2::TokenStream::from_str(tables.as_str()).unwrap());
     let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
@@ -459,7 +462,10 @@ fn process_mod(
             }
         });
 
-        let database_wrapper = tables.as_ref().map_or(quote!{ #psibase_mod::EmptyDatabase }, |tables| quote!{ super::#tables::TablesWrapper });
+        let database_wrapper = tables.as_ref().map_or(
+            quote! { #psibase_mod::EmptyDatabase },
+            |tables| quote! { super::#tables::TablesWrapper },
+        );
 
         items.push(parse_quote! {
             impl #psibase_mod::ToServiceSchema for #wrapper {

@@ -79,7 +79,8 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
         // Transform table attributes into expanded code
         let mut processed_tables = Vec::new();
         for (tb_name, items_idxs) in table_structs.iter() {
-            let table_idx = process_service_tables(psibase_mod, tb_name, items, items_idxs, &mut table_names);
+            let table_idx =
+                process_service_tables(psibase_mod, tb_name, items, items_idxs, &mut table_names);
             if table_idx.is_ok() {
                 processed_tables.push((tb_name, table_idx.unwrap()));
             }
