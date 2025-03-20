@@ -608,13 +608,17 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             self.after.clone(),
         );
 
+        if self.debug {
+            println!("EventQuery::query() SQL query str: {}", query);
+        }
+
         let json_str = crate::services::r_events::Wrapper::call().sqlQuery(query);
         if self.debug {
-            println!("Raw JSON string: {}", json_str);
+            println!("EventQuery::query() Raw JSON response: {}", json_str);
         }
         let mut rows: Vec<SqlRow> = serde_json::from_str(&json_str).unwrap_or_else(|e| {
             if self.debug {
-                println!("Failed to deserialize rows: {}", e);
+                println!("EventQuery::query() Failed to deserialize rows: {}", e);
             }
             crate::abort_message(&format!("Failed to deserialize rows: {}", e))
         });
