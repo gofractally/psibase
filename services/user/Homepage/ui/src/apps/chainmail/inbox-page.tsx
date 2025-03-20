@@ -6,6 +6,7 @@ import {
     MailList,
     MailboxHeader,
     MessageDetail,
+    NoMessageSelected,
 } from "@/apps/chainmail/components";
 import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
 
@@ -32,15 +33,19 @@ export default function InboxPage() {
                 />
             }
             right={
-                <MessageDetail
-                    message={selectedMessage ?? null}
-                    mailbox={"inbox"}
-                    onBack={
-                        display === "right"
-                            ? () => setSelectedMessageId("")
-                            : undefined
-                    }
-                />
+                selectedMessage ? (
+                    <MessageDetail
+                        message={selectedMessage ?? null}
+                        mailbox={"inbox"}
+                        onBack={
+                            display === "right"
+                                ? () => setSelectedMessageId("")
+                                : undefined
+                        }
+                    />
+                ) : (
+                    <NoMessageSelected>Select a message</NoMessageSelected>
+                )
             }
             header={<MailboxHeader>Inbox</MailboxHeader>}
             displayMode={display}
