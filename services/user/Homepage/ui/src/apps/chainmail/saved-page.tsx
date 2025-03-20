@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { TwoColumnSelect } from "@/components/TwoColumnSelect";
+import { TwoColumnSelect } from "@/components/two-column-select";
 
 import {
     MailList,

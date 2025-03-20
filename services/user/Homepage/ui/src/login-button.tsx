@@ -1,15 +1,17 @@
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { Button } from "./components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useConnectedAccounts } from "./hooks/useConnectedAccounts";
-import { useSelectAccount } from "./hooks/useSelectAccount";
-import { useChainId } from "./hooks/useChainId";
+
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
 import { createIdenticon } from "@/lib/createIdenticon";
+
+import { Button } from "./components/ui/button";
+import { useChainId } from "./hooks/use-chain-id";
+import { useConnectedAccounts } from "./hooks/use-connected-accounts";
+import { useSelectAccount } from "./hooks/use-select-account";
 
 export const LoginButton = () => {
     const { mutate: login, isPending } = useCreateConnectionToken();

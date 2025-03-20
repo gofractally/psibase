@@ -2,7 +2,7 @@
 pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::AccountNumber;
-    use psibase::{Fracpack, SingletonKey, ToSchema};
+    use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ProfileTable", index = 0)]

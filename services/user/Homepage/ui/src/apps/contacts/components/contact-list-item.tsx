@@ -1,8 +1,8 @@
 import { AvatarImage } from "@/components/ui/avatar";
 import { Avatar } from "@/components/ui/avatar";
 
-import { useAvatar } from "@/hooks/useAvatar";
-import { useProfile } from "@/hooks/useProfile";
+import { useAvatar } from "@/hooks/use-avatar";
+import { useProfile } from "@/hooks/use-profile";
 import { cn } from "@/lib/utils";
 
 import { LocalContact } from "../types";

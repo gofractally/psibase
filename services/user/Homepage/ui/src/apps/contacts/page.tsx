@@ -10,9 +10,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tooltip } from "@/components/ui/tooltip";
 
-import { TwoColumnSelect } from "@/components/TwoColumnSelect";
+import { TwoColumnSelect } from "@/components/two-column-select";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { ContactDetails } from "./components/contact-details";
 import { ContactListSection } from "./components/contact-list-section";

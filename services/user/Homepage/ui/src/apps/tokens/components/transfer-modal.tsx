@@ -8,11 +8,13 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useChainId } from "@/hooks/useChainId";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { Quantity } from "@/apps/tokens/lib/quantity";
-import { useAvatar } from "@/hooks/useAvatar";
 
 interface Props {
     open: boolean;

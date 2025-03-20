@@ -17,7 +17,7 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 
-import { useNavLocation } from "@/hooks/useNavLocation";
+import { useNavLocation } from "@/hooks/use-nav-location";
 
 import { LoadingBox } from "./apps/chainmail/components/empty-states";
 import {
@@ -27,7 +27,7 @@ import {
     CardHeader,
     CardTitle,
 } from "./components/ui/card";
-import { useCurrentUser } from "./hooks/useCurrentUser";
+import { useCurrentUser } from "./hooks/use-current-user";
 import { LoginButton } from "./login-button";
 
 const SplashScreen = () => {

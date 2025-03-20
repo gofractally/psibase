@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input";
 import { FormProfile } from "@/components/form-profile";
 
 import { AwaitTime } from "@/globals";
-import { useAvatar } from "@/hooks/useAvatar";
-import { useCacheBust } from "@/hooks/useCacheBust";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useProfile } from "@/hooks/useProfile";
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCacheBust } from "@/hooks/use-cache-bust";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
 
 import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
 import { useSetProfile } from "../hooks/useSetProfile";

@@ -1,4 +1,6 @@
 import { PlusCircle, TriangleAlert } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -6,11 +8,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { useSelectAccount } from "@/hooks/useSelectAccount";
-import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { useAvatar } from "@/hooks/useAvatar";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useSelectAccount } from "@/hooks/use-select-account";
 
 interface Props {}
 

@@ -28,9 +28,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { useAvatar } from "@/hooks/useAvatar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useProfile } from "@/hooks/useProfile";
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useProfile } from "@/hooks/use-profile";
 
 import { useDeleteContact } from "../hooks/useDeleteContact";
 import { useUpdateContact } from "../hooks/useUpdateContact";

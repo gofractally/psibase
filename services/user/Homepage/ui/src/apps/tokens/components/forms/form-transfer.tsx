@@ -1,9 +1,7 @@
-import {
-    TokenSelection,
-    RecipientInput,
-    FromInput,
-    AmountInput,
-} from "./fields";
+import { ArrowRight, Flame, Plus } from "lucide-react";
+import { FC } from "react";
+import { UseFormReturn } from "react-hook-form";
+
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -15,14 +13,20 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { cn } from "@/lib/utils";
+
+import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
 import { Tab, TabType } from "@/apps/tokens/hooks/useTab";
 import { FormSchema } from "@/apps/tokens/hooks/useTokenForm";
-import { Token } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { ArrowRight, Flame, Plus } from "lucide-react";
-import { FC } from "react";
-import { UseFormReturn } from "react-hook-form";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { cn } from "@/lib/utils";
+
+import {
+    AmountInput,
+    FromInput,
+    RecipientInput,
+    TokenSelection,
+} from "./fields";
 
 interface Props {
     form: UseFormReturn<FormSchema>;

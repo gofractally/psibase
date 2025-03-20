@@ -1,12 +1,15 @@
-import QueryKey from "@/lib/queryKeys";
 import { queryClient } from "@/main";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ProfileResponse } from "../../../hooks/useProfile";
-import { Account } from "@/lib/zod/Account";
+
+import { supervisor } from "@/supervisor";
+
 import { AwaitTime } from "@/globals";
+import QueryKey from "@/lib/queryKeys";
+import { Account } from "@/lib/zod/Account";
+
+import { ProfileResponse } from "../../../hooks/use-profile";
 
 const Params = z.object({
     displayName: z.string(),

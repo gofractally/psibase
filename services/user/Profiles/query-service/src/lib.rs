@@ -3,7 +3,6 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
-    use serde::Deserialize;
     use profiles::tables::Profile;
 
     struct Query;

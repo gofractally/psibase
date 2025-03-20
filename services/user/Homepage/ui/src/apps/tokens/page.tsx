@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { ConfirmationModal } from "@/components";
 
 import { AwaitTime } from "@/globals";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { wait } from "@/lib/wait";
 import { Account } from "@/lib/zod/Account";
 

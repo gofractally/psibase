@@ -1,11 +1,14 @@
-import { AwaitTime } from "@/globals";
 import { queryClient } from "@/main";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { setCurrentUser } from "./useCurrentUser";
-import { Account } from "@/lib/zod/Account";
+
+import { supervisor } from "@/supervisor";
+
+import { AwaitTime } from "@/globals";
 import QueryKey from "@/lib/queryKeys";
+import { Account } from "@/lib/zod/Account";
+
+import { setCurrentUser } from "./use-current-user";
 
 export const useSelectAccount = () =>
     useMutation<void, Error, string>({

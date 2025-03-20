@@ -1,10 +1,11 @@
-import { generateAvatar } from "@/lib/createIdenticon";
-import { useChainId } from "@/hooks/useChainId";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { siblingUrl } from "@psibase/common-lib";
-import { useProfile } from "./useProfile";
 
-import { useCacheBust } from "./useCacheBust";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { generateAvatar } from "@/lib/createIdenticon";
+
+import { useCacheBust } from "./use-cache-bust";
+import { useProfile } from "./use-profile";
 
 export const useAvatar = (
     user?: string | null | undefined,

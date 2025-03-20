@@ -50,16 +50,16 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 
-import { useAvatar } from "@/hooks/useAvatar";
-import { useCanExportAccount } from "@/hooks/useCanExportAccount";
-import { useChainId } from "@/hooks/useChainId";
-import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useGenerateInvite } from "@/hooks/useGenerateInvite";
-import { useLogout } from "@/hooks/useLogout";
-import { useProfile } from "@/hooks/useProfile";
-import { useSelectAccount } from "@/hooks/useSelectAccount";
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCanExportAccount } from "@/hooks/use-can-export-account";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGenerateInvite } from "@/hooks/use-generate-invite";
+import { useLogout } from "@/hooks/use-logout";
+import { useProfile } from "@/hooks/use-profile";
+import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
 import { Account } from "@/lib/zod/Account";
 
