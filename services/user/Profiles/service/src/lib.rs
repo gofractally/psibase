@@ -5,21 +5,7 @@ pub mod tables {
     use psibase::{Fracpack, SingletonKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "ExampleThingTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ExampleThing {
-        pub thing: String,
-    }
-
-    #[table(name = "ProfileTable", index = 2)]
+    #[table(name = "ProfileTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Profile {
         #[primary_key]
@@ -29,66 +15,15 @@ pub mod tables {
         pub bio: String,
         pub avatar: bool,
     }
-
-    impl ExampleThing {
-        #[primary_key]
-        fn pk(&self) -> SingletonKey {
-            SingletonKey {}
-        }
-    }
 }
 
 #[psibase::service(name = "profiles")]
 pub mod service {
-    use crate::tables::{
-        ExampleThing, ExampleThingTable, InitRow, InitTable, Profile, ProfileTable,
-    };
+    use crate::tables::{Profile, ProfileTable};
     use psibase::*;
 
     #[action]
-    fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-
-        // Configures this service within the event service
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
-
-        // Initial service configuration
-        let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&SingletonKey {}).is_none() {
-            thing_table
-                .put(&ExampleThing {
-                    thing: String::from("default thing"),
-                })
-                .unwrap();
-        }
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn setExampleThing(thing: String) {
-        let table = ExampleThingTable::new();
-        let old_thing = table
-            .get_index_pk()
-            .get(&SingletonKey {})
-            .unwrap_or_default()
-            .thing;
-
-        table
-            .put(&ExampleThing {
-                thing: thing.clone(),
-            })
-            .unwrap();
-    }
+    fn init() {}
 
     #[action]
     #[allow(non_snake_case)]
@@ -115,17 +50,6 @@ pub mod service {
     fn getProfile(account: AccountNumber) -> Option<Profile> {
         let table = ProfileTable::new();
         table.get_index_pk().get(&account)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getExampleThing() -> String {
-        let table = ExampleThingTable::new();
-        table
-            .get_index_pk()
-            .get(&SingletonKey {})
-            .unwrap_or_default()
-            .thing
     }
 
     #[event(history)]

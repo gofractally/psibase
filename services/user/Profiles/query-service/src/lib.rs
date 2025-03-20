@@ -6,28 +6,11 @@ mod service {
     use serde::Deserialize;
     use profiles::tables::Profile;
 
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
-
     struct Query;
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            profiles::Wrapper::call().getExampleThing()
-        }
-
-        /// This query gets the historical updates of the Example Thing.
-        async fn historical_updates(&self) -> Vec<HistoricalUpdate> {
-            let json_str = services::r_events::Wrapper::call()
-                .sqlQuery("SELECT * FROM \"history.profiles.updated\" ORDER BY ROWID".to_string());
-            serde_json::from_str(&json_str).unwrap_or_default()
-        }
-
+        
         async fn profile(&self, account: AccountNumber) -> Option<Profile> {
             profiles::Wrapper::call().getProfile(account)
         }

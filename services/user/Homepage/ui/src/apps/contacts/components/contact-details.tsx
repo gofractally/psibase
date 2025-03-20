@@ -224,6 +224,13 @@ export function ContactDetails({
                             </div>
                         </div>
                     )}
+                    {profile?.profile?.bio && (
+                        <div className="flex flex-col gap-1">
+                            <div className="text-sm text-muted-foreground">
+                                {profile?.profile?.bio}
+                            </div>
+                        </div>
+                    )}
                     <div className="flex w-full justify-center gap-2 text-muted-foreground ">
                         <Button
                             onClick={() => onTransferFunds(contact.account)}
