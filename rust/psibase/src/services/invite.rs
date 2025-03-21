@@ -1,5 +1,5 @@
 pub use crate::services::auth_sig::SubjectPublicKeyInfo;
-use crate::{account, AccountNumber, TimePointUSec};
+use crate::{account, AccountNumber};
 use async_graphql::{InputObject, SimpleObject};
 use fracpack::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -51,14 +51,6 @@ pub struct InviteRecord {
     secret: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-pub struct Updated {
-    pub inviteId: u32,
-    pub actor: AccountNumber,
-    pub datetime: TimePointUSec,
-    pub event: String,
-}
-
 #[derive(Debug, Copy, Clone, Pack, Unpack, Serialize, Deserialize, SimpleObject, InputObject)]
 #[fracpack(fracpack_mod = "fracpack")]
 #[graphql(input_name = "NewAccountRecordInput")]
@@ -74,7 +66,7 @@ pub const PAYER_ACCOUNT: AccountNumber = account!("invited-sys");
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
-    use crate::AccountNumber;
+    use crate::{AccountNumber, TimePointUSec};
 
     #[action]
     fn createInvite(
@@ -109,6 +101,11 @@ mod service {
 
     #[action]
     fn delExpired(maxDeleted: u32) {
+        unimplemented!()
+    }
+
+    #[event(history)]
+    pub fn updated(inviteId: u32, actor: AccountNumber, datetime: TimePointUSec, event: String) {
         unimplemented!()
     }
 
