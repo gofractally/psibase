@@ -123,8 +123,14 @@ export function NavUser() {
 
     const { setTheme } = useTheme();
 
-    const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
-        useConnectedAccounts();
+    const {
+        data: connectedAccountsData,
+        isFetched: isFetchedConnectedAccounts,
+    } = useConnectedAccounts();
+
+    const connectedAccounts = connectedAccountsData.filter(
+        (account) => account.toLowerCase() !== currentUser?.toLowerCase(),
+    );
 
     const { mutateAsync: login } = useCreateConnectionToken();
     const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
