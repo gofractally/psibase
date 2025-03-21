@@ -2,7 +2,7 @@ import { Account } from "@/lib/zod/Account";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 import { supervisor } from "@/supervisor";
-import { removeUserFromCache } from "./useContacts";
+import { removeUserFromCache } from "./use-contacts";
 import { queryClient } from "@/main";
 import QueryKey from "@/lib/queryKeys";
 import { toast } from "sonner";

@@ -11,7 +11,6 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -32,8 +31,8 @@ import { useAvatar } from "@/hooks/use-avatar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
-import { useDeleteContact } from "../hooks/useDeleteContact";
-import { useUpdateContact } from "../hooks/useUpdateContact";
+import { useDeleteContact } from "../hooks/use-delete-contact";
+import { useUpdateContact } from "../hooks/use-update-contact";
 import { LocalContact } from "../types";
 import { formatNames } from "../utils/formatNames";
 import { ContactForm } from "./contact-form";

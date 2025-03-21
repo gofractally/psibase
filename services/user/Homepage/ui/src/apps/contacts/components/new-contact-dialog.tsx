@@ -10,7 +10,7 @@ import {
 
 import { Account } from "@/lib/zod/Account";
 
-import { useCreateContact } from "../hooks/useCreateContact";
+import { useCreateContact } from "../hooks/use-create-contact";
 import { ContactForm } from "./contact-form";
 
 interface Props {

@@ -8,7 +8,7 @@ import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
 import { LocalContact, zLocalContact } from "../types";
-import { upsertUserToCache } from "./useContacts";
+import { upsertUserToCache } from "./use-contacts";
 
 export const useCreateContact = () => {
     const queryClient = useQueryClient();

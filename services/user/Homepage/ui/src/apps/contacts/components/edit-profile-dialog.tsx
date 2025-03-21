@@ -15,9 +15,9 @@ import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@/hooks/use-profile";
 
-import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
-import { useSetProfile } from "../hooks/useSetProfile";
-import { useUploadAvatar } from "../hooks/useUploadAvatar";
+import { useRemoveAvatar } from "../hooks/use-remove-avatar";
+import { useSetProfile } from "../hooks/use-set-profile";
+import { useUploadAvatar } from "../hooks/use-upload-avatar";
 
 interface Props {
     onClose: () => void;

@@ -17,8 +17,8 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { ContactDetails } from "./components/contact-details";
 import { ContactListSection } from "./components/contact-list-section";
 import { NewContactDialog } from "./components/new-contact-dialog";
-import { useContacts } from "./hooks/useContacts";
-import { useCreateContact } from "./hooks/useCreateContact";
+import { useContacts } from "./hooks/use-contacts";
+import { useCreateContact } from "./hooks/use-create-contact";
 
 export const ContactsPage = () => {
     const { data: currentUser } = useCurrentUser();
