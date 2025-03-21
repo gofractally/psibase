@@ -69,8 +69,8 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    check(isNew, inviteAlreadyExists.data());
    auto inviter = getSender();
 
-   Seconds secondsInWeek{60 * 60 * 24 * 7};
-   auto    now = to<Transact>().currentBlock().time;
+   auto secondsInWeek = std::chrono::duration_cast<Seconds>(std::chrono::weeks(1));
+   auto now           = to<Transact>().currentBlock().time;
 
    auto     idx      = inviteTable.getIndex<0>();
    uint32_t inviteId = (idx.empty()) ? 0 : (*(--idx.end())).inviteId + 1;
