@@ -28,6 +28,7 @@ export default function SentPage() {
                     messages={query.data ?? []}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
+                    isLoading={query.isLoading}
                 />
             }
             right={

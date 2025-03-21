@@ -5,10 +5,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { formatDistanceToNow } from "@/apps/chainmail/utils";
 
+import { EmptyBox, LoadingBox } from "./empty-states";
+
 interface SharedProps {
     mailbox: Mailbox;
     selectedMessage?: Message | DraftMessage;
     onSelectMessage: (id: string) => void;
+    isLoading?: boolean;
 }
 
 export interface MailListProps extends SharedProps {
@@ -20,7 +23,16 @@ export function MailList({
     messages,
     selectedMessage,
     onSelectMessage,
+    isLoading,
 }: MailListProps) {
+    if (isLoading) {
+        return <LoadingBox />;
+    }
+
+    if (messages.length === 0) {
+        return <EmptyBox>No messages</EmptyBox>;
+    }
+
     return (
         <ScrollArea className="h-full w-full">
             <div className="divide-y">

@@ -24,6 +24,7 @@ export default function ArchivePage() {
         <TwoColumnSelect
             left={
                 <MailList
+                    isLoading={query.isLoading}
                     mailbox={"archived"}
                     messages={query.data ?? []}
                     onSelectMessage={setSelectedMessageId}

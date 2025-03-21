@@ -30,6 +30,7 @@ export default function InboxPage() {
                     messages={query.data ?? []}
                     onSelectMessage={setSelectedMessageId}
                     selectedMessage={selectedMessage}
+                    isLoading={query.isLoading}
                 />
             }
             right={
