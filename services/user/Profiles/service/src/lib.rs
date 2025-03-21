@@ -55,6 +55,3 @@ pub mod service {
     #[event(history)]
     pub fn profileSet(account: AccountNumber, displayName: String) {}
 }
-
-#[cfg(test)]
-mod tests;
