@@ -19,7 +19,11 @@ import { useRemoveAvatar } from "../hooks/useRemoveAvatar";
 import { useSetProfile } from "../hooks/useSetProfile";
 import { useUploadAvatar } from "../hooks/useUploadAvatar";
 
-export const EditProfileDialogContent = () => {
+interface Props {
+    onClose: () => void;
+}
+
+export const EditProfileDialogContent = ({ onClose }: Props) => {
     const { mutateAsync: setProfile, isPending: isSettingProfile } =
         useSetProfile();
 
@@ -144,6 +148,7 @@ export const EditProfileDialogContent = () => {
                             displayName: data.displayName,
                             avatar: currentAvatar,
                         });
+                        onClose();
                         return data;
                     }}
                 />

@@ -102,7 +102,7 @@ export function ContactDetails({
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                 )}
-                <div className="flex flex-1 justify-between text-lg font-semibold">
+                <div className="flex flex-1 items-center justify-between text-lg font-semibold">
                     <h2 className="text-lg">{primaryName}</h2>
                     <DropdownMenu>
                         <DropdownMenuTrigger>
@@ -202,7 +202,11 @@ export function ContactDetails({
                         </DialogFooter>
                     </DialogContent>
                 ) : modalPage === modalPages.Values.editProfile ? (
-                    <EditProfileDialogContent />
+                    <EditProfileDialogContent
+                        onClose={() => {
+                            closeModal();
+                        }}
+                    />
                 ) : (
                     <DialogContent>
                         <div>Error: Unrecognised modal page</div>

@@ -79,7 +79,7 @@ export const TransferModal = ({
                                 </div>
                                 <div>
                                     <img
-                                        className="h-20 w-20   border"
+                                        className="h-20 w-20 border object-cover"
                                         src={
                                             label == "From"
                                                 ? fromAvatar

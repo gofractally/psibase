@@ -160,7 +160,13 @@ export function NavUser() {
             {modalType == "generateInvite" && (
                 <InviteDialogContent generateInvite={generateInvite} />
             )}
-            {modalType == "editProfile" && <EditProfileDialogContent />}
+            {modalType == "editProfile" && (
+                <EditProfileDialogContent
+                    onClose={() => {
+                        setShowModal(false);
+                    }}
+                />
+            )}
             <SidebarMenu>
                 <SidebarMenuItem>
                     <DropdownMenu>
