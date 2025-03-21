@@ -1,5 +1,8 @@
 #pragma once
 
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 #include <psibase/Table.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
@@ -871,134 +874,316 @@ namespace psibase
       return ok;
    }  // gql_query(EventDecoder)
 
+   struct EventQueryInterface
+   {
+      std::string sqlQuery(const std::string& squery);
+   };
+   PSIO_REFLECT(EventQueryInterface, method(sqlQuery, query))
+
    template <typename T>
-   concept EventType = requires(T events) {
-      typename decltype(events)::History;
-      // Don't require Ui and Merkle for now
-      //typename decltype(events)::Ui;
-      //typename decltype(events)::Merkle;
+   struct SqlRow
+   {
+      uint64_t rowid;
+      T        data;
+      PSIO_REFLECT(SqlRow, rowid, data)
    };
 
-   /// GraphQL support for decoding multiple events
+   /// GraphQL Pagination through Event tables
    ///
-   /// If a GraphQL query function returns this type, then the system
-   /// returns a GraphQL object with the following query methods:
+   /// Event tables are stored in an SQLite database in a service.
    ///
-   /// ```text
-   /// type MyService_Events {
-   ///     history(ids: [String!]!): [MyService_EventsHistory!]!
-   ///     ui(ids: [String!]!):      [MyService_EventsUi!]!
-   ///     merkle(ids: [String!]!):  [MyService_EventsMerkle!]!
-   /// }
-   /// ```
+   /// This interface allows you to query the event tables using the
+   /// [GraphQL Pagination Spec](https://relay.dev/graphql/connections.htm).
    ///
-   /// These methods take an array of event IDs. They return arrays
-   /// of objects containing the decoded (if possible) events.
-   /// See [EventDecoder] for how to interact with the return values;
-   /// `MyService_EventsHistory`, `MyService_EventsUi`, and
-   /// `MyService_EventsMerkle` all behave the same.
+   /// `condition` defines a SQL WHERE clause filter.
+   /// `first`, `last`, `before`, and `after` page through the results.
    ///
-   ///
-   /// #### EventQuery example
-   ///
-   /// This example assumes you're already [serving GraphQL](#psibaseservegraphql) and
-   /// have [defined events](services-events.md#defining-events) for your service.
-   ///
-   /// ```c++
-   /// struct Query
-   /// {
-   ///    psibase::AccountNumber service;
-   ///
-   ///    auto events() const
-   ///    {
-   ///       return psibase::EventQuery<MyService::Events>{service};
-   ///    }
-   /// };
-   /// PSIO_REFLECT(Query, method(events))
-   /// ```
-   ///
-   /// Example query:
-   ///
-   /// ```text
-   /// {
-   ///   events {
-   ///     history(ids: ["3", "4"]) {
-   ///       event_id
-   ///       event_all_content
-   ///     }
-   ///   }
-   /// }
-   /// ```
-   ///
-   /// Example reply:
-   ///
-   /// ```text
-   /// {
-   ///   "data": {
-   ///     "events": {
-   ///       "history": [
-   ///         {
-   ///           "event_id": "3",
-   ///           "tokenId": 1,
-   ///           "creator": "tokens",
-   ///           "precision": {
-   ///             "value": 8
-   ///           },
-   ///           "maxSupply": {
-   ///             "value": "100000000000000000"
-   ///           }
-   ///         },
-   ///         {
-   ///           "event_id": "4",
-   ///           "prevEvent": 1,
-   ///           "tokenId": "3",
-   ///           "setter": "tokens",
-   ///           "flag": "untradeable",
-   ///           "enable": true
-   ///         }
-   ///       ]
-   ///     }
-   ///   }
-   /// }
-   /// ```
-   template <EventType Events>
-   struct EventQuery
+   /// They conform to the Pagination Spec, except that simultaneous `first`
+   /// and `last` arguments are forbidden, rather than simply discouraged.
+   template <typename T>
+   class EventQuery
    {
-      AccountNumber service;
+     public:
+      /// Create a new query for the given table
+      explicit EventQuery(std::string table_name) : _table_name(std::move(table_name)) {}
 
-      /// Decode history events
-      auto history(const std::vector<uint64_t>& ids) const
+      /// Enable debug output printing
+      EventQuery& with_debug_output()
       {
-         std::vector<EventDecoder<typename Events::History>> result;
-         result.reserve(ids.size());
-         for (auto id : ids)
-            result.push_back({DbId::historyEvent, id, service});
-         return result;
+         _debug = true;
+         return *this;
       }
 
-      /// Decode user interface events
-      auto ui(const std::vector<uint64_t>& ids) const
+      /// Add a SQL WHERE clause condition to filter results
+      ///
+      /// This replaces the current condition if one exists.
+      EventQuery& condition(std::string cond)
       {
-         std::vector<EventDecoder<typename Events::Ui>> result;
-         result.reserve(ids.size());
-         for (auto id : ids)
-            result.push_back({DbId::uiEvent, id, service});
-         return result;
+         _condition = std::move(cond);
+         return *this;
       }
 
-      /// Decode merkle events
-      auto merkle(const std::vector<uint64_t>& ids) const
+      /// Limit the result to the first `n` matching records.
+      ///
+      /// This replaces the current value. Returns error if n is negative.
+      EventQuery& first(std::optional<int32_t> n)
       {
-         std::vector<EventDecoder<typename Events::Merkle>> result;
-         result.reserve(ids.size());
-         for (auto id : ids)
-            result.push_back({DbId::merkleEvent, id, service});
-         return result;
+         if (n.has_value())
+         {
+            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
+            {
+               check(false, "'first' value out of range");
+            }
+            if (_last.has_value())
+            {
+               check(false, "Cannot specify both 'first' and 'last'");
+            }
+         }
+
+         _first = n;
+         return *this;
       }
 
-      PSIO_REFLECT(EventQuery, method(history, ids), method(ui, ids), method(merkle, ids))
+      /// Limit the result to the last `n` matching records.
+      ///
+      /// This replaces the current value. Returns error if n is negative.
+      EventQuery& last(std::optional<int32_t> n)
+      {
+         if (n.has_value())
+         {
+            if (n.value() < 0 || n.value() == std::numeric_limits<int32_t>::max())
+            {
+               check(false, "'last' value out of range");
+            }
+            if (_first.has_value())
+            {
+               check(false, "Cannot specify both 'first' and 'last'");
+            }
+         }
 
-      friend auto get_type_name(EventQuery*) { return psio::get_type_name<Events>(); }
+         _last = n;
+         return *this;
+      }
+
+      /// Resume paging. Limits the result to records before `cursor`.
+      /// `cursor` is opaque; get it from a previously-returned Connection.
+      ///
+      /// This replaces the current value.
+      EventQuery& before(std::optional<std::string> cursor)
+      {
+         _before = std::move(cursor);
+         return *this;
+      }
+
+      /// Resume paging. Limits the result to records after `cursor`.
+      /// `cursor` is opaque; get it from a previously-returned Connection.
+      ///
+      /// This replaces the current value.
+      EventQuery& after(std::optional<std::string> cursor)
+      {
+         _after = std::move(cursor);
+         return *this;
+      }
+
+      /// Execute the query and return a Connection containing the results
+      ///
+      /// Returns error if both first and last are specified.
+      Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge"> query()
+          const
+      {
+         auto [rows, has_next_page, has_prev_page] = all_edges();
+
+         using EdgeType = Edge<T, psio::reflect<T>::name + "Edge">;
+         using ConnType =
+             Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+
+         ConnType connection;
+         connection.pageInfo.hasNextPage     = has_next_page;
+         connection.pageInfo.hasPreviousPage = has_prev_page;
+
+         for (const auto& row : rows)
+         {
+            EdgeType edge;
+            edge.node   = row.data;
+            edge.cursor = std::to_string(row.rowid);
+            connection.edges.push_back(std::move(edge));
+         }
+
+         if (!connection.edges.empty())
+         {
+            connection.pageInfo.startCursor = connection.edges.front().cursor;
+            connection.pageInfo.endCursor   = connection.edges.back().cursor;
+         }
+
+         return connection;
+      }
+
+     private:
+      std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const
+      {
+         std::optional<int32_t> limit_plus_one;
+         bool                   descending = false;
+
+         if (_first.has_value())
+         {
+            limit_plus_one = _first.value() + 1;
+         }
+         else if (_last.has_value())
+         {
+            limit_plus_one = _last.value() + 1;
+            descending     = true;
+         }
+
+         auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
+         auto json_str  = sql_query(query_str, _debug);
+         auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
+
+         if (_debug)
+         {
+            printf("EventQuery::query() Deserialized %zu rows\n", rows.size());
+         }
+
+         bool                   has_next_page = false;
+         bool                   has_prev_page = false;
+         std::optional<int32_t> user_limit;
+
+         if (_first.has_value())
+         {
+            has_next_page = rows.size() > static_cast<size_t>(_first.value());
+            user_limit    = _first;
+         }
+         else if (_last.has_value())
+         {
+            has_prev_page = rows.size() > static_cast<size_t>(_last.value());
+            user_limit    = _last;
+         }
+
+         if (user_limit.has_value())
+         {
+            auto limit = static_cast<size_t>(user_limit.value());
+            if (rows.size() > limit)
+            {
+               rows.resize(limit);
+            }
+         }
+
+         if (_last.has_value())
+         {
+            std::reverse(rows.begin(), rows.end());
+         }
+
+         return {rows, has_next_page, has_prev_page};
+      }
+
+      uint64_t extract_cursor(std::optional<std::string> cursor) const
+      {
+         uint64_t         b{};
+         std::string_view c = *cursor;
+         auto [ptr, ec]     = std::from_chars(c.data(), c.data() + c.size(), b);
+         check(ec == std::errc{}, "Invalid cursor");
+         check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
+         return b;
+      }
+
+      std::string generate_sql_query(std::optional<int32_t>     limit,
+                                     bool                       descending,
+                                     std::optional<std::string> before,
+                                     std::optional<std::string> after) const
+      {
+         std::vector<std::string> filters;
+
+         if (_condition.has_value() && !_condition->empty())
+         {
+            filters.push_back(*_condition);
+         }
+
+         if (before.has_value())
+         {
+            filters.push_back(std::format("ROWID < {}", extract_cursor(before)));
+         }
+
+         if (after.has_value())
+         {
+            filters.push_back(std::format("ROWID > {}", extract_cursor(after)));
+         }
+
+         auto order = descending ? "DESC" : "ASC";
+         auto query = std::format("SELECT ROWID, * FROM \"{}\"", _table_name);
+
+         if (!filters.empty())
+         {
+            query += " WHERE ";
+            bool first = true;
+            for (const auto& filter : filters)
+            {
+               if (!first)
+                  query += " AND ";
+               query += filter;
+               first = false;
+            }
+         }
+
+         query += std::format(" ORDER BY ROWID {}", order);
+
+         if (limit.has_value())
+         {
+            query += std::format(" LIMIT {}", limit.value());
+         }
+
+         return query;
+      }
+
+      static std::string sql_query(const std::string& query, bool debug)
+      {
+         if (debug)
+         {
+            printf("[EventQuery] SQL query str: %s\n", query.c_str());
+         }
+
+         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query);
+
+         if (debug)
+         {
+            printf("[EventQuery] Raw JSON response: %s\n", json_str.c_str());
+         }
+
+         return json_str;
+      }
+
+      std::string                _table_name;
+      std::optional<std::string> _condition;
+      std::optional<int32_t>     _first;
+      std::optional<int32_t>     _last;
+      std::optional<std::string> _before;
+      std::optional<std::string> _after;
+      bool                       _debug = false;
+
    };  // EventQuery
+
+   template <typename T>
+   void from_json(SqlRow<T>& s, auto& stream)
+   {
+      from_json_object(stream,
+                       [&](std::string_view key)
+                       {
+                          if (key == "rowid")
+                          {
+                             std::string rowid_str;
+                             from_json(rowid_str, stream);
+                             auto [ptr, ec] = std::from_chars(
+                                 rowid_str.data(), rowid_str.data() + rowid_str.size(), s.rowid);
+                             check(ec == std::errc{}, "Invalid rowid");
+                          }
+                          else
+                          {
+                             bool found = psio::get_data_member<T>(
+                                 key, [&](auto member) { from_json(s.data.*member, stream); });
+                             if (!found)
+                             {
+                                from_json_skip_value(stream);
+                             }
+                          }
+                       });
+   }
 
 }  // namespace psibase

@@ -423,6 +423,8 @@ namespace psibase
          return KvIterator<T>(db, std::move(copy), prefix.size(), is_secondary, true);
       }
 
+      bool empty() const { return begin() == end(); }
+
       /// Get iterator to first object with `key >= k`
       ///
       /// If the index's key is an `std::tuple`, then `k` may be the first `n` fields

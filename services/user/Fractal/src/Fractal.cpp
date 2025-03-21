@@ -40,12 +40,7 @@ void Fractal::init()
 
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "identityAdded"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invCreated"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invReceived"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 0);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 1);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invAccepted"_m, 2);
-   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "invRejected"_m, 0);
+   to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "updated"_m, 0);
 }
 
 void Fractal::createIdentity()
@@ -89,10 +84,11 @@ void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
    auto fracRecord   = fractalTable.get(fractal);
    check(fracRecord.has_value(), "fractal DNE");
 
-   to<InviteNs::Invite>().createInvite(pubkey, std::nullopt, std::nullopt, service, std::nullopt);
+   auto inviteId = to<InviteNs::Invite>().createInvite(pubkey, std::nullopt, std::nullopt, service,
+                                                       std::nullopt);
 
    auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(pubkey);
+   auto invite      = inviteTable.get(inviteId);
    check(not invite.has_value(), "invite already exists");
 
    auto sender      = getSender();
@@ -100,25 +96,26 @@ void Fractal::invite(AccountNumber fractal, PublicKey pubkey)
    auto member      = memberTable.get(MembershipKey{sender, fractal});
    check(member.has_value(), "only members can invite others to a fractal");
 
-   auto record = InviteRecord{pubkey, sender, fractal, psibase::AccountNumber{0}};
+   auto record = InviteRecord{inviteId, pubkey, sender, fractal, psibase::AccountNumber{0}};
    inviteTable.put(record);
 
    // Save stats? total invites created?
 
-   emit().history().invCreated(pubkey, sender, fractal);
+   emit().history().updated(inviteId, sender, to<Transact>().currentBlock().time,
+                            InviteEventType::created);
 }
 
-void Fractal::claim(PublicKey inviteKey)
+void Fractal::claim(uint32_t inviteId)
 {
    auto inviteTable   = Tables().open<InviteTable>();
-   auto fractalInvite = inviteTable.get(inviteKey);
+   auto fractalInvite = inviteTable.get(inviteId);
    check(fractalInvite.has_value(),
          "This invite does not exist. It is either not a fractal invite, or could have been "
          "deleted after expiry.");
    check(fractalInvite->recipient == AccountNumber{0}, "this invite has already been claimed");
 
    auto sender = getSender();
-   to<InviteNs::Invite>().checkClaim(sender, inviteKey);
+   to<InviteNs::Invite>().checkClaim(sender, inviteId);
 
    // Save the claimant account name with the invite
    auto record      = *fractalInvite;
@@ -130,17 +127,18 @@ void Fractal::claim(PublicKey inviteKey)
    newIdentity(sender, requireNew);
 
    // Invite has officially been accepted/associated with an account. No need to keep original inv object
-   to<InviteNs::Invite>().delInvite(inviteKey);
+   to<InviteNs::Invite>().delInvite(inviteId);
 
-   emit().history().invReceived(inviteKey, sender, record.fractal);
+   emit().history().updated(inviteId, sender, to<Transact>().currentBlock().time,
+                            InviteEventType::claimed);
 }
 
-void Fractal::accept(PublicKey inviteKey)
+void Fractal::accept(uint32_t inviteId)
 {
    auto sender = getSender();
 
    auto inviteTable = Tables().open<InviteTable>();
-   auto record      = inviteTable.get(inviteKey);
+   auto record      = inviteTable.get(inviteId);
    check(record.has_value(), "invite DNE");
 
    auto identityTable = Tables().open<IdentityTable>();
@@ -151,7 +149,7 @@ void Fractal::accept(PublicKey inviteKey)
    auto fractal = invite.fractal;
    if (invite.recipient != sender)
    {
-      claim(inviteKey);
+      claim(inviteId);
    }
    auto fractalTable = Tables().open<FractalTable>();
    auto fracRecord   = fractalTable.get(fractal);
@@ -169,26 +167,28 @@ void Fractal::accept(PublicKey inviteKey)
    for (auto inv : idx)
    {
       if (inv.fractal == fractal)
-         reject(inv.key);
+         reject(inv.inviteId);
    }
 
-   emit().history().invAccepted(inviteKey, invite.creator, fractal, sender);
+   emit().history().updated(inviteId, sender, to<Transact>().currentBlock().time,
+                            InviteEventType::accepted);
 }
 
-void Fractal::reject(PublicKey inviteKey)
+void Fractal::reject(uint32_t inviteId)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
-   auto invite      = inviteTable.get(inviteKey);
+   auto invite      = inviteTable.get(inviteId);
    check(invite.has_value(), "invite DNE");
    if (invite->recipient != sender)
    {
-      claim(inviteKey);
+      claim(inviteId);
    }
 
    inviteTable.remove(*invite);
 
-   emit().history().invRejected(inviteKey, sender, invite->fractal);
+   emit().history().updated(inviteId, sender, to<Transact>().currentBlock().time,
+                            InviteEventType::rejected);
 }
 
 void Fractal::registerType()
@@ -293,9 +293,9 @@ struct Queries
       return Fractal::Tables(Fractal::service).open<IdentityTable>().get(user);
    }
 
-   auto getInvite(FractalNs::PublicKey pubkey) const
+   auto getInvite(uint32_t inviteId) const
    {  //
-      return Fractal::Tables(Fractal::service).open<InviteTable>().get(pubkey);
+      return Fractal::Tables(Fractal::service).open<InviteTable>().get(inviteId);
    }
 
    auto getMember(AccountNumber user, AccountNumber fractal) const
@@ -304,29 +304,12 @@ struct Queries
       return Fractal::Tables(Fractal::service).open<MemberTable>().get(key);
    }
 
-   auto getFractals(AccountNumber           user,
-                    optional<AccountNumber> gt,
-                    optional<AccountNumber> ge,
-                    optional<AccountNumber> lt,
-                    optional<AccountNumber> le,
-                    optional<uint32_t>      first,
-                    optional<uint32_t>      last,
-                    optional<string>        before,
-                    optional<string>        after) const
+   auto getFractals(AccountNumber user) const
    {
-      auto idx = Fractal::Tables{Fractal::service}.open<MemberTable>().getIndex<1>().subindex(user);
-
-      auto convert = [](const auto& opt)
-      {
-         optional<tuple<AccountNumber>> ret;
-         if (opt)
-            ret.emplace(std::make_tuple(opt.value()));
-         return ret;
-      };
-
-      return makeConnection<Connection<MembershipRecord, "MemConnection", "MemEdge">>(
-          idx, {convert(gt)}, {convert(ge)}, {convert(lt)}, {convert(le)}, first, last, before,
-          after);
+      return Fractal::Tables{Fractal::service}
+          .open<MemberTable>()
+          .getIndex<1>()
+          .subindex<AccountNumber>(user);
    }
 
    auto getFractal(AccountNumber fractal) const
@@ -343,7 +326,7 @@ PSIO_REFLECT(Queries,  //
              method(getIdentity, user),
              method(getInvite, pubkey),
              method(getMember, user, fractal),
-             method(getFractals, user, gt, ge, lt, le, first, last, before, after),
+             method(getFractals, user),
              method(getFractal, fractal),
              method(getFractalType, service)
              //

@@ -451,9 +451,9 @@ SCENARIO("Toggling manual-debit")
          {  //
             CHECK(a.getUserConf(bob, manualDebit).returnVal() == false);
          }
-         THEN("Alice may not enable manual-debit again")
+         THEN("Alice may enable manual-debit again. Idempotent.")
          {
-            CHECK(a.setUserConf(manualDebit, true).failed(redundantUpdate));
+            CHECK(a.setUserConf(manualDebit, true).succeeded());
 
             AND_THEN("But Bob may enable manual-debit")
             {  //

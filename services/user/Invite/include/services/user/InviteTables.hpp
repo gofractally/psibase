@@ -9,33 +9,43 @@ namespace UserService
    {
       using Spki = SystemService::AuthSig::SubjectPublicKeyInfo;
 
-      /// Table to track the contents of the invite creation
-      /// whitelist and blacklist
-      struct InviteSettingsRecord
-      {
-         psibase::SingletonKey               key;
-         std::vector<psibase::AccountNumber> whitelist;
-         std::vector<psibase::AccountNumber> blacklist;
-      };
-      PSIO_REFLECT(InviteSettingsRecord, key, whitelist, blacklist);
-      using InviteSettingsTable = psibase::Table<InviteSettingsRecord, &InviteSettingsRecord::key>;
-
-      enum InviteStates
+      enum InviteStates : uint8_t
       {
          pending = 0,
          accepted,
          rejected
       };
 
+      struct InviteEventType
+      {
+         static constexpr std::string_view created        = "created";
+         static constexpr std::string_view accepted       = "accepted";
+         static constexpr std::string_view rejected       = "rejected";
+         static constexpr std::string_view deleted        = "deleted";
+         static constexpr std::string_view deletedExpired = "deletedExpired";
+      };
+
+      struct NextInviteId
+      {
+         uint32_t nextInviteId;
+
+         auto primary() const { return psibase::SingletonKey{}; }
+      };
+      PSIO_REFLECT(NextInviteId, nextInviteId);
+      using NextInviteIdTable = psibase::Table<NextInviteId, &NextInviteId::primary>;
+
       /// An invite object
       struct InviteRecord
       {
+         /// Monotonically increasing ID of the invite
+         uint32_t inviteId;
+
          /// The public key of the invite. This uniquely identifies an invite and
          ///   may also used to authenticate the transaction accepting the invite.
          Spki pubkey;
 
          /// An optional secondary identifier for the invite
-         std::optional<uint32_t> id;
+         std::optional<uint32_t> secondaryId;
 
          /// The creator of the invite object
          psibase::AccountNumber inviter;
@@ -65,12 +75,17 @@ namespace UserService
          /// Encrypted invite secret
          std::optional<std::string> secret;
 
-         auto byInviter() const { return std::tie(inviter, pubkey); }
-         auto byId() const { return std::tie(id, pubkey); }
+         auto byInviter() const { return std::tie(inviter, inviteId); }
+         auto byId2() const { return std::tie(secondaryId, inviteId); }
+         auto byPubkey() const
+         {
+            return std::tuple{SystemService::AuthSig::keyFingerprint(pubkey), inviteId};
+         }
       };
       PSIO_REFLECT(InviteRecord,
+                   inviteId,
                    pubkey,
-                   id,
+                   secondaryId,
                    inviter,
                    app,
                    appDomain,
@@ -79,8 +94,11 @@ namespace UserService
                    newAccountToken,
                    state,
                    secret);
-      using InviteTable = psibase::
-          Table<InviteRecord, &InviteRecord::pubkey, &InviteRecord::byInviter, &InviteRecord::byId>;
+      using InviteTable = psibase::Table<InviteRecord,
+                                         &InviteRecord::inviteId,
+                                         &InviteRecord::byInviter,
+                                         &InviteRecord::byId2,
+                                         &InviteRecord::byPubkey>;
 
       struct NewAccountRecord
       {

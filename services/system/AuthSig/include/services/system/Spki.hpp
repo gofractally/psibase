@@ -57,6 +57,6 @@ namespace SystemService
          return true;
       }
 
-      std::string keyFingerprint(const SubjectPublicKeyInfo& key);
+      psibase::Checksum256 keyFingerprint(const SubjectPublicKeyInfo& key);
    }  // namespace AuthSig
 }  // namespace SystemService

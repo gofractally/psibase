@@ -171,12 +171,13 @@ void Nft::setUserConf(psibase::EnumElement flag, bool enable)
    auto bit     = NftHolderRecord::Configurations::value(flag);
    bool flagSet = getNftHolder(sender).config.get(bit);
 
-   check(flagSet != enable, redundantUpdate);
+   if (flagSet != enable)
+   {
+      record.config.set(bit, enable);
+      Tables().open<NftHolderTable>().put(record);
 
-   record.config.set(bit, enable);
-   Tables().open<NftHolderTable>().put(record);
-
-   emit().history().userConfSet(sender, flag, enable);
+      emit().history().userConfSet(sender, flag, enable);
+   }
 }
 
 NftRecord Nft::getNft(NID nftId)

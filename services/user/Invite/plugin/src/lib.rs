@@ -65,7 +65,8 @@ fn fetch_and_decode(token: &InviteToken) -> Result<InviteRecordSubset, CommonTyp
 
     let query = format!(
         r#"query {{
-            getInviteById(id: {id}) {{
+            inviteById2(secondaryId: "{id}") {{
+                inviteId,
                 pubkey,
                 inviter,
                 app,
@@ -99,12 +100,11 @@ impl Invitee for InvitePlugin {
 
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
-        let invite_pubkey = invite.pubkey;
 
         Transact::add_action_to_transaction(
             acceptCreate::ACTION_NAME,
             &acceptCreate {
-                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+                inviteId: invite.invite_id,
                 acceptedBy: accepted_by,
                 newAccountKey: keyvault::to_der(&keyvault::generate_keypair()?)?.into(),
             }
@@ -118,16 +118,14 @@ impl Invitee for InvitePlugin {
 
     fn accept(token: String) -> Result<(), CommonTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
-
         let invite = fetch_and_decode(&invite_token)?;
-        let invite_pubkey = invite.pubkey;
 
         AuthInvite::notify(&token)?;
 
         Transact::add_action_to_transaction(
             accept::ACTION_NAME,
             &accept {
-                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+                inviteId: invite.invite_id,
             }
             .packed(),
         )?;
@@ -140,7 +138,6 @@ impl Invitee for InvitePlugin {
     fn reject(token: String) -> Result<(), CommonTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
-        let invite_pubkey = invite.pubkey;
 
         hook_actions_sender();
 
@@ -149,7 +146,7 @@ impl Invitee for InvitePlugin {
         Transact::add_action_to_transaction(
             reject::ACTION_NAME,
             &reject {
-                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+                inviteId: invite.invite_id,
             }
             .packed(),
         )?;
@@ -222,13 +219,15 @@ impl Inviter for InvitePlugin {
             createInvite::ACTION_NAME,
             &createInvite {
                 inviteKey: keyvault::to_der(&keypair.public_key)?.into(),
-                id: Some(id),
+                secondaryId: Some(id),
+                secret: Some(encrypted_private_key_hex),
                 app,
                 appDomain: Some(sender_app.origin),
-                secret: Some(encrypted_private_key_hex),
             }
             .packed(),
         )?;
+
+        println!("Attempting to create invite");
 
         let seed_u64 = u64::from_le_bytes(seed.as_slice().try_into().unwrap());
         let invite_token = InviteToken { pk: seed_u64, id };
@@ -239,12 +238,10 @@ impl Inviter for InvitePlugin {
     fn delete_invite(token: String) -> Result<(), CommonTypes::Error> {
         let invite_token = InviteToken::from_encoded(&token)?;
         let invite = fetch_and_decode(&invite_token)?;
-        let invite_pubkey = invite.pubkey;
-
         Transact::add_action_to_transaction(
-            "delInvite",
-            &InviteService::action_structs::delInvite {
-                inviteKey: keyvault::to_der(&invite_pubkey)?.into(),
+            delInvite::ACTION_NAME,
+            &delInvite {
+                inviteId: invite.invite_id,
             }
             .packed(),
         )?;

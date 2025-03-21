@@ -65,10 +65,11 @@ namespace SystemService
                return;
             }
          }
-         abortMessage("transaction does not include a claim for the key "
-                      + keyFingerprint(row->pubkey) + " needed to authenticate sender "
-                      + sender.str() + " for action " + action.service.str()
-                      + "::" + action.method.str());
+         auto fingerprint = keyFingerprint(row->pubkey);
+         auto hex         = psio::hex(fingerprint.data(), fingerprint.data() + 32);
+         abortMessage("transaction does not include a claim for the key " + hex +
+                      " needed to authenticate sender " + sender.str() + " for action " +
+                      action.service.str() + "::" + action.method.str());
       }
 
       void AuthSig::canAuthUserSys(psibase::AccountNumber user)

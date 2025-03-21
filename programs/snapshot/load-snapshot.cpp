@@ -83,8 +83,11 @@ ProducerGroup findProducer(const psibase::JointConsensus& consensus, const State
 std::string keyId(const psibase::Claim& claim)
 {
    if (claim.service == SystemService::VerifySig::service)
-      return keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
+   {
+      auto fingerprint = keyFingerprint(SystemService::AuthSig::SubjectPublicKeyInfo{
           .data = {claim.rawData.begin(), claim.rawData.end()}});
+      return psio::hex(fingerprint.data(), fingerprint.data() + 32, {':'});
+   }
    else
       return psio::convert_to_json(claim);
 }
