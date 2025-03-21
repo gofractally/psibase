@@ -215,9 +215,11 @@ export function ContactDetails({
             </Dialog>
             <div className="mx-auto flex w-full max-w-screen-md flex-col items-center justify-center gap-4 p-4">
                 <div className="flex w-full justify-center">
-                    <Avatar className="h-32 w-32 rounded-none">
-                        <AvatarImage src={avatarSrc} />
-                    </Avatar>
+                    <img
+                        src={avatarSrc}
+                        alt="Contact avatar"
+                        className="h-56 w-full rounded-none object-contain"
+                    />
                 </div>
                 <div className="flex flex-col gap-2 text-center">
                     <div className="text-lg font-medium">{primaryName}</div>
