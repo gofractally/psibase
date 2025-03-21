@@ -17,7 +17,7 @@ use bindings::host::common::types as CommonTypes;
 // for Permissions handling permissions test
 use bindings::permissions::plugin::users::is_auth_or_prompt;
 // for handling-own-permissions test
-// use bindings::host::common::{client as HostClient};
+// use bindings::host::common::client as HostClient;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -144,7 +144,7 @@ impl Actions for AuthSig {
 
         if !from_auth_sig_ui() {
             // if using Permissions to handle permissions...
-            is_auth_or_prompt(&caller, None)?;
+            is_auth_or_prompt(&caller)?;
 
             // if handling permissions itself...
             // WORKS as far as proper redirect; would need to create mock page to do final verification params are right
@@ -152,7 +152,7 @@ impl Actions for AuthSig {
             //     HostClient::prompt_user(
             //         &caller,
             //         // TODO: this should allow for a path *with* query params
-            //         "authsigperm.html",
+            //         Some("authsigperm.html?custom_param=123"),
             //     )?;
             // }
         }

@@ -219,7 +219,7 @@ export class PluginHost implements HostInterface {
         return `${siblingUrl(null, app)}`;
     }
     
-    private setActivePermRequest(caller: string, callee: string, urlPath: string): Result<string, RecoverableErrorPayload> {
+    private setActivePermRequest(caller: string, callee: string, urlPath: string | undefined): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
         const perm_req = new TextEncoder().encode(
             JSON.stringify({
@@ -244,10 +244,19 @@ export class PluginHost implements HostInterface {
     
     // Client interface
     // NOTE: returnUrlPath should not be here; it's passed from Caller as part of redirect
-    promptUser(caller: string, permsUrlPath: string): Result<void, PluginError> {
-        if (permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
+    promptUser(caller: string, permsUrlPath: string | undefined): Result<void, PluginError> {
+        console.info(`PluginHost::promptUser() permsUrlPath[${permsUrlPath}]`);
 
-        const sender = this.myServiceAccount(); // Auth-sig
+        if (!!permsUrlPath && permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
+
+        let sender;
+        // TODO: any slicker/more reliable way to do this?
+        if (!!permsUrlPath) {
+            sender = this.myServiceAccount();
+        } else {
+            sender = this.getSenderApp().app;
+        }
+        console.info(`PluginHost::promptUser() sender[${sender}], myServiceAccount[${this.myServiceAccount()}], getSenderApp()[${this.getSenderApp().app}]`);
         if (!sender) {
             throw Error("Failed to get sender");
         }
@@ -264,7 +273,7 @@ export class PluginHost implements HostInterface {
     }
 }
 
-const buildPermsUrl = (caller: string, callee: string, id: string, permsUrlPath: string) => {
+const buildPermsUrl = (caller: string, callee: string, id: string, permsUrlPath: string | undefined) => {
     let subdomain = "supervisor";
     let urlPath = "/perms_oauth.html";
     const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + urlPath;
