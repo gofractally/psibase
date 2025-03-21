@@ -1,3 +1,5 @@
+import { NavLink } from "react-router-dom";
+
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -5,9 +7,9 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useNavLocation } from "@/hooks/useNavLocation";
+
+import { useNavLocation } from "@/hooks/use-nav-location";
 import { cn } from "@/lib/utils";
-import { NavLink } from "react-router-dom";
 
 export function NavSubNav() {
     const { currentApp, currentChild } = useNavLocation();

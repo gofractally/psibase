@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 
-import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
+import { TwoColumnSelect } from "@/components/two-column-select";
+
+import {
+    MailList,
+    MailboxHeader,
+    MessageDetail,
+} from "@/apps/chainmail/components";
 import { useIsDesktop, useSavedMessages } from "@/apps/chainmail/hooks";
 
 export default function SavedPage() {
@@ -11,17 +17,27 @@ export default function SavedPage() {
         setSelectedMessageId("");
     }, []);
 
+    const display = isDesktop ? "both" : selectedMessage ? "right" : "left";
+
     return (
-        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
-            <MailboxHeader>Saved Messages</MailboxHeader>
-            <Mailbox
-                isDesktop={isDesktop}
-                mailbox="saved"
-                messages={query.data ?? []}
-                isLoading={query.isLoading}
-                selectedMessage={selectedMessage}
-                setSelectedMessageId={setSelectedMessageId}
-            />
-        </div>
+        <TwoColumnSelect
+            left={
+                <MailList
+                    mailbox={"saved"}
+                    messages={query.data ?? []}
+                    onSelectMessage={setSelectedMessageId}
+                    selectedMessage={selectedMessage}
+                />
+            }
+            right={
+                <MessageDetail
+                    message={selectedMessage ?? null}
+                    mailbox={"saved"}
+                    onBack={() => setSelectedMessageId("")}
+                />
+            }
+            header={<MailboxHeader>Saved</MailboxHeader>}
+            displayMode={display}
+        />
     );
 }

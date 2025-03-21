@@ -10,6 +10,8 @@ export const tokensConfig: AppConfigType = {
     description: "Create, burn and send tokens.",
     icon: <Coins className="h-6 w-6" />,
     isMore: false,
+    isLoginRequired: true,
+    showLoginLoadingSpinner: true,
     children: [
         {
             path: '',

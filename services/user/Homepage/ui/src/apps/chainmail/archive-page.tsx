@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 
-import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
+import { TwoColumnSelect } from "@/components/two-column-select";
+
+import {
+    MailList,
+    MailboxHeader,
+    MessageDetail,
+} from "@/apps/chainmail/components";
 import { useArchivedMessages, useIsDesktop } from "@/apps/chainmail/hooks";
 
 export default function ArchivePage() {
@@ -12,17 +18,28 @@ export default function ArchivePage() {
         setSelectedMessageId("");
     }, []);
 
+    const display = isDesktop ? "both" : selectedMessage ? "right" : "left";
+
     return (
-        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
-            <MailboxHeader>Archived Messages</MailboxHeader>
-            <Mailbox
-                isDesktop={isDesktop}
-                mailbox="archived"
-                messages={query.data ?? []}
-                isLoading={query.isLoading}
-                selectedMessage={selectedMessage}
-                setSelectedMessageId={setSelectedMessageId}
-            />
-        </div>
+        <TwoColumnSelect
+            left={
+                <MailList
+                    isLoading={query.isLoading}
+                    mailbox={"archived"}
+                    messages={query.data ?? []}
+                    onSelectMessage={setSelectedMessageId}
+                    selectedMessage={selectedMessage}
+                />
+            }
+            right={
+                <MessageDetail
+                    message={selectedMessage ?? null}
+                    mailbox={"archived"}
+                    onBack={() => setSelectedMessageId("")}
+                />
+            }
+            header={<MailboxHeader>Archived</MailboxHeader>}
+            displayMode={display}
+        />
     );
 }

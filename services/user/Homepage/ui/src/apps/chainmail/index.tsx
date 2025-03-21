@@ -13,6 +13,8 @@ export const chainMailConfig: AppConfigType = {
     description: "Send mail between accounts.",
     icon: <Mail className="h-6 w-6" />,
     isMore: false,
+    showLoginLoadingSpinner: true,
+    isLoginRequired: true,
     children: [
         {
             path: "",
