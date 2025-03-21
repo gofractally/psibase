@@ -9,6 +9,9 @@ import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
+import { v4 as uuidv4 } from 'uuid';
+import { PERM_OAUTH_REQ_KEY, REDIRECT_ERROR_CODE } from "../constants";
+
 interface HttpRequest {
     uri: string;
     method: string;
@@ -215,16 +218,72 @@ export class PluginHost implements HostInterface {
     getAppUrl(app: string): string {
         return `${siblingUrl(null, app)}`;
     }
+    
+    private setActivePermRequest(caller: string, callee: string, urlPath: string | undefined): Result<string, RecoverableErrorPayload> {
+        let req_id = uuidv4();
+        const perm_req = new TextEncoder().encode(
+            JSON.stringify({
+            id: req_id,
+            permsUrlPath: urlPath,
+            expiry_timestamp: new Date().getUTCSeconds(),
+            payload: {
+                caller,
+                callee,
+            }
+        }));
+        this.supervisor.supervisorCall({
+            service: "clientdata",
+            plugin: "plugin",
+            intf: "keyvalue",
+            method: "set",
+            params: [
+                PERM_OAUTH_REQ_KEY, perm_req]} as QualifiedFunctionCallArgs);
+        return req_id
+    }
 
-    // Web interface
-    popup(url_path: string): Result<void, PluginError> {
-        let url = this.self.origin;
-        if (!url_path.startsWith("/")) url_path = "/" + url_path;
-        url = url + url_path;
-        window.open(
-            url,
-            "_blank",
-            "popup=true,menubar=false,width=640,height=480,left=100,top=100,location=false,toolbar=false",
-        );
+    
+    // Client interface
+    // NOTE: returnUrlPath should not be here; it's passed from Caller as part of redirect
+    promptUser(caller: string, permsUrlPath: string | undefined): Result<void, PluginError> {
+        console.info(`PluginHost::promptUser() permsUrlPath[${permsUrlPath}]`);
+
+        if (!!permsUrlPath && permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
+
+        let sender;
+        // TODO: any slicker/more reliable way to do this?
+        if (!!permsUrlPath) {
+            sender = this.myServiceAccount();
+        } else {
+            sender = this.getSenderApp().app;
+        }
+        console.info(`PluginHost::promptUser() sender[${sender}], myServiceAccount[${this.myServiceAccount()}], getSenderApp()[${this.getSenderApp().app}]`);
+        if (!sender) {
+            throw Error("Failed to get sender");
+        }
+
+        const req_id = this.setActivePermRequest(caller, sender, permsUrlPath);
+
+        if (typeof req_id === "string") {
+            const re = this.recoverableError(buildPermsUrl(caller, sender, req_id, permsUrlPath));
+            re.code = REDIRECT_ERROR_CODE;
+            throw re;
+        } else {
+            throw req_id;
+        }
     }
 }
+
+const buildPermsUrl = (caller: string, callee: string, id: string, permsUrlPath: string | undefined) => {
+    let subdomain = "supervisor";
+    let urlPath = "/perms_oauth.html";
+    const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + urlPath;
+
+    const payload = {
+        caller,
+        callee,
+        id,
+        permsUrlPath,
+    };
+    const urlPayload = encodeURIComponent(JSON.stringify(payload));
+    return supervisorPermsUrl + "?payload=" + urlPayload;
+};

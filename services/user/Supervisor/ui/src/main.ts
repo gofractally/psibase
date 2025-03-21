@@ -25,12 +25,17 @@ const callHandlers: CallHandler[] = [];
 
 const shouldHandleMessage = (message: MessageEvent) => {
     const isTop = message.source == window.top;
+    const isTopSupervisor = !isTop && window.top?.location.origin == siblingUrl(null, "supervisor", null, true);
     const isParent = message.source == window.parent;
     const protocol = new URL(message.origin).protocol + "//";
     const urlSuffix = siblingUrl().slice(protocol.length);
     const isSameRootDomain = message.origin.endsWith(urlSuffix);
 
-    return isTop && isParent && isSameRootDomain;
+    const shouldRespond = (isTop || isTopSupervisor) && isParent && isSameRootDomain;
+    if (!shouldRespond) {
+        console.error("Supervisor rejected postMessage()");
+    }
+    return shouldRespond;
 };
 
 // When the supervisor is first loaded, all it does is register some handlers for

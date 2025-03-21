@@ -2,16 +2,13 @@
 mod bindings;
 
 use authority::verify_caller_is_this_app;
-use bindings::exports::permissions::plugin::{
-    admin::Guest as Admin, api::Guest as Api, users::Guest as UsersApi,
-};
-use bindings::host::common::{client as HostClient, types::Error, web as CommonWeb};
+use bindings::exports::permissions::plugin::{api::Guest as Api, users::Guest as UsersApi};
+use bindings::host::common::{client as HostClient, types::Error};
 
 mod authority;
 mod db;
 mod errors;
-use db::{AccessGrants, CurrentAccessRequest};
-use errors::ErrorType;
+use db::AccessGrants;
 
 struct PermissionsPlugin;
 
@@ -23,26 +20,25 @@ impl Api for PermissionsPlugin {
 }
 
 impl UsersApi for PermissionsPlugin {
-    fn is_permitted(caller: String) -> Result<bool, Error> {
+    fn is_auth_or_prompt(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
+        println!(
+            "PermissionsPlugin::is_auth_or_prompt() caller[{}] callee[{}]",
+            caller, callee
+        );
 
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
-            CurrentAccessRequest::set(&caller, &callee)?;
-            CommonWeb::popup(&format!("permissions.html?caller={caller}&callee={callee}"))?;
-            return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
+            HostClient::prompt_user(&caller, None)?;
+            Ok(AccessGrants::get(&caller, &callee).is_some())
         } else {
             Ok(true)
         }
     }
-}
 
-impl Admin for PermissionsPlugin {
-    fn is_valid_request(caller: String, callee: String) -> Result<bool, Error> {
-        verify_caller_is_this_app()?;
-        let is_valid = CurrentAccessRequest::is_valid_request(&caller, &callee)?;
-        CurrentAccessRequest::delete()?;
-        return Ok(is_valid);
+    fn is_auth(caller: String) -> Result<bool, Error> {
+        let callee = HostClient::get_sender_app().app.unwrap();
+        Ok(AccessGrants::get(&caller, &callee).is_some())
     }
 }
 

@@ -38,10 +38,12 @@ export const client = {
     getAppUrl(app) {
         return host.getAppUrl(app);
     },
-};
 
-export const web = {
-    popup(url_path) {
-        return host.popup(url_path);
+    getActivePermRequest(id) {
+        return host.getActivePermRequest(id);
+    },
+
+    promptUser(caller, permsUrlPath, returnUrlPath) {
+        return host.promptUser(caller, permsUrlPath, returnUrlPath);
     },
 };

@@ -1,55 +1,66 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@shadcn/button";
-import { Checkbox } from "@shadcn/checkbox";
-
-import { siblingUrl } from "@psibase/common-lib";
-import { Nav } from "@components/nav";
 
 import { supervisor } from "./perms_main";
+import { useQuery } from "@tanstack/react-query";
+import { siblingUrl } from "@psibase/common-lib";
 
 export const App = () => {
     const thisServiceName = "permissions";
-    const [isLoading, setIsLoading] = useState<boolean>(true);
     const [params, setParams] = useState<any>({});
-    const [isValidPermRequest, setIsValidPermRequest] = useState<any>({});
+    const [isLoading, setIsLoading] = useState(true);
+    const [validPermRequest, setValidPermRequest] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const init = async () => {
+    const initApp = async () => {
         await supervisor.onLoaded();
 
         const qps = getQueryParams();
+        const payload = JSON.parse(decodeURIComponent(qps.payload));
         setParams(qps);
 
-        const isValidRequest = await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "admin",
-            method: "isValidRequest",
-            params: [qps.caller, qps.callee],
-        });
-        setIsValidPermRequest(isValidRequest);
-
+        setValidPermRequest(payload);
         setIsLoading(false);
     };
 
     useEffect(() => {
-        init();
+        initApp();
     }, []);
 
-    const accept = async () => {
+    const followReturnRedirect = async () => {
+        let retUrl = validPermRequest?.returnUrlPath;
+        const redirectPath = retUrl ? "/" + retUrl : "";
+
+        const url =
+            siblingUrl(null, validPermRequest?.caller, null, true) +
+            redirectPath;
+        if (window.top) {
+            window.top.location.href = url;
+        }
+    };
+
+    const approve = async () => {
         try {
-            let res = await supervisor.functionCall({
+            await supervisor.functionCall({
                 service: thisServiceName,
                 intf: "api",
                 method: "savePermission",
-                params: [params.caller, params.callee],
+                params: [validPermRequest?.caller, validPermRequest?.callee],
             });
         } catch (e) {
+            if (e instanceof Error) {
+                setError(e.message);
+            } else {
+                setError("Unknown error saving permission");
+            }
             console.error("error saving permission: ", e);
+            throw e;
         }
-        window.close();
+        followReturnRedirect();
     };
     const deny = () => {
-        window.close();
+        followReturnRedirect();
     };
     const getQueryParams = () => {
         const queryString = window.location.search;
@@ -59,25 +70,29 @@ export const App = () => {
 
     if (isLoading) {
         return <div>Loading...</div>;
-    }
-
-    if (!params.caller || !params.callee) {
-        console.error("Malformed query params: ", window.location.href);
-    }
-
-    if (!isValidPermRequest) {
-        console.error("Forged request detected.");
-        return <div>Forged request detected.</div>;
+    } else {
+        if (!validPermRequest) {
+            console.error("Forged request detected.");
+        }
     }
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Grant access?" />
-            <p>
-                {`"${params.caller}" is requesting full access to "${params.callee}".`}
-            </p>
-            <Button onClick={accept}>Accept</Button>
-            <Button onClick={deny}>Deny</Button>
+            <h2 style={{ textAlign: "center" }}>Grant access?</h2>
+            {!!validPermRequest ? (
+                <>
+                    <p>
+                        {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
+                    </p>
+                    {!!error && <div>ERROR: {error}</div>}
+                    <div className="flex justify-center gap-4">
+                        <Button onClick={approve}>Approve</Button>
+                        <Button onClick={deny}>Deny</Button>
+                    </div>
+                </>
+            ) : (
+                <div>Forged request detected.</div>
+            )}
         </div>
     );
 };
