@@ -100,7 +100,7 @@ interface client {
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
     
-    prompt-user: func(caller: string, url-perms-path: string, return-url-path: string) -> result<_, error>;
+    prompt-user: func(caller: string, url-perms-path: string) -> result<_, error>;
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;

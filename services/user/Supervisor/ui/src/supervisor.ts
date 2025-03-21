@@ -334,7 +334,7 @@ export class Supervisor implements AppInterface {
                 //   converted to a PluginError to be handled by the client.
                 let newError;
                 if (e.payload.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message, JSON.parse(e.payload.message));
+                    newError = new RedirectErrorObject(e.payload.producer, e.payload.message);
                 } else {
                     newError = new PluginErrorObject(e.payload.producer, e.payload.message);
                 }

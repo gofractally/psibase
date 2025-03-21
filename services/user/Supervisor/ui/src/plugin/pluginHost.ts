@@ -219,13 +219,12 @@ export class PluginHost implements HostInterface {
         return `${siblingUrl(null, app)}`;
     }
     
-    private setActivePermRequest(caller: string, callee: string, urlPath: string, returnUrlPath: string): Result<string, RecoverableErrorPayload> {
+    private setActivePermRequest(caller: string, callee: string, urlPath: string): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
         const perm_req = new TextEncoder().encode(
             JSON.stringify({
             id: req_id,
             permsUrlPath: urlPath,
-            returnUrlPath: returnUrlPath,
             expiry_timestamp: new Date().getUTCSeconds(),
             payload: {
                 caller,
@@ -242,20 +241,40 @@ export class PluginHost implements HostInterface {
         return req_id
     }
 
+    
     // Client interface
-    promptUser(caller: string, urlPath: string, returnUrlPath: string): Result<void, PluginError> {
-        if (urlPath.length > 0 && !urlPath.startsWith("/")) urlPath = "/" + urlPath;
+    // NOTE: returnUrlPath should not be here; it's passed from Caller as part of redirect
+    promptUser(caller: string, permsUrlPath: string): Result<void, PluginError> {
+        if (permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
 
-        const senderApp = this.getSenderApp().app;
-        if (!senderApp) {
-            throw Error("No sender app");
+        const sender = this.myServiceAccount(); // Auth-sig
+        if (!sender) {
+            throw Error("Failed to get sender");
         }
 
-        const req_id = this.setActivePermRequest(caller, senderApp, urlPath, returnUrlPath);
+        const req_id = this.setActivePermRequest(caller, sender, permsUrlPath);
 
-        const re = this.recoverableError(JSON.stringify({id: req_id}));
-        re.code = REDIRECT_ERROR_CODE;
-        throw re;
-
+        if (typeof req_id === "string") {
+            const re = this.recoverableError(buildPermsUrl(caller, sender, req_id, permsUrlPath));
+            re.code = REDIRECT_ERROR_CODE;
+            throw re;
+        } else {
+            throw req_id;
+        }
     }
 }
+
+const buildPermsUrl = (caller: string, callee: string, id: string, permsUrlPath: string) => {
+    let subdomain = "supervisor";
+    let urlPath = "/perms_oauth.html";
+    const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + urlPath;
+
+    const payload = {
+        caller,
+        callee,
+        id,
+        permsUrlPath,
+    };
+    const urlPayload = encodeURIComponent(JSON.stringify(payload));
+    return supervisorPermsUrl + "?payload=" + urlPayload;
+};

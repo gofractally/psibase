@@ -27,15 +27,21 @@ export class RedirectErrorObject {
     name: string;
     pluginId: QualifiedPluginId;
     message: string;
-    data: any;
-    constructor(pluginId: QualifiedPluginId, message: string, data: any) {
+    constructor(pluginId: QualifiedPluginId, message: string) {
         this.name = "RedirectErrorObject";
         this.pluginId = pluginId;
         this.message = message;
-        this.data = data;
     }
 }
 
+export class GenericError extends Error {
+    name: string;
+    constructor(message: string) {
+        super(message);
+        this.name = "GenericError";
+        this.message = message;
+    }
+}
 export class GenericErrorObject {
     name: string;
     message: string;
@@ -72,5 +78,5 @@ export const isPluginErrorObject = (error: any): error is PluginErrorObject => {
     return isGenericErrorObject(error) && "pluginId" in error;
 }
 export const isRedirectErrorObject = (error: any): error is RedirectErrorObject => {
-    return isGenericError(error) && "pluginId" in error && "data" in error;
+    return isGenericErrorObject(error) && "pluginId" in error && error.name === "RedirectErrorObject";
 };

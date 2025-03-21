@@ -7,10 +7,12 @@ import {
 } from "./db";
 
 const buildIframeUrl = (perms_req: ValidPermissionRequest) => {
+    // TODO: custom permission handling by an app needs to be part of this url construction
+    // looks like it is, but I don't think this is working. I'll need to test/debug
     let subdomain = "permissions";
     let urlPath = "/permissions.html";
     if (perms_req.permsUrlPath) {
-        subdomain = perms_req.payload.caller;
+        subdomain = perms_req.payload.callee;
         urlPath = perms_req.permsUrlPath;
     }
     const url = siblingUrl(null, subdomain, null, true) + urlPath;
@@ -35,16 +37,21 @@ export const App = () => {
 
     const initApp = async () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const requiredQueryParams = urlParams.has("id");
+        const requiredQueryParams = urlParams.has("payload");
         setHasRequiredQueryParams(requiredQueryParams);
+        const payload = urlParams.get("payload");
+        if (!payload) {
+            throw new Error("Access Request error: No payload provided");
+        }
+        const payloadObj = JSON.parse(decodeURIComponent(payload));
 
         if (requiredQueryParams) {
-            const idParam = urlParams.get("id");
-            if (!idParam) {
-                throw new Error("Access Request error: No id provided");
-            }
+            // const idParam = urlParams.get("id");
+            // if (!idParam) {
+            //     throw new Error("Access Request error: No id provided");
+            // }
 
-            const perms_req_res = await ActiveAccessRequest.get(idParam);
+            const perms_req_res = await ActiveAccessRequest.get(payloadObj.id);
             // TODO: is caller being gotten at the right time from the right place? ==> const senderApp = getSenderApp().app;
             if (isTypeValidPermissionRequest(perms_req_res)) {
                 const perms_req = perms_req_res as ValidPermissionRequest;
@@ -64,7 +71,7 @@ export const App = () => {
     return (
         <>
             {!hasRequiredQueryParams ? (
-                <div>ERROR: No id provided</div>
+                <div>ERROR: No payload provided</div>
             ) : (
                 <div
                     style={{

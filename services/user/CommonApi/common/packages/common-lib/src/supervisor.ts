@@ -17,6 +17,9 @@ import {
     buildGetJsonRequest,
     isPluginErrorObject,
     isGenericErrorObject,
+    PluginError,
+    GenericError,
+    isRedirectErrorObject,
 } from "./messaging";
 import { assertTruthy } from "./utils";
 
@@ -150,19 +153,26 @@ export class Supervisor {
         const resolved = this.removePendingRequestById(response.id);
         assertTruthy(resolved, "Resolved pending request");
 
+        if (isRedirectErrorObject(result)) {
+            console.warn("Redirect directive:", result);
+            pendingRequest.reject(result);
+            return;
+        }
         if (isPluginErrorObject(result)) {
             const { service, plugin } = result.pluginId;
 
             console.error(`Call to ${resolved.details} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
-            pendingRequest.reject(result);
+            const resultAsError = new PluginError(result.pluginId, result.message);
+            pendingRequest.reject(resultAsError);
             return;
         }
 
         if (isGenericErrorObject(result)) {
             console.error(`Call to ${resolved.details} failed`);
             console.error(result.message);
-            pendingRequest.reject(result);
+            const resultAsError = new GenericError(result.message);
+            pendingRequest.reject(resultAsError);
             return;
         }
 

@@ -7,7 +7,6 @@ export const supervisor = getSupervisor();
 export interface ValidPermissionRequest {
     id: string,
     permsUrlPath: string,
-    returnUrlPath: string,
     payload: {
         caller: string,
         callee: string,

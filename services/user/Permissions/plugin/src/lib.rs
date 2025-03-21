@@ -20,12 +20,17 @@ impl Api for PermissionsPlugin {
 }
 
 impl UsersApi for PermissionsPlugin {
-    fn is_auth_or_prompt(caller: String) -> Result<bool, Error> {
+    fn is_auth_or_prompt(caller: String, perms_url_path: Option<String>) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
 
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
-            HostClient::prompt_user(&caller, "", "")?;
+            let perms_url_path = if perms_url_path.is_some() {
+                perms_url_path.unwrap()
+            } else {
+                "".to_string()
+            };
+            HostClient::prompt_user(&caller, &perms_url_path)?;
             Ok(AccessGrants::get(&caller, &callee).is_some())
         } else {
             Ok(true)
