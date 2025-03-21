@@ -25,6 +25,15 @@ namespace UserService
          static constexpr std::string_view deletedExpired = "deletedExpired";
       };
 
+      struct NextInviteId
+      {
+         uint32_t nextInviteId;
+
+         auto primary() const { return psibase::SingletonKey{}; }
+      };
+      PSIO_REFLECT(NextInviteId, nextInviteId);
+      using NextInviteIdTable = psibase::Table<NextInviteId, &NextInviteId::primary>;
+
       /// An invite object
       struct InviteRecord
       {

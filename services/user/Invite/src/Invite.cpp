@@ -72,11 +72,13 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    auto secondsInWeek = std::chrono::duration_cast<Seconds>(std::chrono::weeks(1));
    auto now           = to<Transact>().currentBlock().time;
 
-   auto     idx      = inviteTable.getIndex<0>();
-   uint32_t inviteId = (idx.empty()) ? 0 : (*(--idx.end())).inviteId + 1;
+   auto     inviteIdTable = Tables().open<NextInviteIdTable>();
+   auto     nextIdRecord  = inviteIdTable.get(SingletonKey{});
+   uint32_t nextId        = (nextIdRecord.has_value()) ? nextIdRecord->nextInviteId + 1 : 0;
+   inviteIdTable.put(NextInviteId{nextId});
 
    InviteRecord newInvite{
-       .inviteId        = inviteId,
+       .inviteId        = nextId,
        .pubkey          = inviteKey,
        .secondaryId     = secondaryId,
        .inviter         = inviter,
@@ -89,9 +91,9 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    };
    inviteTable.put(newInvite);
 
-   emit().history().updated(inviteId, inviter, now, InviteEventType::created);
+   emit().history().updated(nextId, inviter, now, InviteEventType::created);
 
-   return inviteId;
+   return nextId;
 }
 
 void Invite::accept(uint32_t inviteId)

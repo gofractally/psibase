@@ -23,7 +23,8 @@ namespace UserService
       class Invite : public psibase::Service
       {
         public:
-         using Tables = psibase::ServiceTables<InviteTable, InitTable, NewAccTable>;
+         using Tables =
+             psibase::ServiceTables<InviteTable, InitTable, NewAccTable, NextInviteIdTable>;
          /// "invite"
          static constexpr auto service = SystemService::Accounts::inviteService;
          /// "invited-sys"
