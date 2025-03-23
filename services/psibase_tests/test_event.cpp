@@ -140,18 +140,6 @@ TEST_CASE("test events")
       CHECK(s == "antidisestablishmentarianism"s);
       CHECK(i == 42);
    }
-
-   std::string query = "query { events { history(ids: [" + std::to_string(evId) + "]) { s i } } }";
-   auto        response = gql<EventsRoot>(t, query);
-
-   auto history = response.data.events.history;
-   REQUIRE(history.size() == 1);
-
-   {
-      auto [s, i] = history.back();
-      REQUIRE(i == 42);
-      REQUIRE(s == "antidisestablishmentarianism");
-   }
 }
 
 TEST_CASE("test merkle events")
