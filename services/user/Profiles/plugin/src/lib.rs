@@ -1,8 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
-
 use bindings::exports::profiles::plugin::api::Guest as Api;
 use bindings::exports::profiles::plugin::contacts::Guest as Contacts;
 
@@ -18,8 +16,6 @@ use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
-
-use psibase::AccountNumber;
 
 mod errors;
 use errors::ErrorType;
@@ -38,8 +34,10 @@ fn check_app_sender() -> Result<(), ErrorType> {
 }
 
 fn check_account_exists(account: &str) -> Result<(), ErrorType> {
-    get_account(account).map_err(|_| ErrorType::NoAccountFound(account.to_string()))?;
-    Ok(())
+    get_account(account)
+        .map_err(|_| ErrorType::InvalidAccountNumber(account.to_string()))?
+        .ok_or(ErrorType::NoAccountFound(account.to_string()))
+        .map(|_| ())
 }
 
 fn user() -> Result<String, ErrorType> {
