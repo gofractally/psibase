@@ -15,13 +15,11 @@ struct EvaluationsPlugin;
 
 impl Api for EvaluationsPlugin {
     fn schedule_evaluation(
-        id: u32,
         rsvp_start_from: u32,
         rsvp_deadline: u32,
         evaluation_deadline: u32,
     ) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::scheduleEvaluation {
-            id,
             rsvp_start_from,
             rsvp_deadline,
             evaluation_deadline,
@@ -30,8 +28,6 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("scheduleEvaluation", &packed_args).unwrap();
         Ok(())
     }
-
-
 }
 
 bindings::export!(EvaluationsPlugin with_types_in bindings);

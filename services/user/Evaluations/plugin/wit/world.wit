@@ -15,7 +15,7 @@ interface api {
     use host:common/types.{error};
     use types.{evaluation};
     
-    schedule-evaluation: func(id: u32, rsvp-start-from: u32, rsvp-deadline: u32, evaluation-deadline: u32) -> result<_, error>;
+    schedule-evaluation: func(rsvp-start-from: u32, rsvp-deadline: u32, evaluation-deadline: u32) -> result<_, error>;
 
 }
 
