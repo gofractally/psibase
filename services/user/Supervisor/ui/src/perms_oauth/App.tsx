@@ -9,6 +9,7 @@ import {
 const buildIframeUrl = (perms_req: ValidPermissionRequest) => {
     // TODO: custom permission handling by an app needs to be part of this url construction
     // looks like it is, but I don't think this is working. I'll need to test/debug
+    // TODO: this default path should move to Permissions call of promptUser()
     let subdomain = "permissions";
     let urlPath = "/permissions.html";
     if (perms_req.permsUrlPath) {
@@ -23,6 +24,7 @@ const buildIframeUrl = (perms_req: ValidPermissionRequest) => {
         ...perms_req.payload,
         returnUrlPath: urlParams.get("returnUrlPath"),
     };
+    // TODO: this all should come from localstorage accessed by `id`
     newIframeUrl.searchParams.set(
         "payload",
         encodeURIComponent(JSON.stringify(urlPayload)),

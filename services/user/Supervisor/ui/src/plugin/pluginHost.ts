@@ -221,6 +221,7 @@ export class PluginHost implements HostInterface {
     
     private setActivePermRequest(caller: string, callee: string, urlPath: string | undefined): Result<string, RecoverableErrorPayload> {
         let req_id = uuidv4();
+        // TODO: break this up for different params below
         const perm_req = new TextEncoder().encode(
             JSON.stringify({
             id: req_id,
@@ -231,7 +232,19 @@ export class PluginHost implements HostInterface {
                 callee,
             }
         }));
+        // TODO: this needs to map id to subdomain and subpath
+        // This is Supervisor localStorage space
         this.supervisor.supervisorCall({
+            service: "clientdata",
+            plugin: "plugin",
+            intf: "keyvalue",
+            method: "set",
+            params: [
+                PERM_OAUTH_REQ_KEY, perm_req]} as QualifiedFunctionCallArgs);
+
+        // TODO: needs id to payload
+        // This is Permissions localStorage space
+        this.supervisor.call(this.self, {
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
@@ -250,7 +263,8 @@ export class PluginHost implements HostInterface {
         if (!!permsUrlPath && permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
 
         let sender;
-        // TODO: any slicker/more reliable way to do this?
+        console.info(`PluginHost::promptUser() myServiceAccount()[${this.myServiceAccount()}], getSenderApp()[${this.getSenderApp().app}]`);
+        // TODO: any slicker/more reliable way to do this? Yes, this should comes as the payload arg to promptUser()
         if (!!permsUrlPath) {
             sender = this.myServiceAccount();
         } else {
@@ -261,6 +275,7 @@ export class PluginHost implements HostInterface {
             throw Error("Failed to get sender");
         }
 
+        // TODO: this should a generic payload (for user prompts other than perms_oauth)
         const req_id = this.setActivePermRequest(caller, sender, permsUrlPath);
 
         if (typeof req_id === "string") {

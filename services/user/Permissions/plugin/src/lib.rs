@@ -29,6 +29,8 @@ impl UsersApi for PermissionsPlugin {
 
         let perms_pref = AccessGrants::get(&caller, &callee);
         if perms_pref.is_none() {
+            // TODO: caller and callee should both be here, and this should be a single payload (for generic use of user_prompt())
+            // TODO: this is the place to specify the default permissions path
             HostClient::prompt_user(&caller, None)?;
             Ok(AccessGrants::get(&caller, &callee).is_some())
         } else {

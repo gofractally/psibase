@@ -12,15 +12,32 @@ export const App = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
-
+    const [isTopSupervisor, setIsTopSupervisor] = useState(false);
     const initApp = async () => {
         await supervisor.onLoaded();
 
         const qps = getQueryParams();
         const payload = JSON.parse(decodeURIComponent(qps.payload));
         setParams(qps);
-
         setValidPermRequest(payload);
+
+        try {
+            console.info("Determining isTopSupervisor:");
+            console.info(window.top);
+            const isTopSupervisor =
+                window.top?.location.origin ==
+                siblingUrl(null, "supervisor", null, true);
+            console.info("isTopSupervisor:", isTopSupervisor);
+            setIsTopSupervisor(isTopSupervisor);
+        } catch (e) {
+            // setError("Security error: unable to determine top origin.");
+            console.error(
+                "Security error: unable to determine if Supervisor is top.",
+            );
+            // setIsLoading(false);
+            // return;
+        }
+
         setIsLoading(false);
     };
 
@@ -68,7 +85,9 @@ export const App = () => {
         return Object.fromEntries(urlParams.entries());
     };
 
-    if (isLoading) {
+    if (error) {
+        return <div>{error}</div>;
+    } else if (isLoading) {
         return <div>Loading...</div>;
     } else {
         if (!validPermRequest) {
