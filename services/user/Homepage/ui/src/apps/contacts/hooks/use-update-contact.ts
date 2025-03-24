@@ -15,9 +15,9 @@ export const useUpdateContact = () => {
         mutationFn: async (updatedContact: LocalContact) => {
             void (await supervisor.functionCall({
                 service: Account.parse("profiles"),
-                method: "updateContact",
+                method: "set",
                 params: [updatedContact],
-                intf: "api",
+                intf: "contacts",
             }));
         },
         onError: (error) => {

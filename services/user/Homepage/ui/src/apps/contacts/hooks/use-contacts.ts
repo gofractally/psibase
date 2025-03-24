@@ -17,9 +17,9 @@ export const useContacts = (
         queryFn: async () => {
             const res = await supervisor.functionCall({
                 service: Account.parse("profiles"),
-                method: "getContacts",
+                method: "get",
                 params: [],
-                intf: "api",
+                intf: "contacts",
             });
 
             return zLocalContact.array().parse(res);
@@ -40,8 +40,8 @@ export const upsertUserToCache = (
 
             return isExisting
                 ? parsed.map((c) =>
-                      c.account === contact.account ? contact : c,
-                  )
+                    c.account === contact.account ? contact : c,
+                )
                 : [...parsed, contact];
         }
         return [contact];

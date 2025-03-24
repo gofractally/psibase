@@ -50,12 +50,16 @@ impl ContactTable {
         Keyvalue::set(&self.key(), &contacts.packed())
     }
 
-    pub fn set(&self, contact: ContactEntry) -> Result<(), Error> {
+    pub fn set(&self, contact: ContactEntry, overwrite: bool) -> Result<(), Error> {
         let mut contacts = self.get_contacts();
 
         match contacts.iter().position(|c| c.account == contact.account) {
             Some(index) => {
-                contacts[index] = contact;
+                if overwrite {
+                    contacts[index] = contact;
+                } else {
+                    return Err(ErrorType::ContactAlreadyExists(contact.account.to_string()).into());
+                }
             }
             None => {
                 contacts.push(contact);

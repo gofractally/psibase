@@ -16,16 +16,16 @@ export const useCreateContact = () => {
     return useMutation({
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
-            let toastId = toast.loading("Creating contact...");
             void (await supervisor.functionCall({
                 service: Account.parse("profiles"),
-                method: "addContact",
-                intf: "api",
-                params: [parsed],
+                method: "set",
+                intf: "contacts",
+                params: [parsed, false],
             }));
-            toast.dismiss(toastId);
         },
-        onSuccess: (_, newContact) => {
+        onMutate: () => ({ toastId: toast.loading("Creating contact...") }),
+        onSuccess: (_, newContact, context) => {
+            toast.success("Contact created", { id: context.toastId });
             const username = Account.parse(
                 queryClient.getQueryData(QueryKey.currentUser()),
             );
@@ -35,10 +35,9 @@ export const useCreateContact = () => {
                     queryKey: QueryKey.contacts(username),
                 });
             }, AwaitTime);
-            toast.success("Contact created");
         },
-        onError: (error) => {
-            toast.error(`Failed to create contact ${error.message}`);
+        onError: (error, _, context) => {
+            toast.error(error.message, { id: context?.toastId });
         },
     });
 };

@@ -20,14 +20,13 @@ interface Props {
     onSubmit: (data: LocalContact) => Promise<void>;
 }
 
-const toastError = (error: unknown): void => {
+const parseError = (error: unknown): string => {
     if (error instanceof Error) {
-        toast.error(error.message);
+        return error.message;
     } else if (typeof error === "string") {
-        toast.error(error);
+        return error;
     } else {
-        console.error("Unknown error", error);
-        toast.error("An unknown error occurred");
+        return "An unknown error occurred";
     }
 };
 
@@ -38,16 +37,19 @@ export function ContactForm({ initialValues, onSubmit }: Props) {
     });
 
     const handleSubmit = async (data: LocalContact) => {
-        let id = toast.loading("Creating contact...");
+        const id = toast.loading("Creating contact...");
         try {
             await onSubmit(data);
             toast.success(
                 `Saved contact ${data.nickname || `@${data.account}`}`,
+                { id },
             );
         } catch (e) {
-            toastError(e);
+            const message = parseError(e);
+            form.setError("root", { message });
+            toast.error(message, { id });
+            throw e;
         }
-        toast.dismiss(id);
     };
 
     return (
@@ -127,11 +129,7 @@ export function ContactForm({ initialValues, onSubmit }: Props) {
                 />
 
                 <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting
-                        ? "Submitting..."
-                        : form.formState.isSubmitSuccessful
-                          ? "Success"
-                          : "Submit"}
+                    {form.formState.isSubmitting ? "Submitting..." : "Submit"}
                 </Button>
             </form>
         </Form>

@@ -47,11 +47,11 @@ fn user() -> Result<String, ErrorType> {
 }
 
 impl Contacts for ProfilesPlugin {
-    fn set(contact: Contact) -> Result<(), Error> {
+    fn set(contact: Contact, overwrite: bool) -> Result<(), Error> {
         check_app_sender()?;
         check_account_exists(&contact.account)?;
 
-        ContactTable::new(user()?).set(contact_table::ContactEntry::from(contact))
+        ContactTable::new(user()?).set(contact_table::ContactEntry::from(contact), overwrite)
     }
 
     fn remove(account: String) -> Result<(), Error> {

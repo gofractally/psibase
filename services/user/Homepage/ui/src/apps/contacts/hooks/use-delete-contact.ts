@@ -12,9 +12,9 @@ export const useDeleteContact = () =>
         mutationFn: async (account: z.infer<typeof Account>) => {
             await supervisor.functionCall({
                 service: Account.parse("profiles"),
-                method: "removeContact",
+                method: "remove",
                 params: [Account.parse(account)],
-                intf: "api",
+                intf: "contacts",
             });
         },
         onSuccess: (_, account) => {

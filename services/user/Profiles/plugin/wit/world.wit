@@ -22,7 +22,7 @@ interface contacts {
     use host:common/types.{error};
     use types.{contact};
 
-    set: func(contact: contact) -> result<_, error>;
+    set: func(contact: contact, overwrite: bool) -> result<_, error>;
     remove: func(account: string) -> result<_, error>;
     get: func() -> result<list<contact>, error>;
 }
