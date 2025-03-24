@@ -94,10 +94,13 @@ namespace psibase
       Result(TransactionTrace&& t)
           : TraceResult(std::forward<TransactionTrace>(t)), _return(std::nullopt)
       {
-         auto actionTrace = getTopAction(t, 0);
-         if (actionTrace.rawRetval.size() != 0)
+         if (!_t.error.has_value())
          {
-            _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
+            auto actionTrace = getTopAction(t, 0);
+            if (actionTrace.rawRetval.size() != 0)
+            {
+               _return = psio::from_frac<ReturnType>(actionTrace.rawRetval);
+            }
          }
       }
 
@@ -304,7 +307,7 @@ namespace psibase
       {
          return {.host     = account.str() + ".psibase.io",
                  .rootHost = "psibase.io",
-                 .method   = "POST",
+                 .method   = "GET",
                  .target{target}};
       }
 

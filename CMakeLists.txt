@@ -718,12 +718,14 @@ psibase_package(
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
-        SERVER invite
+        SERVER r-invite
         INIT
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     SERVICE auth-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
         DATA ${Plugins_OUTPUT_FILE_auth_invite} /plugin.wasm
+    SERVICE r-invite
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
 )

@@ -193,13 +193,14 @@ void Tokens::setUserConf(psibase::EnumElement flag, bool enable)
    auto holder  = getTokenHolder(sender);
    auto flagBit = TokenHolderRecord::Configurations::value(flag);
 
-   check(not holder.config.get(flagBit) == enable, redundantUpdate);
+   if (not holder.config.get(flagBit) == enable)
+   {
+      holder.config.set(flagBit, enable);
 
-   holder.config.set(flagBit, enable);
+      emit().history().userConfSet(sender, flag, enable);
 
-   emit().history().userConfSet(sender, flag, enable);
-
-   Tables().open<TokenHolderTable>().put(holder);
+      Tables().open<TokenHolderTable>().put(holder);
+   }
 }
 
 void Tokens::setTokenConf(TID tokenId, psibase::EnumElement flag, bool enable)

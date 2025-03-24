@@ -3,7 +3,7 @@ enable_testing()
 function(service name suffix)
     add_executable(${name}${suffix} ${ARGN})
     target_include_directories(${name}${suffix} PUBLIC include)
-    target_link_libraries(${name}${suffix} services_system${suffix} psibase-service-simple-malloc${suffix} )
+    target_link_libraries(${name}${suffix} services_system${suffix} services_user${suffix} psibase-service-simple-malloc${suffix} )
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
