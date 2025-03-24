@@ -33,6 +33,8 @@ interface api {
 
     start-evaluation: func(id: u32) -> result<_, error>;
 
+    set-group-sizes: func(id: u32, group-sizes: list<u8>) -> result<_, error>;
+
 }
 
 

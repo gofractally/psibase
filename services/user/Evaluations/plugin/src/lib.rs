@@ -37,6 +37,11 @@ impl Api for EvaluationsPlugin {
         let packed_args = evaluations::action_structs::startEvaluation { id }.packed();
         add_action_to_transaction("startEvaluation", &packed_args)
     }
+
+    fn set_group_sizes(id: u32, group_sizes: Vec<u8>) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::setGroupSizes { id, group_sizes }.packed();
+        add_action_to_transaction("setGroupSizes", &packed_args)
+    }
 }
 
 bindings::export!(EvaluationsPlugin with_types_in bindings);
