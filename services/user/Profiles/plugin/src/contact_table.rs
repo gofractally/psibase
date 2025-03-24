@@ -36,8 +36,10 @@ pub struct ContactTable {
 }
 
 impl ContactTable {
-    pub fn new(user: AccountNumber) -> Self {
-        Self { user }
+    pub fn new(user: String) -> Self {
+        Self {
+            user: AccountNumber::from_str(&user).unwrap(),
+        }
     }
 
     fn key(&self) -> String {

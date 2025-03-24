@@ -40,18 +40,20 @@ fn check_account_exists(account: &str) -> Result<(), ErrorType> {
     Ok(())
 }
 
+fn user() -> Result<String, ErrorType> {
+    get_current_user()
+        .map_err(|_| ErrorType::NoUserLoggedIn())?
+        .ok_or(ErrorType::NoUserLoggedIn())
+}
+
 impl Contacts for ProfilesPlugin {
     fn set(contact: Contact) -> Result<(), Error> {
         check_app_sender()?;
         check_account_exists(&contact.account)?;
 
-        let current_user = get_current_user()?.ok_or(ErrorType::NoUserLoggedIn())?;
+        let contact_table = contact_table::ContactTable::new(user()?);
 
-        let contact_table = contact_table::ContactTable::new(
-            AccountNumber::from_str(current_user.as_str()).unwrap(),
-        );
-        let contact = contact_table::ContactEntry::from(contact);
-        contact_table.set(contact)
+        contact_table.set(contact_table::ContactEntry::from(contact))
     }
 
     fn remove(account: String) -> Result<(), Error> {
@@ -61,11 +63,7 @@ impl Contacts for ProfilesPlugin {
         let account_number = AccountNumber::from_str(&account)
             .map_err(|_| ErrorType::InvalidAccountNumber(account))?;
 
-        let current_user = get_current_user()?.ok_or(ErrorType::NoUserLoggedIn())?;
-
-        let user_table = contact_table::ContactTable::new(
-            AccountNumber::from_str(current_user.as_str()).unwrap(),
-        );
+        let user_table = contact_table::ContactTable::new(user()?);
 
         user_table.remove(account_number)
     }
@@ -73,11 +71,7 @@ impl Contacts for ProfilesPlugin {
     fn get() -> Result<Vec<Contact>, Error> {
         check_app_sender()?;
 
-        let current_user = get_current_user()?.ok_or(ErrorType::NoUserLoggedIn())?;
-
-        let user_table = contact_table::ContactTable::new(
-            AccountNumber::from_str(current_user.as_str()).unwrap(),
-        );
+        let user_table = contact_table::ContactTable::new(user()?);
         let contacts = user_table.get_contacts();
 
         Ok(contacts
