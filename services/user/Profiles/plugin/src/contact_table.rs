@@ -1,10 +1,10 @@
-pub const CONTACTS_KEY: &str = "contacts";
-
 use std::str::FromStr;
 
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::AccountNumber;
+
+use crate::bindings::profiles::plugin::types::Contact;
 
 use crate::bindings::host::common::types::Error;
 
@@ -19,18 +19,14 @@ pub struct ContactEntry {
     pub phone: Option<String>,
 }
 
-impl ContactEntry {
-    pub fn new(
-        account: String,
-        nickname: Option<String>,
-        email: Option<String>,
-        phone: Option<String>,
-    ) -> Self {
+impl From<Contact> for ContactEntry {
+    fn from(contact: Contact) -> Self {
         Self {
-            account: AccountNumber::from_str(&account).expect("Invalid account number"),
-            nickname,
-            email,
-            phone,
+            account: AccountNumber::from_str(&contact.account.as_str())
+                .expect("Invalid account number"),
+            nickname: contact.nickname,
+            email: contact.email,
+            phone: contact.phone,
         }
     }
 }
@@ -45,18 +41,24 @@ impl ContactTable {
     }
 
     fn key(&self) -> String {
-        CONTACTS_KEY.to_string() + "." + &self.user.to_string()
+        self.user.to_string()
     }
 
-    pub fn add(&self, contact: ContactEntry) -> Result<(), Error> {
+    pub fn save_contacts(&self, contacts: Vec<ContactEntry>) -> Result<(), Error> {
+        Keyvalue::set(&self.key(), &contacts.packed())
+    }
+
+    pub fn set(&self, contact: ContactEntry) -> Result<(), Error> {
         let mut contacts = self.get_contacts();
 
-        let already_exists = contacts.iter().any(|c| c.account == contact.account);
-        if already_exists {
-            return Err(ErrorType::ContactAlreadyExists(contact.account.to_string()).into());
+        match contacts.iter().position(|c| c.account == contact.account) {
+            Some(index) => {
+                contacts[index] = contact;
+            }
+            None => {
+                contacts.push(contact);
+            }
         }
-
-        contacts.push(contact);
         self.save_contacts(contacts)
     }
 
@@ -66,22 +68,6 @@ impl ContactTable {
         contacts
             .map(|c| <Vec<ContactEntry>>::unpacked(&c).unwrap())
             .unwrap_or_default()
-    }
-
-    pub fn save_contacts(&self, contacts: Vec<ContactEntry>) -> Result<(), Error> {
-        Keyvalue::set(&self.key(), &contacts.packed())
-    }
-
-    pub fn update_contact(&self, contact: ContactEntry) -> Result<(), Error> {
-        let mut contacts = self.get_contacts();
-
-        match contacts.iter().position(|c| c.account == contact.account) {
-            Some(index) => {
-                contacts[index] = contact;
-                self.save_contacts(contacts)
-            }
-            None => Err(ErrorType::ContactNotFound(contact.account.to_string()).into()),
-        }
     }
 
     pub fn remove(&self, account: AccountNumber) -> Result<(), Error> {

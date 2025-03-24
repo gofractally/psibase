@@ -23,9 +23,6 @@ pub mod service {
     use psibase::*;
 
     #[action]
-    fn init() {}
-
-    #[action]
     #[allow(non_snake_case)]
     fn setProfile(display_name: String, bio: String, avatar: bool) {
         let table = ProfileTable::new();
@@ -39,10 +36,6 @@ pub mod service {
         };
 
         table.put(&new_profile).unwrap();
-
-        Wrapper::emit()
-            .history()
-            .profileSet(caller, get_sender().to_string() + &display_name.clone());
     }
 
     #[action]
@@ -51,7 +44,4 @@ pub mod service {
         let table = ProfileTable::new();
         table.get_index_pk().get(&account)
     }
-
-    #[event(history)]
-    pub fn profileSet(account: AccountNumber, displayName: String) {}
 }

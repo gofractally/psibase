@@ -9,5 +9,6 @@ world impl {
     include accounts:plugin/imports;
 
     export api;
+    export contacts;
     
 }

@@ -18,23 +18,26 @@ interface types {
 
 }
 
+interface contacts {
+    use host:common/types.{error};
+    use types.{contact};
+
+    set: func(contact: contact) -> result<_, error>;
+    remove: func(account: string) -> result<_, error>;
+    get: func() -> result<list<contact>, error>;
+}
+
 interface api {
     
     use host:common/types.{error};
-    use types.{profile, contact};
+    use types.{profile};
     use sites:plugin/types.{file};
 
-
-    upload-avatar: func(file: file, compression-quality: u8) -> result<_, error>;
+    set-profile: func(profile: profile);
+    
+    upload-avatar: func(file: file) -> result<_, error>;
     remove-avatar: func() -> result<_, error>;
 
-    add-contact: func(new-contact: contact) -> result<_, error>;
-    update-contact: func(updated-contact: contact) -> result<_, error>;
-    remove-contact: func(account: string) -> result<_, error>;
-
-    get-contacts: func() -> result<list<contact>, error>;
-
-    set-profile: func(profile: profile);
 }
 
 
