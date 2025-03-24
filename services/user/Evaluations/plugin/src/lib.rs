@@ -15,18 +15,27 @@ struct EvaluationsPlugin;
 
 impl Api for EvaluationsPlugin {
     fn schedule_evaluation(
-        rsvp_start_from: u32,
-        rsvp_deadline: u32,
-        evaluation_deadline: u32,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
     ) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::scheduleEvaluation {
-            rsvp_start_from,
-            rsvp_deadline,
-            evaluation_deadline,
+            registration,
+            deliberation,
+            submission,
         }
         .packed();
-        add_action_to_transaction("scheduleEvaluation", &packed_args).unwrap();
-        Ok(())
+        add_action_to_transaction("scheduleEvaluation", &packed_args)
+    }
+
+    fn register(id: u32, entropy: u64) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::register { id, entropy }.packed();
+        add_action_to_transaction("register", &packed_args)
+    }
+
+    fn start_evaluation(id: u32) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::startEvaluation { id }.packed();
+        add_action_to_transaction("startEvaluation", &packed_args)
     }
 }
 

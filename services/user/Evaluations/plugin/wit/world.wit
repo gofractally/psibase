@@ -2,11 +2,22 @@ package evaluations:plugin;
 
 
 interface types {
+
+    type account-number = u32;
+
+
+    record timings {
+        registration: u32,
+        deliberation: u32,
+        submission: u32, 
+    }
+
     record evaluation {
         id: u32,
+        owner: account-number,
         rsvp-start-from: u32,
         rsvp-deadline: u32,
-        evaluation-deadline: u32,
+        timings: timings,
     }
 
 }
@@ -15,7 +26,12 @@ interface api {
     use host:common/types.{error};
     use types.{evaluation};
     
-    schedule-evaluation: func(rsvp-start-from: u32, rsvp-deadline: u32, evaluation-deadline: u32) -> result<_, error>;
+
+    schedule-evaluation: func(registration: u32, deliberation: u32, submission: u32) -> result<_, error>;
+
+    register: func(id: u32, entropy: u64) -> result<_, error>;
+
+    start-evaluation: func(id: u32) -> result<_, error>;
 
 }
 
