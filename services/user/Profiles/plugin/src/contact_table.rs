@@ -72,10 +72,13 @@ impl ContactTable {
             .unwrap_or_default()
     }
 
-    pub fn remove(&self, account: AccountNumber) -> Result<(), Error> {
+    pub fn remove(&self, account: &str) -> Result<(), Error> {
         let mut contacts = self.get_contacts();
 
-        match contacts.iter().position(|c| c.account == account) {
+        let account_number = AccountNumber::from_str(&account)
+            .map_err(|_| ErrorType::InvalidAccountNumber(account.to_string()))?;
+
+        match contacts.iter().position(|c| c.account == account_number) {
             Some(index) => {
                 contacts.remove(index);
                 self.save_contacts(contacts)

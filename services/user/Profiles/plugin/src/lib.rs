@@ -26,6 +26,8 @@ use errors::ErrorType;
 
 mod contact_table;
 
+use contact_table::ContactTable;
+
 struct ProfilesPlugin;
 
 fn check_app_sender() -> Result<(), ErrorType> {
@@ -51,28 +53,20 @@ impl Contacts for ProfilesPlugin {
         check_app_sender()?;
         check_account_exists(&contact.account)?;
 
-        let contact_table = contact_table::ContactTable::new(user()?);
-
-        contact_table.set(contact_table::ContactEntry::from(contact))
+        ContactTable::new(user()?).set(contact_table::ContactEntry::from(contact))
     }
 
     fn remove(account: String) -> Result<(), Error> {
         check_app_sender()?;
         check_account_exists(&account)?;
 
-        let account_number = AccountNumber::from_str(&account)
-            .map_err(|_| ErrorType::InvalidAccountNumber(account))?;
-
-        let user_table = contact_table::ContactTable::new(user()?);
-
-        user_table.remove(account_number)
+        ContactTable::new(user()?).remove(&account)
     }
 
     fn get() -> Result<Vec<Contact>, Error> {
         check_app_sender()?;
 
-        let user_table = contact_table::ContactTable::new(user()?);
-        let contacts = user_table.get_contacts();
+        let contacts = ContactTable::new(user()?).get_contacts();
 
         Ok(contacts
             .into_iter()
