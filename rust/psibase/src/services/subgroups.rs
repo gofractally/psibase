@@ -30,7 +30,6 @@ mod service {
     ///
     /// ## Example: `gmp(14, [4,5,6])`
     ///
-    /// ```
     /// Step 1: Sort and deduplicate allowed_groups
     /// s_allowed_groups = [4,5,6]
     ///
@@ -51,7 +50,7 @@ mod service {
     /// |-- Returns [6,4,4]
     ///
     /// Result: [6,4,4]
-    /// ```
+    ///
     ///
     #[action]
     fn gmp(population: u32, allowed_groups: Vec<u32>) -> Option<Vec<u32>> {
