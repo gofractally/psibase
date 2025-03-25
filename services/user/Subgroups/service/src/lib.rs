@@ -24,29 +24,29 @@ pub mod service {
     ///
     /// ## Example: `partition(14, [6,5,4], {})`
     ///
-    /// ```
     /// Call Tree for partition(14, [6,5,4], {}):
     ///
+    /// ```
     /// partition(14)
-    /// ├── try group=6
-    /// │   ├── partition(8)
-    /// │   │   ├── try group=6
-    /// │   │   │   ├── partition(2) ❌ (no valid partition)
-    /// │   │   ├── try group=5
-    /// │   │   │   ├── partition(3) ❌ (no valid partition)
-    /// │   │   ├── try group=4
-    /// │   │   │   ├── partition(4)
-    /// │   │   │   │   ├── try group=6 ❌ (too large)
-    /// │   │   │   │   ├── try group=5 ❌ (too large)
-    /// │   │   │   │   ├── try group=4
-    /// │   │   │   │   │   ├── partition(0) ✅ returns []
-    /// │   │   │   │   │   └── memo[4] = [4]
-    /// │   │   │   │   └── returns [4]
-    /// │   │   │   └── memo[8] = [4,4]
-    /// │   │   └── returns [4,4]
-    /// │   └── memo[14] = [6,4,4]
-    /// │   └── returns [6,4,4]
-    /// └── Found valid partition: [6,4,4]
+    /// |-- try group=6
+    /// |   |-- partition(8)
+    /// |   |   |-- try group=6
+    /// |   |   |   |-- partition(2) ❌ (no valid partition)
+    /// |   |   |-- try group=5
+    /// |   |   |   |-- partition(3) ❌ (no valid partition)
+    /// |   |   |-- try group=4
+    /// |   |   |   |-- partition(4)
+    /// |   |   |   |   |-- try group=6 ❌ (too large)
+    /// |   |   |   |   |-- try group=5 ❌ (too large)
+    /// |   |   |   |   |-- try group=4
+    /// |   |   |   |   |   |-- partition(0) ✅ returns []
+    /// |   |   |   |   |   |-- memo[4] = [4]
+    /// |   |   |   |   |-- returns [4]
+    /// |   |   |   |-- memo[8] = [4,4]
+    /// |   |   |-- returns [4,4]
+    /// |   |-- memo[14] = [6,4,4]
+    /// |   |-- returns [6,4,4]
+    /// |-- Found valid partition: [6,4,4]
     /// ```
     ///
     /// ## Memo Table Evolution:
@@ -132,19 +132,19 @@ pub mod service {
     ///
     /// Step 2: Iterate through s_allowed_groups in reverse order
     /// First iteration: g = 6
-    /// ├── allowed = [6]
-    /// ├── partition(14, [6], {})
-    /// └── No valid partition found
+    /// |-- allowed = [6]
+    /// |-- partition(14, [6], {})
+    /// |-- No valid partition found
     ///
     /// Second iteration: g = 5
-    /// ├── allowed = [6,5]
-    /// ├── partition(14, [6,5], {})
-    /// └── No valid partition found
+    /// |-- allowed = [6,5]
+    /// |-- partition(14, [6,5], {})
+    /// |-- No valid partition found
     ///
     /// Third iteration: g = 4
-    /// ├── allowed = [6,5,4]
-    /// ├── partition(14, [6,5,4], {})
-    /// └── Returns [6,4,4]
+    /// |-- allowed = [6,5,4]
+    /// |-- partition(14, [6,5,4], {})
+    /// |-- Returns [6,4,4]
     ///
     /// Result: [6,4,4]
     /// ```
@@ -172,21 +172,21 @@ mod tests;
 
 /* Saving compute with memoization
 partition(20, [8,5,3], {})
-├── try group=8
-│   ├── partition(12)
-│   │   ├── try group=8
-│   │   │   ├── partition(4)
-│   │   │   │   ├── try group=8 ❌
-│   │   │   │   ├── try group=5 ❌
-│   │   │   │   ├── try group=3 ❌
-│   │   │   │   └── memo[4] = None
-│   │   │   └── No valid partition
-│   │   ├── try group=5
-│   │   │   ├── partition(7)
-│   │   │   │   ├── try group=8 ❌
-│   │   │   │   ├── try group=5 ❌
-│   │   │   │   ├── try group=3
-│   │   │   │   │   ├── partition(4) ❌ lookup in memo returns None
-│   │   │   │   └── No valid partition
+|-- try group=8
+|   |-- partition(12)
+|   |   |-- try group=8
+|   |   |   |-- partition(4)
+|   |   |   |   |-- try group=8 ❌
+|   |   |   |   |-- try group=5 ❌
+|   |   |   |   |-- try group=3 ❌
+|   |   |   |   |-- memo[4] = None
+|   |   |   |-- No valid partition
+|   |   |-- try group=5
+|   |   |   |-- partition(7)
+|   |   |   |   |-- try group=8 ❌
+|   |   |   |   |-- try group=5 ❌
+|   |   |   |   |-- try group=3
+|   |   |   |   |   |-- partition(4) ❌ lookup in memo returns None
+|   |   |   |   |-- No valid partition
 ...
 */

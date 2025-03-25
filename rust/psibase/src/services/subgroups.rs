@@ -36,19 +36,19 @@ mod service {
     ///
     /// Step 2: Iterate through s_allowed_groups in reverse order
     /// First iteration: g = 6
-    /// ├── allowed = [6]
-    /// ├── partition(14, [6], {})
-    /// └── No valid partition found
+    /// |-- allowed = [6]
+    /// |-- partition(14, [6], {})
+    /// |-- No valid partition found
     ///
     /// Second iteration: g = 5
-    /// ├── allowed = [6,5]
-    /// ├── partition(14, [6,5], {})
-    /// └── No valid partition found
+    /// |-- allowed = [6,5]
+    /// |-- partition(14, [6,5], {})
+    /// |-- No valid partition found
     ///
     /// Third iteration: g = 4
-    /// ├── allowed = [6,5,4]
-    /// ├── partition(14, [6,5,4], {})
-    /// └── Returns [6,4,4]
+    /// |-- allowed = [6,5,4]
+    /// |-- partition(14, [6,5,4], {})
+    /// |-- Returns [6,4,4]
     ///
     /// Result: [6,4,4]
     /// ```
