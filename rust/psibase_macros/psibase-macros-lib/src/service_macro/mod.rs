@@ -750,6 +750,12 @@ fn process_mod(
         pub use #mod_name::#structs;
 
         #polyfill
+
+        #[test]
+        #[ignore]
+        fn _psibase_get_schema() {
+            #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
+        }
     }
     .into()
 } // process_mod
@@ -811,6 +817,29 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             #[no_mangle]
             pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
                 tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvPut(db: DbId, key: *const u8, key_len: u32, value: *const u8, value_len: u32)
+            {
+                tester_raw::kvPut(get_selected_chain(), db, key, key_len, value, value_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn setRetval(_retval: *const u8, _len: u32) -> u32 {
+                panic!("setRetval not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn call(action: *const u8, len: u32) -> u32 {
+                panic!("call not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn putSequential(_db: DbId, _value: *const u8, _value_len: u32) -> u64 {
+                panic!("putSequential not supported in tester");
+            }
+            #[no_mangle]
+            pub unsafe extern "C" fn getCurrentAction() -> u32 {
+                panic!("getCurrentAction not supported in tester");
             }
         }
     }

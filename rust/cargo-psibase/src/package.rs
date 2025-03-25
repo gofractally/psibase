@@ -1,4 +1,4 @@
-use crate::{build, build_package_root, build_plugin, Args, SERVICE_POLYFILL};
+use crate::{build, build_package_root, build_plugin, build_schema, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -283,7 +283,9 @@ pub async fn build_package(
                 flags: pmeta.flags,
                 server: None,
                 // TODO: generate schema
-                schema: None,
+                schema: Some(
+                    build_schema(args, &[&package.id.repr], &["-p", &package.name]).await?,
+                ),
             };
             if let Some(server) = pmeta.server {
                 info.server = Some(server.parse()?);

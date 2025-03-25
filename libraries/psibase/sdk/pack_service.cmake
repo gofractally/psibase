@@ -342,7 +342,7 @@ function(cargo_psibase_package)
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/${ARG_PATH}/Cargo.toml
         INSTALL_COMMAND ""
         BUILD_ALWAYS 1
-        DEPENDS ${ARG_DEPENDS} cargo-psibase
+        DEPENDS ${ARG_DEPENDS} cargo-psibase psitest
     )
 
     add_custom_command(

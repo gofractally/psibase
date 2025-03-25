@@ -132,3 +132,10 @@ pub trait ToServiceSchema {
 pub fn create_schema<T: ToServiceSchema>() -> Schema {
     T::schema()
 }
+
+pub fn print_schema_impl<T: ToServiceSchema>() {
+    println!(
+        "psibase-schema-gen-output: {}",
+        serde_json::to_string(&T::schema()).unwrap()
+    )
+}

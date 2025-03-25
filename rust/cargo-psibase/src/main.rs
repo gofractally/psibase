@@ -5,7 +5,8 @@ use cargo_metadata::Message;
 use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
-use psibase::{ExactAccountNumber, PackageInfo};
+use psibase::{ExactAccountNumber, PackageInfo, Schema};
+use regex::Regex;
 use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File, OpenOptions};
@@ -59,6 +60,10 @@ struct Args {
     /// Directory for all generated artifacts
     #[clap(long, global = true, value_name = "DIRECTORY")]
     target_dir: Option<PathBuf>,
+
+    /// Path to psitest executable
+    #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psitest(), env = "CARGO_PSIBASE_PSITEST")]
+    psitest: PathBuf,
 
     #[clap(subcommand)]
     command: Command,
@@ -126,11 +131,7 @@ struct InstallCommand {
 }
 
 #[derive(Parser, Debug)]
-struct TestCommand {
-    /// Path to psitest executable
-    #[clap(long, default_value = "psitest")]
-    psitest: PathBuf,
-}
+struct TestCommand {}
 
 #[derive(Subcommand, Debug)]
 enum Command {
@@ -165,6 +166,27 @@ fn warn(label: &str, message: &str) {
 
 fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
+}
+
+fn find_psitest() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psitest = format!("psitest{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psitest);
+                if sibling.is_file() {
+                    return sibling;
+                }
+                if parent.ends_with("rust/release") {
+                    let in_build_dir = parent.parent().unwrap().parent().unwrap().join(psitest);
+                    if in_build_dir.exists() {
+                        return in_build_dir;
+                    }
+                }
+            }
+        }
+    }
+    "psitest".to_string().into()
 }
 
 fn optimize(code: &mut Module) -> Result<(), Error> {
@@ -359,6 +381,80 @@ async fn build(
     Ok(files)
 }
 
+async fn build_schema(
+    args: &Args,
+    packages: &[&str],
+    extra_args: &[&str],
+) -> Result<Schema, Error> {
+    let mut command = tokio::process::Command::new(get_cargo())
+        .envs(vec![("CARGO_PSIBASE_TEST", "")])
+        .arg("test")
+        .args(extra_args)
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .arg("--lib")
+        .arg("--no-run")
+        .args(SERVICE_ARGS_RUSTC)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) =
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    let files = files?;
+    for f in &files {
+        process(f, None)?
+    }
+
+    let mut command = tokio::process::Command::new(&args.psitest)
+        .arg(&files[0])
+        .arg("_psibase_get_schema")
+        .arg("--show-output")
+        .arg("--include-ignored")
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let status = command.wait();
+
+    let (status, schema) = tokio::join!(
+        status, //
+        async {
+            let re = Regex::new(r"^psibase-schema-gen-output: (.*)$").unwrap();
+            let mut schema = None;
+            while let Some(line) = stdout.next_line().await? {
+                if schema.is_none() {
+                    if let Some(cap) = re.captures(&line) {
+                        schema = Some(cap[1].to_owned());
+                    }
+                }
+            }
+            Ok::<_, Error>(schema)
+        },
+    );
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    Ok(serde_json::from_str::<Schema>(
+        &schema?.ok_or_else(|| anyhow!("Failed to generate schema"))?,
+    )?)
+}
+
 async fn build_plugin(
     args: &Args,
     packages: &[&str],
@@ -536,7 +632,7 @@ fn get_test_packages<'a>(
 
 async fn test(
     args: &Args,
-    opts: &TestCommand,
+    _opts: &TestCommand,
     metadata: &MetadataIndex<'_>,
     root: &str,
 ) -> Result<(), Error> {
@@ -577,10 +673,14 @@ async fn test(
 
     for test in tests {
         pretty_path("Running", &test);
-        let args = [test.to_str().unwrap(), "--nocapture"];
-        let msg = format!("Failed running: psitest {}", args.join(" "));
-        if !std::process::Command::new(&opts.psitest)
-            .args(args)
+        let psitest_args = [test.to_str().unwrap(), "--nocapture"];
+        let msg = format!(
+            "Failed running: {} {}",
+            args.psitest.display(),
+            psitest_args.join(" ")
+        );
+        if !std::process::Command::new(&args.psitest)
+            .args(psitest_args)
             .status()
             .context(msg.clone())?
             .success()
