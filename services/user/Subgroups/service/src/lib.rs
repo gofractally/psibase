@@ -69,8 +69,6 @@ pub mod service {
         solutions[n as usize].clone()
     }
 
-    /// # Description
-    ///
     /// This action runs an algorithm that could be called, "greatest minimum partition".
     ///
     /// It returns a vector of subgroupings that sum to the total population, where
