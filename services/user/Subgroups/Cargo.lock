@@ -2238,11 +2238,9 @@ dependencies = [
 name = "subgroups"
 version = "0.15.0"
 dependencies = [
- "async-graphql",
  "psibase",
  "psibase_macros",
  "serde",
- "serde_json",
  "subgroups-pkg",
 ]
 

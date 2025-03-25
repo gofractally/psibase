@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "subgroups-pkg"                                                            # Crate name
+name = "subgroups-pkg"
 description = "Generates subgroups given total population and allowed group size"
 version.workspace = true
 rust-version.workspace = true
@@ -26,10 +26,6 @@ lto = true
 [package.metadata.psibase]
 package-name = "Subgroups"
 services = ["subgroups"]
-
-[package.metadata.psibase.dependencies]
-HttpServer = "0.15.0"
-Sites = "0.15.0"
 
 [lib]
 crate-type = ["rlib"]
