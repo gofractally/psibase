@@ -71,7 +71,7 @@ export function ContactDetails({
     const isSelf = contact.account === currentUser;
     const { data: profile } = useProfile(contact.account);
 
-    const avatarSrc = useAvatar(contact.account);
+    const { avatarSrc } = useAvatar(contact.account);
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,

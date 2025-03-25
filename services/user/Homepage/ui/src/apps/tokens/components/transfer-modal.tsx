@@ -57,8 +57,8 @@ export const TransferModal = ({
     const numSymbol = quantity ? quantity.format(true).split(" ") : ["", ""];
     const [amountFormatted, symbol] = numSymbol;
 
-    const fromAvatar = useAvatar(from);
-    const toAvatar = useAvatar(to);
+    const { avatarSrc: fromAvatar } = useAvatar(from);
+    const { avatarSrc: toAvatar } = useAvatar(to);
 
     return (
         <AlertDialog open={open}>

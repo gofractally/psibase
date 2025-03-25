@@ -14,7 +14,6 @@ import { ProfileResponse } from "../../../hooks/use-profile";
 const Params = z.object({
     displayName: z.string(),
     bio: z.string(),
-    avatar: z.boolean(),
 });
 
 export const useSetProfile = () =>
@@ -41,7 +40,6 @@ export const useSetProfile = () =>
                         account: currentUser,
                         bio: params.bio,
                         displayName: params.displayName,
-                        avatar: params.avatar,
                     },
                 }),
             );

@@ -13,7 +13,6 @@ pub mod tables {
 
         pub display_name: String,
         pub bio: String,
-        pub avatar: bool,
     }
 }
 
@@ -24,7 +23,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn setProfile(display_name: String, bio: String, avatar: bool) {
+    fn setProfile(display_name: String, bio: String) {
         let table = ProfileTable::new();
 
         let caller = get_sender();
@@ -32,7 +31,6 @@ pub mod service {
             account: caller,
             display_name: display_name.clone(),
             bio: bio.clone(),
-            avatar: avatar,
         };
 
         table.put(&new_profile).unwrap();

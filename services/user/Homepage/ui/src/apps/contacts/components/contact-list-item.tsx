@@ -18,7 +18,7 @@ export const ContactItem = ({
     onSelect: () => void;
 }) => {
     const { data: profile } = useProfile(contact.account);
-    const avatarSrc = useAvatar(contact.account);
+    const { avatarSrc } = useAvatar(contact.account);
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,

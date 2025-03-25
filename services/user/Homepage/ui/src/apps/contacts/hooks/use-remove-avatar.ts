@@ -1,16 +1,15 @@
 import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { z } from "zod";
-
 import { supervisor } from "@/supervisor";
-
-import { ProfileResponse } from "@/hooks/use-profile";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
+import { useCacheBust } from "@/hooks/use-cache-bust";
+import { AwaitTime } from "@/globals";
 
-export const useRemoveAvatar = () =>
-    useMutation({
+export const useRemoveAvatar = () => {
+    const { setBustedUser } = useCacheBust();
+    return useMutation({
         mutationFn: async () =>
             supervisor.functionCall({
                 method: "removeAvatar",
@@ -26,25 +25,12 @@ export const useRemoveAvatar = () =>
             );
             if (!currentUser) throw new Error("No current user");
 
-            queryClient.setQueryData(
-                QueryKey.profile(currentUser),
-                (currentData: unknown) => {
-                    if (currentData) {
-                        const parsed = ProfileResponse.parse(currentData);
-                        if (!parsed.profile) return;
-                        const newData: z.infer<typeof ProfileResponse> = {
-                            ...parsed,
-                            profile: {
-                                ...parsed.profile,
-                                avatar: false,
-                            },
-                        };
-                        return newData;
-                    }
-                },
-            );
+            setTimeout(() => {
+                setBustedUser(currentUser);
+            }, AwaitTime)
         },
         onError: () => {
             toast.error("Failed to remove avatar from storage");
         },
     });
+};

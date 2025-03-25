@@ -79,7 +79,7 @@ function AccountMenuItem({
     isConnectingToAccount: boolean;
     connectToAccount: (account: string) => void;
 }) {
-    const avatarSrc = useAvatar(account);
+    const { avatarSrc } = useAvatar(account);
 
     return (
         <DropdownMenuItem
@@ -99,12 +99,12 @@ export function NavUser() {
     const { data: currentUser, isFetched: isFetchedLoggedInuser } =
         useCurrentUser();
 
-    const { data: chainId, isFetched: isFetchedChainId } = useChainId();
+    const { isFetched: isFetchedChainId } = useChainId();
     const { mutateAsync: logout } = useLogout();
     const navigate = useNavigate();
 
     const { data: profile } = useProfile(currentUser);
-    const avatarSrc = useAvatar(currentUser);
+    const { avatarSrc } = useAvatar(currentUser);
 
     const onLogout = async () => {
         await logout();

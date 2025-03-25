@@ -5,7 +5,6 @@ interface types {
     record profile {
         display-name: option<string>,
         bio: option<string>,
-        avatar: bool,
     }
 
     record contact {
@@ -35,7 +34,6 @@ interface api {
     
     use host:common/types.{error};
     use types.{profile, avatar};
-    use sites:plugin/types.{file};
 
     set-profile: func(profile: profile) -> result<_, error>;
     

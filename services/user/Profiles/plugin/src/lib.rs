@@ -84,7 +84,6 @@ impl Api for ProfilesPlugin {
         let packed_profile_args = profiles::action_structs::setProfile {
             display_name: profile.display_name.unwrap_or_default(),
             bio: profile.bio.unwrap_or_default(),
-            avatar: profile.avatar,
         }
         .packed();
 

@@ -59,34 +59,18 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
             });
             toast.success("Avatar uploaded");
 
-            const isAvatar = !!profile?.profile?.avatar;
             setTimeout(async () => {
                 if (currentUser) {
                     setBustedUser(currentUser);
-                }
-                if (!isAvatar) {
-                    await setProfile({
-                        avatar: true,
-                        displayName: profile?.profile?.displayName ?? "",
-                        bio: profile?.profile?.bio ?? "",
-                    });
                 }
             }, AwaitTime);
         }
     };
 
+    const { avatarSrc, type, forceRefresh } = useAvatar(currentUser);
     const removeImage = async () => {
-        await Promise.all([
-            removeAvatar(),
-            setProfile({
-                avatar: false,
-                displayName: profile?.profile?.displayName ?? "",
-                bio: profile?.profile?.bio ?? "",
-            }),
-        ]);
+        await removeAvatar();
     };
-
-    const avatarSrc = useAvatar(currentUser);
 
     return (
         <DialogContent>
@@ -118,7 +102,7 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
                         />
                     </div>
                     <div>
-                        {profile?.profile?.avatar && (
+                        {type === "uploaded" && (
                             <Button
                                 type="button"
                                 disabled={isPending}
@@ -140,11 +124,9 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
                 <FormProfile
                     initialData={profile?.profile || undefined}
                     onSubmit={async (data) => {
-                        const currentAvatar = !!profile?.profile?.avatar;
                         await setProfile({
                             bio: data.bio,
                             displayName: data.displayName,
-                            avatar: currentAvatar,
                         });
                         onClose();
                         return data;
