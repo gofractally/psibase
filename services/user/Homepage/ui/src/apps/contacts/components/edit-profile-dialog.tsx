@@ -52,10 +52,8 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         if (file) {
             const buffer = await file.arrayBuffer();
             await uploadAvatar({
-                compressionQuality: 11,
-                file: {
+                avatar: {
                     contentType: file.type,
-                    path: "/profile/avatar",
                     content: new Uint8Array(buffer),
                 },
             });

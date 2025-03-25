@@ -15,6 +15,10 @@ interface types {
         phone: option<string>,
     }
 
+    record avatar {
+        content-type: string,
+        content: list<u8>,
+    }
 
 }
 
@@ -30,12 +34,12 @@ interface contacts {
 interface api {
     
     use host:common/types.{error};
-    use types.{profile};
+    use types.{profile, avatar};
     use sites:plugin/types.{file};
 
-    set-profile: func(profile: profile);
+    set-profile: func(profile: profile) -> result<_, error>;
     
-    upload-avatar: func(file: file) -> result<_, error>;
+    upload-avatar: func(avatar: avatar) -> result<_, error>;
     remove-avatar: func() -> result<_, error>;
 
 }

@@ -9,4 +9,5 @@ plugin_error! {
     NoAccountFound(account: String) => "No account found: {account}",
     UnauthorizedApp() => "App sender must be home page",
     ContactAlreadyExists(account: String) => "Contact already exists: {account}",
+    AvatarTooBig(size: String) => "Avatar exceeds max file size of {size}",
 }

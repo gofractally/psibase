@@ -46,11 +46,12 @@ impl ContactTable {
         self.user.to_string()
     }
 
-    pub fn save_contacts(&self, contacts: Vec<ContactEntry>) -> Result<(), Error> {
+    fn save_contacts(&self, contacts: Vec<ContactEntry>) -> Result<(), Error> {
         Keyvalue::set(&self.key(), &contacts.packed())
     }
 
-    pub fn set(&self, contact: ContactEntry, overwrite: bool) -> Result<(), Error> {
+    pub fn set(&self, contact: Contact, overwrite: bool) -> Result<(), Error> {
+        let contact = ContactEntry::from(contact);
         let mut contacts = self.get_contacts();
 
         match contacts.iter().position(|c| c.account == contact.account) {
@@ -61,9 +62,7 @@ impl ContactTable {
                     return Err(ErrorType::ContactAlreadyExists(contact.account.to_string()).into());
                 }
             }
-            None => {
-                contacts.push(contact);
-            }
+            None => contacts.push(contact),
         }
         self.save_contacts(contacts)
     }
