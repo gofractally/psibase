@@ -23,7 +23,7 @@ namespace psibase
           : db{std::move(db)},
             wasmCache{std::move(wasmCache)},
             watchdogManager(std::make_shared<WatchdogManager>()),
-            sockets(std::make_shared<Sockets>())
+            sockets(std::make_shared<Sockets>(this->db))
       {
       }
    };

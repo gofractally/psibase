@@ -174,14 +174,14 @@ export const CreatePage = () => {
         selectedPackageIds.some((id) => id == getId(pack))
     );
 
-    const loadingStates = selectedPackages.map((pack) => ({
-        text: `Installing ${pack.name}..`,
-    }));
+    const initialLoadingStates = [{ text: "Preparing transactions" }];
+    const [loadingStates, setLoadingStates] =
+        useState<{ text: string }[]>(initialLoadingStates);
 
     const installRan = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string>("");
 
-    const [currentState, setCurrentState] = useState(1);
+    const [currentState, setCurrentState] = useState<[number, number]>([0, 0]);
 
     useEffect(() => {
         const setKeysAndBoot = async () => {
@@ -208,16 +208,17 @@ export const CreatePage = () => {
                     compression: isDev ? 4 : 7,
                     onProgressUpdate: (state) => {
                         if (isRequestingUpdate(state)) {
-                            const [_, current, total] = state;
-                            const newIndex = calculateIndex(
-                                loadingStates.length,
-                                current,
-                                total
-                            );
-                            setCurrentState(newIndex);
+                            const [_, completed, started, labels] = state;
+                            setLoadingStates([
+                                ...initialLoadingStates,
+                                ...labels.map((label) => ({ text: label })),
+                            ]);
+                            setCurrentState([
+                                initialLoadingStates.length + completed,
+                                initialLoadingStates.length + started,
+                            ]);
                         } else if (isBootCompleteUpdate(state)) {
                             if (state.success) {
-                                setCurrentState(loadingStates.length + 1);
                                 toast({
                                     title: "Success",
                                     description: "Successfully booted chain.",
@@ -281,7 +282,8 @@ export const CreatePage = () => {
             <MultiStepLoader
                 loadingStates={loadingStates}
                 loading={loading}
-                currentState={currentState}
+                completed={currentState[0]}
+                started={currentState[1]}
             />
             <div className="relative flex h-full flex-col justify-between ">
                 <div></div>

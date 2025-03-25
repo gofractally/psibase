@@ -8,6 +8,14 @@ namespace UserService
    {
       using PublicKey = SystemService::AuthSig::SubjectPublicKeyInfo;
 
+      struct InviteEventType
+      {
+         static constexpr std::string_view created  = "created";
+         static constexpr std::string_view claimed  = "claimed";
+         static constexpr std::string_view accepted = "accepted";
+         static constexpr std::string_view rejected = "rejected";
+      };
+
       // Implemented by fractal types in order to be compatible with this parent service
       struct FractalInterface
       {
@@ -78,6 +86,7 @@ namespace UserService
 
       struct InviteRecord
       {
+         uint32_t               inviteId;
          PublicKey              key;
          psibase::AccountNumber creator;
          psibase::AccountNumber fractal;
@@ -85,9 +94,9 @@ namespace UserService
 
          using Secondary = psibase::CompositeKey<&InviteRecord::recipient, &InviteRecord::key>;
       };
-      PSIO_REFLECT(InviteRecord, key, creator, fractal, recipient);
+      PSIO_REFLECT(InviteRecord, inviteId, key, creator, fractal, recipient);
       using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::key, InviteRecord::Secondary{}>;
+          psibase::Table<InviteRecord, &InviteRecord::inviteId, InviteRecord::Secondary{}>;
       PSIO_REFLECT_TYPENAME(InviteTable)
 
       // Identity in the fractal service, does not necessarily mean you joined a fractal

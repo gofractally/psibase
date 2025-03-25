@@ -2062,7 +2062,10 @@ namespace psibase
          }
       }
 
-      void addSocket(const std::shared_ptr<Socket>& sock) { systemContext->sockets->add(sock); }
+      void setSocket(std::int32_t fd, const std::shared_ptr<Socket>& sock)
+      {
+         systemContext->sockets->set(*writer, fd, sock);
+      }
 
       std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
       {
