@@ -81,7 +81,7 @@ pub mod helpers {
         Closed,
     }
 
-    pub fn get_timed_status(
+    pub fn get_scheduled_phase(
         evaluation: &Evaluation,
         current_time_seconds: u32,
     ) -> EvaluationStatus {
@@ -228,7 +228,7 @@ pub mod service {
             "only the owner can set the group sizes",
         );
         let current_time_seconds: u32 = 222;
-        let status = helpers::get_timed_status(&evaluation, current_time_seconds);
+        let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
         check(
             status == helpers::EvaluationStatus::Registration,
             "evaluation must be in registration or deliberation phase",
@@ -242,7 +242,8 @@ pub mod service {
     fn startEvaluation(id: u32) {
         let mut evaluation = helpers::get_evaluation(id);
         let current_time_seconds: u32 = 222;
-        let status = helpers::get_timed_status(&evaluation, current_time_seconds);
+
+        let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
 
         check(
             status == helpers::EvaluationStatus::Deliberation,
@@ -295,7 +296,7 @@ pub mod service {
         );
 
         let current_time_seconds: u32 = 222;
-        let status = helpers::get_timed_status(&evaluation, current_time_seconds);
+        let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
 
         let can_close = match status {
             EvaluationStatus::Deliberation | EvaluationStatus::Submission => {
@@ -348,7 +349,7 @@ pub mod service {
         let evaluation = helpers::get_evaluation(evaluation_id);
         let current_time_seconds: u32 = 222;
         check(
-            helpers::get_timed_status(&evaluation, current_time_seconds)
+            helpers::get_scheduled_phase(&evaluation, current_time_seconds)
                 == helpers::EvaluationStatus::Deliberation,
             "evaluation must be in deliberation phase",
         );
@@ -375,7 +376,7 @@ pub mod service {
         let mut evaluation = helpers::get_evaluation(id);
 
         let status: helpers::EvaluationStatus =
-            helpers::get_timed_status(&evaluation, current_time_seconds);
+            helpers::get_scheduled_phase(&evaluation, current_time_seconds);
 
         let is_allowed_to_register = true;
 
