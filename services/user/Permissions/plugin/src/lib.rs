@@ -22,19 +22,17 @@ impl Api for PermissionsPlugin {
 impl UsersApi for PermissionsPlugin {
     fn is_auth_or_prompt(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
-        println!(
-            "PermissionsPlugin::is_auth_or_prompt() caller[{}] callee[{}]",
-            caller, callee
-        );
 
         let perms_pref = AccessGrants::get(&caller, &callee);
-        if perms_pref.is_none() {
-            // TODO: caller and callee should both be here, and this should be a single payload (for generic use of user_prompt())
-            // TODO: this is the place to specify the default permissions path
-            HostClient::prompt_user(&caller, None)?;
-            Ok(AccessGrants::get(&caller, &callee).is_some())
-        } else {
+        if perms_pref.is_some() {
             Ok(true)
+        } else {
+            // [x] TODO: caller and callee should both be here, and this should be a single payload (for generic use of user_prompt())
+            // [x] TODO: this is the place to specify the default permissions path
+            let payload = format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, callee);
+            // Q: I need subdomain here, right? Otherwise, nothing downstream knows how to determine subdomain
+            HostClient::prompt_user("/permissions.html", &payload)?;
+            unreachable!();
         }
     }
 

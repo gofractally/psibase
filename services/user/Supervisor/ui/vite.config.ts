@@ -23,13 +23,13 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, "index.html"),
-                perms_oauth: resolve(__dirname, "perms_oauth.html"),
+                oauth: resolve(__dirname, "oauth.html"),
             },
             output: {
                 entryFileNames: "assets/[name].js",
                 chunkFileNames: "assets/[name].js",
                 assetFileNames: "assets/[name].[ext]",
-                // This ensures perms_oauth.html is output at the root level
+                // This ensures oauth.html is output at the root level
                 dir: "dist"
             }
         }

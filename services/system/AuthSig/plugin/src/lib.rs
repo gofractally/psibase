@@ -149,10 +149,11 @@ impl Actions for AuthSig {
             // if handling permissions itself...
             // WORKS as far as proper redirect; would need to create mock page to do final verification params are right
             // if true || "auth-sig handling" == "own permissions" {
+            //     let payload_json_str = format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, caller);
             //     HostClient::prompt_user(
-            //         &caller,
-            //         // TODO: this should allow for a path *with* query params
+            //         // [x] TODO: this should allow for a path *with* query params
             //         Some("authsigperm.html?custom_param=123"),
+            //         &payload_json_str,
             //     )?;
             // }
         }

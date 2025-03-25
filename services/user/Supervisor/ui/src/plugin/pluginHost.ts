@@ -10,7 +10,7 @@ import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 import { v4 as uuidv4 } from 'uuid';
-import { PERM_OAUTH_REQ_KEY, REDIRECT_ERROR_CODE } from "../constants";
+import { OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
 
 interface HttpRequest {
     uri: string;
@@ -24,6 +24,20 @@ interface HttpResponse {
     headers: Array<[string, string]>;
     body: string;
 }
+
+interface PromptUserPayload {
+    caller: string;
+    callee: string;
+}
+
+interface SupervisorPromptPayload {
+    id: string;
+    subdomain: string;
+    subpath: string;
+    expiry_timestamp: number;
+}
+// interface ActivePromptUserPayload extends PromptUserPayload, SupervisorPromptPayload {
+// }
 
 function convert(tuples: [string, string][]): Record<string, string> {
     const record: Record<string, string> = {};
@@ -219,67 +233,71 @@ export class PluginHost implements HostInterface {
         return `${siblingUrl(null, app)}`;
     }
     
-    private setActivePermRequest(caller: string, callee: string, urlPath: string | undefined): Result<string, RecoverableErrorPayload> {
-        let req_id = uuidv4();
-        // TODO: break this up for different params below
-        const perm_req = new TextEncoder().encode(
-            JSON.stringify({
-            id: req_id,
-            permsUrlPath: urlPath,
-            expiry_timestamp: new Date().getUTCSeconds(),
-            payload: {
-                caller,
-                callee,
-            }
-        }));
+    private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
+        let up_id = uuidv4();
+        
+        // Q: promptUser() needs to *add* subdomain (callee) to the payload, right? Or?
+        const parsedUpPayload: PromptUserPayload = JSON.parse(upPayloadJsonStr);
+        // const activePromptUserPayload = {
+        //     ...parsedUpPayload,
+        //     subdomain: callee,
+        //     subpath: subpath,
+        // } as ActivePromptUserPayload;
+
+        // const pl: PromptUserPayload = JSON.parse(payloadJsonStr);
         // TODO: this needs to map id to subdomain and subpath
         // This is Supervisor localStorage space
+        const supervisorUP = {
+            id: up_id,
+            subdomain: this.self.app,
+            subpath: subpath,
+            expiry_timestamp: new Date().getUTCSeconds(),
+        } as SupervisorPromptPayload;
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
             method: "set",
             params: [
-                PERM_OAUTH_REQ_KEY, perm_req]} as QualifiedFunctionCallArgs);
+                OAUTH_REQUEST_KEY, new TextEncoder().encode(
+            JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
         // TODO: needs id to payload
         // This is Permissions localStorage space
+        // const perms_up: PromptUserPayload = {
+        //     // urlPath,
+        //     caller: parsedUpPayload.caller,
+        //     callee: parsedUpPayload.callee,
+        // };
         this.supervisor.call(this.self, {
             service: "clientdata",
             plugin: "plugin",
             intf: "keyvalue",
             method: "set",
             params: [
-                PERM_OAUTH_REQ_KEY, perm_req]} as QualifiedFunctionCallArgs);
-        return req_id
+                OAUTH_REQUEST_KEY, new TextEncoder().encode(
+            JSON.stringify(parsedUpPayload))]} as QualifiedFunctionCallArgs);
+        return up_id
     }
 
     
     // Client interface
     // NOTE: returnUrlPath should not be here; it's passed from Caller as part of redirect
-    promptUser(caller: string, permsUrlPath: string | undefined): Result<void, PluginError> {
-        console.info(`PluginHost::promptUser() permsUrlPath[${permsUrlPath}]`);
+    promptUser(subpath: string | undefined, payloadJsonStr: string): Result<void, PluginError> {
+        if (!!subpath && subpath.length > 0 && !subpath.startsWith("/")) subpath = "/" + subpath;
 
-        if (!!permsUrlPath && permsUrlPath.length > 0 && !permsUrlPath.startsWith("/")) permsUrlPath = "/" + permsUrlPath;
-
-        let sender;
-        console.info(`PluginHost::promptUser() myServiceAccount()[${this.myServiceAccount()}], getSenderApp()[${this.getSenderApp().app}]`);
-        // TODO: any slicker/more reliable way to do this? Yes, this should comes as the payload arg to promptUser()
-        if (!!permsUrlPath) {
-            sender = this.myServiceAccount();
-        } else {
-            sender = this.getSenderApp().app;
-        }
-        console.info(`PluginHost::promptUser() sender[${sender}], myServiceAccount[${this.myServiceAccount()}], getSenderApp()[${this.getSenderApp().app}]`);
-        if (!sender) {
-            throw Error("Failed to get sender");
-        }
-
-        // TODO: this should a generic payload (for user prompts other than perms_oauth)
-        const req_id = this.setActivePermRequest(caller, sender, permsUrlPath);
+        // [x] TODO: this should be a generic payload (for user prompts other than perms_oauth)
+        // [x] Q: this is permissions-specific; where should this actually be happening?
+        // A: It's now simply been renamed to not be premissions-related; it's userPrompt() related
+        
+        const req_id = this.setActiveUserPrompt(subpath, payloadJsonStr);
 
         if (typeof req_id === "string") {
-            const re = this.recoverableError(buildPermsUrl(caller, sender, req_id, permsUrlPath));
+            // const re = this.recoverableError(buildPermsUrl(caller, sender, req_id, subpath));
+
+            let subdomain = "supervisor";
+            const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + "/oauth.html";
+            const re = this.recoverableError(supervisorPermsUrl + "?id=" + req_id);
             re.code = REDIRECT_ERROR_CODE;
             throw re;
         } else {
@@ -287,18 +305,3 @@ export class PluginHost implements HostInterface {
         }
     }
 }
-
-const buildPermsUrl = (caller: string, callee: string, id: string, permsUrlPath: string | undefined) => {
-    let subdomain = "supervisor";
-    let urlPath = "/perms_oauth.html";
-    const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + urlPath;
-
-    const payload = {
-        caller,
-        callee,
-        id,
-        permsUrlPath,
-    };
-    const urlPayload = encodeURIComponent(JSON.stringify(payload));
-    return supervisorPermsUrl + "?payload=" + urlPayload;
-};

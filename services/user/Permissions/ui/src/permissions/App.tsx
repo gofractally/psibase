@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@shadcn/button";
 
 import { supervisor } from "./perms_main";
-import { useQuery } from "@tanstack/react-query";
 import { siblingUrl } from "@psibase/common-lib";
+import { OAUTH_REQUEST_KEY } from "@/constants";
 
 export const App = () => {
     const thisServiceName = "permissions";
-    const [params, setParams] = useState<any>({});
+    const [permOauthReqId, setPermOauthReqId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -17,9 +17,18 @@ export const App = () => {
         await supervisor.onLoaded();
 
         const qps = getQueryParams();
-        const payload = JSON.parse(decodeURIComponent(qps.payload));
-        setParams(qps);
-        setValidPermRequest(payload);
+        setPermOauthReqId(qps.id);
+
+        const permReqPayloadEnc = await supervisor.functionCall({
+            service: "clientdata",
+            intf: "keyvalue",
+            method: "get",
+            params: [OAUTH_REQUEST_KEY],
+        });
+        const permReqPayload = JSON.parse(
+            new TextDecoder().decode(permReqPayloadEnc),
+        );
+        setValidPermRequest(permReqPayload);
 
         try {
             console.info("Determining isTopSupervisor:");
@@ -46,15 +55,30 @@ export const App = () => {
     }, []);
 
     const followReturnRedirect = async () => {
-        let retUrl = validPermRequest?.returnUrlPath;
-        const redirectPath = retUrl ? "/" + retUrl : "";
+        const qps = getQueryParams();
+        let returnUrlPath = qps.returnUrlPath;
+        if (
+            !!returnUrlPath &&
+            returnUrlPath.length > 0 &&
+            !returnUrlPath.startsWith("/")
+        )
+            returnUrlPath = "/" + returnUrlPath;
 
         const url =
             siblingUrl(null, validPermRequest?.caller, null, true) +
-            redirectPath;
+            returnUrlPath;
         if (window.top) {
             window.top.location.href = url;
         }
+    };
+
+    const deletePermRequest = async () => {
+        await supervisor.functionCall({
+            service: "clientdata",
+            intf: "keyvalue",
+            method: "delete",
+            params: [OAUTH_REQUEST_KEY],
+        });
     };
 
     const approve = async () => {
@@ -74,9 +98,11 @@ export const App = () => {
             console.error("error saving permission: ", e);
             throw e;
         }
+        deletePermRequest();
         followReturnRedirect();
     };
     const deny = () => {
+        deletePermRequest();
         followReturnRedirect();
     };
     const getQueryParams = () => {

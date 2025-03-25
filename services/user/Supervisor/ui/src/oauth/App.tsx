@@ -6,29 +6,36 @@ import {
     ValidPermissionRequest,
 } from "./db";
 
-const buildIframeUrl = (perms_req: ValidPermissionRequest) => {
+const buildIframeUrl = (promptUserReq: ValidPermissionRequest) => {
+    const urlParams = new URLSearchParams(window.location.search);
     // TODO: custom permission handling by an app needs to be part of this url construction
     // looks like it is, but I don't think this is working. I'll need to test/debug
     // TODO: this default path should move to Permissions call of promptUser()
-    let subdomain = "permissions";
-    let urlPath = "/permissions.html";
-    if (perms_req.permsUrlPath) {
-        subdomain = perms_req.payload.callee;
-        urlPath = perms_req.permsUrlPath;
-    }
-    const url = siblingUrl(null, subdomain, null, true) + urlPath;
+    // let subdomain = "permissions";
+    // let urlPath = "/oauth.html";
+    // if (promptUserReq.subpath) {
+    // subdomain = promptUserReq.subdomain;
+    // urlPath = promptUserReq.subpath;
+    // }
+    const url =
+        siblingUrl(null, promptUserReq.subdomain, null, true) +
+        promptUserReq.subpath;
     const newIframeUrl = new URL(url);
-    newIframeUrl.searchParams.set("id", perms_req.id);
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlPayload = {
-        ...perms_req.payload,
-        returnUrlPath: urlParams.get("returnUrlPath"),
-    };
-    // TODO: this all should come from localstorage accessed by `id`
+    newIframeUrl.searchParams.set("id", promptUserReq.id);
     newIframeUrl.searchParams.set(
-        "payload",
-        encodeURIComponent(JSON.stringify(urlPayload)),
+        "returnUrlPath",
+        urlParams.get("returnUrlPath") || "",
     );
+    // const urlParams = new URLSearchParams(window.location.search);
+    // const urlPayload = {
+    //     ...promptUserReq.payload,
+    //     returnUrlPath: urlParams.get("returnUrlPath"),
+    // };
+    // // TODO: this all should come from localstorage accessed by `id`
+    // newIframeUrl.searchParams.set(
+    //     "payload",
+    //     encodeURIComponent(JSON.stringify(urlPayload)),
+    // );
     return newIframeUrl.toString();
 };
 
@@ -39,13 +46,13 @@ export const App = () => {
 
     const initApp = async () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const requiredQueryParams = urlParams.has("payload");
+        const requiredQueryParams = urlParams.has("id");
         setHasRequiredQueryParams(requiredQueryParams);
-        const payload = urlParams.get("payload");
-        if (!payload) {
-            throw new Error("Access Request error: No payload provided");
+        const oauth_id = urlParams.get("id");
+        if (!oauth_id) {
+            throw new Error("Access Request error: No id provided");
         }
-        const payloadObj = JSON.parse(decodeURIComponent(payload));
+        // const payloadObj = JSON.parse(decodeURIComponent(payload));
 
         if (requiredQueryParams) {
             // const idParam = urlParams.get("id");
@@ -53,11 +60,11 @@ export const App = () => {
             //     throw new Error("Access Request error: No id provided");
             // }
 
-            const perms_req_res = await ActiveAccessRequest.get(payloadObj.id);
+            const perms_req_res = await ActiveAccessRequest.get(oauth_id);
             // TODO: is caller being gotten at the right time from the right place? ==> const senderApp = getSenderApp().app;
             if (isTypeValidPermissionRequest(perms_req_res)) {
-                const perms_req = perms_req_res as ValidPermissionRequest;
-                setIframeUrl(buildIframeUrl(perms_req));
+                const promptUserReq = perms_req_res as ValidPermissionRequest;
+                setIframeUrl(buildIframeUrl(promptUserReq));
 
                 ActiveAccessRequest.delete();
             } else {

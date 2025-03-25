@@ -106,9 +106,9 @@ interface client {
     /// * `caller`: The caller who is calling a permissioned method
     /// * `url-perms-path`: Optional: for a plugin that handles its own permissions,
     /// *   the path to the page that will handle the permissions request
-    // TODO: update API as follows:
-    prompt-user: func(caller: string, url-perms-path: option<string>) -> result<_, error>;
-    // prompt-user: func(subpath: string, payload: string) -> result<_, error>;
+    // [x] TODO: update API as follows:
+    // prompt-user: func(caller: string, url-perms-path: option<string>) -> result<_, error>;
+    prompt-user: func(subpath: string, payload-json-str: string) -> result<_, error>;
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;
