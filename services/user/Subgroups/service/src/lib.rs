@@ -35,6 +35,11 @@ pub mod service {
     ///                      returns the solution preferred according to `is_preferred`
     /// * `None` - No valid partition exists
     fn partition(n: u32, allowed: &Vec<u32>, is_preferred: PreferenceFunction) -> Option<Vec<u32>> {
+        // TODO:
+        // This can be optimized to use a circular buffer.
+        // Bonus points for setting the initial state in a way that eliminates the need
+        // for a range check at the start of the inner loop.
+
         let mut solutions = vec![None; (n as usize) + 1];
 
         // Base case: for population 0, the solution is an empty vector
@@ -88,8 +93,8 @@ pub mod service {
     #[action]
     fn gmp(population: u32, allowed_groups: Vec<u32>) -> Option<Vec<u32>> {
         let mut allowed = allowed_groups.clone();
-        allowed.dedup();
         allowed.sort_unstable();
+        allowed.dedup();
         partition(population, &allowed, greatest_minimum_preference)
     }
 }
