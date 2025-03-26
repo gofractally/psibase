@@ -25,6 +25,7 @@ pub struct Options {
     pub psibase_mod: String,
     pub gql: bool,
     pub tables: Option<String>,
+    pub generate_schema: Option<bool>,
 }
 
 impl Default for Options {
@@ -45,6 +46,7 @@ impl Default for Options {
             psibase_mod: "psibase".into(),
             gql: true,
             tables: None,
+            generate_schema: None,
         }
     }
 }

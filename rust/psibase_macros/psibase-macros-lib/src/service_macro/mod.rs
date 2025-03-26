@@ -41,6 +41,9 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if options.dispatch.is_none() {
         options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
     }
+    if options.generate_schema.is_none() {
+        options.generate_schema = options.dispatch.clone();
+    }
     if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
         options.dispatch = Some(false);
     }
@@ -735,6 +738,17 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
+    let schema_gen = if options.generate_schema.unwrap() {
+        quote! {
+            #[test]
+            #[ignore]
+            fn _psibase_get_schema() {
+                #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
+            }
+        }
+    } else {
+        quote! {}
+    };
     quote! {
         #silence
         #impl_mod
@@ -751,11 +765,7 @@ fn process_mod(
 
         #polyfill
 
-        #[test]
-        #[ignore]
-        fn _psibase_get_schema() {
-            #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
-        }
+        #schema_gen
     }
     .into()
 } // process_mod
