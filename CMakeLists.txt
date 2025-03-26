@@ -486,6 +486,11 @@ cargo_psibase_package(
     PATH services/system/StagedTx
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Subgroups.psi
+    PATH services/user/Subgroups
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/AuthSig.psi
     NAME AuthSig
@@ -723,12 +728,14 @@ psibase_package(
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Nft(^${PSIBASE_VERSION})" "Tokens(^${PSIBASE_VERSION})" "AuthSig(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
-        SERVER invite
+        SERVER r-invite
         INIT
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     SERVICE auth-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthInvite.wasm
         DATA ${Plugins_OUTPUT_FILE_auth_invite} /plugin.wasm
+    SERVICE r-invite
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
 )
@@ -874,7 +881,7 @@ psibase_package(
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
                     Docs Events Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Supervisor Symbol Tokens Transact Homepage Workshop 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
 psibase_package(
@@ -921,7 +928,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
     Docs Events Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -959,6 +966,7 @@ install(
           ${SERVICE_DIR}/SetCode.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
+          ${SERVICE_DIR}/Subgroups.psi
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/SupervisorTests.psi
           ${SERVICE_DIR}/Symbol.psi

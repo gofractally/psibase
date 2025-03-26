@@ -2,11 +2,11 @@ import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { siblingUrl } from "@psibase/common-lib";
+import { siblingUrl, getSupervisor } from "@psibase/common-lib";
 
 import { modifyUrlParams } from "@lib/utils";
 
-import { supervisor } from "src/main";
+const supervisor = getSupervisor();
 
 export const useCreateConnectionToken = () =>
     useMutation<string, Error>({
