@@ -6,22 +6,26 @@ pub mod service {
     /// Returns true if the new solution is preferred over the old solution.
     type PreferenceFunction = fn(new: &[u32], old: &[u32]) -> bool;
 
-    /// Preference function that compares based on the greatest minimum group size.
-    /// If minimum values are equal, it compares based on maximum group size.
+    /// Prefers groupings with the greatest minimum group size.
+    /// Achieves by comparison based on lexicographical ordering.
+    /// Returns true if new > old.
     fn greatest_minimum_preference(new: &[u32], old: &[u32]) -> bool {
-        let old_min = old.iter().min().unwrap_or(&u32::MAX);
-        let new_min = new.iter().min().unwrap_or(&u32::MAX);
+        let mut new_sorted = new.to_vec();
+        let mut old_sorted = old.to_vec();
 
-        // Criterion 1: If the new minimum is greater than the old minimum
-        let criterion1 = new_min > old_min;
+        new_sorted.sort();
+        old_sorted.sort();
 
-        // Criterion 2: If the minimum values are equal, then prefer the solution
-        // with the minimum number of groups at the minimum group size
-        let criterion2 = new_min == old_min
-            && new.iter().filter(|&x| x == new_min).count()
-                < old.iter().filter(|&x| x == old_min).count();
+        for (n, o) in new_sorted.iter().zip(old_sorted.iter()) {
+            if n > o {
+                return true;
+            }
+            if n < o {
+                return false;
+            }
+        }
 
-        criterion1 || criterion2
+        false
     }
 
     /// Finds a valid partition of `n` into groups of `allowed` sizes
@@ -79,10 +83,6 @@ pub mod service {
     /// to construct groups would be: [4, 6]. But the optimal way according to this algorithm
     /// would be: [5,5]. This is because the minimum partition in the first case is 4, and in
     /// the second case it is 5, and this algorithm tries to find the greatest minimum partition.
-    ///
-    /// If two alternative group constructions have equivalent greatest minimum partitions,
-    /// (e.g. [6,4,4] [5,5,4] ), this implementation will prefer the grouping that minimizes the total
-    /// number of groups with the minimum group size. (e.g. [5,5,4])
     ///
     /// Parameters:
     /// * `population` - The total population to partition

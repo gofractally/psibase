@@ -12,10 +12,6 @@ mod service {
     /// would be: [5,5]. This is because the minimum partition in the first case is 4, and in
     /// the second case it is 5, and this algorithm tries to find the greatest minimum partition.
     ///
-    /// If two alternative group constructions have equivalent greatest minimum partitions,
-    /// (e.g. [6,4,4] [5,5,4] ), this implementation will prefer the grouping that minimizes the total
-    /// number of groups with the minimum group size. (e.g. [5,5,4])
-    ///
     /// Parameters:
     /// * `population` - The total population to partition
     /// * `allowed_groups` - A vector of allowed group sizes
