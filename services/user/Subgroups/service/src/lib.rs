@@ -12,23 +12,17 @@ pub mod service {
     fn greatest_minimum_preference(new: &[u32], old: &[u32]) -> bool {
         let mut new_sorted = new.to_vec();
         let mut old_sorted = old.to_vec();
-
-        new_sorted.sort();
-        old_sorted.sort();
-
-        for (n, o) in new_sorted.iter().zip(old_sorted.iter()) {
-            if n > o {
-                return true;
-            }
-            if n < o {
-                return false;
-            }
-        }
-
-        false
+        new_sorted.sort_unstable();
+        old_sorted.sort_unstable();
+        new_sorted > old_sorted
     }
 
-    /// Finds a valid partition of `n` into groups of `allowed` sizes
+    /// Finds a valid partition of `n` into groups of `allowed` sizes, using a preference function
+    /// to discriminate between alternative valid solutions.
+    ///
+    /// Requirements for the preference function:
+    /// 1. It must define a strict weak ordering for partitions of each total size, up to n.
+    /// 2. Adding the same group to two partitions must not change the result of is_preferred.
     ///
     /// Parameters
     /// * `n` - The number to partition (population)
@@ -95,7 +89,7 @@ pub mod service {
     fn gmp(population: u32, allowed_groups: Vec<u32>) -> Option<Vec<u32>> {
         let mut allowed = allowed_groups.clone();
         allowed.dedup();
-        allowed.sort();
+        allowed.sort_unstable();
         partition(population, &allowed, greatest_minimum_preference)
     }
 }
