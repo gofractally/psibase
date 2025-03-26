@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 mod errors;
-
 use errors::ErrorType::*;
 mod helpers;
 use helpers::*;
@@ -14,10 +13,7 @@ use types::*;
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
-// for Permissions handling permissions test
 use bindings::permissions::plugin::users::is_auth_or_prompt;
-// for handling-own-permissions test
-// use bindings::host::common::client as HostClient;
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -143,19 +139,7 @@ impl Actions for AuthSig {
         let caller = get_sender_app().app.unwrap();
 
         if !from_auth_sig_ui() {
-            // if using Permissions to handle permissions...
             is_auth_or_prompt(&caller)?;
-
-            // if handling permissions itself...
-            // WORKS as far as proper redirect; would need to create mock page to do final verification params are right
-            // if true || "auth-sig handling" == "own permissions" {
-            //     let payload_json_str = format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, caller);
-            //     HostClient::prompt_user(
-            //         // [x] TODO: this should allow for a path *with* query params
-            //         Some("authsigperm.html?custom_param=123"),
-            //         &payload_json_str,
-            //     )?;
-            // }
         }
 
         Transact::add_action_to_transaction(

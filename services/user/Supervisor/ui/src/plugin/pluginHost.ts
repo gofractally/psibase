@@ -229,7 +229,7 @@ export class PluginHost implements HostInterface {
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = uuidv4();
         
-        // In Supervisor localStorage space, map id to subdomain and subpath
+        // In Supervisor localStorage space, store id, subdomain, and subpath
         const supervisorUP = {
             id: up_id,
             subdomain: this.self.app,
@@ -245,8 +245,7 @@ export class PluginHost implements HostInterface {
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
             JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
-        // In Permissions localStorage space, map id to payload
-        // TODO: not needed for app-handled permissions; add a conditional here?
+        // In Permissions (or an app-handling-its-own-permissions') localStorage space, save id and payload
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
         parsedUpPayload.id = up_id;
 
@@ -264,7 +263,13 @@ export class PluginHost implements HostInterface {
     
     // Client interface
     promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
-        if (!!subpath && subpath.length > 0 && !subpath.startsWith("/")) subpath = "/" + subpath;
+        if (!!subpath && subpath.length > 0) {
+            if (!subpath.startsWith("/")) subpath = "/" + subpath;
+            if (subpath.includes("?")) {
+                console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
+                subpath = subpath.substring(0, subpath.indexOf("?"));
+            }
+        }
 
         const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
 
