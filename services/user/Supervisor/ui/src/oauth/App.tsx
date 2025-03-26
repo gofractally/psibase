@@ -4,9 +4,12 @@ import { ActiveOauthRequest, isTypeOauthRequest, OauthRequest } from "./db";
 
 const buildIframeUrl = (promptUserReq: OauthRequest) => {
     const urlParams = new URLSearchParams(window.location.search);
-    const url =
-        siblingUrl(null, promptUserReq.subdomain, null, true) +
-        promptUserReq.subpath;
+    const url = siblingUrl(
+        null,
+        promptUserReq.subdomain,
+        promptUserReq.subpath,
+        true,
+    );
     const newIframeUrl = new URL(url);
     newIframeUrl.searchParams.set("id", promptUserReq.id);
     newIframeUrl.searchParams.set(

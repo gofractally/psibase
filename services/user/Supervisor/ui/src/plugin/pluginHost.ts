@@ -263,18 +263,15 @@ export class PluginHost implements HostInterface {
     
     // Client interface
     promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
-        if (!!subpath && subpath?.length > 0) {
-            if (!subpath.startsWith("/")) subpath = "/" + subpath;
-            if (subpath.includes("?")) {
-                console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
-                subpath = subpath.substring(0, subpath.indexOf("?"));
-            }
+        if (!!subpath && subpath?.length > 0 && subpath.includes("?")) {
+            console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");
+            subpath = subpath.substring(0, subpath.indexOf("?"));
         }
 
         const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
 
         if (typeof aup_id === "string") {
-            const oauthUrl = siblingUrl(null, "supervisor", null, true) + "/oauth.html";
+            const oauthUrl = siblingUrl(null, "supervisor", "/oauth.html", true);
             const re = this.recoverableError(oauthUrl + "?id=" + aup_id);
             re.code = REDIRECT_ERROR_CODE;
             throw re;

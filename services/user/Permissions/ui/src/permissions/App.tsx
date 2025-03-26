@@ -48,19 +48,13 @@ export const App = () => {
 
     const followReturnRedirect = async () => {
         const qps = getQueryParams();
-        let returnUrlPath = qps.returnUrlPath;
-        if (
-            !!returnUrlPath &&
-            returnUrlPath.length > 0 &&
-            !returnUrlPath.startsWith("/")
-        )
-            returnUrlPath = "/" + returnUrlPath;
-
-        const url =
-            siblingUrl(null, validPermRequest?.caller, null, true) +
-            returnUrlPath;
         if (window.top) {
-            window.top.location.href = url;
+            window.top.location.href = siblingUrl(
+                null,
+                validPermRequest?.caller,
+                qps.returnUrlPath,
+                true,
+            );
         }
     };
 
