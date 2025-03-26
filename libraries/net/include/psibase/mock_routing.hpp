@@ -5,6 +5,7 @@
 #include <psibase/mock_timer.hpp>
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/post.hpp>
 #include <cassert>
 #include <deque>
 #include <functional>
@@ -33,7 +34,8 @@ namespace psibase::net
       void on_producer_change() {}
       void post_recv(peer_id origin, const auto& msg)
       {
-         ctx.post(
+         boost::asio::post(
+             ctx,
              [msg, this, origin]()
              {
                 if (auto iter = _peers.find(origin); iter != _peers.end())
@@ -85,7 +87,7 @@ namespace psibase::net
       void async_send(peer_id id, const Msg& msg, F&& f)
       {
          async_send(id, msg);
-         ctx.post([f]() { f(std::error_code()); });
+         boost::asio::post(ctx, [f]() { f(std::error_code()); });
       }
       template <typename Msg>
       void multicast_producers(const Msg& msg)

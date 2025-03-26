@@ -11,10 +11,7 @@ namespace eosio::vm
 
 namespace psibase
 {
-   using KvResourceMap = boost::container::flat_map<KvResourceKey,
-                                                    KvResourceDelta,
-                                                    std::less<KvResourceKey>,
-                                                    std::vector<KvResourcePair>>;
+   using KvResourceMap = std::vector<KvResourcePair>;
 
    struct TransactionContextImpl;
 
