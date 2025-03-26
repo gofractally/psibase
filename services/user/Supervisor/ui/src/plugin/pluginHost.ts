@@ -263,7 +263,7 @@ export class PluginHost implements HostInterface {
     
     // Client interface
     promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
-        if (!!subpath && subpath.length > 0) {
+        if (!!subpath && subpath?.length > 0) {
             if (!subpath.startsWith("/")) subpath = "/" + subpath;
             if (subpath.includes("?")) {
                 console.error("Query params stripped from subpath for security reasons; all params should be passed via the payload");

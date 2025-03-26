@@ -11,11 +11,17 @@ export const App = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
-    const [isTopSupervisor, setIsTopSupervisor] = useState(false);
     const initApp = async () => {
         await supervisor.onLoaded();
 
-        const permReqPayload = await ActivePermsOauthRequest.get();
+        let permReqPayload;
+        try {
+            permReqPayload = await ActivePermsOauthRequest.get();
+        } catch (e) {
+            setError("Permissions request error: " + e);
+            setIsLoading(false);
+            return;
+        }
 
         const qps = getQueryParams();
         if (qps.id && qps.id != permReqPayload.id) {
@@ -33,24 +39,6 @@ export const App = () => {
         }
 
         setValidPermRequest(permReqPayload);
-
-        try {
-            console.info("Determining isTopSupervisor:");
-            console.info(window.top);
-            const isTopSupervisor =
-                window.top?.location.origin ==
-                siblingUrl(null, "supervisor", null, true);
-            console.info("isTopSupervisor:", isTopSupervisor);
-            setIsTopSupervisor(isTopSupervisor);
-        } catch (e) {
-            // setError("Security error: unable to determine top origin.");
-            console.error(
-                "Security error: unable to determine if Supervisor is top.",
-            );
-            // setIsLoading(false);
-            // return;
-        }
-
         setIsLoading(false);
     };
 

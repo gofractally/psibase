@@ -17,28 +17,27 @@ const buildIframeUrl = (promptUserReq: OauthRequest) => {
 };
 
 export const App = () => {
-    const [hasRequiredQueryParams, setHasRequiredQueryParams] =
-        useState<boolean>(false);
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const initApp = async () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const requiredQueryParams = urlParams.has("id");
-        setHasRequiredQueryParams(requiredQueryParams);
         const oauth_id = urlParams.get("id");
         if (!oauth_id) {
-            throw new Error("Access Request error: No id provided");
+            setError("OAuth request error: No id provided");
+            return;
         }
 
-        if (requiredQueryParams) {
+        try {
             const oauthReq = await ActiveOauthRequest.get(oauth_id);
             if (isTypeOauthRequest(oauthReq)) {
                 setIframeUrl(buildIframeUrl(oauthReq as OauthRequest));
-
                 ActiveOauthRequest.delete();
             } else {
-                console.error("Invalid oauth request payload");
+                setError("OAuth request error: Invalid payload");
             }
+        } catch (e) {
+            setError("OAuth request error: " + e);
         }
     };
 
@@ -46,32 +45,30 @@ export const App = () => {
         initApp();
     }, []);
 
+    if (!!error) {
+        return <div>{error}</div>;
+    }
+
     return (
-        <>
-            {!hasRequiredQueryParams ? (
-                <div>ERROR: No payload provided</div>
-            ) : (
-                <div
+        <div
+            style={{
+                width: "100%",
+                height: "100vh",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+            }}
+        >
+            {iframeUrl && (
+                <iframe
+                    src={iframeUrl}
                     style={{
-                        width: "100%",
-                        height: "100vh",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
+                        width: "50%",
+                        height: "50vh",
+                        border: "none",
                     }}
-                >
-                    {iframeUrl && (
-                        <iframe
-                            src={iframeUrl}
-                            style={{
-                                width: "50%",
-                                height: "50vh",
-                                border: "none",
-                            }}
-                        />
-                    )}
-                </div>
+                />
             )}
-        </>
+        </div>
     );
 };

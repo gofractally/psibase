@@ -22,7 +22,8 @@ export class PluginErrorObject {
     }
 }
 
-// This is the object sent across app boundaries and must not be of type Error
+// The `Object` suffix indicates a class that explicitly *don't* inherit from Error because
+// Errors don't serialize properly during a postMessage() and data is lost.
 export class RedirectErrorObject {
     name: string;
     pluginId: QualifiedPluginId;
