@@ -44,10 +44,69 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Attestation {
         pub evaluation_id: u32,
+        pub group_number: u32,
         pub owner: AccountNumber,
-        pub group_id: u32,
-        pub is_final: bool,
-        pub ordering: Option<Vec<AccountNumber>>,
+
+        pub proposal: Option<Vec<u8>>,
+        pub submission: Option<Vec<AccountNumber>>,
+    }
+
+    #[table(name = "GroupTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct Group {
+        pub evaluation_id: u32,
+        pub number: u32,
+        pub members: Vec<AccountNumber>,
+
+        pub key_submitter: Option<AccountNumber>,
+        pub key_hash: Option<String>,
+        pub keys: Vec<String>,
+
+        pub result: Option<Vec<AccountNumber>>,
+    }
+
+    impl Evaluation {
+        pub fn new(
+            id: u32,
+            created_at: u32,
+            owner: AccountNumber,
+            registration: u32,
+            deliberation: u32,
+            submission: u32,
+        ) -> Self {
+            Self {
+                id,
+                owner,
+                created_at,
+                registration,
+                deliberation,
+                submission,
+                use_hooks: false,
+                group_results: vec![],
+                group_sizes: vec![],
+                groups_created: vec![],
+                users: vec![],
+            }
+        }
+    }
+
+    impl Group {
+        #[primary_key]
+        fn pk(&self) -> (u32, u32) {
+            (self.evaluation_id, self.number)
+        }
+
+        pub fn new(evaluation_id: u32, number: u32, members: Vec<AccountNumber>) -> Self {
+            Self {
+                evaluation_id,
+                number,
+                members,
+                key_submitter: None,
+                key_hash: None,
+                keys: vec![],
+                result: None,
+            }
+        }
     }
 
     impl Attestation {
@@ -56,13 +115,13 @@ pub mod tables {
             (self.evaluation_id, self.owner)
         }
 
-        pub fn new(evaluation_id: u32, owner: AccountNumber, group_id: u32) -> Self {
+        pub fn new(evaluation_id: u32, group_number: u32, owner: AccountNumber) -> Self {
             Self {
                 evaluation_id,
+                group_number,
                 owner,
-                group_id,
-                is_final: false,
-                ordering: None,
+                proposal: None,
+                submission: None,
             }
         }
     }
@@ -70,7 +129,9 @@ pub mod tables {
 
 pub mod helpers {
 
-    use crate::tables::{Attestation, ConfigTable, Evaluation, EvaluationTable};
+    use crate::tables::{
+        Attestation, AttestationTable, ConfigTable, Evaluation, EvaluationTable, GroupTable,
+    };
     use psibase::*;
 
     #[derive(PartialEq, Eq)]
@@ -79,6 +140,12 @@ pub mod helpers {
         Deliberation,
         Submission,
         Closed,
+    }
+
+    #[derive(Eq, PartialEq)]
+    pub enum GroupResult {
+        NotEnoughAttestations,
+        Order(Vec<AccountNumber>),
     }
 
     pub fn get_scheduled_phase(
@@ -156,8 +223,48 @@ pub mod helpers {
         groups
     }
 
-    pub fn rank_order_group(attestations: Vec<Attestation>) -> Vec<AccountNumber> {
-        vec![]
+    pub fn calculate_results(
+        attestations: Vec<Option<Vec<AccountNumber>>>,
+        users: Vec<AccountNumber>,
+        is_past_deadline: bool,
+    ) -> GroupResult {
+        let percent_attested = attestations.len() as f64 / users.len() as f64;
+        if !is_past_deadline && percent_attested < 0.66 {
+            return GroupResult::NotEnoughAttestations;
+        }
+        let x = GroupResult::Order(users);
+        return x;
+    }
+
+    pub fn get_group_result(
+        evaluation_id: u32,
+        group_number: u32,
+        current_time: u32,
+    ) -> GroupResult {
+        let group_table = GroupTable::new();
+        let group = group_table
+            .get_index_pk()
+            .get(&(evaluation_id, group_number))
+            .unwrap();
+        let attestation_table: AttestationTable = AttestationTable::new();
+        let mut attestations: Vec<Option<Vec<AccountNumber>>> = Vec::new();
+
+        for member in group.members.clone() {
+            let attestation = attestation_table
+                .get_index_pk()
+                .get(&(evaluation_id, member))
+                .unwrap();
+            attestations.push(attestation.submission);
+        }
+
+        let evaluation = get_evaluation(evaluation_id);
+
+        let status = get_scheduled_phase(&evaluation, current_time);
+        calculate_results(
+            attestations,
+            group.members,
+            status == EvaluationStatus::Closed,
+        )
     }
 }
 
@@ -166,7 +273,8 @@ pub mod service {
 
     use crate::helpers::{self, EvaluationStatus};
     use crate::tables::{
-        Attestation, AttestationTable, ConfigRow, ConfigTable, Evaluation, EvaluationTable,
+        Attestation, AttestationTable, ConfigRow, ConfigTable, Evaluation, EvaluationTable, Group,
+        GroupTable,
     };
 
     use psibase::*;
@@ -188,26 +296,22 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn scheduleEvaluation(registration: u32, deliberation: u32, submission: u32) {
+    fn create(registration: u32, deliberation: u32, submission: u32) {
         let eval_table: EvaluationTable = EvaluationTable::new();
 
         let next_id = helpers::get_next_id();
+
         // TODO: Figure out the time
         let current_time_seconds: u32 = 333;
 
-        let evaluation = Evaluation {
-            id: next_id,
-            owner: get_sender(),
-            created_at: current_time_seconds,
+        let evaluation = Evaluation::new(
+            next_id,
+            current_time_seconds,
+            get_sender(),
             registration,
             deliberation,
             submission,
-            use_hooks: false,
-            group_results: vec![],
-            group_sizes: vec![],
-            groups_created: vec![],
-            users: vec![],
-        };
+        );
 
         eval_table.put(&evaluation).unwrap();
     }
@@ -221,25 +325,31 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn setGroupSizes(id: u32, group_sizes: Vec<u8>) {
-        let mut evaluation = helpers::get_evaluation(id);
+    fn propose(evaluation_id: u32, proposal: Vec<u8>) {
+        let sender = get_sender();
+
+        let evaluation = helpers::get_evaluation(evaluation_id);
         check(
-            evaluation.owner == get_sender(),
-            "only the owner can set the group sizes",
+            helpers::get_scheduled_phase(&evaluation, 222)
+                == helpers::EvaluationStatus::Deliberation,
+            "evaluation must be in deliberation phase",
         );
-        let current_time_seconds: u32 = 222;
-        let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
-        check(
-            status == helpers::EvaluationStatus::Registration,
-            "evaluation must be in registration or deliberation phase",
-        );
-        evaluation.group_sizes = group_sizes;
-        helpers::update_evaluation(&evaluation);
+
+        let attestation_table: AttestationTable = AttestationTable::new();
+
+        let mut attestation = attestation_table
+            .get_index_pk()
+            .get(&(evaluation_id, sender))
+            .unwrap();
+
+        attestation.proposal = Some(proposal);
+
+        attestation_table.put(&attestation).unwrap();
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn startEvaluation(id: u32) {
+    fn start(id: u32, entropy: u64) {
         let mut evaluation = helpers::get_evaluation(id);
         let current_time_seconds: u32 = 222;
 
@@ -249,127 +359,231 @@ pub mod service {
             status == helpers::EvaluationStatus::Deliberation,
             "evaluation must be in deliberation phase",
         );
+        check(
+            evaluation.owner == get_sender(),
+            "only the owner can start the evaluation",
+        );
+        check(
+            evaluation.groups_created.len() == 0,
+            "groups have already been created",
+        );
 
-        let has_not_ran_before = false;
-        check(has_not_ran_before, "evaluation has already been started");
-
-        // iterate over the groups array and create a group for each one of that size
         let mut users_to_process = evaluation.users.clone();
         let sized_groups = evaluation.group_sizes.clone();
 
-        let seed: u64 = 123;
-
-        helpers::shuffle_vec(&mut users_to_process, seed);
+        helpers::shuffle_vec(&mut users_to_process, entropy);
 
         let attestation_table: AttestationTable = AttestationTable::new();
         let groups = helpers::spread_users_into_groups(&users_to_process, sized_groups);
 
-        for group in groups {
-            let group_id = helpers::get_next_id();
-            evaluation.groups_created.push(group_id);
+        let group_table: GroupTable = GroupTable::new();
+
+        for (index, group) in groups.iter().enumerate() {
+            let group_number: u32 = (index as u32) + 1;
+            evaluation.groups_created.push(group_number);
+
             for user in group {
-                let attestation = Attestation::new(evaluation.id, user, group_id);
+                let attestation = Attestation::new(evaluation.id, group_number, user.clone());
                 attestation_table.put(&attestation).unwrap();
             }
+
+            let new_group = Group::new(evaluation.id, group_number, group.clone());
+            group_table.put(&new_group).unwrap();
         }
 
         helpers::update_evaluation(&evaluation);
     }
 
-    fn is_all_users_attested(evaluation: &Evaluation) -> bool {
-        evaluation.users.iter().all(|user| {
-            AttestationTable::new()
-                .get_index_pk()
-                .get(&(evaluation.id, *user))
-                .map_or(false, |attestation| attestation.is_final)
-        })
+    #[action]
+    #[allow(non_snake_case)]
+    fn groupKey(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {
+        let evaluation = helpers::get_evaluation(evaluation_id);
+
+        let current_time_seconds: u32 = 222;
+        let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
+        check(
+            status == helpers::EvaluationStatus::Deliberation,
+            "evaluation must be in deliberation phase",
+        );
+
+        let group_table = GroupTable::new();
+        let sender = get_sender();
+
+        let mut group = group_table
+            .get_index_pk()
+            .get(&(evaluation_id, group_number))
+            .unwrap();
+        check(
+            group.key_submitter.is_none(),
+            "group key has already been submitted",
+        );
+
+        check(
+            group.members.contains(&sender),
+            "user is not a member of the group",
+        );
+
+        group.key_submitter = Some(sender);
+        group.key_hash = Some(hash);
+        group.keys = vec!["TODO".to_string()];
+        group_table.put(&group).unwrap();
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn closeEvaluation(id: u32) {
-        let evaluation = helpers::get_evaluation(id);
+        let evaluation_table: EvaluationTable = EvaluationTable::new();
+        let group_table: GroupTable = GroupTable::new();
 
-        check(
-            evaluation.group_results.len() == 0,
-            "evaluation is already closed",
-        );
+        let evaluation = helpers::get_evaluation(id);
 
         let current_time_seconds: u32 = 222;
         let status = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
 
-        let can_close = match status {
-            EvaluationStatus::Deliberation | EvaluationStatus::Submission => {
-                is_all_users_attested(&evaluation)
+        check(
+            status == EvaluationStatus::Closed,
+            "evaluation has not reached closed time",
+        );
+
+        for group_number in evaluation.groups_created {
+            let group = group_table
+                .get_index_pk()
+                .get(&(evaluation.id, group_number))
+                .unwrap();
+            for user in group.members {
+                let attestation_table: AttestationTable = AttestationTable::new();
+                attestation_table.erase(&(evaluation.id, user));
             }
-            EvaluationStatus::Closed => true,
-            _ => false,
-        };
-        check(can_close, "evaluation is not ready to be closed");
+            group_table.erase(&(evaluation.id, group_number));
+        }
 
-        let attestation_table: AttestationTable = AttestationTable::new();
-
-        let all_user_attestations: Vec<Attestation> = evaluation
-            .users
-            .clone()
-            .iter()
-            .map(|user| {
-                attestation_table
-                    .get_index_pk()
-                    .get(&(evaluation.id, *user))
-                    .unwrap()
-            })
-            .collect();
-
-        let mut updated_evaluation = evaluation;
-
-        let group_results = updated_evaluation
-            .groups_created
-            .iter()
-            .map(|group_id| {
-                let group_attestations: Vec<Attestation> = all_user_attestations
-                    .iter()
-                    .filter(|attestation| attestation.group_id == *group_id)
-                    .cloned()
-                    .collect();
-
-                helpers::rank_order_group(group_attestations)
-            })
-            .collect();
-
-        updated_evaluation.group_results = group_results;
-        helpers::update_evaluation(&updated_evaluation);
+        evaluation_table.erase(&evaluation.id);
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn attest(evaluation_id: u32, ordering: Vec<AccountNumber>, is_final: bool) {
+    fn nudge_group(evaluation_id: u32, group_number: u32) {
+        let group_table = GroupTable::new();
+        let group = group_table
+            .get_index_pk()
+            .get(&(evaluation_id, group_number))
+            .unwrap();
+
+        check(group.key_submitter.is_some(), "cannot attest without key");
+
+        let evaluation = helpers::get_evaluation(evaluation_id);
+        let current_time_seconds: u32 = 111;
+
+        check(
+            helpers::get_scheduled_phase(&evaluation, current_time_seconds)
+                == helpers::EvaluationStatus::Closed,
+            "evaluation must be in closed phase",
+        );
+
+        let attestation_table: AttestationTable = AttestationTable::new();
+        let mut attestations: Vec<Option<Vec<AccountNumber>>> = Vec::new();
+
+        for member in group.members.clone() {
+            let attestation = attestation_table
+                .get_index_pk()
+                .get(&(evaluation_id, member))
+                .unwrap();
+            attestations.push(attestation.submission);
+        }
+        let result = helpers::calculate_results(attestations, group.members, true);
+
+        match result {
+            helpers::GroupResult::Order(users) => {
+                let mut group = group_table
+                    .get_index_pk()
+                    .get(&(evaluation_id, group_number))
+                    .unwrap();
+                group.result = Some(users);
+                group_table.put(&group).unwrap();
+            }
+            helpers::GroupResult::NotEnoughAttestations => {
+                check(false, "not enough attestations");
+            }
+        }
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn attest(evaluation_id: u32, submission: Vec<String>) {
         let sender = get_sender();
 
         let evaluation = helpers::get_evaluation(evaluation_id);
         let current_time_seconds: u32 = 222;
+
+        let scheduled_phase = helpers::get_scheduled_phase(&evaluation, current_time_seconds);
+
         check(
-            helpers::get_scheduled_phase(&evaluation, current_time_seconds)
-                == helpers::EvaluationStatus::Deliberation,
+            scheduled_phase == helpers::EvaluationStatus::Deliberation,
             "evaluation must be in deliberation phase",
         );
+        // Question: Can someone attest if they haven't proposed?
 
         let attestation_table: AttestationTable = AttestationTable::new();
-        let attestation = attestation_table
+        let mut attestation = attestation_table
             .get_index_pk()
-            .get(&(evaluation_id, sender));
-        check(attestation.is_some(), "no attestation found for this user");
-        let mut attestation = attestation.unwrap();
-        check(attestation.is_final == false, "user has already attested");
+            .get(&(evaluation_id, sender))
+            .unwrap();
 
-        attestation.ordering = Some(ordering);
-        attestation.is_final = is_final;
+        check(
+            attestation.submission.is_none(),
+            "user has already submitted",
+        );
+
+        let submission_account_numbers = submission
+            .iter()
+            .map(|s| AccountNumber::from(s.as_str()))
+            .collect();
+
+        attestation.submission = Some(submission_account_numbers);
+
         attestation_table.put(&attestation).unwrap();
+
+        let group_table = GroupTable::new();
+        let group = group_table
+            .get_index_pk()
+            .get(&(attestation.evaluation_id, attestation.group_number))
+            .unwrap();
+
+        check(group.key_submitter.is_some(), "cannot attest without key");
+
+        let members = group.members;
+        let mut member_attestations: Vec<Option<Vec<AccountNumber>>> = Vec::new();
+
+        for member in members.clone() {
+            let member_attest = attestation_table
+                .get_index_pk()
+                .get(&(evaluation_id, member))
+                .unwrap();
+
+            member_attestations.push(member_attest.submission);
+        }
+
+        let result = helpers::calculate_results(
+            member_attestations,
+            members,
+            scheduled_phase == helpers::EvaluationStatus::Closed,
+        );
+        match result {
+            helpers::GroupResult::Order(users) => {
+                let mut group = group_table
+                    .get_index_pk()
+                    .get(&(evaluation_id, attestation.group_number))
+                    .unwrap();
+                group.result = Some(users);
+                group_table.put(&group).unwrap();
+            }
+            _ => return,
+        }
     }
 
     #[action]
     #[allow(non_snake_case)]
-    fn register(id: u32, entropy: u64) {
+    fn register(id: u32) {
         let sender = get_sender();
 
         let current_time_seconds: u32 = 222;
