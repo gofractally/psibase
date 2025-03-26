@@ -37,8 +37,7 @@ export const App = () => {
 
                 ActiveOauthRequest.delete();
             } else {
-                // TODO: this should be a recoverable error
-                throw oauthReq;
+                console.error("Invalid oauth request payload");
             }
         }
     };

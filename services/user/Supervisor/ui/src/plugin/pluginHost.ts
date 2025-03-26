@@ -229,8 +229,7 @@ export class PluginHost implements HostInterface {
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = uuidv4();
         
-        // TODO: this needs to map id to subdomain and subpath
-        // This is Supervisor localStorage space
+        // In Supervisor localStorage space, map id to subdomain and subpath
         const supervisorUP = {
             id: up_id,
             subdomain: this.self.app,
@@ -246,8 +245,7 @@ export class PluginHost implements HostInterface {
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
             JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
-        // TODO: needs id to payload
-        // This is Permissions localStorage space
+        // In Permissions localStorage space, map id to payload
         // TODO: not needed for app-handled permissions; add a conditional here?
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
         parsedUpPayload.id = up_id;

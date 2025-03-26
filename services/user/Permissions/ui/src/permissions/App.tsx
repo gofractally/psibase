@@ -4,7 +4,6 @@ import { Button } from "@shadcn/button";
 
 import { supervisor } from "./perms_main";
 import { siblingUrl } from "@psibase/common-lib";
-import { OAUTH_REQUEST_KEY } from "@/constants";
 import { ActivePermsOauthRequest } from "./db";
 
 export const App = () => {
@@ -16,23 +15,7 @@ export const App = () => {
     const initApp = async () => {
         await supervisor.onLoaded();
 
-        // const permReqPayload = await ActivePermsOauthRequest.get();
-        const permReqPayloadEnc = await supervisor.functionCall({
-            service: "clientdata",
-            intf: "keyvalue",
-            method: "get",
-            params: [OAUTH_REQUEST_KEY],
-        });
-
-        if (!permReqPayloadEnc) {
-            setError("Failed to retrieve permissions request payload.");
-            setIsLoading(false);
-            return;
-        }
-
-        const permReqPayload = JSON.parse(
-            new TextDecoder().decode(permReqPayloadEnc),
-        );
+        const permReqPayload = await ActivePermsOauthRequest.get();
 
         const qps = getQueryParams();
         if (qps.id && qps.id != permReqPayload.id) {
@@ -93,16 +76,6 @@ export const App = () => {
         }
     };
 
-    // TODO: extract out keyvalue operations into db.ts
-    const deletePermRequest = async () => {
-        await supervisor.functionCall({
-            service: "clientdata",
-            intf: "keyvalue",
-            method: "delete",
-            params: [OAUTH_REQUEST_KEY],
-        });
-    };
-
     const approve = async () => {
         try {
             await supervisor.functionCall({
@@ -120,13 +93,11 @@ export const App = () => {
             console.error("error saving permission: ", e);
             throw e;
         }
-        // ActivePermsOauthRequest.delete();
-        deletePermRequest();
+        ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };
     const deny = () => {
-        // ActivePermsOauthRequest.delete();
-        deletePermRequest();
+        ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };
     const getQueryParams = () => {
@@ -144,20 +115,14 @@ export const App = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <h2 style={{ textAlign: "center" }}>Grant access?</h2>
-            {!!validPermRequest ? (
-                <>
-                    <p>
-                        {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
-                    </p>
-                    {!!error && <div>ERROR: {error}</div>}
-                    <div className="flex justify-center gap-4">
-                        <Button onClick={approve}>Approve</Button>
-                        <Button onClick={deny}>Deny</Button>
-                    </div>
-                </>
-            ) : (
-                <div>Forged request detected.</div>
-            )}
+            <p>
+                {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
+            </p>
+            {!!error && <div>ERROR: {error}</div>}
+            <div className="flex justify-center gap-4">
+                <Button onClick={approve}>Approve</Button>
+                <Button onClick={deny}>Deny</Button>
+            </div>
         </div>
     );
 };
