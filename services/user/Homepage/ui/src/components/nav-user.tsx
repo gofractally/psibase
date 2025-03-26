@@ -1,18 +1,35 @@
+import { type UseMutationResult } from "@tanstack/react-query";
 import {
     ChevronsUpDown,
+    Contact,
+    Copy,
+    Download,
     LogIn,
     LogOut,
     Moon,
     PlusCircle,
-    Sun,
-    UserPlus,
-    Download,
-    User,
-    Copy,
     RefreshCcw,
+    Sun,
+    User,
+    UserPlus,
 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { siblingUrl } from "@psibase/common-lib";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,34 +49,49 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
-import { useChainId } from "@/hooks/useChainId";
-import { useLogout } from "@/hooks/useLogout";
-import { useTheme } from "./theme-provider";
-import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
-import { useCreateConnectionToken } from "@/hooks/useCreateConnectionToken";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useCanExportAccount } from "@/hooks/use-can-export-account";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
+import { useCreateConnectionToken } from "@/hooks/use-create-connection-token";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGenerateInvite } from "@/hooks/use-generate-invite";
+import { useLogout } from "@/hooks/use-logout";
+import { useProfile } from "@/hooks/use-profile";
+import { useSelectAccount } from "@/hooks/use-select-account";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import { useSelectAccount } from "@/hooks/useSelectAccount";
-import { useGenerateInvite } from "@/hooks/useGenerateInvite";
-import { useCanExportAccount } from "@/hooks/useCanExportAccount";
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "./ui/label";
-import { Input } from "./ui/input";
+import { Account } from "@/lib/zod/Account";
+
+import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
+
+import { useTheme } from "./theme-provider";
 import { Button } from "./ui/button";
-import { toast } from "sonner";
-import { type UseMutationResult } from "@tanstack/react-query";
-import { siblingUrl } from "@psibase/common-lib";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+
+function AccountMenuItem({
+    account,
+    isConnectingToAccount,
+    connectToAccount,
+}: {
+    account: z.infer<typeof Account>;
+    isConnectingToAccount: boolean;
+    connectToAccount: (account: string) => void;
+}) {
+    const { avatarSrc } = useAvatar(account);
+
+    return (
+        <DropdownMenuItem
+            disabled={isConnectingToAccount}
+            key={account}
+            onClick={() => connectToAccount(account)}
+        >
+            <img className="mr-2 h-4 w-4 rounded-none" src={avatarSrc} />
+            <span>{account}</span>
+        </DropdownMenuItem>
+    );
+}
 
 export function NavUser() {
     const { isMobile } = useSidebar();
@@ -67,19 +99,38 @@ export function NavUser() {
     const { data: currentUser, isFetched: isFetchedLoggedInuser } =
         useCurrentUser();
 
-    const { data: chainId, isFetched: isFetchedChainId } = useChainId();
+    const { isFetched: isFetchedChainId } = useChainId();
     const { mutateAsync: logout } = useLogout();
     const navigate = useNavigate();
+
+    const { data: profile } = useProfile(currentUser);
+    const { avatarSrc } = useAvatar(currentUser);
 
     const onLogout = async () => {
         await logout();
         navigate("/");
     };
 
+    const [modalType, setModalType] = useState<
+        "editProfile" | "generateInvite"
+    >("editProfile");
+    const [showModal, setShowModal] = useState(false);
+
+    const onEditProfile = () => {
+        setModalType("editProfile");
+        setShowModal(true);
+    };
+
     const { setTheme } = useTheme();
 
-    const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
-        useConnectedAccounts();
+    const {
+        data: connectedAccountsData,
+        isFetched: isFetchedConnectedAccounts,
+    } = useConnectedAccounts();
+
+    const connectedAccounts = connectedAccountsData.filter(
+        (account) => account.toLowerCase() !== currentUser?.toLowerCase(),
+    );
 
     const { mutateAsync: login } = useCreateConnectionToken();
     const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
@@ -87,6 +138,12 @@ export function NavUser() {
 
     const generateInvite = useGenerateInvite();
     const { data: canExportAccount } = useCanExportAccount(currentUser);
+
+    const onGenerateInvite = () => {
+        generateInvite.mutate();
+        setModalType("generateInvite");
+        setShowModal(true);
+    };
 
     const isNoOptions = connectedAccounts.length == 0;
     const isUsingOnlyOption =
@@ -99,8 +156,17 @@ export function NavUser() {
         ) || isConnectingToAccount;
 
     return (
-        <Dialog>
-            <InviteDialogContent generateInvite={generateInvite} />
+        <Dialog open={showModal} onOpenChange={setShowModal}>
+            {modalType == "generateInvite" && (
+                <InviteDialogContent generateInvite={generateInvite} />
+            )}
+            {modalType == "editProfile" && (
+                <EditProfileDialogContent
+                    onClose={() => {
+                        setShowModal(false);
+                    }}
+                />
+            )}
             <SidebarMenu>
                 <SidebarMenuItem>
                     <DropdownMenu>
@@ -111,14 +177,8 @@ export function NavUser() {
                             >
                                 <Avatar className="h-8 w-8 rounded-lg">
                                     <AvatarImage
-                                        src={
-                                            chainId && currentUser
-                                                ? generateAvatar(
-                                                      chainId,
-                                                      currentUser,
-                                                  )
-                                                : undefined
-                                        }
+                                        className="object-cover"
+                                        src={avatarSrc}
                                         alt={currentUser || ""}
                                     />
                                     <AvatarFallback className="rounded-lg">
@@ -127,7 +187,9 @@ export function NavUser() {
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate ">
-                                        {currentUser || "Not logged in"}
+                                        {profile?.profile?.displayName ||
+                                            currentUser ||
+                                            "Not logged in"}
                                     </span>
                                 </div>
                                 <ChevronsUpDown className="ml-auto size-4" />
@@ -143,14 +205,8 @@ export function NavUser() {
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                     <Avatar className="h-8 w-8 rounded-lg">
                                         <AvatarImage
-                                            src={
-                                                chainId && currentUser
-                                                    ? generateAvatar(
-                                                          chainId,
-                                                          currentUser,
-                                                      )
-                                                    : undefined
-                                            }
+                                            src={avatarSrc}
+                                            className="object-cover"
                                         />
                                         <AvatarFallback className="rounded-lg">
                                             ?
@@ -158,7 +214,16 @@ export function NavUser() {
                                     </Avatar>
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-semibold">
-                                            {currentUser || "Not logged in"}
+                                            {profile?.profile?.displayName ||
+                                                currentUser ||
+                                                "Not logged in"}{" "}
+                                            {profile?.profile?.displayName ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {`(${currentUser})`}
+                                                </span>
+                                            ) : (
+                                                ""
+                                            )}
                                         </span>
                                     </div>
                                 </div>
@@ -201,32 +266,20 @@ export function NavUser() {
                                             <DropdownMenuSubContent>
                                                 {connectedAccounts.map(
                                                     (connectedAccount) => (
-                                                        <DropdownMenuItem
-                                                            disabled={
-                                                                isConnectingToAccount
-                                                            }
+                                                        <AccountMenuItem
                                                             key={
                                                                 connectedAccount
                                                             }
-                                                            onClick={() =>
-                                                                connectToAccount(
-                                                                    connectedAccount,
-                                                                )
+                                                            account={
+                                                                connectedAccount
                                                             }
-                                                        >
-                                                            <img
-                                                                className="mr-2 h-4 w-4 rounded-none"
-                                                                src={createIdenticon(
-                                                                    chainId +
-                                                                        connectedAccount,
-                                                                )}
-                                                            />
-                                                            <span>
-                                                                {
-                                                                    connectedAccount
-                                                                }
-                                                            </span>
-                                                        </DropdownMenuItem>
+                                                            isConnectingToAccount={
+                                                                isConnectingToAccount
+                                                            }
+                                                            connectToAccount={
+                                                                connectToAccount
+                                                            }
+                                                        />
                                                     ),
                                                 )}
                                                 <DropdownMenuSeparator />
@@ -279,17 +332,25 @@ export function NavUser() {
                                 </DropdownMenuSub>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
-                            <DialogTrigger asChild>
-                                <DropdownMenuItem
-                                    disabled={!currentUser}
-                                    onClick={() => {
-                                        generateInvite.mutate();
-                                    }}
-                                >
-                                    <User className="mr-2 h-4 w-4" />
-                                    Create invite
-                                </DropdownMenuItem>
-                            </DialogTrigger>
+                            <DropdownMenuItem
+                                disabled={!currentUser}
+                                onClick={() => {
+                                    onGenerateInvite();
+                                }}
+                            >
+                                <User className="mr-2 h-4 w-4" />
+                                Create invite
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                disabled={!currentUser}
+                                onClick={() => {
+                                    onEditProfile();
+                                }}
+                            >
+                                <Contact className="mr-2 h-4 w-4" />
+                                Edit profile
+                            </DropdownMenuItem>
 
                             <DropdownMenuItem
                                 disabled={!canExportAccount}

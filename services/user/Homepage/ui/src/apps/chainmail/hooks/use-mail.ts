@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/queryKeys";
 
 import { zSendMessageSchema } from "../components/compose-dialog";

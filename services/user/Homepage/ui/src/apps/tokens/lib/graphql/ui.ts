@@ -1,4 +1,5 @@
-import { graphql } from "./index";
+import { graphql } from "@/lib/graphql";
+
 export interface Root {
   data: Data;
 }
