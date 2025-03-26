@@ -27,11 +27,9 @@ impl UsersApi for PermissionsPlugin {
         if perms_pref.is_some() {
             Ok(true)
         } else {
-            // [x] TODO: caller and callee should both be here, and this should be a single payload (for generic use of user_prompt())
-            // [x] TODO: this is the place to specify the default permissions path
-            let payload = format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, callee);
-            // Q: I need subdomain here, right? Otherwise, nothing downstream knows how to determine subdomain
-            HostClient::prompt_user("/permissions.html", &payload)?;
+            let user_prompt_payload =
+                format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, callee);
+            HostClient::prompt_user(Some("/permissions.html"), Some(&user_prompt_payload))?;
             unreachable!();
         }
     }

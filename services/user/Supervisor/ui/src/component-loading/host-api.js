@@ -39,11 +39,7 @@ export const client = {
         return host.getAppUrl(app);
     },
 
-    getActivePermRequest(id) {
-        return host.getActivePermRequest(id);
-    },
-
-    promptUser(caller, permsUrlPath, returnUrlPath) {
-        return host.promptUser(caller, permsUrlPath, returnUrlPath);
+    promptUser(subpath, payloadJsonStr) {
+        return host.promptUser(subpath, payloadJsonStr);
     },
 };

@@ -100,15 +100,10 @@ interface client {
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
     
-    /// Prompts the user to authorize `caller` to access the permissions method
-    /// being called in `sender`'s plugin
-    /// Parameters
-    /// * `caller`: The caller who is calling a permissioned method
-    /// * `url-perms-path`: Optional: for a plugin that handles its own permissions,
-    /// *   the path to the page that will handle the permissions request
-    // [x] TODO: update API as follows:
-    // prompt-user: func(caller: string, url-perms-path: option<string>) -> result<_, error>;
-    prompt-user: func(subpath: string, payload-json-str: string) -> result<_, error>;
+    /// `prompt-user` prompts the user for input. `prompt-user` will display the content at `subpath`, supplying `payload-json-str` as ?????
+    /// * `subpath`: Optional: the subpath to visit on the caller's subdomain to access the prompting
+    /// * `payload-json-str`: Optional: any data payload that the prompt page may need as a serialized JSON string
+    prompt-user: func(subpath: option<string>, payload-json-str: option<string>) -> result<_, error>;
 
     /// Gets the URL of the specified app on the current root domain.
     get-app-url: func(app: string) -> string;

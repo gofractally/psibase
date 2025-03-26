@@ -8,7 +8,6 @@ import { OAUTH_REQUEST_KEY } from "@/constants";
 
 export const App = () => {
     const thisServiceName = "permissions";
-    const [permOauthReqId, setPermOauthReqId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -16,19 +15,26 @@ export const App = () => {
     const initApp = async () => {
         await supervisor.onLoaded();
 
-        const qps = getQueryParams();
-        setPermOauthReqId(qps.id);
-
         const permReqPayloadEnc = await supervisor.functionCall({
             service: "clientdata",
             intf: "keyvalue",
             method: "get",
             params: [OAUTH_REQUEST_KEY],
         });
+
         const permReqPayload = JSON.parse(
             new TextDecoder().decode(permReqPayloadEnc),
         );
+        // TODO: ?Check that id is valid?
         setValidPermRequest(permReqPayload);
+
+        if (!permReqPayload.caller || !permReqPayload.callee) {
+            setError(
+                "Invalid permissions request payload: missing caller or callee.",
+            );
+            setIsLoading(false);
+            return;
+        }
 
         try {
             console.info("Determining isTopSupervisor:");
@@ -72,6 +78,7 @@ export const App = () => {
         }
     };
 
+    // TODO: extract out keyvalue operations into db.ts
     const deletePermRequest = async () => {
         await supervisor.functionCall({
             service: "clientdata",

@@ -36,8 +36,6 @@ interface SupervisorPromptPayload {
     subpath: string;
     expiry_timestamp: number;
 }
-// interface ActivePromptUserPayload extends PromptUserPayload, SupervisorPromptPayload {
-// }
 
 function convert(tuples: [string, string][]): Record<string, string> {
     const record: Record<string, string> = {};
@@ -236,15 +234,8 @@ export class PluginHost implements HostInterface {
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = uuidv4();
         
-        // Q: promptUser() needs to *add* subdomain (callee) to the payload, right? Or?
         const parsedUpPayload: PromptUserPayload = JSON.parse(upPayloadJsonStr);
-        // const activePromptUserPayload = {
-        //     ...parsedUpPayload,
-        //     subdomain: callee,
-        //     subpath: subpath,
-        // } as ActivePromptUserPayload;
 
-        // const pl: PromptUserPayload = JSON.parse(payloadJsonStr);
         // TODO: this needs to map id to subdomain and subpath
         // This is Supervisor localStorage space
         const supervisorUP = {
@@ -264,11 +255,7 @@ export class PluginHost implements HostInterface {
 
         // TODO: needs id to payload
         // This is Permissions localStorage space
-        // const perms_up: PromptUserPayload = {
-        //     // urlPath,
-        //     caller: parsedUpPayload.caller,
-        //     callee: parsedUpPayload.callee,
-        // };
+        // TODO: not needed for app-handled permissions; add a conditional here?
         this.supervisor.call(this.self, {
             service: "clientdata",
             plugin: "plugin",
@@ -282,26 +269,18 @@ export class PluginHost implements HostInterface {
 
     
     // Client interface
-    // NOTE: returnUrlPath should not be here; it's passed from Caller as part of redirect
-    promptUser(subpath: string | undefined, payloadJsonStr: string): Result<void, PluginError> {
+    promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
         if (!!subpath && subpath.length > 0 && !subpath.startsWith("/")) subpath = "/" + subpath;
 
-        // [x] TODO: this should be a generic payload (for user prompts other than perms_oauth)
-        // [x] Q: this is permissions-specific; where should this actually be happening?
-        // A: It's now simply been renamed to not be premissions-related; it's userPrompt() related
-        
-        const req_id = this.setActiveUserPrompt(subpath, payloadJsonStr);
+        const aup_id = this.setActiveUserPrompt(subpath, payloadJsonStr || JSON.stringify({}));
 
-        if (typeof req_id === "string") {
-            // const re = this.recoverableError(buildPermsUrl(caller, sender, req_id, subpath));
-
-            let subdomain = "supervisor";
-            const supervisorPermsUrl = siblingUrl(null, subdomain, null, true) + "/oauth.html";
-            const re = this.recoverableError(supervisorPermsUrl + "?id=" + req_id);
+        if (typeof aup_id === "string") {
+            const oauthUrl = siblingUrl(null, "supervisor", null, true) + "/oauth.html";
+            const re = this.recoverableError(oauthUrl + "?id=" + aup_id);
             re.code = REDIRECT_ERROR_CODE;
             throw re;
         } else {
-            throw req_id;
+            throw aup_id;
         }
     }
 }
