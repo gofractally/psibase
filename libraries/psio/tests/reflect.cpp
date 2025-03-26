@@ -101,7 +101,9 @@ TEST_CASE("contract_proxy")
    psio::translator<contr> tr;
 
    std::cout << tr.get_json_schema() << "\n";
-   std::cout << tr.get_gql_schema() << "\n";
+
+   auto schema = tr.get_gql_schema();
+   std::cout << std::string(schema.begin(), schema.end()) << "\n";
 
    /*
    block_reint( [&](){
