@@ -25,11 +25,6 @@ interface HttpResponse {
     body: string;
 }
 
-interface PromptUserPayload {
-    caller: string;
-    callee: string;
-}
-
 interface SupervisorPromptPayload {
     id: string;
     subdomain: string;
@@ -234,8 +229,6 @@ export class PluginHost implements HostInterface {
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = uuidv4();
         
-        const parsedUpPayload: PromptUserPayload = JSON.parse(upPayloadJsonStr);
-
         // TODO: this needs to map id to subdomain and subpath
         // This is Supervisor localStorage space
         const supervisorUP = {
@@ -256,6 +249,9 @@ export class PluginHost implements HostInterface {
         // TODO: needs id to payload
         // This is Permissions localStorage space
         // TODO: not needed for app-handled permissions; add a conditional here?
+        const parsedUpPayload = JSON.parse(upPayloadJsonStr);
+        parsedUpPayload.id = up_id;
+
         this.supervisor.call(this.self, {
             service: "clientdata",
             plugin: "plugin",

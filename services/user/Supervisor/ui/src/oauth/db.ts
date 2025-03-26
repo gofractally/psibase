@@ -30,7 +30,7 @@ export class ActiveOauthRequest {
             params: [OAUTH_REQUEST_KEY]});
 
         if (!oauthReqBytes) {
-            throw "No active oauth request found";
+            throw new Error("No active oauth request found");
         }
 
         const oauthReq = JSON.parse(new TextDecoder().decode(oauthReqBytes));

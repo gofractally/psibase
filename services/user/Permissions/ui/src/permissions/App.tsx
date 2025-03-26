@@ -5,6 +5,7 @@ import { Button } from "@shadcn/button";
 import { supervisor } from "./perms_main";
 import { siblingUrl } from "@psibase/common-lib";
 import { OAUTH_REQUEST_KEY } from "@/constants";
+import { ActivePermsOauthRequest } from "./db";
 
 export const App = () => {
     const thisServiceName = "permissions";
@@ -15,6 +16,7 @@ export const App = () => {
     const initApp = async () => {
         await supervisor.onLoaded();
 
+        // const permReqPayload = await ActivePermsOauthRequest.get();
         const permReqPayloadEnc = await supervisor.functionCall({
             service: "clientdata",
             intf: "keyvalue",
@@ -22,11 +24,22 @@ export const App = () => {
             params: [OAUTH_REQUEST_KEY],
         });
 
+        if (!permReqPayloadEnc) {
+            setError("Failed to retrieve permissions request payload.");
+            setIsLoading(false);
+            return;
+        }
+
         const permReqPayload = JSON.parse(
             new TextDecoder().decode(permReqPayloadEnc),
         );
-        // TODO: ?Check that id is valid?
-        setValidPermRequest(permReqPayload);
+
+        const qps = getQueryParams();
+        if (qps.id && qps.id != permReqPayload.id) {
+            setError("Forged request detected.");
+            setIsLoading(false);
+            return;
+        }
 
         if (!permReqPayload.caller || !permReqPayload.callee) {
             setError(
@@ -35,6 +48,8 @@ export const App = () => {
             setIsLoading(false);
             return;
         }
+
+        setValidPermRequest(permReqPayload);
 
         try {
             console.info("Determining isTopSupervisor:");
@@ -105,10 +120,12 @@ export const App = () => {
             console.error("error saving permission: ", e);
             throw e;
         }
+        // ActivePermsOauthRequest.delete();
         deletePermRequest();
         followReturnRedirect();
     };
     const deny = () => {
+        // ActivePermsOauthRequest.delete();
         deletePermRequest();
         followReturnRedirect();
     };
@@ -122,10 +139,6 @@ export const App = () => {
         return <div>{error}</div>;
     } else if (isLoading) {
         return <div>Loading...</div>;
-    } else {
-        if (!validPermRequest) {
-            console.error("Forged request detected.");
-        }
     }
 
     return (
