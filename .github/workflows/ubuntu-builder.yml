@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:e8368ffa80abea2f0167b2ea7e9d902758e8b25f"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2204:2dcf25d3881383cc3b6773224c29ea4cf0454798"
             ubuntu-version: "2204"
-          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:e8368ffa80abea2f0167b2ea7e9d902758e8b25f"
+          - builder-image: "ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-2404:3193d032ed2bdc95040b3f486b1ec7a86bffd40a"
             ubuntu-version: "2404"
     steps:
       - name: Timestamp
