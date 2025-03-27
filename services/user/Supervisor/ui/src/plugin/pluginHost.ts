@@ -9,7 +9,6 @@ import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
-import { v4 as uuidv4 } from 'uuid';
 import { OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
 
 interface HttpRequest {
@@ -227,7 +226,7 @@ export class PluginHost implements HostInterface {
     }
     
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
-        let up_id = uuidv4();
+        let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
         
         // In Supervisor localStorage space, store id, subdomain, and subpath
         const supervisorUP = {

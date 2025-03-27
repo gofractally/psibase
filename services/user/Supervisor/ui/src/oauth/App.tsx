@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { siblingUrl } from "@psibase/common-lib";
 import { ActiveOauthRequest, isTypeOauthRequest, OauthRequest } from "./db";
 
@@ -23,7 +23,7 @@ export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const initApp = async () => {
+    const initApp = useCallback(async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const oauth_id = urlParams.get("id");
         if (!oauth_id) {
@@ -42,7 +42,7 @@ export const App = () => {
         } catch (e) {
             setError("OAuth request error: " + e);
         }
-    };
+    }, []);
 
     useEffect(() => {
         initApp();
@@ -56,7 +56,7 @@ export const App = () => {
         <div
             style={{
                 width: "100%",
-                height: "100vh",
+                height: "100dvh",
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
@@ -67,7 +67,7 @@ export const App = () => {
                     src={iframeUrl}
                     style={{
                         width: "50%",
-                        height: "50vh",
+                        height: "50dvh",
                         border: "none",
                     }}
                 />
