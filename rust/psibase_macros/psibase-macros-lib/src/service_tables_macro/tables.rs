@@ -53,7 +53,7 @@ impl KeySchemaData {
             for idx in field {
                 path = quote! { #path #idx, }
             }
-            result = quote! { #result #psibase_mod::FieldId { path: vec![ #path ] }, }
+            result = quote! { #result #psibase_mod::FieldId { path: vec![ #path ], transform: None, type_: None }, }
         }
         quote! { vec![ #result ] }
     }

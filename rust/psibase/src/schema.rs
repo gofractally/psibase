@@ -11,6 +11,15 @@ type ActionMap = IndexMap<String, FunctionType>;
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct FieldId {
     pub path: Vec<u32>,
+    pub transform: Option<String>,
+    #[serde(rename = "type")]
+    pub type_: Option<AnyType>,
+}
+
+impl VisitTypes for FieldId {
+    fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
+        self.type_.visit_types(f);
+    }
 }
 
 pub type IndexInfo = Vec<FieldId>;
@@ -27,7 +36,8 @@ pub struct TableInfo {
 
 impl VisitTypes for TableInfo {
     fn visit_types<F: FnMut(&mut AnyType) -> ()>(&mut self, f: &mut F) {
-        self.type_.visit_types(f)
+        self.type_.visit_types(f);
+        self.indexes.visit_types(f);
     }
 }
 
