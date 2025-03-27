@@ -8,10 +8,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useChainId } from "@/hooks/useChainId";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+
+import { useAvatar } from "@/hooks/use-avatar";
+import { useChainId } from "@/hooks/use-chain-id";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 import { useBalances } from "@/apps/tokens/hooks/tokensPlugin/useBalances";
-import { createIdenticon } from "@/lib/createIdenticon";
 import { Quantity } from "@/apps/tokens/lib/quantity";
 
 interface Props {
@@ -55,6 +57,9 @@ export const TransferModal = ({
     const numSymbol = quantity ? quantity.format(true).split(" ") : ["", ""];
     const [amountFormatted, symbol] = numSymbol;
 
+    const { avatarSrc: fromAvatar } = useAvatar(from);
+    const { avatarSrc: toAvatar } = useAvatar(to);
+
     return (
         <AlertDialog open={open}>
             <AlertDialogContent>
@@ -74,8 +79,12 @@ export const TransferModal = ({
                                 </div>
                                 <div>
                                     <img
-                                        className="h-20 w-20   border"
-                                        src={createIdenticon(chainId + address)}
+                                        className="h-20 w-20 border object-cover"
+                                        src={
+                                            label == "From"
+                                                ? fromAvatar
+                                                : toAvatar
+                                        }
                                     />
                                 </div>
                                 <div className="truncate text-center text-lg">

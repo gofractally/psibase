@@ -1,8 +1,12 @@
 import { queryClient } from "@/main";
-import { supervisor } from "@/supervisor";
 import { useMutation } from "@tanstack/react-query";
-import { setCurrentUser, currentUserQueryKey } from "./useCurrentUser";
+
+import { supervisor } from "@/supervisor";
+
 import { AwaitTime } from "@/globals";
+import QueryKey from "@/lib/queryKeys";
+
+import { setCurrentUser } from "./use-current-user";
 
 export const useLogout = () =>
     useMutation({
@@ -15,9 +19,11 @@ export const useLogout = () =>
                 intf: "activeApp",
             }),
         onSuccess: () => {
-            setCurrentUser(null)
+            setCurrentUser(null);
             setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: currentUserQueryKey });
+                queryClient.refetchQueries({
+                    queryKey: QueryKey.currentUser(),
+                });
             }, AwaitTime);
         },
     });

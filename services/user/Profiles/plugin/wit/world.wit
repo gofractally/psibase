@@ -1,0 +1,48 @@
+package profiles:plugin;
+
+interface types {
+ 
+    record profile {
+        display-name: option<string>,
+        bio: option<string>,
+    }
+
+    record contact {
+        account: string,
+        nickname: option<string>,
+        email: option<string>,
+        phone: option<string>,
+    }
+
+    record avatar {
+        content-type: string,
+        content: list<u8>,
+    }
+
+}
+
+interface contacts {
+    use host:common/types.{error};
+    use types.{contact};
+
+    set: func(contact: contact, overwrite: bool) -> result<_, error>;
+    remove: func(account: string) -> result<_, error>;
+    get: func() -> result<list<contact>, error>;
+}
+
+interface api {
+    
+    use host:common/types.{error};
+    use types.{profile, avatar};
+
+    set-profile: func(profile: profile) -> result<_, error>;
+    
+    upload-avatar: func(avatar: avatar) -> result<_, error>;
+    remove-avatar: func() -> result<_, error>;
+
+}
+
+
+world imports {
+    import api;
+}
