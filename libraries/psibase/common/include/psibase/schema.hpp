@@ -38,6 +38,14 @@ namespace psibase
       std::uint16_t               table;
       psio::schema_types::AnyType type;
       std::vector<IndexInfo>      indexes;
+
+      std::string str() const
+      {
+         if (name)
+            return *name;
+         else
+            return std::to_string(table);
+      }
    };
    PSIO_REFLECT(TableInfo, name, table, type, indexes)
 

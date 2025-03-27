@@ -27,6 +27,62 @@ namespace UserService
          else
             abortMessage("Cannot find owner for " + account.str());
       }
+
+      using namespace psio::schema_types;
+      using TypeMatchInput = std::vector<std::pair<AnyType, AnyType>>;
+
+      const AnyType* getFieldType(const Object& ty, std::uint32_t index)
+      {
+         return &ty.members.at(index).type;
+      }
+      const AnyType* getFieldType(const Struct& ty, std::uint32_t index)
+      {
+         return &ty.members.at(index).type;
+      }
+      const AnyType* getFieldType(const Tuple& ty, std::uint32_t index)
+      {
+         return &ty.members.at(index);
+      }
+      const AnyType* getFieldType(const auto& ty, std::uint32_t index)
+      {
+         abortMessage("Can only extract fields of Tuple, Struct, or Object");
+      }
+
+      const AnyType& getFieldType(const Schema& schema, const AnyType& ty, const FieldId& field)
+      {
+         const AnyType* result = &ty;
+         for (auto idx : field.path)
+         {
+            result = result->resolve(schema);
+            if (!result)
+               abortMessage("Failed to resolve type");
+            result = std::visit([&](const auto& t) { return getFieldType(t, idx); }, result->value);
+         }
+         return *result;
+      }
+
+      bool indexesEqual(const Schema&                 lschema,
+                        const AnyType&                ltype,
+                        const std::vector<IndexInfo>& lhs,
+                        const Schema&                 rschema,
+                        const AnyType&                rtype,
+                        const std::vector<IndexInfo>& rhs,
+                        TypeMatchInput&               keyTypes)
+      {
+         return std::ranges::equal(
+             lhs, rhs,
+             [&](const auto& lhs, const auto& rhs)
+             {
+                return std::ranges::equal(
+                    lhs, rhs,
+                    [&](const auto& lhs, const auto& rhs)
+                    {
+                       keyTypes.push_back(
+                           {getFieldType(lschema, ltype, lhs), getFieldType(rschema, rtype, rhs)});
+                       return lhs.path == rhs.path;
+                    });
+             });
+      }
    }  // namespace
 
    void Packages::postinstall(PackageMeta package, std::vector<char> manifest)
@@ -73,8 +129,8 @@ namespace UserService
          if (existing->schema.database && !existing->schema.database->empty())
          {
             std::vector<TableInfo> nullTables;
-            std::vector<std::pair<psio::schema_types::AnyType, psio::schema_types::AnyType>>
-                tableRows;
+            TypeMatchInput         tableRows;  // extension okay
+            TypeMatchInput         keyTypes;   // exact match required
             for (const auto& [db, existingTables] : *existing->schema.database)
             {
                const auto* currentTables = &nullTables;
@@ -93,17 +149,33 @@ namespace UserService
                   if (pos == currentTables->end())
                   {
                      // TODO: It's okay as long as the table is empty
-                     abortMessage("Cannot remove table " + std::to_string(prev.table));
+                     abortMessage("Cannot remove table " + prev.str());
                   }
                   else
                   {
+                     // TODO: Adding and removing indexes safely is possible, but
+                     // requires migration.
+                     // - Remove index: Migration deletes the rows of the index. Index can
+                     //   be reused after migration completes.
+                     // - Add index: All table writes update index. Migration writes index for
+                     //   existing rows. Key conflict on regular update fails as usual. Key
+                     //   conflict in migrate aborts migration. Index can be read after migration
+                     //   completes.
                      tableRows.push_back({prev.type, pos->type});
+                     if (!indexesEqual(existing->schema.types, prev.type, prev.indexes,
+                                       schema.types, pos->type, pos->indexes, keyTypes))
+                     {
+                        abortMessage("Cannot change indexes for table " + prev.str());
+                     }
                   }
                }
             }
             auto difference = match(existing->schema.types, schema.types, tableRows);
             if (!(difference >= 0))
                abortMessage("Incompatible tables");
+            if (match(existing->schema.types, schema.types, keyTypes) !=
+                SchemaDifference::equivalent)
+               abortMessage("Incompatible table indexes");
             // TODO: Check events
             // TOOD: Should actions be checked?
          }
