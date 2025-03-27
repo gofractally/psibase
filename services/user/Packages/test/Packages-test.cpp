@@ -180,7 +180,7 @@ TEST_CASE("test table compatibility")
    {
       CHECK(alice.to<Packages>()
                 .setSchema(ServiceSchema::make<ServiceV7>())
-                .failed("Incompatible table indexes"));
+                .failed("Cannot change indexes"));
    }
 }
 

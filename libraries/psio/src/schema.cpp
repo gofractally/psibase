@@ -1682,4 +1682,20 @@ namespace psio::schema_types
       return impl.difference;
    }
 
+   TypeMatcher::TypeMatcher(const Schema& l, const Schema& r, SchemaDifference allowed)
+       : impl(new SchemaMatch(l, r)), allowed(allowed)
+   {
+   }
+
+   TypeMatcher::~TypeMatcher() {}
+
+   bool TypeMatcher::match(const AnyType& lhs, const AnyType& rhs)
+   {
+      if (!impl->match(lhs, rhs))
+         return false;
+      if ((impl->difference & ~allowed) != SchemaDifference::equivalent)
+         return false;
+      return true;
+   }
+
 }  // namespace psio::schema_types

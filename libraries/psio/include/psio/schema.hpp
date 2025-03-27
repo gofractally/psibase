@@ -1406,6 +1406,19 @@ namespace psio
       SchemaDifference match(const Schema&                                   schema1,
                              const Schema&                                   schema2,
                              const std::vector<std::pair<AnyType, AnyType>>& types);
+
+      struct SchemaMatch;
+      struct TypeMatcher
+      {
+        public:
+         TypeMatcher(const Schema& l, const Schema& r, SchemaDifference allowed);
+         ~TypeMatcher();
+         bool match(const AnyType& lhs, const AnyType& rhs);
+
+        private:
+         std::unique_ptr<SchemaMatch> impl;
+         SchemaDifference             allowed;
+      };
    }  // namespace schema_types
 
    using schema_types::match;

@@ -29,7 +29,6 @@ namespace UserService
       }
 
       using namespace psio::schema_types;
-      using TypeMatchInput = std::vector<std::pair<AnyType, AnyType>>;
 
       const AnyType* getFieldType(const Object& ty, std::uint32_t index)
       {
@@ -67,21 +66,21 @@ namespace UserService
                         const Schema&                 rschema,
                         const AnyType&                rtype,
                         const std::vector<IndexInfo>& rhs,
-                        TypeMatchInput&               keyTypes)
+                        TypeMatcher&                  keyMatcher)
       {
-         return std::ranges::equal(
-             lhs, rhs,
-             [&](const auto& lhs, const auto& rhs)
-             {
-                return std::ranges::equal(
-                    lhs, rhs,
-                    [&](const auto& lhs, const auto& rhs)
-                    {
-                       keyTypes.push_back(
-                           {getFieldType(lschema, ltype, lhs), getFieldType(rschema, rtype, rhs)});
-                       return lhs.path == rhs.path;
-                    });
-             });
+         return std::ranges::equal(lhs, rhs,
+                                   [&](const auto& lhs, const auto& rhs)
+                                   {
+                                      return std::ranges::equal(
+                                          lhs, rhs,
+                                          [&](const auto& lhs, const auto& rhs)
+                                          {
+                                             return lhs.path == rhs.path &&
+                                                    keyMatcher.match(
+                                                        getFieldType(lschema, ltype, lhs),
+                                                        getFieldType(rschema, rtype, rhs));
+                                          });
+                                   });
       }
    }  // namespace
 
@@ -126,11 +125,11 @@ namespace UserService
       auto schemas = tables.open<InstalledSchemaTable>();
       if (auto existing = schemas.get(service))
       {
-         TypeMatchInput tableRows;  // extension okay
+         TypeMatcher rowMatcher(existing->schema.types, schema.types, SchemaDifference::upgrade);
+         TypeMatcher keyMatcher(existing->schema.types, schema.types, SchemaDifference::equivalent);
          if (existing->schema.database && !existing->schema.database->empty())
          {
             std::vector<TableInfo> nullTables;
-            TypeMatchInput         keyTypes;  // exact match required
             for (const auto& [db, existingTables] : *existing->schema.database)
             {
                const auto* currentTables = &nullTables;
@@ -161,18 +160,16 @@ namespace UserService
                      //   existing rows. Key conflict on regular update fails as usual. Key
                      //   conflict in migrate aborts migration. Index can be read after migration
                      //   completes.
-                     tableRows.push_back({prev.type, pos->type});
+                     if (!rowMatcher.match(prev.type, pos->type))
+                        abortMessage("Incompatible update for table " + prev.str());
                      if (!indexesEqual(existing->schema.types, prev.type, prev.indexes,
-                                       schema.types, pos->type, pos->indexes, keyTypes))
+                                       schema.types, pos->type, pos->indexes, keyMatcher))
                      {
                         abortMessage("Cannot change indexes for table " + prev.str());
                      }
                   }
                }
             }
-            if (match(existing->schema.types, schema.types, keyTypes) !=
-                SchemaDifference::equivalent)
-               abortMessage("Incompatible table indexes");
          }
          // UI events do not need to maintain compatibility
          for (const auto& [name, ty] : existing->schema.history)
@@ -184,7 +181,10 @@ namespace UserService
             }
             else
             {
-               tableRows.push_back({ty, pos->second});
+               if (!rowMatcher.match(ty, pos->second))
+               {
+                  abortMessage("Incompatible update to event history." + name);
+               }
             }
          }
          for (const auto& [name, ty] : existing->schema.merkle)
@@ -196,12 +196,12 @@ namespace UserService
             }
             else
             {
-               tableRows.push_back({ty, pos->second});
+               if (!rowMatcher.match(ty, pos->second))
+               {
+                  abortMessage("Incompatible update to event merkle." + name);
+               }
             }
          }
-         auto difference = match(existing->schema.types, schema.types, tableRows);
-         if (!(difference >= 0))
-            abortMessage("Incompatible table or event");
       }
       schemas.put({service, std::move(schema)});
    }
