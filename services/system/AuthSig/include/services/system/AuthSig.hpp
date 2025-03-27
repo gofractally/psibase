@@ -24,7 +24,9 @@ namespace SystemService
          /// The public key included in the claims for each transaction sent by this account.
          SubjectPublicKeyInfo pubkey;
 
-         auto byPubkey() const { return std::tuple{keyFingerprint(pubkey), account}; }
+         using ByPubkey = psibase::CompositeKey<
+             psibase::NestedKey<&AuthRecord::pubkey, &SubjectPublicKeyInfo::fingerprint>{},
+             &AuthRecord::account>;
       };
       PSIO_REFLECT(AuthRecord, account, pubkey)
 
@@ -39,7 +41,7 @@ namespace SystemService
       {
         public:
          static constexpr auto service = psibase::AccountNumber("auth-sig");
-         using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, &AuthRecord::byPubkey>;
+         using AuthTable = psibase::Table<AuthRecord, &AuthRecord::account, AuthRecord::ByPubkey{}>;
          using Tables    = psibase::ServiceTables<AuthTable>;
 
          /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]

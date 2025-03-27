@@ -616,6 +616,15 @@ namespace psibase
       return detail::invoke(*this, value);
    }
 
+   template <auto V>
+   struct nt_wrap;
+
+#define PSIBASE_REFLECT_KEY_TRANSFORM(fn, name)                                               \
+   inline constexpr const char* psibase_get_key_transform_name(::psibase::nt_wrap<fn>*, auto) \
+   {                                                                                          \
+      return name;                                                                            \
+   }
+
    /// Stores objects in the key-value database
    ///
    /// Template arguments:

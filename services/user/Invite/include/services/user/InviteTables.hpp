@@ -76,10 +76,9 @@ namespace UserService
 
          using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::inviteId>;
          using ById2 = psibase::CompositeKey<&InviteRecord::secondaryId, &InviteRecord::inviteId>;
-         auto byPubkey() const
-         {
-            return std::tuple{SystemService::AuthSig::keyFingerprint(pubkey), inviteId};
-         }
+         using ByPubkey =
+             psibase::CompositeKey<psibase::NestedKey<&InviteRecord::pubkey, &Spki::fingerprint>{},
+                                   &InviteRecord::inviteId>;
       };
       PSIO_REFLECT(InviteRecord,
                    inviteId,
@@ -97,7 +96,7 @@ namespace UserService
                                          &InviteRecord::inviteId,
                                          InviteRecord::ByInviter{},
                                          InviteRecord::ById2{},
-                                         &InviteRecord::byPubkey>;
+                                         InviteRecord::ByPubkey{}>;
       PSIO_REFLECT_TYPENAME(InviteTable)
 
       struct NewAccountRecord

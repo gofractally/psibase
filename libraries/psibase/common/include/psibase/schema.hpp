@@ -58,6 +58,11 @@ namespace psibase
    template <auto X>
    constexpr bool is_equal_member<X, X> = true;
 
+   //const char* psibase_get_key_transform_name(nt_wrap<V>*, auto)
+   //{
+   //   return "unknown";
+   //}
+
    /// Represents the schema for a service
    struct ServiceSchema
    {
@@ -179,7 +184,7 @@ namespace psibase
          if constexpr (std::is_function_v<M>)
          {
             static_assert(Last, "NestedKey only allows member functions as the final element");
-            prefix.transform = "unknown";
+            prefix.transform = psibase_get_key_transform_name((nt_wrap<K>*)nullptr, K);
             prefix.type =
                 builder
                     .insert<std::remove_cv_t<typename psio::MemberPtrType<M T::*>::ReturnType>>();
