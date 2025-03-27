@@ -126,11 +126,11 @@ namespace UserService
       auto schemas = tables.open<InstalledSchemaTable>();
       if (auto existing = schemas.get(service))
       {
+         TypeMatchInput tableRows;  // extension okay
          if (existing->schema.database && !existing->schema.database->empty())
          {
             std::vector<TableInfo> nullTables;
-            TypeMatchInput         tableRows;  // extension okay
-            TypeMatchInput         keyTypes;   // exact match required
+            TypeMatchInput         keyTypes;  // exact match required
             for (const auto& [db, existingTables] : *existing->schema.database)
             {
                const auto* currentTables = &nullTables;
@@ -170,15 +170,38 @@ namespace UserService
                   }
                }
             }
-            auto difference = match(existing->schema.types, schema.types, tableRows);
-            if (!(difference >= 0))
-               abortMessage("Incompatible tables");
             if (match(existing->schema.types, schema.types, keyTypes) !=
                 SchemaDifference::equivalent)
                abortMessage("Incompatible table indexes");
-            // TODO: Check events
-            // TOOD: Should actions be checked?
          }
+         // UI events do not need to maintain compatibility
+         for (const auto& [name, ty] : existing->schema.history)
+         {
+            auto pos = schema.history.find(name);
+            if (pos == schema.history.end())
+            {
+               abortMessage("Cannot remove event history." + name);
+            }
+            else
+            {
+               tableRows.push_back({ty, pos->second});
+            }
+         }
+         for (const auto& [name, ty] : existing->schema.merkle)
+         {
+            auto pos = schema.merkle.find(name);
+            if (pos == schema.merkle.end())
+            {
+               abortMessage("Cannot remove event merkle." + name);
+            }
+            else
+            {
+               tableRows.push_back({ty, pos->second});
+            }
+         }
+         auto difference = match(existing->schema.types, schema.types, tableRows);
+         if (!(difference >= 0))
+            abortMessage("Incompatible table or event");
       }
       schemas.put({service, std::move(schema)});
    }

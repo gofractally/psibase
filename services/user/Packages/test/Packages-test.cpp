@@ -142,7 +142,7 @@ namespace
    PSIBASE_REFLECT_TABLES(ServiceV7, ServiceV7::Tables)
 }  // namespace
 
-TEST_CASE("test schema compatibility")
+TEST_CASE("test table compatibility")
 {
    DefaultTestChain t;
    auto             alice = t.from(t.addAccount("alice"_a));
@@ -155,9 +155,8 @@ TEST_CASE("test schema compatibility")
    }
    SECTION("Invalid row upgrade")
    {
-      CHECK(alice.to<Packages>()
-                .setSchema(ServiceSchema::make<ServiceV3>())
-                .failed("Incompatible tables"));
+      CHECK(
+          alice.to<Packages>().setSchema(ServiceSchema::make<ServiceV3>()).failed("Incompatible"));
    }
    SECTION("Add index")
    {
@@ -182,5 +181,88 @@ TEST_CASE("test schema compatibility")
       CHECK(alice.to<Packages>()
                 .setSchema(ServiceSchema::make<ServiceV7>())
                 .failed("Incompatible table indexes"));
+   }
+}
+
+namespace
+{
+   struct EventsV1 : Service
+   {
+      static constexpr AccountNumber service{"alice"};
+      struct Events
+      {
+         struct History
+         {
+            void e1() {}
+         };
+      };
+   };
+   PSIO_REFLECT(EventsV1)
+   PSIBASE_REFLECT_HISTORY_EVENTS(EventsV1, method(e1))
+   PSIBASE_REFLECT_TABLES(EventsV1)
+
+   // Valid upgrade
+   struct EventsV2 : Service
+   {
+      static constexpr AccountNumber service{"alice"};
+      struct Events
+      {
+         struct History
+         {
+            void e1(std::optional<std::uint32_t> o) {}
+            void e2(std::uint32_t i) {}
+         };
+      };
+   };
+   PSIO_REFLECT(EventsV2)
+   PSIBASE_REFLECT_HISTORY_EVENTS(EventsV2, method(e1, o), method(e2, i))
+   PSIBASE_REFLECT_TABLES(EventsV2)
+
+   // Invalid upgrade
+   struct EventsV3 : Service
+   {
+      static constexpr AccountNumber service{"alice"};
+      struct Events
+      {
+         struct History
+         {
+            void e1(std::uint32_t i) {}
+         };
+      };
+   };
+   PSIO_REFLECT(EventsV3)
+   PSIBASE_REFLECT_HISTORY_EVENTS(EventsV3, method(e1, i))
+   PSIBASE_REFLECT_TABLES(EventsV3)
+
+   // Remove event
+   struct EventsV4 : Service
+   {
+      static constexpr AccountNumber service{"alice"};
+   };
+   PSIO_REFLECT(EventsV4)
+   PSIBASE_REFLECT_TABLES(EventsV4)
+
+}  // namespace
+
+TEST_CASE("test event compatibility")
+{
+   DefaultTestChain t;
+   auto             alice = t.from(t.addAccount("alice"_a));
+
+   REQUIRE(alice.to<Packages>().setSchema(ServiceSchema::make<EventsV1>()).succeeded());
+
+   SECTION("Valid upgrade")
+   {
+      CHECK(alice.to<Packages>().setSchema(ServiceSchema::make<EventsV2>()).succeeded());
+   }
+   SECTION("Invalid upgrade")
+   {
+      CHECK(alice.to<Packages>().setSchema(ServiceSchema::make<EventsV3>()).failed("Incompatible"));
+   }
+   SECTION("Remove event")
+   {
+      CHECK(alice.to<Packages>()
+                .setSchema(ServiceSchema::make<EventsV4>())
+                .failed("Cannot remove event"));
    }
 }
