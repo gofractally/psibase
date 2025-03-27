@@ -109,5 +109,7 @@ namespace SystemService
                    method(newAccount, name, key)
                    //
       )
+      PSIBASE_REFLECT_TABLES(AuthSig, AuthSig::Tables)
+      PSIO_REFLECT_TYPENAME(AuthSig::AuthTable)
    }  // namespace AuthSig
 }  // namespace SystemService

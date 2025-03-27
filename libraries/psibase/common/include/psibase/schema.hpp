@@ -26,9 +26,11 @@ namespace psibase
 
    struct FieldId
    {
-      std::vector<std::uint32_t> path;
+      std::vector<std::uint32_t>                 path;
+      std::optional<std::string>                 transform;
+      std::optional<psio::schema_types::AnyType> type;
    };
-   PSIO_REFLECT(FieldId, path)
+   PSIO_REFLECT(FieldId, path, transform, type)
 
    using IndexInfo = std::vector<FieldId>;
 
@@ -169,20 +171,38 @@ namespace psibase
       }
 
       template <bool Last, auto K, typename T, typename M>
-      static void makeKeyImpl(M T::*, FieldId&& prefix, IndexInfo& out)
+      static void makeKeyImpl(M                    T::*,
+                              FieldId&&            prefix,
+                              psio::SchemaBuilder& builder,
+                              IndexInfo&           out)
       {
-         static_assert(!std::is_function_v<M>,
-                       "Member function keys not supported. Use CompositeKey instead.");
-         prefix.path.push_back(
-             get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr));
-         if constexpr (Last)
+         if constexpr (std::is_function_v<M>)
          {
+            static_assert(Last, "NestedKey only allows member functions as the final element");
+            prefix.transform = "unknown";
+            prefix.type =
+                builder
+                    .insert<std::remove_cv_t<typename psio::MemberPtrType<M T::*>::ReturnType>>();
             out.push_back(std::move(prefix));
+         }
+         else
+         {
+            static_assert(!std::is_function_v<M>,
+                          "Member function keys not supported. Use CompositeKey instead.");
+            prefix.path.push_back(
+                get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr));
+            if constexpr (Last)
+            {
+               out.push_back(std::move(prefix));
+            }
          }
       }
 
       template <bool Last, auto K>
-      static void makeNestedKeyImpl(NestedKey<>, FieldId&& prefix, IndexInfo& out)
+      static void makeNestedKeyImpl(NestedKey<>,
+                                    FieldId&&            prefix,
+                                    psio::SchemaBuilder& builder,
+                                    IndexInfo&           out)
       {
          if constexpr (Last)
          {
@@ -191,46 +211,58 @@ namespace psibase
       }
 
       template <bool Last, auto K, auto K0>
-      static void makeKeyImpl(CompositeKey<K0>, FieldId&& prefix, IndexInfo& out)
+      static void makeKeyImpl(CompositeKey<K0>,
+                              FieldId&&            prefix,
+                              psio::SchemaBuilder& builder,
+                              IndexInfo&           out)
       {
-         makeKeyImpl<Last, K0>(K0, std::move(prefix), out);
+         makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
       }
 
       template <bool Last, auto K, auto... KN>
-      static void makeKeyImpl(CompositeKey<KN...>, FieldId&& prefix, IndexInfo& out)
+      static void makeKeyImpl(CompositeKey<KN...>,
+                              FieldId&&            prefix,
+                              psio::SchemaBuilder& builder,
+                              IndexInfo&           out)
       {
          static_assert(Last, "CompositeKey can only appear at the end of a NestedKey");
 
          std::size_t prefixLen = prefix.path.size();
 
-         (makeKeyImpl<true, KN>(KN, FieldId(prefix), out), ...);
+         (makeKeyImpl<true, KN>(KN, FieldId(prefix), builder, out), ...);
       }
 
       template <bool Last, auto K, auto K0>
-      static void makeKeyImpl(NestedKey<K0>, FieldId&& prefix, IndexInfo& out)
+      static void makeKeyImpl(NestedKey<K0>,
+                              FieldId&&            prefix,
+                              psio::SchemaBuilder& builder,
+                              IndexInfo&           out)
       {
-         makeKeyImpl<Last, K0>(K0, std::move(prefix), out);
+         makeKeyImpl<Last, K0>(K0, std::move(prefix), builder, out);
       }
 
       template <bool Last, auto K, auto K0, auto... KN>
-      static void makeKeyImpl(NestedKey<K0, KN...>, FieldId&& prefix, IndexInfo& out)
+      static void makeKeyImpl(NestedKey<K0, KN...>,
+                              FieldId&&            prefix,
+                              psio::SchemaBuilder& builder,
+                              IndexInfo&           out)
       {
-         makeKeyImpl<false, K0>(K0, std::move(prefix), out);
-         makeKeyImpl<Last, NestedKey<KN...>{}>(NestedKey<KN...>{}, std::move(prefix), out);
+         makeKeyImpl<false, K0>(K0, std::move(prefix), builder, out);
+         makeKeyImpl<Last, NestedKey<KN...>{}>(NestedKey<KN...>{}, std::move(prefix), builder, out);
       }
 
       template <typename T, auto K>
-      static IndexInfo makeKey()
+      static IndexInfo makeKey(psio::SchemaBuilder& builder)
       {
          IndexInfo result;
-         makeKeyImpl<true, K>(K, {}, result);
+         makeKeyImpl<true, K>(K, {}, builder, result);
          return result;
       }
 
       template <typename T, auto... K>
-      static std::vector<IndexInfo> makeIndexes(Table<T, K...>*)
+      static std::vector<IndexInfo> makeIndexes(psio::SchemaBuilder& builder, Table<T, K...>*)
       {
-         return std::vector<IndexInfo>{makeKey<T, K>()...};
+         return std::vector<IndexInfo>{makeKey<T, K>(builder)...};
       }
 
       template <typename T>
@@ -239,7 +271,7 @@ namespace psibase
          return TableInfo{.name    = psio::get_type_name<T>(),
                           .table   = table,
                           .type    = builder.insert<typename T::value_type>(),
-                          .indexes = makeIndexes((T*)nullptr)};
+                          .indexes = makeIndexes(builder, (T*)nullptr)};
       }
 
       static constexpr const char* dbName(DbId db)
@@ -269,6 +301,16 @@ namespace psibase
          for (auto& t : tables)
          {
             rowTypes.push_back(&t.type);
+            for (auto& idx : t.indexes)
+            {
+               for (auto& field : idx)
+               {
+                  if (field.type)
+                  {
+                     rowTypes.push_back(&*field.type);
+                  }
+               }
+            }
          }
       }
 
