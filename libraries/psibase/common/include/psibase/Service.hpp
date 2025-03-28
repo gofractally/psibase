@@ -67,6 +67,15 @@ namespace psibase
      public:
 #ifdef __wasm32__
 
+      /// Open a table by index.
+      ///
+      /// The tables must be reflected using `PSIBASE_REFLECT_TABLES`.
+      ///
+      /// ```c++
+      /// void MyService::act() {
+      ///    auto table = open<DbId::service, 1>();
+      /// }
+      /// ```
       template <DbId db, std::uint16_t table, typename DerivedService>
       auto open(this const DerivedService&)
       {
@@ -77,6 +86,16 @@ namespace psibase
              .template open<table>();
       }
 
+      /// Open a table in a specific db, by table or record type.
+      ///
+      /// The db can only contain one instance of the table.  The
+      /// tables must be reflected using `PSIBASE_REFLECT_TABLES`.
+      ///
+      /// ```c++
+      /// void MyService::act() {
+      ///    auto table = open<DbId::service, MyTable>();
+      /// }
+      /// ```
       template <DbId db, typename T, typename DerivedService>
       auto open(this const DerivedService&)
       {
@@ -86,6 +105,16 @@ namespace psibase
          return boost::mp11::mp_at_c<AllTables, index>(DerivedService::service).template open<T>();
       }
 
+      /// Open a table by table or record type.
+      ///
+      /// There can only be one instance of the table in the service.
+      /// The tables must be reflected using `PSIBASE_REFLECT_TABLES`.
+      ///
+      /// ```c++
+      /// void MyService::act() {
+      ///    auto table = open<DbId::service, MyTable>();
+      /// }
+      /// ```
       template <typename T, typename DerivedService>
       auto open(this const DerivedService&)
       {
