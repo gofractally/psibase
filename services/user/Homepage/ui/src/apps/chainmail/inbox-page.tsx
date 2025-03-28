@@ -1,10 +1,18 @@
 import { useEffect } from "react";
 
-import { Mailbox, MailboxHeader } from "@/apps/chainmail/components";
+import { TwoColumnSelect } from "@/components/two-column-select";
+
+import {
+    MailList,
+    MailboxHeader,
+    MessageDetail,
+    NoMessageSelected,
+} from "@/apps/chainmail/components";
 import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
 
 export default function InboxPage() {
     const isDesktop = useIsDesktop();
+
     const { query, selectedMessage, setSelectedMessageId } =
         useIncomingMessages();
 
@@ -12,17 +20,36 @@ export default function InboxPage() {
         setSelectedMessageId("");
     }, []);
 
+    const display = isDesktop ? "both" : selectedMessage ? "right" : "left";
+
     return (
-        <div className="flex h-[calc(100dvh-theme(spacing.20))] flex-col">
-            <MailboxHeader>Inbox</MailboxHeader>
-            <Mailbox
-                isDesktop={isDesktop}
-                mailbox="inbox"
-                messages={query.data ?? []}
-                isLoading={query.isPending}
-                selectedMessage={selectedMessage}
-                setSelectedMessageId={setSelectedMessageId}
-            />
-        </div>
+        <TwoColumnSelect
+            left={
+                <MailList
+                    mailbox="inbox"
+                    messages={query.data ?? []}
+                    onSelectMessage={setSelectedMessageId}
+                    selectedMessage={selectedMessage}
+                    isLoading={query.isLoading}
+                />
+            }
+            right={
+                selectedMessage ? (
+                    <MessageDetail
+                        message={selectedMessage ?? null}
+                        mailbox={"inbox"}
+                        onBack={
+                            display === "right"
+                                ? () => setSelectedMessageId("")
+                                : undefined
+                        }
+                    />
+                ) : (
+                    <NoMessageSelected>Select a message</NoMessageSelected>
+                )
+            }
+            header={<MailboxHeader>Inbox</MailboxHeader>}
+            displayMode={display}
+        />
     );
 }

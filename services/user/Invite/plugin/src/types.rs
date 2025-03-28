@@ -20,6 +20,7 @@ pub trait TryParseGqlResponse: Sized {
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InviteRecordSubset {
+    pub invite_id: u32,
     pub pubkey: String,
     pub inviter: psibase::AccountNumber,
     pub app: Option<psibase::AccountNumber>,
@@ -33,14 +34,14 @@ pub struct InviteRecordSubset {
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 pub struct GetInviteResponse {
-    pub getInviteById: Option<InviteRecordSubset>,
+    pub inviteById2: Option<InviteRecordSubset>,
 }
 
 impl TryParseGqlResponse for InviteRecordSubset {
     fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
         let response_root: ResponseRoot<GetInviteResponse> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
-        Ok(response_root.data.getInviteById.ok_or_else(|| {
+        Ok(response_root.data.inviteById2.ok_or_else(|| {
             QueryError("Unable to extract InviteRecordSubset from query response".to_string())
         })?)
     }
