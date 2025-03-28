@@ -11,6 +11,7 @@ struct SocketListService : psibase::Service
    std::optional<HttpReply> serveSys(const HttpRequest& req);
 };
 PSIO_REFLECT(SocketListService, method(serveSys, request))
+PSIBASE_REFLECT_TABLES(SocketListService)
 
 namespace
 {
