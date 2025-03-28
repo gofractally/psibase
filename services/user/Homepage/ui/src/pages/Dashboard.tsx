@@ -36,12 +36,6 @@ const apps: App[] = [
         service: Account.parse("chainmail"),
     },
     {
-        title: "Workshop",
-        description: "A developer portal to administer apps.",
-        icon: <Terminal className="h-6 w-6" />,
-        href: siblingUrl(null, "workshop", null, false),
-    },
-    {
         title: "Doc",
         description: "Review technical documentation and guides.",
         icon: <Book className="h-6 w-6" />,

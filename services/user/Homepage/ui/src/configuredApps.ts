@@ -2,7 +2,6 @@ import { z } from "zod";
 import { chainMailConfig } from "./apps/chainmail";
 import { tokensConfig } from "./apps/tokens";
 import { Account } from "./lib/zod/Account";
-import { workshopConfig } from "./apps/workshop";
 import { contactsConfig } from "./apps/contacts";
 
 export const AppConfig = z.object({
@@ -31,5 +30,5 @@ export const configuredApps: AppConfigType[] = [
     tokensConfig,
     chainMailConfig,
     contactsConfig,
-    workshopConfig,
+
 ].map((config) => AppConfig.parse(config));
