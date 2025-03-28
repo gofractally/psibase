@@ -11,7 +11,7 @@ CoreFractal::CoreFractal(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 }

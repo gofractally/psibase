@@ -1,4 +1,4 @@
-use crate::{build, build_package_root, build_plugin, Args, SERVICE_POLYFILL};
+use crate::{build, build_package_root, build_plugin, build_schema, Args, SERVICE_POLYFILL};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -282,6 +282,7 @@ pub async fn build_package(
             let mut info = ServiceInfo {
                 flags: pmeta.flags,
                 server: None,
+                schema: None,
             };
             if let Some(server) = pmeta.server {
                 info.server = Some(server.parse()?);
@@ -352,8 +353,19 @@ pub async fn build_package(
             .find(|(_, _, _, id)| id.as_str() == service.unwrap())
             .is_none();
 
+    for (plugin, service, path, id) in plugins {
+        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
+        if paths.len() != 1 {
+            Err(anyhow!(
+                "Plugin {} should produce exactly one wasm target",
+                plugin
+            ))?
+        };
+        data_files.push((service, path.to_string(), paths.pop().unwrap()))
+    }
+
     let mut service_wasms = Vec::new();
-    for (service, info, id) in services {
+    for (service, mut info, id) in services {
         let mut paths = build(
             args,
             &[id.as_str()],
@@ -368,18 +380,8 @@ pub async fn build_package(
                 service
             ))?
         };
+        info.schema = Some(build_schema(args, &[&id], &["-p", &service]).await?);
         service_wasms.push((service, info, paths.pop().unwrap()));
-    }
-
-    for (plugin, service, path, id) in plugins {
-        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
-        if paths.len() != 1 {
-            Err(anyhow!(
-                "Plugin {} should produce exactly one wasm target",
-                plugin
-            ))?
-        };
-        data_files.push((service, path.to_string(), paths.pop().unwrap()))
     }
 
     if need_to_build_root {

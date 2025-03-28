@@ -37,7 +37,7 @@ namespace UserService
       std::vector<psibase::AccountNumber> accounts;
       psibase::AccountNumber              owner;
 
-      auto byName() const { return PackageKey(name, owner); }
+      using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
    PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, owner)
 
@@ -56,9 +56,19 @@ namespace UserService
       // gzipped json vector<PackageDataFile>
       std::vector<char> data;
 
-      auto byName() const { return std::tuple(name, owner); }
+      using ByName = psibase::CompositeKey<&PackageManifest::name, &PackageManifest::owner>;
    };
    PSIO_REFLECT(PackageManifest, name, owner, data)
+
+   struct InstalledSchema
+   {
+      psibase::AccountNumber account;
+      psibase::ServiceSchema schema;
+   };
+   PSIO_REFLECT(InstalledSchema, account, schema)
+
+   using InstalledSchemaTable = psibase::Table<InstalledSchema, &InstalledSchema::account>;
+   PSIO_REFLECT_TYPENAME(InstalledSchemaTable)
 
    struct TransactionOrder
    {
@@ -66,21 +76,27 @@ namespace UserService
       std::uint64_t          id;
       std::uint32_t          index;
 
-      auto key() const { return std::tuple(owner, id); }
+      using Key = psibase::CompositeKey<&TransactionOrder::owner, &TransactionOrder::id>;
    };
    PSIO_REFLECT(TransactionOrder, owner, id, index)
 
-   using InstalledPackageTable = psibase::Table<InstalledPackage, &InstalledPackage::byName>;
-   using PackageManifestTable  = psibase::Table<PackageManifest, &PackageManifest::byName>;
-   using TransactionOrderTable = psibase::Table<TransactionOrder, &TransactionOrder::key>;
+   using InstalledPackageTable = psibase::Table<InstalledPackage, InstalledPackage::ByName{}>;
+   PSIO_REFLECT_TYPENAME(InstalledPackageTable)
+   using PackageManifestTable = psibase::Table<PackageManifest, PackageManifest::ByName{}>;
+   PSIO_REFLECT_TYPENAME(PackageManifestTable)
+   using TransactionOrderTable = psibase::Table<TransactionOrder, TransactionOrder::Key{}>;
+   PSIO_REFLECT_TYPENAME(TransactionOrderTable)
 
    struct Packages : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"packages"};
-      using Tables                  = psibase::
-          ServiceTables<InstalledPackageTable, PackageManifestTable, TransactionOrderTable>;
+      using Tables                  = psibase::ServiceTables<InstalledPackageTable,
+                                                             PackageManifestTable,
+                                                             TransactionOrderTable,
+                                                             InstalledSchemaTable>;
       // This should be the last action run when installing a package
       void postinstall(PackageMeta package, std::vector<char> manifest);
+      void setSchema(psibase::ServiceSchema schema);
 
       /// Used to ensure that the transactions that install packages
       /// are executed in order.
@@ -92,7 +108,9 @@ namespace UserService
    };
    PSIO_REFLECT(Packages,
                 method(postinstall, package, manifest),
+                method(setSchema, account, schema),
                 method(checkOrder, id, index),
                 method(removeOrder, id))
+   PSIBASE_REFLECT_TABLES(Packages, Packages::Tables)
 
 }  // namespace UserService

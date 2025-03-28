@@ -32,6 +32,7 @@ namespace UserService
                 createCounter,
                 lastPriceUpdateTime);
    using SymbolLengthTable = psibase::Table<SymbolLengthRecord, &SymbolLengthRecord::symbolLength>;
+   PSIO_REFLECT_TYPENAME(SymbolLengthTable)
 
    struct PriceAdjustmentRecord
    {
@@ -42,6 +43,7 @@ namespace UserService
    PSIO_REFLECT(PriceAdjustmentRecord, key, increasePct, decreasePct);
    using PriceAdjustmentSingleton =
        psibase::Table<PriceAdjustmentRecord, &PriceAdjustmentRecord::key>;
+   PSIO_REFLECT_TYPENAME(PriceAdjustmentSingleton)
 
    struct SaleDetails
    {
@@ -68,4 +70,5 @@ namespace UserService
    };
    PSIO_REFLECT(SymbolRecord, symbolId, ownerNft, saleDetails);
    using SymbolTable = psibase::Table<SymbolRecord, &SymbolRecord::symbolId>;
+   PSIO_REFLECT_TYPENAME(SymbolTable)
 }  // namespace UserService

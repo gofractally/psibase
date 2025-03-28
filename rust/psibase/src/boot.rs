@@ -138,6 +138,14 @@ pub fn get_initial_actions<
     let mut accounts_with_auth = HashSet::new();
 
     for s in &mut service_packages[..] {
+        let mut actions = Vec::new();
+        s.set_schema(&mut actions)?;
+        for act in actions {
+            builder.push(act)?;
+        }
+    }
+
+    for s in &mut service_packages[..] {
         builder.set_label(format!("Installing {}", s.name()));
         for account in s.get_accounts() {
             if !s.has_service(*account) {

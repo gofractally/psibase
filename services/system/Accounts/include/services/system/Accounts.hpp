@@ -14,11 +14,10 @@ namespace SystemService
    struct AccountsStatus
    {
       uint32_t totalAccounts = 0;
-
-      std::tuple<> key() const { return {}; }
    };
    PSIO_REFLECT(AccountsStatus, totalAccounts)
-   using AccountsStatusTable = psibase::Table<AccountsStatus, &AccountsStatus::key>;
+   using AccountsStatusTable = psibase::Table<AccountsStatus, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(AccountsStatusTable)
 
    struct ResourceLimit
    {
@@ -61,11 +60,10 @@ namespace SystemService
 
       // If this is absent, it means resource usage is unlimited
       std::optional<ResourceLimit> resourceBalance;
-
-      auto key() const { return accountNum; }
    };
    PSIO_REFLECT(Account, accountNum, authService, resourceBalance)
-   using AccountTable = psibase::Table<Account, &Account::key>;
+   using AccountTable = psibase::Table<Account, &Account::accountNum>;
+   PSIO_REFLECT_TYPENAME(AccountTable)
 
    /// This service facilitates the creation of new accounts
    ///
@@ -127,4 +125,6 @@ namespace SystemService
                 method(billCpu, name, amount)
                 //
    )
+
+   PSIBASE_REFLECT_TABLES(Accounts, Accounts::Tables)
 }  // namespace SystemService

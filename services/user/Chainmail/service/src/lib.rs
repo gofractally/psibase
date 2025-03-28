@@ -6,7 +6,7 @@ mod event_query_helpers;
 mod helpers;
 mod tables;
 
-#[psibase::service]
+#[psibase::service(tables = "tables::tables")]
 mod service {
     use crate::event_query_helpers::serve_rest_api;
     use crate::tables::tables::{InitRow, InitTable, SavedMessage, SavedMessageTable};

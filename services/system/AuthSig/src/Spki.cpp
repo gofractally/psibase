@@ -63,5 +63,10 @@ namespace SystemService
       {
          return psibase::sha256(key.data.data(), key.data.size());
       }
+
+      psibase::Checksum256 SubjectPublicKeyInfo::fingerprint() const
+      {
+         return psibase::sha256(data.data(), data.size());
+      }
    }  // namespace AuthSig
 }  // namespace SystemService

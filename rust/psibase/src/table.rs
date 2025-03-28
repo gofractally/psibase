@@ -202,6 +202,10 @@ pub trait Table<Record: TableRecord>: Sized {
     }
 }
 
+pub trait ServiceTablesWrapper {
+    fn get_service() -> AccountNumber;
+}
+
 pub struct SingletonKey {}
 
 impl ToKey for SingletonKey {

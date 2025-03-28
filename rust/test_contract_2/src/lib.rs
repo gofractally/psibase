@@ -10,7 +10,7 @@ mod tables {
     use serde::{Deserialize, Serialize};
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
-    #[derive(Fracpack, Serialize, Deserialize, SimpleObject)]
+    #[derive(Fracpack, Serialize, Deserialize, SimpleObject, ToSchema)]
     pub struct Answer {
         /// The account responsible for the calculation
         #[primary_key]
@@ -21,7 +21,7 @@ mod tables {
     }
 }
 
-#[psibase::service]
+#[psibase::service(tables = "tables")]
 #[allow(non_snake_case)]
 mod service {
     use crate::tables::{Answer, AnswerTable};
@@ -233,6 +233,8 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
             }
         })
     );
+
+    println!("{}", chain.get(SERVICE, "/schema")?.text()?);
 
     Ok(())
 }

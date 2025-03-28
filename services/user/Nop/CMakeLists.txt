@@ -8,3 +8,5 @@ add_custom_command(
 add_custom_target(
     Nop.wasm ALL DEPENDS ${out}
 )
+
+configure_file(src/Nop-schema.json ${ROOT_BINARY_DIR}/Nop-schema.json COPYONLY)

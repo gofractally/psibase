@@ -136,6 +136,7 @@ namespace UserService
    );
    PSIBASE_REFLECT_UI_EVENTS(Tokens);
    PSIBASE_REFLECT_MERKLE_EVENTS(Tokens);
+   PSIBASE_REFLECT_TABLES(Tokens, Tokens::Tables)
    // clang-format on
 
 }  // namespace UserService

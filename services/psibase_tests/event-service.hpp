@@ -59,3 +59,4 @@ PSIBASE_REFLECT_HISTORY_EVENTS(EventService,  //
 PSIBASE_REFLECT_UI_EVENTS(EventService)
 PSIBASE_REFLECT_MERKLE_EVENTS(EventService,  //
                               method(m, s))
+PSIBASE_REFLECT_TABLES(EventService)

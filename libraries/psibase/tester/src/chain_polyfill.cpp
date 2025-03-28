@@ -29,9 +29,21 @@ void psibase::raw::writeConsole(const char* message, uint32_t len)
    ::write(1, message, len);
 }
 
-// PSIBASE_NATIVE(getCurrentAction) uint32_t getCurrentAction();
-// PSIBASE_NATIVE(call) uint32_t call(const char* action, uint32_t len);
-// PSIBASE_NATIVE(setRetval) void setRetval(const char* retval, uint32_t len);
+std::uint32_t psibase::raw::getCurrentAction()
+{
+   psibase::abortMessage("Tester does not support getCurrentAction");
+}
+
+std::uint32_t psibase::raw::call(const char* action, std::uint32_t len)
+{
+   psibase::abortMessage("Tester does not support call");
+}
+
+void psibase::raw::setRetval(const char* retval, std::uint32_t len)
+{
+   psibase::abortMessage("Tester does not support setRetval");
+}
+
 // PSIBASE_NATIVE(kvPut)
 // void kvPut(DbId db, const char* key, uint32_t keyLen, const char* value, uint32_t valueLen);
 // PSIBASE_NATIVE(putSequential)
@@ -76,6 +88,11 @@ void psibase::raw::kvPut(DbId        db,
 {
    psibase::tester::raw::kvPut(psibase::tester::raw::getSelectedChain(), db, key, keyLen, value,
                                valueLen);
+}
+
+std::int32_t psibase::raw::socketSend(std::int32_t fd, const void* data, std::size_t size)
+{
+   psibase::abortMessage("Tester does not support socketSend");
 }
 
 // PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);

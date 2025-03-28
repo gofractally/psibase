@@ -16,5 +16,6 @@ struct KeepSocket : Service
    }
 };
 PSIO_REFLECT(KeepSocket, method(serveSys, req, socket))
+PSIBASE_REFLECT_TABLES(KeepSocket)
 
 PSIBASE_DISPATCH(KeepSocket)

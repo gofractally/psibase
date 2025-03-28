@@ -21,4 +21,5 @@ namespace SystemService
       void                     setCpuLimit(psibase::AccountNumber account);
    };
    PSIO_REFLECT(CpuLimit, method(getCpuTime), method(setCpuLimit, account))
+   PSIBASE_REFLECT_TABLES(CpuLimit)
 }  // namespace SystemService

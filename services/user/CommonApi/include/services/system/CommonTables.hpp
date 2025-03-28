@@ -5,9 +5,9 @@ namespace UserService
 {
    struct InitializedRecord
    {
-      psibase::SingletonKey key;
    };
-   PSIO_REFLECT(InitializedRecord, key);
-   using InitTable = psibase::Table<InitializedRecord, &InitializedRecord::key>;
+   PSIO_REFLECT(InitializedRecord);
+   using InitTable = psibase::Table<InitializedRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(InitTable)
 
 }  // namespace UserService

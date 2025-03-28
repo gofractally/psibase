@@ -33,4 +33,6 @@ namespace UserService
                 method(serveSys, request),
                 //
    )
+
+   PSIBASE_REFLECT_TABLES(AuthInvite)
 }  // namespace UserService

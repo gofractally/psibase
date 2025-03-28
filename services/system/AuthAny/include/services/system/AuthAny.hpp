@@ -30,4 +30,5 @@ namespace SystemService
                 method(isRejectSys, sender, rejecters)
                 //
    )
+   PSIBASE_REFLECT_TABLES(AuthAny)
 }  // namespace SystemService

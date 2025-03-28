@@ -16,6 +16,7 @@ function(add suffix)
             VerifySig-prestart${suffix}.wasm
             -o ${ROOT_BINARY_DIR}/VerifySig${suffix}.wasm
     )
+    psibase_schema(VerifySig${suffix} ${ROOT_BINARY_DIR}/VerifySig${suffix}-schema.json)
 endfunction(add)
 
 conditional_add()

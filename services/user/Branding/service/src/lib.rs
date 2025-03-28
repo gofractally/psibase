@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{Fracpack, SingletonKey, ToSchema};
+    use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
     #[table(name = "NetworkNameTable")]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
@@ -11,9 +11,7 @@ mod tables {
 
     impl NetworkName {
         #[primary_key]
-        fn by_key(&self) -> SingletonKey {
-            SingletonKey {}
-        }
+        fn by_key(&self) {}
     }
 
     impl Default for NetworkName {
@@ -25,16 +23,19 @@ mod tables {
     }
 }
 
-#[psibase::service(name = "branding")]
+#[psibase::service(name = "branding", tables = "tables")]
 mod service {
+    use crate::tables::*;
     use async_graphql::Object;
     use psibase::*;
-    use crate::tables::*;
 
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
-        check(get_sender() == SERVICE, "Only the 'branding' account is authorized to set network branding");
+        check(
+            get_sender() == SERVICE,
+            "Only the 'branding' account is authorized to set network branding",
+        );
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();
@@ -50,7 +51,7 @@ mod service {
     #[Object]
     impl Query {
         async fn network_name(&self) -> String {
-            let curr_val = NetworkNameTable::new().get_index_pk().get(&SingletonKey {});
+            let curr_val = NetworkNameTable::new().get_index_pk().get(&());
             curr_val.unwrap_or_default().name
         }
     }

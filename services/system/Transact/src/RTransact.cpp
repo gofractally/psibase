@@ -13,10 +13,9 @@ using namespace SystemService;
 std::optional<SignedTransaction> SystemService::RTransact::next()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   auto unapplied = WriteOnly{}.open<UnappliedTransactionTable>();
-   auto nextSequence =
-       unapplied.get(SingletonKey{}).value_or(UnappliedTransactionRecord{0}).nextSequence;
-   auto included = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
+   auto unapplied    = WriteOnly{}.open<UnappliedTransactionTable>();
+   auto nextSequence = unapplied.get({}).value_or(UnappliedTransactionRecord{0}).nextSequence;
+   auto included     = Transact::Tables{Transact::service}.open<IncludedTrxTable>();
    std::optional<SignedTransaction> result;
    PSIBASE_SUBJECTIVE_TX
    {
@@ -319,8 +318,7 @@ namespace
          }
          // Find the next sequence number
          auto available = Subjective{}.open<AvailableSequenceTable>();
-         auto sequence =
-             available.get(SingletonKey{}).value_or(AvailableSequenceRecord{0}).nextSequence;
+         auto sequence  = available.get({}).value_or(AvailableSequenceRecord{0}).nextSequence;
          available.put({sequence + 1});
          pending.put({.id         = id,
                       .expiration = trx.transaction->tapos().expiration(),
@@ -528,7 +526,7 @@ namespace
       {
          auto table = Subjective{}.open<JWTKeyTable>();
          auto index = table.getIndex<0>();
-         row        = index.get(SingletonKey{});
+         row        = index.get({});
          if (!row)
          {
             char buf[16];

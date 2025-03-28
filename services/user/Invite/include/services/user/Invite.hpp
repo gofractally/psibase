@@ -135,6 +135,7 @@ namespace UserService
       );
       PSIBASE_REFLECT_UI_EVENTS(Invite);
       PSIBASE_REFLECT_MERKLE_EVENTS(Invite);
+      PSIBASE_REFLECT_TABLES(Invite, Invite::Tables)
       // clang-format on
    }  // namespace InviteNs
 

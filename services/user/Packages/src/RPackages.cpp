@@ -12,7 +12,10 @@ namespace UserService
    {
       auto installed() const
       {
-         return Packages::Tables(Packages::service).open<InstalledPackageTable>().getIndex<0>();
+         return Packages::Tables(Packages::service)
+             .open<InstalledPackageTable>()
+             .getIndex<0>()
+             .subindex<PackageKey>(std::tuple{});
       }
       // Returns the accounts that need to be created to install a package.
       // Validates that existing accounts have the correct owner.

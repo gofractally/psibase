@@ -68,12 +68,15 @@ mod tests {
         assert_eq!(get_nr_nfts(&chain, bob)?, 0);
 
         Wrapper::push_from(&chain, alice)
-            .propose(vec![Action {
-                sender: bob,
-                service: Nft::SERVICE,
-                method: MethodNumber::from("mint"),
-                rawData: Nft::action_structs::mint {}.packed().into(),
-            }])
+            .propose(
+                vec![Action {
+                    sender: bob,
+                    service: Nft::SERVICE,
+                    method: MethodNumber::from("mint"),
+                    rawData: Nft::action_structs::mint {}.packed().into(),
+                }],
+                true,
+            )
             .get()?;
 
         assert_eq!(get_nr_nfts(&chain, bob)?, 1);

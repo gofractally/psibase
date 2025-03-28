@@ -20,6 +20,7 @@ namespace SystemService
    PSIO_REFLECT(TransactionData, id, trx)
 
    using TransactionDataTable = psibase::Table<TransactionData, &TransactionData::id>;
+   PSIO_REFLECT_TYPENAME(TransactionDataTable)
 
    struct PendingTransactionRecord
    {
@@ -28,37 +29,39 @@ namespace SystemService
       psibase::TimePointSec ctime;
       std::uint64_t         sequence;
 
-      auto ctimeKey() const { return std::tuple(ctime, sequence); }
-      auto expirationKey() const { return std::tuple(expiration, sequence); }
+      using CTimeKey      = psibase::CompositeKey<&PendingTransactionRecord::ctime,
+                                                  &PendingTransactionRecord::sequence>;
+      using ExpirationKey = psibase::CompositeKey<&PendingTransactionRecord::expiration,
+                                                  &PendingTransactionRecord::sequence>;
    };
    PSIO_REFLECT(PendingTransactionRecord, id, expiration, ctime, sequence);
 
    using PendingTransactionTable = psibase::Table<PendingTransactionRecord,
                                                   &PendingTransactionRecord::id,
                                                   &PendingTransactionRecord::sequence,
-                                                  &PendingTransactionRecord::ctimeKey,
-                                                  &PendingTransactionRecord::expirationKey>;
+                                                  PendingTransactionRecord::CTimeKey{},
+                                                  PendingTransactionRecord::ExpirationKey{}>;
+   PSIO_REFLECT_TYPENAME(PendingTransactionTable)
 
    struct AvailableSequenceRecord
    {
       std::uint64_t nextSequence;
-      auto          primary_key() const { return psibase::SingletonKey{}; }
    };
    PSIO_REFLECT(AvailableSequenceRecord, nextSequence);
 
-   using AvailableSequenceTable =
-       psibase::Table<AvailableSequenceRecord, &AvailableSequenceRecord::primary_key>;
+   using AvailableSequenceTable = psibase::Table<AvailableSequenceRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(AvailableSequenceTable)
 
    // Follows forks
    struct UnappliedTransactionRecord
    {
       std::uint64_t nextSequence;
-      auto          primary_key() const { return psibase::SingletonKey{}; }
    };
    PSIO_REFLECT(UnappliedTransactionRecord, nextSequence)
 
    using UnappliedTransactionTable =
-       psibase::Table<UnappliedTransactionRecord, &UnappliedTransactionRecord::primary_key>;
+       psibase::Table<UnappliedTransactionRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(UnappliedTransactionTable)
 
    struct ReversibleBlocksRow
    {
@@ -69,6 +72,7 @@ namespace SystemService
 
    using ReversibleBlocksTable =
        psibase::Table<ReversibleBlocksRow, &ReversibleBlocksRow::blockNum>;
+   PSIO_REFLECT_TYPENAME(ReversibleBlocksTable)
 
    struct TraceClientInfo
    {
@@ -85,15 +89,16 @@ namespace SystemService
    PSIO_REFLECT(TraceClientRow, id, clients)
 
    using TraceClientTable = psibase::Table<TraceClientRow, &TraceClientRow::id>;
+   PSIO_REFLECT_TYPENAME(TraceClientTable)
 
    struct JWTKeyRecord
    {
       std::vector<char> key;
-      auto              primaryKey() const { return psibase::SingletonKey{}; }
    };
    PSIO_REFLECT(JWTKeyRecord, key)
 
-   using JWTKeyTable = psibase::Table<JWTKeyRecord, &JWTKeyRecord::primaryKey>;
+   using JWTKeyTable = psibase::Table<JWTKeyRecord, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(JWTKeyTable)
 
    struct LoginReply
    {
@@ -130,4 +135,5 @@ namespace SystemService
                 method(onBlock),
                 method(serveSys, request, socket),
                 method(getUser, request))
+   PSIBASE_REFLECT_TABLES(RTransact, RTransact::Subjective, RTransact::WriteOnly)
 }  // namespace SystemService

@@ -49,3 +49,5 @@ PSIBASE_REFLECT_HISTORY_EVENTS(TestService,
                                method(time, t));
 PSIBASE_REFLECT_UI_EVENTS(TestService);
 PSIBASE_REFLECT_MERKLE_EVENTS(TestService);
+
+PSIBASE_REFLECT_TABLES(TestService)

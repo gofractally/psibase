@@ -36,6 +36,7 @@ namespace UserService
       );
       PSIBASE_REFLECT_UI_EVENTS(CoreFractal);
       PSIBASE_REFLECT_MERKLE_EVENTS(CoreFractal);
+      PSIBASE_REFLECT_TABLES(CoreFractal, CoreFractal::Tables)
       // clang-format on
 
    }  // namespace FractalNs

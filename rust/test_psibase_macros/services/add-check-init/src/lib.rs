@@ -11,7 +11,7 @@ mod service_tables {
     }
 }
 
-#[psibase::service(name = "addcheckinit")]
+#[psibase::service(name = "addcheckinit", tables = "service_tables")]
 #[allow(non_snake_case)]
 pub mod service {
     use crate::service_tables::{InitRow, InitTable};

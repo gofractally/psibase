@@ -91,6 +91,7 @@ namespace UserService
          }
       };
       PSIO_REFLECT(RInvite, method(serveSys, request))
+      PSIBASE_REFLECT_TABLES(RInvite)
    }  // namespace InviteNs
 }  // namespace UserService
 

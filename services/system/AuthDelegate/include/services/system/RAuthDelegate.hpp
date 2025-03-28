@@ -13,4 +13,5 @@ namespace SystemService
    };
    PSIO_REFLECT(RAuthDelegate,  //
                 method(serveSys, request))
+   PSIBASE_REFLECT_TABLES(RAuthDelegate)
 }  // namespace SystemService

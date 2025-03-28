@@ -54,7 +54,7 @@ Tokens::Tokens(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().getIndex<0>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().getIndex<0>().get({});
       check(initRecord.has_value(), uninitialized);
    }
 }
@@ -63,7 +63,7 @@ void Tokens::init()
 {
    // Set initialized flag
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.getIndex<0>().get(SingletonKey{}));
+   auto init      = (initTable.getIndex<0>().get({}));
    check(not init.has_value(), alreadyInit);
    initTable.put(InitializedRecord{});
 

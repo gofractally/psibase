@@ -40,3 +40,12 @@ extern "C" [[clang::export_name("prestart")]] void prestart()
 
 // Caution! Don't replace with version in dispatcher!
 extern "C" void start(AccountNumber thisService) {}
+
+#ifdef PSIBASE_GENERATE_SCHEMA
+
+int main(int argc, const char* const* argv)
+{
+   return ::psibase::serviceMain<SystemService::VerifySig>(argc, argv);
+}
+
+#endif

@@ -3,6 +3,8 @@ project(psidk)
 
 get_filename_component(root ${CMAKE_CURRENT_LIST_DIR}/../../.. REALPATH)
 
+get_filename_component(PSITEST_EXECUTABLE ${root}/../../bin/psitest REALPATH)
+
 separate_arguments(release-cxx-flags NATIVE_COMMAND ${CMAKE_CXX_FLAGS_RELEASE})
 separate_arguments(release-link-flags NATIVE_COMMAND ${CMAKE_EXE_LINKER_FLAGS_RELEASE})
 add_library(wasm-base INTERFACE)

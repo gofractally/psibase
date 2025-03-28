@@ -104,6 +104,14 @@ extern "C" {
         match_key_size: u32,
     ) -> u32;
     pub fn kvMax(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32) -> u32;
+    pub fn kvPut(
+        chain_handle: u32,
+        db: crate::DbId,
+        key: *const u8,
+        key_len: u32,
+        value: *const u8,
+        value_len: u32,
+    );
 }
 
 thread_local! {

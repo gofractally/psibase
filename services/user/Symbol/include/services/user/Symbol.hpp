@@ -75,6 +75,8 @@ namespace UserService
    );
    PSIBASE_REFLECT_UI_EVENTS(Symbol);
    PSIBASE_REFLECT_MERKLE_EVENTS(Symbol);
+
+   PSIBASE_REFLECT_TABLES(Symbol, Symbol::Tables)
    // clang-format on
 
 }  // namespace UserService
