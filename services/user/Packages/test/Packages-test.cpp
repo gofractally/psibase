@@ -140,6 +140,7 @@ namespace
    };
    PSIO_REFLECT(ServiceV7)
    PSIBASE_REFLECT_TABLES(ServiceV7, ServiceV7::Tables)
+
 }  // namespace
 
 TEST_CASE("test table compatibility")
@@ -180,6 +181,109 @@ TEST_CASE("test table compatibility")
    {
       CHECK(alice.to<Packages>()
                 .setSchema(ServiceSchema::make<ServiceV7>())
+                .failed("Cannot change indexes"));
+   }
+}
+
+namespace
+{
+   // A transformed
+   struct TableRowXForm
+   {
+      TableKey k;
+      auto     inner() const { return k.value; }
+      auto     outer() const { return k; }
+      auto     rev() const { return ~k.value; }
+   };
+   PSIO_REFLECT(TableRowXForm, k)
+   PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::inner, "inner")
+   PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::outer, "outer")
+   PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXForm::rev, "rev")
+   struct TableRowXFormExtended
+   {
+      TableKeyExtended k;
+      auto             inner() const { return k.value; }
+      auto             outer() const { return k; }
+   };
+   PSIO_REFLECT(TableRowXFormExtended, k)
+   PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXFormExtended::inner, "inner")
+   PSIBASE_REFLECT_KEY_TRANSFORM(&TableRowXFormExtended::outer, "outer")
+
+   using TableXFormIV1 = Table<TableRowXForm, &TableRowXForm::inner>;
+   PSIO_REFLECT_TYPENAME(TableXFormIV1)
+   struct ServiceXFormIV1
+   {
+      static constexpr AccountNumber service{"alice"};
+      using Tables = psibase::ServiceTables<TableXFormIV1>;
+   };
+   PSIO_REFLECT(ServiceXFormIV1)
+   PSIBASE_REFLECT_TABLES(ServiceXFormIV1, ServiceXFormIV1::Tables)
+
+   // Upgrade without affecting the key
+   using TableXFormIV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::inner>;
+   PSIO_REFLECT_TYPENAME(TableXFormIV2)
+   struct ServiceXFormIV2
+   {
+      static constexpr AccountNumber service{"alice"};
+      using Tables = psibase::ServiceTables<TableXFormIV2>;
+   };
+   PSIO_REFLECT(ServiceXFormIV2)
+   PSIBASE_REFLECT_TABLES(ServiceXFormIV2, ServiceXFormIV2::Tables)
+
+   // Change transform
+   using TableXFormIV3 = Table<TableRowXForm, &TableRowXForm::rev>;
+   PSIO_REFLECT_TYPENAME(TableXFormIV3)
+   struct ServiceXFormIV3
+   {
+      static constexpr AccountNumber service{"alice"};
+      using Tables = psibase::ServiceTables<TableXFormIV3>;
+   };
+   PSIO_REFLECT(ServiceXFormIV3)
+   PSIBASE_REFLECT_TABLES(ServiceXFormIV3, ServiceXFormIV3::Tables)
+
+   // Upgrade that changes the key
+   using TableXFormOV1 = Table<TableRowXForm, &TableRowXForm::outer>;
+   PSIO_REFLECT_TYPENAME(TableXFormOV1)
+   struct ServiceXFormOV1
+   {
+      static constexpr AccountNumber service{"alice"};
+      using Tables = psibase::ServiceTables<TableXFormOV1>;
+   };
+   PSIO_REFLECT(ServiceXFormOV1)
+   PSIBASE_REFLECT_TABLES(ServiceXFormOV1, ServiceXFormOV1::Tables)
+   using TableXFormOV2 = Table<TableRowXFormExtended, &TableRowXFormExtended::outer>;
+   PSIO_REFLECT_TYPENAME(TableXFormOV2)
+   struct ServiceXFormOV2
+   {
+      static constexpr AccountNumber service{"alice"};
+      using Tables = psibase::ServiceTables<TableXFormOV2>;
+   };
+   PSIO_REFLECT(ServiceXFormOV2)
+   PSIBASE_REFLECT_TABLES(ServiceXFormOV2, ServiceXFormOV2::Tables)
+}  // namespace
+
+TEST_CASE("test key transform compatibility")
+{
+   DefaultTestChain t;
+   auto             alice = t.from(t.addAccount("alice"_a));
+
+   SECTION("key base upgrade")
+   {
+      REQUIRE(alice.to<Packages>().setSchema(ServiceSchema::make<ServiceXFormIV1>()).succeeded());
+      CHECK(alice.to<Packages>().setSchema(ServiceSchema::make<ServiceXFormIV2>()).succeeded());
+   }
+   SECTION("change transform")
+   {
+      REQUIRE(alice.to<Packages>().setSchema(ServiceSchema::make<ServiceXFormIV1>()).succeeded());
+      CHECK(alice.to<Packages>()
+                .setSchema(ServiceSchema::make<ServiceXFormIV3>())
+                .failed("Cannot change indexes"));
+   }
+   SECTION("actual key upgrade")
+   {
+      REQUIRE(alice.to<Packages>().setSchema(ServiceSchema::make<ServiceXFormOV1>()).succeeded());
+      CHECK(alice.to<Packages>()
+                .setSchema(ServiceSchema::make<ServiceXFormOV2>())
                 .failed("Cannot change indexes"));
    }
 }

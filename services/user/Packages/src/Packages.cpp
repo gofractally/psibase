@@ -68,19 +68,20 @@ namespace UserService
                         const std::vector<IndexInfo>& rhs,
                         TypeMatcher&                  keyMatcher)
       {
-         return std::ranges::equal(lhs, rhs,
-                                   [&](const auto& lhs, const auto& rhs)
-                                   {
-                                      return std::ranges::equal(
-                                          lhs, rhs,
-                                          [&](const auto& lhs, const auto& rhs)
-                                          {
-                                             return lhs.path == rhs.path &&
-                                                    keyMatcher.match(
-                                                        getFieldType(lschema, ltype, lhs),
-                                                        getFieldType(rschema, rtype, rhs));
-                                          });
-                                   });
+         return std::ranges::equal(
+             lhs, rhs,
+             [&](const auto& lhs, const auto& rhs)
+             {
+                return std::ranges::equal(
+                    lhs, rhs,
+                    [&](const auto& lhs, const auto& rhs)
+                    {
+                       return lhs.path == rhs.path && lhs.transform == rhs.transform &&
+                              keyMatcher.match(
+                                  lhs.type ? *lhs.type : getFieldType(lschema, ltype, lhs),
+                                  rhs.type ? *rhs.type : getFieldType(rschema, rtype, rhs));
+                    });
+             });
       }
    }  // namespace
 
