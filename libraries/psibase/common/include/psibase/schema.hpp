@@ -271,12 +271,17 @@ namespace psibase
       }
 
       template <typename T>
-      static TableInfo makeTable(psio::SchemaBuilder& builder, std::uint16_t table)
+      static void makeTable(psio::SchemaBuilder&    builder,
+                            std::uint16_t           table,
+                            std::vector<TableInfo>& out)
       {
-         return TableInfo{.name    = psio::get_type_name<T>(),
-                          .table   = table,
-                          .type    = builder.insert<typename T::value_type>(),
-                          .indexes = makeIndexes(builder, (T*)nullptr)};
+         if constexpr (!std::is_void_v<T>)
+         {
+            out.push_back({.name    = psio::get_type_name<T>(),
+                           .table   = table,
+                           .type    = builder.insert<typename T::value_type>(),
+                           .indexes = makeIndexes(builder, (T*)nullptr)});
+         }
       }
 
       static constexpr const char* dbName(DbId db)
@@ -302,7 +307,7 @@ namespace psibase
          constexpr auto name   = dbName(db);
          auto&          tables = (*out.database)[name];
          std::uint16_t  i      = 0;
-         (tables.push_back(makeTable<T>(builder, i++)), ...);
+         (makeTable<T>(builder, i++, tables), ...);
          for (auto& t : tables)
          {
             rowTypes.push_back(&t.type);
