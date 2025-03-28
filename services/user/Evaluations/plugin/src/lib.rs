@@ -14,11 +14,17 @@ use errors::ErrorType;
 struct EvaluationsPlugin;
 
 impl Api for EvaluationsPlugin {
-    fn create(registration: u32, deliberation: u32, submission: u32) -> Result<(), Error> {
+    fn create(
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+    ) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::create {
             registration,
             deliberation,
             submission,
+            finish_by,
         }
         .packed();
         add_action_to_transaction("create", &packed_args)
@@ -34,15 +40,14 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("start", &packed_args)
     }
 
-    fn group_key(
-        evaluation_id: u32,
-        group_number: u32,
-        keys: Vec<Vec<u8>>,
-        hash: String,
-    ) -> Result<(), Error> {
+    fn close(id: u32) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::close { id }.packed();
+        add_action_to_transaction("close", &packed_args)
+    }
+
+    fn group_key(evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::groupKey {
             evaluation_id,
-            group_number,
             keys,
             hash,
         }
