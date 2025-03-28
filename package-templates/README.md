@@ -10,7 +10,7 @@ This directory contains app templates that can be used with cargo-generate to qu
 
 # Install
 
-`cargo install cargo-generate`
+`cargo install cargo-generate@0.22.0`
 
 # Usage
 

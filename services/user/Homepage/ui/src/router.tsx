@@ -5,7 +5,6 @@ import { Layout } from "./layout";
 import { InviteResponse } from "./pages/InviteResponse";
 import { configuredApps } from "./configuredApps";
 
-
 export default createBrowserRouter([
     {
         path: "/",
@@ -15,10 +14,10 @@ export default createBrowserRouter([
                 path: "/",
                 element: <Dashboard />,
             },
-            ...configuredApps.map(app => ({
+            ...configuredApps.map((app) => ({
                 path: app.service,
                 element: app.element,
-                children: app.children.map(child => ({
+                children: app.children.map((child) => ({
                     path: child.path,
                     element: child.element,
                 })),
