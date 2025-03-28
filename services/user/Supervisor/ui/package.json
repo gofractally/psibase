@@ -24,6 +24,7 @@
         "@rollup/browser": "^4.9.0",
         "@tanstack/react-query": "^4.29.19",
         "react": "^18.2.0",
-        "react-dom": "^18.2.0"
+        "react-dom": "^18.2.0",
+        "zod": "^3.24.2"
     }
 }

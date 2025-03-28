@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { siblingUrl } from "@psibase/common-lib";
-import { ActiveOauthRequest, isTypeOauthRequest, OauthRequest } from "./db";
+import { ActiveOauthRequest, OauthRequestSchema, OauthRequest } from "./db";
 
 const buildIframeUrl = (promptUserReq: OauthRequest) => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -32,9 +32,10 @@ export const App = () => {
         }
 
         try {
-            const oauthReq = await ActiveOauthRequest.get(oauth_id);
-            if (isTypeOauthRequest(oauthReq)) {
-                setIframeUrl(buildIframeUrl(oauthReq as OauthRequest));
+            const oauthReqUnchecked = await ActiveOauthRequest.get(oauth_id);
+            const oauthReq = OauthRequestSchema.safeParse(oauthReqUnchecked);
+            if (oauthReq.success) {
+                setIframeUrl(buildIframeUrl(oauthReq.data));
                 ActiveOauthRequest.delete();
             } else {
                 setError("OAuth request error: Invalid payload");

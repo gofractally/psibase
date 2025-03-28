@@ -10,6 +10,7 @@ import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 import { OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
+import { z } from "zod";
 
 interface HttpRequest {
     uri: string;
@@ -24,12 +25,14 @@ interface HttpResponse {
     body: string;
 }
 
-interface SupervisorPromptPayload {
-    id: string;
-    subdomain: string;
-    subpath: string;
-    expiry_timestamp: number;
-}
+const SupervisorPromptPayload = z.object({
+    id: z.string().uuid(),
+    subdomain: z.string().nonempty(),
+    subpath: z.string(),
+    expiry_timestamp: z.number(),
+});
+
+type SupervisorPromptPayload = z.infer<typeof SupervisorPromptPayload>;
 
 function convert(tuples: [string, string][]): Record<string, string> {
     const record: Record<string, string> = {};
@@ -229,12 +232,12 @@ export class PluginHost implements HostInterface {
         let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
         
         // In Supervisor localStorage space, store id, subdomain, and subpath
-        const supervisorUP = {
+        const supervisorUP = SupervisorPromptPayload.parse({
             id: up_id,
             subdomain: this.self.app,
             subpath: subpath,
-            expiry_timestamp: new Date().getUTCSeconds(),
-        } as SupervisorPromptPayload;
+            expiry_timestamp: Math.floor(new Date().getTime() / 1000),
+        });
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
