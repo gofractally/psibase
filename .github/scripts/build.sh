@@ -39,7 +39,8 @@ DOCKER="docker run --rm \
   -e SCCACHE_IDLE_TIMEOUT \
   -e SCCACHE_CACHE_SIZE \
   -e RUSTC_WRAPPER \
-  -e WASM_PACK_CACHE=.wasm-pack-cache \
+  -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
+  -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
 
