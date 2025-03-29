@@ -3,7 +3,7 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
-    use evaluations::tables::Evaluation;
+    use evaluations::db::tables::Evaluation;
 
     struct Query;
 
