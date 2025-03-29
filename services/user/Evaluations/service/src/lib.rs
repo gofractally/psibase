@@ -107,6 +107,24 @@ pub mod tables {
             }
         }
 
+        pub fn get_groups(&self) -> Vec<Group> {
+            let table = GroupTable::new();
+            let result = table
+                .get_index_pk()
+                .range((self.id, 0)..=(self.id, u32::MAX))
+                .collect();
+            result
+        }
+
+        pub fn get_users(&self) -> Vec<User> {
+            let table = UserTable::new();
+            let result = table
+                .get_index_pk()
+                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
+                .collect();
+            result
+        }
+
         pub fn get(evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
             let result = table.get_index_pk().get(&evaluation_id);
@@ -191,9 +209,7 @@ pub mod helpers;
 #[psibase::service(name = "evaluations")]
 pub mod service {
     use crate::helpers::{self};
-    use crate::tables::{
-        ConfigRow, ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserTable,
-    };
+    use crate::tables::{ConfigRow, ConfigTable, Evaluation, Group, User};
     use psibase::*;
 
     #[action]
@@ -250,41 +266,28 @@ pub mod service {
             "only the owner can start the evaluation",
         );
         check(
-            helpers::get_groups(id).len() == 0,
+            evaluation.get_groups().len() == 0,
             "groups have already been created",
         );
 
-        let mut users_to_process = helpers::get_users(id);
-
-        let allowed_group_sizes = evaluation
-            .allowable_group_sizes
-            .iter()
-            .map(|size| *size as u32)
-            .collect();
-
-        let chunks = psibase::services::subgroups::Wrapper::call()
-            .gmp(users_to_process.len() as u32, allowed_group_sizes)
-            .unwrap()
-            .iter()
-            .map(|size| *size as u8)
-            .collect();
+        let mut users_to_process = evaluation.get_users();
 
         helpers::shuffle_vec(&mut users_to_process, entropy);
 
-        let chunked_groups = helpers::chunk_users(&users_to_process, chunks);
+        let chunked_groups = helpers::spread_users(&users_to_process, &evaluation);
 
-        for (index, group) in chunked_groups.into_iter().enumerate() {
+        for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
             let group_number: u32 = (index as u32) + 1;
             let new_group = Group::new(evaluation.id, group_number);
             new_group.save();
 
-            for mut user in group {
+            for mut user in grouped_users {
                 user.group_number = Some(group_number);
                 user.save();
             }
         }
 
-        helpers::update_evaluation(&evaluation);
+        evaluation.save();
     }
 
     #[action]

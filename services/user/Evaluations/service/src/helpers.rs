@@ -117,6 +117,25 @@ pub fn chunk_users(users: &Vec<User>, chunk_sizes: Vec<u8>) -> Vec<Vec<User>> {
     groups
 }
 
+pub fn spread_users(users_to_process: &Vec<User>, evaluation: &Evaluation) -> Vec<Vec<User>> {
+    // 4, 5, 6
+    let allowable_group_sizes = evaluation
+        .allowable_group_sizes
+        .iter()
+        .map(|size| *size as u32)
+        .collect();
+
+    // 6, 6, 6, 6, 5, 4
+    let chunk_sizes = psibase::services::subgroups::Wrapper::call()
+        .gmp(users_to_process.len() as u32, allowable_group_sizes)
+        .unwrap()
+        .iter()
+        .map(|size| *size as u8)
+        .collect();
+
+    chunk_users(&users_to_process, chunk_sizes)
+}
+
 pub fn calculate_results(attestations: Vec<Option<Vec<AccountNumber>>>) -> GroupResult {
     let group_size = attestations.len();
     let minimum_required_to_call = (group_size as f32 * 0.51).ceil() as usize;
@@ -149,31 +168,13 @@ pub fn calculate_results(attestations: Vec<Option<Vec<AccountNumber>>>) -> Group
     GroupResult::ConsensusMisalignment
 }
 
-pub fn get_groups(evaluation_id: u32) -> Vec<Group> {
-    let table = GroupTable::new();
-    table
-        .get_index_pk()
-        .range((evaluation_id, 0)..=(evaluation_id, u32::MAX))
-        .collect()
-}
-
-pub fn get_users(evaluation_id: u32) -> Vec<User> {
-    let table = UserTable::new();
-    table
-        .get_index_pk()
-        .range(
-            (evaluation_id, AccountNumber::new(0))..=(evaluation_id, AccountNumber::new(u64::MAX)),
-        )
-        .collect()
-}
-
 pub fn get_user(evaluation_id: u32, user: AccountNumber) -> User {
     let table = UserTable::new();
     table.get_index_pk().get(&(evaluation_id, user)).unwrap()
 }
 
 pub fn get_group_result(evaluation_id: u32, group_number: u32) -> GroupResult {
-    let users = get_users(evaluation_id);
+    let users = Evaluation::get(evaluation_id).get_users();
     let attestations = users
         .iter()
         .filter(|user| user.group_number == Some(group_number))
