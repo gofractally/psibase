@@ -1,4 +1,4 @@
-use crate::tables::{ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserTable};
+use crate::tables::{ConfigTable, Evaluation, EvaluationTable, User, UserTable};
 use psibase::AccountNumber;
 use psibase::*;
 use std::collections::HashMap;
