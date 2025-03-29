@@ -3,18 +3,18 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@shadcn/button";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
-import { ActivePermsOauthRequest } from "./db";
+import { ActivePermsOauthRequest, PermsOauthRequest } from "./db";
 
 const supervisor = getSupervisor();
 
 export const App = () => {
     const thisServiceName = "permissions";
     const [isLoading, setIsLoading] = useState(true);
-    const [validPermRequest, setValidPermRequest] = useState<any>(null);
+    const [validPermRequest, setValidPermRequest] =
+        useState<PermsOauthRequest>();
     const [error, setError] = useState<string | null>(null);
-    const initApp = useCallback(async () => {
-        await supervisor.onLoaded();
 
+    const initApp = useCallback(async () => {
         let permReqPayload;
         try {
             permReqPayload = await ActivePermsOauthRequest.get();
@@ -98,9 +98,11 @@ export const App = () => {
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
             <h2 style={{ textAlign: "center" }}>Grant access?</h2>
-            <p>
-                {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
-            </p>
+            {validPermRequest && (
+                <p>
+                    {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
+                </p>
+            )}
             {!!error && <div>ERROR: {error}</div>}
             <div className="flex justify-center gap-4">
                 <Button onClick={approve}>Approve</Button>

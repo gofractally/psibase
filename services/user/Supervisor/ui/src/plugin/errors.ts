@@ -1,4 +1,5 @@
 import { PluginError, QualifiedPluginId } from "@psibase/common-lib";
+import { z } from "zod";
 
 export class PluginDownloadFailed extends PluginError {
     constructor(pluginId: QualifiedPluginId) {
@@ -37,43 +38,24 @@ export interface RecoverableErrorPayload {
     producer: QualifiedPluginId;
 }
 
+const zRecoverableErrorPayload = z.object({
+    code: z.number(),
+    message: z.string(),
+    producer: z.object({
+        service: z.string(),
+        plugin: z.string(),
+    }),
+});
+
 // A recoverable error should be passed to prior plugins in the callstack, as they
 // may choose to handle the error rather than returning an error back to the UI.
-export interface RecoverableError {
-    name: string;
-    message: string;
-    payload: RecoverableErrorPayload;
-}
+export type RecoverableError = z.infer<typeof zRecoverableError>;
 
-export const isRecoverableError = (e: any): e is RecoverableError => {
-    return (
-        typeof e === "object" &&
-        e !== null &&
-        "name" in e &&
-        typeof e.name === "string" &&
-        "message" in e &&
-        typeof e.message === "string" &&
-        "payload" in e &&
-        typeof e.payload === "object" &&
-        e.payload !== null &&
-        isRecoverableErrorPayload(e.payload)
-    );
-};
+const zRecoverableError = z.object({
+    name: z.string(),
+    message: z.string(),
+    payload: zRecoverableErrorPayload,
+});
 
-export const isRecoverableErrorPayload = (
-    payload: any,
-): payload is RecoverableErrorPayload => {
-    return (
-        "code" in payload &&
-        typeof payload.code === "number" &&
-        "message" in payload &&
-        typeof payload.message === "string" &&
-        "producer" in payload &&
-        typeof payload.producer === "object" &&
-        payload.producer !== null &&
-        "service" in payload.producer &&
-        typeof payload.producer.service === "string" &&
-        "plugin" in payload.producer &&
-        typeof payload.producer.plugin === "string"
-    );
-};
+export const isRecoverableError = (e: any): e is RecoverableError => zRecoverableError.safeParse(e).success;
+

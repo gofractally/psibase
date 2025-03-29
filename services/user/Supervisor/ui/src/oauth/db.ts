@@ -1,13 +1,14 @@
 import { Result } from '../hostInterface';
 import { RecoverableErrorPayload } from '../plugin/errors';
-import { OAUTH_REQUEST_KEY, OAUTH_REQUEST_EXPIRATION } from '../constants';
+import { OAUTH_REQUEST_KEY } from '../constants';
 import { getSupervisor } from "@psibase/common-lib";
 import { z } from 'zod';
+import { unixSeconds } from '../utils';
 
 export const supervisor = getSupervisor();
 
 export const OauthRequestSchema = z.object({
-    id: z.string().uuid(),
+    id: z.string(),
     subdomain: z.string(),
     subpath: z.string(),
     expiry_timestamp: z.number(),
@@ -21,21 +22,21 @@ export class ActiveOauthRequest {
             service: "clientdata",
             intf: "keyvalue",
             method: "get",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY]
+        });
 
         if (!oauthReqBytes) {
             throw new Error("No active oauth request found");
         }
 
-        const oauthReq = JSON.parse(new TextDecoder().decode(oauthReqBytes));
+        const oauthReq = OauthRequestSchema.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
         if (id != oauthReq.id) {
             await this.delete();
             throw new Error("Oauth request id mismatch");
         }
 
-        let isExpired = (Math.floor(new Date().getTime() / 1000)
-            - oauthReq.expiry_timestamp.seconds)
-            >= OAUTH_REQUEST_EXPIRATION;
+        const isExpired = unixSeconds() >= oauthReq.expiry_timestamp;
+
         if (isExpired) {
             await this.delete();
             throw new Error("Oauth request expired");
@@ -54,6 +55,7 @@ export class ActiveOauthRequest {
             service: "clientdata",
             intf: "keyvalue",
             method: "delete",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY]
+        });
     }
 }

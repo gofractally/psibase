@@ -58,3 +58,6 @@ export const parser = (): Promise<any> => {
 export const isString = (value: any): value is string => {
     return typeof value === "string";
 };
+
+
+export const unixSeconds = () => Math.floor(new Date().getTime() / 1000);
