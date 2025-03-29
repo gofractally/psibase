@@ -6,11 +6,11 @@ import {
 } from "@psibase/common-lib";
 import { HostInterface, PluginPostDetails, Result } from "../hostInterface";
 import { Supervisor } from "../supervisor";
-import { OriginationData, QualifiedOriginationData } from "../utils";
+import { OriginationData, QualifiedOriginationData, unixSeconds } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
-import { OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
-import { z } from "zod";
+import { OAUTH_REQUEST_EXPIRATION, OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
+import { OauthRequestSchema } from "../oauth/db";
 
 interface HttpRequest {
     uri: string;
@@ -25,14 +25,6 @@ interface HttpResponse {
     body: string;
 }
 
-const SupervisorPromptPayload = z.object({
-    id: z.string().uuid(),
-    subdomain: z.string().nonempty(),
-    subpath: z.string(),
-    expiry_timestamp: z.number(),
-});
-
-type SupervisorPromptPayload = z.infer<typeof SupervisorPromptPayload>;
 
 function convert(tuples: [string, string][]): Record<string, string> {
     const record: Record<string, string> = {};
@@ -227,16 +219,16 @@ export class PluginHost implements HostInterface {
     getAppUrl(app: string): string {
         return `${siblingUrl(null, app)}`;
     }
-    
+
     private setActiveUserPrompt(subpath: string | undefined, upPayloadJsonStr: string): Result<string, RecoverableErrorPayload> {
         let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
-        
+
         // In Supervisor localStorage space, store id, subdomain, and subpath
-        const supervisorUP = SupervisorPromptPayload.parse({
+        const supervisorUP = OauthRequestSchema.parse({
             id: up_id,
             subdomain: this.self.app,
             subpath: subpath,
-            expiry_timestamp: Math.floor(new Date().getTime() / 1000),
+            expiry_timestamp: unixSeconds() + OAUTH_REQUEST_EXPIRATION,
         });
         this.supervisor.supervisorCall({
             service: "clientdata",
@@ -245,7 +237,8 @@ export class PluginHost implements HostInterface {
             method: "set",
             params: [
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
+                    JSON.stringify(supervisorUP))]
+        } as QualifiedFunctionCallArgs);
 
         // In Permissions (or an app-handling-its-own-permissions') localStorage space, save id and payload
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
@@ -258,11 +251,12 @@ export class PluginHost implements HostInterface {
             method: "set",
             params: [
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
-            JSON.stringify(parsedUpPayload))]} as QualifiedFunctionCallArgs);
+                    JSON.stringify(parsedUpPayload))]
+        } as QualifiedFunctionCallArgs);
         return up_id
     }
 
-    
+
     // Client interface
     promptUser(subpath: string | undefined, payloadJsonStr: string | undefined): Result<void, PluginError> {
         if (!!subpath && subpath?.length > 0 && subpath.includes("?")) {
