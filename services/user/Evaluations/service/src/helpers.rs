@@ -1,6 +1,4 @@
-use crate::tables::{
-    Attestation, AttestationTable, ConfigTable, Evaluation, EvaluationTable, GroupTable,
-};
+use crate::tables::{ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserTable};
 use psibase::AccountNumber;
 use psibase::*;
 use std::collections::HashMap;
@@ -22,8 +20,16 @@ pub enum GroupResult {
     ConsensusSuccess(Vec<AccountNumber>), // Attestations are in consensus
 }
 
+pub fn get_current_time_seconds() -> u32 {
+    psibase::services::transact::Wrapper::call()
+        .currentBlock()
+        .time
+        .seconds()
+        .seconds as u32
+}
+
 pub fn get_scheduled_phase(evaluation: &Evaluation) -> EvaluationStatus {
-    let current_time_seconds = 222;
+    let current_time_seconds = get_current_time_seconds();
     calculate_scheduled_phase(evaluation, current_time_seconds)
 }
 
@@ -57,10 +63,6 @@ pub fn assert_status(evaluation: &Evaluation, expected_status: EvaluationStatus)
         current_phase == expected_status,
         format!("evaluation must be in {phase_name} phase").as_str(),
     );
-}
-pub fn get_evaluation(id: u32) -> Evaluation {
-    let table: EvaluationTable = EvaluationTable::new();
-    table.get_index_pk().get(&id).unwrap()
 }
 
 pub fn update_evaluation(evaluation: &Evaluation) {
@@ -96,16 +98,13 @@ pub fn shuffle_vec<T>(vec: &mut Vec<T>, seed: u64) {
     }
 }
 
-pub fn spread_users_into_groups(
-    users: &Vec<AccountNumber>,
-    group_sizes: Vec<u8>,
-) -> Vec<Vec<AccountNumber>> {
+pub fn chunk_users(users: &Vec<User>, chunk_sizes: Vec<u8>) -> Vec<Vec<User>> {
     let mut users_to_process = users.clone();
     let mut groups = vec![];
 
-    for group_size in group_sizes {
+    for chunk_size in chunk_sizes {
         let mut group = vec![];
-        for _ in 0..group_size {
+        for _ in 0..chunk_size {
             let user = users_to_process.pop();
             if let Some(user) = user {
                 group.push(user);
@@ -118,10 +117,8 @@ pub fn spread_users_into_groups(
     groups
 }
 
-pub fn calculate_results(
-    attestations: Vec<Option<Vec<AccountNumber>>>,
-    group_size: usize,
-) -> GroupResult {
+pub fn calculate_results(attestations: Vec<Option<Vec<AccountNumber>>>) -> GroupResult {
+    let group_size = attestations.len();
     let minimum_required_to_call = (group_size as f32 * 0.51).ceil() as usize;
     let flat_attestations: Vec<_> = attestations.into_iter().flatten().collect();
     let total_possible_attestations = group_size;
@@ -152,22 +149,35 @@ pub fn calculate_results(
     GroupResult::ConsensusMisalignment
 }
 
-pub fn get_group_result(evaluation_id: u32, group_number: u32) -> GroupResult {
-    let group_table = GroupTable::new();
-    let group = group_table
+pub fn get_groups(evaluation_id: u32) -> Vec<Group> {
+    let table = GroupTable::new();
+    table
         .get_index_pk()
-        .get(&(evaluation_id, group_number))
-        .unwrap();
-    let attestation_table: AttestationTable = AttestationTable::new();
-    let mut attestations: Vec<Option<Vec<AccountNumber>>> = Vec::new();
+        .range((evaluation_id, 0)..=(evaluation_id, u32::MAX))
+        .collect()
+}
 
-    for member in group.members.clone() {
-        let attestation = attestation_table
-            .get_index_pk()
-            .get(&(evaluation_id, member))
-            .unwrap();
-        attestations.push(attestation.submission);
-    }
+pub fn get_users(evaluation_id: u32) -> Vec<User> {
+    let table = UserTable::new();
+    table
+        .get_index_pk()
+        .range(
+            (evaluation_id, AccountNumber::new(0))..=(evaluation_id, AccountNumber::new(u64::MAX)),
+        )
+        .collect()
+}
 
-    calculate_results(attestations, group.members.len())
+pub fn get_user(evaluation_id: u32, user: AccountNumber) -> User {
+    let table = UserTable::new();
+    table.get_index_pk().get(&(evaluation_id, user)).unwrap()
+}
+
+pub fn get_group_result(evaluation_id: u32, group_number: u32) -> GroupResult {
+    let users = get_users(evaluation_id);
+    let attestations = users
+        .iter()
+        .filter(|user| user.group_number == Some(group_number))
+        .map(|user| user.submission.clone())
+        .collect();
+    calculate_results(attestations)
 }
