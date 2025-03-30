@@ -1,23 +1,9 @@
-import { siblingUrl } from "@psibase/common-lib";
+import { getEvaluation, Evaluation } from "@lib/getEvaluation";
 import { useQuery } from "@tanstack/react-query";
 
 
 
-
-
-export const useEvaluation = (id: number) => useQuery({
+export const useEvaluation = (id: number) => useQuery<Evaluation>({
     queryKey: ["evaluation", id],
-    queryFn: async () => {
-        const queriedExampleThing = await fetch(
-            siblingUrl(undefined, "evaluations", "/graphql"),
-            {
-                method: "POST",
-                body: JSON.stringify({
-                    query: `{ getEvaluation(id: ${id}) { id } }`,
-                }),
-            },
-        );
-        return await queriedExampleThing.json();
-    },
+    queryFn: async () => getEvaluation(id),
 });
-

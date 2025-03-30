@@ -1,5 +1,9 @@
+import { queryClient } from "@/main";
+import { getEvaluation } from "@lib/getEvaluation";
+import { getLastId } from "@lib/getLastId";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000)
@@ -18,11 +22,17 @@ const Params = z.object({
 })
 
 
-export const useCreateEvaluation = () => {
-    return useMutation<void, Error, z.infer<typeof Params>>({
-        mutationFn: async (params) => {
+const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export const useCreateEvaluation = () => {
+
+
+
+    const navigate = useNavigate();
+    return useMutation<number, Error, z.infer<typeof Params>>({
+        mutationFn: async (params) => {
             const { deliberation, finishBy, registration, submission } = Params.parse(params)
+            const lastId = await getLastId()
 
             const pars = {
                 method: 'create',
@@ -30,7 +40,16 @@ export const useCreateEvaluation = () => {
                 intf: 'api',
                 params: [registration, deliberation, submission, finishBy],
             }
+
             void await getSupervisor().functionCall(pars)
+            await wait(2000);
+
+            const newId = lastId + 1;
+            const res = await queryClient.fetchQuery({ queryKey: ["evaluation", newId], queryFn: () => getEvaluation(newId) })
+            return res.id;
         },
+        onSuccess: (id) => {
+            navigate(`/${id}`)
+        }
     });
 }

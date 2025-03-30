@@ -23,17 +23,15 @@ export const SubmitButton = ({
                 state.isValid,
                 state.isSubmitting,
                 state.isSubmitSuccessful,
-                state.isPristine,
             ]}
         >
-            {([isValid, isSubmitting, isSubmitSuccessful, isPristine]) => {
+            {([isValid, isSubmitting, isSubmitSuccessful]) => {
                 return (
                     <Button
                         type="submit"
                         disabled={
                             !isValid ||
                             isSubmitting ||
-                            isPristine ||
                             (isSubmitSuccessful && submitOnce)
                         }
                     >

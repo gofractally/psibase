@@ -53,6 +53,31 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getLastId() -> u32 {
+        let table = ConfigTable::new();
+        table
+            .get_index_pk()
+            .get(&SingletonKey {})
+            .unwrap()
+            .last_used_id
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getGroups(id: u32) -> Vec<Group> {
+        let evaluation = Evaluation::get(id);
+        evaluation.get_groups()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getUsers(id: u32) -> Vec<User> {
+        let evaluation = Evaluation::get(id);
+        evaluation.get_users()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn start(id: u32, entropy: u64) {
         let evaluation = Evaluation::get(id);
 

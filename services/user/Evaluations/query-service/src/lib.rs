@@ -3,7 +3,7 @@
 mod service {
     use async_graphql::*;
     use psibase::*;
-    use evaluations::db::tables::Evaluation;
+    use evaluations::db::tables::{Evaluation, Group, User};
 
     struct Query;
 
@@ -12,6 +12,18 @@ mod service {
 
         async fn get_evaluation(&self, id: u32) -> Option<Evaluation> {
             evaluations::Wrapper::call().getEvaluation(id)
+        }
+
+        async fn get_last_id(&self) -> u32 {
+            evaluations::Wrapper::call().getLastId()
+        }
+
+        async fn get_groups(&self, id: u32) -> Vec<Group> {
+            evaluations::Wrapper::call().getGroups(id)
+        }
+
+        async fn get_users(&self, id: u32) -> Vec<User> {
+            evaluations::Wrapper::call().getUsers(id)
         }
     }
 

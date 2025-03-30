@@ -2,8 +2,7 @@ import { useCreateEvaluation } from "@hooks/use-create-evaluation";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import { useAppForm } from "./app-form";
-
-import humanizeDuration from "humanize-duration";
+import { humanize } from "@lib/humanize";
 
 dayjs.extend(duration);
 
@@ -13,12 +12,6 @@ const registration = dayjs().set("minute", lowestFifth(dayjs().minute()));
 const deliberation = registration.add(45, "minutes");
 const submission = deliberation.add(10, "minutes");
 const finishBy = submission.add(10, "minutes");
-
-const humanize = (ms: number) =>
-    humanizeDuration(ms, {
-        units: ["w", "d", "h", "m"],
-        largest: 3,
-    });
 
 export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
     const { mutateAsync: createEvaluation } = useCreateEvaluation();
@@ -55,6 +48,8 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
     });
 
     const now = dayjs();
+
+    console.log(form.state.errors, "are form errors");
 
     return (
         <div>
