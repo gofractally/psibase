@@ -1,77 +1,69 @@
+import { useCloseEvaluation } from "@hooks/use-close-evaluation";
 import { useCurrentUser } from "@hooks/use-current-user";
 import { useEvaluation } from "@hooks/use-evaluation";
+import { useGroups } from "@hooks/use-groups";
 import { useRegister } from "@hooks/use-register";
+import { useStartEvaluation } from "@hooks/use-start-evaluation";
 import { useUsers } from "@hooks/use-users";
-import { type Evaluation } from "@lib/getEvaluation";
+import { getStatus } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
 import dayjs from "dayjs";
 import { useParams } from "react-router-dom";
-import { z } from "zod";
-
-const zStatus = z.enum([
-    "pending",
-    "registration",
-    "deliberation",
-    "submission",
-    "finished",
-]);
-
-const getStatus = (evaluation: Evaluation): z.infer<typeof zStatus> => {
-    const currentTime = dayjs().unix();
-    if (currentTime >= evaluation.finishBy) {
-        return zStatus.Values.finished;
-    }
-    if (currentTime >= evaluation.submissionStarts) {
-        return zStatus.Values.submission;
-    }
-    if (currentTime >= evaluation.deliberationStarts) {
-        return zStatus.Values.deliberation;
-    }
-    if (currentTime >= evaluation.registrationStarts) {
-        return zStatus.Values.registration;
-    }
-    return zStatus.Values.pending;
-};
-
-// TODO: status is based on time only but should also call it finished if the result for the evaluation is already published
 
 export const EvaluationPage = () => {
     const { id } = useParams();
 
     const { data: evaluation } = useEvaluation(Number(id));
-    console.log({ evaluation });
     const { mutate: register, isPending: isRegisterPending } = useRegister();
     const { data: currentUser } = useCurrentUser();
+    const { data: users } = useUsers(evaluation?.id);
+    const { data: groups } = useGroups(evaluation?.id);
+    const {
+        mutateAsync: startEvaluation,
+        isPending: isStartEvaluationPending,
+    } = useStartEvaluation();
 
-    const { data: users, error: usersError } = useUsers(evaluation?.id);
-    console.log({ users, usersError });
+    const {
+        mutateAsync: closeEvaluation,
+        isPending: isCloseEvaluationPending,
+        isSuccess: isCloseEvaluationSuccess,
+    } = useCloseEvaluation();
 
     const isRegistered = (users || []).some(
         (user) => user.user === currentUser,
     );
 
+    console.log({ groups });
+
     const isNoUser = currentUser === null;
 
-    const status = evaluation && getStatus(evaluation);
-
-    console.log({ id, evaluation, status });
+    const status =
+        evaluation &&
+        users &&
+        currentUser &&
+        groups &&
+        getStatus(evaluation, currentUser, users, groups);
 
     if (isNoUser) {
         return <div>You need to be logged in to access this page</div>;
     }
+    if (!status) {
+        return <div>Loading...</div>;
+    }
+
+    console.log({ status });
 
     return (
         <div className="flex h-full w-full flex-col items-center justify-center">
             <div className="text-2xl font-bold">Evaluation</div>
 
-            {!status && <div>Loading...</div>}
-            {status === "pending" && (
+            {status.type === "pending" && (
                 <div>
                     <div>
                         Registration starts at{" "}
                         {dayjs
-                            .unix(evaluation!.registrationStarts)
+                            .unix(status.registrationStarts)
                             .format("ddd MMM D, HH:mm")}
                     </div>
                     <div>
@@ -79,40 +71,29 @@ export const EvaluationPage = () => {
                             Register in{" "}
                             {humanize(
                                 dayjs
-                                    .unix(evaluation!.registrationStarts)
+                                    .unix(status.registrationStarts)
                                     .diff(dayjs()),
                             )}
                         </Button>
                     </div>
                 </div>
             )}
-            {status === "registration" && (
+
+            {status.type === "registrationAvailable" && (
                 <div>
-                    {isRegistered && (
-                        <div>
-                            <div>You are registered for this evaluation </div>
-                            <div>
-                                {dayjs
-                                    .unix(evaluation!.deliberationStarts)
-                                    .format("ddd MMM D, HH:mm")}{" "}
-                                ({" "}
-                                {humanize(
-                                    dayjs
-                                        .unix(evaluation!.deliberationStarts)
-                                        .diff(dayjs()),
-                                )}
-                                )
-                            </div>
-                        </div>
-                    )}
-                    {!isRegistered && (
-                        <div>
-                            Registration is open until{" "}
-                            {dayjs
+                    <div>You are registered for this evaluation </div>
+                    <div>
+                        {dayjs
+                            .unix(evaluation!.deliberationStarts)
+                            .format("ddd MMM D, HH:mm")}{" "}
+                        ({" "}
+                        {humanize(
+                            dayjs
                                 .unix(evaluation!.deliberationStarts)
-                                .format("ddd MMM D, HH:mm")}
-                        </div>
-                    )}
+                                .diff(dayjs()),
+                        )}
+                        )
+                    </div>
                     <div className="flex w-full justify-center">
                         <Button
                             disabled={isRegisterPending || isRegistered}
@@ -129,32 +110,114 @@ export const EvaluationPage = () => {
                     </div>
                 </div>
             )}
-            {status === "deliberation" && (
+            {status.type === "registeredAwaitingDeliberation" && (
                 <div>
-                    <div>Deliberation</div>
-                    {isRegistered && (
-                        <div>
-                            Your group has attested, awaiting the other groups
-                            to do the same.
-                        </div>
-                    )}
-                    {!isRegistered && (
-                        <div>
-                            Evaluation is in progress, will be completed by{" "}
-                            {dayjs
-                                .unix(evaluation!.finishBy)
-                                .format("ddd MMM D, HH:mm")}
-                            (
-                            {humanize(
-                                dayjs.unix(evaluation!.finishBy).diff(dayjs()),
-                            )}
-                            )
+                    <div>You are registered for this evaluation </div>
+                    <div>
+                        Deliberation starts at{" "}
+                        {dayjs
+                            .unix(status.deliberationStarts)
+                            .format("ddd MMM D, HH:mm")}
+                    </div>
+                    <div className="flex w-full justify-center">
+                        <Button
+                            disabled={isRegisterPending || isRegistered}
+                            onClick={() => {
+                                register(evaluation!.id);
+                            }}
+                        >
+                            {isRegisterPending
+                                ? "Registering..."
+                                : isRegistered
+                                  ? "Registered"
+                                  : "Register"}
+                        </Button>
+                    </div>
+                </div>
+            )}
+            {status.type === "awaitingEvaluationStart" && (
+                <div>
+                    <div>Evaluation about to start...</div>
+                    {status.userShouldStart ? (
+                        <Button
+                            disabled={isStartEvaluationPending}
+                            onClick={() => {
+                                startEvaluation({
+                                    id: evaluation!.id,
+                                    entropy: Math.floor(
+                                        1000000 * Math.random(),
+                                    ),
+                                });
+                            }}
+                        >
+                            {isStartEvaluationPending
+                                ? "Starting..."
+                                : "Start evaluation"}
+                        </Button>
+                    ) : (
+                        <div className="text-sm text-muted-foreground">
+                            Awaiting the evaluation to be started by the owner.
                         </div>
                     )}
                 </div>
             )}
-            {status === "submission" && <div>Submission</div>}
-            {status === "finished" && <div>Finished</div>}
+            {status.type === "deliberationPendingAsParticipant" && (
+                <div>
+                    <div>Deliberation</div>
+                    <div>
+                        Deliberation is in progress, will be completed by{" "}
+                        {dayjs
+                            .unix(status.deliberationDeadline)
+                            .format("ddd MMM D, HH:mm")}
+                        (
+                        {humanize(
+                            dayjs
+                                .unix(status.deliberationDeadline)
+                                .diff(dayjs()),
+                        )}
+                        )
+                    </div>
+                </div>
+            )}
+            {status.type === "evaluationNotStartedInTime" && (
+                <div>
+                    <div>Evaluation not started in time</div>
+                    
+                    {isCloseEvaluationSuccess && <div>Evaluation closed</div>}
+                    {status.userShouldDelete && !isCloseEvaluationSuccess && (
+                        <div>
+                            <Button
+                                disabled={isCloseEvaluationPending}
+                                onClick={() => {
+                                    closeEvaluation({ id: evaluation!.id });
+                                }}
+                            >
+                                {isCloseEvaluationPending
+                                    ? "Closing..."
+                                    : "Close evaluation"}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {status.type === "userMustSubmit" && (
+                <div>
+                    <div>*Redirect to submission page*</div>
+                </div>
+            )}
+            {status.type === "canWatchResults" && (
+                <div>
+                    <div>Submission is pending...</div>
+                    <div>
+                        Will be completed by{" "}
+                        {dayjs
+                            .unix(status.submissionDeadline)
+                            .format("ddd MMM D, HH:mm")}
+                    </div>
+                    <div>**Show current results**</div>
+                </div>
+            )}
         </div>
     );
 };

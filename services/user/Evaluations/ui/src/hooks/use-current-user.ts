@@ -1,4 +1,4 @@
-import { Account } from "@/lib/zod/Account";
+import { Account, zAccount } from "@/lib/zod/Account";
 import { queryClient } from "@/main";
 import { getSupervisor } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +13,7 @@ export const queryFn = async () => {
         service: "accounts",
         intf: "api",
     });
-    return res ? Account.parse(res) : null;
+    return res ? zAccount.parse(res) : null;
 };
 
 export const useCurrentUser = () =>
@@ -23,8 +23,8 @@ export const useCurrentUser = () =>
         staleTime: 60000,
     });
 
-export const setCurrentUser = (accountName: z.infer<typeof Account> | null) => {
+export const setCurrentUser = (accountName: Account | null) => {
     queryClient.setQueryData(['currentUser'], () =>
-        accountName === null ? null : Account.parse(accountName),
+        accountName === null ? null : zAccount.parse(accountName),
     );
 };

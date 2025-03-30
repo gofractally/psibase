@@ -87,6 +87,7 @@ pub mod tables {
     impl Evaluation {
         pub fn new(
             id: u32,
+            allowable_group_sizes: Vec<u8>,
             created_at: u32,
             owner: AccountNumber,
             registration_starts: u32,
@@ -103,7 +104,7 @@ pub mod tables {
                 submission_starts,
                 finish_by,
                 use_hooks: false,
-                allowable_group_sizes: vec![],
+                allowable_group_sizes,
             }
         }
 

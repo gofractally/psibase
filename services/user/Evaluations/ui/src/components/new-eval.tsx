@@ -8,10 +8,14 @@ dayjs.extend(duration);
 
 const lowestFifth = (minute: number) => minute - (minute % 5);
 
-const registration = dayjs().set("minute", lowestFifth(dayjs().minute()));
-const deliberation = registration.add(45, "minutes");
-const submission = deliberation.add(10, "minutes");
-const finishBy = submission.add(10, "minutes");
+const now = dayjs();
+
+const registration = now
+    .set("minute", lowestFifth(dayjs().minute()))
+    .set("second", 0);
+const deliberation = now.add(1, "minutes").set("second", 0);
+const submission = deliberation.add(1, "minutes");
+const finishBy = submission.add(1, "minutes");
 
 export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
     const { mutateAsync: createEvaluation } = useCreateEvaluation();
@@ -34,6 +38,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         finishBy: dayjs(finishBy).unix(),
                         registration: dayjs(registration).unix(),
                         submission: dayjs(submission).unix(),
+                        allowableGroupSizes: [4, 5, 6],
                     });
                 } catch (error) {
                     console.error(error);

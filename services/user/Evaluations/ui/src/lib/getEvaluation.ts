@@ -1,13 +1,13 @@
 import { z } from "zod"
 import { graphql } from "./graphql"
-import { Account } from "./zod/Account";
+import { zAccount } from "./zod/Account";
 import { zUnix } from "./zod/unix";
 
 
 export const zEvaluation = z.object({
     id: z.number(),
     createdAt: zUnix,
-    owner: Account,
+    owner: zAccount,
     registrationStarts: zUnix,
     deliberationStarts: zUnix,
     submissionStarts: zUnix,

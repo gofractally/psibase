@@ -25,7 +25,13 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn create(registration: u32, deliberation: u32, submission: u32, finish_by: u32) {
+    fn create(
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+        allowable_group_sizes: Vec<u8>,
+    ) {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
@@ -33,6 +39,7 @@ pub mod service {
 
         let new_evaluation = Evaluation::new(
             helpers::get_next_id(),
+            allowable_group_sizes,
             helpers::get_current_time_seconds(),
             get_sender(),
             registration,
@@ -91,6 +98,7 @@ pub mod service {
             "groups have already been created",
         );
 
+        // return;
         let mut users_to_process = evaluation.get_users();
 
         helpers::shuffle_vec(&mut users_to_process, entropy);

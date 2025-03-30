@@ -11,9 +11,7 @@ export const App = () => {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Evaluations" />
-
+        <div className="">
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <Button onClick={() => setIsOpen(true)}>
                     Create New Evaluation

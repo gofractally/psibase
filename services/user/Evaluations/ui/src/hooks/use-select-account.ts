@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
+import { setCurrentUser } from "./use-current-user";
 
 const supervisor = getSupervisor();
 
@@ -19,11 +20,8 @@ export const useSelectAccount = () => {
                 intf: "activeApp",
             }));
         },
-        onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["loggedInUser"] });
-            }, 2000);
+        onSuccess: (_, accountName) => {
+            setCurrentUser(accountName);
         },
         onError: (error) => {
             toast.error(error.message);

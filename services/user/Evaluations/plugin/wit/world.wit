@@ -27,7 +27,7 @@ interface api {
     use types.{evaluation, account-number};
     
 
-    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32) -> result<_, error>;
+    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, allowable-group-sizes: list<u8>) -> result<_, error>;
 
     register: func(id: u32) -> result<_, error>;
 

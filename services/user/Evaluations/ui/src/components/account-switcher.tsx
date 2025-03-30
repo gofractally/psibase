@@ -1,10 +1,10 @@
 import {
     useCreateConnectionToken,
     useCurrentAccounts,
-    useLoggedInUser,
     useLogout,
     useSelectAccount,
 } from "@hooks";
+import { useCurrentUser } from "@hooks/use-current-user";
 import { Avatar, AvatarFallback } from "@shadcn/avatar";
 
 import { Button } from "@shadcn/button";
@@ -26,8 +26,8 @@ import { LogIn, LogOut, PlusCircle, User, UserPlus } from "lucide-react";
 export function AccountSwitcher() {
     const { mutateAsync: onLogin } = useCreateConnectionToken();
 
-    const { data: loggedInUser } = useLoggedInUser();
-    const isLoggedIn = !!loggedInUser;
+    const { data: currentUser } = useCurrentUser();
+    const isLoggedIn = !!currentUser;
 
     const { data: currentAccounts, isPending: isLoadingAccounts } =
         useCurrentAccounts();
@@ -38,14 +38,15 @@ export function AccountSwitcher() {
     const { mutateAsync: selectAccount } = useSelectAccount();
 
     const otherConnectedAccounts = currentAccounts.filter(
-        (account) => account !== loggedInUser,
+        (account) => account !== currentUser,
     );
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="my-2" >
+                <Button variant="ghost" size="icon" className="my-2">
                     <User className="h-4 w-4" />
+                    {currentUser?.slice(0, 1)}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -54,18 +55,18 @@ export function AccountSwitcher() {
                 align="end"
                 sideOffset={4}
             >
-                {loggedInUser ? (
+                {currentUser ? (
                     <>
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
                                     <AvatarFallback className="rounded-lg">
-                                        {loggedInUser[0]}
+                                        {currentUser[0]}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
-                                        {loggedInUser}
+                                        {currentUser}
                                     </span>
                                 </div>
                             </div>
@@ -101,7 +102,7 @@ export function AccountSwitcher() {
                             <DropdownMenuSubTrigger>
                                 <UserPlus className="mr-2 h-4 w-4" />
                                 <span>
-                                    {loggedInUser
+                                    {currentUser
                                         ? "Switch account"
                                         : "Select an account"}
                                 </span>

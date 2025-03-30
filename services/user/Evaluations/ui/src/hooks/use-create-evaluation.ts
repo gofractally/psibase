@@ -13,6 +13,7 @@ const Params = z.object({
     deliberation: z.number(),
     submission: z.number(),
     finishBy: z.number(),
+    allowableGroupSizes: z.array(z.number()),
 }).refine((data) => data.registration < data.deliberation && data.deliberation < data.submission && data.submission < data.finishBy, {
     message: "Dates must be in chronological order",
     path: ["registration", "deliberation", "submission", "finishBy"]
@@ -25,21 +26,22 @@ const Params = z.object({
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const useCreateEvaluation = () => {
-
-
-
     const navigate = useNavigate();
+
     return useMutation<number, Error, z.infer<typeof Params>>({
         mutationFn: async (params) => {
-            const { deliberation, finishBy, registration, submission } = Params.parse(params)
+            const { deliberation, finishBy, registration, submission, allowableGroupSizes } = Params.parse(params)
             const lastId = await getLastId()
 
+            const updatedGroupSize = Object.fromEntries(allowableGroupSizes.map((size, index) => [index, size]))
             const pars = {
                 method: 'create',
                 service: 'evaluations',
                 intf: 'api',
-                params: [registration, deliberation, submission, finishBy],
+                params: [registration, deliberation, submission, finishBy, updatedGroupSize],
             }
+
+            console.log(pars, "are pars");
 
             void await getSupervisor().functionCall(pars)
             await wait(2000);

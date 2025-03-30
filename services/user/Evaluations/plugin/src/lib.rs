@@ -19,12 +19,14 @@ impl Api for EvaluationsPlugin {
         deliberation: u32,
         submission: u32,
         finish_by: u32,
+        allowable_group_sizes: Vec<u8>,
     ) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::create {
             registration,
             deliberation,
             submission,
             finish_by,
+            allowable_group_sizes,
         }
         .packed();
         add_action_to_transaction("create", &packed_args)
