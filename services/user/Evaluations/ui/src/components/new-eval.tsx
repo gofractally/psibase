@@ -54,8 +54,6 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
 
     const now = dayjs();
 
-    console.log(form.state.errors, "are form errors");
-
     return (
         <div>
             <form

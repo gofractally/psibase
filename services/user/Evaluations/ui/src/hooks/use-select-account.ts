@@ -8,8 +8,6 @@ import { setCurrentUser } from "./use-current-user";
 const supervisor = getSupervisor();
 
 export const useSelectAccount = () => {
-    const queryClient = useQueryClient();
-
     return useMutation<void, Error, string>({
         mutationKey: ["selectAccount"],
         mutationFn: async (accountName: string) => {

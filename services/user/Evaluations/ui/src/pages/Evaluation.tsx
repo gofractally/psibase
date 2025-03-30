@@ -34,8 +34,6 @@ export const EvaluationPage = () => {
         (user) => user.user === currentUser,
     );
 
-    console.log({ groups });
-
     const isNoUser = currentUser === null;
 
     const status =
@@ -182,7 +180,7 @@ export const EvaluationPage = () => {
             {status.type === "evaluationNotStartedInTime" && (
                 <div>
                     <div>Evaluation not started in time</div>
-                    
+
                     {isCloseEvaluationSuccess && <div>Evaluation closed</div>}
                     {status.userShouldDelete && !isCloseEvaluationSuccess && (
                         <div>

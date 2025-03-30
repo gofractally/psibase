@@ -37,6 +37,11 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("register", &packed_args)
     }
 
+    fn unregister(id: u32) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::unregister { id }.packed();
+        add_action_to_transaction("unregister", &packed_args)
+    }
+
     fn start(id: u32, entropy: u64) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::start { id, entropy }.packed();
         add_action_to_transaction("start", &packed_args)

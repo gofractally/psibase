@@ -1,10 +1,9 @@
+import { getGroups } from "@lib/getGroups";
+import { useQuery } from "@tanstack/react-query";
 
-import { getGroups } from "@lib/getGroups"
-import { useQuery } from "@tanstack/react-query"
-
-
-export const useGroups = (evaluationId: number | undefined) => useQuery({
-    queryKey: ['groups', evaluationId],
-    queryFn: () => getGroups(evaluationId!),
-    enabled: !!evaluationId,
-})
+export const useGroups = (evaluationId: number | undefined) =>
+    useQuery({
+        queryKey: ["groups", evaluationId],
+        queryFn: () => getGroups(evaluationId!),
+        enabled: !!evaluationId,
+    });

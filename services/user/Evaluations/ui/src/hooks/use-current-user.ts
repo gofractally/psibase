@@ -18,13 +18,13 @@ export const queryFn = async () => {
 
 export const useCurrentUser = () =>
     useQuery({
-        queryKey: ['currentUser'],
+        queryKey: ["currentUser"],
         queryFn,
         staleTime: 60000,
     });
 
 export const setCurrentUser = (accountName: Account | null) => {
-    queryClient.setQueryData(['currentUser'], () =>
+    queryClient.setQueryData(["currentUser"], () =>
         accountName === null ? null : zAccount.parse(accountName),
     );
 };

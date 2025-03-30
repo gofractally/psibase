@@ -225,6 +225,24 @@ pub mod service {
         let user = User::new(evaluation.id, get_sender());
         user.save();
     }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn unregister(id: u32) {
+        let evaluation = Evaluation::get(id);
+        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
+
+        let is_hook_allows_deregistration = true;
+
+        check(
+            is_hook_allows_deregistration,
+            "user is not allowed to deregister",
+        );
+
+        let sender = get_sender();
+        let user = User::get(evaluation.id, sender);
+        user.delete();
+    }
 }
 
 #[cfg(test)]
