@@ -549,15 +549,21 @@ namespace psibase
       raw::kvPut(db, key, key_len, value, value_len);
    }
 
+   /// A key function that builds a key from multiple subkeys
+   ///
+   /// The key will be a tuple composed from all the subkeys in order.
    template <auto... K>
    struct CompositeKey
    {
       auto        operator()(const auto& value) const;
       friend auto operator<=>(const CompositeKey&, const CompositeKey&) = default;
-      // TODO: remove once porting is finished
-      PSIO_REFLECT(CompositeKey)
    };
 
+   /// A key functions that extracts a member of a member
+   ///
+   /// Any level of nesting is supported. The last key can
+   /// be any invokable object. All the other keys must be
+   /// pointers-to-data-members.
    template <auto... K>
    struct NestedKey
    {
@@ -634,9 +640,10 @@ namespace psibase
    ///
    /// `Primary` and `Secondary` may be:
    /// - pointer-to-data-member. e.g. `&MyType::key`
-   /// - pointer-to-member-function which returns a key. e.g. `&MyType::keyFunction`
-   /// - non-member function which takes a `const T&` as its only argument and returns a key
-   /// - a callable object which takes a `const T&` as its only argument and returns a key
+   /// - a instance of a standard key type: `NestedKey` or `CompositeKey`
+   /// - pointer-to-member-function which returns a key. e.g. `&MyType::keyFunction`.
+   ///   Be careful when using such functions, as changing the behavior of the function
+   ///   will corrupt the database, and such changes cannot be detected automatically.
    ///
    /// #### Schema changes
    ///

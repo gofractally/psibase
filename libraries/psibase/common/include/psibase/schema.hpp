@@ -58,10 +58,11 @@ namespace psibase
    template <auto X>
    constexpr bool is_equal_member<X, X> = true;
 
-   //const char* psibase_get_key_transform_name(nt_wrap<V>*, auto)
-   //{
-   //   return "unknown";
-   //}
+   template <auto V>
+   const char* psibase_get_key_transform_name(nt_wrap<V>*, auto)
+   {
+      return "unknown";
+   }
 
    /// Represents the schema for a service
    struct ServiceSchema
