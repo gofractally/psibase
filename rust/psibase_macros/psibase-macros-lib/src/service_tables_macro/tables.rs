@@ -413,12 +413,14 @@ fn make_key_field(expr: &Expr, field_names: &Vec<String>) -> Vec<u32> {
     loop {
         match current {
             Expr::Path(expr) => {
-                if expr.path.leading_colon.is_none()
-                    && expr.path.segments.len() == 1
-                    && expr.path.segments[0].ident.to_string() == "self"
+                if expr.path.leading_colon.is_some()
+                    || expr.path.segments.len() != 1
+                    || expr.path.segments[0].ident.to_string() != "self"
                 {
-                    break;
+                    emit_error!(expr, "Only fields can be used in keys");
+                    return Vec::new();
                 }
+                break;
             }
             Expr::Field(field) => {
                 names.push(&field.member);
