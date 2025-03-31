@@ -71,6 +71,11 @@ pub mod tables {
             let table = UserTable::new();
             table.put(&self).unwrap();
         }
+
+        pub fn delete(&self) {
+            let table = UserTable::new();
+            table.erase(&self.pk());
+        }
     }
 
     #[table(name = "GroupTable", index = 3)]

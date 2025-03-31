@@ -4,6 +4,7 @@ import { useEvaluation } from "@hooks/use-evaluation";
 import { useGroups } from "@hooks/use-groups";
 import { useRegister } from "@hooks/use-register";
 import { useStartEvaluation } from "@hooks/use-start-evaluation";
+import { useUnregister } from "@hooks/use-unregister";
 import { useUsers } from "@hooks/use-users";
 import { getStatus } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
@@ -16,6 +17,7 @@ export const EvaluationPage = () => {
 
     const { data: evaluation } = useEvaluation(Number(id));
     const { mutate: register, isPending: isRegisterPending } = useRegister();
+    const { mutate: unregister, isPending: isUnregisterPending } = useUnregister();
     const { data: currentUser } = useCurrentUser();
     const { data: users } = useUsers(evaluation?.id);
     const { data: groups } = useGroups(evaluation?.id);
@@ -119,16 +121,16 @@ export const EvaluationPage = () => {
                     </div>
                     <div className="flex w-full justify-center">
                         <Button
-                            disabled={isRegisterPending || isRegistered}
+                            disabled={isUnregisterPending}
                             onClick={() => {
-                                register(evaluation!.id);
+                                if (window.confirm("Are you sure you want to unregister?")) {
+                                    unregister(evaluation!.id);
+                                }
                             }}
                         >
-                            {isRegisterPending
-                                ? "Registering..."
-                                : isRegistered
-                                  ? "Registered"
-                                  : "Register"}
+                            {isUnregisterPending
+                                ? "Unregistering..."
+                                : "Unregister"}
                         </Button>
                     </div>
                 </div>
