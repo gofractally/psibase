@@ -61,7 +61,7 @@ export const App = () => {
         try {
             await supervisor.functionCall({
                 service: thisServiceName,
-                intf: "api",
+                intf: "admin",
                 method: "savePermission",
                 params: [validPermRequest?.caller, validPermRequest?.callee],
             });

@@ -34,7 +34,6 @@ export class ActiveOauthRequest {
         }
 
         let isExpired = (Math.floor(new Date().getTime() / 1000) >= oauthReq.expiry_timestamp);
-        console.info("Request.get(): Remaining time before expiry: ", oauthReq.expiry_timestamp - Math.floor(new Date().getTime() / 1000));
         if (isExpired) {
             await this.delete();
             throw new Error("Oauth request expired");

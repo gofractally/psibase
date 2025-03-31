@@ -2,14 +2,6 @@ package permissions:plugin;
 
 interface api {
     use host:common/types.{error};
-    /// @description Save a permission granting a `caller` access to the privileged methods of `callee`.
-    /// @param caller The caller, requesting access
-    /// @param callee The callee, with the privileged methods
-    save-permission: func(caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
-}
-
-interface users {
-    use host:common/types.{error};
     /// @description Check if the caller is permitted access to `callee`'s privileged methods
     /// and if not already, prompt user to request such access.
     /// @param caller The caller, requesting access
@@ -21,5 +13,4 @@ interface users {
 
 world imports {
     import api;
-    import users;
 }

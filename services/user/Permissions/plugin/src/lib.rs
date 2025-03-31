@@ -2,7 +2,7 @@
 mod bindings;
 
 use authority::verify_caller_is_this_app;
-use bindings::exports::permissions::plugin::{api::Guest as Api, users::Guest as UsersApi};
+use bindings::exports::permissions::plugin::{admin::Guest as PermsAdmin, api::Guest as Api};
 use bindings::host::common::{client as HostClient, types::Error};
 
 mod authority;
@@ -12,14 +12,14 @@ use db::AccessGrants;
 
 struct PermissionsPlugin;
 
-impl Api for PermissionsPlugin {
+impl PermsAdmin for PermissionsPlugin {
     fn save_permission(caller: String, callee: String) -> Result<(), Error> {
         verify_caller_is_this_app()?;
         Ok(AccessGrants::set(&caller, &callee))
     }
 }
 
-impl UsersApi for PermissionsPlugin {
+impl Api for PermissionsPlugin {
     fn is_auth_or_prompt(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
 

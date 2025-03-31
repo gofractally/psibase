@@ -238,7 +238,6 @@ export class PluginHost implements HostInterface {
             subpath: subpath,
             expiry_timestamp: Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION,
         });
-        console.info("setActiveUserPrompt().expiry_timestamp:", Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION);
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
