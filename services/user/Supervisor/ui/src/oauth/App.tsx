@@ -33,15 +33,12 @@ export const App = () => {
 
         try {
             const oauthReqUnchecked = await ActiveOauthRequest.get(oauth_id);
-            const oauthReq = OauthRequestSchema.safeParse(oauthReqUnchecked);
-            if (oauthReq.success) {
-                setIframeUrl(buildIframeUrl(oauthReq.data));
-                ActiveOauthRequest.delete();
-            } else {
-                setError("OAuth request error: Invalid payload");
-            }
+            const oauthReq = OauthRequestSchema.parse(oauthReqUnchecked);
+            setIframeUrl(buildIframeUrl(oauthReq));
         } catch (e) {
             setError("OAuth request error: " + e);
+        } finally {
+            await ActiveOauthRequest.delete();
         }
     }, []);
 

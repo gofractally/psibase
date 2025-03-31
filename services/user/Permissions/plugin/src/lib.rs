@@ -27,8 +27,11 @@ impl UsersApi for PermissionsPlugin {
         if perms_pref.is_some() {
             Ok(true)
         } else {
-            let user_prompt_payload =
-                format!("{{\"caller\":\"{}\",\"callee\":\"{}\"}}", caller, callee);
+            let user_prompt_payload = serde_json::json!({
+                "caller": caller,
+                "callee": callee
+            })
+            .to_string();
             HostClient::prompt_user(Some("/permissions.html"), Some(&user_prompt_payload))?;
             unreachable!();
         }

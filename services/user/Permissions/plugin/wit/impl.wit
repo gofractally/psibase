@@ -3,6 +3,7 @@ package permissions:plugin;
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
+    include accounts:plugin/imports;
 
     export api;
     export users;

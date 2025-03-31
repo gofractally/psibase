@@ -13,8 +13,6 @@ export const App = () => {
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const initApp = useCallback(async () => {
-        await supervisor.onLoaded();
-
         let permReqPayload;
         try {
             permReqPayload = await ActivePermsOauthRequest.get();
@@ -76,11 +74,11 @@ export const App = () => {
             console.error("error saving permission: ", e);
             throw e;
         }
-        ActivePermsOauthRequest.delete();
+        await ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };
-    const deny = () => {
-        ActivePermsOauthRequest.delete();
+    const deny = async () => {
+        await ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };
     const getQueryParams = () => {

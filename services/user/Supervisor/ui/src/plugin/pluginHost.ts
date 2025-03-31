@@ -9,7 +9,7 @@ import { Supervisor } from "../supervisor";
 import { OriginationData, QualifiedOriginationData } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
-import { OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
+import { OAUTH_REQUEST_EXPIRATION, OAUTH_REQUEST_KEY, REDIRECT_ERROR_CODE } from "../constants";
 import { z } from "zod";
 
 interface HttpRequest {
@@ -26,7 +26,7 @@ interface HttpResponse {
 }
 
 const SupervisorPromptPayload = z.object({
-    id: z.string().uuid(),
+    id: z.string(),
     subdomain: z.string().nonempty(),
     subpath: z.string(),
     expiry_timestamp: z.number(),
@@ -236,8 +236,9 @@ export class PluginHost implements HostInterface {
             id: up_id,
             subdomain: this.self.app,
             subpath: subpath,
-            expiry_timestamp: Math.floor(new Date().getTime() / 1000),
+            expiry_timestamp: Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION,
         });
+        console.info("setActiveUserPrompt().expiry_timestamp:", Math.floor(new Date().getTime() / 1000) + OAUTH_REQUEST_EXPIRATION);
         this.supervisor.supervisorCall({
             service: "clientdata",
             plugin: "plugin",
@@ -247,7 +248,7 @@ export class PluginHost implements HostInterface {
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
             JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
-        // In Permissions (or an app-handling-its-own-permissions') localStorage space, save id and payload
+        // In app localStorage space, save id and payload
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
         parsedUpPayload.id = up_id;
 
