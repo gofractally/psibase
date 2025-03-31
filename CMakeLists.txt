@@ -728,6 +728,7 @@ psibase_package(
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
+        SERVER r-invite
         INIT
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     SERVICE auth-invite
