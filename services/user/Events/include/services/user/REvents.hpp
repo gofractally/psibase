@@ -19,5 +19,6 @@ namespace UserService
       std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest&);
    };
    PSIO_REFLECT(REvents, method(sqlQuery, query), method(serveSys, request))
+   PSIBASE_REFLECT_TABLES(REvents)
 
 }  // namespace UserService

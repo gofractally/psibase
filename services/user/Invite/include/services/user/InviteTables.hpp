@@ -28,11 +28,10 @@ namespace UserService
       struct NextInviteId
       {
          uint32_t nextInviteId;
-
-         auto primary() const { return psibase::SingletonKey{}; }
       };
       PSIO_REFLECT(NextInviteId, nextInviteId);
-      using NextInviteIdTable = psibase::Table<NextInviteId, &NextInviteId::primary>;
+      using NextInviteIdTable = psibase::Table<NextInviteId, psibase::SingletonKey{}>;
+      PSIO_REFLECT_TYPENAME(NextInviteIdTable)
 
       /// An invite object
       struct InviteRecord
@@ -75,12 +74,11 @@ namespace UserService
          /// Encrypted invite secret
          std::optional<std::string> secret;
 
-         auto byInviter() const { return std::tie(inviter, inviteId); }
-         auto byId2() const { return std::tie(secondaryId, inviteId); }
-         auto byPubkey() const
-         {
-            return std::tuple{SystemService::AuthSig::keyFingerprint(pubkey), inviteId};
-         }
+         using ByInviter = psibase::CompositeKey<&InviteRecord::inviter, &InviteRecord::inviteId>;
+         using ById2 = psibase::CompositeKey<&InviteRecord::secondaryId, &InviteRecord::inviteId>;
+         using ByPubkey =
+             psibase::CompositeKey<psibase::NestedKey<&InviteRecord::pubkey, &Spki::fingerprint>{},
+                                   &InviteRecord::inviteId>;
       };
       PSIO_REFLECT(InviteRecord,
                    inviteId,
@@ -96,9 +94,10 @@ namespace UserService
                    secret);
       using InviteTable = psibase::Table<InviteRecord,
                                          &InviteRecord::inviteId,
-                                         &InviteRecord::byInviter,
-                                         &InviteRecord::byId2,
-                                         &InviteRecord::byPubkey>;
+                                         InviteRecord::ByInviter{},
+                                         InviteRecord::ById2{},
+                                         InviteRecord::ByPubkey{}>;
+      PSIO_REFLECT_TYPENAME(InviteTable)
 
       struct NewAccountRecord
       {
@@ -107,6 +106,7 @@ namespace UserService
       };
       PSIO_REFLECT(NewAccountRecord, name, inviter);
       using NewAccTable = psibase::Table<NewAccountRecord, &NewAccountRecord::name>;
+      PSIO_REFLECT_TYPENAME(NewAccTable)
 
    }  // namespace InviteNs
 }  // namespace UserService

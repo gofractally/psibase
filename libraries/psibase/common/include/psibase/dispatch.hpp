@@ -127,6 +127,8 @@ namespace psibase
 
 }  // namespace psibase
 
+#ifndef PSIBASE_GENERATE_SCHEMA
+
 // TODO: prevent recursion, but allow opt-in
 #define PSIBASE_DISPATCH(SERVICE)                                                         \
    extern "C" void called(psibase::AccountNumber receiver, psibase::AccountNumber sender) \
@@ -138,4 +140,54 @@ namespace psibase
    {                                                                                      \
       __wasm_call_ctors();                                                                \
    }
-\
+
+#else
+
+#include <iostream>
+#include <psibase/schema.hpp>
+
+namespace psibase
+{
+   template <typename Service>
+   int serviceMain(int argc, const char* const* argv)
+   {
+      bool schema = false;
+      for (int i = 1; i < argc; ++i)
+      {
+         std::string_view arg = argv[i];
+         if (arg == "--schema")
+         {
+            schema = true;
+         }
+         else
+         {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            return 1;
+         }
+      }
+      if (schema)
+      {
+         AccountNumber service = {};
+         if constexpr (requires { Service::service; })
+         {
+            service = Service::service;
+         }
+         std::cout << psio::convert_to_json(ServiceSchema::make<Service>(service));
+      }
+      else
+      {
+         std::cerr << "Missing command" << std::endl;
+         return 1;
+      }
+      return 0;
+   }
+}  // namespace psibase
+
+#define PSIBASE_DISPATCH(SERVICE)                         \
+   int main(int argc, const char* const* argv)            \
+   {                                                      \
+      return ::psibase::serviceMain<SERVICE>(argc, argv); \
+   }                                                      \
+   extern "C" void called(psibase::AccountNumber receiver, psibase::AccountNumber sender) {}
+
+#endif

@@ -18,5 +18,6 @@ class MockCpuLimit : public psibase::Service
    void                     setCpuLimit(psibase::AccountNumber account) {}
 };
 PSIO_REFLECT(MockCpuLimit, method(getCpuTime), method(setCpuLimit, account))
+PSIBASE_REFLECT_TABLES(MockCpuLimit)
 
 PSIBASE_DISPATCH(MockCpuLimit)

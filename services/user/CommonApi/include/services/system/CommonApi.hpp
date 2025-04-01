@@ -32,5 +32,6 @@ namespace SystemService
    PSIO_REFLECT(CommonApi,
       method(serveSys, request),
    )
+   PSIBASE_REFLECT_TABLES(CommonApi)
    // clang-format on
 }  // namespace SystemService

@@ -16,7 +16,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "profiles")]
+#[psibase::service(name = "profiles", tables = "tables")]
 pub mod service {
     use crate::tables::{Profile, ProfileTable};
     use psibase::*;
