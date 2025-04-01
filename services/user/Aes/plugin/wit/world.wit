@@ -26,6 +26,14 @@ interface with-password {
     decrypt: func(password: list<u8>, encrypted: list<u8>, salt: string) -> result<list<u8>, error>;
 }
 
+interface with-key {
+    use host:common/types.{error};
+    encrypt: func(key: list<u8>, data: list<u8>) -> list<u8>;
+    decrypt: func(key: list<u8>, cipher: list<u8>) -> result<list<u8>, error>;
+
+}
+
 world imports {
     import with-password;
+    import with-key;
 }
