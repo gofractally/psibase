@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import { useAppForm } from "./app-form";
 import { humanize } from "@lib/humanize";
+import { NumbersField } from "./numbers-field";
 
 dayjs.extend(duration);
 
@@ -26,11 +27,17 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
             deliberation: deliberation.toDate(),
             submission: submission.toDate(),
             finishBy: finishBy.toDate(),
+            allowableGroupSizes: [1, 2, 3, 4, 5, 6],
         },
         validators: {
             onSubmitAsync: async (data) => {
-                const { registration, deliberation, submission, finishBy } =
-                    data.value;
+                const {
+                    registration,
+                    deliberation,
+                    submission,
+                    finishBy,
+                    allowableGroupSizes,
+                } = data.value;
 
                 try {
                     await createEvaluation({
@@ -38,7 +45,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         finishBy: dayjs(finishBy).unix(),
                         registration: dayjs(registration).unix(),
                         submission: dayjs(submission).unix(),
-                        allowableGroupSizes: [4, 5, 6],
+                        allowableGroupSizes,
                     });
                 } catch (error) {
                     console.error(error);
@@ -165,6 +172,13 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                                 ),
                             )}
                         />
+                    )}
+                />
+
+                <form.AppField
+                    name="allowableGroupSizes"
+                    children={(field) => (
+                        <NumbersField label="Allowable Group Sizes" />
                     )}
                 />
                 <form.AppForm>

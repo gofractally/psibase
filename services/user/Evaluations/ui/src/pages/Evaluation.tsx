@@ -9,22 +9,33 @@ import { useUsers } from "@hooks/use-users";
 import { getStatus } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
+import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useInterval } from "usehooks-ts";
 
 export const EvaluationPage = () => {
     const { id } = useParams();
 
-    const { data: evaluation } = useEvaluation(Number(id));
+    const [derp, setDerp] = useState<number>(0);
+    const { data: evaluation, error: evaluationError } = useEvaluation(
+        Number(id),
+    );
     const { mutate: register, isPending: isRegisterPending } = useRegister();
-    const { mutate: unregister, isPending: isUnregisterPending } = useUnregister();
+    const { mutate: unregister, isPending: isUnregisterPending } =
+        useUnregister();
     const { data: currentUser } = useCurrentUser();
-    const { data: users } = useUsers(evaluation?.id);
-    const { data: groups } = useGroups(evaluation?.id);
+    const { data: users, error: usersError } = useUsers(evaluation?.id);
+    const { data: groups, error: groupsError } = useGroups(evaluation?.id);
     const {
         mutateAsync: startEvaluation,
         isPending: isStartEvaluationPending,
     } = useStartEvaluation();
+
+    useInterval(() => {
+        setDerp(derp + 1);
+    }, 1000);
 
     const {
         mutateAsync: closeEvaluation,
@@ -44,6 +55,27 @@ export const EvaluationPage = () => {
         currentUser &&
         groups &&
         getStatus(evaluation, currentUser, users, groups);
+
+    console.log({
+        status,
+        evaluation,
+        groups,
+        evaluationError,
+        groupsError,
+        usersError,
+    });
+
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (
+            status &&
+            (status.type === "deliberationPendingAsParticipant" ||
+                status.type == "userMustSubmit")
+        ) {
+            navigate(`/${id}/${status.groupNumber}`);
+        }
+    }, [status]);
 
     if (isNoUser) {
         return <div>You need to be logged in to access this page</div>;
@@ -98,6 +130,7 @@ export const EvaluationPage = () => {
                         <Button
                             disabled={isRegisterPending || isRegistered}
                             onClick={() => {
+                                console.log("calling register?");
                                 register(evaluation!.id);
                             }}
                         >
@@ -119,11 +152,21 @@ export const EvaluationPage = () => {
                             .unix(status.deliberationStarts)
                             .format("ddd MMM D, HH:mm")}
                     </div>
+                    <div>
+                        {humanize(
+                            dayjs.unix(status.deliberationStarts).diff(dayjs()),
+                        )}
+                    </div>
                     <div className="flex w-full justify-center">
                         <Button
                             disabled={isUnregisterPending}
+                            variant="outline"
                             onClick={() => {
-                                if (window.confirm("Are you sure you want to unregister?")) {
+                                if (
+                                    window.confirm(
+                                        "Are you sure you want to unregister?",
+                                    )
+                                ) {
                                     unregister(evaluation!.id);
                                 }
                             }}
@@ -165,17 +208,7 @@ export const EvaluationPage = () => {
                 <div>
                     <div>Deliberation</div>
                     <div>
-                        Deliberation is in progress, will be completed by{" "}
-                        {dayjs
-                            .unix(status.deliberationDeadline)
-                            .format("ddd MMM D, HH:mm")}
-                        (
-                        {humanize(
-                            dayjs
-                                .unix(status.deliberationDeadline)
-                                .diff(dayjs()),
-                        )}
-                        )
+                        Sending you to group number {status.groupNumber}...
                     </div>
                 </div>
             )}

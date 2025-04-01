@@ -6,7 +6,6 @@ import { Account } from "./zod/Account";
 import { User } from "./getUsers";
 import { Group, zGroup } from "./getGroups";
 
-
 const zTimeStatus = z.enum([
     "pending",
     "registration",
@@ -15,7 +14,10 @@ const zTimeStatus = z.enum([
     "finished",
 ]);
 
-const getTimeStatus = (evaluation: Evaluation, currentTime: number): z.infer<typeof zTimeStatus> => {
+const getTimeStatus = (
+    evaluation: Evaluation,
+    currentTime: number,
+): z.infer<typeof zTimeStatus> => {
     if (currentTime >= evaluation.finishBy) {
         return zTimeStatus.Values.finished;
     }
@@ -30,7 +32,6 @@ const getTimeStatus = (evaluation: Evaluation, currentTime: number): z.infer<typ
     }
     return zTimeStatus.Values.pending;
 };
-
 
 const Unix = z.number();
 
@@ -81,13 +82,13 @@ const AwaitingEvaluationStart = z.object({
 const AwaitingUserSubmission = z.object({
     type: z.literal(Types.UserMustSubmit),
     submissionDeadline: Unix,
-    groupNumber: z.number()
+    groupNumber: z.number(),
 });
 
 const CanWatchResults = z.object({
     type: z.literal(Types.CanWatchResults),
     submissionDeadline: Unix,
-    groups: zGroup.array()
+    groups: zGroup.array(),
 });
 
 const EvaluationNotStartedInTime = z.object({
@@ -95,26 +96,23 @@ const EvaluationNotStartedInTime = z.object({
     userShouldDelete: z.boolean(),
 });
 
-
-
-const zStatus = z.discriminatedUnion("type",
-    [
-        Pending,
-        RegistrationAvailable,
-        Registered,
-        DeliberationPendingParticipant,
-        DeliberationPendingSpectator,
-        AwaitingEvaluationStart,
-        AwaitingUserSubmission,
-        CanWatchResults,
-        EvaluationNotStartedInTime,
-    ]);
+const zStatus = z.discriminatedUnion("type", [
+    Pending,
+    RegistrationAvailable,
+    Registered,
+    DeliberationPendingParticipant,
+    DeliberationPendingSpectator,
+    AwaitingEvaluationStart,
+    AwaitingUserSubmission,
+    CanWatchResults,
+    EvaluationNotStartedInTime,
+]);
 
 export const getStatus = (
     evaluation: Evaluation,
     currentUser: Account,
     users: User[],
-    groups: Group[]
+    groups: Group[],
 ): z.infer<typeof zStatus> => {
     const currentTime = dayjs().unix();
     const timeStatus = getTimeStatus(evaluation, currentTime);
@@ -139,9 +137,8 @@ export const getStatus = (
                 deliberationStarts: evaluation.deliberationStarts,
             });
         }
-
     } else if (timeStatus == zTimeStatus.Values.deliberation) {
-        const awaitingStart = users.some((user) => !user.groupNumber)
+        const awaitingStart = users.some((user) => !user.groupNumber);
         if (awaitingStart) {
             return AwaitingEvaluationStart.parse({
                 type: Types.AwaitingEvaluationStart,
@@ -162,8 +159,10 @@ export const getStatus = (
                 deliberationDeadline: evaluation.submissionStarts,
             });
         }
-    } else if (timeStatus == zTimeStatus.Values.submission || timeStatus == zTimeStatus.Values.finished) {
-
+    } else if (
+        timeStatus == zTimeStatus.Values.submission ||
+        timeStatus == zTimeStatus.Values.finished
+    ) {
         // is not a member and just watching
         // is group called?
         // is a member and already submitted
@@ -171,28 +170,50 @@ export const getStatus = (
 
         const user = users.find((user) => user.user === currentUser);
         if (user) {
-            const group = groups.find((group) => group.number === user.groupNumber);
+            const group = groups.find(
+                (group) => group.number === user.groupNumber,
+            );
             if (!group) {
                 return EvaluationNotStartedInTime.parse({
                     type: Types.EvaluationNotStartedInTime,
                     userShouldDelete: isOwner,
-                })
+                });
             }
             if (group.result) {
-                return CanWatchResults.parse({ type: Types.CanWatchResults, groups })
+                return CanWatchResults.parse({
+                    type: Types.CanWatchResults,
+                    groups,
+                    submissionDeadline: evaluation.finishBy,
+                });
             } else {
-                // figure out if the user has attested or not. 
+                // figure out if the user has attested or not.
+                const userState = users.find(
+                    (user) => user.user === currentUser,
+                );
 
-                throw new Error("Not implemented");
+                if (!userState) throw new Error("User not found");
+
+                if (userState.submission && userState.submission.length > 0) {
+                    return CanWatchResults.parse({
+                        type: Types.CanWatchResults,
+                        groups,
+                        submissionDeadline: evaluation.finishBy,
+                    });
+                } else {
+                    return AwaitingUserSubmission.parse({
+                        type: Types.UserMustSubmit,
+                        submissionDeadline: evaluation.finishBy,
+                        groupNumber: group.number,
+                    });
+                }
             }
         } else {
             return CanWatchResults.parse({
                 type: Types.CanWatchResults,
-                groups
-            })
+                groups,
+                submissionDeadline: evaluation.finishBy,
+            });
         }
-
-
     } else {
         throw new Error("Invalid status calculation");
     }

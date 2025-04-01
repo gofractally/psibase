@@ -47,9 +47,6 @@ export const useCreateEvaluation = () => {
             } = Params.parse(params);
             const lastId = await getLastId();
 
-            const updatedGroupSize = Object.fromEntries(
-                allowableGroupSizes.map((size, index) => [index, size]),
-            );
             const pars = {
                 method: "create",
                 service: "evaluations",
@@ -59,11 +56,9 @@ export const useCreateEvaluation = () => {
                     deliberation,
                     submission,
                     finishBy,
-                    updatedGroupSize,
+                    allowableGroupSizes.map((size) => size.toString()),
                 ],
             };
-
-            console.log(pars, "are pars");
 
             void (await getSupervisor().functionCall(pars));
             await wait(2000);
@@ -73,6 +68,7 @@ export const useCreateEvaluation = () => {
                 queryKey: ["evaluation", newId],
                 queryFn: () => getEvaluation(newId),
             });
+            console.log(res, "is res");
             return res.id;
         },
         onSuccess: (id) => {

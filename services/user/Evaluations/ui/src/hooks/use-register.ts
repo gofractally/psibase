@@ -3,6 +3,11 @@ import { zUser } from "@lib/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
+import { PrivateKey } from "eciesjs";
+import { Buffer } from "buffer";
+import { storeAsymmetricKey } from "@lib/keys";
+
+globalThis.Buffer = Buffer;
 
 export const useRegister = () => {
     const { data: currentUser } = useCurrentUser();
@@ -11,11 +16,20 @@ export const useRegister = () => {
             if (!currentUser) {
                 throw new Error("User not found");
             }
+
+            const privateKey = new PrivateKey();
+            const publicKey = privateKey.publicKey.toHex();
+
+            console.log({ privateKey, publicKey }, "key pair for registration");
+            const secret = privateKey.secret.toString("base64");
+
+            storeAsymmetricKey(id, secret);
+
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: "evaluations",
                 intf: "api",
-                params: [id],
+                params: [id, publicKey],
             }));
 
             queryClient.setQueryData(["users", id], (data: unknown) => {
@@ -30,6 +44,9 @@ export const useRegister = () => {
 
                 return zUser.array().parse([...users, newUser]);
             });
+        },
+        onError(error) {
+            console.error(error, "is error");
         },
     });
 };
