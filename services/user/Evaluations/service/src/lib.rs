@@ -25,6 +25,21 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn cancel(id: u32) {
+        let evaluation = Evaluation::get(id);
+        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
+
+        let sender = get_sender();
+        check(
+            evaluation.owner == sender,
+            "only the owner can cancel the evaluation",
+        );
+
+        evaluation.delete();
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn create(
         registration: u32,
         deliberation: u32,
@@ -35,6 +50,16 @@ pub mod service {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
+        );
+
+        check(
+            allowable_group_sizes.len() > 0,
+            "allowable group sizes must be at least 1",
+        );
+
+        check(
+            allowable_group_sizes.iter().all(|size| *size > 0),
+            "allowable group sizes must be greater than 0",
         );
 
         let new_evaluation = Evaluation::new(
@@ -56,6 +81,13 @@ pub mod service {
     fn getEvaluation(id: u32) -> Option<Evaluation> {
         let evaluation = Evaluation::get(id);
         Some(evaluation)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getGroup(id: u32, group_number: u32) -> Option<Group> {
+        let evaluation = Evaluation::get(id);
+        evaluation.get_group(group_number)
     }
 
     #[action]
@@ -85,6 +117,25 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getUser(id: u32, user: AccountNumber) -> Option<User> {
+        let user = User::get(id, user);
+        Some(user)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getGroupUsers(id: u32, group_number: u32) -> Vec<User> {
+        let evaluation = Evaluation::get(id);
+        evaluation
+            .get_users()
+            .iter()
+            .filter(|user| user.group_number == Some(group_number))
+            .map(|user| user.clone())
+            .collect()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn start(id: u32, entropy: u64) {
         let evaluation = Evaluation::get(id);
 
@@ -98,12 +149,18 @@ pub mod service {
             "groups have already been created",
         );
 
-        // return;
         let mut users_to_process = evaluation.get_users();
 
         helpers::shuffle_vec(&mut users_to_process, entropy);
 
         let chunked_groups = helpers::spread_users(&users_to_process, &evaluation);
+
+        check(
+            chunked_groups.is_some(),
+            "unable to spread users into groups",
+        );
+
+        let chunked_groups = chunked_groups.unwrap();
 
         for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
             let group_number: u32 = (index as u32) + 1;
@@ -150,11 +207,12 @@ pub mod service {
     #[allow(non_snake_case)]
     fn close(id: u32) {
         let evaluation = Evaluation::get(id);
+
+        // TODO: Wait until close phase or delete at any time?
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Closed);
 
-        let sender = get_sender();
         check(
-            evaluation.owner == sender,
+            evaluation.owner == get_sender(),
             "only the owner can close the evaluation",
         );
 
@@ -211,7 +269,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn register(id: u32) {
+    fn register(id: u32, key: String) {
         let evaluation = Evaluation::get(id);
 
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
@@ -222,7 +280,7 @@ pub mod service {
             "user is not allowed to register",
         );
 
-        let user = User::new(evaluation.id, get_sender());
+        let user = User::new(evaluation.id, get_sender(), key);
         user.save();
     }
 

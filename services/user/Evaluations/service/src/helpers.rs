@@ -117,23 +117,23 @@ pub fn chunk_users(users: &Vec<User>, chunk_sizes: Vec<u8>) -> Vec<Vec<User>> {
     groups
 }
 
-pub fn spread_users(users_to_process: &Vec<User>, evaluation: &Evaluation) -> Vec<Vec<User>> {
-    // 4, 5, 6
-    let allowable_group_sizes = evaluation
-        .allowable_group_sizes
-        .iter()
-        .map(|size| *size as u32)
-        .collect();
+pub fn spread_users(
+    users_to_process: &Vec<User>,
+    evaluation: &Evaluation,
+) -> Option<Vec<Vec<User>>> {
+    let chunk_sizes = psibase::services::subgroups::Wrapper::call().gmp(
+        users_to_process.len() as u32,
+        evaluation
+            .allowable_group_sizes
+            .iter()
+            .map(|&size| size as u32)
+            .collect(),
+    )?;
 
-    // 6, 6, 6, 6, 5, 4
-    let chunk_sizes = psibase::services::subgroups::Wrapper::call()
-        .gmp(users_to_process.len() as u32, allowable_group_sizes)
-        .unwrap()
-        .iter()
-        .map(|size| *size as u8)
-        .collect();
-
-    chunk_users(&users_to_process, chunk_sizes)
+    Some(chunk_users(
+        users_to_process,
+        chunk_sizes.into_iter().map(|size| size as u8).collect(),
+    ))
 }
 
 pub fn calculate_results(attestations: Vec<Option<Vec<AccountNumber>>>) -> GroupResult {

@@ -39,6 +39,7 @@ pub mod tables {
         pub user: AccountNumber,
         pub group_number: Option<u32>,
         pub proposal: Option<Vec<u8>>,
+        pub key: String,
 
         // Change this to a hash and change field name to attestation
         pub submission: Option<Vec<AccountNumber>>,
@@ -50,13 +51,14 @@ pub mod tables {
             (self.evaluation_id, self.user)
         }
 
-        pub fn new(evaluation_id: u32, user: AccountNumber) -> Self {
+        pub fn new(evaluation_id: u32, user: AccountNumber, key: String) -> Self {
             Self {
                 evaluation_id,
                 user,
                 group_number: None,
                 proposal: None,
                 submission: None,
+                key,
             }
         }
 
@@ -119,6 +121,12 @@ pub mod tables {
                 .get_index_pk()
                 .range((self.id, 0)..=(self.id, u32::MAX))
                 .collect();
+            result
+        }
+
+        pub fn get_group(&self, group_number: u32) -> Option<Group> {
+            let table = GroupTable::new();
+            let result = table.get_index_pk().get(&(self.id, group_number));
             result
         }
 

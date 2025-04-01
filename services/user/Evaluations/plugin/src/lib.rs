@@ -19,8 +19,12 @@ impl Api for EvaluationsPlugin {
         deliberation: u32,
         submission: u32,
         finish_by: u32,
-        allowable_group_sizes: Vec<u8>,
+        group_sizes: Vec<String>,
     ) -> Result<(), Error> {
+        let allowable_group_sizes = group_sizes
+            .iter()
+            .map(|s| s.parse::<u8>().unwrap())
+            .collect();
         let packed_args = evaluations::action_structs::create {
             registration,
             deliberation,
@@ -32,8 +36,8 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("create", &packed_args)
     }
 
-    fn register(id: u32) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::register { id }.packed();
+    fn register(id: u32, key: String) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::register { id, key }.packed();
         add_action_to_transaction("register", &packed_args)
     }
 

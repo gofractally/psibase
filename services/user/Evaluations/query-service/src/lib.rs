@@ -22,8 +22,20 @@ mod service {
             evaluations::Wrapper::call().getGroups(id)
         }
 
+        async fn get_group(&self, id: u32, group_number: u32) -> Option<Group> {
+            evaluations::Wrapper::call().getGroup(id, group_number)
+        }
+
+        async fn get_group_users(&self, id: u32, group_number: u32) -> Vec<User> {
+            evaluations::Wrapper::call().getGroupUsers(id, group_number)
+        }
+
         async fn get_users(&self, id: u32) -> Vec<User> {
             evaluations::Wrapper::call().getUsers(id)
+        }
+
+        async fn get_user(&self, id: u32, user: AccountNumber) -> Option<User> {
+            evaluations::Wrapper::call().getUser(id, user)
         }
     }
 
