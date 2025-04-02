@@ -26,7 +26,6 @@ mod tables {
 mod service {
     use crate::tables::{Answer, AnswerTable};
     use async_graphql::{connection::Connection, *};
-    use psibase::services::events::Wrapper as EventsSvc;
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -49,9 +48,7 @@ mod service {
     }
 
     #[action]
-    pub fn init() {
-        EventsSvc::call().setSchema(create_schema::<Wrapper>());
-    }
+    pub fn init() {}
 
     #[action]
     pub fn add(a: i32, b: i32) -> i32 {
