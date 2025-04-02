@@ -17,5 +17,6 @@ psibase_package(
     VERSION 1.0.0
     DESCRIPTION "An example service with the minimal UI"
     SERVICE example
-    TARGET example
+        TARGET example
+        SERVER example
 )

@@ -203,6 +203,9 @@ struct DeployArgs {
     /// Filename containing the service
     filename: String,
 
+    /// Filename containing the schema
+    schema: PathBuf,
+
     /// Create the account if it doesn't exist. Also set the account to
     /// authenticate using this key, even if the account already existed.
     #[clap(short = 'c', long, value_name = "KEY")]
@@ -569,6 +572,10 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
+    let schema: psibase::Schema = serde_json::from_slice(
+        &std::fs::read(&args.schema)
+            .with_context(|| format!("Can not read {}", args.schema.display()))?,
+    )?;
 
     let mut actions: Vec<Action> = Vec::new();
 
@@ -597,6 +604,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     }
 
     actions.push(set_code_action(args.account.into(), wasm));
+    actions.push(packages::Wrapper::pack_from(args.account.into()).setSchema(schema));
 
     if args.register_proxy {
         actions.push(reg_server(args.account.into(), args.account.into()));
