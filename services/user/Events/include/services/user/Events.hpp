@@ -51,8 +51,6 @@ namespace UserService
       static constexpr psibase::AccountNumber service{"events"};
       static constexpr auto                   serviceFlags =
           psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
-      /// Sets the schema associated with a service.
-      void setSchema(const psibase::ServiceSchema& schema);
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
       /// Indexes increase the CPU cost of transactions that create events.
@@ -72,7 +70,6 @@ namespace UserService
    };
    PSIO_REFLECT(EventIndex,
                 method(init),
-                method(setSchema, schema),
                 method(addIndex, db, service, event, column),
                 method(sync),
                 method(onBlock))

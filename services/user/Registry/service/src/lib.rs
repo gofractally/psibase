@@ -52,7 +52,6 @@ pub mod service {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
 
-        EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(
             DbId::HistoryEvent,
             SERVICE,

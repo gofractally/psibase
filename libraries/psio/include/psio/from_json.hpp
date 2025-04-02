@@ -6,6 +6,7 @@
 #include <optional>
 #include <psio/check.hpp>
 #include <psio/reflect.hpp>
+#include <psio/untagged.hpp>
 #include <system_error>
 #include <tuple>
 #include <variant>
@@ -378,19 +379,42 @@ namespace psio
          set_variant_impl<N + 1>(result, type);
    }
 
+   template <typename T, typename V, typename S>
+   bool from_json_untagged_variant_impl(V& v, S& stream)
+   {
+      if constexpr (psio_is_untagged(static_cast<T*>(nullptr)))
+      {
+         from_json(v.template emplace<T>(), stream);
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+
    /// \group from_json_explicit
    template <typename... T, typename S>
    void from_json(std::variant<T...>& result, S& stream)
    {
-      stream.get_start_object();
-      std::string_view  type         = stream.get_key();
-      const char* const type_names[] = {get_type_name((T*)nullptr)...};
-      uint32_t type_idx = std::find(type_names, type_names + sizeof...(T), type) - type_names;
-      if (type_idx >= sizeof...(T))
-         abort_error(from_json_error::invalid_type_for_variant);
-      set_variant_impl(result, type_idx);
-      std::visit([&](auto& x) { from_json(x, stream); }, result);
-      stream.get_end_object();
+      if (stream.peek_token().get().type == json_token_type::type_start_object)
+      {
+         stream.get_start_object();
+         std::string_view  type         = stream.get_key();
+         const char* const type_names[] = {get_type_name((T*)nullptr)...};
+         uint32_t type_idx = std::find(type_names, type_names + sizeof...(T), type) - type_names;
+         if (type_idx >= sizeof...(T))
+            abort_error(from_json_error::invalid_type_for_variant);
+         set_variant_impl(result, type_idx);
+         std::visit([&](auto& x) { from_json(x, stream); }, result);
+         stream.get_end_object();
+      }
+      else
+      {
+         bool okay = (from_json_untagged_variant_impl<T>(result, stream) || ...);
+         if (!okay)
+            abort_error(from_json_error::expected_variant);
+      }
    }
 
    /**

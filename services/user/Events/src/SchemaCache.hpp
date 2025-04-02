@@ -1,13 +1,13 @@
 #pragma once
 
 #include <map>
-#include <services/user/EventsTables.hpp>
+#include <services/user/Packages.hpp>
 
 namespace UserService
 {
    struct SchemaCache
    {
-      explicit SchemaCache(ServiceSchemaTable table);
+      explicit SchemaCache(InstalledSchemaTable table);
       const psio::schema_types::CompiledType* getSchemaType(psibase::DbId          db,
                                                             psibase::AccountNumber service,
                                                             psibase::MethodNumber  event);
@@ -15,12 +15,12 @@ namespace UserService
       struct CacheEntry
       {
          CacheEntry(const CacheEntry&) = delete;
-         CacheEntry(ServiceSchema&& schema);
-         ServiceSchema                      schema;
+         CacheEntry(psibase::ServiceSchema&& schema);
+         psibase::ServiceSchema             schema;
          psio::schema_types::CompiledSchema cschema;
       };
       static SchemaCache&                          instance();
-      ServiceSchemaTable                           table;
+      InstalledSchemaTable                         table;
       std::map<psibase::AccountNumber, CacheEntry> cache;
    };
 }  // namespace UserService

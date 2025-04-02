@@ -35,9 +35,6 @@ void Fractal::init()
    // Register with HttpServer
    to<SystemService::HttpServer>().registerServer(service);
 
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Fractal>());
-
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "identityAdded"_m, 0);
    to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "updated"_m, 0);

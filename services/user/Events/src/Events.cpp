@@ -14,12 +14,6 @@ using namespace psibase;
 using namespace psio::schema_types;
 using namespace UserService;
 
-void EventIndex::setSchema(const ServiceSchema& schema)
-{
-   check(getSender() == schema.service, "Wrong sender");
-   Events{}.open<ServiceSchemaTable>().put(schema);
-}
-
 void EventIndex::addIndex(psibase::DbId          db,
                           psibase::AccountNumber service,
                           psibase::MethodNumber  event,
