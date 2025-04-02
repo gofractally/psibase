@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@shadcn/button";
 
@@ -12,7 +12,7 @@ export const App = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [validPermRequest, setValidPermRequest] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
-    const initApp = useCallback(async () => {
+    const initApp = async () => {
         let permReqPayload;
         try {
             permReqPayload = await ActivePermsOauthRequest.get();
@@ -41,7 +41,7 @@ export const App = () => {
 
         setValidPermRequest(permReqPayload);
         setIsLoading(false);
-    }, []);
+    };
 
     useEffect(() => {
         initApp();
@@ -71,30 +71,38 @@ export const App = () => {
                     validPermRequest?.callee,
                 ],
             });
+            await ActivePermsOauthRequest.delete();
         } catch (e) {
             if (e instanceof Error) {
                 setError(e.message);
             } else {
                 setError("Unknown error saving permission");
             }
-            console.error("error saving permission: ", e);
             throw e;
         }
-        await ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };
     const deny = async () => {
-        await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "admin",
-            method: "delPerm",
-            params: [
-                validPermRequest?.user,
-                validPermRequest?.caller,
-                validPermRequest?.callee,
-            ],
-        });
-        await ActivePermsOauthRequest.delete();
+        try {
+            await supervisor.functionCall({
+                service: thisServiceName,
+                intf: "admin",
+                method: "delPerm",
+                params: [
+                    validPermRequest?.user,
+                    validPermRequest?.caller,
+                    validPermRequest?.callee,
+                ],
+            });
+            await ActivePermsOauthRequest.delete();
+        } catch (e) {
+            if (e instanceof Error) {
+                setError(e.message);
+            } else {
+                setError("Unknown error deleting permission");
+            }
+            throw e;
+        }
         followReturnRedirect();
     };
     const getQueryParams = () => {

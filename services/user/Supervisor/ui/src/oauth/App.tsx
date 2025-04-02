@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { siblingUrl } from "@psibase/common-lib";
-import { ActiveOauthRequest, OauthRequestSchema, OauthRequest } from "./db";
+import { ActiveOauthRequest, zOauthRequest, OauthRequest } from "./db";
 
 const buildIframeUrl = (promptUserReq: OauthRequest) => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -23,7 +23,7 @@ export const App = () => {
     const [iframeUrl, setIframeUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const initApp = useCallback(async () => {
+    const initApp = async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const oauth_id = urlParams.get("id");
         if (!oauth_id) {
@@ -33,14 +33,13 @@ export const App = () => {
 
         try {
             const oauthReqUnchecked = await ActiveOauthRequest.get(oauth_id);
-            const oauthReq = OauthRequestSchema.parse(oauthReqUnchecked);
+            const oauthReq = zOauthRequest.parse(oauthReqUnchecked);
             setIframeUrl(buildIframeUrl(oauthReq));
+            await ActiveOauthRequest.delete();
         } catch (e) {
             setError("OAuth request error: " + e);
-        } finally {
-            await ActiveOauthRequest.delete();
         }
-    }, []);
+    };
 
     useEffect(() => {
         initApp();

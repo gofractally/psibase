@@ -26,10 +26,10 @@ interface HttpResponse {
 }
 
 const SupervisorPromptPayload = z.object({
-    id: z.string(),
-    subdomain: z.string().nonempty(),
+    id: z.string().min(1),
+    subdomain: z.string().min(1),
     subpath: z.string(),
-    expiry_timestamp: z.number(),
+    expiry_timestamp: z.number().min(0),
 });
 
 type SupervisorPromptPayload = z.infer<typeof SupervisorPromptPayload>;
@@ -247,7 +247,7 @@ export class PluginHost implements HostInterface {
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
             JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
-        const currentUser = this.supervisor.supervisorCall({
+        const currentUser = this.supervisor.call(this.self, {
             service: "accounts",
             plugin: "plugin",
             intf: "api",

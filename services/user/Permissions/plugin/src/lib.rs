@@ -2,13 +2,14 @@
 mod bindings;
 
 use authority::verify_caller_is_this_app;
+use bindings::accounts::plugin::api as Accounts;
 use bindings::exports::permissions::plugin::{admin::Guest as PermsAdmin, api::Guest as Api};
 use bindings::host::common::{client as HostClient, types::Error};
 
 mod authority;
 mod db;
 mod errors;
-use db::{AccessGrants, ActiveOauthRequest};
+use db::AccessGrants;
 
 struct PermissionsPlugin;
 
@@ -38,11 +39,8 @@ impl Api for PermissionsPlugin {
 
     fn is_auth(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
-        // TODO: try this as a match block
-        match ActiveOauthRequest.get() {
-            Some(active_oauth_req) => {
-                Ok(AccessGrants::get(&active_oauth_req.user, &caller, &callee).is_some())
-            }
+        match Accounts::get_current_user()? {
+            Some(current_user) => Ok(AccessGrants::get(&current_user, &caller, &callee).is_some()),
             None => Ok(false),
         }
     }

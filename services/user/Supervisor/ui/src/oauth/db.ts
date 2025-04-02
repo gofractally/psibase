@@ -6,14 +6,14 @@ import { z } from 'zod';
 
 export const supervisor = getSupervisor();
 
-export const OauthRequestSchema = z.object({
-    id: z.string(),
-    subdomain: z.string(),
-    subpath: z.string(),
-    expiry_timestamp: z.number(),
+export const zOauthRequest = z.object({
+    id: z.string().min(1),
+    subdomain: z.string().min(1),
+    subpath: z.string().min(1),
+    expiry_timestamp: z.number().min(0),
 });
 
-export type OauthRequest = z.infer<typeof OauthRequestSchema>;
+export type OauthRequest = z.infer<typeof zOauthRequest>;
 
 export class ActiveOauthRequest {
     static async get(id: string): Promise<Result<OauthRequest, RecoverableErrorPayload>> {
@@ -27,7 +27,7 @@ export class ActiveOauthRequest {
             throw new Error("No active oauth request found");
         }
 
-        const oauthReq = OauthRequestSchema.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
+        const oauthReq = zOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
         if (id != oauthReq.id) {
             await this.delete();
             throw new Error("Oauth request id mismatch");
@@ -39,7 +39,7 @@ export class ActiveOauthRequest {
             throw new Error("Oauth request expired");
         }
 
-        return OauthRequestSchema.parse({
+        return zOauthRequest.parse({
             id: oauthReq.id,
             subdomain: oauthReq.subdomain,
             subpath: oauthReq.subpath,
