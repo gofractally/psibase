@@ -39,12 +39,12 @@ impl Api for PermissionsPlugin {
     fn is_auth(caller: String) -> Result<bool, Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
         // TODO: try this as a match block
-        let active_oauth_req_opt = ActiveOauthRequest.get();
-        if active_oauth_req_opt.is_none() {
-            return Ok(false);
+        match ActiveOauthRequest.get() {
+            Some(active_oauth_req) => {
+                Ok(AccessGrants::get(&active_oauth_req.user, &caller, &callee).is_some())
+            }
+            None => Ok(false),
         }
-        let active_oauth_req = active_oauth_req_opt.unwrap();
-        Ok(AccessGrants::get(&active_oauth_req.user, &caller, &callee).is_some())
     }
 }
 

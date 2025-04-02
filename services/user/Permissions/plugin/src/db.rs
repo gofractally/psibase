@@ -34,17 +34,16 @@ pub struct ActiveOauthRequestPayload {
 
 impl ActiveOauthRequest {
     pub fn get(&self) -> Option<ActiveOauthRequestPayload> {
-        // TODO: see if this is nicer as a match
-        let oauth_request_bytes_opt = Keyvalue::get(OAUTH_REQUEST_KEY);
-        if oauth_request_bytes_opt.is_none() {
-            return None;
+        match Keyvalue::get(OAUTH_REQUEST_KEY) {
+            Some(oauth_request_bytes) => {
+                let decoded_text =
+                    String::from_utf8(oauth_request_bytes).expect("Failed to decode UTF-8 bytes");
+                Some(
+                    serde_json::from_str::<ActiveOauthRequestPayload>(&decoded_text)
+                        .expect("Failed to parse active oauth request"),
+                )
+            }
+            None => None,
         }
-        let oauth_request_bytes = oauth_request_bytes_opt.unwrap();
-        let decoded_text =
-            String::from_utf8(oauth_request_bytes).expect("Failed to decode UTF-8 bytes");
-        Some(
-            serde_json::from_str::<ActiveOauthRequestPayload>(&decoded_text)
-                .expect("Failed to parse active oauth request"),
-        )
     }
 }
