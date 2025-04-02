@@ -4,14 +4,14 @@ import { z } from "zod";
 
 const supervisor = getSupervisor();
 
-const PermsOauthRequest = z.object({
+const zPermsOauthRequest = z.object({
     id: z.string(),
     user: z.string(),
     caller: z.string(),
     callee: z.string(),
 });
 
-export type PermsOauthRequest = z.infer<typeof PermsOauthRequest>;
+type PermsOauthRequest = z.infer<typeof zPermsOauthRequest>;
 
 export class ActivePermsOauthRequest {
     static async get(): Promise<PermsOauthRequest> {
@@ -25,7 +25,7 @@ export class ActivePermsOauthRequest {
             throw new Error("No active oauth request found");
         }
 
-        const oauthReq = PermsOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
+        const oauthReq = zPermsOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
         return oauthReq
     }
 

@@ -25,14 +25,14 @@ interface HttpResponse {
     body: string;
 }
 
-const SupervisorPromptPayload = z.object({
+const zSupervisorPromptPayload = z.object({
     id: z.string().min(1),
     subdomain: z.string().min(1),
     subpath: z.string(),
     expiry_timestamp: z.number().min(0),
 });
 
-type SupervisorPromptPayload = z.infer<typeof SupervisorPromptPayload>;
+type SupervisorPromptPayload = z.infer<typeof zSupervisorPromptPayload>;
 
 function convert(tuples: [string, string][]): Record<string, string> {
     const record: Record<string, string> = {};
@@ -232,7 +232,7 @@ export class PluginHost implements HostInterface {
         let up_id = window.crypto.randomUUID?.() ?? Math.random().toString();
         
         // In Supervisor localStorage space, store id, subdomain, and subpath
-        const supervisorUP = SupervisorPromptPayload.parse({
+        const supervisorUP: SupervisorPromptPayload = zSupervisorPromptPayload.parse({
             id: up_id,
             subdomain: this.self.app,
             subpath: subpath,
