@@ -29,10 +29,12 @@ export const App = () => {
             return;
         }
 
-        if (!permReqPayload.caller || !permReqPayload.callee) {
-            setError(
-                "Invalid permissions request payload: missing caller or callee.",
-            );
+        if (
+            !permReqPayload.user ||
+            !permReqPayload.caller ||
+            !permReqPayload.callee
+        ) {
+            setError("Invalid permissions request payload: missing fields.");
             setIsLoading(false);
             return;
         }
@@ -62,8 +64,12 @@ export const App = () => {
             await supervisor.functionCall({
                 service: thisServiceName,
                 intf: "admin",
-                method: "savePermission",
-                params: [validPermRequest?.caller, validPermRequest?.callee],
+                method: "savePerm",
+                params: [
+                    validPermRequest?.user,
+                    validPermRequest?.caller,
+                    validPermRequest?.callee,
+                ],
             });
         } catch (e) {
             if (e instanceof Error) {
@@ -78,6 +84,16 @@ export const App = () => {
         followReturnRedirect();
     };
     const deny = async () => {
+        await supervisor.functionCall({
+            service: thisServiceName,
+            intf: "admin",
+            method: "delPerm",
+            params: [
+                validPermRequest?.user,
+                validPermRequest?.caller,
+                validPermRequest?.callee,
+            ],
+        });
         await ActivePermsOauthRequest.delete();
         followReturnRedirect();
     };

@@ -247,9 +247,17 @@ export class PluginHost implements HostInterface {
                 OAUTH_REQUEST_KEY, new TextEncoder().encode(
             JSON.stringify(supervisorUP))]} as QualifiedFunctionCallArgs);
 
+        const currentUser = this.supervisor.supervisorCall({
+            service: "accounts",
+            plugin: "plugin",
+            intf: "api",
+            method: "getCurrentUser",
+            params: []
+        });
         // In app localStorage space, save id and payload
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
         parsedUpPayload.id = up_id;
+        parsedUpPayload.user = currentUser;
 
         this.supervisor.call(this.self, {
             service: "clientdata",

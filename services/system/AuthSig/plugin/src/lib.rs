@@ -13,7 +13,7 @@ use types::*;
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
-use bindings::permissions::plugin::api::is_auth_or_prompt;
+use bindings::permissions::plugin::api::{is_auth, prompt_auth};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -139,7 +139,9 @@ impl Actions for AuthSig {
         let caller = get_sender_app().app.unwrap();
 
         if !from_auth_sig_ui() {
-            is_auth_or_prompt(&caller)?;
+            if !is_auth(&caller)? {
+                prompt_auth(&caller)?;
+            }
         }
 
         Transact::add_action_to_transaction(

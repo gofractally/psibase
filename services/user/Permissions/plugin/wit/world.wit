@@ -2,11 +2,11 @@ package permissions:plugin;
 
 interface api {
     use host:common/types.{error};
-    /// @description Check if the caller is permitted access to `callee`'s privileged methods
-    /// and if not already, prompt user to request such access.
+    /// @description Prompt user to request caller have access to `callee`'s privileged methods.
+    /// prompt_auth() throws an object with redirect info for the calling app, which must do the actual redirect.
     /// @param caller The caller, requesting access
-    is-auth-or-prompt: func(caller: string) -> result<bool, error>;
-    /// @description `is-auth-or-prompt()` but without the automatic prompting of the user.
+    prompt-auth: func(caller: string) -> result<_, error>;
+    /// @description is caller authenticated to access `callee`'s privileged methods
     /// @param caller The caller, requesting access
     is-auth: func(caller: string) -> result<bool, error>;
 }

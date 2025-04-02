@@ -6,6 +6,7 @@ const supervisor = getSupervisor();
 
 const PermsOauthRequest = z.object({
     id: z.string(),
+    user: z.string(),
     caller: z.string(),
     callee: z.string(),
 });
