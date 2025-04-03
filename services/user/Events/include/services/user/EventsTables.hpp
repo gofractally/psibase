@@ -42,7 +42,9 @@ namespace UserService
       psibase::AccountNumber          service;
       psibase::MethodNumber           event;
       std::vector<SecondaryIndexInfo> indexes;
-      auto                            primaryKey() const { return std::tuple(db, service, event); }
+      using PrimaryKey = psibase::CompositeKey<&SecondaryIndexRecord::db,
+                                               &SecondaryIndexRecord::service,
+                                               &SecondaryIndexRecord::event>;
    };
    PSIO_REFLECT(SecondaryIndexRecord, db, service, event, indexes);
 
@@ -60,7 +62,11 @@ namespace UserService
       // Remove: endKey == 0
       std::vector<char> nextKey;
       std::uint64_t     endKey;
-      auto              byIndex() const { return std::tuple(db, service, event, info); }
+      using ByIndex = psibase::CompositeKey<&PendingIndexRecord::db,
+                                            &PendingIndexRecord::service,
+                                            &PendingIndexRecord::event,
+                                            &PendingIndexRecord::info>;
+      auto byIndex() const { return ByIndex{}(*this); }
    };
    PSIO_REFLECT(PendingIndexRecord, seq, db, service, event, info, nextKey, endKey)
 
@@ -81,30 +87,46 @@ namespace UserService
       psibase::DbId          db;
       psibase::AccountNumber service;
       psibase::MethodNumber  event;
-      auto                   primaryKey() const { return std::tuple(db, service, event); }
+      using PrimaryKey = psibase::
+          CompositeKey<&IndexDirtyRecord::db, &IndexDirtyRecord::service, &IndexDirtyRecord::event>;
+      auto primaryKey() const { return PrimaryKey{}(*this); }
    };
    PSIO_REFLECT(IndexDirtyRecord, db, service, event)
 
    using ServiceSchemaTable = psibase::Table<ServiceSchema, &ServiceSchema::service>;
    using DbIndexStatusTable = psibase::Table<DbIndexStatus, &DbIndexStatus::db>;
+   PSIO_REFLECT_TYPENAME(DbIndexStatusTable)
    using SecondaryIndexTable =
-       psibase::Table<SecondaryIndexRecord, &SecondaryIndexRecord::primaryKey>;
+       psibase::Table<SecondaryIndexRecord, SecondaryIndexRecord::PrimaryKey{}>;
+   PSIO_REFLECT_TYPENAME(SecondaryIndexTable)
    using PendingIndexTable =
-       psibase::Table<PendingIndexRecord, &PendingIndexRecord::seq, &PendingIndexRecord::byIndex>;
-   using IndexDirtyTable = psibase::Table<IndexDirtyRecord, &IndexDirtyRecord::primaryKey>;
+       psibase::Table<PendingIndexRecord, &PendingIndexRecord::seq, PendingIndexRecord::ByIndex{}>;
+   PSIO_REFLECT_TYPENAME(PendingIndexTable)
+   using IndexDirtyTable = psibase::Table<IndexDirtyRecord, IndexDirtyRecord::PrimaryKey{}>;
+   PSIO_REFLECT_TYPENAME(IndexDirtyTable)
 
-   // These are stored in the writeOnly database
-   constexpr std::uint16_t dbIndexStatusTableNum{0};
+   using EventsTables =
+       psibase::WriteOnlyTables<DbIndexStatusTable,
+                                void,  // The actual indexes are not a regular table
+                                SecondaryIndexTable,
+                                PendingIndexTable,
+                                IndexDirtyTable,
+                                SecondaryIndexTable,
+                                ServiceSchemaTable,
+                                SecondaryIndexTable>;
+
    constexpr std::uint16_t eventIndexesNum{1};
    // There are three copies of the list of secondary indexes:
    // - spec: The indexes requested by services
    // - all: Derived from spec by applying subjective rules
    // - ready: A subset of all containing only indexes that are fully synced
    constexpr std::uint16_t secondaryIndexTableNum{2};
-   constexpr std::uint16_t pendingIndexTableNum{3};
-   constexpr std::uint16_t indexDirtyTableNum{4};
    constexpr std::uint16_t secondaryIndexSpecTableNum{5};
-   constexpr std::uint16_t schemaTableNum{6};
    constexpr std::uint16_t secondaryIndexReadyTableNum{7};
 
 }  // namespace UserService
+
+namespace psibase
+{
+   PSIO_REFLECT_TYPENAME(UserService::ServiceSchemaTable)
+}

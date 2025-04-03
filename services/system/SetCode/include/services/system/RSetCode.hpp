@@ -13,4 +13,5 @@ namespace SystemService
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);
    };
    PSIO_REFLECT(RSetCode, method(serveSys, req))
+   PSIBASE_REFLECT_TABLES(RSetCode)
 }  // namespace SystemService

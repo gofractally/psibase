@@ -38,7 +38,7 @@ namespace UserService
 
    SchemaCache& SchemaCache::instance()
    {
-      static SchemaCache result{Events::open<ServiceSchemaTable>(schemaTableNum)};
+      static SchemaCache result{Events{}.open<ServiceSchemaTable>()};
       return result;
    }
 }  // namespace UserService

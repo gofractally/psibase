@@ -20,6 +20,7 @@ import { useBranding } from "@/hooks/use-branding"
 import { Skeleton } from "@/components/ui/skeleton"
 import { NavMain } from "./nav-main"
 import { NavSubNav } from "./nav-sub-nav"
+import { Developers } from "./Developers"
 
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -58,6 +59,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSubNav  />
       </SidebarContent>
       <SidebarFooter>
+        <Developers />
         <NavUser />
       </SidebarFooter>
     </Sidebar>

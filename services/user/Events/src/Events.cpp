@@ -17,7 +17,7 @@ using namespace UserService;
 void EventIndex::setSchema(const ServiceSchema& schema)
 {
    check(getSender() == schema.service, "Wrong sender");
-   Events::open<ServiceSchemaTable>(schemaTableNum).put(schema);
+   Events{}.open<ServiceSchemaTable>().put(schema);
 }
 
 void EventIndex::addIndex(psibase::DbId          db,
@@ -29,7 +29,7 @@ void EventIndex::addIndex(psibase::DbId          db,
    const CompiledType* type = SchemaCache::instance().getSchemaType(db, service, event);
    check(!!type, "Unknown event");
    check(column < type->children.size(), "Unknown column");
-   auto secondary = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
+   auto secondary = Events{}.open<DbId::writeOnly, secondaryIndexSpecTableNum>();
    auto row       = secondary.getIndex<0>().get(std::tuple(db, service, event));
    if (!row)
       row = SecondaryIndexRecord{db, service, event, std::vector{SecondaryIndexInfo{}}};
@@ -42,8 +42,7 @@ void EventIndex::addIndex(psibase::DbId          db,
    row->indexes.push_back(SecondaryIndexInfo{column});
    secondary.put(*row);
    // mark the table as dirty
-   auto dirtyTable = IndexDirtyTable{
-       DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, indexDirtyTableNum))};
+   auto dirtyTable = Events{}.open<IndexDirtyTable>();
    dirtyTable.put(IndexDirtyRecord{db, service, event});
 }
 
@@ -247,9 +246,7 @@ namespace
 
    bool processQueue(std::uint32_t maxSteps)
    {
-      auto queue = PendingIndexTable{
-          DbId::writeOnly,
-          psio::convert_to_key(std::tuple(EventIndex::service, pendingIndexTableNum))};
+      auto queue = Events{}.open<PendingIndexTable>();
 
       auto&             cache = SchemaCache::instance();
       EventWrapper      wrapper;
@@ -280,9 +277,9 @@ void EventIndex::init()
        psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
    check(!!dbStatus, "DatabaseStatusRow not found");
 
-   auto status = Events::open<DbIndexStatusTable>(dbIndexStatusTableNum);
+   auto status = Events{}.open<DbIndexStatusTable>();
 
-   auto queue = Events::open<PendingIndexTable>(pendingIndexTableNum);
+   auto queue = Events{}.open<PendingIndexTable>();
 
    if (!status.getIndex<0>().get(DbId::historyEvent))
    {
@@ -302,7 +299,7 @@ void EventIndex::init()
 // queues any required index updates.
 void queueIndexChanges()
 {
-   auto status          = Events::open<DbIndexStatusTable>(dbIndexStatusTableNum).getIndex<0>();
+   auto status          = Events{}.open<DbIndexStatusTable>().getIndex<0>();
    auto getNextEventNum = [&](DbId db)
    {
       if (auto result = status.get(db))
@@ -310,13 +307,12 @@ void queueIndexChanges()
       return static_cast<std::uint64_t>(1);
    };
 
-   auto objective  = Events::open<SecondaryIndexTable>(secondaryIndexSpecTableNum);
-   auto subjective = Events::open<SecondaryIndexTable>(secondaryIndexTableNum);
-   auto ready      = Events::open<SecondaryIndexTable>(secondaryIndexReadyTableNum);
-   auto dirtyTable = IndexDirtyTable{
-       DbId::writeOnly, psio::convert_to_key(std::tuple(EventIndex::service, indexDirtyTableNum))};
-   auto          queue = PendingIndexTable{DbId::writeOnly, psio::convert_to_key(std::tuple(
-                                                       EventIndex::service, pendingIndexTableNum))};
+   auto objective  = Events{}.open<DbId::writeOnly, secondaryIndexSpecTableNum>();
+   auto subjective = Events{}.open<DbId::writeOnly, secondaryIndexTableNum>();
+   auto ready      = Events{}.open<DbId::writeOnly, secondaryIndexReadyTableNum>();
+   auto dirtyTable = Events{}.open<IndexDirtyTable>();
+   auto queue      = Events{}.open<PendingIndexTable>();
+
    std::uint64_t nextSeq;
    {
       auto begin = queue.getIndex<0>().begin();
@@ -419,7 +415,7 @@ void Events::sync()
        psibase::DatabaseStatusRow::db, psibase::DatabaseStatusRow::key());
    check(!!dbStatus, "DatabaseStatusRow not found");
 
-   auto        table = Events::open<DbIndexStatusTable>(dbIndexStatusTableNum);
+   auto        table = Events{}.open<DbIndexStatusTable>();
    IndexWriter writer;
    for (auto db : {DbId::historyEvent, DbId::merkleEvent})
    {

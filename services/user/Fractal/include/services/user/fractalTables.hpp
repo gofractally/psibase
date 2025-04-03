@@ -31,6 +31,7 @@ namespace UserService
       };
       PSIO_REFLECT(FractalTypeRecord, service);
       using FractalTypeTable = psibase::Table<FractalTypeRecord, &FractalTypeRecord::service>;
+      PSIO_REFLECT_TYPENAME(FractalTypeTable)
 
       struct FractalRecord
       {
@@ -43,7 +44,7 @@ namespace UserService
          std::string description;
          std::string languageCode;
 
-         auto byType() const { return std::tie(type, account); }
+         using ByType = psibase::CompositeKey<&FractalRecord::type, &FractalRecord::account>;
       };
       PSIO_REFLECT(FractalRecord,
                    account,
@@ -54,7 +55,8 @@ namespace UserService
                    description,
                    languageCode);
       using FractalTable =
-          psibase::Table<FractalRecord, &FractalRecord::account, &FractalRecord::byType>;
+          psibase::Table<FractalRecord, &FractalRecord::account, FractalRecord::ByType{}>;
+      PSIO_REFLECT_TYPENAME(FractalTable)
 
       struct MembershipKey
       {
@@ -71,13 +73,16 @@ namespace UserService
          psibase::AccountNumber inviter;
          uint64_t               rewardShares;
 
-         auto byAccount() const { return std::tie(key.account, key.fractal); }
+         using ByAccount = psibase::NestedKey<
+             &MembershipRecord::key,
+             psibase::CompositeKey<&MembershipKey::account, &MembershipKey::fractal>{}>;
 
          auto operator<=>(const MembershipRecord&) const = default;
       };
       PSIO_REFLECT(MembershipRecord, key, inviter, rewardShares);
       using MemberTable =
-          psibase::Table<MembershipRecord, &MembershipRecord::key, &MembershipRecord::byAccount>;
+          psibase::Table<MembershipRecord, &MembershipRecord::key, MembershipRecord::ByAccount{}>;
+      PSIO_REFLECT_TYPENAME(MemberTable)
 
       struct InviteRecord
       {
@@ -87,11 +92,12 @@ namespace UserService
          psibase::AccountNumber fractal;
          psibase::AccountNumber recipient;
 
-         auto secondary() const { return std::tie(recipient, key); }
+         using Secondary = psibase::CompositeKey<&InviteRecord::recipient, &InviteRecord::key>;
       };
       PSIO_REFLECT(InviteRecord, inviteId, key, creator, fractal, recipient);
       using InviteTable =
-          psibase::Table<InviteRecord, &InviteRecord::inviteId, &InviteRecord::secondary>;
+          psibase::Table<InviteRecord, &InviteRecord::inviteId, InviteRecord::Secondary{}>;
+      PSIO_REFLECT_TYPENAME(InviteTable)
 
       // Identity in the fractal service, does not necessarily mean you joined a fractal
       // TODO: rename to ProfileRecord
@@ -105,6 +111,7 @@ namespace UserService
       };
       PSIO_REFLECT(IdentityRecord, name, displayName);
       using IdentityTable = psibase::Table<IdentityRecord, &IdentityRecord::name>;
+      PSIO_REFLECT_TYPENAME(IdentityTable)
 
    }  // namespace FractalNs
 }  // namespace UserService
