@@ -10,6 +10,7 @@ mod authority;
 mod db;
 mod errors;
 use db::AccessGrants;
+use errors::ErrorType;
 
 struct PermissionsPlugin;
 
@@ -41,7 +42,7 @@ impl Api for PermissionsPlugin {
         let callee = HostClient::get_sender_app().app.unwrap();
         match Accounts::get_current_user()? {
             Some(current_user) => Ok(AccessGrants::get(&current_user, &caller, &callee).is_some()),
-            None => Ok(false),
+            None => Err(ErrorType::LoggedInUserDNE().into()),
         }
     }
 }

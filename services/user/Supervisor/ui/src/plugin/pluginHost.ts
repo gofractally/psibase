@@ -254,6 +254,10 @@ export class PluginHost implements HostInterface {
             method: "getCurrentUser",
             params: []
         });
+        if (!currentUser) {
+            throw this.recoverableError("No logged in user found");
+        }
+
         // In app localStorage space, save id and payload
         const parsedUpPayload = JSON.parse(upPayloadJsonStr);
         parsedUpPayload.id = up_id;
