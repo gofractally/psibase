@@ -197,6 +197,8 @@ pub mod service {
             "group key has already been submitted",
         );
 
+        // dont bother storing the keyh hash let that be in the event too
+
         group.key_submitter = Some(sender);
         group.key_hash = Some(hash);
         group.keys = keys;
@@ -269,7 +271,15 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn register(id: u32, key: String) {
+    fn register(id: u32, key: Vec<u8>) {
+        // Change it so that it's just a vector of u8s that are being attested to
+        // Proposals still need to be encrypted, but can that just be an event?
+        // Maintain a personal table where we hold up peoples keys
+        // Keys rotate frequently,
+        // Register requires a key to be set,
+        // Groupkey should emit an event of the symmetric key inside of the asymmetric payloads
+        //
+
         let evaluation = Evaluation::get(id);
 
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);

@@ -11,11 +11,9 @@ const lowestFifth = (minute: number) => minute - (minute % 5);
 
 const now = dayjs();
 
-const registration = now
-    .set("minute", lowestFifth(dayjs().minute()))
-    .set("second", 0);
-const deliberation = now.add(1, "minutes").set("second", 0);
-const submission = deliberation.add(1, "minutes");
+const registration = now;
+const deliberation = now.add(10, "seconds");
+const submission = deliberation.add(5, "minutes");
 const finishBy = submission.add(1, "minutes");
 
 export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {

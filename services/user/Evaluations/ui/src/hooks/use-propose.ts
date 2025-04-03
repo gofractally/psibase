@@ -1,18 +1,17 @@
 import { queryClient } from "@/main";
-import { zUser } from "@lib/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
-import { PrivateKey } from "eciesjs";
 import { Buffer } from "buffer";
 import { z } from "zod";
+import { zAccount } from "@lib/zod/Account";
 
 globalThis.Buffer = Buffer;
 
 const Params = z.object({
     evaluationId: z.number(),
     groupNumber: z.number(),
-    proposal: z.instanceof(Uint8Array),
+    proposal: zAccount.array(),
 });
 
 export const usePropose = () => {

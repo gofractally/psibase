@@ -17,19 +17,11 @@ export const useRegister = () => {
                 throw new Error("User not found");
             }
 
-            const privateKey = new PrivateKey();
-            const publicKey = privateKey.publicKey.toHex();
-
-            console.log({ privateKey, publicKey }, "key pair for registration");
-            const secret = privateKey.secret.toString("base64");
-
-            storeAsymmetricKey(id, secret);
-
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: "evaluations",
                 intf: "api",
-                params: [id, publicKey],
+                params: [id],
             }));
 
             queryClient.setQueryData(["users", id], (data: unknown) => {

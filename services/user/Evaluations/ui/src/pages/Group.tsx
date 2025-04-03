@@ -41,8 +41,6 @@ export const GroupPage = () => {
 
     const { mutate: propose } = usePropose();
 
-    const symKeyData = useSymKey(Number(id), Number(groupNumber));
-
     const users = groupData?.users;
     const group = groupData?.group;
 
@@ -61,26 +59,6 @@ export const GroupPage = () => {
         setDebouncedRankedUsers(users);
     };
 
-    useEffect(() => {
-        if (groupData && symKeyData.success) {
-            console.log("running");
-
-            const myVote = arrayToUint8Array(debouncedRankedUsers);
-
-            const encryptedPayload = Uint8Array.from(
-                encrypt(symKeyData.symmetricKey, myVote),
-            );
-
-            console.log({ myVote, encryptedPayload, debouncedRankedUsers });
-
-            propose({
-                evaluationId: Number(id),
-                groupNumber: Number(groupNumber),
-                proposal: encryptedPayload,
-            });
-        }
-    }, [debouncedRankedUsers, groupData, symKeyData]);
-
     const onRemove = (user: string) => {
         updateUsers(rankedUsers.filter((u) => u !== user));
     };
@@ -88,8 +66,6 @@ export const GroupPage = () => {
     const onAdd = (user: string) => {
         updateUsers([...rankedUsers, user]);
     };
-
-    console.log({ users, group, symKeyData });
 
     const isSubmission = evaluation && now >= evaluation?.submissionStarts;
     const isFinished = evaluation && now >= evaluation?.finishBy;
@@ -104,23 +80,6 @@ export const GroupPage = () => {
 
     if (status === Status.Values.Finished) {
         navigate(`/${id}`);
-    }
-
-    if (symKeyData.loading) {
-        return (
-            <div className="flex h-screen flex-col items-center justify-center">
-                <div>Loading...</div>
-                <div>{symKeyData.message}</div>
-            </div>
-        );
-    }
-
-    if (symKeyData.success === false && symKeyData.loading === false) {
-        return (
-            <div className="flex h-screen flex-col items-center justify-center">
-                <div>Error: {symKeyData.message}</div>
-            </div>
-        );
     }
 
     const description =

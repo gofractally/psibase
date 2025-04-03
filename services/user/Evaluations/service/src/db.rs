@@ -39,7 +39,7 @@ pub mod tables {
         pub user: AccountNumber,
         pub group_number: Option<u32>,
         pub proposal: Option<Vec<u8>>,
-        pub key: String,
+        pub key: Vec<u8>,
 
         // Change this to a hash and change field name to attestation
         pub submission: Option<Vec<AccountNumber>>,
@@ -51,7 +51,7 @@ pub mod tables {
             (self.evaluation_id, self.user)
         }
 
-        pub fn new(evaluation_id: u32, user: AccountNumber, key: String) -> Self {
+        pub fn new(evaluation_id: u32, user: AccountNumber, key: Vec<u8>) -> Self {
             Self {
                 evaluation_id,
                 user,
