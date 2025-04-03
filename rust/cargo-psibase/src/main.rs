@@ -65,6 +65,10 @@ struct Args {
     #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psitest(), env = "CARGO_PSIBASE_PSITEST")]
     psitest: PathBuf,
 
+    /// Path to psibase executable
+    #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psibase(), env = "CARGO_PSIBASE_PSIBASE")]
+    psibase: PathBuf,
+
     #[clap(subcommand)]
     command: Command,
 }
@@ -166,6 +170,21 @@ fn warn(label: &str, message: &str) {
 
 fn pretty_path(label: &str, filename: &Path) {
     pretty(label, &filename.file_name().unwrap().to_string_lossy());
+}
+
+fn find_psibase() -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Ok(exe) = exe.canonicalize() {
+            if let Some(parent) = exe.parent() {
+                let psibase = format!("psibase{}", std::env::consts::EXE_SUFFIX);
+                let sibling = parent.join(&psibase);
+                if sibling.is_file() {
+                    return sibling;
+                }
+            }
+        }
+    }
+    "psibase".to_string().into()
 }
 
 fn find_psitest() -> PathBuf {
@@ -713,6 +732,8 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
+    let psibase_command = &args.psibase;
+
     let mut args = vec!["deploy".into()];
     if let Some(api) = &opts.api {
         args.push("--api".into());
@@ -732,8 +753,12 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
     args.push(account.clone());
     args.push(files[0].to_string_lossy().into());
 
-    let msg = format!("Failed running: psibase {}", args.join(" "));
-    if !std::process::Command::new("psibase")
+    let msg = format!(
+        "Failed running: {} {}",
+        psibase_command.display(),
+        args.join(" ")
+    );
+    if !std::process::Command::new(psibase_command)
         .args(args)
         .status()
         .context(msg.clone())?
@@ -766,7 +791,7 @@ async fn install(
     packages.resolve_dependencies()?;
     let index = packages.build(args).await?;
 
-    let mut command = std::process::Command::new("psibase");
+    let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
     if let Some(api) = &opts.api {
