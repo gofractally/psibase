@@ -720,6 +720,10 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
         Err(anyhow!("Expected a single library"))?
     }
 
+    let schema = build_schema(args, &[root], &vec![]).await?;
+    let mut schema_file = tempfile::NamedTempFile::new()?;
+    serde_json::to_writer(&mut schema_file, &schema)?;
+
     let account = if let Some(account) = opts.account {
         account.to_string()
     } else {
@@ -752,6 +756,7 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
     args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
     args.push(account.clone());
     args.push(files[0].to_string_lossy().into());
+    args.push(schema_file.path().to_string_lossy().into());
 
     let msg = format!(
         "Failed running: {} {}",

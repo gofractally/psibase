@@ -54,11 +54,10 @@ make -j $(nproc)
 Let's deploy both services.
 
 ```sh
-psibase deploy -ip arithmetic arithmetic.wasm
-psibase deploy -ip caller caller.wasm
+psibase install ./Calling.psi
 ```
 
-See the [psibase deploy](../../../../run-infrastructure/cli/psibase.md#deploy) docs for more details.
+See the [psibase install](../../../../run-infrastructure/cli/psibase.md#install) docs for more details.
 
 ## Trying the service
 

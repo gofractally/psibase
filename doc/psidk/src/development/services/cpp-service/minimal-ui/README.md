@@ -12,11 +12,15 @@ Here is the service definition. Place `example.cpp` and `CMakeLists.txt` in an e
 
 ## CMakeLists.txt
 
-[CMakeLists.txt](CMakeLists.txt) is the same as the one in [Basic Service](../basic/).
+```
+{{#include CMakeLists.txt}}
+```
+
+The `SERVER` option will register the service with the [`http-server` service](../../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../../default-apps/http-server.md) docs for more details.
 
 ## Building
 
-This will create `example.wasm`:
+This will create `MinimalUI.psi`:
 
 ```sh
 mkdir build
@@ -30,10 +34,8 @@ make -j $(nproc)
 This will deploy the service to the chain:
 
 ```sh
-psibase deploy -ip example example.wasm
+psibase install ./MinimalUI.psi
 ```
-
-The `-p` option will register the service with the [`http-server` service](../../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../../default-apps/http-server.md) docs for more details.
 
 ## Trying the service
 

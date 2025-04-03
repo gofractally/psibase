@@ -16,7 +16,7 @@ Here is a basic service definition. Place `example.cpp` and `CMakeLists.txt` in 
 
 ## Building
 
-This will create `example.wasm`:
+This will create `Example.psi`:
 
 ```sh
 mkdir build
@@ -29,11 +29,11 @@ make -j $(nproc)
 
 This, when run on a local test chain, will:
 
-- Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
+- Create the `example` account, if it doesn't already exist. The account will be owned by the `root` account.
 - Deploy the `example.wasm` service on that service.
 
 ```sh
-psibase deploy -i example example.wasm
+psibase install ./Example.psi
 ```
 
 ## Trying the service
