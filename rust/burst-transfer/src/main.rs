@@ -13,7 +13,7 @@ struct Args {
         short = 'a',
         long,
         value_name = "URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/"
+        default_value = "http://psibase.localhost:8080/"
     )]
     api: url::Url,
 
