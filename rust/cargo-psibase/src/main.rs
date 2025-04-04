@@ -230,17 +230,17 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
 }
 
 fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
-    let timestamp_file = filename.to_string_lossy().to_string() + ".cargo_psibase";
+    let mut timestamp_file = filename.clone();
+    timestamp_file.as_mut_os_string().push(".cargo_psibase");
     let md = fs::metadata(filename)
-        .with_context(|| format!("Failed to get metadata for {}", filename.to_string_lossy()))?;
-    if let Ok(md2) = fs::metadata::<PathBuf>(timestamp_file.as_str().into()) {
+        .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
+    if let Ok(md2) = fs::metadata(&timestamp_file) {
         if md2.modified().unwrap() >= md.modified().unwrap() {
             return Ok(());
         }
     }
 
-    let code = &read(filename)
-        .with_context(|| format!("Failed to read {}", filename.to_string_lossy()))?;
+    let code = &read(filename).with_context(|| format!("Failed to read {}", filename.display()))?;
 
     let debug_build = false;
     let mut config = walrus::ModuleConfig::new();
@@ -258,7 +258,7 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
     optimize(&mut dest_module)?;
 
     write(filename, dest_module.emit_wasm())
-        .with_context(|| format!("Failed to write {}", filename.to_string_lossy()))?;
+        .with_context(|| format!("Failed to write {}", filename.display()))?;
 
     OpenOptions::new()
         .create(true)
@@ -692,18 +692,11 @@ async fn test(
 
     for test in tests {
         pretty_path("Running", &test);
-        let psitest_args = [test.to_str().unwrap(), "--nocapture"];
-        let msg = format!(
-            "Failed running: {} {}",
-            args.psitest.display(),
-            psitest_args.join(" ")
-        );
-        if !std::process::Command::new(&args.psitest)
-            .args(psitest_args)
-            .status()
-            .context(msg.clone())?
-            .success()
-        {
+        let mut command = std::process::Command::new(&args.psitest);
+        command.arg(test);
+        command.arg("--nocapture");
+        let msg = format!("Failed running: {:?}", command);
+        if !command.status().context(msg.clone())?.success() {
             return Err(anyhow! {msg});
         }
     }
@@ -736,38 +729,29 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
             .replace(".wasm", "")
     };
 
-    let psibase_command = &args.psibase;
+    let mut command = std::process::Command::new(&args.psibase);
 
-    let mut args = vec!["deploy".into()];
+    command.arg("deploy");
     if let Some(api) = &opts.api {
-        args.push("--api".into());
-        args.push(api.to_string());
+        command.args(["--api", api.as_str()]);
     }
     if let Some(key) = &opts.create_account {
-        args.append(&mut vec!["--create-account".into(), key.to_string()]);
+        command.args(["--create-account", key.as_str()]);
     }
     if opts.create_insecure_account {
-        args.push("--create-insecure-account".into());
+        command.arg("--create-insecure-account");
     }
     if opts.register_proxy {
-        args.push("--register-proxy".into());
+        command.arg("--register-proxy");
     }
-    args.append(&mut vec!["--sender".into(), opts.sender.to_string()]);
-    args.push(account.clone());
-    args.push(files[0].to_string_lossy().into());
-    args.push(schema_file.path().to_string_lossy().into());
+    command.arg("--sender");
+    command.arg(opts.sender.to_string());
+    command.arg(&account);
+    command.arg(&files[0]);
+    command.arg(schema_file.path());
 
-    let msg = format!(
-        "Failed running: {} {}",
-        psibase_command.display(),
-        args.join(" ")
-    );
-    if !std::process::Command::new(psibase_command)
-        .args(args)
-        .status()
-        .context(msg.clone())?
-        .success()
-    {
+    let msg = format!("Failed running: {:?}", command);
+    if !command.status().context(msg.clone())?.success() {
         Err(anyhow! {msg})?;
     }
 
