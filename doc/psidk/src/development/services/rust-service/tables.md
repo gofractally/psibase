@@ -134,8 +134,8 @@ Redeploy the service and test it out:
 ```
 cargo psibase deploy -ip
 
-curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/0/99999999 | jq
-curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/20/30 | jq
+curl http://messages.psibase.localhost:8080/messages/0/99999999 | jq
+curl http://messages.psibase.localhost:8080/messages/20/30 | jq
 ```
 
 `jq`, if you have it installed, pretty-prints the result.
@@ -395,8 +395,8 @@ mod service {
 We replaced the `/messages` query with two new ones. Let's try them out:
 
 ```
-curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/from/alice/0/99999999 | jq
-curl http://messages.psibase.127.0.0.1.sslip.io:8080/messages/to/bob/0/99999999 | jq
+curl http://messages.psibase.localhost:8080/messages/from/alice/0/99999999 | jq
+curl http://messages.psibase.localhost:8080/messages/to/bob/0/99999999 | jq
 ```
 
 ## Why Is It Empty?

@@ -54,7 +54,7 @@ The `-p` option will register the service with the [`http-server` service](../..
 
 ## Trying the UI
 
-If you're running a test chain locally, then it will typically be at `http://psibase.127.0.0.1.sslip.io:8080/` or `http://psibase.127.0.0.1.sslip.io:8079/`. To try the service, prefix your host with your service name (e.g. `http://example.psibase.127.0.0.1.sslip.io:8080/`).
+If you're running a test chain locally, then it will typically be at `http://psibase.localhost:8080/`. To try the service, prefix your host with your service name (e.g. `http://example.psibase.localhost:8080/`).
 
 ## How it Works
 

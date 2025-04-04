@@ -55,7 +55,7 @@ struct NodeArgs {
         long,
         value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/",
+        default_value = "http://psibase.localhost:8080/",
         value_parser = parse_api_endpoint
     )]
     api: Url,

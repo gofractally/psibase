@@ -26,7 +26,7 @@ psibase - The psibase blockchain command line client
 
 - `-a`, `--api` *url*
 
-  `psinode` API Endpoint. The default is `http://psibase.127.0.0.1.sslip.io/`
+  `psinode` API Endpoint. The default is `http://psibase.localhost/`
   
 - `-h`, `--help`
 
