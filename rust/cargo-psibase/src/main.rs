@@ -743,7 +743,6 @@ async fn deploy(args: &Args, opts: &DeployCommand, root: &str) -> Result<(), Err
         args.push("--api".into());
         args.push(api.to_string());
     }
-    args.push("--suppress-ok".into());
     if let Some(key) = &opts.create_account {
         args.append(&mut vec!["--create-account".into(), key.to_string()]);
     }
@@ -802,7 +801,6 @@ async fn install(
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
-    command.arg("--suppress-ok");
     if let Some(sender) = &opts.sender {
         command.args(["--sender", &sender.to_string()]);
     }
