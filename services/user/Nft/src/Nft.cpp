@@ -48,8 +48,6 @@ void Nft::init()
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Nft::service);
 
-   // Register event schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Nft>());
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 0);
    to<EventIndex>().addIndex(DbId::historyEvent, Nft::service, "minted"_m, 1);

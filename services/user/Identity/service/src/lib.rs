@@ -102,7 +102,6 @@ mod service {
     fn init() {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
         services::http_server::Wrapper::call().registerServer(SERVICE);
     }
 

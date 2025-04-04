@@ -103,9 +103,6 @@ void Symbol::init()
    // Register serveSys handler
    to<SystemService::HttpServer>().registerServer(Symbol::service);
 
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Symbol>());
-
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 0);
    to<EventIndex>().addIndex(DbId::historyEvent, Symbol::service, "symCreated"_m, 1);

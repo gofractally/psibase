@@ -36,9 +36,6 @@ pub mod service {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
 
-        // Configures this service within the event service
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
-
         // Initial service configuration
         let thing_table = ExampleThingTable::new();
         if thing_table.get_index_pk().get(&SingletonKey {}).is_none() {

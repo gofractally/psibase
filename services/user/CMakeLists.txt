@@ -44,6 +44,7 @@ function(add suffix)
         Fractal/include
         Invite/include
         Nft/include
+        Packages/include
         Sites/include
         Symbol/include
         Tokens/include

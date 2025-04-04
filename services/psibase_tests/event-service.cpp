@@ -4,6 +4,7 @@
 #include <psibase/serveGraphQL.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/user/Events.hpp>
+#include <services/user/Packages.hpp>
 
 using namespace psibase;
 
@@ -11,8 +12,7 @@ void EventService::init()
 {
    to<SystemService::HttpServer>().registerServer(EventService::service);
 
-   using Events = UserService::EventIndex;
-   to<Events>().setSchema(ServiceSchema::make<EventService>());
+   to<UserService::Packages>().setSchema(ServiceSchema::make<EventService>());
 }
 
 psibase::EventNumber EventService::foo(std::string s, int i)

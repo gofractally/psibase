@@ -99,9 +99,6 @@ void Tokens::init()
    // Register proxy
    to<SystemService::HttpServer>().registerServer(RTokens::service);
 
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Tokens>());
-
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"created"}, 0);
    to<EventIndex>().addIndex(DbId::historyEvent, Tokens::service, MethodNumber{"created"}, 1);

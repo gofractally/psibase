@@ -51,8 +51,7 @@ void Invite::init()
    // Create the invite payer account and set its auth contract
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, false);
 
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Invite>());
+   // Register event indices
    to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
 }
 

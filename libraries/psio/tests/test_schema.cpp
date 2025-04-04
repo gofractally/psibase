@@ -131,6 +131,31 @@ TEST_CASE("schema generated")
    CHECK(to_json(cschema, "f64", "000000000000F03F") == "1");
 }
 
+TEST_CASE("schema serialization")
+{
+   SchemaBuilder builder;
+   builder.insert<std::uint8_t>("u8");
+   builder.insert<std::optional<std::uint8_t>>("o");
+   builder.insert<MyType>("s");
+   builder.insert<std::vector<std::int32_t>>("v");
+   builder.insert<std::variant<std::uint32_t>>("var");
+   builder.insert<MyType2>("x");
+   builder.insert<std::tuple<std::int8_t>>("tup");
+   builder.insert<std::array<std::int16_t, 1>>("a");
+   builder.insert<bool>("bool");
+   builder.insert<float>("f32");
+   builder.insert<double>("f64");
+   Schema schema       = std::move(builder).build();
+   auto   schema_text  = convert_to_json(schema);
+   auto   schema2      = convert_from_json<Schema>(schema_text);
+   auto   schema_text2 = convert_to_json(schema2);
+   CHECK(schema_text == schema_text2);
+   auto schema_bin   = to_frac(schema);
+   auto schema3      = from_frac<Schema>(schema_bin);
+   auto schema_text3 = convert_to_json(schema3);
+   CHECK(schema_text3 == schema_text);
+}
+
 template <typename T, typename U>
 bool isExtension()
 {
