@@ -38,10 +38,8 @@ export const client = {
     getAppUrl(app) {
         return host.getAppUrl(app);
     },
-};
 
-export const web = {
-    popup(url_path) {
-        return host.popup(url_path);
+    promptUser(subpath, payloadJsonStr) {
+        return host.promptUser(subpath, payloadJsonStr);
     },
 };

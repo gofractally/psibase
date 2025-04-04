@@ -13,7 +13,7 @@ use types::*;
 use bindings::auth_sig::plugin::types::{Keypair, Pem};
 use bindings::host::common::client::get_sender_app;
 use bindings::host::common::types as CommonTypes;
-use bindings::permissions::plugin::users::is_permitted;
+use bindings::permissions::plugin::api::{is_auth, prompt_auth};
 use bindings::transact::plugin::intf as Transact;
 
 // Exported interfaces
@@ -139,8 +139,8 @@ impl Actions for AuthSig {
         let caller = get_sender_app().app.unwrap();
 
         if !from_auth_sig_ui() {
-            if !is_permitted(&caller)? {
-                return Err(InsufficientPermissions(String::from("set key")).into());
+            if !is_auth(&caller)? {
+                prompt_auth(&caller)?;
             }
         }
 

@@ -2,15 +2,23 @@ package permissions:plugin;
 
 interface admin {
     use host:common/types.{error};
-
-    is-valid-request: func(caller: string, callee: string) -> result<bool, error>;
+    /// @description Save a permission granting a `caller` access to the privileged methods of `callee` for user `user`.
+    /// @param user The user, requesting access
+    /// @param caller The caller, requesting access
+    /// @param callee The callee, with the privileged methods
+    save-perm: func(user: string, caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
+    /// @description Delete permission granting a `caller` access to the privileged methods of `callee` for user `user`.
+    /// @param user The user, requesting access
+    /// @param caller The caller, requesting access
+    /// @param callee The callee, with the privileged methods
+    del-perm: func(user: string, caller: string, callee: string) -> result<_, error>; // only option in v1 is fullAccess
 }
 
 world impl {
     include host:common/imports;
     include clientdata:plugin/imports;
+    include accounts:plugin/imports;
 
     export api;
-    export users;
     export admin;
 }

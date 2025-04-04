@@ -2,47 +2,48 @@
 mod bindings;
 
 use authority::verify_caller_is_this_app;
-use bindings::exports::permissions::plugin::{
-    admin::Guest as Admin, api::Guest as Api, users::Guest as UsersApi,
-};
-use bindings::host::common::{client as HostClient, types::Error, web as CommonWeb};
+use bindings::accounts::plugin::api as Accounts;
+use bindings::exports::permissions::plugin::{admin::Guest as PermsAdmin, api::Guest as Api};
+use bindings::host::common::{client as HostClient, types::Error};
 
 mod authority;
 mod db;
 mod errors;
-use db::{AccessGrants, CurrentAccessRequest};
+use db::AccessGrants;
 use errors::ErrorType;
 
 struct PermissionsPlugin;
 
+impl PermsAdmin for PermissionsPlugin {
+    fn save_perm(user: String, caller: String, callee: String) -> Result<(), Error> {
+        verify_caller_is_this_app()?;
+        Ok(AccessGrants::set(&user, &caller, &callee))
+    }
+
+    fn del_perm(user: String, caller: String, callee: String) -> Result<(), Error> {
+        verify_caller_is_this_app()?;
+        Ok(AccessGrants::delete(&user, &caller, &callee))
+    }
+}
+
 impl Api for PermissionsPlugin {
-    fn save_permission(caller: String, callee: String) -> Result<(), Error> {
-        verify_caller_is_this_app()?;
-        Ok(AccessGrants::set(&caller, &callee))
-    }
-}
-
-impl UsersApi for PermissionsPlugin {
-    fn is_permitted(caller: String) -> Result<bool, Error> {
+    fn prompt_auth(caller: String) -> Result<(), Error> {
         let callee = HostClient::get_sender_app().app.unwrap();
-
-        let perms_pref = AccessGrants::get(&caller, &callee);
-        if perms_pref.is_none() {
-            CurrentAccessRequest::set(&caller, &callee)?;
-            CommonWeb::popup(&format!("permissions.html?caller={caller}&callee={callee}"))?;
-            return Err(ErrorType::PermissionsDialogAsyncNotYetAvailable().into());
-        } else {
-            Ok(true)
-        }
+        let user_prompt_payload = serde_json::json!({
+            "caller": caller,
+            "callee": callee
+        })
+        .to_string();
+        HostClient::prompt_user(Some("/permissions.html"), Some(&user_prompt_payload))?;
+        unreachable!();
     }
-}
 
-impl Admin for PermissionsPlugin {
-    fn is_valid_request(caller: String, callee: String) -> Result<bool, Error> {
-        verify_caller_is_this_app()?;
-        let is_valid = CurrentAccessRequest::is_valid_request(&caller, &callee)?;
-        CurrentAccessRequest::delete()?;
-        return Ok(is_valid);
+    fn is_auth(caller: String) -> Result<bool, Error> {
+        let callee = HostClient::get_sender_app().app.unwrap();
+        match Accounts::get_current_user()? {
+            Some(current_user) => Ok(AccessGrants::get(&current_user, &caller, &callee).is_some()),
+            None => Err(ErrorType::LoggedInUserDNE().into()),
+        }
     }
 }
 
