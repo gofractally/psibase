@@ -20,9 +20,7 @@ pub mod tables {
 
     impl ExampleThing {
         #[primary_key]
-        fn pk(&self) -> () {
-            ()
-        }
+        fn pk(&self) -> {}
     }
 }
 
