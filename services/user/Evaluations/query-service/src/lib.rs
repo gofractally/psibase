@@ -3,7 +3,7 @@
 mod service {
     use async_graphql::connection::Connection;
     use async_graphql::*;
-    use evaluations::db::tables::{Evaluation, Group, User};
+    use evaluations::db::tables::{Evaluation, Group, User, UserSettings};
     use psibase::*;
     use serde::Deserialize;
 
@@ -18,8 +18,8 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
-        evaluation_id: u32,
-        group_number: u32,
+        evaluation_id: String,
+        group_number: String,
         keys: Vec<Vec<u8>>,
         hash: String,
     }
@@ -67,6 +67,16 @@ mod service {
 
         async fn get_user(&self, id: u32, user: AccountNumber) -> Option<User> {
             evaluations::Wrapper::call().getUser(id, user)
+        }
+
+        async fn get_user_settings(
+            &self,
+            account_numbers: Vec<AccountNumber>,
+        ) -> Vec<Option<UserSettings>> {
+            account_numbers
+                .iter()
+                .map(|account_number| evaluations::Wrapper::call().getUserSettings(*account_number))
+                .collect()
         }
     }
 

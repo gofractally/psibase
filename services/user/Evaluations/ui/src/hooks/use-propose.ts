@@ -26,7 +26,12 @@ export const usePropose = () => {
                 method: "propose",
                 service: "evaluations",
                 intf: "api",
-                params: [evaluationId, groupNumber, proposal.map(String)],
+                params: [
+                    evaluationId,
+                    groupNumber,
+                    proposal.map(String),
+                    currentUser,
+                ],
             };
             console.log("Proposing...", pars);
 

@@ -18,6 +18,10 @@ pub fn get() -> Vec<AsymKey> {
         .unwrap_or_default()
 }
 
+pub fn get_latest() -> Option<AsymKey> {
+    get().into_iter().last()
+}
+
 pub fn save(keys: Vec<AsymKey>) -> Result<(), Error> {
     Keyvalue::set(KEY, &keys.packed())
 }

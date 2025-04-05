@@ -24,9 +24,10 @@ interface api {
     // get-votes: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
 
     close: func(evaluation-id: u32) -> result<_, error>;
+    attest: func(evaluation-id: u32, group-number: u32, user: account) -> result<list<list<u8>>, error>;
 
-    attest: func(evaluation-id: u32, submission: list<u8>) -> result<_, error>;
-    propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<string, error>;
+    propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>, user: account) -> result<string, error>;
+
 
     refresh-key: func(key: list<u8>) -> result<_, error>;
    

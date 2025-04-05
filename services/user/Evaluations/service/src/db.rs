@@ -39,9 +39,8 @@ pub mod tables {
         pub evaluation_id: u32,
         pub user: AccountNumber,
         pub group_number: Option<u32>,
-        pub proposal: Option<Vec<u8>>,
-
         pub submission: Option<Vec<u8>>,
+        pub proposal: Option<Vec<u8>>,
     }
 
     #[table(name = "GroupTable", index = 3)]
@@ -87,8 +86,8 @@ pub mod tables {
                 evaluation_id,
                 user,
                 group_number: None,
-                proposal: None,
                 submission: None,
+                proposal: None,
             }
         }
 

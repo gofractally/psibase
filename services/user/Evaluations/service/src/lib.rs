@@ -5,7 +5,7 @@ pub mod db;
 #[psibase::service(name = "evaluations")]
 pub mod service {
     use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User, UserSettings};
-    use crate::helpers::{self};
+    use crate::helpers;
     use psibase::*;
 
     #[action]
@@ -128,6 +128,12 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn getUserSettings(account_number: AccountNumber) -> Option<UserSettings> {
+        UserSettings::get(account_number)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn start(id: u32, entropy: u64) {
         let evaluation = Evaluation::get(id);
 
@@ -229,6 +235,7 @@ pub mod service {
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
 
         let mut user = User::get(evaluation_id, sender);
+        
         user.proposal = Some(proposal);
         user.save();
     }
