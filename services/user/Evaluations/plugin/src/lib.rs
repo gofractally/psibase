@@ -8,12 +8,13 @@ use bindings::exports::evaluations::plugin::api::Guest as Api;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
-use ecies::{decrypt, encrypt, utils::generate_keypair};
+use ecies::{decrypt, encrypt, utils::generate_keypair, PublicKey, SecretKey};
 
-use psibase::{fracpack::Pack, get_sender};
+use psibase::{fracpack::Pack, fracpack::Unpack, get_sender};
 
 mod errors;
 
+mod key_table;
 pub mod types;
 
 use rand::Rng;
@@ -50,11 +51,7 @@ fn fetch_and_decode(
 }
 
 fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, Error> {
-    let key = format!(
-        "symmetric_key_{}_{}",
-        get_sender().to_string(),
-        evaluation_id
-    );
+    let key = format!("symmetric_key_{}", evaluation_id);
     let symmetric_key = Keyvalue::get(&key);
     if symmetric_key.is_some() {
         return Ok(symmetric_key.unwrap());
@@ -74,6 +71,7 @@ fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, E
         });
 
         if is_already_symmetric_key_created {
+            // fetch the key from graphql and decrypt it with the asymmetric key;
             let my_index = sorted_users_by_alphabetical_order
                 .iter()
                 .position(|user| {
@@ -161,20 +159,29 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("create", &packed_args)
     }
 
-    fn register(id: u32) -> Result<(), Error> {
-        let (private_key, public_key) = generate_keypair();
+    fn refresh_key(key: Vec<u8>) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::refreshKey { key }.packed();
+        add_action_to_transaction("refreshKey", &packed_args)
+    }
 
-        let public_key_vectored = public_key.serialize().to_vec();
+    fn barry() -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::barry {}.packed();
+        add_action_to_transaction("barry", &packed_args)
+    }
 
-        let key = format!("asym_private_key_{}_{}", get_sender().to_string(), id);
+    fn register(id: u32, account: String) -> Result<(), Error> {
+        let key = key_table::AsymKey::new();
+        let public_key_vectored = key.public_key().serialize().to_vec();
 
-        Keyvalue::set(&key, &private_key.serialize().to_vec()).expect("Failed to set private key");
-
-        let packed_args = evaluations::action_structs::register {
-            id,
+        let packed_args = evaluations::action_structs::refreshKey {
             key: public_key_vectored,
         }
         .packed();
+        add_action_to_transaction("refreshKey", &packed_args).unwrap();
+        key.save()?;
+
+        let account_number = psibase::AccountNumber::from_str(account.as_str()).unwrap();
+        let packed_args = evaluations::action_structs::register { id, account_number }.packed();
         add_action_to_transaction("register", &packed_args)
     }
 
@@ -193,17 +200,7 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("close", &packed_args)
     }
 
-    fn group_key(evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::groupKey {
-            evaluation_id,
-            keys,
-            hash,
-        }
-        .packed();
-        add_action_to_transaction("groupKey", &packed_args)
-    }
-
-    fn attest(evaluation_id: u32, submission: Vec<String>) -> Result<(), Error> {
+    fn attest(evaluation_id: u32, submission: Vec<u8>) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::attest {
             evaluation_id,
             submission,
@@ -217,35 +214,26 @@ impl Api for EvaluationsPlugin {
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<String, Error> {
-        // get the symmetric key, if it doesn't exist... fetch it?
-        let symmetric_key = get_symmetric_key(evaluation_id, group_number);
+        let symmetric_key = get_symmetric_key(evaluation_id, group_number)?;
 
-        match symmetric_key {
-            Ok(symmetric_key) => {
-                // okay okay okay, so... we have a symmetric key, so we need to encrypt the proposal with the symmetric key
-                let accounts: Vec<psibase::AccountNumber> = proposal
-                    .iter()
-                    .map(|s| psibase::AccountNumber::from_str(s.as_str()).unwrap())
-                    .collect();
+        let accounts: Vec<psibase::AccountNumber> = proposal
+            .iter()
+            .map(|s| psibase::AccountNumber::from_str(s.as_str()).unwrap())
+            .collect();
 
-                let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
-                    &symmetric_key,
-                    &accounts.packed(),
-                    &get_sender().to_string().as_str(),
-                );
+        let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
+            &symmetric_key,
+            &accounts.packed(),
+            &get_sender().to_string().as_str(),
+        );
 
-                let packed_args = evaluations::action_structs::propose {
-                    evaluation_id,
-                    proposal: encrypted_proposal,
-                }
-                .packed();
-                let _ = add_action_to_transaction("propose", &packed_args);
-                return Ok("should have pushed...".to_string());
-            }
-            Err(e) => {
-                return Ok("we have an error".to_string() + e.message.to_string().as_str());
-            }
+        let packed_args = evaluations::action_structs::propose {
+            evaluation_id,
+            proposal: encrypted_proposal,
         }
+        .packed();
+        add_action_to_transaction("propose", &packed_args)?;
+        Ok("should have pushed...".to_string())
     }
 }
 

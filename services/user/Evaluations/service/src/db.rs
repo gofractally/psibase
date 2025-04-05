@@ -39,26 +39,55 @@ pub mod tables {
         pub user: AccountNumber,
         pub group_number: Option<u32>,
         pub proposal: Option<Vec<u8>>,
-        pub key: Vec<u8>,
 
-        // Change this to a hash and change field name to attestation
-        pub submission: Option<Vec<AccountNumber>>,
+        pub submission: Option<Vec<u8>>,
     }
 
+    #[table(name = "GroupTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct Group {
+        pub evaluation_id: u32,
+        pub number: u32,
+        pub key_submitter: Option<AccountNumber>,
+        pub result: Option<Vec<u8>>,
+    }
+
+    #[table(name = "UserSettingsTable", index = 4)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct UserSettings {
+        #[primary_key]
+        pub user: AccountNumber,
+        pub key: Vec<u8>,
+    }
+
+    impl UserSettings {
+        pub fn new(user: AccountNumber, key: Vec<u8>) -> Self {
+            Self { user, key }
+        }
+
+        pub fn get(user: AccountNumber) -> Option<Self> {
+            let table = UserSettingsTable::new();
+            table.get_index_pk().get(&user)
+        }
+
+        pub fn save(&self) {
+            let table = UserSettingsTable::new();
+            table.put(&self).unwrap();
+        }
+    }
     impl User {
         #[primary_key]
         fn pk(&self) -> (u32, AccountNumber) {
             (self.evaluation_id, self.user)
         }
 
-        pub fn new(evaluation_id: u32, user: AccountNumber, key: Vec<u8>) -> Self {
+        pub fn new(evaluation_id: u32, user: AccountNumber) -> Self {
             Self {
                 evaluation_id,
                 user,
                 group_number: None,
                 proposal: None,
                 submission: None,
-                key,
             }
         }
 
@@ -78,17 +107,6 @@ pub mod tables {
             let table = UserTable::new();
             table.erase(&self.pk());
         }
-    }
-
-    #[table(name = "GroupTable", index = 3)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
-    pub struct Group {
-        pub evaluation_id: u32,
-        pub number: u32,
-        pub key_submitter: Option<AccountNumber>,
-        pub key_hash: Option<String>,
-        pub keys: Vec<Vec<u8>>,
-        pub result: Option<Vec<AccountNumber>>,
     }
 
     impl Evaluation {
@@ -205,8 +223,6 @@ pub mod tables {
                 evaluation_id,
                 number,
                 key_submitter: None,
-                key_hash: None,
-                keys: vec![],
                 result: None,
             }
         }

@@ -3,44 +3,33 @@ package evaluations:plugin;
 
 interface types {
 
-    type account-number = u32;
+    type account = string;
 
 
-    record timings {
-        registration: u32,
-        deliberation: u32,
-        submission: u32, 
-    }
-
-    record evaluation {
-        id: u32,
-        owner: account-number,
-        rsvp-start-from: u32,
-        rsvp-deadline: u32,
-        timings: timings,
-    }
 
 }
 
 interface api {
     use host:common/types.{error};
-    use types.{evaluation, account-number};
+    use types.{account};
     
 
     create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, allowable-group-sizes: list<string>) -> result<_, error>;
 
-    register: func(id: u32) -> result<_, error>;
+    register: func(id: u32, account: account) -> result<_, error>;
     unregister: func(id: u32) -> result<_, error>;
 
     start: func(id: u32, entropy: u64) -> result<_, error>;
 
-    group-key: func(evaluation-id: u32, keys: list<list<u8>>, hash: string) -> result<_, error>;
+    barry: func() -> result<_, error>;
+
 
     close: func(evaluation-id: u32) -> result<_, error>;
 
-    attest: func(evaluation-id: u32, submission: list<string>) -> result<_, error>;
+    attest: func(evaluation-id: u32, submission: list<u8>) -> result<_, error>;
     propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<string, error>;
 
+    refresh-key: func(key: list<u8>) -> result<_, error>;
    
 }
 

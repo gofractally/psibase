@@ -4,7 +4,7 @@ pub mod db;
 
 #[psibase::service(name = "evaluations")]
 pub mod service {
-    use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User};
+    use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User, UserSettings};
     use crate::helpers::{self};
     use psibase::*;
 
@@ -12,6 +12,8 @@ pub mod service {
     fn init() {
         let table = ConfigTable::new();
         table.put(&ConfigRow { last_used_id: 0 }).unwrap();
+
+        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
     }
 
     #[pre_action(exclude(init))]
@@ -21,6 +23,17 @@ pub mod service {
             table.get_index_pk().get(&SingletonKey {}).is_some(),
             "service not inited",
         );
+    }
+
+    #[event(history)]
+    pub fn add(a: String, b: String, res: String) {}
+
+    #[action]
+    fn barry() {
+        let a = "1".to_string();
+        let b = "2".to_string();
+        let res = "3".to_string();
+        Wrapper::emit().history().add(a, b, res);
     }
 
     #[action]
@@ -178,12 +191,20 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
+    fn refreshKey(key: Vec<u8>) {
+        let user = UserSettings::new(get_sender(), key);
+        user.save();
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
     fn groupKey(evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
         let evaluation = Evaluation::get(evaluation_id);
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
 
         let sender = get_sender();
-        let user = helpers::get_user(evaluation_id, sender);
+
+        let user = User::get(evaluation_id, sender);
 
         check(
             user.group_number.is_some(),
@@ -197,11 +218,7 @@ pub mod service {
             "group key has already been submitted",
         );
 
-        // dont bother storing the keyh hash let that be in the event too
-
         group.key_submitter = Some(sender);
-        group.key_hash = Some(hash);
-        group.keys = keys;
         group.save();
     }
 
@@ -235,22 +252,16 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn attest(evaluation_id: u32, submission: Vec<String>) {
+    fn attest(evaluation_id: u32, submission: Vec<u8>) {
         let sender = get_sender();
         let evaluation = Evaluation::get(evaluation_id);
 
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Submission);
 
         let mut user = User::get(evaluation_id, sender);
-
         check(user.submission.is_none(), "you have already submitted");
 
-        let submission_account_numbers = submission
-            .iter()
-            .map(|s| AccountNumber::from(s.as_str()))
-            .collect();
-
-        user.submission = Some(submission_account_numbers);
+        user.submission = Some(submission);
         user.save();
 
         let mut group = Group::get(evaluation_id, user.group_number.unwrap());
@@ -260,8 +271,8 @@ pub mod service {
         if group.result.is_none() {
             let result = helpers::get_group_result(evaluation_id, user.group_number.unwrap());
             match result {
-                helpers::GroupResult::ConsensusSuccess(users) => {
-                    group.result = Some(users);
+                helpers::GroupResult::ConsensusSuccess(result) => {
+                    group.result = Some(result);
                     group.save();
                 }
                 _ => {}
@@ -271,18 +282,19 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn register(id: u32, key: Vec<u8>) {
-        // Change it so that it's just a vector of u8s that are being attested to
+    fn register(id: u32, account_number: AccountNumber) {
         // Proposals still need to be encrypted, but can that just be an event?
-        // Maintain a personal table where we hold up peoples keys
-        // Keys rotate frequently,
-        // Register requires a key to be set,
         // Groupkey should emit an event of the symmetric key inside of the asymmetric payloads
         //
-
         let evaluation = Evaluation::get(id);
-
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
+
+        let sender = get_sender();
+        check(
+            sender == account_number || sender == evaluation.owner,
+            "user is not allowed to register",
+        );
+
         let is_hook_allows_registration = true;
 
         check(
@@ -290,7 +302,13 @@ pub mod service {
             "user is not allowed to register",
         );
 
-        let user = User::new(evaluation.id, get_sender(), key);
+        let user_settings = UserSettings::get(account_number);
+
+        check(
+            user_settings.is_some(),
+            "user must have a pre-existing key to be registered",
+        );
+        let user = User::new(evaluation.id, get_sender());
         user.save();
     }
 

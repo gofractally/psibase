@@ -35,7 +35,7 @@ export const getGroup = async (evaluationId: number, groupNumber: number) => {
     const response = z
         .object({
             data: z.object({
-                getGroup: zGroup,
+                getGroup: zGroup.nullable(),
                 getGroupUsers: zGroupUser.array(),
             }),
         })

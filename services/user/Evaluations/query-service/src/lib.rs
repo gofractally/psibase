@@ -1,14 +1,37 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
+    use async_graphql::connection::Connection;
     use async_graphql::*;
-    use psibase::*;
     use evaluations::db::tables::{Evaluation, Group, User};
+    use psibase::*;
+    use serde::Deserialize;
 
     struct Query;
 
+    #[derive(Deserialize, SimpleObject)]
+    struct HistoricalUpdate {
+        a: String,
+        b: String,
+        res: String,
+    }
+
     #[Object]
     impl Query {
+        async fn historical_updates(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
+            EventQuery::new("history.evaluations.add")
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
 
         async fn get_evaluation(&self, id: u32) -> Option<Evaluation> {
             evaluations::Wrapper::call().getEvaluation(id)
@@ -42,12 +65,10 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-            // Services graphql queries
+        // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query))
-
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
-
             // Serves a full service schema at the /schema endpoint
             .or_else(|| serve_schema::<evaluations::Wrapper>(&request))
     }
