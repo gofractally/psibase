@@ -26,30 +26,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn add(a: String, b: String, res: String) {}
-
-    #[action]
-    fn barry() {
-        let a = "1".to_string();
-        let b = "2".to_string();
-        let res = "3".to_string();
-        Wrapper::emit().history().add(a, b, res);
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn cancel(id: u32) {
-        let evaluation = Evaluation::get(id);
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
-
-        let sender = get_sender();
-        check(
-            evaluation.owner == sender,
-            "only the owner can cancel the evaluation",
-        );
-
-        evaluation.delete();
-    }
+    pub fn keysset(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {}
 
     #[action]
     #[allow(non_snake_case)]
@@ -58,7 +35,8 @@ pub mod service {
         deliberation: u32,
         submission: u32,
         finish_by: u32,
-        allowable_group_sizes: Vec<u8>,
+        group_sizes: Vec<u8>,
+        rank_amount: u8,
     ) {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
@@ -66,24 +44,25 @@ pub mod service {
         );
 
         check(
-            allowable_group_sizes.len() > 0,
+            group_sizes.len() > 0,
             "allowable group sizes must be at least 1",
         );
 
         check(
-            allowable_group_sizes.iter().all(|size| *size > 0),
+            group_sizes.iter().all(|size| *size > 0),
             "allowable group sizes must be greater than 0",
         );
 
         let new_evaluation = Evaluation::new(
             helpers::get_next_id(),
-            allowable_group_sizes,
+            group_sizes,
             helpers::get_current_time_seconds(),
             get_sender(),
             registration,
             deliberation,
             submission,
             finish_by,
+            rank_amount,
         );
 
         new_evaluation.save();
@@ -220,6 +199,10 @@ pub mod service {
 
         group.key_submitter = Some(sender);
         group.save();
+
+        Wrapper::emit()
+            .history()
+            .keysset(evaluation_id, user.group_number.unwrap(), keys, hash);
     }
 
     #[action]

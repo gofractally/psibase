@@ -16,6 +16,14 @@ mod service {
         res: String,
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct KeysSet {
+        evaluation_id: u32,
+        group_number: u32,
+        keys: Vec<Vec<u8>>,
+        hash: String,
+    }
+
     #[Object]
     impl Query {
         async fn historical_updates(
@@ -24,8 +32,8 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.evaluations.add")
+        ) -> async_graphql::Result<Connection<u64, KeysSet>> {
+            EventQuery::new("history.evaluations.keysset")
                 .first(first)
                 .last(last)
                 .before(before)

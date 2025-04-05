@@ -9,7 +9,6 @@ import { useUsers } from "@hooks/use-users";
 import { getStatus } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
-import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -234,6 +233,13 @@ export const EvaluationPage = () => {
                 </div>
             )}
 
+            {status.type === "deliberationPendingAsSpectator" && (
+                <div>
+                    <div>
+                        You are a spectator and not included in this evaluation.
+                    </div>
+                </div>
+            )}
             {status.type === "userMustSubmit" && (
                 <div>
                     <div>*Redirect to submission page*</div>

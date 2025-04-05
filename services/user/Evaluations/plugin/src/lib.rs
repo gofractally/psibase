@@ -34,14 +34,11 @@ fn fetch_and_decode(
             getGroup(id: {id}, groupNumber: {group_number}) {{
                 evaluationId
                 keySubmitter
-                keyHash
-                keys
             }}
             getGroupUsers(id: {id}, groupNumber: {group_number}) {{
                 user
                 submission
                 proposal
-                key
             }}
         }}"#,
         id = id,
@@ -50,11 +47,11 @@ fn fetch_and_decode(
     GetEvaluationResponse::from_gql(CommonServer::post_graphql_get_json(&query)?)
 }
 
-fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, Error> {
+fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<(Vec<u8>, String), Error> {
     let key = format!("symmetric_key_{}", evaluation_id);
     let symmetric_key = Keyvalue::get(&key);
     if symmetric_key.is_some() {
-        return Ok(symmetric_key.unwrap());
+        return Ok((symmetric_key.unwrap(), "salty".to_string()));
     } else {
         let res = fetch_and_decode(evaluation_id, group_number)?;
         let group = res.getGroup.unwrap();
@@ -92,14 +89,10 @@ fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, E
 
             // TODO: hash my_key and compare it with the keyHash in the group
 
-            let key = format!(
-                "symmetric_key_{}_{}",
-                get_sender().to_string(),
-                evaluation_id
-            );
+            let key = format!("symmetric_key_{}", evaluation_id);
             Keyvalue::set(&key, &my_key).expect("Failed to set private key");
 
-            return Ok(my_key);
+            return Ok((my_key, "salty".to_string()));
         } else {
             let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().gen();
 
@@ -113,16 +106,12 @@ fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, E
                 ));
             });
 
-            // hash the symmetric key...
-            let symmetric_key_hash = "do this later".to_string();
-
-            Keyvalue::set(&key, &new_shared_symmetric_key)
-                .expect("Failed to save the symmetric key");
+            let hash = "derp".to_string();
 
             let packed_args = evaluations::action_structs::groupKey {
                 evaluation_id,
                 keys: payloads,
-                hash: symmetric_key_hash,
+                hash,
             }
             .packed();
             let tx_res = add_action_to_transaction("groupKey", &packed_args);
@@ -131,7 +120,7 @@ fn get_symmetric_key(evaluation_id: u32, group_number: u32) -> Result<Vec<u8>, E
                 panic!("failed to set the symmetric key");
             }
 
-            return Ok(new_shared_symmetric_key.to_vec());
+            return Ok((new_shared_symmetric_key.to_vec(), "salty".to_string()));
         }
     }
 }
@@ -143,17 +132,20 @@ impl Api for EvaluationsPlugin {
         submission: u32,
         finish_by: u32,
         group_sizes: Vec<String>,
+        rank_amount: u8,
     ) -> Result<(), Error> {
-        let allowable_group_sizes = group_sizes
+        let sizes = group_sizes
             .iter()
             .map(|s| s.parse::<u8>().unwrap())
             .collect();
+
         let packed_args = evaluations::action_structs::create {
             registration,
             deliberation,
             submission,
             finish_by,
-            allowable_group_sizes,
+            group_sizes: sizes,
+            rank_amount,
         }
         .packed();
         add_action_to_transaction("create", &packed_args)
@@ -162,11 +154,6 @@ impl Api for EvaluationsPlugin {
     fn refresh_key(key: Vec<u8>) -> Result<(), Error> {
         let packed_args = evaluations::action_structs::refreshKey { key }.packed();
         add_action_to_transaction("refreshKey", &packed_args)
-    }
-
-    fn barry() -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::barry {}.packed();
-        add_action_to_transaction("barry", &packed_args)
     }
 
     fn register(id: u32, account: String) -> Result<(), Error> {
@@ -214,24 +201,23 @@ impl Api for EvaluationsPlugin {
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<String, Error> {
-        let symmetric_key = get_symmetric_key(evaluation_id, group_number)?;
+        let (symmetric_key, salt) = get_symmetric_key(evaluation_id, group_number)?;
 
-        let accounts: Vec<psibase::AccountNumber> = proposal
+        let proposal = proposal
             .iter()
-            .map(|s| psibase::AccountNumber::from_str(s.as_str()).unwrap())
-            .collect();
+            .map(|p| p.as_bytes())
+            .collect::<Vec<&[u8]>>()
+            .concat();
 
-        let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
-            &symmetric_key,
-            &accounts.packed(),
-            &get_sender().to_string().as_str(),
-        );
+        let encrypted_proposal =
+            bindings::aes::plugin::with_password::encrypt(&symmetric_key, &proposal, &salt);
 
         let packed_args = evaluations::action_structs::propose {
             evaluation_id,
             proposal: encrypted_proposal,
         }
         .packed();
+
         add_action_to_transaction("propose", &packed_args)?;
         Ok("should have pushed...".to_string())
     }

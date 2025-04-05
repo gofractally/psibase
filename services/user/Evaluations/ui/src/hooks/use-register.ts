@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
 import { PrivateKey } from "eciesjs";
 import { Buffer } from "buffer";
-import { storeAsymmetricKey } from "@lib/keys";
+import { zAccount } from "@lib/zod/Account";
 
 globalThis.Buffer = Buffer;
 
@@ -17,11 +17,18 @@ export const useRegister = () => {
                 throw new Error("User not found");
             }
 
+            console.log({
+                method: "register",
+                service: "evaluations",
+                intf: "api",
+                params: [id, zAccount.parse(currentUser)],
+            });
+
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: "evaluations",
                 intf: "api",
-                params: [id],
+                params: [id, zAccount.parse(currentUser)],
             }));
 
             queryClient.setQueryData(["users", id], (data: unknown) => {

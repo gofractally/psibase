@@ -1,11 +1,14 @@
 // import { useDecrypt } from "@hooks/use-decrypt";
 import { useEvaluation } from "@hooks/use-evaluation";
 import { useGroup } from "@hooks/use-group";
-import { useSymKey } from "@hooks/use-sym-key";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useDebounceValue, useInterval } from "usehooks-ts";
+import {
+    useDebounceCallback,
+    useDebounceValue,
+    useInterval,
+} from "usehooks-ts";
 import { z } from "zod";
 
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
@@ -13,17 +16,7 @@ import { Button } from "@shadcn/button";
 import { AlignJustify, Plus, X } from "lucide-react";
 import { humanize } from "@lib/humanize";
 import { usePropose } from "@hooks/use-propose";
-import { encrypt } from "eciesjs";
-
-const Status = z.enum(["Deliberate", "Submission", "Finished"]);
-
-type Status = z.infer<typeof Status>;
-
-const arrayToUint8Array = (array: string[]) =>
-    Uint8Array.from(Array.from(array).map((letter) => letter.charCodeAt(0)));
-
-const uint8ArrayToArray = (uint8Array: Uint8Array) =>
-    Array.from(uint8Array).map((letter) => String.fromCharCode(letter));
+import { arrayMove } from "@lib/arrayMove";
 
 export const GroupPage = () => {
     const { id, groupNumber } = useParams();
@@ -41,54 +34,51 @@ export const GroupPage = () => {
 
     const { mutate: propose } = usePropose();
 
-    const users = groupData?.users;
-    const group = groupData?.group;
-
-    const [rankedUsers, setRankedUsers] = useState<string[]>([]);
-    const unrankedUsers = users?.filter(
-        (user) => !rankedUsers.includes(user.user),
+    const rankedOptionNumbers = [...Array(evaluation?.rankAmount)].map(
+        (_, index) => index + 1,
     );
 
-    const [debouncedRankedUsers, setDebouncedRankedUsers] = useDebounceValue(
-        rankedUsers,
-        2000,
+    const [rankedNumbers, setRankedNumbers] = useState<number[]>([]);
+    const unrankedNumbers = rankedOptionNumbers.filter(
+        (number) => !rankedNumbers.includes(number),
     );
 
-    const updateUsers = (users: string[]) => {
-        setRankedUsers(users);
-        setDebouncedRankedUsers(users);
+    const debouncedRankedNumbers = useDebounceCallback((numbers: number[]) => {
+        propose({
+            evaluationId: Number(id),
+            groupNumber: Number(groupNumber),
+            proposal: numbers,
+        });
+    }, 2000);
+
+    const updateRankedNumbers = (numbers: number[]) => {
+        setRankedNumbers(numbers);
+        debouncedRankedNumbers(numbers);
     };
 
-    const onRemove = (user: string) => {
-        updateUsers(rankedUsers.filter((u) => u !== user));
+    const onRemove = (number: number) => {
+        updateRankedNumbers(rankedNumbers.filter((n) => n !== number));
     };
 
-    const onAdd = (user: string) => {
-        updateUsers([...rankedUsers, user]);
+    const onAdd = (number: number) => {
+        updateRankedNumbers([...rankedNumbers, number]);
     };
 
     const isSubmission = evaluation && now >= evaluation?.submissionStarts;
     const isFinished = evaluation && now >= evaluation?.finishBy;
 
-    const status = Status.parse(
-        isFinished
-            ? Status.Values.Finished
-            : isSubmission
-              ? Status.Values.Submission
-              : Status.Values.Deliberate,
-    );
-
-    if (status === Status.Values.Finished) {
-        navigate(`/${id}`);
-    }
-
     const description =
         evaluation && now >= evaluation.submissionStarts
-            ? `Submission deadline in ${humanize((evaluation.finishBy - now) * 1000)}`
+            ? now >= evaluation.finishBy
+                ? `Evaluation finished`
+                : `Submission deadline in ${humanize((evaluation.finishBy - now) * 1000)}`
             : evaluation && now >= evaluation.deliberationStarts
               ? `Deliberation deadline in ${humanize((evaluation.submissionStarts - now) * 1000)}`
               : "Registration";
 
+    const onSortEnd = (oldIndex: number, newIndex: number) => {
+        updateRankedNumbers(arrayMove(rankedNumbers, oldIndex, newIndex));
+    };
     return (
         <div className="flex max-w-screen-lg flex-col gap-4">
             <div className="flex justify-between">
@@ -97,26 +87,26 @@ export const GroupPage = () => {
             </div>
 
             <div>
-                <div>Ranked users</div>
+                <div>Ranked numbers</div>
                 <div className="text-sm text-muted-foreground">
                     Sort from highest to lowest in contribution.
                 </div>
                 <SortableList
-                    className="jss30 w-full border p-4"
+                    className="jss30 flex w-full flex-col gap-2 border p-4"
                     draggedItemClassName="jss32"
-                    onSortEnd={function noRefCheck() {}}
+                    onSortEnd={onSortEnd}
                 >
-                    {rankedUsers.map((user) => (
-                        <SortableItem key={user}>
+                    {rankedNumbers.map((number) => (
+                        <SortableItem key={number.toString()}>
                             <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
-                                <div className="flex-1">{user}</div>
+                                <div className="flex-1 text-lg">{number}</div>
                                 <SortableKnob>
                                     <AlignJustify className="h-6 w-6" />
                                 </SortableKnob>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => onRemove(user)}
+                                    onClick={() => onRemove(number)}
                                 >
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -135,17 +125,17 @@ export const GroupPage = () => {
                     </div>
                 </div>
                 <div className="flex w-full flex-col gap-2">
-                    {unrankedUsers && unrankedUsers.length > 0 ? (
-                        unrankedUsers.map((user) => (
+                    {unrankedNumbers && unrankedNumbers.length > 0 ? (
+                        unrankedNumbers.map((number) => (
                             <div
-                                key={user.key}
+                                key={number}
                                 className="flex w-full items-center justify-between rounded-sm border p-2"
                             >
-                                <div>{user.user}</div>
+                                <div>{number}</div>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => onAdd(user.user)}
+                                    onClick={() => onAdd(number)}
                                 >
                                     <Plus className="h-4 w-4" />
                                 </Button>

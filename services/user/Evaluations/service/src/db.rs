@@ -30,6 +30,7 @@ pub mod tables {
         pub finish_by: u32,
         pub use_hooks: bool,
         pub allowable_group_sizes: Vec<u8>,
+        pub rank_amount: u8,
     }
 
     #[table(name = "UserTable", index = 2)]
@@ -119,6 +120,7 @@ pub mod tables {
             deliberation_starts: u32,
             submission_starts: u32,
             finish_by: u32,
+            rank_amount: u8,
         ) -> Self {
             Self {
                 id,
@@ -130,6 +132,7 @@ pub mod tables {
                 finish_by,
                 use_hooks: false,
                 allowable_group_sizes,
+                rank_amount,
             }
         }
 

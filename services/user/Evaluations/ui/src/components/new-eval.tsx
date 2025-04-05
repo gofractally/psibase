@@ -26,6 +26,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
             submission: submission.toDate(),
             finishBy: finishBy.toDate(),
             allowableGroupSizes: [1, 2, 3, 4, 5, 6],
+            rankAmount: 6,
         },
         validators: {
             onSubmitAsync: async (data) => {
@@ -35,6 +36,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     submission,
                     finishBy,
                     allowableGroupSizes,
+                    rankAmount,
                 } = data.value;
 
                 try {
@@ -44,6 +46,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         registration: dayjs(registration).unix(),
                         submission: dayjs(submission).unix(),
                         allowableGroupSizes,
+                        rankAmount,
                     });
                 } catch (error) {
                     console.error(error);
@@ -177,6 +180,19 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     name="allowableGroupSizes"
                     children={(field) => (
                         <NumbersField label="Allowable Group Sizes" />
+                    )}
+                />
+                <form.AppField
+                    name="rankAmount"
+                    validators={{
+                        onChange: ({ value }) => {
+                            if (value < 2 || value > 255) {
+                                return "Rank amount must be between 2 and 255";
+                            }
+                        },
+                    }}
+                    children={(field) => (
+                        <field.NumberField label="Rank Amount" />
                     )}
                 />
                 <form.AppForm>

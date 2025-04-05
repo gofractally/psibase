@@ -4,14 +4,13 @@ import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
 import { Buffer } from "buffer";
 import { z } from "zod";
-import { zAccount } from "@lib/zod/Account";
 
 globalThis.Buffer = Buffer;
 
 const Params = z.object({
     evaluationId: z.number(),
     groupNumber: z.number(),
-    proposal: zAccount.array(),
+    proposal: z.number().array(),
 });
 
 export const usePropose = () => {
@@ -23,13 +22,17 @@ export const usePropose = () => {
             if (!currentUser) {
                 throw new Error("User not found");
             }
-
-            void (await getSupervisor().functionCall({
+            const pars = {
                 method: "propose",
                 service: "evaluations",
                 intf: "api",
-                params: [evaluationId, proposal],
-            }));
+                params: [evaluationId, groupNumber, proposal.map(String)],
+            };
+            console.log("Proposing...", pars);
+
+            void (await getSupervisor().functionCall(pars));
+
+            console.log("Proposed");
 
             queryClient.refetchQueries({
                 queryKey: ["group", evaluationId, groupNumber],
