@@ -131,6 +131,5 @@ mod service {
         None.or_else(|| serve_graphql(&request, Query))
             .or_else(|| serve_graphiql(&request))
             .or_else(|| serve_simple_ui::<staged_tx::Wrapper>(&request))
-            .or_else(|| serve_schema::<staged_tx::Wrapper>(&request))
     }
 }

@@ -5,7 +5,6 @@
 
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
-#include <psibase/serveSchema.hpp>
 
 using namespace psibase;
 using namespace SystemService;
@@ -689,10 +688,6 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest& request
          to_json(LoginReply{token}, stream);
          return reply;
       }
-   }
-   else if (auto res = serveSchema<Transact>(request))
-   {
-      return res;
    }
 
    return {};

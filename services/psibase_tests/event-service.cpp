@@ -88,8 +88,6 @@ PSIO_REFLECT(Query,  //
 
 std::optional<psibase::HttpReply> EventService::serveSys(psibase::HttpRequest request)
 {
-   if (auto result = serveSchema<EventService>(request))
-      return result;
    if (auto result = serveGraphQL(request, Query{}))
       return result;
 
