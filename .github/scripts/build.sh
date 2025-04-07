@@ -64,5 +64,7 @@ echo =====
 ${DOCKER} bash -c "cd build && cpack -G TGZ -D CPACK_PACKAGE_FILE_NAME=psidk-ubuntu-${UBUNTU_BUILD_VER}"
 echo =====
 ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.gz psidk-book"
-echo =====
-${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./services/user/ --init -v --name Buildtest --silent basic-01 && cd services/user/Buildtest && /root/psibase/build/psidk/bin/psibase package"
+echo =====1
+${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./services/user/ --init -v --name Buildtest --silent basic-01"
+echo =====2
+${DOCKER} bash -c "cd services/user/Buildtest && /root/psibase/build/rust/release/cargo-psibase package"
