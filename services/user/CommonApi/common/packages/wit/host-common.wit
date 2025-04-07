@@ -100,7 +100,7 @@ interface client {
     /// currently running plugin was fetched.
     my-service-origin: func() -> string;
     
-    /// `prompt-user` prompts the user for input. `prompt-user` will display the content at `subpath`, supplying `payload-json-str` as ?????
+    /// `prompt-user` prompts the user for input. `prompt-user` will display the content at `subpath`, supplying an arbitrary payload `payload-json-str`
     /// * `subpath`: Optional: the subpath to visit on the caller's subdomain to access the prompting
     /// * `payload-json-str`: Optional: any data payload that the prompt page may need as a serialized JSON string
     prompt-user: func(subpath: option<string>, payload-json-str: option<string>) -> result<_, error>;
