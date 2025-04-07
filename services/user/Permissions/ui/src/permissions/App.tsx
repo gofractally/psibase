@@ -1,55 +1,109 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@shadcn/button";
-import { Checkbox } from "@shadcn/checkbox";
 
-import { siblingUrl } from "@psibase/common-lib";
-import { Nav } from "@components/nav";
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+import { ActivePermsOauthRequest } from "./db";
 
-import { supervisor } from "./perms_main";
+const supervisor = getSupervisor();
 
 export const App = () => {
     const thisServiceName = "permissions";
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [params, setParams] = useState<any>({});
-    const [isValidPermRequest, setIsValidPermRequest] = useState<any>({});
-
-    const init = async () => {
-        await supervisor.onLoaded();
+    const [isLoading, setIsLoading] = useState(true);
+    const [validPermRequest, setValidPermRequest] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+    const initApp = async () => {
+        let permReqPayload;
+        try {
+            permReqPayload = await ActivePermsOauthRequest.get();
+        } catch (e) {
+            setError("Permissions request error: " + e);
+            setIsLoading(false);
+            return;
+        }
 
         const qps = getQueryParams();
-        setParams(qps);
+        if (qps.id && qps.id != permReqPayload.id) {
+            setError("Forged request detected.");
+            setIsLoading(false);
+            return;
+        }
 
-        const isValidRequest = await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "admin",
-            method: "isValidRequest",
-            params: [qps.caller, qps.callee],
-        });
-        setIsValidPermRequest(isValidRequest);
+        if (
+            !permReqPayload.user ||
+            !permReqPayload.caller ||
+            !permReqPayload.callee
+        ) {
+            setError("Invalid permissions request payload: missing fields.");
+            setIsLoading(false);
+            return;
+        }
 
+        setValidPermRequest(permReqPayload);
         setIsLoading(false);
     };
 
     useEffect(() => {
-        init();
+        initApp();
     }, []);
 
-    const accept = async () => {
-        try {
-            let res = await supervisor.functionCall({
-                service: thisServiceName,
-                intf: "api",
-                method: "savePermission",
-                params: [params.caller, params.callee],
-            });
-        } catch (e) {
-            console.error("error saving permission: ", e);
+    const followReturnRedirect = async () => {
+        const qps = getQueryParams();
+        if (window.top) {
+            window.top.location.href = siblingUrl(
+                null,
+                validPermRequest?.caller,
+                qps.returnUrlPath,
+                true,
+            );
         }
-        window.close();
     };
-    const deny = () => {
-        window.close();
+
+    const approve = async () => {
+        try {
+            await supervisor.functionCall({
+                service: thisServiceName,
+                intf: "admin",
+                method: "savePerm",
+                params: [
+                    validPermRequest?.user,
+                    validPermRequest?.caller,
+                    validPermRequest?.callee,
+                ],
+            });
+            await ActivePermsOauthRequest.delete();
+        } catch (e) {
+            if (e instanceof Error) {
+                setError(e.message);
+            } else {
+                setError("Unknown error saving permission");
+            }
+            throw e;
+        }
+        followReturnRedirect();
+    };
+    const deny = async () => {
+        try {
+            await supervisor.functionCall({
+                service: thisServiceName,
+                intf: "admin",
+                method: "delPerm",
+                params: [
+                    validPermRequest?.user,
+                    validPermRequest?.caller,
+                    validPermRequest?.callee,
+                ],
+            });
+            await ActivePermsOauthRequest.delete();
+        } catch (e) {
+            if (e instanceof Error) {
+                setError(e.message);
+            } else {
+                setError("Unknown error deleting permission");
+            }
+            throw e;
+        }
+        followReturnRedirect();
     };
     const getQueryParams = () => {
         const queryString = window.location.search;
@@ -57,27 +111,23 @@ export const App = () => {
         return Object.fromEntries(urlParams.entries());
     };
 
-    if (isLoading) {
+    if (error) {
+        return <div>{error}</div>;
+    } else if (isLoading) {
         return <div>Loading...</div>;
-    }
-
-    if (!params.caller || !params.callee) {
-        console.error("Malformed query params: ", window.location.href);
-    }
-
-    if (!isValidPermRequest) {
-        console.error("Forged request detected.");
-        return <div>Forged request detected.</div>;
     }
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Grant access?" />
+            <h2 style={{ textAlign: "center" }}>Grant access?</h2>
             <p>
-                {`"${params.caller}" is requesting full access to "${params.callee}".`}
+                {`"${validPermRequest.caller}" is requesting full access to "${validPermRequest.callee}".`}
             </p>
-            <Button onClick={accept}>Accept</Button>
-            <Button onClick={deny}>Deny</Button>
+            {!!error && <div>ERROR: {error}</div>}
+            <div className="flex justify-center gap-4">
+                <Button onClick={approve}>Approve</Button>
+                <Button onClick={deny}>Deny</Button>
+            </div>
         </div>
     );
 };
