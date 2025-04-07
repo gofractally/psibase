@@ -48,7 +48,6 @@ These help implement basic functionality:
 - [psibase::serve_simple_ui](https://docs.rs/psibase/latest/psibase/fn.serve_simple_ui.html)
 - [psibase::serve_simple_index](https://docs.rs/psibase/latest/psibase/fn.serve_simple_index.html)
 - [psibase::serve_action_templates](https://docs.rs/psibase/latest/psibase/fn.serve_action_templates.html)
-- [psibase::serve_schema](https://docs.rs/psibase/latest/psibase/fn.serve_schema.html)
 - [psibase::serve_pack_action](https://docs.rs/psibase/latest/psibase/fn.serve_pack_action.html)
 
 Here's a common pattern for using these functions.
@@ -73,8 +72,7 @@ mod service {
             });
         }
 
-        None.or_else(|| serve_schema::<Wrapper>(&request))
-            .or_else(|| serve_action_templates::<Wrapper>(&request))
+        None.or_else(|| serve_action_templates::<Wrapper>(&request))
             .or_else(|| serve_pack_action::<Wrapper>(&request))
     }
 }
