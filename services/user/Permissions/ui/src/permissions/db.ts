@@ -19,14 +19,17 @@ export class ActivePermsOauthRequest {
             service: "clientdata",
             intf: "keyvalue",
             method: "get",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY],
+        });
 
         if (!oauthReqBytes) {
-            throw new Error("No active oauth request found");
+            throw new Error("No active authorization request found");
         }
 
-        const oauthReq = zPermsOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
-        return oauthReq
+        const oauthReq = zPermsOauthRequest.parse(
+            JSON.parse(new TextDecoder().decode(oauthReqBytes)),
+        );
+        return oauthReq;
     }
 
     static async delete() {

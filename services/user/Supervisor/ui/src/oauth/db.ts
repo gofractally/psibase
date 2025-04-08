@@ -1,8 +1,8 @@
-import { Result } from '../hostInterface';
-import { RecoverableErrorPayload } from '../plugin/errors';
-import { OAUTH_REQUEST_KEY } from '../constants';
+import { Result } from "../hostInterface";
+import { RecoverableErrorPayload } from "../plugin/errors";
+import { OAUTH_REQUEST_KEY } from "../constants";
 import { getSupervisor } from "@psibase/common-lib";
-import { z } from 'zod';
+import { z } from "zod";
 
 export const supervisor = getSupervisor();
 
@@ -16,27 +16,34 @@ export const zOauthRequest = z.object({
 export type OauthRequest = z.infer<typeof zOauthRequest>;
 
 export class ActiveOauthRequest {
-    static async get(id: string): Promise<Result<OauthRequest, RecoverableErrorPayload>> {
+    static async get(
+        id: string,
+    ): Promise<Result<OauthRequest, RecoverableErrorPayload>> {
         const oauthReqBytes = await supervisor.functionCall({
             service: "clientdata",
             intf: "keyvalue",
             method: "get",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY],
+        });
 
         if (!oauthReqBytes) {
-            throw new Error("No active oauth request found");
+            throw new Error("No active authorization request found");
         }
 
-        const oauthReq = zOauthRequest.parse(JSON.parse(new TextDecoder().decode(oauthReqBytes)));
+        const oauthReq = zOauthRequest.parse(
+            JSON.parse(new TextDecoder().decode(oauthReqBytes)),
+        );
         if (id != oauthReq.id) {
             await this.delete();
-            throw new Error("Oauth request id mismatch");
+            throw new Error("Authorization request id mismatch");
         }
 
-        let isExpired = (Math.floor(new Date().getTime() / 1000) >= oauthReq.expiry_timestamp);
+        let isExpired =
+            Math.floor(new Date().getTime() / 1000) >=
+            oauthReq.expiry_timestamp;
         if (isExpired) {
             await this.delete();
-            throw new Error("Oauth request expired");
+            throw new Error("Authorization request expired");
         }
 
         return zOauthRequest.parse({
@@ -52,6 +59,7 @@ export class ActiveOauthRequest {
             service: "clientdata",
             intf: "keyvalue",
             method: "delete",
-            params: [OAUTH_REQUEST_KEY]});
+            params: [OAUTH_REQUEST_KEY],
+        });
     }
 }

@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
+import { ShieldAlert } from "lucide-react";
+
 import { siblingUrl } from "@psibase/common-lib";
+
+import { Card, CardHeader, CardTitle, CardDescription } from "@shadcn/card";
+
 import { ActiveOauthRequest, zOauthRequest, OauthRequest } from "./db";
 
 const buildIframeUrl = (promptUserReq: OauthRequest) => {
@@ -27,7 +32,7 @@ export const App = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const oauth_id = urlParams.get("id");
         if (!oauth_id) {
-            setError("OAuth request error: No id provided");
+            setError("Error: No ID provided");
             return;
         }
 
@@ -37,7 +42,7 @@ export const App = () => {
             setIframeUrl(buildIframeUrl(oauthReq));
             await ActiveOauthRequest.delete();
         } catch (e) {
-            setError("OAuth request error: " + e);
+            setError(String(e));
         }
     };
 
@@ -45,8 +50,24 @@ export const App = () => {
         initApp();
     }, []);
 
-    if (!!error) {
-        return <div>{error}</div>;
+    if (error) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+                <Card className="w-full max-w-md">
+                    <CardHeader className="text-center">
+                        <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
+                            <ShieldAlert className="text-primary h-8 w-8" />
+                        </div>
+                        <CardTitle className="text-2xl">
+                            App Permissions Error
+                        </CardTitle>
+                        <CardDescription>
+                            <strong>{error}</strong>
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </div>
+        );
     }
 
     return (
@@ -55,16 +76,14 @@ export const App = () => {
                 width: "100%",
                 height: "100dvh",
                 display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
             }}
         >
             {iframeUrl && (
                 <iframe
                     src={iframeUrl}
                     style={{
-                        width: "50%",
-                        height: "50dvh",
+                        width: "100%",
+                        height: "100%",
                         border: "none",
                     }}
                 />
