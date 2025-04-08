@@ -5,7 +5,6 @@
 #include <psibase/serveActionTemplates.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <psibase/servePackAction.hpp>
-#include <psibase/serveSchema.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <regex>
 #include <services/system/Accounts.hpp>
@@ -730,9 +729,6 @@ namespace SystemService
 
    std::optional<HttpReply> Sites::serveSitesApp(const HttpRequest& request)
    {
-      if (auto result = psibase::serveSchema<Sites>(request))
-         return result;
-
       if (auto result = psibase::serveGraphQL(request, Query{getReceiver()}))
          return result;
 

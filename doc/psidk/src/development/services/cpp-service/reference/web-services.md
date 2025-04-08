@@ -56,7 +56,6 @@ These help implement basic functionality:
 - [psibase::serveSimpleUI]
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
-- [psibase::serveSchema]
 - [psibase::serveGraphQL]
 - [psibase::makeConnection]
   - [psibase::PageInfo]
@@ -92,7 +91,6 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveSimpleUI}}
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
-{{#cpp-doc ::psibase::serveSchema}}
 {{#cpp-doc ::psibase::serveGraphQL}}
 {{#cpp-doc ::psibase::makeConnection}}
 {{#cpp-doc ::psibase::PageInfo}}

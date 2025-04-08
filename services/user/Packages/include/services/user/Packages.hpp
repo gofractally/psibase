@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psibase/psibase.hpp>
+#include <psibase/schema.hpp>
 
 namespace UserService
 {

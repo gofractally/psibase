@@ -3,7 +3,6 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psibase/serveSchema.hpp>
 #include <services/system/SetCode.hpp>
 
 namespace SystemService
@@ -91,9 +90,7 @@ namespace SystemService
 
    std::optional<psibase::HttpReply> RSetCode::serveSys(psibase::HttpRequest request)
    {
-      if (auto result = psibase::serveSchema<SetCode>(request))
-         return result;
-      else if (auto result = psibase::serveGraphQL(request, Query{}))
+      if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       return std::nullopt;
    }
