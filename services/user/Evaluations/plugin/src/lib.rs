@@ -17,6 +17,7 @@ use psibase::{
 
 mod errors;
 
+pub mod consensus;
 mod key_table;
 pub mod types;
 
@@ -170,7 +171,7 @@ fn get_symmetric_key(
 
             payloads.push(
                 encrypt(&user_setting.key, &new_shared_symmetric_key)
-                    .expect(("failed encrypting messages")),
+                    .expect("failed encrypting messages"),
             );
         });
 
@@ -189,15 +190,11 @@ fn get_symmetric_key(
     // }
 }
 
-fn get_submissions(
+fn get_decrypted_submissions(
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<Vec<Vec<u8>>, Error> {
-    // fetch the submissions from graphql
-    // decrypt them with the symmetric key
-    // return the submissions
-
     let res = fetch_and_decode(evaluation_id, group_number)?;
     let submissions = res.getGroupUsers.unwrap();
 
@@ -283,12 +280,22 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("close", &packed_args)
     }
 
-    fn attest(evaluation_id: u32, group_number: u32, user: String) -> Result<Vec<Vec<u8>>, Error> {
-        get_submissions(
+    fn attest(evaluation_id: u32, group_number: u32, user: String) -> Result<(), Error> {
+        let submissions = get_decrypted_submissions(
             evaluation_id,
             group_number,
             AccountNumber::from_str(user.as_str()).expect("user is not an account number"),
         )
+        .expect("failed getting submissions");
+
+        let consensus = consensus::calculate_consensus(submissions, 99);
+
+        let packed_args = evaluations::action_structs::attest {
+            evaluation_id,
+            submission: consensus,
+        }
+        .packed();
+        add_action_to_transaction("attest", &packed_args)
     }
 
     fn propose(
@@ -296,7 +303,7 @@ impl Api for EvaluationsPlugin {
         group_number: u32,
         proposal: Vec<String>,
         user: String,
-    ) -> Result<String, Error> {
+    ) -> Result<(), Error> {
         let (symmetric_key, salt) = get_symmetric_key(
             evaluation_id,
             group_number,
@@ -318,8 +325,7 @@ impl Api for EvaluationsPlugin {
         }
         .packed();
 
-        add_action_to_transaction("propose", &packed_args)?;
-        Ok("should have pushed...".to_string())
+        add_action_to_transaction("propose", &packed_args)
     }
 }
 

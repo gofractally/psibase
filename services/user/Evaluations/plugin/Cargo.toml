@@ -13,6 +13,7 @@ serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
 ecies = {version = "0.2", default-features = false, features = ["pure"]}
 rand = "0.8.5"
+average = "0.10.0"
 
 [lib]
 crate-type = ["cdylib"]

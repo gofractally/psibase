@@ -71,7 +71,6 @@ impl TryParseGqlResponse for GetUserSettingsResponse {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
