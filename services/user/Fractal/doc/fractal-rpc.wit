@@ -1,0 +1,25 @@
+interface types {
+    @since(feature = member-fractals)
+    enum member-type {
+        user,
+        fractal,
+    }
+
+    record member {
+        // ...member
+        @since(feature = member-fractals)
+        type: member-type,
+    }
+}
+
+
+interface fractal-queries {
+    get-members: func(fractal: account, member-type: option<member-type>, titles: option<u32>) -> option<list<member>>;
+    get-member: func(fractal: account, account: string) -> option<member>;
+
+    @since(feature = fractal-creation)
+    get-fractal: func(fractal: account) -> fractal;
+
+    get-delegates: func(fractal: account) -> list<account>;
+    get-council: func(fractal: account) -> list<account>;
+}
