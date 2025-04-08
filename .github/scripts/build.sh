@@ -41,6 +41,7 @@ DOCKER="docker run --rm \
   -e RUSTC_WRAPPER \
   -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
   -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
+  -e USER \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
 
@@ -51,7 +52,8 @@ echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== build start ====="
 mkdir -p build
-${DOCKER} bash -c "export USER=\$(getent passwd \$(id -u) | cut -d: -f1)"
+# Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
+# ${DOCKER} bash -c "export USER=\$(getent passwd \$(id -u) | cut -d: -f1)"
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
 ${DOCKER} bash -c "cd build && make -j $(nproc) && ( echo '===== sccache ====='; sccache -s; echo '===== ccache ====='; ccache -s )"
 echo =====
