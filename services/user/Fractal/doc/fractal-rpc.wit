@@ -14,6 +14,7 @@ interface types {
 
 
 interface fractal-queries {
+    // if it can be calculated in a query, don't put it in state (to minimize complexity out the gate)
     get-members: func(fractal: account, member-type: option<member-type>, titles: option<u32>) -> option<list<member>>;
     get-member: func(fractal: account, account: string) -> option<member>;
 
