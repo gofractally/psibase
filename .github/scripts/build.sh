@@ -54,6 +54,7 @@ echo "===== build start ====="
 mkdir -p build
 # Ensure there's a $USER environment variable set with username corresponding to the uid of the user running the container
 # ${DOCKER} bash -c "export USER=\$(getent passwd \$(id -u) | cut -d: -f1)"
+${DOCKER} bash -c "echo USER: $USER"
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
 ${DOCKER} bash -c "cd build && make -j $(nproc) && ( echo '===== sccache ====='; sccache -s; echo '===== ccache ====='; ccache -s )"
 echo =====
@@ -70,4 +71,9 @@ ${DOCKER} bash -c "cd build && mv book psidk-book && tar czf ../psidk-book.tar.g
 echo =====1
 ${DOCKER} bash -c "cargo generate -p ./package-templates/ --destination ./services/user/ --init -v --name Buildtest --silent basic-01"
 echo =====2
-${DOCKER} bash -c "cd services/user/Buildtest && /root/psibase/build/rust/release/cargo-psibase package"
+${DOCKER} bash -c "ls -la /home/runner/work/psibase/psibase"
+${DOCKER} bash -c "ls -la /home/runner/work/psibase/psibase/build/rust/release"
+echo =====3
+# ${DOCKER} bash -c "chmod -R 777 /root/psibase/build/rust/release/cargo-psibase"
+# echo =====4
+${DOCKER} bash -c "cd services/user/Buildtest && /home/runner/work/psibase/psibase/build/rust/release/cargo-psibase package"
