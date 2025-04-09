@@ -1,15 +1,3 @@
-/// This .wit file acts as a spec for multiple implementation phases of the Fractal service.
-/// feature gating is used to show the phases.
-/// The phases are expected to progress as follows:
-/// v1: ungated features
-/// v2:
-/// - petitions
-/// - schduled-meetings
-/// v3:
-/// - member-fractals
-/// v4:
-/// - fractal-invites // referral rewards
-/// 
 /// WIT Spec
 /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md#wit-worlds
 
@@ -20,7 +8,7 @@ interface types {
     }
 
     record fractal {
-        service: account, // Primary key
+        account: account, // Primary key
         created-at: timepointsec,
         name: string,
         mission: string,
@@ -38,7 +26,7 @@ interface types {
         @since(feature = fractal-invites)
         inviter: option<account>,
         // display name, bio, avatar - stored in `sites` service
-        joined-at: timestamp,
+        joined-at: timepointsec,
         titles: u32,
     }
 
@@ -63,7 +51,7 @@ interface types {
 
 // Don't need to pass fractal account, the caller is always the fractal
 interface fractal {
-    create-fractal: func(details: details);
+    create-fractal: func(name: string, mission: string);
     set-name: func(name: string);
     set-mission: func(mission: string);
 

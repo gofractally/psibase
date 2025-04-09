@@ -1,0 +1,11 @@
+/// This .wit file acts as a spec for multiple implementation phases of the Fractal service.
+/// feature gating is used to show the phases.
+/// The phases are expected to progress as follows:
+/// v1: ungated features
+/// v2:
+/// - petitions
+/// - schduled-meetings
+/// v3:
+/// - member-fractals
+/// v4:
+/// - fractal-invites // referral rewards
