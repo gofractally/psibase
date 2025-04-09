@@ -1,3 +1,6 @@
+/// WIT Spec
+/// https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md#wit-worlds
+
 interface types {
     @since(feature = scheduled-meetings)
     record meeting-config {
@@ -5,7 +8,7 @@ interface types {
     }
 
     record fractal {
-        service: account, // Primary key
+        account: account, // Primary key
         created-at: timepointsec,
         name: string,
         mission: string,
@@ -19,11 +22,12 @@ interface types {
     // @since(feature = member-fractals)
     // ambassador, u32(1) << 1;
     record member {
-        account: account, // primary key
-        @since(feature = invites)
+        fractal: account, // { primary key
+        account: account, // primary key }
+        @since(feature = fractal-invites)
         inviter: option<account>,
         // display name, bio, avatar - stored in `sites` service
-        joined-at: timestamp,
+        joined-at: timepointsec,
         titles: u32,
     }
 
@@ -48,7 +52,7 @@ interface types {
 
 // Don't need to pass fractal account, the caller is always the fractal
 interface fractal {
-    create-fractal: func(details: details);
+    create-fractal: func(name: string, mission: string);
     set-name: func(name: string);
     set-mission: func(mission: string);
 
@@ -60,7 +64,7 @@ interface member {
     join-waitlist: func(fractal: account);
     config-candidacy: func(fractal: account, enable: bool);
 
-    @since(feature = invites)
+    @since(feature = fractal-invites)
     invite: func(fractal: account, account: account);
 
     @since(feature = petitions)
