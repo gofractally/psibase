@@ -15,7 +15,7 @@ use psibase::{
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    PackageRegistry, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
     TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
@@ -1063,11 +1063,13 @@ async fn apply_packages<
     key: &Option<AnyPublicKey>,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
+    let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
             PackageOp::Install(info) => {
                 // TODO: verify ownership of existing accounts
                 let mut package = reg.get_by_info(&info).await?;
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 out.set_label(format!("Installing {}-{}", &info.name, &info.version));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
@@ -1083,12 +1085,14 @@ async fn apply_packages<
                     sender,
                     true,
                     compression_level,
+                    &mut schemas,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
             PackageOp::Replace(meta, info) => {
                 let mut package = reg.get_by_info(&info).await?;
+                package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
@@ -1112,6 +1116,7 @@ async fn apply_packages<
                     sender,
                     true,
                     compression_level,
+                    &mut schemas,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
