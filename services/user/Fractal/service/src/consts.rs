@@ -1,0 +1,1 @@
+pub const CANDIDATE_TITLE_BIT_OFFSET: u32 = 0;
