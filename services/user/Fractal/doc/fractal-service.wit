@@ -22,7 +22,8 @@ interface types {
     // @since(feature = member-fractals)
     // ambassador, u32(1) << 1;
     record member {
-        account: account, // primary key
+        fractal: account, // { primary key
+        account: account, // primary key }
         @since(feature = fractal-invites)
         inviter: option<account>,
         // display name, bio, avatar - stored in `sites` service
