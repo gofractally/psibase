@@ -1122,7 +1122,10 @@ impl<'a> CompiledSchema<'a> {
         }
     }
     fn get_by_id(&self, id: usize) -> &CompiledType {
-        &self.types[id]
+        match &self.types[id] {
+            CompiledType::Alias(next) => &self.types[*next],
+            ty => ty,
+        }
     }
 
     /// Looks up a CompiledType
