@@ -39,8 +39,8 @@ pub mod tables {
 
     impl Member {
         #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
         }
     }
 

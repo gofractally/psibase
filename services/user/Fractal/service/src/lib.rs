@@ -85,9 +85,9 @@ pub mod service {
     }
 
     #[action]
-    fn config_candidacy(_fractal: AccountNumber, enable: bool) {
+    fn config_candidacy(fractal: AccountNumber, enable: bool) {
         let table = MemberTable::new();
-        let mut member = table.get_index_pk().get(&get_sender()).unwrap_or_default();
+        let mut member = table.get_index_pk().get(&(fractal, get_sender())).unwrap_or_default();
         member.titles |= (enable as u32) << consts::CANDIDATE_TITLE_BIT_OFFSET;
         table.put(&member).unwrap();
     }
