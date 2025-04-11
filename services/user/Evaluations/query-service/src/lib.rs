@@ -26,18 +26,16 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn historical_updates(
+        async fn get_group_key(
             &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
+            evaluation_id: u32,
+            group_number: u32,
         ) -> async_graphql::Result<Connection<u64, KeysSet>> {
             EventQuery::new("history.evaluations.keysset")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
+                .condition(format!(
+                    "evaluation_id = {} AND group_number = {}",
+                    evaluation_id, group_number
+                ))
                 .query()
         }
 

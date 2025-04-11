@@ -235,7 +235,7 @@ pub mod service {
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
 
         let mut user = User::get(evaluation_id, sender);
-        
+
         user.proposal = Some(proposal);
         user.save();
     }
@@ -257,6 +257,7 @@ pub mod service {
         let mut group = Group::get(evaluation_id, user.group_number.unwrap());
 
         check(group.key_submitter.is_some(), "cannot attest without key");
+        check(group.result.is_none(), "group result already set");
 
         if group.result.is_none() {
             let result = helpers::get_group_result(evaluation_id, user.group_number.unwrap());

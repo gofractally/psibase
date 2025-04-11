@@ -6,6 +6,7 @@ world impl {
     include sites:plugin/imports;
     include clientdata:plugin/imports;
     include aes:plugin/imports;
+    include base64:plugin/imports;
 
 
     export api;

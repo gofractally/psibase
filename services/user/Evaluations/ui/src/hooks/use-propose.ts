@@ -1,11 +1,11 @@
-import { queryClient } from "@/main";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
-import { Buffer } from "buffer";
 import { z } from "zod";
-
-globalThis.Buffer = Buffer;
+import { useDebounceCallback } from "usehooks-ts";
+import { useRef } from "react";
+import { getProposal } from "@lib/getProposal";
+import { setCachedProposal } from "./use-proposal";
 
 const Params = z.object({
     evaluationId: z.number(),
@@ -13,8 +13,11 @@ const Params = z.object({
     proposal: z.number().array(),
 });
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const usePropose = () => {
     const { data: currentUser } = useCurrentUser();
+
     return useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
             const { evaluationId, groupNumber, proposal } =
@@ -36,15 +39,6 @@ export const usePropose = () => {
             console.log("Proposing...", pars);
 
             void (await getSupervisor().functionCall(pars));
-
-            console.log("Proposed");
-
-            queryClient.refetchQueries({
-                queryKey: ["group", evaluationId, groupNumber],
-            });
-        },
-        onError(error) {
-            console.error(error, "is error");
         },
     });
 };

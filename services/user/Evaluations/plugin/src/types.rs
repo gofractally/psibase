@@ -23,7 +23,7 @@ pub struct EvaluationRecordSubset {
 }
 
 #[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
+#[derive(Deserialize, Pack, Unpack, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupUserSubset {
     pub user: String,
@@ -32,8 +32,16 @@ pub struct GroupUserSubset {
 }
 
 #[allow(non_snake_case)]
+#[derive(Deserialize, Pack, Unpack, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EvaluationRecord {
+    pub rankAmount: u8,
+}
+
+#[allow(non_snake_case)]
 #[derive(Deserialize)]
 pub struct GetEvaluationResponse {
+    pub getEvaluation: Option<EvaluationRecord>,
     pub getGroup: Option<EvaluationRecordSubset>,
     pub getGroupUsers: Option<Vec<GroupUserSubset>>,
 }
@@ -99,11 +107,13 @@ pub struct Edge {
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyHistoryResponse {
-    pub historicalUpdates: KeyHistoryRoot,
+    pub getGroupKey: KeyHistoryRoot,
 }
 
-impl TryParseGqlResponse for KeyHistoryResponse {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+impl TryFrom<String> for KeyHistoryResponse {
+    type Error = CommonTypes::Error;
+
+    fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<KeyHistoryResponse> =
             serde_json::from_str(&response).map_err(|e| QueryResponseParseError(e.to_string()))?;
 

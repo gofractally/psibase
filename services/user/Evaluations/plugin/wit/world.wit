@@ -2,32 +2,28 @@ package evaluations:plugin;
 
 
 interface types {
-
     type account = string;
-
-
-
 }
 
 interface api {
     use host:common/types.{error};
     use types.{account};
     
-
     create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, rank-amount: u8) -> result<_, error>;
 
     register: func(id: u32, account: account) -> result<_, error>;
+
     unregister: func(id: u32) -> result<_, error>;
 
     start: func(id: u32, entropy: u64) -> result<_, error>;
 
-    // get-votes: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
-
     close: func(evaluation-id: u32) -> result<_, error>;
+
     attest: func(evaluation-id: u32, group-number: u32, user: account) -> result<_, error>;
 
     propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>, user: account) -> result<_, error>;
 
+    get-proposal: func(evaluation-id: u32, group-number: u32, user: account) -> result<option<list<u8>>, error>;
 
     refresh-key: func(key: list<u8>) -> result<_, error>;
    

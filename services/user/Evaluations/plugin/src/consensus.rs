@@ -44,8 +44,15 @@ pub fn get_level(option: &u8, ranked_options: &Vec<u8>, options_size: u8) -> u8 
         .unwrap_or(0)
 }
 
-pub fn calculate_consensus(submissions: Vec<Vec<u8>>, options_size: u8) -> Vec<u8> {
-    let ranked_options = remove_eliminated_options(submissions, options_size);
+pub fn calculate_consensus(submissions: Vec<Option<Vec<u8>>>, options_size: u8) -> Vec<u8> {
+    let ranked_options = remove_eliminated_options(
+        submissions
+            .into_iter()
+            .filter(|sub| sub.is_some())
+            .map(|sub| sub.unwrap())
+            .collect(),
+        options_size,
+    );
     let unique_ranked_options: HashSet<u8> = ranked_options.iter().flatten().cloned().collect();
 
     let mut results: Vec<(u8, f64)> = unique_ranked_options

@@ -1879,6 +1879,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "sha2",
  "wit-bindgen-rt 0.30.0",
 ]
 

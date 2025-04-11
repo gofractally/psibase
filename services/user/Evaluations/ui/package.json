@@ -38,6 +38,8 @@
         "react-dom": "^18.2.0",
         "react-easy-sort": "^1.6.0",
         "react-router-dom": "^6.23.1",
+        "react-rx": "^4.1.27",
+        "rxjs": "^7.8.2",
         "sonner": "^1.7.1",
         "tailwind-merge": "^2.3.0",
         "tailwindcss-animate": "^1.0.7",

@@ -3,25 +3,19 @@ mod bindings;
 
 use std::str::FromStr;
 
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::evaluations::plugin::api::Guest as Api;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
-use ecies::{decrypt, encrypt, utils::generate_keypair, PublicKey, SecretKey};
+use ecies::{decrypt, encrypt};
 
-use psibase::{
-    fracpack::{Pack, Unpack},
-    get_sender, AccountNumber,
-};
-
-mod errors;
+use psibase::{fracpack::Pack, AccountNumber};
 
 pub mod consensus;
+mod errors;
 mod key_table;
 pub mod types;
 
-use rand::Rng;
 use types::{
     GetEvaluationResponse, GetUserSettingsResponse, KeyHistoryResponse, TryParseGqlResponse,
     UserSetting,
@@ -29,6 +23,10 @@ use types::{
 
 use errors::ErrorType;
 struct EvaluationsPlugin;
+
+fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {
+    AccountNumber::from_str(s).map_err(|_| ErrorType::InvalidAccountNumber.into())
+}
 
 fn fetch_and_decode(
     evaluation_id: u32,
@@ -38,6 +36,9 @@ fn fetch_and_decode(
 
     let query = format!(
         r#"query {{
+            getEvaluation(id: {id}) {{
+                rankAmount
+            }}
             getGroup(id: {id}, groupNumber: {group_number}) {{
                 evaluationId
                 keySubmitter
@@ -70,7 +71,7 @@ fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettingsRe
 fn fetch_key_history() -> Result<KeyHistoryResponse, Error> {
     let query = format!(
         r#"query {{
-            historicalUpdates(first: 99) {{
+            getGroupKey(first: 99) {{
                 edges {{
                     node {{
                         evaluationId
@@ -83,137 +84,150 @@ fn fetch_key_history() -> Result<KeyHistoryResponse, Error> {
         }}"#
     );
 
-    KeyHistoryResponse::from_gql(CommonServer::post_graphql_get_json(&query)?)
+    KeyHistoryResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
 }
-
 fn get_symmetric_key(
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
-) -> Result<(Vec<u8>, String), Error> {
-    let key = format!("symmetric_key_{}", evaluation_id);
-    let symmetric_key = Keyvalue::get(&key);
-    // if symmetric_key.is_some() {
-    //     return Ok((symmetric_key.unwrap(), "salty".to_string()));
-    // } else {
-    let res = fetch_and_decode(evaluation_id, group_number)?;
-    let group = res.getGroup.expect("group is none");
-    let users = res.getGroupUsers.expect("users are none");
-
-    let is_already_symmetric_key_created = group.keySubmitter.is_some();
-
-    let mut sorted_users_by_alphabetical_order = users;
-
-    sorted_users_by_alphabetical_order.sort_by(|a, b| {
-        let a_account_number =
-            psibase::AccountNumber::from_str(a.user.as_str()).expect("a is not an account number");
-        let b_account_number =
-            psibase::AccountNumber::from_str(b.user.as_str()).expect("b is not an account number");
-        a_account_number.value.cmp(&b_account_number.value)
-    });
-
-    let user_settings: Vec<UserSetting> = fetch_user_settings(
-        sorted_users_by_alphabetical_order
-            .iter()
-            .map(|user| user.user.clone())
-            .collect(),
-    )?
-    .getUserSettings
-    .into_iter()
-    .map(|setting| setting.expect("setting is none"))
-    .collect();
-
-    if is_already_symmetric_key_created {
-        // fetch the key from graphql and decrypt it with the asymmetric key;
-
-        let my_index = sorted_users_by_alphabetical_order
-            .iter()
-            .position(|user| {
-                psibase::AccountNumber::from_str(user.user.as_str())
-                    .expect("user is not an account number")
-                    .value
-                    == sender.value
-            })
-            .expect("failed to find my index");
-
-        let key_history = fetch_key_history().expect("failed to fetch key history");
-        let key_history_edges = key_history.historicalUpdates.edges;
-        let relevant_evaluation = key_history_edges
-            .iter()
-            .find(|edge| edge.node.evaluationId == evaluation_id.to_string())
-            .expect("failed to find relevant evaluation");
-
-        // get it from events.
-        let my_cipher = &relevant_evaluation.node.keys[my_index];
-
-        let my_asymmetric_key =
-            key_table::get_latest().expect("failed to get latest asymmetric key");
-
-        let my_key =
-            decrypt(&my_asymmetric_key.private_key, &my_cipher).expect("failed to decrypt");
-
-        // TODO: hash my_key and compare it with the keyHash in the group
-
-        let key = format!("symmetric_key_{}", evaluation_id);
-        Keyvalue::set(&key, &my_key).expect("Failed to set private key");
-
-        return Ok((my_key, "salty".to_string()));
-    } else {
-        let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().gen();
-
-        let mut payloads: Vec<Vec<u8>> = vec![];
-
-        sorted_users_by_alphabetical_order.iter().for_each(|user| {
-            let user_setting = user_settings
-                .iter()
-                .find(|setting| setting.user == user.user)
-                .unwrap();
-
-            payloads.push(
-                encrypt(&user_setting.key, &new_shared_symmetric_key)
-                    .expect("failed encrypting messages"),
-            );
-        });
-
-        let hash = "derp".to_string();
-
-        let packed_args = evaluations::action_structs::groupKey {
-            evaluation_id,
-            keys: payloads,
-            hash,
-        }
-        .packed();
-        add_action_to_transaction("groupKey", &packed_args);
-
-        return Ok((new_shared_symmetric_key.to_vec(), "salty".to_string()));
+) -> Result<key_table::SymmetricKey, Error> {
+    if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id, group_number) {
+        return Ok(key);
     }
-    // }
+
+    let res = fetch_and_decode(evaluation_id, group_number)?;
+    let group = res.getGroup.ok_or(ErrorType::GroupNotFound)?;
+    let users = res.getGroupUsers.ok_or(ErrorType::UsersNotFound)?;
+
+    if group.keySubmitter.is_some() {
+        decrypt_existing_key(evaluation_id, group_number, sender, &users)
+    } else {
+        create_new_symmetric_key(evaluation_id, group_number, &users)
+    }
+}
+
+fn decrypt_existing_key(
+    evaluation_id: u32,
+    group_number: u32,
+    sender: AccountNumber,
+    users: &Vec<types::GroupUserSubset>,
+) -> Result<key_table::SymmetricKey, Error> {
+    let sorted_users = sort_users_by_account(users)?;
+    let my_index = sorted_users
+        .iter()
+        .position(|user| parse_account_number(&user.user).unwrap() == sender)
+        .ok_or(ErrorType::UserNotFound)?;
+
+    let key_history = fetch_key_history()?;
+    let edge = key_history
+        .getGroupKey
+        .edges
+        .iter()
+        .find(|edge| edge.node.evaluationId == evaluation_id.to_string())
+        .ok_or(ErrorType::FailedToFindEvaluation)?;
+
+    let my_cipher = &edge.node.keys[my_index];
+    let my_asymmetric_key = key_table::get_latest().ok_or(ErrorType::NoAsymmetricKey)?;
+    let decrypted_key = decrypt(&my_asymmetric_key.private_key, my_cipher)
+        .map_err(|_| ErrorType::FailedToDecryptKey)?;
+
+    let symmetric_key = key_table::SymmetricKey::new(decrypted_key, evaluation_id, group_number);
+    if edge.node.hash != symmetric_key.hash() {
+        return Err(ErrorType::KeyMismatch.into());
+    }
+
+    symmetric_key.save(evaluation_id)?;
+    Ok(symmetric_key)
+}
+
+fn sort_users_by_account(
+    users: &Vec<types::GroupUserSubset>,
+) -> Result<Vec<types::GroupUserSubset>, Error> {
+    let mut sorted = users.clone();
+    sorted.sort_by(|a, b| {
+        parse_account_number(&a.user)
+            .map(|a| a.value)
+            .unwrap_or(0)
+            .cmp(&parse_account_number(&b.user).map(|b| b.value).unwrap_or(0))
+    });
+    Ok(sorted)
+}
+
+fn create_new_symmetric_key(
+    evaluation_id: u32,
+    group_number: u32,
+    users: &Vec<types::GroupUserSubset>,
+) -> Result<key_table::SymmetricKey, Error> {
+    let symmetric_key = key_table::SymmetricKey::generate(evaluation_id, group_number);
+    let sorted_users = sort_users_by_account(users)?;
+    let user_settings =
+        fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.getUserSettings;
+
+    let payloads: Vec<Vec<u8>> = sorted_users
+        .iter()
+        .map(|user| {
+            let setting = user_settings
+                .iter()
+                .find(|s| s.as_ref().map(|s| s.user == user.user).unwrap_or(false))
+                .and_then(|s| s.as_ref())
+                .ok_or(ErrorType::UserSettingNotFound)?;
+            encrypt(&setting.key, &symmetric_key.key).map_err(|_| ErrorType::EncryptionFailed)
+        })
+        .collect::<Result<_, _>>()?;
+
+    let hash = symmetric_key.hash();
+    let packed_args = evaluations::action_structs::groupKey {
+        evaluation_id,
+        keys: payloads,
+        hash,
+    }
+    .packed();
+    add_action_to_transaction("groupKey", &packed_args)?;
+    Ok(symmetric_key)
 }
 
 fn get_decrypted_submissions(
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
-) -> Result<Vec<Vec<u8>>, Error> {
+) -> Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error> {
     let res = fetch_and_decode(evaluation_id, group_number)?;
-    let submissions = res.getGroupUsers.unwrap();
+    let mut submissions = res.getGroupUsers.unwrap();
 
-    let (symmetric_key, salt) = get_symmetric_key(evaluation_id, group_number, sender)?;
+    submissions.sort_by(|a, b| {
+        psibase::AccountNumber::from_str(a.user.as_str())
+            .unwrap()
+            .value
+            .cmp(
+                &psibase::AccountNumber::from_str(b.user.as_str())
+                    .unwrap()
+                    .value,
+            )
+    });
+
+    let symmetric_key = get_symmetric_key(evaluation_id, group_number, sender)?;
 
     let subs = submissions
         .into_iter()
-        .filter(|s| s.proposal.is_some())
         .map(|s| {
-            let decrypted: Vec<u8> = bindings::aes::plugin::with_password::decrypt(
-                &symmetric_key,
-                &s.proposal.as_ref().unwrap(),
-                &salt,
-            )
-            .unwrap();
-
-            decrypted
+            let user = AccountNumber::from_str(s.user.as_str()).unwrap();
+            if s.proposal.is_some() {
+                (
+                    user,
+                    Some(
+                        bindings::aes::plugin::with_password::decrypt(
+                            &symmetric_key.key,
+                            &s.proposal.as_ref().unwrap(),
+                            &symmetric_key.salt,
+                        )
+                        .unwrap(),
+                    ),
+                )
+            } else {
+                (user, None)
+            }
         })
-        .collect::<Vec<Vec<u8>>>();
+        .collect::<Vec<(AccountNumber, Option<Vec<u8>>)>>();
 
     Ok(subs)
 }
@@ -288,7 +302,14 @@ impl Api for EvaluationsPlugin {
         )
         .expect("failed getting submissions");
 
-        let consensus = consensus::calculate_consensus(submissions, 99);
+        let evaluation = fetch_and_decode(evaluation_id, group_number)?;
+        let consensus = consensus::calculate_consensus(
+            submissions
+                .into_iter()
+                .map(|(_, submission)| submission)
+                .collect(),
+            evaluation.getEvaluation.unwrap().rankAmount,
+        );
 
         let packed_args = evaluations::action_structs::attest {
             evaluation_id,
@@ -298,26 +319,50 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("attest", &packed_args)
     }
 
+    fn get_proposal(
+        evaluation_id: u32,
+        group_number: u32,
+        user: String,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        let submissions = get_decrypted_submissions(
+            evaluation_id,
+            group_number,
+            AccountNumber::from_str(user.as_str()).expect("user is not an account number"),
+        )?;
+
+        let user_account =
+            AccountNumber::from_str(user.as_str()).expect("user is not an account number");
+
+        let user_submission = submissions
+            .into_iter()
+            .find(|(account, _)| account.value == user_account.value)
+            .expect("user submission is not found");
+
+        Ok(user_submission.1)
+    }
+
     fn propose(
         evaluation_id: u32,
         group_number: u32,
         proposal: Vec<String>,
         user: String,
     ) -> Result<(), Error> {
-        let (symmetric_key, salt) = get_symmetric_key(
+        let symmetric_key = get_symmetric_key(
             evaluation_id,
             group_number,
             AccountNumber::from_str(user.as_str()).expect("user is not an account number"),
         )?;
 
-        let proposal = proposal
+        let parsed_proposal = proposal
             .iter()
-            .map(|p| p.as_bytes())
-            .collect::<Vec<&[u8]>>()
-            .concat();
+            .map(|p| p.parse::<u8>().unwrap())
+            .collect::<Vec<u8>>();
 
-        let encrypted_proposal =
-            bindings::aes::plugin::with_password::encrypt(&symmetric_key, &proposal, &salt);
+        let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
+            &symmetric_key.key,
+            &parsed_proposal,
+            &symmetric_key.salt,
+        );
 
         let packed_args = evaluations::action_structs::propose {
             evaluation_id,
