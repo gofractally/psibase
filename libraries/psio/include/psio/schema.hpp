@@ -1218,7 +1218,7 @@ namespace psio
             }
             else
             {
-               static_assert(false, "Only float and double are supported");
+               static_assert(std::is_same_v<T, float>, "Only float and double are supported");
             }
             if (errno || end != s.c_str() + s.size())
                abort_error(from_json_error::expected_number);
