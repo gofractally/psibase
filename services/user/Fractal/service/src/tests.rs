@@ -12,9 +12,9 @@ mod tests {
         let alice = AccountNumber::from("alice");
         chain.new_account(alice).unwrap();
 
-        Wrapper::push_from(&chain, alice)
-            .setExampleThing("a new thing".to_string())
-            .get()?;
+        // Wrapper::push_from(&chain, alice)
+        //     .setExampleThing("a new thing".to_string())
+        //     .get()?;
 
         Ok(())
     }

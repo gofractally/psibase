@@ -3,7 +3,7 @@ mod consts;
 
 #[psibase::service(name = "fractal", tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable, Fractal, FractalTable, MemberTable};
+    use crate::tables::tables::{InitRow, InitTable, Fractal, FractalTable, Member, MemberTable};
     use crate::consts;
     use psibase::*;
 
@@ -15,14 +15,7 @@ pub mod service {
         table.put(&InitRow {}).unwrap();
 
         // Initial service configuration
-        let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&()).is_none() {
-            thing_table
-                .put(&ExampleThing {
-                    thing: String::from("default thing"),
-                })
-                .unwrap();
-        }
+        
     }
 
     #[pre_action(exclude(init))]
@@ -32,28 +25,6 @@ pub mod service {
             table.get_index_pk().get(&()).is_some(),
             "service not inited",
         );
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn setExampleThing(thing: String) {
-        let table = ExampleThingTable::new();
-        let old_thing = table.get_index_pk().get(&()).unwrap_or_default().thing;
-
-        table
-            .put(&ExampleThing {
-                thing: thing.clone(),
-            })
-            .unwrap();
-
-        Wrapper::emit().history().updated(old_thing, thing);
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getExampleThing() -> String {
-        let table = ExampleThingTable::new();
-        table.get_index_pk().get(&()).unwrap_or_default().thing
     }
 
     #[action]
@@ -94,8 +65,23 @@ pub mod service {
 
     /// Member interface
     #[action]
-    fn join_waitlist(_fractal: AccountNumber) {
-        // WaitlistSrv::call().join_waitlist(get_sender());
+    fn join_waitlist(fractal: AccountNumber) {
+        // for now, allow all immediate membership
+        let table = MemberTable::new();
+        table.put(&Member {
+            fractal,
+            account: get_sender(),
+            joined_at: psibase::TimePointSec::from(TransactSvc::call().currentBlock().time.seconds()),
+            titles: 0,
+        }).unwrap();
+
+        // Eventually...
+        // let table = WaitlistTable::new();
+        // table.put(&Waitlist {
+        //     fractal: _fractal,
+        //     account: get_sender(),
+        //     joined_at: psibase::TimePointSec::from(TransactSvc::call().currentBlock().time.seconds()),
+        // }).unwrap();
     }
 
     #[action]

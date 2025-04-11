@@ -12,18 +12,7 @@ pub mod tables {
         fn pk(&self) {}
     }
 
-    #[table(name = "ExampleThingTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ExampleThing {
-        pub thing: String,
-    }
-
-    impl ExampleThing {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "FractalTable", index = 2)]
+    #[table(name = "FractalTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Fractal {
         pub account: AccountNumber,
@@ -39,9 +28,10 @@ pub mod tables {
         }
     }
 
-    #[table(name = "MemberTable", index = 3)]
+    #[table(name = "MemberTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Member {
+        pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub joined_at: psibase::TimePointSec,
         pub titles: u32,
@@ -54,7 +44,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "ScoreTable", index = 4)]
+    #[table(name = "ScoreTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Score {
         pub fractal: AccountNumber,
@@ -68,4 +58,19 @@ pub mod tables {
             (self.fractal, self.account)
         }
     }
+
+    // TODO: Add waitlist table later
+    // #[table(name = "WaitlistTable", index = 4)]
+    // #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    // pub struct Waitlist {
+    //     pub fractal: AccountNumber,
+    //     pub account: AccountNumber,
+    //     pub joined_at: psibase::TimePointSec,
+    // }
+    // impl Waitlist {
+    //     #[primary_key]
+    //     fn pk(&self) -> (AccountNumber, AccountNumber) {
+    //         (self.fractal, self.account)
+    //     }
+    // }
 }
