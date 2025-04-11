@@ -95,11 +95,24 @@ namespace psio
          data.insert(data.end(), s, s + size);
       }
 
+      void rewrite(size_t offset, const void* src, size_t size)
+      {
+         std::memcpy(data.data() + offset, src, size);
+      }
+
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
+
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+         rewrite(offset, &v, sizeof(v));
+      }
+
+      size_t written() const { return data.size(); }
    };
 
    struct vector_stream
