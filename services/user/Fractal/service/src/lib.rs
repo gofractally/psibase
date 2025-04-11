@@ -1,4 +1,4 @@
-mod tables;
+pub mod tables;
 mod consts;
 
 #[psibase::service(name = "fractal", tables = "tables::tables")]
@@ -70,7 +70,7 @@ pub mod service {
         let table = MemberTable::new();
         table.put(&Member {
             fractal,
-            account: get_sender(),
+            member: get_sender(),
             joined_at: psibase::TimePointSec::from(TransactSvc::call().currentBlock().time.seconds()),
             titles: 0,
         }).unwrap();

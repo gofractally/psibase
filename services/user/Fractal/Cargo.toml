@@ -36,5 +36,5 @@ crate-type = ["rlib"]
 
 [dependencies]
 fractal = { path = "service", version = "0.15.0" }
-# r-fractal = { path = "query-service", version = "0.15.0" }
+r-fractal = { path = "query-service", version = "0.15.0" }
 # plugin = { path = "plugin", version = "0.15.0" }

@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, ToSchema};
+    use psibase::{AccountNumber, Fracpack, ToSchema };
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -32,7 +32,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Member {
         pub fractal: AccountNumber,
-        pub account: AccountNumber,
+        pub member: AccountNumber,
         pub joined_at: psibase::TimePointSec,
         pub titles: u32,
     }
@@ -40,7 +40,7 @@ pub mod tables {
     impl Member {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.account)
+            (self.fractal, self.member)
         }
     }
 
@@ -48,14 +48,14 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Score {
         pub fractal: AccountNumber,
-        pub account: AccountNumber,
+        pub member: AccountNumber,
         pub value: u32,
     }
 
     impl Score {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.fractal, self.account)
+            (self.fractal, self.member)
         }
     }
 

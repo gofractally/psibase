@@ -4,34 +4,21 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
-
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
+    use fractal::tables::tables::{Member, MemberTable, Fractal, FractalTable};
 
     struct Query;
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            fractal::Wrapper::call().getExampleThing()
-        }
-
         async fn get_members(&self,
-            (fractal: AccountNumber, member_type: Option<String>, titles: Option<u32>),
+            fractal: AccountNumber,
+            // titles: Option<u32>,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        // ) -> Option<Vec<Member>> {
         ) -> async_graphql::Result<Connection<u64, Member>> {
-            // let fractal = Fractal::new(fractal);
-            // let members = fractal.get_members(member_type, titles);
-            // Some(members)
-            TableQuery::subindex::<(psibase::TimePointSec)>(MemberTable::new().get_index_pk().get(&(fractal, member_type, titles)).unwrap_or_default())
+            TableQuery::subindex::<AccountNumber>(MemberTable::new().get_index_pk().get(&fractal).unwrap_or_default())
             .first(first)
             .last(last)
             .before(before)
@@ -46,21 +33,17 @@ mod service {
             Some(member)
         }
 
+        async fn get_fractal(&self, fractal: AccountNumber) -> Option<Fractal> {
+            let table = FractalTable::new();
+            let fractal = table.get_index_pk().get(&fractal).unwrap_or_default();
+            Some(fractal)
+        }
 
-        /// This query gets paginated historical updates of the Example Thing.
-        async fn historical_updates(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.fractal.updated")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
+        async fn get_council(&self, fractal: AccountNumber) -> Vec<Member> {
+            let table = MemberTable::new();
+            TableQuery::subindex::<(AccountNumber, psibase::TimePointSec, u32)>(MemberTable::new().get_index_pk().get(&(fractal)).unwrap_or_default())
+            .query()
+            .await
         }
     }
 

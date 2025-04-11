@@ -1,2 +1,2 @@
 pub use fractal;
-// pub use r_fractal;
+pub use r_fractal;
