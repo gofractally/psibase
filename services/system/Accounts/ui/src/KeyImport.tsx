@@ -1,5 +1,4 @@
 import { useSearchParams } from "react-router-dom";
-import { base64ToPem } from "./lib/key";
 import { usePrivateToPublicKey } from "./hooks/usePrivateToPublicKey";
 import { useAccountsLookup } from "./hooks/useAccountsLookup";
 import { useEffect, useState } from "react";
@@ -11,6 +10,7 @@ import { supervisor } from "./main";
 import { z } from "zod";
 import { toast } from "sonner";
 import { siblingUrl } from "@psibase/common-lib";
+import { useDecodeB64 } from "./hooks/useB64";
 
 const ImportKeyParams = z.object({
   accounts: z.string().array(),
@@ -74,9 +74,7 @@ function KeyImport() {
   const [searchParams] = useSearchParams();
 
   const key = searchParams.get("key");
-
-  const extractedPrivateKey = key && base64ToPem(key);
-
+  const { data: extractedPrivateKey } = useDecodeB64(key);
   const { data: publicKey } = usePrivateToPublicKey(extractedPrivateKey || "");
   const { data: importableAccounts } = useAccountsLookup(publicKey);
 

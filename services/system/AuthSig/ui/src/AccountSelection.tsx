@@ -1,8 +1,7 @@
 import { useCreateConnectionToken } from "./hooks/useCreateConnectionToken";
-import { usePublicToPrivate } from "./hooks/usePrivateToPublicKey";
+import { usePublicToPrivate } from "./hooks/usePrivateFromPublicKey";
 import { siblingUrl } from "@psibase/common-lib";
 import { modifyUrlParams } from "./lib/modifyUrlParams";
-import { pemToBase64 } from "./lib/key";
 import { Button } from "./components/ui/button";
 import { useState } from "react";
 import { useAccountLookup } from "./hooks/useAccountLookup";
@@ -60,8 +59,9 @@ export const AccountSelection = () => {
 
   const { data: account } = useAccountLookup(selectedAccount);
   const { data: privateKey } = usePublicToPrivate(account?.pubkey);
-  const key = privateKey && pemToBase64(privateKey);
-  const url = modifyUrlParams(siblingUrl("", "accounts"), { key: key || "" });
+  const url = modifyUrlParams(siblingUrl("", "accounts"), {
+    key: privateKey || "",
+  });
 
   const isLoading = isLoadingConnectedAccounts;
 
