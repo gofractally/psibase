@@ -2,6 +2,7 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
+    use fractal::consts::COUNCIL_SIZE;
     use fractal::tables::tables::{Fractal, FractalTable, Member, MemberTable};
     use psibase::*;
 
@@ -53,6 +54,7 @@ mod service {
                 MemberTable::new().get_index_pk(),
                 &fractal,
             )
+            .first(Some(COUNCIL_SIZE as i32))
             .query()
             .await
         }
