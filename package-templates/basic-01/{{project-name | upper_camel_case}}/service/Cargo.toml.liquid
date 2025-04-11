@@ -10,7 +10,7 @@ server = "r-{{project-name}}"
 plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
-    { sender = "{{project-name}}", service = "{{project-name}}", method = "init", rawData = "0000" },
+    { sender = "{{project-name}}", service = "{{project-name}}", method = "init", data = {} },
 ]
 
 [dependencies]
