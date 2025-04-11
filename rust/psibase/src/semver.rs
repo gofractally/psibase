@@ -229,7 +229,7 @@ impl VersionMatch<'_> {
                                 return false;
                             }
                             if let Some(patch) = self.patch {
-                                if patch != v.patch {
+                                if v.patch < patch {
                                     return false;
                                 }
                             }
