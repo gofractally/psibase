@@ -52,7 +52,7 @@ namespace psibase
       void setSchema(std::vector<Action>& actions);
       void storeData(std::vector<Action>& actions);
       void regServer(std::vector<Action>& actions);
-      void postinstall(std::vector<Action>& actions);
+      void postinstall(std::vector<Action>& actions, std::span<const PackagedService> packages);
       void commitInstall(std::vector<Action>& actions, AccountNumber sender);
 
       std::vector<char>                                                    buf;

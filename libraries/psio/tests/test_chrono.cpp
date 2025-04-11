@@ -7,6 +7,10 @@ TEST_CASE("roundtrip chrono")
    test<std::chrono::nanoseconds>({std::chrono::nanoseconds(0), std::chrono::nanoseconds(1),
                                    std::chrono::nanoseconds::min(),
                                    std::chrono::nanoseconds::max()});
+   test<std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>>(
+       {std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::now())});
+   test<std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>>(
+       {std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::system_clock::now())});
 }
 
 TEST_CASE("chrono format")

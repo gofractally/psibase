@@ -12,7 +12,7 @@ server = "chainmail"
 plugin = "plugin"
 data = [{ src = "../ui/dist/", dst = "/" }]
 postinstall = [
-    { sender = "chainmail", service = "chainmail", method = "init", rawData = "0000" },
+    { sender = "chainmail", service = "chainmail", method = "init" },
 ]
 
 [dependencies]
