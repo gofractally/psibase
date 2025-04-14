@@ -44,20 +44,27 @@ mod service {
 }
 ```
 
+Add the following to `Cargo.toml`. This will allow `cargo psibase` to build a psibase package from the crate. See [Building Packages](../package.md) for more details.
+
+```toml
+[package.metadata.psibase]
+package-name = "Example"
+```
+
 ## Deploying the Service
 
 If you have a local chain running, run: 
 
 ```sh
-cargo psibase deploy -i example
+cargo psibase install
 ```
 
 This will:
-- Build the service.
-- Create the `example` account, if it doesn't already exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains. `-i` is a shortcut for `--create-insecure-account`.
+- Build a psibase package for the service.
+- Create the `example` account, if it doesn't already exist. The account will be owned by the `root` account.
 - Deploy the just-built service on that account.
 
-See the [psibase cli docs](../../../../run-infrastructure/cli/psibase.md#deploy) for more information on `psibase deploy`.
+See the [psibase cli docs](../../../../run-infrastructure/cli/psibase.md#install) for more information on `psibase install`.
 
 ## Where's the pub?
 
@@ -70,4 +77,4 @@ There are two related commands for interacting with psibase blockchains:
 - The `psibase` utility knows how to interact with blockchains.
 - `cargo psibase` builds, tests, and deploys Rust services on blockchains.
 
-Here's an example of how they differ: `psibase deploy` has an argument which must point to an existing WASM. `cargo psibase deploy` builds and deploys the service identified by `Cargo.toml`.
+Here's an example of how they differ: `psibase install` has an argument which must point to an existing package. `cargo psibase install` builds and installs the package identified by `Cargo.toml`.

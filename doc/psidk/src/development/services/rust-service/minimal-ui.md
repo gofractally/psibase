@@ -42,15 +42,22 @@ mod service {
 }
 ```
 
+Add the following to `Cargo.toml`.
+```toml
+[package.metadata.psibase]
+package-name = "ExampleUI"
+server = "example-ui"
+```
+
+The `server` option registers an RPC service to handle HTTP requests. In this simple case, `example` will handle its own requests. See the [`registerServer`](../../../default-apps/http-server.md#systemservicehttpserverregisterserver) docs for more details.
+
 ## Building and Deploying
 
 This will build the service and deploy it to the chain:
 
 ```sh
-cargo psibase deploy -ip example-ui
+cargo psibase install
 ```
-
-The `-p` option will register the service with the [`http-server` service](../../../default-apps/http-server.md). This allows the service to handle web requests. See the [`registerServer`](../../../default-apps/http-server.md) docs for more details.
 
 ## Trying the UI
 

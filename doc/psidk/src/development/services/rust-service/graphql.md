@@ -43,11 +43,18 @@ mod service {
 }
 ```
 
+Add the following to `Cargo.toml`.
+```toml
+[package.metadata.psibase]
+package-name = "ExampleQuery"
+server = "example_query"
+```
+
 ## Trying It Out
 
 ```
 # Build and deploy the service
-cargo psibase deploy -ip
+cargo psibase install
 ```
 
 If you're running psibase locally, you can follow the [minimal UI instructions](./minimal-ui.md#trying-the-ui) to connect to the `example-query` service. You should be able to access:
@@ -221,7 +228,7 @@ impl Query {
 ## Trying it out
 
 ```
-cargo psibase deploy -ip
+cargo psibase install
 
 psibase create -i alice
 psibase create -i bob

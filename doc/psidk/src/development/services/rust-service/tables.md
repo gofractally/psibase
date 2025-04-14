@@ -83,11 +83,18 @@ mod service {
 }
 ```
 
+Add the following to `Cargo.toml`.
+```toml
+[package.metadata.psibase]
+package-name = "Messages"
+server = "messages"
+```
+
 ## Trying It Out
 
 ```
 # Build and deploy the service
-cargo psibase deploy -ip
+cargo psibase install
 
 # Create some test users
 psibase create -i alice
