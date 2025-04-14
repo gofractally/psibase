@@ -6,6 +6,8 @@ pub mod db;
 pub mod service {
     use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User, UserSettings};
     use crate::helpers;
+
+    // use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
     use psibase::*;
 
     #[action]
@@ -303,6 +305,18 @@ pub mod service {
         );
         let user = User::new(evaluation.id, get_sender());
         user.save();
+
+        let caller = ServiceCaller {
+            service: evaluation.owner,
+            sender: get_sender(),
+        };
+
+        caller.call(
+            MethodNumber::from(
+                psibase::services::evaluations::action_structs::register::ACTION_NAME,
+            ),
+            psibase::services::evaluations::action_structs::register { evaluation_id: id },
+        )
     }
 
     #[action]
