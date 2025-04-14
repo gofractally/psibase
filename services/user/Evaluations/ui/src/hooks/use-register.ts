@@ -17,13 +17,6 @@ export const useRegister = () => {
                 throw new Error("User not found");
             }
 
-            console.log({
-                method: "register",
-                service: "evaluations",
-                intf: "api",
-                params: [id, zAccount.parse(currentUser)],
-            });
-
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: "evaluations",
@@ -38,7 +31,7 @@ export const useRegister = () => {
                     user: currentUser,
                     groupNumber: null,
                     proposal: null,
-                    submission: null,
+                    attestation: null,
                 });
 
                 return zUser.array().parse([...users, newUser]);

@@ -9,7 +9,7 @@ interface api {
     use host:common/types.{error};
     use types.{account};
     
-    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, rank-amount: u8) -> result<_, error>;
+    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, rank-amount: u8, use-hooks: bool) -> result<_, error>;
 
     register: func(id: u32, account: account) -> result<_, error>;
 

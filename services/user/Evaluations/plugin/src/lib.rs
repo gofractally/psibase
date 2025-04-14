@@ -29,6 +29,7 @@ impl Api for EvaluationsPlugin {
         finish_by: u32,
         group_sizes: Vec<String>,
         rank_amount: u8,
+        use_hooks: bool,
     ) -> Result<(), Error> {
         let sizes = group_sizes
             .iter()
@@ -42,6 +43,7 @@ impl Api for EvaluationsPlugin {
             finish_by,
             group_sizes: sizes,
             rank_amount,
+            use_hooks,
         }
         .packed();
         add_action_to_transaction("create", &packed_args)

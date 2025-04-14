@@ -39,6 +39,7 @@ pub mod service {
         finish_by: u32,
         group_sizes: Vec<u8>,
         rank_amount: u8,
+        use_hooks: bool,
     ) {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
@@ -65,6 +66,7 @@ pub mod service {
             submission,
             finish_by,
             rank_amount,
+            use_hooks,
         );
 
         new_evaluation.save();
@@ -306,17 +308,19 @@ pub mod service {
         let user = User::new(evaluation.id, get_sender());
         user.save();
 
-        let caller = ServiceCaller {
-            service: evaluation.owner,
-            sender: get_sender(),
-        };
+        if evaluation.use_hooks {
+            let caller = ServiceCaller {
+                service: evaluation.owner,
+                sender: get_sender(),
+            };
 
-        caller.call(
-            MethodNumber::from(
-                psibase::services::evaluations::action_structs::register::ACTION_NAME,
-            ),
-            psibase::services::evaluations::action_structs::register { evaluation_id: id },
-        )
+            caller.call(
+                MethodNumber::from(
+                    psibase::services::evaluations::action_structs::register::ACTION_NAME,
+                ),
+                psibase::services::evaluations::action_structs::register { evaluation_id: id },
+            )
+        }
     }
 
     #[action]

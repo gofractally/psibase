@@ -19,14 +19,14 @@ pub fn fetch_and_decode(
             }}
             getGroupUsers(id: {id}, groupNumber: {group_number}) {{
                 user
-                submission
+                attestation
                 proposal
             }}
         }}"#,
         id = id,
         group_number = group_number
     );
-    GetEvaluationResponse::from_gql(CommonServer::post_graphql_get_json(&query)?)
+    GetEvaluationResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
 }
 
 pub fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettingsResponse, Error> {
@@ -39,7 +39,7 @@ pub fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettin
         }}"#,
         account_numbers = account_numbers.join(",")
     );
-    GetUserSettingsResponse::from_gql(CommonServer::post_graphql_get_json(&query)?)
+    GetUserSettingsResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
 }
 
 pub fn fetch_key_history(

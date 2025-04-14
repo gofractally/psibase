@@ -7,8 +7,8 @@ import { setCurrentUser } from "./use-current-user";
 
 const supervisor = getSupervisor();
 
-export const useSelectAccount = () => {
-    return useMutation<void, Error, string>({
+export const useSelectAccount = () =>
+    useMutation<void, Error, string>({
         mutationKey: ["selectAccount"],
         mutationFn: async (accountName: string) => {
             void (await supervisor.functionCall({
@@ -25,4 +25,3 @@ export const useSelectAccount = () => {
             toast.error(error.message);
         },
     });
-};

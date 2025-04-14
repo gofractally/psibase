@@ -16,6 +16,7 @@ const Params = z
         finishBy: z.number(),
         allowableGroupSizes: z.array(z.number()),
         rankAmount: z.number().min(2).max(255),
+        useHooks: z.boolean(),
     })
     .refine(
         (data) =>
@@ -46,6 +47,7 @@ export const useCreateEvaluation = () => {
                 submission,
                 allowableGroupSizes,
                 rankAmount,
+                useHooks,
             } = Params.parse(params);
 
             const lastId = await getLastId();
@@ -61,10 +63,9 @@ export const useCreateEvaluation = () => {
                     finishBy,
                     allowableGroupSizes.map(String),
                     rankAmount,
+                    useHooks,
                 ],
             };
-
-            console.log(pars, "is pars");
 
             void (await getSupervisor().functionCall(pars));
             await wait(2000);

@@ -27,7 +27,7 @@ pub struct EvaluationRecordSubset {
 #[serde(rename_all = "camelCase")]
 pub struct GroupUserSubset {
     pub user: String,
-    pub submission: Option<Vec<u8>>,
+    pub attestation: Option<Vec<u8>>,
     pub proposal: Option<Vec<u8>>,
 }
 
@@ -46,8 +46,10 @@ pub struct GetEvaluationResponse {
     pub getGroupUsers: Option<Vec<GroupUserSubset>>,
 }
 
-impl TryParseGqlResponse for GetEvaluationResponse {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+impl TryFrom<String> for GetEvaluationResponse {
+    type Error = CommonTypes::Error;
+
+    fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<GetEvaluationResponse> = serde_json::from_str(&response)
             .map_err(|e| {
                 QueryResponseParseError("GetEvaluationResponse: ".to_string() + &e.to_string())
@@ -72,8 +74,10 @@ pub struct GetUserSettingsResponse {
     pub getUserSettings: Vec<Option<UserSetting>>,
 }
 
-impl TryParseGqlResponse for GetUserSettingsResponse {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+impl TryFrom<String> for GetUserSettingsResponse {
+    type Error = CommonTypes::Error;
+
+    fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<GetUserSettingsResponse> = serde_json::from_str(&response)
             .map_err(|e| {
                 QueryResponseParseError("GetUserSettingsResponse: ".to_string() + &e.to_string())

@@ -47,6 +47,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         submission: dayjs(submission).unix(),
                         allowableGroupSizes,
                         rankAmount,
+                        useHooks: false,
                     });
                 } catch (error) {
                     console.error(error);

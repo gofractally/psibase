@@ -30,7 +30,6 @@ export const useSetGroupKey = () =>
                     intf: "api",
                 }));
 
-                // throw a custom error if there is no aAccount
                 const currentUser = zAccount.safeParse(
                     queryClient.getQueryData(["currentUser"]),
                 );

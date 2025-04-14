@@ -6,14 +6,14 @@ export const zUser = z.object({
     user: zAccount,
     groupNumber: z.number().nullable(),
     proposal: z.number().array().nullable(),
-    submission: z.number().array().nullable(),
+    attestation: z.number().array().nullable(),
 });
 
 export type User = z.infer<typeof zUser>;
 
 export const getUsers = async (evaluationId: number) => {
     const res = await graphql(
-        `{ getUsers(id: ${evaluationId}) { user groupNumber evaluationId proposal submission } }`,
+        `{ getUsers(id: ${evaluationId}) { user groupNumber evaluationId proposal attestation } }`,
         "evaluations",
     );
 

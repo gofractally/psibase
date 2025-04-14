@@ -54,15 +54,10 @@ export const GroupPage = () => {
             now < evaluation?.finishBy &&
             !isPending
         ) {
-            if (!currentUser) {
-                console.warn("Cannot submit due to lack of current user...");
-                return;
-            }
             toast("Attesting...");
             attest({
                 evaluationId: Number(id),
                 groupNumber: Number(groupNumber),
-                currentUser,
             }).then(() => {
                 let pending = toast.loading("Attested, loading results...");
                 wait(2500).then(() => {
@@ -73,7 +68,7 @@ export const GroupPage = () => {
                 });
             });
         }
-    }, [now, evaluation, isAttesting, isAttested, isAttestError, currentUser]);
+    }, [now, evaluation, isAttesting, isAttested, isAttestError]);
 
     const rankedOptionNumbers = [...Array(evaluation?.rankAmount)].map(
         (_, index) => index + 1,

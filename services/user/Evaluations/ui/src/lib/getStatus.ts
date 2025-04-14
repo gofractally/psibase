@@ -193,7 +193,7 @@ export const getStatus = (
 
                 if (!userState) throw new Error("User not found");
 
-                if (userState.submission && userState.submission.length > 0) {
+                if (userState.attestation && userState.attestation.length > 0) {
                     return CanWatchResults.parse({
                         type: Types.CanWatchResults,
                         groups,

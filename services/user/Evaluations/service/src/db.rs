@@ -120,6 +120,7 @@ pub mod tables {
             submission_starts: u32,
             finish_by: u32,
             rank_amount: u8,
+            use_hooks: bool,
         ) -> Self {
             Self {
                 id,
@@ -129,7 +130,7 @@ pub mod tables {
                 deliberation_starts,
                 submission_starts,
                 finish_by,
-                use_hooks: false,
+                use_hooks,
                 allowable_group_sizes,
                 rank_amount,
             }
