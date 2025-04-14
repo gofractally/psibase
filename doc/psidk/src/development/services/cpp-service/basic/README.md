@@ -16,7 +16,7 @@ Here is a basic service definition. Place `example.cpp` and `CMakeLists.txt` in 
 
 ## Building
 
-This will create `Example.psi`:
+This will create a psibase package, `Example.psi`:
 
 ```sh
 mkdir build

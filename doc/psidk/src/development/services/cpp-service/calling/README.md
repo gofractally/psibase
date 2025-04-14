@@ -36,7 +36,7 @@ This service calls into the arithmetic service.
 
 ## CMakeLists.txt
 
-[CMakeLists.txt](CMakeLists.txt) is almost the same as previous examples, but instead of building 1 service, it builds 2.
+[CMakeLists.txt](CMakeLists.txt) is almost the same as previous examples, but instead of building one service, it builds two.
 
 ## Building
 
@@ -76,7 +76,7 @@ When a service calls another, the system pauses its execution and runs that othe
 The system keeps each service alive during the entire transaction. This allows some interesting capabilities:
 
 - Services may call each other many times without repeating the WASM startup overhead.
-- Services may call into each other recursively. Be careful; you need to either plan for this or disable it. TODO: make it easy for services to opt out of recursion.
+- Services may call into each other recursively if they opt-in using [Service::recurse()](../reference/services-events.md#psibaseservicerecurse).
 - A service method may store intermediate results in global variables then return. Future calls to that service, within the same transaction, have access to those global variables. They're wiped at the end of the transaction.
 
 # Who called me?
