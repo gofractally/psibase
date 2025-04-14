@@ -18,15 +18,13 @@ export const EvaluationPage = () => {
     const { id } = useParams();
 
     const [ticks, setTick] = useState<number>(0);
-    const { data: evaluation, error: evaluationError } = useEvaluation(
-        Number(id),
-    );
+    const { data: evaluation } = useEvaluation(Number(id));
     const { mutate: register, isPending: isRegisterPending } = useRegister();
     const { mutate: unregister, isPending: isUnregisterPending } =
         useUnregister();
     const { data: currentUser } = useCurrentUser();
-    const { data: users, error: usersError } = useUsers(evaluation?.id);
-    const { data: groups, error: groupsError } = useGroups(evaluation?.id);
+    const { data: users } = useUsers(evaluation?.id);
+    const { data: groups } = useGroups(evaluation?.id);
     const {
         mutateAsync: startEvaluation,
         isPending: isStartEvaluationPending,
