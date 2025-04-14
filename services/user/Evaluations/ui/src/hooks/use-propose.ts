@@ -2,10 +2,6 @@ import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "./use-current-user";
 import { z } from "zod";
-import { useDebounceCallback } from "usehooks-ts";
-import { useRef } from "react";
-import { getProposal } from "@lib/getProposal";
-import { setCachedProposal } from "./use-proposal";
 
 const Params = z.object({
     evaluationId: z.number(),

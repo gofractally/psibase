@@ -1,7 +1,5 @@
 import { Button } from "@shadcn/button";
 
-import { Nav } from "@components/nav";
-
 import { Dialog, DialogContent } from "@shadcn/dialog";
 import { NewEval } from "@components/new-eval";
 
