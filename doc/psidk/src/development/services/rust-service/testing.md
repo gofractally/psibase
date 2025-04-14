@@ -46,7 +46,7 @@ mod service {
 /* packages takes a comma-delimited list and references the
  * package.metadata.psibase.package-name (case-sensitive) in Cargo.toml).
  * The test chain will be initialized with default packages + services listed here. */
-#[psibase::test_case(packages("example"))]
+#[psibase::test_case(packages("Example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Verify the actions work as expected.
     assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
@@ -75,7 +75,7 @@ Add the following to `Cargo.toml`. This will allow `cargo psibase` to build a ps
 
 ```toml
 [package.metadata.psibase]
-package-name = "example"
+package-name = "Example"
 ```
 
 ## Running the Test
@@ -112,8 +112,3 @@ ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
-
-## Next Step
-
-Services may call other services; we show how to do this in
-[Calling Other Services](calling.md).

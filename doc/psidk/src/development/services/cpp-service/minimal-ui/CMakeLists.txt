@@ -12,11 +12,15 @@ find_package(psibase REQUIRED)
 add_executable(example example.cpp)
 target_link_libraries(example Psibase::service)
 
+# Create a package
 psibase_package(
     NAME MinimalUI
     VERSION 1.0.0
     DESCRIPTION "An example service with the minimal UI"
+    # The account that the service will run on
     SERVICE example
+        # The CMake target that builds the service
         TARGET example
+        # The service that will handle HTTP requests.
         SERVER example
 )
