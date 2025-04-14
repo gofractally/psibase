@@ -98,7 +98,7 @@ impl Api for EvaluationsPlugin {
 
         let packed_args = evaluations::action_structs::attest {
             evaluation_id,
-            submission: consensus,
+            attestation: consensus,
         }
         .packed();
         add_action_to_transaction("attest", &packed_args)

@@ -40,8 +40,6 @@ export const getGroups = async (evaluationId: number): Promise<Group[]> => {
         "evaluations",
     );
 
-    console.log(res, "came back");
-
     const response = GraphqlResponse.parse(res);
 
     if (response.data) {

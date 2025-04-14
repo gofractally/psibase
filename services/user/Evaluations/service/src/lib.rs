@@ -216,7 +216,6 @@ pub mod service {
     fn close(id: u32) {
         let evaluation = Evaluation::get(id);
 
-        // TODO: Wait until close phase or delete at any time?
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Closed);
 
         check(
@@ -248,16 +247,16 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn attest(evaluation_id: u32, submission: Vec<u8>) {
+    fn attest(evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
         let evaluation = Evaluation::get(evaluation_id);
 
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Submission);
 
         let mut user = User::get(evaluation_id, sender);
-        check(user.submission.is_none(), "you have already submitted");
+        check(user.attestation.is_none(), "you have already submitted");
 
-        user.submission = Some(submission);
+        user.attestation = Some(attestation);
         user.save();
 
         let mut group = Group::get(evaluation_id, user.group_number.unwrap());
@@ -280,9 +279,6 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn register(id: u32, account_number: AccountNumber) {
-        // Proposals still need to be encrypted, but can that just be an event?
-        // Groupkey should emit an event of the symmetric key inside of the asymmetric payloads
-        //
         let evaluation = Evaluation::get(id);
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
 

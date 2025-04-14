@@ -39,7 +39,7 @@ pub mod tables {
         pub evaluation_id: u32,
         pub user: AccountNumber,
         pub group_number: Option<u32>,
-        pub submission: Option<Vec<u8>>,
+        pub attestation: Option<Vec<u8>>,
         pub proposal: Option<Vec<u8>>,
     }
 
@@ -86,7 +86,7 @@ pub mod tables {
                 evaluation_id,
                 user,
                 group_number: None,
-                submission: None,
+                attestation: None,
                 proposal: None,
             }
         }

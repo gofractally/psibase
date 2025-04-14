@@ -178,7 +178,7 @@ pub fn get_group_result(evaluation_id: u32, group_number: u32) -> GroupResult {
     let attestations = users
         .iter()
         .filter(|user| user.group_number == Some(group_number))
-        .map(|user| user.submission.clone())
+        .map(|user| user.attestation.clone())
         .collect();
     calculate_results(attestations)
 }
