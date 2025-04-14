@@ -75,9 +75,3 @@ Here's an example of how they differ: `psibase deploy` has an argument which mus
 ## Testing the Service
 
 The next section, [Testing Services](../testing.md) covers testing our service.
-
-## Homework
-
-There's a bug in both `add` and `multiply`. What is it? Even though it's still
-a bug, and can be exploitable in some situations, how is it less dangerous in Rust
-than it is in C++? How can you avoid it?
