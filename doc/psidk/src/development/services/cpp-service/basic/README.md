@@ -35,7 +35,3 @@ This, when run on a local test chain, will:
 ```sh
 psibase install ./Example.psi
 ```
-
-## vscode support
-
-Code completion and symbol lookup in VSCode won't work until you add `.vscode/c_cpp_properties.json` and `.vscode/settings.json` to the root of your project. You can check the corresponding `*.sample` files at the root of the [psibase](https://github.com/gofractally/psibase) repository for an example.
