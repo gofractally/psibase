@@ -71,7 +71,3 @@ There are two related commands for interacting with psibase blockchains:
 - `cargo psibase` builds, tests, and deploys Rust services on blockchains.
 
 Here's an example of how they differ: `psibase deploy` has an argument which must point to an existing WASM. `cargo psibase deploy` builds and deploys the service identified by `Cargo.toml`.
-
-## Testing the Service
-
-The next section, [Testing Services](../testing.md) covers testing our service.
