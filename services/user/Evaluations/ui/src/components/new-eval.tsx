@@ -12,9 +12,9 @@ const lowestFifth = (minute: number) => minute - (minute % 5);
 const now = dayjs();
 
 const registration = now;
-const deliberation = now.add(10, "seconds");
-const submission = deliberation.add(5, "minutes");
-const finishBy = submission.add(1, "minutes");
+const deliberation = now.add(30, "seconds");
+const submission = deliberation.add(20, "seconds");
+const finishBy = submission.add(60, "minutes");
 
 export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
     const { mutateAsync: createEvaluation } = useCreateEvaluation();

@@ -235,6 +235,12 @@ pub mod service {
         helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
 
         let mut user = User::get(evaluation_id, sender);
+        let group = Group::get(evaluation_id, user.group_number.unwrap());
+
+        check(
+            group.key_submitter.is_some(),
+            "group key has not been submitted",
+        );
 
         user.proposal = Some(proposal);
         user.save();

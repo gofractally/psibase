@@ -8,12 +8,13 @@ export const getProposal = async (
 ) => {
     const supervisor = getSupervisor();
 
-    const res = await supervisor.functionCall({
+    const pars = {
         method: "getProposal",
         params: [evaluationId, groupId, currentUser],
         service: "evaluations",
         intf: "api",
-    });
+    };
+    const res = await supervisor.functionCall(pars);
 
     return z.number().array().parse(Array.from(res));
 };

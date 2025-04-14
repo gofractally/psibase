@@ -11,7 +11,7 @@ export const useProposal = (
         queryKey: ["proposal", evaluationId, groupId, currentUser],
         queryFn: () => getProposal(evaluationId!, groupId!, currentUser!),
         enabled: !!evaluationId && !!groupId && !!currentUser,
-        staleTime: 60 * 1000,
+        staleTime: Infinity,
     });
 
 export const setCachedProposal = (

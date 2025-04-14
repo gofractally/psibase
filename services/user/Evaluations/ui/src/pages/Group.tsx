@@ -1,8 +1,8 @@
 import { useEvaluation } from "@hooks/use-evaluation";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { useDebounceCallback, useInterval } from "usehooks-ts";
+import { useNavigate, useParams } from "react-router-dom";
+import { useInterval } from "usehooks-ts";
 
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { Button } from "@shadcn/button";
@@ -12,57 +12,14 @@ import { usePropose } from "@hooks/use-propose";
 import { arrayMove } from "@lib/arrayMove";
 import { setCachedProposal, useProposal } from "@hooks/use-proposal";
 import { useCurrentUser } from "@hooks/use-current-user";
-import {
-    debounceTime,
-    distinctUntilChanged,
-    ReplaySubject,
-    Subject,
-    switchMap,
-} from "rxjs";
-import { getSupervisor } from "@psibase/common-lib";
-import { useObservable } from "react-rx";
-import { getProposal } from "@lib/getProposal";
-interface OnRankAction {
-    evaluationId: number;
-    groupNumber: number;
-    proposal: number[];
-    currentUser: string;
-}
 
-const onRankSubject$ = new ReplaySubject<OnRankAction>(1);
+import { useAsyncDebouncer } from "@tanstack/react-pacer";
+import { useAttest } from "@hooks/use-attest";
+import { toast } from "sonner";
+import { useUsers } from "@hooks/use-users";
 
-const onRankAction$ = onRankSubject$.pipe(
-    debounceTime(3000),
-    distinctUntilChanged((a, b) =>
-        a.proposal.every((value, index) => value === b.proposal[index]),
-    ),
-    switchMap(async (action) => {
-        const { evaluationId, groupNumber, proposal, currentUser } = action;
-
-        const pars = {
-            method: "propose",
-            service: "evaluations",
-            intf: "api",
-            params: [
-                evaluationId,
-                groupNumber,
-                proposal.map(String),
-                currentUser,
-            ],
-        };
-        void (await getSupervisor().functionCall(pars));
-        return action;
-    }),
-    debounceTime(3000),
-    switchMap(async (action) => {
-        const res = await getProposal(
-            action.evaluationId,
-            action.groupNumber,
-            action.currentUser,
-        );
-        return { ...action, proposal: res };
-    }),
-);
+const wait = (ms: number = 2500) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
 export const GroupPage = () => {
     const { id, groupNumber } = useParams();
@@ -74,29 +31,55 @@ export const GroupPage = () => {
         setNow(dayjs().unix());
     }, 1000);
 
+    const navigate = useNavigate();
+
     const { data: evaluation } = useEvaluation(Number(id));
 
-    const { mutate: propose } = usePropose();
+    const { refetch: refetchUsers } = useUsers(Number(id));
+
+    const { mutateAsync: propose } = usePropose();
+
+    const {
+        mutateAsync: attest,
+        isPending: isAttesting,
+        isError: isAttestError,
+        isSuccess: isAttested,
+    } = useAttest();
 
     useEffect(() => {
-        let x = onRankAction$.subscribe((proposalData) => {
-            setCachedProposal(
-                proposalData.evaluationId,
-                proposalData.groupNumber,
-                proposalData.currentUser,
-                proposalData.proposal,
-            );
-        });
-        return () => x.unsubscribe();
-    }, []);
+        const isPending = isAttesting || isAttested || isAttestError;
+        if (
+            evaluation &&
+            now >= evaluation?.submissionStarts &&
+            now < evaluation?.finishBy &&
+            !isPending
+        ) {
+            if (!currentUser) {
+                console.warn("Cannot submit due to lack of current user...");
+                return;
+            }
+            toast("Attesting...");
+            attest({
+                evaluationId: Number(id),
+                groupNumber: Number(groupNumber),
+                currentUser,
+            }).then(() => {
+                let pending = toast.loading("Attested, loading results...");
+                wait(2500).then(() => {
+                    refetchUsers().then(() => {
+                        toast.dismiss(pending);
+                        navigate(`/${id}`);
+                    });
+                });
+            });
+        }
+    }, [now, evaluation, isAttesting, isAttested, isAttestError, currentUser]);
 
     const rankedOptionNumbers = [...Array(evaluation?.rankAmount)].map(
         (_, index) => index + 1,
     );
 
-    useObservable(onRankAction$);
-
-    const { data: proposal } = useProposal(
+    const { data: proposal, refetch: refetchProposal } = useProposal(
         Number(id),
         Number(groupNumber),
         currentUser,
@@ -107,23 +90,33 @@ export const GroupPage = () => {
         (number) => !rankedNumbers.includes(number),
     );
 
-    const debouncedRankedNumbers = useDebounceCallback(
-        (numbers: number[]) => {
-            console.count("debouncedRankedNumbers");
-            propose({
-                evaluationId: Number(id),
-                groupNumber: Number(groupNumber),
-                proposal: numbers,
-            });
+    const { cancel, maybeExecute: refreshProposal } = useAsyncDebouncer(
+        async () => {
+            await refetchProposal();
         },
-        8000,
-        { trailing: true },
+        {
+            wait: 3000,
+        },
     );
 
-    console.log(debouncedRankedNumbers.isPending);
+    const { maybeExecute: debouncedRankedNumbers } = useAsyncDebouncer(
+        async (rankedNumbers: number[]) => {
+            cancel();
+            await propose({
+                evaluationId: Number(id),
+                groupNumber: Number(groupNumber),
+                proposal: rankedNumbers,
+            });
+            refreshProposal();
+        },
+        {
+            wait: 4000,
+        },
+    );
 
     const updateRankedNumbers = (numbers: number[]) => {
         if (!currentUser) throw new Error("No current user");
+        cancel();
         setCachedProposal(
             Number(id),
             Number(groupNumber),
@@ -140,9 +133,6 @@ export const GroupPage = () => {
     const onAdd = (number: number) => {
         updateRankedNumbers([...rankedNumbers, number]);
     };
-
-    const isSubmission = evaluation && now >= evaluation?.submissionStarts;
-    const isFinished = evaluation && now >= evaluation?.finishBy;
 
     const description =
         evaluation && now >= evaluation.submissionStarts

@@ -19,11 +19,11 @@ interface api {
 
     close: func(evaluation-id: u32) -> result<_, error>;
 
-    attest: func(evaluation-id: u32, group-number: u32, user: account) -> result<_, error>;
+    attest: func(evaluation-id: u32, group-number: u32) -> result<_, error>;
 
-    propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>, user: account) -> result<_, error>;
+    propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
 
-    get-proposal: func(evaluation-id: u32, group-number: u32, user: account) -> result<option<list<u8>>, error>;
+    get-proposal: func(evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
 
     refresh-key: func(key: list<u8>) -> result<_, error>;
    

@@ -1,4 +1,5 @@
 use crate::bindings;
+use crate::bindings::base64::plugin::standard::encode;
 use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::errors::ErrorType;
 use crate::key_table;
@@ -16,15 +17,38 @@ pub fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_str(s).map_err(|_| ErrorType::InvalidAccountNumber.into())
 }
 
+pub fn current_user() -> Result<AccountNumber, Error> {
+    let current_user = bindings::accounts::plugin::api::get_current_user()?;
+    if current_user.is_none() {
+        return Err(ErrorType::NotLoggedIn.into());
+    }
+    let account_number = psibase::AccountNumber::from_str(current_user.unwrap().as_str()).unwrap();
+    Ok(account_number)
+}
+
 pub fn create_new_symmetric_key(
     evaluation_id: u32,
-    group_number: u32,
     users: &Vec<types::GroupUserSubset>,
+    creator: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
-    let symmetric_key = key_table::SymmetricKey::generate(evaluation_id, group_number);
     let sorted_users = sort_users_by_account(users)?;
     let user_settings =
         fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.getUserSettings;
+
+    let creator_public_key = user_settings
+        .iter()
+        .find_map(|opt_s| {
+            opt_s.as_ref().and_then(|s| {
+                if s.user == creator.to_string() {
+                    Some(s.key.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .ok_or(ErrorType::UserSettingNotFound)?;
+
+    let symmetric_key = key_table::SymmetricKey::generate(encode(&creator_public_key));
 
     let payloads: Vec<Vec<u8>> = sorted_users
         .iter()
@@ -49,15 +73,15 @@ pub fn create_new_symmetric_key(
     Ok(symmetric_key)
 }
 
-pub fn get_decrypted_submissions(
+pub fn get_decrypted_proposals(
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error> {
     let res = fetch_and_decode(evaluation_id, group_number)?;
-    let mut submissions = res.getGroupUsers.unwrap();
+    let mut proposals = res.getGroupUsers.unwrap();
 
-    submissions.sort_by(|a, b| {
+    proposals.sort_by(|a, b| {
         psibase::AccountNumber::from_str(a.user.as_str())
             .unwrap()
             .value
@@ -70,7 +94,7 @@ pub fn get_decrypted_submissions(
 
     let symmetric_key = get_symmetric_key(evaluation_id, group_number, sender)?;
 
-    let subs = submissions
+    let proposals = proposals
         .into_iter()
         .map(|s| {
             let user = AccountNumber::from_str(s.user.as_str()).unwrap();
@@ -81,7 +105,7 @@ pub fn get_decrypted_submissions(
                         bindings::aes::plugin::with_password::decrypt(
                             &symmetric_key.key,
                             &s.proposal.as_ref().unwrap(),
-                            &symmetric_key.salt,
+                            &symmetric_key.salt.as_str(),
                         )
                         .unwrap(),
                     ),
@@ -92,7 +116,7 @@ pub fn get_decrypted_submissions(
         })
         .collect::<Vec<(AccountNumber, Option<Vec<u8>>)>>();
 
-    Ok(subs)
+    Ok(proposals)
 }
 
 pub fn get_symmetric_key(
@@ -100,18 +124,28 @@ pub fn get_symmetric_key(
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
-    if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id, group_number) {
-        return Ok(key);
-    }
+    // if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id) {
+    //     return Ok(key);
+    // }
 
     let res = fetch_and_decode(evaluation_id, group_number)?;
     let group = res.getGroup.ok_or(ErrorType::GroupNotFound)?;
     let users = res.getGroupUsers.ok_or(ErrorType::UsersNotFound)?;
 
     if group.keySubmitter.is_some() {
-        decrypt_existing_key(evaluation_id, group_number, sender, &users)
+        decrypt_existing_key(
+            evaluation_id,
+            group_number,
+            sender,
+            &users,
+            parse_account_number(
+                &group
+                    .keySubmitter
+                    .expect("keySubmitter is invalid account number"),
+            )?,
+        )
     } else {
-        create_new_symmetric_key(evaluation_id, group_number, &users)
+        create_new_symmetric_key(evaluation_id, &users, sender)
     }
 }
 
@@ -120,6 +154,7 @@ pub fn decrypt_existing_key(
     group_number: u32,
     sender: AccountNumber,
     users: &Vec<types::GroupUserSubset>,
+    submitter: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
     let my_index = sorted_users
@@ -127,7 +162,7 @@ pub fn decrypt_existing_key(
         .position(|user| parse_account_number(&user.user).unwrap() == sender)
         .ok_or(ErrorType::UserNotFound)?;
 
-    let key_history = fetch_key_history()?;
+    let key_history = fetch_key_history(evaluation_id, group_number)?;
     let edge = key_history
         .getGroupKey
         .edges
@@ -140,7 +175,21 @@ pub fn decrypt_existing_key(
     let decrypted_key = decrypt(&my_asymmetric_key.private_key, my_cipher)
         .map_err(|_| ErrorType::FailedToDecryptKey)?;
 
-    let symmetric_key = key_table::SymmetricKey::new(decrypted_key, evaluation_id, group_number);
+    let submitter_public_key = fetch_user_settings(vec![submitter.to_string()])?
+        .getUserSettings
+        .iter()
+        .find_map(|s| {
+            s.as_ref().and_then(|s| {
+                if s.user == submitter.to_string() {
+                    Some(s.key.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .ok_or(ErrorType::UserSettingNotFound)?;
+
+    let symmetric_key = key_table::SymmetricKey::new(decrypted_key, encode(&submitter_public_key));
     if edge.node.hash != symmetric_key.hash() {
         return Err(ErrorType::KeyMismatch.into());
     }

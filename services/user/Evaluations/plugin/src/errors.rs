@@ -13,4 +13,5 @@ plugin_error! {
     NoAsymmetricKey => "No asymmetric key found",
     UsersNotFound => "Users not found",
     GroupNotFound => "Group not found",
+    NotLoggedIn => "Not logged in",
 }

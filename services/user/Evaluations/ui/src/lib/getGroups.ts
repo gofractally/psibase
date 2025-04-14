@@ -21,7 +21,7 @@ export const zGroup = z.object({
     evaluationId: z.number(),
     number: z.number(),
     keySubmitter: z.string().nullable(),
-    result: z.string().nullable(),
+    result: z.number().array().nullable(),
 });
 
 const SuccessResponse = z.object({
@@ -30,7 +30,7 @@ const SuccessResponse = z.object({
     }),
 });
 
-const GraphqlResponse = z.union([ErrorResponse, SuccessResponse]);
+const GraphqlResponse = ErrorResponse.or(SuccessResponse);
 
 export type Group = z.infer<typeof zGroup>;
 

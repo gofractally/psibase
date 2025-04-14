@@ -7,7 +7,7 @@ use bindings::exports::evaluations::plugin::api::Guest as Api;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::{fracpack::Pack, AccountNumber};
+use psibase::fracpack::Pack;
 
 pub mod consensus;
 mod errors;
@@ -17,7 +17,7 @@ mod key_table;
 pub mod types;
 
 use graphql::fetch_and_decode;
-use helpers::{get_decrypted_submissions, get_symmetric_key, parse_account_number};
+use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
 
 struct EvaluationsPlugin;
 
@@ -83,13 +83,9 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("close", &packed_args)
     }
 
-    fn attest(evaluation_id: u32, group_number: u32, user: String) -> Result<(), Error> {
-        let submissions = get_decrypted_submissions(
-            evaluation_id,
-            group_number,
-            parse_account_number(user.as_str()).expect("user is not an account number"),
-        )
-        .expect("failed getting submissions");
+    fn attest(evaluation_id: u32, group_number: u32) -> Result<(), Error> {
+        let current_user = current_user()?;
+        let submissions = get_decrypted_proposals(evaluation_id, group_number, current_user)?;
 
         let evaluation = fetch_and_decode(evaluation_id, group_number)?;
         let consensus = consensus::calculate_consensus(
@@ -108,39 +104,21 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("attest", &packed_args)
     }
 
-    fn get_proposal(
-        evaluation_id: u32,
-        group_number: u32,
-        user: String,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        let submissions = get_decrypted_submissions(
-            evaluation_id,
-            group_number,
-            AccountNumber::from_str(user.as_str()).expect("user is not an account number"),
-        )?;
-
-        let user_account =
-            AccountNumber::from_str(user.as_str()).expect("user is not an account number");
+    fn get_proposal(evaluation_id: u32, group_number: u32) -> Result<Option<Vec<u8>>, Error> {
+        let current_user = current_user()?;
+        let submissions = get_decrypted_proposals(evaluation_id, group_number, current_user)?;
 
         let user_submission = submissions
             .into_iter()
-            .find(|(account, _)| account.value == user_account.value)
+            .find(|(account, _)| account.value == current_user.value)
             .expect("user submission is not found");
 
         Ok(user_submission.1)
     }
 
-    fn propose(
-        evaluation_id: u32,
-        group_number: u32,
-        proposal: Vec<String>,
-        user: String,
-    ) -> Result<(), Error> {
-        let symmetric_key = get_symmetric_key(
-            evaluation_id,
-            group_number,
-            AccountNumber::from_str(user.as_str()).expect("user is not an account number"),
-        )?;
+    fn propose(evaluation_id: u32, group_number: u32, proposal: Vec<String>) -> Result<(), Error> {
+        let current_user = current_user()?;
+        let symmetric_key = get_symmetric_key(evaluation_id, group_number, current_user)?;
 
         let parsed_proposal = proposal
             .iter()

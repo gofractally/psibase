@@ -1,6 +1,6 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::common::types::Error;
-use ecies::{decrypt, encrypt, utils::generate_keypair, PublicKey, SecretKey};
+use ecies::{utils::generate_keypair, PublicKey};
 use psibase::fracpack::{Pack, Unpack};
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -59,6 +59,7 @@ impl AsymKey {
     }
 }
 
+#[derive(Pack, Unpack, Debug, Default)]
 pub struct SymmetricKey {
     pub key: Vec<u8>,
     pub salt: String,
@@ -67,23 +68,16 @@ pub struct SymmetricKey {
 use sha2::{Digest, Sha256};
 
 impl SymmetricKey {
-    fn generate_salt(evaluation_id: u32, group_number: u32) -> String {
-        // use the submitters K1 public key to generate a salt
-        format!("{}_{}", evaluation_id, group_number)
-    }
-
     fn storage_key(evaluation_id: u32) -> String {
         format!("symmetric_key_{}", evaluation_id)
     }
 
-    pub fn from_storage(evaluation_id: u32, group_number: u32) -> Option<Self> {
+    pub fn from_storage(evaluation_id: u32) -> Option<Self> {
         let key = Self::storage_key(evaluation_id);
         let key_value = Keyvalue::get(&key);
         if key_value.is_some() {
-            Some(Self {
-                key: key_value.unwrap(),
-                salt: Self::generate_salt(evaluation_id, group_number),
-            })
+            let unpacked_key = SymmetricKey::unpacked(&key_value.unwrap()).unwrap();
+            Some(unpacked_key)
         } else {
             None
         }
@@ -94,23 +88,22 @@ impl SymmetricKey {
         crate::bindings::base64::plugin::standard::encode(&key_hash)
     }
 
-    pub fn new(bytes: Vec<u8>, evaluation_id: u32, group_number: u32) -> Self {
-        Self {
-            key: bytes,
-            salt: Self::generate_salt(evaluation_id, group_number),
-        }
+    pub fn new(bytes: Vec<u8>, salt: String) -> Self {
+        Self { key: bytes, salt }
     }
 
-    pub fn generate(evaluation_id: u32, group_number: u32) -> Self {
+    pub fn generate(salt: String) -> Self {
         let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().gen();
 
         Self {
             key: new_shared_symmetric_key.to_vec(),
-            salt: Self::generate_salt(evaluation_id, group_number),
+            salt: salt,
         }
     }
 
     pub fn save(&self, evaluation_id: u32) -> Result<(), Error> {
-        Keyvalue::set(&(Self::storage_key(evaluation_id)), &self.key.packed())
+        let key = Self::storage_key(evaluation_id);
+        let packed_key = self.packed();
+        Keyvalue::set(&key, &packed_key)
     }
 }

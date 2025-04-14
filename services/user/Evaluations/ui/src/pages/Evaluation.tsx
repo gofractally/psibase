@@ -17,7 +17,7 @@ import { useInterval } from "usehooks-ts";
 export const EvaluationPage = () => {
     const { id } = useParams();
 
-    const [derp, setDerp] = useState<number>(0);
+    const [ticks, setTick] = useState<number>(0);
     const { data: evaluation, error: evaluationError } = useEvaluation(
         Number(id),
     );
@@ -33,7 +33,7 @@ export const EvaluationPage = () => {
     } = useStartEvaluation();
 
     useInterval(() => {
-        setDerp(derp + 1);
+        setTick(ticks + 1);
     }, 1000);
 
     const {
@@ -55,15 +55,6 @@ export const EvaluationPage = () => {
         groups &&
         getStatus(evaluation, currentUser, users, groups);
 
-    console.log({
-        status,
-        evaluation,
-        groups,
-        evaluationError,
-        groupsError,
-        usersError,
-    });
-
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -83,11 +74,9 @@ export const EvaluationPage = () => {
         return <div>Loading...</div>;
     }
 
-    console.log({ status });
-
     return (
         <div className="flex h-full w-full flex-col items-center justify-center">
-            <div className="text-2xl font-bold">Evaluation</div>
+            <div className="text-2xl font-bold">Evaluation {id}</div>
 
             {status.type === "pending" && (
                 <div>
@@ -246,15 +235,21 @@ export const EvaluationPage = () => {
                 </div>
             )}
             {status.type === "canWatchResults" && (
-                <div>
-                    <div>Submission is pending...</div>
-                    <div>
-                        Will be completed by{" "}
-                        {dayjs
-                            .unix(status.submissionDeadline)
-                            .format("ddd MMM D, HH:mm")}
-                    </div>
-                    <div>**Show current results**</div>
+                <div className="grid w-full grid-cols-2 gap-2  sm:grid-cols-3">
+                    {status.groups.map((group) => (
+                        <div key={group.number} className="rounded-sm border">
+                            <div className="text-center text-lg font-semibold">
+                                Group {group.number}
+                            </div>
+                            {group.result && (
+                                <div className="flex flex-col text-center">
+                                    {group.result.map((r) => (
+                                        <div key={r}>{r}</div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

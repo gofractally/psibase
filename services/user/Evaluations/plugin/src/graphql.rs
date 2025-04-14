@@ -42,10 +42,13 @@ pub fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettin
     GetUserSettingsResponse::from_gql(CommonServer::post_graphql_get_json(&query)?)
 }
 
-pub fn fetch_key_history() -> Result<KeyHistoryResponse, Error> {
+pub fn fetch_key_history(
+    evaluation_id: u32,
+    group_number: u32,
+) -> Result<KeyHistoryResponse, Error> {
     let query = format!(
         r#"query {{
-            getGroupKey(first: 99) {{
+            getGroupKey(evaluationId: {evaluation_id}, groupNumber: {group_number}) {{
                 edges {{
                     node {{
                         evaluationId
@@ -55,7 +58,9 @@ pub fn fetch_key_history() -> Result<KeyHistoryResponse, Error> {
                     }}
                 }}
             }}
-        }}"#
+        }}"#,
+        evaluation_id = evaluation_id,
+        group_number = group_number
     );
 
     KeyHistoryResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
