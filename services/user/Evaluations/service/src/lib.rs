@@ -2,7 +2,7 @@ pub mod helpers;
 
 pub mod db;
 
-#[psibase::service(name = "evaluations")]
+#[psibase::service(tables = "db::tables")]
 pub mod service {
     use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User, UserSettings};
     use crate::helpers;
