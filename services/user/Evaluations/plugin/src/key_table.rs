@@ -62,7 +62,7 @@ impl AsymKey {
 #[derive(Pack, Unpack, Debug, Default)]
 pub struct SymmetricKey {
     pub key: Vec<u8>,
-    pub salt: String,
+    salt: Vec<u8>,
 }
 
 use sha2::{Digest, Sha256};
@@ -70,6 +70,10 @@ use sha2::{Digest, Sha256};
 impl SymmetricKey {
     fn storage_key(evaluation_id: u32) -> String {
         format!("symmetric_key_{}", evaluation_id)
+    }
+
+    pub fn salt_base_64(&self) -> String {
+        crate::bindings::base64::plugin::standard::encode(&self.salt)
     }
 
     pub fn from_storage(evaluation_id: u32) -> Option<Self> {
@@ -84,20 +88,22 @@ impl SymmetricKey {
     }
 
     pub fn hash(&self) -> String {
-        let key_hash = Sha256::digest(self.key.clone());
+        let mut combined = self.key.clone();
+        combined.extend_from_slice(&self.salt);
+        let key_hash = Sha256::digest(combined);
         crate::bindings::base64::plugin::standard::encode(&key_hash)
     }
 
-    pub fn new(bytes: Vec<u8>, salt: String) -> Self {
+    pub fn new(bytes: Vec<u8>, salt: Vec<u8>) -> Self {
         Self { key: bytes, salt }
     }
 
-    pub fn generate(salt: String) -> Self {
+    pub fn generate(salt: Vec<u8>) -> Self {
         let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().gen();
 
         Self {
             key: new_shared_symmetric_key.to_vec(),
-            salt: salt,
+            salt,
         }
     }
 

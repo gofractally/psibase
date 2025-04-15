@@ -1,5 +1,4 @@
 use average::Variance;
-use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -44,7 +43,11 @@ pub fn get_level(option: &u8, ranked_options: &Vec<u8>, options_size: u8) -> u8 
         .unwrap_or(0)
 }
 
-pub fn calculate_consensus(submissions: Vec<Option<Vec<u8>>>, options_size: u8) -> Vec<u8> {
+pub fn calculate_consensus(
+    submissions: Vec<Option<Vec<u8>>>,
+    options_size: u8,
+    seed: u32,
+) -> Vec<u8> {
     let ranked_options = remove_eliminated_options(
         submissions
             .into_iter()
@@ -85,19 +88,16 @@ pub fn calculate_consensus(submissions: Vec<Option<Vec<u8>>>, options_size: u8) 
         })
         .collect();
 
-    results.sort_by(|a, b| {
-        match a.1.partial_cmp(&b.1) {
-            Some(Ordering::Equal) => {
-                let is_heads = rand::thread_rng().gen_bool(0.5);
-                if is_heads {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
-                }
+    results.sort_by(|a, b| match a.1.partial_cmp(&b.1) {
+        Some(Ordering::Equal) => {
+            if (seed % 2) == 0 {
+                Ordering::Less
+            } else {
+                Ordering::Greater
             }
-            Some(ordering) => ordering.reverse(), // For descending order
-            None => Ordering::Equal,              // Handle NaN case (arbitrary choice)
         }
+        Some(ordering) => ordering.reverse(),
+        None => Ordering::Equal,
     });
 
     results

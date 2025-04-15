@@ -17,7 +17,7 @@ mod key_table;
 pub mod types;
 
 use graphql::fetch_and_decode;
-use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
+use helpers::{current_user, get_decrypted_proposals, get_symmetric_key, parse_account_number};
 
 struct EvaluationsPlugin;
 
@@ -96,6 +96,7 @@ impl Api for EvaluationsPlugin {
                 .map(|(_, submission)| submission)
                 .collect(),
             evaluation.getEvaluation.unwrap().rankAmount,
+            group_number,
         );
 
         let packed_args = evaluations::action_structs::attest {
@@ -130,7 +131,7 @@ impl Api for EvaluationsPlugin {
         let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
             &symmetric_key.key,
             &parsed_proposal,
-            &symmetric_key.salt,
+            symmetric_key.salt_base_64().as_str(),
         );
 
         let packed_args = evaluations::action_structs::propose {
