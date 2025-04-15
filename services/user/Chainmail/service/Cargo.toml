@@ -16,9 +16,9 @@ postinstall = [
 ]
 
 [dependencies]
-psibase = { path = "../../../../rust/psibase/" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
 async-graphql = "7.0.7"
 serde = { version = "1.0.209", features = ["derive"] }
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.15.0" }
+chainmail_package = { path = "..", version = "0.16.0" }
