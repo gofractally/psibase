@@ -14,8 +14,6 @@ pub mod service {
     fn init() {
         let table = ConfigTable::new();
         table.put(&ConfigRow { last_used_id: 0 }).unwrap();
-
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
     }
 
     #[pre_action(exclude(init))]
