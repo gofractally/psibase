@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, SingletonKey, Table, ToSchema};
+    use psibase::{AccountNumber, Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -12,8 +12,8 @@ pub mod tables {
 
     impl ConfigRow {
         #[primary_key]
-        fn pk(&self) -> SingletonKey {
-            SingletonKey {}
+        fn pk(&self) {
+            ()
         }
     }
 

@@ -72,7 +72,7 @@ pub fn update_evaluation(evaluation: &Evaluation) {
 
 pub fn get_next_id() -> u32 {
     let table = ConfigTable::new();
-    let mut config = table.get_index_pk().get(&SingletonKey {}).unwrap();
+    let mut config = table.get_index_pk().get(&()).unwrap();
     config.last_used_id += 1;
     table.put(&config).unwrap();
     config.last_used_id

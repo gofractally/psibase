@@ -22,7 +22,7 @@ pub mod service {
     fn check_init() {
         let table = ConfigTable::new();
         check(
-            table.get_index_pk().get(&SingletonKey {}).is_some(),
+            table.get_index_pk().get(&()).is_some(),
             "service not inited",
         );
     }
@@ -90,11 +90,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn getLastId() -> u32 {
         let table = ConfigTable::new();
-        table
-            .get_index_pk()
-            .get(&SingletonKey {})
-            .unwrap()
-            .last_used_id
+        table.get_index_pk().get(&()).unwrap().last_used_id
     }
 
     #[action]
