@@ -12,9 +12,7 @@ pub mod tables {
 
     impl ConfigRow {
         #[primary_key]
-        fn pk(&self) {
-            ()
-        }
+        fn pk(&self) {}
     }
 
     #[table(name = "EvaluationTable", index = 1)]
