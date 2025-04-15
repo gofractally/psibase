@@ -8,7 +8,7 @@ psibase - The psibase blockchain command line client
 
 `psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
 `psibase` [`-a` *url*] `info` *packages*\.\.\.  
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
@@ -26,7 +26,7 @@ psibase - The psibase blockchain command line client
 
 - `-a`, `--api` *url*
 
-  `psinode` API Endpoint. The default is `http://psibase.127.0.0.1.sslip.io/`
+  `psinode` API Endpoint. The default is `http://psibase.localhost/`
   
 - `-h`, `--help`
 
@@ -100,7 +100,7 @@ Create or modify an account
 
 ### deploy
 
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *filename*  
+`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
 
 Deploy a service
 
@@ -108,9 +108,13 @@ Deploy a service
 
   Account to deploy the service on
 
-- *filename*
+- *wasm*
 
-  A wasm file containing the service
+  Path to a wasm file containing the service
+
+- *schema*
+
+  Path to a JSON file containing the schema for the service
 
 - `-c`, `--create-account` *public-key*
 

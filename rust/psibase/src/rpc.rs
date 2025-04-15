@@ -6,6 +6,7 @@ use fracpack::{Pack, UnpackOwned};
 use indicatif::ProgressBar;
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::io::Write;
 use std::str::FromStr;
 
 custom_error! { Error
@@ -104,22 +105,28 @@ impl TraceFormat {
         trace: TransactionTrace,
         progress: Option<&ProgressBar>,
     ) -> Result<(), anyhow::Error> {
+        match self {
+            TraceFormat::Full => progress.suspend(|| -> Result<(), anyhow::Error> {
+                println!("{}", trace.to_string());
+                Ok(std::io::stdout().flush()?)
+            })?,
+            TraceFormat::Json => progress.suspend(|| -> Result<(), anyhow::Error> {
+                serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?;
+                println!("");
+                Ok(std::io::stdout().flush()?)
+            })?,
+            _ => {}
+        }
         if let Some(e) = &trace.error {
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),
                     TraceFormat::Stack => trace.fmt_stack(),
-                    TraceFormat::Full => trace.to_string(),
-                    TraceFormat::Json => serde_json::to_string(&trace)?,
+                    TraceFormat::Full => e.to_string(),
+                    TraceFormat::Json => e.to_string(),
                 };
                 Err(Error::ExecutionFailed { message })?;
             }
-        }
-        match self {
-            TraceFormat::Full => progress.suspend(|| print!("{}", trace.to_string())),
-            TraceFormat::Json => progress
-                .suspend(|| serde_json::to_writer_pretty(std::io::stdout().lock(), &trace))?,
-            _ => {}
         }
         Ok(())
     }
@@ -169,7 +176,10 @@ async fn push_transaction_impl(
     )
     .await?;
     if console {
-        progress.suspend(|| print!("{}", trace.console()));
+        progress.suspend(|| {
+            print!("{}", trace.console());
+            std::io::stdout().flush()
+        })?;
     }
     fmt.error_for_trace(trace, progress)
 }

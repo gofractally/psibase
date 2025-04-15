@@ -20,7 +20,7 @@ Fractal::Fractal(psio::shared_view_ptr<psibase::Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 }
@@ -28,15 +28,12 @@ Fractal::Fractal(psio::shared_view_ptr<psibase::Action> action)
 void Fractal::init()
 {
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.get(SingletonKey{}));
+   auto init      = (initTable.get({}));
    check(not init.has_value(), UserService::Errors::alreadyInit);
    initTable.put(InitializedRecord{});
 
    // Register with HttpServer
    to<SystemService::HttpServer>().registerServer(service);
-
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Fractal>());
 
    // Event indices:
    to<EventIndex>().addIndex(DbId::historyEvent, Fractal::service, "identityAdded"_m, 0);

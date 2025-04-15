@@ -38,8 +38,9 @@ namespace psibase
    {
       std::vector<std::string>     flags;
       std::optional<AccountNumber> server;
+      std::optional<ServiceSchema> schema;
    };
-   PSIO_REFLECT(ServiceInfo, flags, server)
+   PSIO_REFLECT(ServiceInfo, flags, server, schema)
 
    struct PackagedService
    {
@@ -48,6 +49,7 @@ namespace psibase
 
       void genesis(std::vector<GenesisService>& out);
       bool hasService(AccountNumber service) const;
+      void setSchema(std::vector<Action>& actions);
       void storeData(std::vector<Action>& actions);
       void regServer(std::vector<Action>& actions);
       void postinstall(std::vector<Action>& actions);

@@ -10,13 +10,20 @@ flowchart TD
    A[HTTP Request]
    B[psinode]
    C[http-server service]
-   D[sites service's serveSys action]
+   sites[sites service's serveSys action]
+   serveSys{{serveSys handles request?}}
 
-   A --> B --> C --> D --> E{{was site data found?}} -->|yes| 200
-   E -->|no| G{{target begins with '/common'?}} -->|yes| H['common-api' service's serveSys action]
-   G -->|no| I{{on a subdomain?}} -->|no| 404
-   I -->|yes| J{{Has registered server?}} -->|no| 404
-   J -->|yes| L[registered server's serveSys action]
+   A --> B --> C
+   sites --> E{{was site data found?}} -->|yes| 200
+   E -->|no| 404
+   C --> G{{target begins with '/common'?}}
+   G -->|yes| common['common-api' service's serveSys action] --> serveSys
+   G -->|no| I{{on a subdomain?}} -->|no| home['homepage' service's serveSys action] --> serveSys
+   I -->|yes| J{{Has registered server?}}
+   J -->|yes| L[registered server's serveSys action] --> serveSys
+   J -->|no| sites
+   serveSys -->|yes| 200
+   serveSys -->|no| sites
 ```
 
 `psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
@@ -56,7 +63,6 @@ These help implement basic functionality:
 - [psibase::serveSimpleUI]
 - [psibase::serveActionTemplates]
 - [psibase::servePackAction]
-- [psibase::serveSchema]
 - [psibase::serveGraphQL]
 - [psibase::makeConnection]
   - [psibase::PageInfo]
@@ -92,7 +98,6 @@ std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request)
 {{#cpp-doc ::psibase::serveSimpleUI}}
 {{#cpp-doc ::psibase::serveActionTemplates}}
 {{#cpp-doc ::psibase::servePackAction}}
-{{#cpp-doc ::psibase::serveSchema}}
 {{#cpp-doc ::psibase::serveGraphQL}}
 {{#cpp-doc ::psibase::makeConnection}}
 {{#cpp-doc ::psibase::PageInfo}}

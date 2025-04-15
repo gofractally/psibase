@@ -44,4 +44,4 @@ export {
     buildGetJsonRequest,
 } from "./GetJsonRequest";
 
-export { PluginError, isPluginError, isGenericError } from "./Errors";
+export { PluginError, PluginErrorObject, RedirectErrorObject, GenericError, GenericErrorObject, isPluginError, isGenericError, isPluginErrorObject, isRedirectErrorObject, isGenericErrorObject } from "./Errors";

@@ -15,5 +15,6 @@ namespace SystemService
       };
       PSIO_REFLECT(RAuthSig,  //
                    method(serveSys, request))
+      PSIBASE_REFLECT_TABLES(RAuthSig)
    }  // namespace AuthSig
 }  // namespace SystemService

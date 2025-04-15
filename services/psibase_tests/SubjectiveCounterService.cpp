@@ -5,7 +5,6 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
 #include <psibase/servePackAction.hpp>
-#include <psibase/serveSchema.hpp>
 #include <string>
 
 using namespace psibase;
@@ -19,6 +18,7 @@ struct SubjectiveCounterRow
 PSIO_REFLECT(SubjectiveCounterRow, key, value)
 
 using SubjectiveCounterTable = psibase::Table<SubjectiveCounterRow, &SubjectiveCounterRow::key>;
+PSIO_REFLECT_TYPENAME(SubjectiveCounterTable)
 
 struct SubjectiveCounterService : psibase::Service
 {
@@ -30,6 +30,7 @@ struct SubjectiveCounterService : psibase::Service
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
 PSIO_REFLECT(SubjectiveCounterService, method(inc, key, id), method(serveSys, req))
+PSIBASE_REFLECT_TABLES(SubjectiveCounterService, SubjectiveCounterService::Tables)
 
 std::uint32_t SubjectiveCounterService::inc(std::string key, std::uint32_t id)
 {
@@ -63,8 +64,6 @@ std::optional<HttpReply> SubjectiveCounterService::serveSys(const HttpRequest& r
       psio::to_json(value, stream);
       return result;
    }
-   if (auto result = serveSchema<SubjectiveCounterService>(req))
-      return result;
    return servePackAction<SubjectiveCounterService>(req);
 }
 

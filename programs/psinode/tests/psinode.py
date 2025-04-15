@@ -139,7 +139,7 @@ class ChainPackContext:
         return fracpack.pack(data, self.get_schema(service).actions[method].params)
     def get_schema(self, service):
         if service not in self._schemas:
-            with self._api.get('/schema', service) as reply:
+            with self._api.get('/schema?service=%s' % service, service='packages') as reply:
                 reply.raise_for_status()
                 self._schemas[service] = ServiceSchema(reply.json(), custom=self._custom)
         return self._schemas[service]

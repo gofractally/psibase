@@ -8,7 +8,24 @@ how services may call each other.
 
 Let's create two services, `arithmetic` and `arithmetic2`.
 
+First create a workspace to hold them. Add an empty source, `src/lib.rs`, and`Cargo.toml`
+```toml
+[workspace]
+members = []
+resolver = "2"
+
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata.psibase]
+package-name = "Example"
+services = ["arithmetic", "arithmetic2"]
 ```
+
+
+```sh
 cargo new --lib arithmetic
 cargo new --lib arithmetic2
 
@@ -22,19 +39,27 @@ cd ../arithmetic2
 cargo add psibase
 cargo add -F derive serde
 cargo add --path ../arithmetic
+cargo add --dev --path ..
+
+# The root crate needs to depend on both the services
+cd ..
+cargo add --path arithmetic
+cargo add --path arithmetic2
 ```
 
 This creates the following tree:
 
 ```
 .
+├── Cargo.lock
+├── Cargo.toml
+├── src
+│   └── lib.rs
 ├── arithmetic
-│   ├── Cargo.lock
 │   ├── Cargo.toml
 │   └── src
 │       └── lib.rs
 └── arithmetic2
-    ├── Cargo.lock
     ├── Cargo.toml
     └── src
         └── lib.rs
@@ -65,7 +90,7 @@ mod service {
 }
 
 // Our test case needs both services to function
-#[psibase::test_case(services("arithmetic", "arithmetic2"))]
+#[psibase::test_case(packages("Example"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     // Verify arithmetic works
     assert_eq!(arithmetic::Wrapper::push(&chain).add(3, 4).get()?, 7);

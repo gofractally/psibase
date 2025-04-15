@@ -45,8 +45,5 @@ mod service {
 
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
-
-            // Serves a full service schema at the /schema endpoint
-            .or_else(|| serve_schema::<{{project-name | snake_case}}::Wrapper>(&request))
     }
 }

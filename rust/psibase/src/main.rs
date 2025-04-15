@@ -55,7 +55,7 @@ struct NodeArgs {
         long,
         value_name = "URL_OR_HOST_ALIAS",
         env = "PSINODE_URL",
-        default_value = "http://psibase.127.0.0.1.sslip.io:8080/",
+        default_value = "http://psibase.localhost:8080/",
         value_parser = parse_api_endpoint
     )]
     api: Url,
@@ -69,10 +69,6 @@ struct NodeArgs {
 #[derive(Args, Debug)]
 #[clap(long_about = None)]
 struct TxArgs {
-    /// Suppress "Ok" message
-    #[clap(long)]
-    suppress_ok: bool,
-
     /// Controls how transaction traces are reported. Possible values are
     /// error, stack, full, or json
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
@@ -202,6 +198,9 @@ struct DeployArgs {
 
     /// Filename containing the service
     filename: String,
+
+    /// Filename containing the schema
+    schema: PathBuf,
 
     /// Create the account if it doesn't exist. Also set the account to
     /// authenticate using this key, even if the account already existed.
@@ -475,6 +474,28 @@ fn with_tapos(
     }
 }
 
+fn make_spinner() -> ProgressBar {
+    let progress = ProgressBar::new_spinner().with_style(
+        ProgressStyle::with_template("{spinner}{msg}")
+            .unwrap()
+            .tick_strings(&["⏳ ", "⌛ ", ""]),
+    );
+    progress.enable_steady_tick(core::time::Duration::from_millis(500));
+    progress
+}
+
+fn finish_progress(sig_args: &SigArgs, progress: ProgressBar, num_transactions: usize) {
+    if sig_args.proposer.is_some() {
+        progress.finish_with_message(format!(
+            "Proposed {} transaction{}",
+            num_transactions,
+            if num_transactions == 1 { "" } else { "s" }
+        ));
+    } else {
+        progress.finish_with_message("Ok");
+    }
+}
+
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
@@ -496,24 +517,29 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
         ));
     }
 
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
         true,
     );
+
+    progress.set_message(format!("Creating {}", args.account));
+
     push_transaction(
         &args.node_args.api,
         client,
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -543,24 +569,28 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
         ));
     }
 
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
+
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
         actions,
         &args.sig_args.proposer,
         true,
     );
+
+    progress.set_message(format!("Setting auth for {}", args.account));
+
     push_transaction(
         &args.node_args.api,
         client,
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -569,6 +599,10 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     let (client, _proxy) = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
+    let schema: psibase::Schema = serde_json::from_slice(
+        &std::fs::read(&args.schema)
+            .with_context(|| format!("Can not read {}", args.schema.display()))?,
+    )?;
 
     let mut actions: Vec<Action> = Vec::new();
 
@@ -597,10 +631,14 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
     }
 
     actions.push(set_code_action(args.account.into(), wasm));
+    actions.push(packages::Wrapper::pack_from(args.account.into()).setSchema(schema));
 
     if args.register_proxy {
         actions.push(reg_server(args.account.into(), args.account.into()));
     }
+
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
 
     let trx = with_tapos(
         &get_tapos_for_head(&args.node_args.api, client.clone()).await?,
@@ -614,12 +652,10 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -635,6 +671,9 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
             t.essence_str().to_string()
         }
     };
+
+    let progress = make_spinner();
+    progress.set_message("Preparing transaction");
 
     let normalized_dest = if let Some(d) = &args.dest {
         if d.starts_with('/') {
@@ -671,12 +710,10 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
-        None,
+        Some(&progress),
     )
     .await?;
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, 1);
     Ok(())
 }
 
@@ -692,7 +729,7 @@ fn fill_tree(
     if md.is_file() {
         let guess = mime_guess::from_path(source);
         if let Some(t) = guess.first() {
-            println!("{} <=== {}   {}", dest, source, t.essence_str());
+            eprintln!("{} <=== {}   {}", dest, source, t.essence_str());
             actions.push((
                 dest.to_owned(),
                 store_sys(
@@ -707,7 +744,7 @@ fn fill_tree(
             if top {
                 return Err(anyhow!("Unknown mime type: {}", source));
             } else {
-                println!("Skip unknown mime type: {}", source);
+                eprintln!("Skip unknown mime type: {}", source);
             }
         }
     } else if md.is_dir() {
@@ -727,7 +764,7 @@ fn fill_tree(
         if top {
             return Err(anyhow!("{} is not a file or directory", source));
         } else {
-            println!("Skip {}", source);
+            eprintln!("Skip {}", source);
         }
     }
     Ok(())
@@ -752,10 +789,10 @@ async fn monitor_trx(
     .await;
     if let Err(err) = result {
         progress.suspend(|| {
-            println!("=====\n{:?}", err);
-            println!("-----\nThese files were in this failed transaction:");
+            eprintln!("=====\n{:?}", err);
+            eprintln!("-----\nThese files were in this failed transaction:");
             for f in files {
-                println!("    {}", f);
+                eprintln!("    {}", f);
             }
         });
         return Err(err);
@@ -878,11 +915,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         }
     }
 
-    if !args.tx_args.suppress_ok {
-        progress.finish_with_message(format!("Successfully booted {}", args.node_args.api));
-    } else {
-        progress.finish_and_clear();
-    }
+    progress.finish_with_message(format!("Successfully booted {}", args.node_args.api));
     Ok(())
 }
 
@@ -977,9 +1010,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         return Err(anyhow!("{}/{} failed transactions", num_failed, num_trx));
     }
 
-    if !args.tx_args.suppress_ok {
-        println!("Ok");
-    }
+    finish_progress(&args.sig_args, progress, num_trx);
     Ok(())
 }
 
@@ -1233,19 +1264,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    if !args.tx_args.suppress_ok {
-        if args.sig_args.proposer.is_some() {
-            progress.finish_with_message(format!(
-                "Proposed {} transaction{}",
-                num_transactions,
-                if num_transactions == 1 { "" } else { "s" }
-            ));
-        } else {
-            progress.finish_with_message("Ok");
-        }
-    } else {
-        progress.finish_and_clear();
-    }
+    finish_progress(&args.sig_args, progress, num_transactions);
 
     Ok(())
 }

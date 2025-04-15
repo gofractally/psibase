@@ -32,7 +32,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
    MethodNumber m{action->method()};
    if (m != MethodNumber{"init"})
    {
-      auto initRecord = Tables().open<InitTable>().get(SingletonKey{});
+      auto initRecord = Tables().open<InitTable>().get({});
       check(initRecord.has_value(), UserService::Errors::uninitialized);
    }
 }
@@ -40,7 +40,7 @@ Invite::Invite(psio::shared_view_ptr<Action> action)
 void Invite::init()
 {
    auto initTable = Tables().open<InitTable>();
-   auto init      = (initTable.get(SingletonKey{}));
+   auto init      = (initTable.get({}));
    initTable.put(InitializedRecord{});
 
    // Configure manual debit for self on Token and NFT
@@ -51,8 +51,7 @@ void Invite::init()
    // Create the invite payer account and set its auth contract
    to<Accounts>().newAccount(payerAccount, AuthInvite::service, false);
 
-   // Register event indices and schema
-   to<EventIndex>().setSchema(ServiceSchema::make<Invite>());
+   // Register event indices
    to<EventIndex>().addIndex(DbId::historyEvent, Invite::service, "updated"_m, 0);
 }
 
@@ -73,7 +72,7 @@ uint32_t Invite::createInvite(Spki                         inviteKey,
    auto now           = to<Transact>().currentBlock().time;
 
    auto     inviteIdTable = Tables().open<NextInviteIdTable>();
-   auto     nextIdRecord  = inviteIdTable.get(SingletonKey{});
+   auto     nextIdRecord  = inviteIdTable.get({});
    uint32_t nextId        = (nextIdRecord.has_value()) ? nextIdRecord->nextInviteId + 1 : 0;
    inviteIdTable.put(NextInviteId{nextId});
 

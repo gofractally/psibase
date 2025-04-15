@@ -8,6 +8,7 @@
 #include <psibase/nativeTables.hpp>
 #include <psibase/schema.hpp>
 #include <psio/reflect.hpp>
+#include <services/user/EventsTables.hpp>
 
 namespace UserService
 {
@@ -50,8 +51,6 @@ namespace UserService
       static constexpr psibase::AccountNumber service{"events"};
       static constexpr auto                   serviceFlags =
           psibase::CodeRow::isSubjective | psibase::CodeRow::forceReplay;
-      /// Sets the schema associated with a service.
-      void setSchema(const psibase::ServiceSchema& schema);
       /// Requests an index. Indexes can improve the performance of queries involving
       /// the column. The indexes are subjective and MAY be adjusted by individual nodes.
       /// Indexes increase the CPU cost of transactions that create events.
@@ -68,21 +67,13 @@ namespace UserService
       void sync();
       /// Runs in subjective mode at the end of each block
       void onBlock();
-
-#ifndef GENERATING_DOCUMENTATION
-      template <typename T>
-      static T open(std::uint16_t id)
-      {
-         return T{psibase::DbId::writeOnly, psio::convert_to_key(std::tuple(service, id))};
-      }
-#endif
    };
    PSIO_REFLECT(EventIndex,
                 method(init),
-                method(setSchema, schema),
                 method(addIndex, db, service, event, column),
                 method(sync),
                 method(onBlock))
+   PSIBASE_REFLECT_TABLES(EventIndex, EventsTables)
 
    using Events = EventIndex;
 

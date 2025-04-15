@@ -92,4 +92,6 @@ namespace SystemService
                 //
    )
 
+   PSIBASE_REFLECT_TABLES(Producers)
+
 }  // namespace SystemService

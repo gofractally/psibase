@@ -26,8 +26,8 @@ This example works directly in the browser without bundling, transpiling, etc.
 ```js
 // Use these if your script is NOT hosted by psinode:
 import { getTaposForHeadBlock, signAndPushTransaction }
-    from 'http://psibase.127.0.0.1.sslip.io:8080/common/common-lib.js';
-const baseUrl = 'http://psibase.127.0.0.1.sslip.io:8080';
+    from 'http://psibase.localhost:8080/common/common-lib.js';
+const baseUrl = 'http://psibase.localhost:8080';
 
 try {
     const transaction = {

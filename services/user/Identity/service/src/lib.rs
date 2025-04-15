@@ -88,7 +88,7 @@ mod tables {
 
 /// Identity service to log identity attestations, and provide a graphiql
 /// query interface.
-#[psibase::service(name = "identity")]
+#[psibase::service(name = "identity", tables = "tables")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
@@ -102,7 +102,6 @@ mod service {
     fn init() {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
-        services::events::Wrapper::call().setSchema(create_schema::<Wrapper>());
         services::http_server::Wrapper::call().registerServer(SERVICE);
     }
 

@@ -44,6 +44,5 @@ SCENARIO("Testing default psibase chain")
    }
 
    // Run the chain
-   std::system(
-       "psinode -o psibase.127.0.0.1.sslip.io tester_psinode_db -l 8080 --producer firstproducer");
+   std::system("psinode tester_psinode_db --producer firstproducer");
 }

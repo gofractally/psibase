@@ -193,6 +193,17 @@ namespace psibase
       }
       return false;
    }
+   void PackagedService::setSchema(std::vector<Action>& actions)
+   {
+      for (const auto& [account, index, info] : services)
+      {
+         if (info.schema)
+         {
+            actions.push_back(
+                transactor<Packages>{account, Packages::service}.setSchema(*info.schema));
+         }
+      }
+   }
    void PackagedService::storeData(std::vector<Action>& actions)
    {
       for (const auto& [sender, index] : data)

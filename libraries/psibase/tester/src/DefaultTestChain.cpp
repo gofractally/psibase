@@ -45,6 +45,12 @@ namespace
       transactor<Transact> tsys{Transact::service, Transact::service};
       std::vector<Action>  actions;
       bool                 has_packages = false;
+
+      for (auto& s : service_packages)
+      {
+         s.setSchema(actions);
+      }
+
       for (auto& s : service_packages)
       {
          for (auto account : s.accounts())

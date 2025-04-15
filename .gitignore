@@ -1,5 +1,6 @@
 .caches
 .ccache
+.cache
 .DS_Store
 .nyc_output
 .vscode

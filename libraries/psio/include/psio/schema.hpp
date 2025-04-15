@@ -3,6 +3,7 @@
 #include <concepts>
 #include <map>
 #include <psio/fracpack.hpp>
+#include <psio/from_json/map.hpp>
 #include <psio/get_type_name.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
@@ -107,6 +108,11 @@ namespace psio
       {
          to_json(*wrapper.value, stream);
       }
+      template <typename T, typename Stream>
+      void from_json(Box<T>& wrapper, Stream& stream)
+      {
+         from_json(*wrapper.value, stream);
+      }
 
       template <typename T>
       T& clio_unwrap_packable(Box<T>& box)
@@ -154,6 +160,7 @@ namespace psio
       struct Member;
 
       void to_json_members(const std::vector<Member>&, auto& stream);
+      void from_json_members(const std::vector<Member>&, auto& stream);
 
       struct Object
       {
@@ -165,6 +172,10 @@ namespace psio
       void to_json(const Object& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+      void from_json(Object& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
       }
 
       inline auto& clio_unwrap_packable(Object& type)
@@ -186,6 +197,10 @@ namespace psio
       void to_json(const Struct& type, auto& stream)
       {
          to_json_members(type.members, stream);
+      }
+      void from_json(Struct& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
       }
 
       inline auto& clio_unwrap_packable(Struct& type)
@@ -215,6 +230,10 @@ namespace psio
       {
          to_json(*type.type, stream);
       }
+      void from_json(List& type, auto& stream)
+      {
+         from_json(*type.type, stream);
+      }
 
       inline auto& clio_unwrap_packable(List& type)
       {
@@ -234,6 +253,10 @@ namespace psio
       void to_json(const Option& type, auto& stream)
       {
          to_json(*type.type, stream);
+      }
+      void from_json(Option& type, auto& stream)
+      {
+         from_json(*type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(Option& type)
@@ -278,6 +301,10 @@ namespace psio
       {
          to_json_members(type.members, stream);
       }
+      void from_json(Variant& type, auto& stream)
+      {
+         from_json_members(type.members, stream);
+      }
 
       inline auto& clio_unwrap_packable(Variant& type)
       {
@@ -299,6 +326,10 @@ namespace psio
       {
          to_json(type.members, stream);
       }
+      void from_json(Tuple& type, auto& stream)
+      {
+         from_json(type.members, stream);
+      }
 
       inline auto& clio_unwrap_packable(Tuple& type)
       {
@@ -319,6 +350,10 @@ namespace psio
       void to_json(const FracPack& type, auto& stream)
       {
          to_json(type.type, stream);
+      }
+      void from_json(FracPack& type, auto& stream)
+      {
+         from_json(type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(FracPack& type)
@@ -343,6 +378,10 @@ namespace psio
       void to_json(const Type& type, auto& stream)
       {
          to_json(type.type, stream);
+      }
+      void from_json(Type& type, auto& stream)
+      {
+         from_json(type.type, stream);
       }
 
       inline auto& clio_unwrap_packable(Type& type)
@@ -392,6 +431,10 @@ namespace psio
       void to_json(const AnyType& type, auto& stream)
       {
          to_json(type.value, stream);
+      }
+      void from_json(AnyType& type, auto& stream)
+      {
+         from_json(type.value, stream);
       }
       inline auto& clio_unwrap_packable(AnyType& type)
       {
@@ -1343,6 +1386,16 @@ namespace psio
          stream.write('}');
       }
 
+      void from_json_members(std::vector<Member>& members, auto& stream)
+      {
+         from_json_object(stream,
+                          [&](std::string_view key)
+                          {
+                             members.push_back(Member{std::string(key)});
+                             from_json(members.back().type, stream);
+                          });
+      }
+
       template <typename T>
       bool matchCustomType(const CompiledType* type, T*)
       {
@@ -1406,6 +1459,19 @@ namespace psio
       SchemaDifference match(const Schema&                                   schema1,
                              const Schema&                                   schema2,
                              const std::vector<std::pair<AnyType, AnyType>>& types);
+
+      struct SchemaMatch;
+      struct TypeMatcher
+      {
+        public:
+         TypeMatcher(const Schema& l, const Schema& r, SchemaDifference allowed);
+         ~TypeMatcher();
+         bool match(const AnyType& lhs, const AnyType& rhs);
+
+        private:
+         std::unique_ptr<SchemaMatch> impl;
+         SchemaDifference             allowed;
+      };
    }  // namespace schema_types
 
    using schema_types::match;

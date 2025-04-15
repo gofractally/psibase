@@ -1,6 +1,5 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
-#include <psibase/serveSchema.hpp>
 #include <psibase/serveSimpleUI.hpp>
 #include <services/system/AuthDelegate.hpp>
 #include <services/system/RAuthDelegate.hpp>
@@ -42,9 +41,6 @@ namespace SystemService
          return result;
 
       if (auto result = serveSimpleUI<AuthDelegate, false>(request))
-         return result;
-
-      if (auto result = serveSchema<AuthDelegate>(request))
          return result;
 
       return std::nullopt;

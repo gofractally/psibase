@@ -17,6 +17,7 @@ struct ParallelSubjectiveRow
 PSIO_REFLECT(ParallelSubjectiveRow, key, value)
 
 using ParallelSubjectiveTable = psibase::Table<ParallelSubjectiveRow, &ParallelSubjectiveRow::key>;
+PSIO_REFLECT_TYPENAME(ParallelSubjectiveTable)
 
 struct GeRow
 {
@@ -25,6 +26,7 @@ struct GeRow
 PSIO_REFLECT(GeRow, key)
 
 using GeTable = Table<GeRow, &GeRow::key>;
+PSIO_REFLECT_TYPENAME(GeTable)
 
 struct ParallelSubjectiveService : psibase::Service
 {
@@ -35,6 +37,7 @@ struct ParallelSubjectiveService : psibase::Service
    std::optional<psibase::HttpReply> serveSys(const psibase::HttpRequest& req);
 };
 PSIO_REFLECT(ParallelSubjectiveService, method(serveSys, req))
+PSIBASE_REFLECT_TABLES(ParallelSubjectiveService, ParallelSubjectiveService::Tables)
 
 volatile int dummy;
 

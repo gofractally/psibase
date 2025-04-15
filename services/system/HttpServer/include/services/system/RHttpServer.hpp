@@ -12,4 +12,5 @@ namespace SystemService
    };
    PSIO_REFLECT(RHttpServer,  //
                 method(serveSys, request))
+   PSIBASE_REFLECT_TABLES(RHttpServer)
 }  // namespace SystemService

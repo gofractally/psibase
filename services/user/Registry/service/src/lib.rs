@@ -2,7 +2,7 @@ mod constants;
 mod tables;
 mod utils;
 
-#[psibase::service(name = "registry")]
+#[psibase::service(name = "registry", tables = "tables::tables")]
 #[allow(non_snake_case)]
 pub mod service {
     use crate::constants::*;
@@ -52,7 +52,6 @@ pub mod service {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
 
-        EventsSvc::call().setSchema(create_schema::<Wrapper>());
         EventsSvc::call().addIndex(
             DbId::HistoryEvent,
             SERVICE,
@@ -339,7 +338,7 @@ pub mod service {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consts::MAX_APP_NAME_LENGTH;
+    use crate::constants::MAX_APP_NAME_LENGTH;
     use crate::service::{AppMetadata, AppStatus, AppStatusU32, TagRecord};
     use psibase::{account, AccountNumber, ChainEmptyResult, TimePointUSec};
 

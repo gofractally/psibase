@@ -12,7 +12,10 @@ namespace UserService
    {
       auto installed() const
       {
-         return Packages::Tables(Packages::service).open<InstalledPackageTable>().getIndex<0>();
+         return Packages::Tables(Packages::service)
+             .open<InstalledPackageTable>()
+             .getIndex<0>()
+             .subindex<PackageKey>(std::tuple{});
       }
       // Returns the accounts that need to be created to install a package.
       // Validates that existing accounts have the correct owner.
@@ -91,11 +94,48 @@ namespace UserService
       return {};
    }
 
+   struct SchemaQuery
+   {
+      std::string service;
+      PSIO_REFLECT(SchemaQuery, service)
+   };
+
+   std::optional<psibase::HttpReply> serveSchema(psibase::HttpRequest& request)
+   {
+      auto path = request.path();
+      if (request.method == "GET" && path == "/schema")
+      {
+         auto query       = request.query<SchemaQuery>();
+         auto schemaTable = Packages{}.open<InstalledSchemaTable>();
+         if (auto row = schemaTable.get(psibase::AccountNumber{query.service}))
+         {
+            psibase::HttpReply reply{
+                .contentType = "application/json",
+            };
+            psio::vector_stream stream{reply.body};
+            psio::to_json(row->schema, stream);
+            return std::move(reply);
+         }
+         else
+         {
+            std::string msg = "No schema for service '" + query.service + "'";
+            return psibase::HttpReply{
+                .status      = psibase::HttpStatus::notFound,
+                .contentType = "text/html",
+                .body        = {msg.begin(), msg.end()},
+            };
+         }
+      }
+      return {};
+   }
+
    std::optional<psibase::HttpReply> RPackages::serveSys(psibase::HttpRequest request)
    {
       if (auto result = psibase::serveGraphQL(request, Query{}))
          return result;
       if (auto result = servePackageManifest(request))
+         return result;
+      if (auto result = serveSchema(request))
          return result;
       return std::nullopt;
    }
