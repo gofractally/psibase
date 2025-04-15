@@ -784,7 +784,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1652,7 +1652,7 @@ dependencies = [
 
 [[package]]
 name = "plugin"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -1713,7 +1713,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1767,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1781,7 +1781,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -1793,14 +1793,14 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "psibase-macros-derive",
 ]
 
 [[package]]
 name = "psibase_names"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "seahash",
 ]
@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "r-registry"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1865,7 +1865,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "registry"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "registry-pkg"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "plugin",
  "r-registry",

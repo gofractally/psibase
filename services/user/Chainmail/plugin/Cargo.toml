@@ -8,16 +8,16 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-wit-bindgen-rt = { version = "0.28.0", features = ["bitflags"] }
-psibase = { path = "../../../../rust/psibase/" }
-chainmail = { path = "../service" }
+wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
+chainmail = { path = "../service", version = "0.16.0" }
 serde_json = "1.0.128"
 serde = "1.0.210"
 serde-aux = "4.5.0"
 chrono = "0.4"
 
 [dev-dependencies]
-chainmail_package = { path = "..", version = "0.15.0" }
+chainmail_package = { path = "..", version = "0.16.0" }
 
 [lib]
 crate-type = ["cdylib"]

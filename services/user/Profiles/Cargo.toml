@@ -3,13 +3,13 @@ resolver = "2"
 members = ["service", "plugin"]
 
 [workspace.package]
-version = "0.15.0"
+version = "0.16.0"
 rust-version = "1.64"
 edition = "2021"
 publish = false
 
 [package]
-name = "profiles-pkg"   # Crate name
+name = "profiles-pkg"         # Crate name
 description = "Add profiles"
 version.workspace = true
 rust-version.workspace = true
@@ -28,14 +28,13 @@ package-name = "Profiles"
 services = ["profiles"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.15.0"
-Sites = "0.15.0"
+HttpServer = "0.16.0"
+Sites = "0.16.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-profiles = { path = "service", version = "0.15.0" }
-
-r-profiles = { path = "query-service", version = "0.15.0" }
-plugin = { path = "plugin", version = "0.15.0" }
+profiles = { path = "service", version = "0.16.0" }
+r-profiles = { path = "query-service", version = "0.16.0" }
+plugin = { path = "plugin", version = "0.16.0" }
