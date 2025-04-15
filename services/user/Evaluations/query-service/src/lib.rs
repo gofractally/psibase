@@ -85,7 +85,5 @@ mod service {
         None.or_else(|| serve_graphql(&request, Query))
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
-            // Serves a full service schema at the /schema endpoint
-            .or_else(|| serve_schema::<evaluations::Wrapper>(&request))
     }
 }
