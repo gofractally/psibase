@@ -65,6 +65,14 @@ pub mod service {
     /// Member interface
     #[action]
     fn join_waitlist(fractal: AccountNumber) {
+        // Eventually...
+        // let table = WaitlistTable::new();
+        // table.put(&Waitlist {
+        //     fractal: _fractal,
+        //     account: get_sender(),
+        //     joined_at: psibase::TimePointSec::from(TransactSvc::call().currentBlock().time.seconds()),
+        // }).unwrap();
+
         // for now, allow all immediate membership
         let table = MemberTable::new();
         table
@@ -77,14 +85,6 @@ pub mod service {
                 titles: 0,
             })
             .unwrap();
-
-        // Eventually...
-        // let table = WaitlistTable::new();
-        // table.put(&Waitlist {
-        //     fractal: _fractal,
-        //     account: get_sender(),
-        //     joined_at: psibase::TimePointSec::from(TransactSvc::call().currentBlock().time.seconds()),
-        // }).unwrap();
     }
 
     #[action]
