@@ -54,7 +54,21 @@ pub mod service {
 
     #[action]
     fn create_eval() {
-        // EvaluationsSrv::call().create_eval(get_sender(), eval_type);
+        let reg_start = TransactSvc::call().currentBlock().time.seconds();
+
+        let delib_start = reg_start + Seconds::new(consts::DURATION_REGISTRATION_MINUTES * 60);
+        let submit_start = delib_start + Seconds::new(consts::DURATION_DELIBERATION_MINUTES * 60);
+        let finish_by = submit_start + Seconds::new(consts::DURATION_SUBMISSION_MINUTES * 60);
+
+        // EvaluationsSrv::call().create(
+        // registration: reg_start,
+        // deliberation: delib_start,
+        // submission: submit_start,
+        // finish_by,
+        // groups_sizes: [4,5],
+        // rank_amount: u8,
+        // true // use_hooks
+        // );
     }
 
     #[action]
