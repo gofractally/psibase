@@ -15,8 +15,6 @@ const parseErrors = (errors: unknown[]): string[] =>
     );
 
 export const FieldErrors = ({ meta }: FieldErrorsProps) => {
-    if (!meta.isTouched || !meta.isBlurred) return null;
-
     return parseErrors(meta.errors).map((error, index) => (
         <p key={index} className="text-sm text-destructive">
             {error}

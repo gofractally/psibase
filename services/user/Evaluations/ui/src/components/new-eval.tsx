@@ -29,6 +29,14 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
             rankAmount: 6,
         },
         validators: {
+            onSubmit: (data) => {
+                const now = dayjs();
+                const { deliberation } = data.value;
+
+                if (now.valueOf() > deliberation.valueOf()) {
+                    return "Deliberation phase has already started";
+                }
+            },
             onSubmitAsync: async (data) => {
                 const {
                     registration,
@@ -85,7 +93,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     }}
                     children={(field) => (
                         <field.DateTimeField
-                            label="Registration"
+                            label="Registration phase"
                             description={
                                 dayjs(field.state.value).isBefore(now)
                                     ? "Now"
@@ -107,6 +115,10 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                             ) {
                                 return "Deliberation must be after registration";
                             }
+
+                            if (new Date().valueOf() > deliberation.valueOf()) {
+                                return "Deliberation phase has already started";
+                            }
                         },
                     }}
                     listeners={{
@@ -121,7 +133,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     }}
                     children={(field) => (
                         <field.DateTimeField
-                            label="Deliberation"
+                            label="Deliberation phase"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("registration")),
@@ -144,7 +156,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     }}
                     children={(field) => (
                         <field.DateTimeField
-                            label="Submission"
+                            label="Submission phase"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("deliberation")),
@@ -167,7 +179,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     }}
                     children={(field) => (
                         <field.DateTimeField
-                            label="Finish By"
+                            label="Finish by"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("submission")),
@@ -176,7 +188,6 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         />
                     )}
                 />
-
                 <form.AppField
                     name="allowableGroupSizes"
                     children={(field) => (
@@ -196,16 +207,18 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                         <field.NumberField label="Rank Amount" />
                     )}
                 />
-                <form.AppForm>
-                    <form.SubmitButton
-                        submitOnce
-                        labels={[
-                            "Create Evaluation",
-                            "Creating Evaluation...",
-                            "Created evaluation",
-                        ]}
-                    />
-                </form.AppForm>
+                <div className="flex py-2">
+                    <form.AppForm>
+                        <form.SubmitButton
+                            submitOnce
+                            labels={[
+                                "Create Evaluation",
+                                "Creating Evaluation...",
+                                "Created evaluation",
+                            ]}
+                        />
+                    </form.AppForm>
+                </div>
             </form>
         </div>
     );

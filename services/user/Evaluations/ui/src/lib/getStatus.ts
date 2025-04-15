@@ -35,10 +35,10 @@ const getTimeStatus = (
 
 const Unix = z.number();
 
-const Types = {
+export const Types = {
     Pending: "pending" as const,
     RegistrationAvailable: "registrationAvailable" as const,
-    Registered: "registeredAwaitingDeliberation" as const,
+    RegisteredAwaitingDeliberation: "registeredAwaitingDeliberation" as const,
     AwaitingEvaluationStart: "awaitingEvaluationStart" as const,
     DeliberationPendingParticipant: "deliberationPendingAsParticipant" as const,
     DeliberationPendingSpectator: "deliberationPendingAsSpectator" as const,
@@ -55,11 +55,13 @@ const Pending = z.object({
 const RegistrationAvailable = z.object({
     type: z.literal(Types.RegistrationAvailable),
     deliberationStarts: Unix,
+    userIsHost: z.boolean(),
 });
 
-const Registered = z.object({
-    type: z.literal(Types.Registered),
+const RegisteredAwaitingDeliberation = z.object({
+    type: z.literal(Types.RegisteredAwaitingDeliberation),
     deliberationStarts: Unix,
+    userIsHost: z.boolean(),
 });
 
 const DeliberationPendingParticipant = z.object({
@@ -99,7 +101,7 @@ const EvaluationNotStartedInTime = z.object({
 const zStatus = z.discriminatedUnion("type", [
     Pending,
     RegistrationAvailable,
-    Registered,
+    RegisteredAwaitingDeliberation,
     DeliberationPendingParticipant,
     DeliberationPendingSpectator,
     AwaitingEvaluationStart,
@@ -127,14 +129,16 @@ export const getStatus = (
     } else if (timeStatus == zTimeStatus.Values.registration) {
         const isRegistered = users.some((user) => user.user === currentUser);
         if (isRegistered) {
-            return Registered.parse({
-                type: Types.Registered,
+            return RegisteredAwaitingDeliberation.parse({
+                type: Types.RegisteredAwaitingDeliberation,
                 deliberationStarts: evaluation.deliberationStarts,
+                userIsHost: isOwner,
             });
         } else {
             return RegistrationAvailable.parse({
                 type: Types.RegistrationAvailable,
                 deliberationStarts: evaluation.deliberationStarts,
+                userIsHost: isOwner,
             });
         }
     } else if (timeStatus == zTimeStatus.Values.deliberation) {
@@ -163,10 +167,13 @@ export const getStatus = (
         timeStatus == zTimeStatus.Values.submission ||
         timeStatus == zTimeStatus.Values.finished
     ) {
-        // is not a member and just watching
-        // is group called?
-        // is a member and already submitted
-        // is a member and not submitted
+        const noGroupsCreated = groups.length === 0;
+        if (noGroupsCreated) {
+            return EvaluationNotStartedInTime.parse({
+                type: Types.EvaluationNotStartedInTime,
+                userShouldDelete: isOwner,
+            });
+        }
 
         const user = users.find((user) => user.user === currentUser);
         if (user) {
@@ -174,10 +181,9 @@ export const getStatus = (
                 (group) => group.number === user.groupNumber,
             );
             if (!group) {
-                return EvaluationNotStartedInTime.parse({
-                    type: Types.EvaluationNotStartedInTime,
-                    userShouldDelete: isOwner,
-                });
+                throw new Error(
+                    `Expected group to be found for ${currentUser}`,
+                );
             }
             if (group.result) {
                 return CanWatchResults.parse({
@@ -186,7 +192,6 @@ export const getStatus = (
                     submissionDeadline: evaluation.finishBy,
                 });
             } else {
-                // figure out if the user has attested or not.
                 const userState = users.find(
                     (user) => user.user === currentUser,
                 );

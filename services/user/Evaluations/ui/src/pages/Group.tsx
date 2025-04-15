@@ -6,7 +6,7 @@ import { useInterval } from "usehooks-ts";
 
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { Button } from "@shadcn/button";
-import { AlignJustify, Plus, X } from "lucide-react";
+import { AlignJustify, Info, Plus, X } from "lucide-react";
 import { humanize } from "@lib/humanize";
 import { usePropose } from "@hooks/use-propose";
 import { arrayMove } from "@lib/arrayMove";
@@ -35,7 +35,17 @@ export const GroupPage = () => {
 
     const { data: evaluation } = useEvaluation(Number(id));
 
-    const { refetch: refetchUsers } = useUsers(Number(id));
+    const { refetch: refetchUsers, data: users } = useUsers(Number(id));
+
+    const isUserAttested = users
+        ? !!users.find((user) => user.user === currentUser)?.attestation
+        : undefined;
+
+    console.log({ isUserAttested }, users);
+
+    if (isUserAttested) {
+        navigate(`/${id}`);
+    }
 
     const { mutateAsync: propose } = usePropose();
 
@@ -52,7 +62,8 @@ export const GroupPage = () => {
             evaluation &&
             now >= evaluation?.submissionStarts &&
             now < evaluation?.finishBy &&
-            !isPending
+            !isPending &&
+            isUserAttested == false
         ) {
             toast("Attesting...");
             attest({
@@ -68,7 +79,14 @@ export const GroupPage = () => {
                 });
             });
         }
-    }, [now, evaluation, isAttesting, isAttested, isAttestError]);
+    }, [
+        now,
+        evaluation,
+        isAttesting,
+        isAttested,
+        isAttestError,
+        isUserAttested,
+    ]);
 
     const rankedOptionNumbers = [...Array(evaluation?.rankAmount)].map(
         (_, index) => index + 1,
@@ -151,30 +169,39 @@ export const GroupPage = () => {
             <div>
                 <div>Ranked numbers</div>
                 <div className="text-sm text-muted-foreground">
-                    Sort from highest to lowest in contribution.
+                    Sort from highest to lowest in value.
                 </div>
                 <SortableList
                     className="jss30 flex w-full flex-col gap-2 border p-4"
                     draggedItemClassName="jss32"
                     onSortEnd={onSortEnd}
                 >
-                    {rankedNumbers.map((number) => (
-                        <SortableItem key={number.toString()}>
-                            <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
-                                <div className="flex-1 text-lg">{number}</div>
-                                <SortableKnob>
-                                    <AlignJustify className="h-6 w-6" />
-                                </SortableKnob>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onRemove(number)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </SortableItem>
-                    ))}
+                    {rankedNumbers.length > 0 ? (
+                        rankedNumbers.map((number) => (
+                            <SortableItem key={number.toString()}>
+                                <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
+                                    <div className="flex-1 text-lg">
+                                        {number}
+                                    </div>
+                                    <SortableKnob>
+                                        <AlignJustify className="h-6 w-6" />
+                                    </SortableKnob>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => onRemove(number)}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </SortableItem>
+                        ))
+                    ) : (
+                        <div className="flex items-center gap-2 text-sm italic text-muted-foreground">
+                            <Info className="h-4 w-4" />
+                            Select the numbers below to rank them.
+                        </div>
+                    )}
                 </SortableList>
             </div>
 

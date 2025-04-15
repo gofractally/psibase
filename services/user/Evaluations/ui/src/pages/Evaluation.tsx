@@ -6,17 +6,23 @@ import { useRegister } from "@hooks/use-register";
 import { useStartEvaluation } from "@hooks/use-start-evaluation";
 import { useUnregister } from "@hooks/use-unregister";
 import { useUsers } from "@hooks/use-users";
-import { getStatus } from "@lib/getStatus";
+import { getStatus, Types } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useInterval } from "usehooks-ts";
+import { useInterval, useLocalStorage } from "usehooks-ts";
+import { Switch } from "@shadcn/switch";
+
+const defaultRefreshInterval = 10000;
 
 export const EvaluationPage = () => {
     const { id } = useParams();
 
+    const [refreshInterval, setRefreshInterval] = useState<number>(
+        defaultRefreshInterval,
+    );
     const [ticks, setTick] = useState<number>(0);
     const { data: evaluation, error: evaluationError } = useEvaluation(
         Number(id),
@@ -25,16 +31,22 @@ export const EvaluationPage = () => {
     const { mutate: unregister, isPending: isUnregisterPending } =
         useUnregister();
     const { data: currentUser } = useCurrentUser();
-    const { data: users, error: usersError } = useUsers(evaluation?.id);
+    const { data: users, error: usersError } = useUsers(
+        evaluation?.id,
+        refreshInterval,
+    );
     const { data: groups, error: groupsError } = useGroups(evaluation?.id);
     const {
         mutateAsync: startEvaluation,
         isPending: isStartEvaluationPending,
+        isError: isStartEvaluationError,
     } = useStartEvaluation();
 
     useInterval(() => {
         setTick(ticks + 1);
     }, 1000);
+
+    const [autoStart, setAutoStart] = useLocalStorage(`autoStart-${id}`, false);
 
     const {
         mutateAsync: closeEvaluation,
@@ -55,6 +67,33 @@ export const EvaluationPage = () => {
         groups &&
         getStatus(evaluation, currentUser, users, groups);
 
+    useEffect(() => {
+        const userIsAwaitingStart =
+            status &&
+            status.type == "awaitingEvaluationStart" &&
+            !status.userShouldStart;
+
+        if (userIsAwaitingStart && refreshInterval > 1000) {
+            setRefreshInterval(1000);
+        }
+    }, [status]);
+
+    useEffect(() => {
+        if (
+            autoStart &&
+            status &&
+            status.type === Types.AwaitingEvaluationStart &&
+            status.userShouldStart &&
+            !isStartEvaluationError &&
+            !isStartEvaluationPending
+        ) {
+            startEvaluation({
+                id: evaluation!.id,
+                entropy: Math.floor(1000000 * Math.random()),
+            });
+        }
+    }, [autoStart, status]);
+
     console.log({
         evaluation,
         users,
@@ -69,8 +108,8 @@ export const EvaluationPage = () => {
     useEffect(() => {
         if (
             status &&
-            (status.type === "deliberationPendingAsParticipant" ||
-                status.type == "userMustSubmit")
+            (status.type === Types.DeliberationPendingParticipant ||
+                status.type == Types.UserMustSubmit)
         ) {
             navigate(`/${id}/${status.groupNumber}`);
         }
@@ -84,10 +123,10 @@ export const EvaluationPage = () => {
     }
 
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center">
+        <div className="flex h-full w-full flex-col ">
             <div className="text-2xl font-bold">Evaluation {id}</div>
 
-            {status.type === "pending" && (
+            {status.type === Types.Pending && (
                 <div>
                     <div>
                         Registration starts at{" "}
@@ -108,12 +147,12 @@ export const EvaluationPage = () => {
                 </div>
             )}
 
-            {status.type === "registrationAvailable" && (
-                <div>
-                    <div>You are registered for this evaluation </div>
+            {status.type === Types.RegistrationAvailable && (
+                <div className="flex flex-col gap-2">
+                    <div>Registration is available.</div>
                     <div>
                         {dayjs
-                            .unix(evaluation!.deliberationStarts)
+                            .unix(evaluation.deliberationStarts)
                             .format("ddd MMM D, HH:mm")}{" "}
                         ({" "}
                         {humanize(
@@ -138,10 +177,22 @@ export const EvaluationPage = () => {
                                   : "Register"}
                         </Button>
                     </div>
+                    {status.userIsHost && (
+                        <div className="flex w-full items-center justify-center gap-2">
+                            <div>Auto start evaluation</div>
+
+                            <Switch
+                                checked={autoStart}
+                                onCheckedChange={(e) => {
+                                    setAutoStart(e);
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
-            {status.type === "registeredAwaitingDeliberation" && (
-                <div>
+            {status.type === Types.RegisteredAwaitingDeliberation && (
+                <div className="flex flex-col gap-2">
                     <div>You are registered for this evaluation </div>
                     <div>
                         Deliberation starts at{" "}
@@ -173,11 +224,22 @@ export const EvaluationPage = () => {
                                 : "Unregister"}
                         </Button>
                     </div>
+                    {status.userIsHost && (
+                        <div className="flex w-full items-center justify-center gap-2">
+                            <div>Auto start evaluation</div>
+                            <Switch
+                                checked={autoStart}
+                                onCheckedChange={(e) => {
+                                    setAutoStart(e);
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
-            {status.type === "awaitingEvaluationStart" && (
+            {status.type === Types.AwaitingEvaluationStart && (
                 <div>
-                    <div>Evaluation about to start...</div>
+                    <div>Awaiting evaluation start...</div>
                     {status.userShouldStart ? (
                         <Button
                             disabled={isStartEvaluationPending}
@@ -201,7 +263,7 @@ export const EvaluationPage = () => {
                     )}
                 </div>
             )}
-            {status.type === "deliberationPendingAsParticipant" && (
+            {status.type === Types.DeliberationPendingParticipant && (
                 <div>
                     <div>Deliberation</div>
                     <div>
@@ -209,7 +271,7 @@ export const EvaluationPage = () => {
                     </div>
                 </div>
             )}
-            {status.type === "evaluationNotStartedInTime" && (
+            {status.type === Types.EvaluationNotStartedInTime && (
                 <div>
                     <div>Evaluation not started in time</div>
 
@@ -231,19 +293,17 @@ export const EvaluationPage = () => {
                 </div>
             )}
 
-            {status.type === "deliberationPendingAsSpectator" && (
+            {status.type === Types.DeliberationPendingSpectator && (
                 <div>
-                    <div>
-                        You are a spectator and not included in this evaluation.
-                    </div>
+                    You are a spectator and not included in this evaluation.
                 </div>
             )}
-            {status.type === "userMustSubmit" && (
+            {status.type === Types.UserMustSubmit && (
                 <div>
                     <div>*Redirect to submission page*</div>
                 </div>
             )}
-            {status.type === "canWatchResults" && (
+            {status.type === Types.CanWatchResults && (
                 <div className="grid w-full grid-cols-2 gap-2  sm:grid-cols-3">
                     {status.groups.map((group) => (
                         <div key={group.number} className="rounded-sm border">
@@ -257,6 +317,16 @@ export const EvaluationPage = () => {
                                     ))}
                                 </div>
                             )}
+                            <div>
+                                Members:{" "}
+                                {users
+                                    .filter(
+                                        (u) => u.groupNumber === group.number,
+                                    )
+                                    .map((u) => u.user)
+                                    .sort((a, b) => a.localeCompare(b))
+                                    .join(", ")}
+                            </div>
                         </div>
                     ))}
                 </div>
