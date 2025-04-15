@@ -6,12 +6,12 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-evaluations = { path = "../service/", version = "0.15.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
+evaluations = { path = "../service/", version = "0.16.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
 wit-bindgen-rt = { version = "0.30.0", features = ["bitflags"] }
-ecies = {version = "0.2", default-features = false, features = ["pure"]}
+ecies = { version = "0.2", default-features = false, features = ["pure"] }
 rand = "0.8.5"
 average = "0.10.0"
 sha2 = "0.10.8"
@@ -33,5 +33,6 @@ world = "impl"
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
+
 [dev-dependencies]
-evaluations-pkg = { path = "..", version = "0.15.0" }
+evaluations-pkg = { path = "..", version = "0.16.0" }
