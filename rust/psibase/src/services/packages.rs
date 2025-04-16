@@ -2,7 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::package::Meta;
-    use crate::{Hex, Schema};
+    use crate::{Checksum256, Hex, Schema};
     #[action]
     fn postinstall(package: Meta, manifest: Hex<Vec<u8>>) {
         unimplemented!()
@@ -11,6 +11,11 @@ mod service {
     #[action]
     fn setSchema(schema: Schema) {
         unimplemented!()
+    }
+
+    #[action]
+    fn publish(package: Meta, sha256: Checksum256, file: String) {
+        unimplemented!();
     }
 
     #[action]

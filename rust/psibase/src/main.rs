@@ -15,18 +15,18 @@ use psibase::{
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    PackageRegistry, PackagedService, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -259,6 +259,25 @@ struct UploadArgs {
 }
 
 #[derive(Args, Debug)]
+struct PublishArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Package files to publish
+    packages: Vec<PathBuf>,
+
+    /// Sender to use (required). Files are uploaded to this account's subdomain.
+    #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
 struct InstallArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -392,6 +411,9 @@ enum Command {
 
     /// Upload a file to a service
     Upload(UploadArgs),
+
+    /// Publish a package
+    Publish(PublishArgs),
 
     /// Install apps to the chain
     Install(InstallArgs),
@@ -1011,6 +1033,74 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     }
 
     finish_progress(&args.sig_args, progress, num_trx);
+    Ok(())
+}
+
+async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
+    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    let progress = ProgressBar::new(args.packages.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
+    );
+    progress.set_message("Preparing transactions");
+
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+
+    let action_limit: usize = 1024 * 1024;
+    let mut builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &args.sig_args.proposer, false),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
+
+    for path in &args.packages {
+        let mut f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        // Read the file
+        let mut content = Vec::new();
+        f.read_to_end(&mut content)?;
+        f.rewind()?;
+        // Calculate the package hash
+        let hash: [u8; 32] = Sha256::digest(&content).into();
+        // Validate the package and get its name
+        let package = PackagedService::new(BufReader::new(f))?;
+        let meta = package.meta();
+        let dest = format!("/packages/{}-{}.psi", &meta.name, &meta.version);
+        // add actions to publish
+        builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
+        builder.push(vec![
+            sites::Wrapper::pack_from(args.sender.into()).storeSys(
+                dest.clone(),
+                "application/zip".to_string(),
+                None,
+                content.into(),
+            ),
+            packages::Wrapper::pack_from(args.sender.into()).publish(
+                meta.clone(),
+                hash.into(),
+                dest,
+            ),
+        ])?;
+        progress.inc(1);
+    }
+    progress.reset();
+
+    let transactions = builder.finish()?;
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
+
+    push_transactions(
+        &args.node_args.api,
+        client,
+        transactions,
+        args.tx_args.trace,
+        args.tx_args.console,
+        &progress,
+    )
+    .await?;
+    finish_progress(&args.sig_args, progress, num_transactions);
     Ok(())
 }
 
@@ -1713,6 +1803,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 upload(&args).await?
             }
         }
+        Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
         Command::List(args) => list(&args).await?,
         Command::Search(args) => search(&args).await?,

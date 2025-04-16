@@ -13,6 +13,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
 `psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed`]  
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
+`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
@@ -207,6 +208,20 @@ Modify an account
   Set the account to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
+
+### publish
+
+`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
+
+Publish packages to a package repository.
+
+- `-S` *sender*
+
+  The account that owns the packages
+
+- *files*
+
+  Package files to publish
 
 ### search
 

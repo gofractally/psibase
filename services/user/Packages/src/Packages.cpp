@@ -207,6 +207,26 @@ namespace UserService
       schemas.put({service, std::move(schema)});
    }
 
+   void Packages::publish(PackageMeta package, Checksum256 sha256, std::string file)
+   {
+      auto sender   = getSender();
+      auto packages = open<PublishedPackageTable>();
+      if (auto existing = packages.get(std::tie(sender, package.name, package.version)))
+      {
+         check(existing->sha256 == sha256, "Package already published");
+      }
+      packages.put({
+          .owner       = sender,
+          .name        = std::move(package.name),
+          .version     = std::move(package.version),
+          .description = std::move(package.description),
+          .depends     = std::move(package.depends),
+          .accounts    = std::move(package.accounts),
+          .sha256      = std::move(sha256),
+          .file        = std::move(file),
+      });
+   }
+
    void Packages::checkOrder(std::uint64_t id, std::uint32_t index)
    {
       auto sender = getSender();
