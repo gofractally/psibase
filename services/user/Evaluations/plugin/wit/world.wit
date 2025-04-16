@@ -24,8 +24,6 @@ interface api {
     propose: func(evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
 
     get-proposal: func(evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
-
-    refresh-key: func(key: list<u8>) -> result<_, error>;
    
 }
 

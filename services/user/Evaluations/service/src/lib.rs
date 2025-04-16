@@ -174,7 +174,7 @@ pub mod service {
 
     #[action]
     #[allow(non_snake_case)]
-    fn refreshKey(key: Vec<u8>) {
+    fn setKey(key: Vec<u8>) {
         let user = UserSettings::new(get_sender(), key);
         user.save();
     }

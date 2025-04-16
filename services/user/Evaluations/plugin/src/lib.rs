@@ -17,7 +17,7 @@ mod key_table;
 pub mod types;
 
 use graphql::fetch_and_decode;
-use helpers::{current_user, get_decrypted_proposals, get_symmetric_key, parse_account_number};
+use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
 
 struct EvaluationsPlugin;
 
@@ -49,20 +49,15 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("create", &packed_args)
     }
 
-    fn refresh_key(key: Vec<u8>) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::refreshKey { key }.packed();
-        add_action_to_transaction("refreshKey", &packed_args)
-    }
-
     fn register(id: u32, account: String) -> Result<(), Error> {
         let key = key_table::AsymKey::new();
         let public_key_vectored = key.public_key().serialize().to_vec();
 
-        let packed_args = evaluations::action_structs::refreshKey {
+        let packed_args = evaluations::action_structs::setKey {
             key: public_key_vectored,
         }
         .packed();
-        add_action_to_transaction("refreshKey", &packed_args).unwrap();
+        add_action_to_transaction("setKey", &packed_args).unwrap();
         key.save()?;
 
         let account_number = psibase::AccountNumber::from_str(account.as_str()).unwrap();
