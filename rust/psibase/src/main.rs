@@ -861,6 +861,7 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
 }
 
 async fn add_package_registry(
+    base_url: &reqwest::Url,
     sources: &Vec<String>,
     client: reqwest::Client,
     result: &mut JointRegistry<BufReader<File>>,
@@ -871,6 +872,8 @@ async fn add_package_registry(
         for source in sources {
             if source.starts_with("http:") || source.starts_with("https:") {
                 result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
+            } else if let Ok(owner) = AccountNumber::from_exact(&*source) {
+                result.push(HTTPRegistry::with_account(base_url, owner, client.clone()).await?)?;
             } else {
                 result.push(DirectoryRegistry::new(source.into()))?;
             }
@@ -880,11 +883,12 @@ async fn add_package_registry(
 }
 
 async fn get_package_registry(
+    base_url: &reqwest::Url,
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
     let mut result = JointRegistry::new();
-    add_package_registry(sources, client, &mut result).await?;
+    add_package_registry(base_url, sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -900,7 +904,13 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         package_registry.push(files)?;
         packages
     };
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
@@ -1223,7 +1233,13 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let to_install = installed
         .resolve_changes(&package_registry, &packages, args.reinstall)
         .await?;
@@ -1367,7 +1383,8 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry =
+            get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -1381,7 +1398,8 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     } else if args.available {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry =
+            get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -1397,7 +1415,8 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+    let package_registry =
+        get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1530,7 +1549,13 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
     for package in &packages {

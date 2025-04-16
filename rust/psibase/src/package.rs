@@ -970,6 +970,42 @@ impl HTTPRegistry {
             index,
         })
     }
+    pub async fn with_account(
+        url: &reqwest::Url,
+        owner: AccountNumber,
+        mut client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        let mut index = HashMap::new();
+
+        let mut end_cursor: Option<String> = None;
+        loop {
+            let data = crate::gql_query::<PackagesQuery>(
+                url,
+                &mut client,
+                packages::SERVICE,
+                format!(
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    serde_json::to_string(&owner)?,
+                    serde_json::to_string(&end_cursor)?,
+                ))
+                .await.with_context(|| "Failed to list packages")?;
+            for edge in data.packages.edges {
+                let package = edge.node;
+                if let Some(prev) = index.insert(package.name.clone(), package) {
+                    Err(Error::DuplicatePackage { package: prev.name })?
+                }
+            }
+            if !data.packages.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.packages.pageInfo.endCursor);
+        }
+        Ok(HTTPRegistry {
+            index_url: owner.url(url)?,
+            client,
+            index,
+        })
+    }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let url = self.index_url.join(filename)?;
         if url.origin() != self.index_url.origin() {
@@ -1107,6 +1143,23 @@ struct InstalledQuery {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct NewAccountsQuery {
     newAccounts: Vec<AccountNumber>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesEdge {
+    node: PackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<PackagesEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesQuery {
+    packages: PackagesConnection,
 }
 
 #[cfg(not(target_family = "wasm"))]
