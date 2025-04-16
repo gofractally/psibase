@@ -2,86 +2,110 @@
 /// https://github.com/gofractally/psibase/issues/1104
 
 interface hook-service-api {
-    eval-register: func(eval-id, user, description) -> bool
-    eval-propose: func(proposer, eval-id, group-nr, ordering: list<u8>)
-    eval-attest: func(attester, eval-id, group-nr, ordering: list<account>)
-    eval-group-fin: func(eval-id, group-nr, hash)
+   /// Validates if a user can register for an evaluation.
+   eval-register: func(eval-id: u32, user: account, description: option<string>) -> bool
+ 
+   /// Handles an attestation submission for a group in an evaluation.
+   eval-attest: func(attester: account, eval-id: u32, group-nr: u16, ordering: list<account>)
+ 
  }
  
- record Timings { // seconds
-    registration: u32,
-    deliberation: u32, 
-    submission: u32
+ /// Initializes the service by creating a configuration table with an initial last_used_id of 0.
+ init: func()
+ 
+ /// Checks if the service has been initialized by verifying the existence of the configuration table.
+ check-init: func()
+ 
+ /// Emits a history event when group keys are set for an evaluation.
+ keysset: func(evaluation-id: u32, group-number: u32, keys: list<list<u8>>, hash: string)
+ 
+ /// Creates a new evaluation with specified parameters.
+ create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<u8>, rank-amount: u8, use-hooks: bool)
+ 
+ /// Retrieves an evaluation by its ID.
+ get-evaluation: func(id: u32) -> option<evaluation>
+ 
+ /// Retrieves a group by evaluation ID and group number.
+ get-group: func(id: u32, group-number: u32) -> option<group>
+ 
+ /// Retrieves the last used ID from the configuration table.
+ get-last-id: func() -> u32
+ 
+ /// Retrieves all groups for an evaluation.
+ get-groups: func(id: u32) -> list<group>
+ 
+ /// Retrieves all users for an evaluation.
+ get-users: func(id: u32) -> list<user>
+ 
+ /// Retrieves a specific user in an evaluation.
+ get-user: func(id: u32, user: account-number) -> option<user>
+ 
+ /// Retrieves users in a specific group of an evaluation.
+ get-group-users: func(id: u32, group-number: u32) -> list<user>
+ 
+ /// Retrieves user settings for an account.
+ get-user-settings: func(account-number: account-number) -> option<user-settings>
+ 
+ /// Starts an evaluation, shuffles users, and assigns them to groups.
+ start: func(id: u32, entropy: u64)
+ 
+ /// Sets a key for the sender's user settings.
+ set-key: func(key: list<u8>)
+ 
+ /// Submits group keys for an evaluation and emits a history event.
+ group-key: func(evaluation-id: u32, keys: list<list<u8>>, hash: string)
+ 
+ /// Closes an evaluation, deleting it from storage.
+ close: func(id: u32)
+ 
+ /// Submits a proposal for a user in an evaluation.
+ propose: func(evaluation-id: u32, proposal: list<u8>)
+ 
+ /// Submits an attestation for a user in an evaluation.
+ attest: func(evaluation-id: u32, attestation: list<u8>)
+ 
+ /// Registers a user for an evaluation.
+ register: func(id: u32, account-number: account-number)
+ 
+ /// Unregisters a user from an evaluation.
+ unregister: func(id: u32)
+ 
+ /// Record representing an evaluation.
+ record evaluation {
+   id: u32,
+   group-sizes: list<u8>,
+   created-time: u32,
+   owner: account-number,
+   registration: u32,
+   deliberation: u32,
+   submission: u32,
+   finish-by: u32,
+   rank-amount: u8,
+   use-hooks: bool
  }
  
- record EvalConfig {
-    owner: account,
-    use-hooks: bool,
-    group-sizes: option<list<u8>>, // None means only one group, otherwise list entries are allowed group sizes. Minimum = 3.
-    timings: Timings
+ /// Record representing a group within an evaluation.
+ record group {
+   evaluation-id: u32,
+   group-number: u32,
+   key-submitter: option<account-number>,
+   result: option<list<u8>>
  }
  
- record Eval {
-    id: u32,
-    creation-date,
-    config: EvalConfig,   
+ /// Record representing a user in an evaluation.
+ record user {
+   evaluation-id: u32,
+   account: account-number,
+   group-number: option<u32>,
+   proposal: option<list<u8>>,
+   attestation: option<list<u8>>
  }
  
- record score {
-    eval-id: u32, 
-    user: account,
-    entropy: u64,
-    rank: u8,
-    group-id: option<u16>,
-    group-key: option<list<u8>>,
- }
- score-table: table<score>
- 
- record attestation: {
-     eval-id: u32,   
-     hash: list<u8>, // primary key: { evail-id, hash }
-     group-nr: u16,
-     ordering: list<account>,
-     nr-attested: u8,
+ /// Record representing user settings.
+ record user-settings {
+   account: account-number,
+   key: list<u8>
  }
  
- ////////////////////////////////////// ACTIONS
- 
- /// Creates a new evaluation
- /// - Temporarily: Anyone can open an eval on behalf of anyone. 
- ///   Future: Validate that the sender == owner
- open(eval: Eval)
- 
- /// Register for an evaluation
- /// - Requires specified eval is open
- /// - Requires being in the registration phase
- /// - Calls `hook-service:is-valid-reg` to allow eval owner to enforce constraints
- register(id: u32, entropy: u64, description: option<string>)
- 
- /// Generate groups
- /// - Requires being in the deliberation phase
- /// - Calculates the groups on the server side
- generate-groups(id: u32)
- 
- /// Publish group-key.
- /// The group key is an encrypted symmetric key used for sharing group-private messages
- /// The number of keys should match the number of group members
- /// - Requires being in the deliberation phase
- /// - Requires no group-key exists
- group-key(id: u32, group-nr: u16, keys: list<list<u8>>)
- 
- /// Propose a rank-ordering (encrypted with group key)
- /// - Requires being in the deliberation phase
- propose(id: u32, group-nr: u16, ordering: list<u8>)
- 
- /// Attest to a final rank-ordering
- /// - Requires being in the submission phase
- /// - Requires that sender is in the specified group
- /// - Requires that the sender has not attested prior
- attest(id: u32, group-nr: u16, ordering: list<account>)
- 
- /// Closes an evaluation, deleting all associated data
- /// - Requires that the submission phase has ended
- /// - Temporarily: anyone can close an eval
- ///   Future: Validate that the sender == owner
- close(id: u32)
+ /// Type representing an account number.
+ type account-number = u64
