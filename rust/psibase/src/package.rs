@@ -44,6 +44,7 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+    InvalidPackageSource = "Invalid package source",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -1006,6 +1007,20 @@ impl HTTPRegistry {
             index,
         })
     }
+    pub async fn with_source(
+        base_url: &reqwest::Url,
+        source: packages::PackageSource,
+        client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        match (source.url, source.account) {
+            (Some(url), Some(account)) => {
+                Self::with_account(&reqwest::Url::parse(&url)?, account, client).await
+            }
+            (None, Some(account)) => Self::with_account(base_url, account, client).await,
+            (Some(url), None) => Self::new(reqwest::Url::parse(&url)?, client).await,
+            (None, None) => return Err(Error::InvalidPackageSource)?,
+        }
+    }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let url = self.index_url.join(filename)?;
         if url.origin() != self.index_url.origin() {
@@ -1162,6 +1177,11 @@ struct PackagesQuery {
     packages: PackagesConnection,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SourcesQuery {
+    sources: Vec<packages::PackageSource>,
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub async fn get_accounts_to_create(
     base_url: &reqwest::Url,
@@ -1181,6 +1201,25 @@ pub async fn get_accounts_to_create(
     )
     .await?;
     Ok(result.newAccounts)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_package_sources(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    account: AccountNumber,
+) -> Result<Vec<packages::PackageSource>, anyhow::Error> {
+    let result: SourcesQuery = crate::gql_query(
+        base_url,
+        client,
+        packages::SERVICE,
+        format!(
+            "query {{ sources(account: {}) {{ url account }} }}",
+            serde_json::to_string(&account)?
+        ),
+    )
+    .await?;
+    Ok(result.sources)
 }
 
 #[cfg(not(target_family = "wasm"))]

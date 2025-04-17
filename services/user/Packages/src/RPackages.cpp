@@ -88,13 +88,24 @@ namespace UserService
             return makeConnection<Conn>(index, {}, {}, {}, {}, first, last, before, after);
          }
       }
+
+      auto sources(psibase::AccountNumber account) const -> std::vector<PackageSource>
+      {
+         auto table = Packages{}.open<PackageSourcesTable>();
+         if (auto row = table.get(account))
+         {
+            return std::move(row->sources);
+         }
+         return {};
+      }
    };
    PSIO_REFLECT(  //
        Query,
        method(installed),
        method(newAccounts, accounts, owner),
        method(package, owner, name, version),
-       method(packages, owner, name, first, last, before, after))
+       method(packages, owner, name, first, last, before, after),
+       method(sources, account))
 
    struct ManifestQuery
    {

@@ -10,13 +10,14 @@ use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, PackagedService, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
+    get_tapos_for_head, login_action, new_account_action, push_transaction, push_transactions,
+    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
+    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry,
+    ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
+    PackageList, PackageOp, PackageOrigin, PackageRegistry, PackagedService, ServiceInfo,
+    SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -333,6 +334,10 @@ struct ListArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -347,6 +352,10 @@ struct SearchArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -361,6 +370,10 @@ struct InfoArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -862,11 +875,17 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
 
 async fn add_package_registry(
     base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
-    client: reqwest::Client,
+    mut client: reqwest::Client,
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
-    if sources.is_empty() {
+    let chain_sources = if let Some(account) = account {
+        get_package_sources(base_url, &mut client, account).await?
+    } else {
+        Vec::new()
+    };
+    if sources.is_empty() && chain_sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
         for source in sources {
@@ -878,17 +897,21 @@ async fn add_package_registry(
                 result.push(DirectoryRegistry::new(source.into()))?;
             }
         }
+        for source in chain_sources {
+            result.push(HTTPRegistry::with_source(base_url, source, client.clone()).await?)?;
+        }
     }
     Ok(())
 }
 
 async fn get_package_registry(
     base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
     let mut result = JointRegistry::new();
-    add_package_registry(base_url, sources, client, &mut result).await?;
+    add_package_registry(base_url, account, sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -906,6 +929,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
     };
     add_package_registry(
         &args.node_args.api,
+        None,
         &args.package_source,
         client.clone(),
         &mut package_registry,
@@ -1235,6 +1259,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     package_registry.push(files)?;
     add_package_registry(
         &args.node_args.api,
+        Some(args.sender.into()),
         &args.package_source,
         client.clone(),
         &mut package_registry,
@@ -1383,8 +1408,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry =
-            get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -1398,8 +1428,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     } else if args.available {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry =
-            get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -1415,8 +1450,13 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry =
-        get_package_registry(&args.node_args.api, &args.package_source, client.clone()).await?;
+    let package_registry = get_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+    )
+    .await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1551,6 +1591,7 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     package_registry.push(files)?;
     add_package_registry(
         &args.node_args.api,
+        Some(args.sender.into()),
         &args.package_source,
         client.clone(),
         &mut package_registry,

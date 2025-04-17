@@ -227,6 +227,11 @@ namespace UserService
       });
    }
 
+   void Packages::setSources(std::vector<PackageSource> sources)
+   {
+      open<PackageSourcesTable>().put({getSender(), std::move(sources)});
+   }
+
    void Packages::checkOrder(std::uint64_t id, std::uint32_t index)
    {
       auto sender = getSender();
