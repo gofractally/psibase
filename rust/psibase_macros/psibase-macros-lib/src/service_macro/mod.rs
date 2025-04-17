@@ -76,7 +76,6 @@ fn process_mod(
     psibase_mod: &proc_macro2::TokenStream,
     mut impl_mod: ItemMod,
 ) -> TokenStream {
-    let mod_name = &impl_mod.ident;
     let service_account = &options.name;
     let constant = proc_macro2::TokenStream::from_str(&options.constant).unwrap();
     let actions = proc_macro2::TokenStream::from_str(&options.actions).unwrap();
@@ -86,10 +85,18 @@ fn process_mod(
     let event_structs_mod = proc_macro2::TokenStream::from_str(&options.event_structs).unwrap();
     let wrapper = proc_macro2::TokenStream::from_str(&options.wrapper).unwrap();
     let structs = proc_macro2::TokenStream::from_str(&options.structs).unwrap();
-    let tables = options
+    let mut tables = options
         .tables
         .as_ref()
         .map(|tables| proc_macro2::TokenStream::from_str(tables.as_str()).unwrap());
+    if tables.is_none() {
+        crate::service_tables_macro::process_mod(psibase_mod, &mut impl_mod);
+        let name = &impl_mod.ident;
+        tables = Some(quote! { #name })
+    }
+
+    let mod_name = &impl_mod.ident;
+
     let mut pre_action_info: PreAction = PreAction::default();
 
     if let Some((_, items)) = &mut impl_mod.content {
