@@ -953,6 +953,22 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
+        // Check if the URL points to an account on chain
+        if let Some(domain) = url.domain() {
+            if let Ok(rootdomain) =
+                crate::as_json::<String>(client.get(url.join("/common/rootdomain")?)).await
+            {
+                let mut root_url = url.clone();
+                root_url.set_host(Some(&rootdomain))?;
+                let account = if domain == &rootdomain {
+                    packages::SERVICE
+                } else {
+                    crate::as_json::<AccountNumber>(client.get(url.join("/common/thisservice")?))
+                        .await?
+                };
+                return Self::with_account(&root_url, account, client).await;
+            }
+        }
         let mut index_url = url.clone();
         index_url
             .path_segments_mut()
