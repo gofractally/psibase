@@ -3,7 +3,7 @@
 mod service {
     use async_graphql::connection::Connection;
     use async_graphql::*;
-    use evaluations::db::tables::{Evaluation, Group, User, UserSettings};
+    use evaluations::db::tables::{Evaluation, Group, User, UserSettings, UserTable};
     use psibase::*;
     use serde::Deserialize;
 
@@ -55,8 +55,25 @@ mod service {
             evaluations::Wrapper::call().getGroup(id, group_number)
         }
 
-        async fn get_group_users(&self, id: u32, group_number: u32) -> Vec<User> {
-            evaluations::Wrapper::call().getGroupUsers(id, group_number)
+        async fn get_group_users(
+            &self,
+            id: u32,
+            group_number: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, User>> {
+            TableQuery::subindex::<AccountNumber>(
+                UserTable::with_service(evaluations::SERVICE).get_index_by_group(),
+                &(id, Some(group_number)),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn get_users(&self, id: u32) -> Vec<User> {
