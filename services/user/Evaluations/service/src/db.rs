@@ -1,7 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{AccountNumber, Fracpack, Table, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -77,6 +77,11 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (u32, AccountNumber) {
             (self.evaluation_id, self.user)
+        }
+
+        #[secondary_key(1)]
+        fn by_group(&self) -> (u32, Option<u32>, AccountNumber) {
+            (self.evaluation_id, self.group_number, self.user)
         }
 
         pub fn new(evaluation_id: u32, user: AccountNumber) -> Self {
