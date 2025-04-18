@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import {
     Shield,
     User,
-    Database,
-    Bell,
     Check,
     X,
     ShieldAlert,
@@ -202,33 +200,12 @@ export const App = () => {
                                 <User className="mt-0.5 h-5 w-5 text-primary" />
                                 <div>
                                     <p className="font-medium">
-                                        Read your profile information
+                                        Act on your behalf
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                        Access your name, email, and profile
-                                        picture
-                                    </p>
-                                </div>
-                            </li>
-                            <li className="flex items-start gap-3">
-                                <Database className="mt-0.5 h-5 w-5 text-primary" />
-                                <div>
-                                    <p className="font-medium">
-                                        Access your data
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        View and manage your stored information
-                                    </p>
-                                </div>
-                            </li>
-                            <li className="flex items-start gap-3">
-                                <Bell className="mt-0.5 h-5 w-5 text-primary" />
-                                <div>
-                                    <p className="font-medium">
-                                        Send notifications
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Send you updates and alerts
+                                        Perform actions and queries on the{" "}
+                                        {validPermRequest?.callee} service on
+                                        your behalf
                                     </p>
                                 </div>
                             </li>
