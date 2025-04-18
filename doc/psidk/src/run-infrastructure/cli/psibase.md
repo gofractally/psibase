@@ -213,7 +213,7 @@ Modify an account
 
 `psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
 
-Publish packages to a package repository.
+Publish packages to a package repository. A package will be skipped if the sender has already published it with the same version.
 
 - `-S` *sender*
 
