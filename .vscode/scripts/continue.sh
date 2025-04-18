@@ -16,4 +16,4 @@ if [ -z "$HOST_IP" ] || [ -z "$PRODUCER" ] || [ -z "$PORT" ]; then
     exit 1
 fi
 
-psinode "$PROJECT_ROOT/db" -p "$PRODUCER" --admin-authz=rw:ip:"$HOST_IP" -l "$PORT" 
+psinode "$PROJECT_ROOT/db" -p "$PRODUCER" --admin-authz=rw:ip:"$HOST_IP" --admin-authz=rw:loopback -l "$PORT" 
