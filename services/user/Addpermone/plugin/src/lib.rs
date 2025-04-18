@@ -2,6 +2,7 @@
 mod bindings;
 mod perms;
 
+use bindings::accounts::plugin::api::get_current_user;
 use bindings::clientdata::plugin::keyvalue as Keyvalue;
 use bindings::exports::addpermone::plugin::admin::Guest as Admin;
 use bindings::exports::addpermone::plugin::api::Guest as Api;
@@ -19,23 +20,31 @@ use errors::ErrorType;
 struct AddpermonePlugin;
 
 impl Api for AddpermonePlugin {
-    fn set_example_thing(thing: String) {
-        verify_auth_method("setExampleThing")?;
+    fn set_example_thing(thing: String) -> Result<(), Error> {
+        verify_auth_method("setExampleThing").map_err(|e| Error::from(e))?;
 
         let packed_example_thing_args =
             addpermone::action_structs::setExampleThing { thing }.packed();
         add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+
+        Ok(())
     }
 }
 
 impl Admin for AddpermonePlugin {
-    fn save_perm(user: String, caller: String, method: String) {
+    fn save_perm(caller: String, method: String) -> Result<(), Error> {
         let any_value = "1".as_bytes();
+        let user = get_current_user().map_err(|e| Error::from(e))?.unwrap();
         Keyvalue::set(&format!("{user}-{caller}->{method}"), any_value).unwrap();
+
+        Ok(())
     }
 
-    fn del_perm(user: String, caller: String, method: String) {
+    fn del_perm(caller: String, method: String) -> Result<(), Error> {
+        let user = get_current_user().map_err(|e| Error::from(e))?.unwrap();
         Keyvalue::delete(&format!("{user}-{caller}->{method}"));
+
+        Ok(())
     }
 }
 
@@ -58,8 +67,8 @@ impl Queries for AddpermonePlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = examplething_val
-            .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        let examplething_val =
+            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
     }
