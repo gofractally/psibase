@@ -1,6 +1,7 @@
 #include <psio/schema.hpp>
 
 #include <psio/chrono.hpp>
+#include <psio/to_hex.hpp>
 #include <set>
 
 namespace psio::schema_types
@@ -124,6 +125,40 @@ namespace psio::schema_types
          }
          return false;
       }
+      static void json2frac(const CompiledType* type, const json::any& in, StreamBase& out)
+      {
+         T::json2frac(in,
+                      [&](std::span<const char> in)
+                      {
+                         if (type->is_container())
+                         {
+                            if (type->kind == CompiledType::nested)
+                            {
+                               CustomTypes builtin;
+                               FracParser  tmpParser{in, type->children[0].type, builtin, false};
+                               while (auto next = tmpParser.next())
+                               {
+                                  if (next.kind == FracParser::error)
+                                     abort_error("Invalid fracpack encoding");
+                               }
+                            }
+                            out.write_raw(checked_cast<std::uint32_t>(in.size()));
+                            out.write(in.data(), in.size());
+                         }
+                         else if (!type->is_variable_size)
+                         {
+                            out.write(in.data(), in.size());
+                         }
+                         else
+                         {
+                            abort_error("Invalid blob");
+                         }
+                      });
+      }
+      static bool is_empty_container(const CompiledType* type, const json::any& in)
+      {
+         return type->is_container() && T::is_empty_container(in);
+      }
    };
 
    struct OctetStringImpl
@@ -131,6 +166,17 @@ namespace psio::schema_types
       static void frac2json(std::span<const char> in, StreamBase& out)
       {
          psio::to_json_hex(in.data(), in.size(), out);
+      }
+      static void json2frac(const json::any& in, auto&& f)
+      {
+         std::vector<char> bytes;
+         if (!from_hex(std::get<std::string>(in.value()), bytes))
+            abort_error(from_json_error::expected_hex_string);
+         f(bytes);
+      }
+      static bool is_empty_container(const json::any& in)
+      {
+         return std::get<std::string>(in.value()).empty();
       }
    };
 
@@ -151,6 +197,11 @@ namespace psio::schema_types
       static void frac2json(std::span<const char> in, StreamBase& out)
       {
          to_json(std::string_view{in.data(), in.size()}, out);
+      }
+      static void json2frac(const json::any& in, auto&& f) { f(std::get<std::string>(in.value())); }
+      static bool is_empty_container(const json::any& in)
+      {
+         return std::get<std::string>(in.value()).empty();
       }
    };
 
@@ -225,6 +276,65 @@ namespace psio::schema_types
          }
          return false;
       }
+      static void json2frac(const CompiledType* type, const json::any& in, StreamBase& out)
+      {
+         type = unwrap(type);
+         if (auto* itype = std::get_if<Int>(&type->original_type->value))
+         {
+            const auto&   s = std::get<std::string>(in.value());
+            std::int64_t  sec;
+            std::uint32_t nsec;
+            if (!parse_system_time(s, sec, nsec))
+            {
+               abort_error("Invalid time point");
+            }
+            std::int64_t mult = 1;
+            for (int i = 0; i < Digits; ++i)
+               mult *= 10;
+            std::int64_t subsec = nsec;
+            if (Digits < 9)
+            {
+               for (int i = Digits; i < 9; ++i)
+               {
+                  subsec /= 10;
+               }
+            }
+            else
+            {
+               for (int i = 9; i < Digits; ++i)
+               {
+                  subsec *= 10;
+               }
+            }
+            std::int64_t value = sec * mult + subsec;
+            // Check range
+            if (!itype->isSigned && value < 0)
+            {
+               abort_error("Time point out of range");
+            }
+            if (itype->bits < 64)
+            {
+               auto extra = value >> itype->bits;
+               if (extra != 0 && extra != -1)
+               {
+                  abort_error("Time point out of range");
+               }
+            }
+            if (itype->bits > 64)
+            {
+               abort_error("Integer types larger than 64 bits not supported");
+            }
+            out.write(static_cast<const void*>(&value), (itype->bits + 7) / 8);
+         }
+         else
+         {
+            abort_error("Wrong type");
+         }
+      }
+      static bool is_empty_container(const CompiledType* type, const json::any& in)
+      {
+         return false;
+      }
    };
 
    struct MapImpl
@@ -244,6 +354,14 @@ namespace psio::schema_types
       {
          assert(!"This handler should never be used. map needs integration with the parser");
          __builtin_unreachable();
+      }
+      static void json2frac(const CompiledType* type, const json::any& in, StreamBase& out)
+      {
+         abort_error("Not implemented");
+      }
+      static bool is_empty_container(const CompiledType* type, const json::any& in)
+      {
+         return std::get<json::any_object>(in.value()).empty();
       }
    };
 

@@ -76,9 +76,9 @@ namespace psio
          }
 
          template <typename Lambda>
-         void visit(Lambda&& l) const
+         decltype(auto) visit(Lambda&& l) const
          {
-            std::visit(std::forward<Lambda>(l), _value);
+            return std::visit(std::forward<Lambda>(l), _value);
          }
 
         private:
@@ -114,7 +114,7 @@ namespace psio
       PSIO_REFLECT_TYPENAME(null_t)
       PSIO_REFLECT(error_t, what)
 
-      inline any::any(){};
+      inline any::any() {};
       template <typename T>
       any::any(const T& v) : _value(v)
       {
