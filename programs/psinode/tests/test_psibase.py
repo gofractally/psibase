@@ -128,6 +128,21 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
 
     @testutil.psinode_test
+    def test_configure_sources(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
+        with tempfile.TemporaryDirectory() as dir:
+            path = os.path.join(dir, foo10.write(dir)["file"])
+            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path])
+            a.push_action("root", "packages", "setSources", {"sources": [{"account":"root"}]})
+            a.wait(new_block())
+            a.run_psibase(['install'] + a.node_args() + ['foo'])
+            a.wait(new_block())
+            self.assertResponse(a.get('/file1.txt', 'foo'), 'data')
+
+    @testutil.psinode_test
     def test_sign(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer'])
