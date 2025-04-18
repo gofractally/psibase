@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { graphql } from "./graphql";
-import { zAccount } from "./zod/Account";
+import { zAccount, Account } from "./zod/Account";
 import { zUnix } from "./zod/unix";
 
 export const zEvaluation = z.object({
@@ -18,11 +18,11 @@ export const zEvaluation = z.object({
 
 export type Evaluation = z.infer<typeof zEvaluation>;
 
-export const getEvaluation = async (id: number) => {
+export const getEvaluation = async (owner: Account, id: number) => {
     const evaluation = await graphql(
         `
     {
-        getEvaluation(id: ${id}) {     
+        getEvaluation(owner: ${owner}, evaluationId: ${id}) {     
             id,
             createdAt,
             owner,

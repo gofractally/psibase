@@ -1,5 +1,4 @@
 import { queryClient } from "@/main";
-import { Group } from "@lib/getGroup";
 import { zAccount } from "@lib/zod/Account";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
@@ -39,7 +38,7 @@ export const useSetGroupKey = () =>
 
                 queryClient.setQueryData(
                     ["group", evaluationId, groupNumber],
-                    (group: Group) => ({
+                    (group: any) => ({
                         ...group,
                         keys: keys,
                         keySubmitter: currentUser.data,

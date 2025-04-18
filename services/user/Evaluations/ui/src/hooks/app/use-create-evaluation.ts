@@ -1,10 +1,12 @@
 import { queryClient } from "@/main";
-import { getEvaluation } from "@lib/getEvaluation";
-import { getLastId } from "@lib/getLastId";
+import { getEvaluation } from "@lib/graphql/getEvaluation";
+import { getLastCreatedEvaluationId } from "@lib/graphql/getLastCreatedEvaluation";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { useCurrentUser } from "../use-current-user";
+import { zAccount } from "@lib/zod/Account";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000);
 
@@ -37,6 +39,7 @@ const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const useCreateEvaluation = () => {
     const navigate = useNavigate();
+    const { data: currentUser } = useCurrentUser();
 
     return useMutation<number, Error, z.infer<typeof Params>>({
         mutationFn: async (params) => {
@@ -50,9 +53,7 @@ export const useCreateEvaluation = () => {
                 useHooks,
             } = Params.parse(params);
 
-            const lastId = await getLastId();
-
-            const pars = {
+            void (await getSupervisor().functionCall({
                 method: "create",
                 service: "evaluations",
                 intf: "api",
@@ -65,15 +66,15 @@ export const useCreateEvaluation = () => {
                     rankAmount,
                     useHooks,
                 ],
-            };
+            }));
+            await wait(3000);
 
-            void (await getSupervisor().functionCall(pars));
-            await wait(2000);
-
-            const newId = lastId + 1;
+            const lastCreated = await getLastCreatedEvaluationId(
+                zAccount.parse(currentUser),
+            );
             const res = await queryClient.fetchQuery({
-                queryKey: ["evaluation", newId],
-                queryFn: () => getEvaluation(newId),
+                queryKey: ["evaluation", lastCreated],
+                queryFn: () => getEvaluation(lastCreated.owner, lastCreated.id),
             });
             return res.id;
         },

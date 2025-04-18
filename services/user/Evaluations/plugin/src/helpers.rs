@@ -26,6 +26,7 @@ pub fn current_user() -> Result<AccountNumber, Error> {
 }
 
 pub fn create_new_symmetric_key(
+    evaluation_owner: AccountNumber,
     evaluation_id: u32,
     users: &Vec<types::GroupUserSubset>,
     creator: AccountNumber,
@@ -62,7 +63,9 @@ pub fn create_new_symmetric_key(
         .collect::<Result<_, _>>()?;
 
     let hash = symmetric_key.hash();
+
     let packed_args = evaluations::action_structs::groupKey {
+        owner: evaluation_owner,
         evaluation_id,
         keys: payloads,
         hash,
@@ -73,6 +76,7 @@ pub fn create_new_symmetric_key(
 }
 
 pub fn get_decrypted_proposals(
+    evaluation_owner: AccountNumber,
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
@@ -87,7 +91,7 @@ pub fn get_decrypted_proposals(
             .cmp(&parse_account_number(&b.user).unwrap().value)
     });
 
-    let symmetric_key = get_symmetric_key(evaluation_id, group_number, sender)?;
+    let symmetric_key = get_symmetric_key(evaluation_owner, evaluation_id, group_number, sender)?;
 
     let proposals = proposals
         .into_iter()
@@ -115,6 +119,7 @@ pub fn get_decrypted_proposals(
 }
 
 pub fn get_symmetric_key(
+    evaluation_owner: AccountNumber,
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
@@ -140,7 +145,7 @@ pub fn get_symmetric_key(
             )?,
         )
     } else {
-        create_new_symmetric_key(evaluation_id, &users, sender)
+        create_new_symmetric_key(evaluation_owner, evaluation_id, &users, sender)
     }
 }
 

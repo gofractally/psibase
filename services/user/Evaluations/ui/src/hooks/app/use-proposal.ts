@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getProposal } from "../lib/getProposal";
 import { queryClient } from "@/main";
+import { getProposal } from "@lib/getProposal";
 
 export const useProposal = (
     evaluationId: number | undefined,

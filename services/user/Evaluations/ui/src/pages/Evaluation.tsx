@@ -1,11 +1,11 @@
-import { useCloseEvaluation } from "@hooks/use-close-evaluation";
+import { useCloseEvaluation } from "@hooks/app/use-close-evaluation";
 import { useCurrentUser } from "@hooks/use-current-user";
-import { useEvaluation } from "@hooks/use-evaluation";
-import { useGroups } from "@hooks/use-groups";
-import { useRegister } from "@hooks/use-register";
-import { useStartEvaluation } from "@hooks/use-start-evaluation";
-import { useUnregister } from "@hooks/use-unregister";
-import { useUsers } from "@hooks/use-users";
+import { useEvaluation } from "@hooks/app/use-evaluation";
+import { useGroups } from "@hooks/app/use-groups";
+import { useRegister } from "@hooks/app/use-register";
+import { useStartEvaluation } from "@hooks/app/use-start-evaluation";
+import { useUnregister } from "@hooks/app/use-unregister";
+import { useUsers } from "@hooks/app/use-users";
 import { getStatus, Types } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
@@ -19,18 +19,20 @@ const defaultRefreshInterval = 10000;
 
 export const EvaluationPage = () => {
     const { id } = useParams();
+    const { data: currentUser } = useCurrentUser();
 
     const [refreshInterval, setRefreshInterval] = useState<number>(
         defaultRefreshInterval,
     );
     const [ticks, setTick] = useState<number>(0);
     const { data: evaluation, error: evaluationError } = useEvaluation(
+        currentUser,
         Number(id),
     );
     const { mutate: register, isPending: isRegisterPending } = useRegister();
     const { mutate: unregister, isPending: isUnregisterPending } =
         useUnregister();
-    const { data: currentUser } = useCurrentUser();
+
     const { data: users, error: usersError } = useUsers(
         evaluation?.id,
         refreshInterval,
@@ -94,15 +96,6 @@ export const EvaluationPage = () => {
         }
     }, [autoStart, status]);
 
-    console.log({
-        evaluation,
-        users,
-        currentUser,
-        groups,
-        evaluationError,
-        usersError,
-        groupsError,
-    });
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -166,7 +159,6 @@ export const EvaluationPage = () => {
                         <Button
                             disabled={isRegisterPending || isRegistered}
                             onClick={() => {
-                                console.log("calling register?");
                                 register(evaluation!.id);
                             }}
                         >
@@ -281,7 +273,7 @@ export const EvaluationPage = () => {
                             <Button
                                 disabled={isCloseEvaluationPending}
                                 onClick={() => {
-                                    closeEvaluation({ id: evaluation!.id });
+                                    closeEvaluation(evaluation!.id);
                                 }}
                             >
                                 {isCloseEvaluationPending

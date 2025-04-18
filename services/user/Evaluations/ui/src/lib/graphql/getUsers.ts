@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { graphql } from "./graphql";
-import { zAccount } from "./zod/Account";
+import { graphql } from "../graphql";
+import { zAccount } from "../zod/Account";
 
 export const zUser = z.object({
     user: zAccount,

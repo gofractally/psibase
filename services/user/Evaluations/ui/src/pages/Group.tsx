@@ -1,4 +1,4 @@
-import { useEvaluation } from "@hooks/use-evaluation";
+import { useEvaluation } from "@hooks/app/use-evaluation";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8,15 +8,15 @@ import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { Button } from "@shadcn/button";
 import { AlignJustify, Info, Plus, X } from "lucide-react";
 import { humanize } from "@lib/humanize";
-import { usePropose } from "@hooks/use-propose";
+import { usePropose } from "@hooks/app/use-propose";
 import { arrayMove } from "@lib/arrayMove";
-import { setCachedProposal, useProposal } from "@hooks/use-proposal";
+import { setCachedProposal, useProposal } from "@hooks/app/use-proposal";
 import { useCurrentUser } from "@hooks/use-current-user";
 
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
-import { useAttest } from "@hooks/use-attest";
+import { useAttest } from "@hooks/app/use-attest";
 import { toast } from "sonner";
-import { useUsers } from "@hooks/use-users";
+import { useUsers } from "@hooks/app/use-users";
 
 const wait = (ms: number = 2500) =>
     new Promise((resolve) => setTimeout(resolve, ms));
@@ -33,7 +33,7 @@ export const GroupPage = () => {
 
     const navigate = useNavigate();
 
-    const { data: evaluation } = useEvaluation(Number(id));
+    const { data: evaluation } = useEvaluation(currentUser, Number(id));
 
     const { refetch: refetchUsers, data: users } = useUsers(Number(id));
 
@@ -140,7 +140,7 @@ export const GroupPage = () => {
     };
 
     const onRemove = (number: number) => {
-        updateRankedNumbers(rankedNumbers.filter((n) => n !== number));
+        updateRankedNumbers(rankedNumbers.filter((n: number) => n !== number));
     };
 
     const onAdd = (number: number) => {
@@ -177,7 +177,7 @@ export const GroupPage = () => {
                     onSortEnd={onSortEnd}
                 >
                     {rankedNumbers.length > 0 ? (
-                        rankedNumbers.map((number) => (
+                        rankedNumbers.map((number: number) => (
                             <SortableItem key={number.toString()}>
                                 <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
                                     <div className="flex-1 text-lg">

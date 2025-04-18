@@ -1,5 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
+    use crate::helpers::{get_current_time_seconds, EvaluationStatus};
     use async_graphql::SimpleObject;
     use psibase::{AccountNumber, Fracpack, Table, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -7,18 +8,31 @@ pub mod tables {
     #[table(name = "ConfigTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack)]
     pub struct ConfigRow {
+        pub owner: AccountNumber,
         pub last_used_id: u32,
     }
 
     impl ConfigRow {
         #[primary_key]
-        fn pk(&self) {}
+        fn pk(&self) -> AccountNumber {
+            self.owner
+        }
+
+        pub fn next_id(owner: AccountNumber) -> u32 {
+            let table = ConfigTable::new();
+            let mut config = table.get_index_pk().get(&owner).unwrap_or(Self {
+                owner,
+                last_used_id: 0,
+            });
+            config.last_used_id += 1;
+            table.put(&config).unwrap();
+            config.last_used_id
+        }
     }
 
     #[table(name = "EvaluationTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Evaluation {
-        #[primary_key]
         pub id: u32,
         pub created_at: u32,
         pub owner: AccountNumber,
@@ -28,13 +42,15 @@ pub mod tables {
         pub finish_by: u32,
         pub use_hooks: bool,
         pub allowable_group_sizes: Vec<u8>,
-        pub rank_amount: u8,
+        pub num_options: u8,
     }
 
     #[table(name = "UserTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct User {
+        pub owner: AccountNumber,
         pub evaluation_id: u32,
+
         pub user: AccountNumber,
         pub group_number: Option<u32>,
         pub attestation: Option<Vec<u8>>,
@@ -44,6 +60,7 @@ pub mod tables {
     #[table(name = "GroupTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     pub struct Group {
+        pub owner: AccountNumber,
         pub evaluation_id: u32,
         pub number: u32,
         pub key_submitter: Option<AccountNumber>,
@@ -75,8 +92,8 @@ pub mod tables {
     }
     impl User {
         #[primary_key]
-        fn pk(&self) -> (u32, AccountNumber) {
-            (self.evaluation_id, self.user)
+        fn pk(&self) -> (AccountNumber, u32, AccountNumber) {
+            (self.owner, self.evaluation_id, self.user)
         }
 
         #[secondary_key(1)]
@@ -84,8 +101,9 @@ pub mod tables {
             (self.evaluation_id, self.group_number, self.user)
         }
 
-        pub fn new(evaluation_id: u32, user: AccountNumber) -> Self {
+        pub fn new(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {
             Self {
+                owner,
                 evaluation_id,
                 user,
                 group_number: None,
@@ -94,9 +112,9 @@ pub mod tables {
             }
         }
 
-        pub fn get(evaluation_id: u32, user: AccountNumber) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {
             let table = UserTable::new();
-            let result = table.get_index_pk().get(&(evaluation_id, user));
+            let result = table.get_index_pk().get(&(owner, evaluation_id, user));
             psibase::check(result.is_some(), "user not found");
             result.unwrap()
         }
@@ -113,18 +131,24 @@ pub mod tables {
     }
 
     impl Evaluation {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u32) {
+            (self.owner, self.id)
+        }
+
         pub fn new(
-            id: u32,
             allowable_group_sizes: Vec<u8>,
-            created_at: u32,
-            owner: AccountNumber,
             registration_starts: u32,
             deliberation_starts: u32,
             submission_starts: u32,
             finish_by: u32,
-            rank_amount: u8,
+            num_options: u8,
             use_hooks: bool,
         ) -> Self {
+            let owner = psibase::get_sender();
+            let created_at = get_current_time_seconds();
+            let id = ConfigRow::next_id(owner);
+
             Self {
                 id,
                 owner,
@@ -135,7 +159,7 @@ pub mod tables {
                 finish_by,
                 use_hooks,
                 allowable_group_sizes,
-                rank_amount,
+                num_options,
             }
         }
 
@@ -143,29 +167,33 @@ pub mod tables {
             let table = GroupTable::new();
             let result = table
                 .get_index_pk()
-                .range((self.id, 0)..=(self.id, u32::MAX))
+                .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
                 .collect();
             result
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
             let table = GroupTable::new();
-            let result = table.get_index_pk().get(&(self.id, group_number));
+            let result = table
+                .get_index_pk()
+                .get(&(self.owner, self.id, group_number));
             result
         }
 
         pub fn get_users(&self) -> Vec<User> {
             let table = UserTable::new();
-            let result = table
+            table
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .collect();
-            result
+                .range(
+                    (self.owner, self.id, AccountNumber::new(0))
+                        ..=(self.owner, self.id, AccountNumber::new(u64::MAX)),
+                )
+                .collect()
         }
 
-        pub fn get(evaluation_id: u32) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
-            let result = table.get_index_pk().get(&evaluation_id);
+            let result = table.get_index_pk().get(&(owner, evaluation_id));
             psibase::check(result.is_some(), "evaluation not found");
             result.unwrap()
         }
@@ -176,14 +204,13 @@ pub mod tables {
         }
 
         pub fn delete(&self) {
-            let evaluation_id = self.id;
             let users_table = UserTable::new();
 
             let users: Vec<User> = users_table
                 .get_index_pk()
                 .range(
-                    (evaluation_id, AccountNumber::new(0))
-                        ..=(evaluation_id, AccountNumber::new(u64::MAX)),
+                    (self.owner, self.id, AccountNumber::new(0))
+                        ..=(self.owner, self.id, AccountNumber::new(u64::MAX)),
                 )
                 .collect();
 
@@ -194,7 +221,7 @@ pub mod tables {
             let groups_table = GroupTable::new();
             let groups: Vec<Group> = groups_table
                 .get_index_pk()
-                .range((evaluation_id, 0)..=(evaluation_id, u32::MAX))
+                .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
                 .collect();
 
             for group in groups {
@@ -202,19 +229,53 @@ pub mod tables {
             }
 
             let evaluation_table = EvaluationTable::new();
-            evaluation_table.erase(&self.id);
+            evaluation_table.erase(&self.pk());
+        }
+
+        pub fn get_current_phase(&self) -> EvaluationStatus {
+            let current_time_seconds = get_current_time_seconds();
+            self.calculate_scheduled_phase(current_time_seconds)
+        }
+
+        fn calculate_scheduled_phase(&self, current_time_seconds: u32) -> EvaluationStatus {
+            if current_time_seconds >= self.finish_by {
+                EvaluationStatus::Closed
+            } else if current_time_seconds >= self.submission_starts {
+                EvaluationStatus::Submission
+            } else if current_time_seconds >= self.deliberation_starts {
+                EvaluationStatus::Deliberation
+            } else if current_time_seconds >= self.registration_starts {
+                EvaluationStatus::Registration
+            } else {
+                EvaluationStatus::Pending
+            }
+        }
+
+        pub fn assert_status(&self, expected_status: EvaluationStatus) {
+            let current_phase = self.get_current_phase();
+            let phase_name = match current_phase {
+                EvaluationStatus::Pending => "Pending",
+                EvaluationStatus::Registration => "Registration",
+                EvaluationStatus::Deliberation => "Deliberation",
+                EvaluationStatus::Submission => "Submission",
+                EvaluationStatus::Closed => "Closed",
+            };
+            psibase::check(
+                current_phase == expected_status,
+                format!("evaluation must be in {phase_name} phase").as_str(),
+            );
         }
     }
 
     impl Group {
         #[primary_key]
-        fn pk(&self) -> (u32, u32) {
-            (self.evaluation_id, self.number)
+        fn pk(&self) -> (AccountNumber, u32, u32) {
+            (self.owner, self.evaluation_id, self.number)
         }
 
-        pub fn get(evaluation_id: u32, number: u32) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
             let table = GroupTable::new();
-            let result = table.get_index_pk().get(&(evaluation_id, number));
+            let result = table.get_index_pk().get(&(owner, evaluation_id, number));
             psibase::check(result.is_some(), "group not found");
             result.unwrap()
         }
@@ -224,8 +285,9 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
-        pub fn new(evaluation_id: u32, number: u32) -> Self {
+        pub fn new(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
             Self {
+                owner,
                 evaluation_id,
                 number,
                 key_submitter: None,

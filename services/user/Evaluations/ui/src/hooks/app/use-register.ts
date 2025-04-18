@@ -1,8 +1,8 @@
 import { queryClient } from "@/main";
-import { zUser } from "@lib/getUsers";
+import { zUser } from "@lib/graphql/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
-import { useCurrentUser } from "./use-current-user";
+import { useCurrentUser } from "../use-current-user";
 import { PrivateKey } from "eciesjs";
 import { Buffer } from "buffer";
 import { zAccount } from "@lib/zod/Account";

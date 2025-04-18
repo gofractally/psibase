@@ -1,4 +1,4 @@
-import { getGroups } from "@lib/getGroups";
+import { getGroups } from "@lib/graphql/getGroups";
 import { useQuery } from "@tanstack/react-query";
 
 export const useGroups = (evaluationId: number | undefined) =>

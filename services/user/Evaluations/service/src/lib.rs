@@ -3,40 +3,28 @@ pub mod helpers;
 pub mod db;
 
 #[psibase::service(tables = "db::tables")]
+#[allow(non_snake_case)]
 pub mod service {
-    use crate::db::tables::{ConfigRow, ConfigTable, Evaluation, Group, User, UserSettings};
+    use crate::db::tables::{Evaluation, Group, User, UserSettings};
     use crate::helpers;
 
-    // use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
+    use crate::helpers::EvaluationStatus;
     use psibase::*;
-
-    #[action]
-    fn init() {
-        let table = ConfigTable::new();
-        table.put(&ConfigRow { last_used_id: 0 }).unwrap();
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = ConfigTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
-    }
 
     #[event(history)]
     pub fn keysset(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {}
 
+    #[event(history)]
+    pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
+
     #[action]
-    #[allow(non_snake_case)]
     fn create(
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
-        group_sizes: Vec<u8>,
-        rank_amount: u8,
+        allowed_group_sizes: Vec<u8>,
+        num_options: u8,
         use_hooks: bool,
     ) {
         check(
@@ -45,101 +33,33 @@ pub mod service {
         );
 
         check(
-            group_sizes.len() > 0,
-            "allowable group sizes must be at least 1",
-        );
-
-        check(
-            group_sizes.iter().all(|size| *size > 0),
-            "allowable group sizes must be greater than 0",
+            allowed_group_sizes.iter().all(|size| *size > 1),
+            "allowable group sizes must be greater than 1",
         );
 
         let new_evaluation = Evaluation::new(
-            helpers::get_next_id(),
-            group_sizes,
-            helpers::get_current_time_seconds(),
-            get_sender(),
+            allowed_group_sizes,
             registration,
             deliberation,
             submission,
             finish_by,
-            rank_amount,
+            num_options,
             use_hooks,
         );
 
         new_evaluation.save();
+        Wrapper::emit()
+            .history()
+            .evaluation_created(get_sender(), new_evaluation.id);
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn getEvaluation(id: u32) -> Option<Evaluation> {
-        let evaluation = Evaluation::get(id);
-        Some(evaluation)
-    }
+    fn start(evaluation_id: u32) {
+        let sender = get_sender();
+        let evaluation = Evaluation::get(sender, evaluation_id);
 
-    #[action]
-    #[allow(non_snake_case)]
-    fn getGroup(id: u32, group_number: u32) -> Option<Group> {
-        let evaluation = Evaluation::get(id);
-        evaluation.get_group(group_number)
-    }
+        evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
-    #[action]
-    #[allow(non_snake_case)]
-    fn getLastId() -> u32 {
-        let table = ConfigTable::new();
-        table.get_index_pk().get(&()).unwrap().last_used_id
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getGroups(id: u32) -> Vec<Group> {
-        let evaluation = Evaluation::get(id);
-        evaluation.get_groups()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getUsers(id: u32) -> Vec<User> {
-        let evaluation = Evaluation::get(id);
-        evaluation.get_users()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getUser(id: u32, user: AccountNumber) -> Option<User> {
-        let user = User::get(id, user);
-        Some(user)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getGroupUsers(id: u32, group_number: u32) -> Vec<User> {
-        let evaluation = Evaluation::get(id);
-        evaluation
-            .get_users()
-            .iter()
-            .filter(|user| user.group_number == Some(group_number))
-            .map(|user| user.clone())
-            .collect()
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn getUserSettings(account_number: AccountNumber) -> Option<UserSettings> {
-        UserSettings::get(account_number)
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn start(id: u32, entropy: u64) {
-        let evaluation = Evaluation::get(id);
-
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
-        check(
-            evaluation.owner == get_sender(),
-            "only the owner can start the evaluation",
-        );
         check(
             evaluation.get_groups().len() == 0,
             "groups have already been created",
@@ -147,20 +67,18 @@ pub mod service {
 
         let mut users_to_process = evaluation.get_users();
 
-        helpers::shuffle_vec(&mut users_to_process, entropy);
+        users_to_process.sort_by_key(|user| user.user.value);
 
-        let chunked_groups = helpers::spread_users(&users_to_process, &evaluation);
+        helpers::shuffle_vec(&mut users_to_process, evaluation_id as u64);
 
-        check(
-            chunked_groups.is_some(),
+        let chunked_groups = check_some(
+            helpers::spread_users(&users_to_process, &evaluation),
             "unable to spread users into groups",
         );
 
-        let chunked_groups = chunked_groups.unwrap();
-
         for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
             let group_number: u32 = (index as u32) + 1;
-            let new_group = Group::new(evaluation.id, group_number);
+            let new_group = Group::new(sender, evaluation.id, group_number);
             new_group.save();
 
             for mut user in grouped_users {
@@ -173,66 +91,58 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
     fn setKey(key: Vec<u8>) {
         let user = UserSettings::new(get_sender(), key);
         user.save();
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn groupKey(evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
-        let evaluation = Evaluation::get(evaluation_id);
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
+    fn groupKey(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
 
-        let sender = get_sender();
+        evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
-        let user = User::get(evaluation_id, sender);
+        let sender: AccountNumber = get_sender();
 
-        check(
-            user.group_number.is_some(),
-            "user is not sorted into a group",
-        );
+        let user = User::get(sender, evaluation_id, sender);
 
-        let mut group = Group::get(evaluation_id, user.group_number.unwrap());
+        let group_number = check_some(user.group_number, "user is not sorted into a group");
 
-        check(
-            group.key_submitter.is_none(),
-            "group key has already been submitted",
-        );
+        let mut group = Group::get(sender, evaluation_id, group_number);
+
+        check_none(group.key_submitter, "group key has already been submitted");
 
         group.key_submitter = Some(sender);
         group.save();
 
         Wrapper::emit()
             .history()
-            .keysset(evaluation_id, user.group_number.unwrap(), keys, hash);
+            .keysset(evaluation_id, group_number, keys, hash);
     }
 
     #[action]
-    #[allow(non_snake_case)]
     fn close(id: u32) {
-        let evaluation = Evaluation::get(id);
-
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Closed);
+        let evaluation = Evaluation::get(get_sender(), id);
+        let current_phase = evaluation.get_current_phase();
 
         check(
-            evaluation.owner == get_sender(),
-            "only the owner can close the evaluation",
+            current_phase == EvaluationStatus::Closed
+                || current_phase == EvaluationStatus::Registration,
+            "evaluation must be in registration or closed phase",
         );
+        // TODO: Call the hook
 
         evaluation.delete();
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn propose(evaluation_id: u32, proposal: Vec<u8>) {
+    fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
         let sender = get_sender();
-        let evaluation = Evaluation::get(evaluation_id);
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Deliberation);
+        let evaluation = Evaluation::get(owner, evaluation_id);
+        evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
-        let mut user = User::get(evaluation_id, sender);
-        let group = Group::get(evaluation_id, user.group_number.unwrap());
+        let mut user = User::get(owner, evaluation_id, sender);
+        let group = Group::get(owner, evaluation_id, user.group_number.unwrap());
 
         check(
             group.key_submitter.is_some(),
@@ -244,26 +154,31 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn attest(evaluation_id: u32, attestation: Vec<u8>) {
+    fn attest(owner: AccountNumber, evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
-        let evaluation = Evaluation::get(evaluation_id);
+        let evaluation = Evaluation::get(owner, evaluation_id);
 
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Submission);
+        let ranks_within_scope = attestation
+            .iter()
+            .all(|rank| rank <= &evaluation.num_options);
+        check(ranks_within_scope, "attestation is out of scope");
 
-        let mut user = User::get(evaluation_id, sender);
+        evaluation.assert_status(helpers::EvaluationStatus::Submission);
+
+        let mut user = User::get(owner, evaluation_id, sender);
         check(user.attestation.is_none(), "you have already submitted");
 
         user.attestation = Some(attestation);
         user.save();
 
-        let mut group = Group::get(evaluation_id, user.group_number.unwrap());
+        let mut group = Group::get(owner, evaluation_id, user.group_number.unwrap());
 
         check(group.key_submitter.is_some(), "cannot attest without key");
         check(group.result.is_none(), "group result already set");
 
         if group.result.is_none() {
-            let result = helpers::get_group_result(evaluation_id, user.group_number.unwrap());
+            let result =
+                helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
             match result {
                 helpers::GroupResult::ConsensusSuccess(result) => {
                     group.result = Some(result);
@@ -275,31 +190,24 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn register(id: u32, account_number: AccountNumber) {
-        let evaluation = Evaluation::get(id);
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
+    fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+
+        evaluation.assert_status(helpers::EvaluationStatus::Registration);
 
         let sender = get_sender();
         check(
-            sender == account_number || sender == evaluation.owner,
+            sender == registrant || sender == evaluation.owner,
             "user is not allowed to register",
         );
 
-        let is_hook_allows_registration = true;
-
-        check(
-            is_hook_allows_registration,
-            "user is not allowed to register",
-        );
-
-        let user_settings = UserSettings::get(account_number);
+        let user_settings = UserSettings::get(registrant);
 
         check(
             user_settings.is_some(),
             "user must have a pre-existing key to be registered",
         );
-        let user = User::new(evaluation.id, get_sender());
+        let user = User::new(evaluation.owner, evaluation.id, registrant);
         user.save();
 
         if evaluation.use_hooks {
@@ -312,27 +220,28 @@ pub mod service {
                 MethodNumber::from(
                     psibase::services::evaluations::action_structs::register::ACTION_NAME,
                 ),
-                psibase::services::evaluations::action_structs::register { evaluation_id: id },
+                psibase::services::evaluations::action_structs::register {
+                    evaluation_id: evaluation.id,
+                    registrant,
+                },
             )
         }
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn unregister(id: u32) {
-        let evaluation = Evaluation::get(id);
-        helpers::assert_status(&evaluation, helpers::EvaluationStatus::Registration);
-
-        let is_hook_allows_deregistration = true;
-
-        check(
-            is_hook_allows_deregistration,
-            "user is not allowed to deregister",
-        );
+    fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+        evaluation.assert_status(helpers::EvaluationStatus::Registration);
 
         let sender = get_sender();
-        let user = User::get(evaluation.id, sender);
+        check(
+            sender == registrant || sender == evaluation.owner,
+            "user is not allowed to unregister",
+        );
+
+        let user = User::get(owner, evaluation_id, registrant);
         user.delete();
+        // TODO: Call the hook
     }
 }
 

@@ -1,5 +1,4 @@
-use crate::db::tables::{ConfigTable, Evaluation, EvaluationTable, User, UserTable};
-use psibase::AccountNumber;
+use crate::db::tables::{Evaluation, EvaluationTable, User};
 use psibase::*;
 use std::collections::HashMap;
 
@@ -28,54 +27,9 @@ pub fn get_current_time_seconds() -> u32 {
         .seconds as u32
 }
 
-pub fn get_scheduled_phase(evaluation: &Evaluation) -> EvaluationStatus {
-    let current_time_seconds = get_current_time_seconds();
-    calculate_scheduled_phase(evaluation, current_time_seconds)
-}
-
-pub fn calculate_scheduled_phase(
-    evaluation: &Evaluation,
-    current_time_seconds: u32,
-) -> EvaluationStatus {
-    if current_time_seconds >= evaluation.finish_by {
-        EvaluationStatus::Closed
-    } else if current_time_seconds >= evaluation.submission_starts {
-        EvaluationStatus::Submission
-    } else if current_time_seconds >= evaluation.deliberation_starts {
-        EvaluationStatus::Deliberation
-    } else if current_time_seconds >= evaluation.registration_starts {
-        EvaluationStatus::Registration
-    } else {
-        EvaluationStatus::Pending
-    }
-}
-
-pub fn assert_status(evaluation: &Evaluation, expected_status: EvaluationStatus) {
-    let current_phase = get_scheduled_phase(&evaluation);
-    let phase_name = match current_phase {
-        EvaluationStatus::Pending => "Pending",
-        EvaluationStatus::Registration => "Registration",
-        EvaluationStatus::Deliberation => "Deliberation",
-        EvaluationStatus::Submission => "Submission",
-        EvaluationStatus::Closed => "Closed",
-    };
-    check(
-        current_phase == expected_status,
-        format!("evaluation must be in {phase_name} phase").as_str(),
-    );
-}
-
 pub fn update_evaluation(evaluation: &Evaluation) {
     let table: EvaluationTable = EvaluationTable::new();
     table.put(evaluation).unwrap();
-}
-
-pub fn get_next_id() -> u32 {
-    let table = ConfigTable::new();
-    let mut config = table.get_index_pk().get(&()).unwrap();
-    config.last_used_id += 1;
-    table.put(&config).unwrap();
-    config.last_used_id
 }
 
 pub fn shuffle_vec<T>(vec: &mut Vec<T>, seed: u64) {
@@ -168,13 +122,12 @@ pub fn calculate_results(attestations: Vec<Option<Vec<u8>>>) -> GroupResult {
     GroupResult::ConsensusMisalignment
 }
 
-pub fn get_user(evaluation_id: u32, user: AccountNumber) -> User {
-    let table = UserTable::new();
-    table.get_index_pk().get(&(evaluation_id, user)).unwrap()
-}
-
-pub fn get_group_result(evaluation_id: u32, group_number: u32) -> GroupResult {
-    let users = Evaluation::get(evaluation_id).get_users();
+pub fn get_group_result(
+    owner: AccountNumber,
+    evaluation_id: u32,
+    group_number: u32,
+) -> GroupResult {
+    let users = Evaluation::get(owner, evaluation_id).get_users();
     let attestations = users
         .iter()
         .filter(|user| user.group_number == Some(group_number))

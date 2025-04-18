@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { getUsers } from "../lib/getUsers";
+import { getUsers } from "../../lib/graphql/getUsers";
 
 export const useUsers = (
     evaluationId: number | undefined,

@@ -10,7 +10,7 @@ server = "r-evaluations"
 plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
-    { sender = "evaluations", service = "evaluations", method = "init", rawData = "0000" },
+    # { sender = "evaluations", service = "evaluations", method = "init", rawData = "0000" },
     { sender = "evaluations", service = "sites", method = "enablespa", rawData = "010001" },
 ]
 
