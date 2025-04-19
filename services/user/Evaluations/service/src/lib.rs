@@ -33,8 +33,8 @@ pub mod service {
         );
 
         check(
-            allowed_group_sizes.iter().all(|size| *size > 1),
-            "allowable group sizes must be greater than 1",
+            allowed_group_sizes.iter().all(|size| *size > 0),
+            "allowable group sizes must be greater than 0",
         );
 
         let new_evaluation = Evaluation::new(

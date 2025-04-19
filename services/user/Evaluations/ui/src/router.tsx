@@ -14,11 +14,11 @@ export const router = createBrowserRouter([
                 element: <App />,
             },
             {
-                path: ":id",
+                path: ":owner/:id",
                 element: <EvaluationPage />,
             },
             {
-                path: ":id/:groupNumber",
+                path: ":owner/:id/:groupNumber",
                 element: <GroupPage />,
             },
         ],

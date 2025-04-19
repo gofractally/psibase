@@ -2,15 +2,15 @@ import { getSupervisor } from "@psibase/common-lib";
 import { z } from "zod";
 
 export const getProposal = async (
+    owner: string,
     evaluationId: number,
     groupId: number,
-    currentUser: string,
 ) => {
     const supervisor = getSupervisor();
 
     const pars = {
         method: "getProposal",
-        params: [evaluationId, groupId, currentUser],
+        params: [owner, evaluationId, groupId],
         service: "evaluations",
         intf: "api",
     };

@@ -3,6 +3,7 @@ use crate::bindings::host::common::types::Error;
 use crate::types::*;
 
 pub fn fetch_and_decode(
+    owner: String,
     evaluation_id: u32,
     group_number: u32,
 ) -> Result<GetEvaluationResponse, CommonServer::Error> {
@@ -10,8 +11,8 @@ pub fn fetch_and_decode(
 
     let query = format!(
         r#"query {{
-            getEvaluation(id: {id}) {{
-                rankAmount
+            getEvaluation(owner: {owner}, evaluationId: {id}) {{
+                numOptions
             }}
             getGroup(id: {id}, groupNumber: {group_number}) {{
                 evaluationId
@@ -23,6 +24,7 @@ pub fn fetch_and_decode(
                 proposal
             }}
         }}"#,
+        owner = owner,
         id = id,
         group_number = group_number
     );

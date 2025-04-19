@@ -22,7 +22,7 @@ const wait = (ms: number = 2500) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
 export const GroupPage = () => {
-    const { id, groupNumber } = useParams();
+    const { owner, id, groupNumber } = useParams();
 
     const { data: currentUser } = useCurrentUser();
     const [now, setNow] = useState(dayjs().unix());
@@ -33,9 +33,9 @@ export const GroupPage = () => {
 
     const navigate = useNavigate();
 
-    const { data: evaluation } = useEvaluation(currentUser, Number(id));
+    const { data: evaluation } = useEvaluation(owner, Number(id));
 
-    const { refetch: refetchUsers, data: users } = useUsers(Number(id));
+    const { refetch: refetchUsers, data: users } = useUsers(owner, Number(id));
 
     const isUserAttested = users
         ? !!users.find((user) => user.user === currentUser)?.attestation
@@ -88,14 +88,14 @@ export const GroupPage = () => {
         isUserAttested,
     ]);
 
-    const rankedOptionNumbers = [...Array(evaluation?.rankAmount)].map(
+    const rankedOptionNumbers = [...Array(evaluation?.numOptions)].map(
         (_, index) => index + 1,
     );
 
     const { data: proposal, refetch: refetchProposal } = useProposal(
+        owner,
         Number(id),
         Number(groupNumber),
-        currentUser,
     );
 
     const rankedNumbers = proposal ?? [];

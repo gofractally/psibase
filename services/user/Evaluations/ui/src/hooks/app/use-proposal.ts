@@ -1,16 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/main";
 import { getProposal } from "@lib/getProposal";
+import { Account } from "@lib/zod/Account";
 
 export const useProposal = (
+    owner: Account | undefined,
     evaluationId: number | undefined,
     groupId: number | undefined,
-    currentUser: string | undefined | null,
 ) =>
     useQuery({
-        queryKey: ["proposal", evaluationId, groupId, currentUser],
-        queryFn: () => getProposal(evaluationId!, groupId!, currentUser!),
-        enabled: !!evaluationId && !!groupId && !!currentUser,
+        queryKey: ["proposal", owner, evaluationId, groupId],
+        queryFn: () => getProposal(owner!, evaluationId!, groupId!),
+        enabled: !!owner && !!evaluationId && !!groupId,
         staleTime: Infinity,
     });
 

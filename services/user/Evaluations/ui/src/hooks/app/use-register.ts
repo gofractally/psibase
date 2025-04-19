@@ -3,16 +3,19 @@ import { zUser } from "@lib/graphql/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "../use-current-user";
-import { PrivateKey } from "eciesjs";
-import { Buffer } from "buffer";
 import { zAccount } from "@lib/zod/Account";
+import { z } from "zod";
 
-globalThis.Buffer = Buffer;
+const Params = z.object({
+    owner: zAccount,
+    id: z.number(),
+    registrant: zAccount,
+});
 
 export const useRegister = () => {
     const { data: currentUser } = useCurrentUser();
     return useMutation({
-        mutationFn: async (id: number) => {
+        mutationFn: async (params: z.infer<typeof Params>) => {
             if (!currentUser) {
                 throw new Error("User not found");
             }
@@ -21,24 +24,27 @@ export const useRegister = () => {
                 method: "register",
                 service: "evaluations",
                 intf: "api",
-                params: [id, zAccount.parse(currentUser)],
+                params: [params.owner, params.id, currentUser],
             }));
 
-            queryClient.setQueryData(["users", id], (data: unknown) => {
-                const users = zUser.array().parse(data);
+            queryClient.setQueryData(
+                ["users", params.owner, params.id],
+                (data: unknown) => {
+                    const users = zUser.array().parse(data);
 
-                const newUser = zUser.parse({
-                    user: currentUser,
-                    groupNumber: null,
-                    proposal: null,
-                    attestation: null,
-                });
+                    const newUserObject: z.infer<typeof zUser> = {
+                        user: currentUser,
+                        groupNumber: null,
+                        proposal: null,
+                        attestation: null,
+                        evaluationId: params.id,
+                    };
 
-                return zUser.array().parse([...users, newUser]);
-            });
-        },
-        onError(error) {
-            console.error(error, "is error");
+                    const newUser = zUser.parse(newUserObject);
+
+                    return zUser.array().parse([...users, newUser]);
+                },
+            );
         },
     });
 };

@@ -5,8 +5,7 @@ import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { useCurrentUser } from "../use-current-user";
-import { zAccount } from "@lib/zod/Account";
+import { Account, zAccount } from "@lib/zod/Account";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000);
 
@@ -17,7 +16,7 @@ const Params = z
         submission: z.number(),
         finishBy: z.number(),
         allowableGroupSizes: z.array(z.number()),
-        rankAmount: z.number().min(2).max(255),
+        numOptions: z.number().min(2).max(255),
         useHooks: z.boolean(),
     })
     .refine(
@@ -37,11 +36,16 @@ const Params = z
 
 const wait = (ms = 1000) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// numOptions
+
 export const useCreateEvaluation = () => {
     const navigate = useNavigate();
-    const { data: currentUser } = useCurrentUser();
 
-    return useMutation<number, Error, z.infer<typeof Params>>({
+    return useMutation<
+        { id: number; owner: Account },
+        Error,
+        z.infer<typeof Params>
+    >({
         mutationFn: async (params) => {
             const {
                 deliberation,
@@ -49,7 +53,7 @@ export const useCreateEvaluation = () => {
                 registration,
                 submission,
                 allowableGroupSizes,
-                rankAmount,
+                numOptions,
                 useHooks,
             } = Params.parse(params);
 
@@ -63,23 +67,27 @@ export const useCreateEvaluation = () => {
                     submission,
                     finishBy,
                     allowableGroupSizes.map(String),
-                    rankAmount,
+                    numOptions,
                     useHooks,
                 ],
             }));
             await wait(3000);
 
-            const lastCreated = await getLastCreatedEvaluationId(
-                zAccount.parse(currentUser),
+            const currentUser = zAccount.parse(
+                queryClient.getQueryData(["currentUser"]),
             );
+            const lastCreated = await getLastCreatedEvaluationId(currentUser);
             const res = await queryClient.fetchQuery({
                 queryKey: ["evaluation", lastCreated],
                 queryFn: () => getEvaluation(lastCreated.owner, lastCreated.id),
             });
-            return res.id;
+            return {
+                id: res.id,
+                owner: res.owner,
+            };
         },
-        onSuccess: (id) => {
-            navigate(`/${id}`);
+        onSuccess: (data) => {
+            navigate(`/${data.owner}/${data.id}`);
         },
     });
 };

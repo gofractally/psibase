@@ -35,7 +35,7 @@ pub struct GroupUserSubset {
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EvaluationRecord {
-    pub rankAmount: u8,
+    pub numOptions: u8,
 }
 
 #[allow(non_snake_case)]

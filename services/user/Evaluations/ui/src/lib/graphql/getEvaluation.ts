@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { graphql } from "./graphql";
-import { zAccount, Account } from "./zod/Account";
-import { zUnix } from "./zod/unix";
+import { graphql } from "../graphql";
+import { zAccount, Account } from "../zod/Account";
+import { zUnix } from "../zod/unix";
 
 export const zEvaluation = z.object({
     id: z.number(),
@@ -13,7 +13,7 @@ export const zEvaluation = z.object({
     finishBy: zUnix,
     allowableGroupSizes: z.number().array(),
     useHooks: z.boolean(),
-    rankAmount: z.number(),
+    numOptions: z.number(),
 });
 
 export type Evaluation = z.infer<typeof zEvaluation>;
@@ -22,7 +22,7 @@ export const getEvaluation = async (owner: Account, id: number) => {
     const evaluation = await graphql(
         `
     {
-        getEvaluation(owner: ${owner}, evaluationId: ${id}) {     
+        getEvaluation(owner: "${owner}", evaluationId: ${id}) {     
             id,
             createdAt,
             owner,
@@ -32,7 +32,7 @@ export const getEvaluation = async (owner: Account, id: number) => {
             finishBy,
             allowableGroupSizes,
             useHooks,
-            rankAmount
+            numOptions
         } 
     }`,
         "evaluations",

@@ -1,6 +1,7 @@
 import { Group } from "@radix-ui/react-dropdown-menu";
 import { z } from "zod";
 import { graphql } from "../graphql";
+import { Account } from "@lib/zod/Account";
 
 const ErrorResponse = z.object({
     errors: z.array(
@@ -18,15 +19,18 @@ const ErrorResponse = z.object({
 });
 
 export const zGroup = z.object({
-    evaluationId: z.number(),
+    owner: z.string(),
     number: z.number(),
+    evaluationId: z.number(),
     keySubmitter: z.string().nullable(),
     result: z.number().array().nullable(),
 });
 
 const SuccessResponse = z.object({
     data: z.object({
-        getGroups: z.array(zGroup),
+        getGroups: z.object({
+            nodes: z.array(zGroup),
+        }),
     }),
 });
 
@@ -34,16 +38,19 @@ const GraphqlResponse = ErrorResponse.or(SuccessResponse);
 
 export type Group = z.infer<typeof zGroup>;
 
-export const getGroups = async (evaluationId: number): Promise<Group[]> => {
+export const getGroups = async (
+    owner: Account,
+    evaluationId: number,
+): Promise<Group[]> => {
     const res = await graphql(
-        `{ getGroups(id: ${evaluationId}) { evaluationId, number, keySubmitter, result } }`,
+        `{ getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { nodes { owner number evaluationId keySubmitter result } } }`,
         "evaluations",
     );
 
     const response = GraphqlResponse.parse(res);
 
     if (response.data) {
-        return response.data.getGroups;
+        return response.data.getGroups.nodes;
     }
     throw new Error(response.errors[0].message);
 };

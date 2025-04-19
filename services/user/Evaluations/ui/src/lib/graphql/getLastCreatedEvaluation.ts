@@ -5,7 +5,7 @@ import { zAccount, Account } from "../zod/Account";
 export const getLastCreatedEvaluationId = async (account: Account) => {
     const parsed = zAccount.parse(account);
     const res = await graphql(
-        `{ getLastEvaluation(owner: ${parsed}) {
+        `{ getLastEvaluation(owner: "${parsed}") {
             id
             owner
         } }`,
@@ -15,7 +15,7 @@ export const getLastCreatedEvaluationId = async (account: Account) => {
     const response = z
         .object({
             data: z.object({
-                getLastCreatedEvaluation: z.object({
+                getLastEvaluation: z.object({
                     id: z.number(),
                     owner: zAccount,
                 }),
@@ -23,5 +23,5 @@ export const getLastCreatedEvaluationId = async (account: Account) => {
         })
         .parse(res);
 
-    return response.data.getLastCreatedEvaluation;
+    return response.data.getLastEvaluation;
 };

@@ -76,6 +76,10 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("register", &packed_args)
     }
 
+    fn hello() -> Result<String, Error> {
+        Ok("world".to_string())
+    }
+
     fn unregister(
         evaluation_owner: String,
         evaluation_id: u32,
@@ -119,7 +123,7 @@ impl Api for EvaluationsPlugin {
                 .into_iter()
                 .map(|(_, submission)| submission)
                 .collect(),
-            evaluation.getEvaluation.unwrap().rankAmount,
+            evaluation.getEvaluation.unwrap().numOptions,
             group_number,
         );
 

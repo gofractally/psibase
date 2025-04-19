@@ -18,7 +18,7 @@ import { Switch } from "@shadcn/switch";
 const defaultRefreshInterval = 10000;
 
 export const EvaluationPage = () => {
-    const { id } = useParams();
+    const { owner, id } = useParams();
     const { data: currentUser } = useCurrentUser();
 
     const [refreshInterval, setRefreshInterval] = useState<number>(
@@ -26,7 +26,7 @@ export const EvaluationPage = () => {
     );
     const [ticks, setTick] = useState<number>(0);
     const { data: evaluation, error: evaluationError } = useEvaluation(
-        currentUser,
+        owner,
         Number(id),
     );
     const { mutate: register, isPending: isRegisterPending } = useRegister();
@@ -34,10 +34,14 @@ export const EvaluationPage = () => {
         useUnregister();
 
     const { data: users, error: usersError } = useUsers(
+        owner,
         evaluation?.id,
         refreshInterval,
     );
-    const { data: groups, error: groupsError } = useGroups(evaluation?.id);
+    const { data: groups, error: groupsError } = useGroups(
+        owner,
+        evaluation?.id,
+    );
     const {
         mutateAsync: startEvaluation,
         isPending: isStartEvaluationPending,
@@ -68,6 +72,16 @@ export const EvaluationPage = () => {
         currentUser &&
         groups &&
         getStatus(evaluation, currentUser, users, groups);
+
+    console.log({
+        status,
+        evaluation,
+        users,
+        currentUser,
+        groups,
+        usersError,
+        groupsError,
+    });
 
     useEffect(() => {
         const userIsAwaitingStart =
@@ -104,7 +118,7 @@ export const EvaluationPage = () => {
             (status.type === Types.DeliberationPendingParticipant ||
                 status.type == Types.UserMustSubmit)
         ) {
-            navigate(`/${id}/${status.groupNumber}`);
+            navigate(`/${owner}/${id}/${status.groupNumber}`);
         }
     }, [status]);
 
@@ -159,7 +173,11 @@ export const EvaluationPage = () => {
                         <Button
                             disabled={isRegisterPending || isRegistered}
                             onClick={() => {
-                                register(evaluation!.id);
+                                register({
+                                    owner: owner!,
+                                    id: evaluation!.id,
+                                    registrant: currentUser!,
+                                });
                             }}
                         >
                             {isRegisterPending
