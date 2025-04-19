@@ -1,0 +1,67 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
+        "allowJs": false,
+        "baseUrl": "./",
+        "paths": {
+            "@psibase/common-lib": [
+                "../../CommonApi/common/packages/common-lib/src"
+            ],
+            "@psibase/common-lib/*": [
+                "../../CommonApi/common/packages/common-lib/src/*"
+            ],
+            "@components": [
+                "src/components"
+            ],
+            "@components/*": [
+                "src/components/*"
+            ],
+            "@shadcn": [
+                "src/shad/components/ui"
+            ],
+            "@shadcn/*": [
+                "src/shad/components/ui/*"
+            ],
+            "@lib": [
+                "src/lib"
+            ],
+            "@lib/*": [
+                "src/lib/*"
+            ],
+            "@hooks": [
+                "src/hooks"
+            ],
+            "@hooks/*": [
+                "src/hooks/*"
+            ],
+            "@/*": [
+                "./src/*"
+            ]
+        },
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "module": "esnext",
+        "moduleResolution": "Node",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "jsx": "react-jsx"
+    },
+    "include": [
+        "src",
+    ],
+    "references": [
+        {
+            "path": "./tsconfig.node.json"
+        }
+    ]
+}

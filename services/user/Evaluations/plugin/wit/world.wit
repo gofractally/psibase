@@ -1,0 +1,35 @@
+package evaluations:plugin;
+
+
+interface types {
+    type account = string;
+}
+
+interface api {
+    use host:common/types.{error};
+    use types.{account};
+    
+    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, rank-amount: u8, use-hooks: bool) -> result<_, error>;
+
+    register: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+
+    unregister: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+
+    start: func(evaluation-id: u32) -> result<_, error>;
+
+    close: func(evaluation-id: u32) -> result<_, error>;
+
+    attest: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<_, error>;
+
+    propose: func(evaluation-owner: account, evaluation-id: u32, proposal: list<string>) -> result<_, error>;
+
+    get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
+
+    hello: func() -> result<string, error>;
+   
+}
+
+
+world imports {
+    import api;
+}

@@ -270,6 +270,7 @@ pub async fn gql_query<T: DeserializeOwned>(
     body: String,
 ) -> Result<T, anyhow::Error> {
     let url = account.url(base_url)?.join("graphql")?;
+    eprintln!("url={:?} for graph ql...", url);
     let result: QueryRoot<T> = as_json(
         client
             .post(url)

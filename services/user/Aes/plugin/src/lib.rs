@@ -6,6 +6,7 @@ use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
+use exports::aes::plugin::with_key::Guest as WithKey;
 use exports::aes::plugin::with_password::Guest as WithPassword;
 use host::common::types::{Error, PluginId};
 use kdf::plugin::api as Kdf;
@@ -59,6 +60,16 @@ fn decrypt_with_aes(key: &[u8; AES_KEY_SIZE], encrypted_data: &[u8]) -> Result<V
     };
 
     Ok(decrypted)
+}
+
+impl WithKey for AesPlugin {
+    fn encrypt(key: Vec<u8>, data: Vec<u8>) -> Vec<u8> {
+        encrypt_with_aes(&key.as_slice().try_into().unwrap(), &data)
+    }
+
+    fn decrypt(key: Vec<u8>, cipher: Vec<u8>) -> Result<Vec<u8>, Error> {
+        decrypt_with_aes(&key.as_slice().try_into().unwrap(), &cipher)
+    }
 }
 
 struct AesPlugin;
