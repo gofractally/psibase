@@ -76,10 +76,6 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("register", &packed_args)
     }
 
-    fn hello() -> Result<String, Error> {
-        Ok("world".to_string())
-    }
-
     fn unregister(
         evaluation_owner: String,
         evaluation_id: u32,

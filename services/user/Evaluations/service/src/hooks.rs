@@ -9,17 +9,12 @@ pub mod eval_hooks {
     }
 
     #[action]
-    fn evalPropose(evaluation_id: u32, group_nr: u32, proposer: AccountNumber) {
+    fn evalUnregister(evaluation_id: u32, account: AccountNumber) {
         unimplemented!()
     }
 
     #[action]
-    fn evalAttest(evaluation_id: u32, group_nr: u32, attester: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn evalGroupFin(evaluation_id: u32, group_nr: u32, result: Vec<u8>) {
+    fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
 }

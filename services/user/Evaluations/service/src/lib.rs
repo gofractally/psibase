@@ -17,6 +17,15 @@ pub mod service {
     #[event(history)]
     pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
 
+    #[event(history)]
+    pub fn group_finished(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        result: Vec<u8>,
+    ) {
+    }
+
     #[action]
     fn create(
         registration: u32,
@@ -130,7 +139,6 @@ pub mod service {
                 || current_phase == EvaluationStatus::Registration,
             "evaluation must be in registration or closed phase",
         );
-        // TODO: Call the hook
 
         evaluation.delete();
     }
@@ -181,8 +189,42 @@ pub mod service {
                 helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
             match result {
                 helpers::GroupResult::ConsensusSuccess(result) => {
-                    group.result = Some(result);
+                    group.result = Some(result.clone());
                     group.save();
+
+                    if evaluation.use_hooks {
+                        let caller = ServiceCaller {
+                            service: evaluation.owner,
+                            sender: get_sender(),
+                        };
+
+                        // caller.call(
+                        //     MethodNumber::from(hooks::action_structs::evalGroupFin::ACTION_NAME),
+                        //     hooks::action_structs::evalGroupFin {
+                        //         evaluation_id: evaluation.id,
+                        //         group_number: user.group_number.unwrap(),
+                        //         result: result.clone(),
+                        //     },
+                        // )
+
+                        caller.call(
+                            MethodNumber::from(
+                                psibase::services::evaluations::action_structs::evalGroupFin::ACTION_NAME,
+                            ),
+                            psibase::services::evaluations::action_structs::evalGroupFin {
+                                evaluation_id: evaluation.id,
+                                group_number: user.group_number.unwrap(),
+                                result: result.clone(),
+                            },
+                        )
+                    }
+
+                    Wrapper::emit().history().group_finished(
+                        evaluation.owner,
+                        evaluation.id,
+                        user.group_number.unwrap(),
+                        result.clone(),
+                    );
                 }
                 _ => {}
             }
@@ -218,11 +260,11 @@ pub mod service {
 
             caller.call(
                 MethodNumber::from(
-                    psibase::services::evaluations::action_structs::register::ACTION_NAME,
+                    psibase::services::evaluations::action_structs::evalRegister::ACTION_NAME,
                 ),
-                psibase::services::evaluations::action_structs::register {
+                psibase::services::evaluations::action_structs::evalRegister {
+                    account: registrant,
                     evaluation_id: evaluation.id,
-                    registrant,
                 },
             )
         }
@@ -241,7 +283,23 @@ pub mod service {
 
         let user = User::get(owner, evaluation_id, registrant);
         user.delete();
-        // TODO: Call the hook
+
+        if evaluation.use_hooks {
+            let caller = ServiceCaller {
+                service: evaluation.owner,
+                sender: get_sender(),
+            };
+
+            caller.call(
+                MethodNumber::from(
+                    psibase::services::evaluations::action_structs::evalUnregister::ACTION_NAME,
+                ),
+                psibase::services::evaluations::action_structs::evalUnregister {
+                    account: registrant,
+                    evaluation_id: evaluation.id,
+                },
+            )
+        }
     }
 }
 
