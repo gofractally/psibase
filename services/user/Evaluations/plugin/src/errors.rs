@@ -14,4 +14,15 @@ plugin_error! {
     UsersNotFound => "Users not found",
     GroupNotFound => "Group not found",
     NotLoggedIn => "Not logged in",
+    InvalidProposal => "Invalid proposal",
+    KeyDeserializationFailed => "Failed to deserialize key data",
+    InvalidKeyLength => "Invalid key length",
+    InvalidPrivateKey => "Invalid private key format",
+    DecryptionFailed => "Failed to decrypt data",
+    MissingKeySubmitter => "Key submitter not found",
+    GraphQLParseError(msg: String) => "GraphQL parsing error: {msg}",
+    InvalidGroupSize => "Invalid group size",
+    TransactionFailed(msg: String) => "Transaction failed: {msg}",
+    EvaluationDataMissing => "Evaluation data not found",
+    UserSubmissionNotFound => "User submission not found"
 }

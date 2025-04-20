@@ -10,18 +10,15 @@ use crate::bindings::host::common::types::Error;
 use crate::graphql::{fetch_and_decode, fetch_key_history, fetch_user_settings};
 use psibase::fracpack::Pack;
 
-use std::str::FromStr;
-
 pub fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {
-    AccountNumber::from_str(s).map_err(|_| ErrorType::InvalidAccountNumber.into())
+    AccountNumber::from_exact(s).map_err(|_| ErrorType::InvalidAccountNumber.into())
 }
 
 pub fn current_user() -> Result<AccountNumber, Error> {
     let current_user = bindings::accounts::plugin::api::get_current_user()?;
-    if current_user.is_none() {
-        return Err(ErrorType::NotLoggedIn.into());
-    }
-    let account_number = psibase::AccountNumber::from_str(current_user.unwrap().as_str()).unwrap();
+    let current_user = current_user.ok_or(ErrorType::NotLoggedIn)?;
+    let account_number =
+        AccountNumber::from_exact(&current_user).map_err(|_| ErrorType::InvalidAccountNumber)?;
     Ok(account_number)
 }
 
@@ -82,13 +79,13 @@ pub fn get_decrypted_proposals(
     sender: AccountNumber,
 ) -> Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error> {
     let res = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
-    let mut proposals = res.get_group_users.unwrap();
+    let mut proposals = res.get_group_users.ok_or(ErrorType::UsersNotFound)?;
 
     proposals.sort_by(|a, b| {
         parse_account_number(&a.user)
-            .unwrap()
-            .value
-            .cmp(&parse_account_number(&b.user).unwrap().value)
+            .map(|a| a.value)
+            .unwrap_or(0)
+            .cmp(&parse_account_number(&b.user).map(|b| b.value).unwrap_or(0))
     });
 
     let symmetric_key = get_symmetric_key(evaluation_owner, evaluation_id, group_number, sender)?;
@@ -96,24 +93,25 @@ pub fn get_decrypted_proposals(
     let proposals = proposals
         .iter()
         .map(|s| {
-            let user = parse_account_number(&s.user).unwrap();
-            if s.proposal.is_some() {
+            let user =
+                parse_account_number(&s.user).map_err(|_| ErrorType::InvalidAccountNumber)?;
+            Ok(if s.proposal.is_some() {
                 (
                     user,
                     Some(
                         bindings::aes::plugin::with_password::decrypt(
                             &symmetric_key.key,
-                            &s.proposal.as_ref().unwrap(),
+                            s.proposal.as_ref().ok_or(ErrorType::DecryptionFailed)?,
                             symmetric_key.salt_base_64().as_str(),
                         )
-                        .unwrap(),
+                        .map_err(|_| ErrorType::DecryptionFailed)?,
                     ),
                 )
             } else {
                 (user, None)
-            }
+            })
         })
-        .collect::<Vec<(AccountNumber, Option<Vec<u8>>)>>();
+        .collect::<Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error>>()?;
 
     Ok(proposals)
 }
@@ -124,7 +122,7 @@ pub fn get_symmetric_key(
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
-    // if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id) {
+    // if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id)? {
     //     return Ok(key);
     // }
 
@@ -138,11 +136,7 @@ pub fn get_symmetric_key(
             group_number,
             sender,
             &users,
-            parse_account_number(
-                &group
-                    .key_submitter
-                    .expect("keySubmitter is invalid account number"),
-            )?,
+            parse_account_number(&group.key_submitter.ok_or(ErrorType::MissingKeySubmitter)?)?,
         )
     } else {
         create_new_symmetric_key(evaluation_owner, evaluation_id, &users, sender)
@@ -177,7 +171,11 @@ pub fn decrypt_existing_key(
 
     let my_index = sorted_users
         .iter()
-        .position(|user| parse_account_number(&user.user).unwrap() == sender)
+        .position(|user| {
+            parse_account_number(&user.user)
+                .map(|u| u == sender)
+                .unwrap_or(false)
+        })
         .ok_or(ErrorType::UserNotFound)?;
 
     let key_history = fetch_key_history(evaluation_id, group_number)?;
@@ -207,10 +205,9 @@ pub fn decrypt_existing_key(
 pub fn sort_users_by_account(users: &types::GetGroupUsers) -> Result<types::GetGroupUsers, Error> {
     let mut sorted = users.clone();
     sorted.sort_by(|a, b| {
-        parse_account_number(&a.user)
-            .map(|a| a.value)
-            .unwrap_or(0)
-            .cmp(&parse_account_number(&b.user).map(|b| b.value).unwrap_or(0))
+        let a_value = parse_account_number(&a.user).map(|a| a.value).unwrap_or(0);
+        let b_value = parse_account_number(&b.user).map(|b| b.value).unwrap_or(0);
+        a_value.cmp(&b_value)
     });
     Ok(sorted)
 }

@@ -1,13 +1,12 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::str::FromStr;
-
 use bindings::exports::evaluations::plugin::api::Guest as Api;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
+use psibase::AccountNumber;
 
 pub mod consensus;
 mod errors;
@@ -16,6 +15,7 @@ pub mod helpers;
 mod key_table;
 pub mod types;
 
+use errors::ErrorType;
 use graphql::fetch_and_decode;
 use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
 
@@ -33,8 +33,11 @@ impl Api for EvaluationsPlugin {
     ) -> Result<(), Error> {
         let sizes = allowed_group_sizes
             .iter()
-            .map(|s| s.parse::<u8>().unwrap())
-            .collect();
+            .map(|s| {
+                s.parse::<u8>()
+                    .map_err(|_| ErrorType::InvalidGroupSize.into())
+            })
+            .collect::<Result<Vec<u8>, Error>>()?;
 
         let packed_args = evaluations::action_structs::create {
             registration,
@@ -55,17 +58,20 @@ impl Api for EvaluationsPlugin {
         registrant: String,
     ) -> Result<(), Error> {
         let key = key_table::AsymKey::new();
-        let public_key_vectored = key.public_key().serialize().to_vec();
+        let public_key_vectored = key.public_key()?.serialize().to_vec();
 
         let packed_args = evaluations::action_structs::setKey {
             key: public_key_vectored,
         }
         .packed();
-        add_action_to_transaction("setKey", &packed_args).unwrap();
+        add_action_to_transaction("setKey", &packed_args)
+            .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
         key.save()?;
 
-        let registrant = psibase::AccountNumber::from_str(registrant.as_str()).unwrap();
-        let owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
+        let registrant =
+            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
 
         let packed_args = evaluations::action_structs::register {
             owner,
@@ -81,8 +87,10 @@ impl Api for EvaluationsPlugin {
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let evaluation_owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
-        let registrant = psibase::AccountNumber::from_str(registrant.as_str()).unwrap();
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let registrant =
+            AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
 
         let packed_args = evaluations::action_structs::unregister {
             owner: evaluation_owner,
@@ -108,18 +116,24 @@ impl Api for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<(), Error> {
-        let evaluation_owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
         let current_user = current_user()?;
         let submissions =
             get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
 
         let evaluation = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
+        let num_options = evaluation
+            .get_evaluation
+            .ok_or(ErrorType::EvaluationDataMissing)?
+            .num_options;
+
         let consensus = consensus::calculate_consensus(
             submissions
                 .into_iter()
                 .map(|(_, submission)| submission)
                 .collect(),
-            evaluation.get_evaluation.unwrap().num_options,
+            num_options,
             group_number,
         );
 
@@ -137,8 +151,8 @@ impl Api for EvaluationsPlugin {
         evaluation_id: u32,
         group_number: u32,
     ) -> Result<Option<Vec<u8>>, Error> {
-        let evaluation_owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
-
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
         let current_user = current_user()?;
         let submissions =
             get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
@@ -146,7 +160,7 @@ impl Api for EvaluationsPlugin {
         let user_submission = submissions
             .into_iter()
             .find(|(account, _)| account.value == current_user.value)
-            .expect("user submission is not found");
+            .ok_or(ErrorType::UserSubmissionNotFound)?;
 
         Ok(user_submission.1)
     }
@@ -157,7 +171,8 @@ impl Api for EvaluationsPlugin {
         group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
-        let evaluation_owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
         let current_user = current_user()?;
 
         let symmetric_key =
@@ -165,8 +180,11 @@ impl Api for EvaluationsPlugin {
 
         let parsed_proposal = proposal
             .iter()
-            .map(|p| p.parse::<u8>().unwrap())
-            .collect::<Vec<u8>>();
+            .map(|p| {
+                p.parse::<u8>()
+                    .map_err(|_| ErrorType::InvalidProposal.into())
+            })
+            .collect::<Result<Vec<u8>, Error>>()?;
 
         let encrypted_proposal = bindings::aes::plugin::with_password::encrypt(
             &symmetric_key.key,

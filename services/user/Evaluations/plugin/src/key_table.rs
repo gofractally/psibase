@@ -1,5 +1,6 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::common::types::Error;
+use crate::errors::ErrorType;
 use ecies::{utils::generate_keypair, PublicKey};
 use psibase::fracpack::{Pack, Unpack};
 use rand::Rng;
@@ -13,14 +14,16 @@ pub struct AsymKey {
 
 const KEY: &str = "asym_keys";
 
-pub fn get() -> Vec<AsymKey> {
+pub fn get() -> Result<Vec<AsymKey>, Error> {
     let keys = Keyvalue::get(KEY);
-    keys.map(|c| <Vec<AsymKey>>::unpacked(&c).unwrap())
-        .unwrap_or_default()
+    keys.map(|c| {
+        <Vec<AsymKey>>::unpacked(&c).map_err(|_| ErrorType::KeyDeserializationFailed.into())
+    })
+    .unwrap_or(Ok(Vec::new()))
 }
 
 pub fn get_latest() -> Option<AsymKey> {
-    get().into_iter().last()
+    get().ok()?.into_iter().last()
 }
 
 pub fn save(keys: Vec<AsymKey>) -> Result<(), Error> {
@@ -28,7 +31,7 @@ pub fn save(keys: Vec<AsymKey>) -> Result<(), Error> {
 }
 
 pub fn add(new_key: AsymKey) -> Result<(), Error> {
-    let mut current_keys = get();
+    let mut current_keys = get()?;
     current_keys.push(new_key);
     current_keys.sort_by_key(|k| k.created_at);
     save(current_keys)
@@ -52,10 +55,15 @@ impl AsymKey {
         add(self)
     }
 
-    pub fn public_key(&self) -> PublicKey {
-        let key_bytes: [u8; 32] = self.private_key.clone().try_into().unwrap();
-        let secret_key = ecies::SecretKey::parse(&key_bytes).unwrap();
-        PublicKey::from_secret_key(&secret_key)
+    pub fn public_key(&self) -> Result<PublicKey, Error> {
+        let key_bytes: [u8; 32] = self
+            .private_key
+            .clone()
+            .try_into()
+            .map_err(|_| ErrorType::InvalidKeyLength)?;
+        let secret_key =
+            ecies::SecretKey::parse(&key_bytes).map_err(|_| ErrorType::InvalidPrivateKey)?;
+        Ok(PublicKey::from_secret_key(&secret_key))
     }
 }
 
@@ -76,15 +84,15 @@ impl SymmetricKey {
         crate::bindings::base64::plugin::standard::encode(&self.salt)
     }
 
-    pub fn from_storage(evaluation_id: u32) -> Option<Self> {
+    pub fn from_storage(evaluation_id: u32) -> Result<Option<Self>, Error> {
         let key = Self::storage_key(evaluation_id);
         let key_value = Keyvalue::get(&key);
-        if key_value.is_some() {
-            let unpacked_key = SymmetricKey::unpacked(&key_value.unwrap()).unwrap();
-            Some(unpacked_key)
-        } else {
-            None
-        }
+        Ok(match key_value {
+            Some(value) => Some(
+                SymmetricKey::unpacked(&value).map_err(|_| ErrorType::KeyDeserializationFailed)?,
+            ),
+            None => None,
+        })
     }
 
     pub fn hash(&self) -> String {
@@ -100,7 +108,6 @@ impl SymmetricKey {
 
     pub fn generate(salt: Vec<u8>) -> Self {
         let new_shared_symmetric_key: [u8; 32] = rand::thread_rng().gen();
-
         Self {
             key: new_shared_symmetric_key.to_vec(),
             salt,

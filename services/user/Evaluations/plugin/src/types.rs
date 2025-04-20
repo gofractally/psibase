@@ -67,9 +67,8 @@ impl TryFrom<String> for Data {
     type Error = CommonTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
-        let response_root: ResponseRoot<Data> = serde_json::from_str(&response).map_err(|e| {
-            QueryResponseParseError("GetEvaluationResponse: ".to_string() + &e.to_string())
-        })?;
+        let response_root: ResponseRoot<Data> = serde_json::from_str(&response)
+            .map_err(|e| GraphQLParseError(format!("GetEvaluationResponse: {}", e)))?;
 
         Ok(response_root.data)
     }
@@ -93,9 +92,7 @@ impl TryFrom<String> for GetUserSettingsResponse {
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<GetUserSettingsResponse> = serde_json::from_str(&response)
-            .map_err(|e| {
-                QueryResponseParseError("GetUserSettingsResponse: ".to_string() + &e.to_string())
-            })?;
+            .map_err(|e| GraphQLParseError(format!("GetUserSettingsResponse: {}", e)))?;
 
         Ok(response_root.data)
     }
@@ -133,9 +130,7 @@ impl TryFrom<String> for KeyHistoryResponse {
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
         let response_root: ResponseRoot<KeyHistoryResponse> = serde_json::from_str(&response)
-            .map_err(|e| {
-                QueryResponseParseError("KeyHistoryResponse: ".to_string() + &e.to_string())
-            })?;
+            .map_err(|e| GraphQLParseError(format!("KeyHistoryResponse: {}", e)))?;
 
         Ok(response_root.data)
     }
