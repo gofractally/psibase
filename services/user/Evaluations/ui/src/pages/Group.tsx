@@ -16,7 +16,8 @@ import { useCurrentUser } from "@hooks/use-current-user";
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
 import { useAttest } from "@hooks/app/use-attest";
 import { toast } from "sonner";
-import { useUsers } from "@hooks/app/use-users";
+import { useUsersAndGroups } from "@hooks/app/use-users";
+import { zAccount } from "@lib/zod/Account";
 
 const wait = (ms: number = 2500) =>
     new Promise((resolve) => setTimeout(resolve, ms));
@@ -35,16 +36,19 @@ export const GroupPage = () => {
 
     const { data: evaluation } = useEvaluation(owner, Number(id));
 
-    const { refetch: refetchUsers, data: users } = useUsers(owner, Number(id));
+    const { refetch: refetchUsers, data: users } = useUsersAndGroups(
+        owner,
+        Number(id),
+    );
 
     const isUserAttested = users
-        ? !!users.find((user) => user.user === currentUser)?.attestation
+        ? !!users.users.find((user) => user.user === currentUser)?.attestation
         : undefined;
 
     console.log({ isUserAttested }, users);
 
     if (isUserAttested) {
-        navigate(`/${id}`);
+        navigate(`/${owner}/${id}`);
     }
 
     const { mutateAsync: propose } = usePropose();
@@ -67,6 +71,7 @@ export const GroupPage = () => {
         ) {
             toast("Attesting...");
             attest({
+                owner: zAccount.parse(owner),
                 evaluationId: Number(id),
                 groupNumber: Number(groupNumber),
             }).then(() => {
@@ -74,7 +79,7 @@ export const GroupPage = () => {
                 wait(2500).then(() => {
                     refetchUsers().then(() => {
                         toast.dismiss(pending);
-                        navigate(`/${id}`);
+                        navigate(`/${owner}/${id}`);
                     });
                 });
             });
@@ -116,6 +121,7 @@ export const GroupPage = () => {
         async (rankedNumbers: number[]) => {
             cancel();
             await propose({
+                owner: zAccount.parse(owner),
                 evaluationId: Number(id),
                 groupNumber: Number(groupNumber),
                 proposal: rankedNumbers,
@@ -131,9 +137,9 @@ export const GroupPage = () => {
         if (!currentUser) throw new Error("No current user");
         cancel();
         setCachedProposal(
+            zAccount.parse(owner),
             Number(id),
             Number(groupNumber),
-            currentUser,
             numbers,
         );
         debouncedRankedNumbers(numbers);

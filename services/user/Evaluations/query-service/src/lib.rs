@@ -4,7 +4,8 @@ mod service {
     use async_graphql::connection::Connection;
     use async_graphql::*;
     use evaluations::db::tables::{
-        ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserSettings, UserTable,
+        ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserSettings,
+        UserSettingsTable, UserTable,
     };
     use psibase::*;
     use serde::Deserialize;
@@ -39,6 +40,21 @@ mod service {
                     evaluation_id, group_number
                 ))
                 .query()
+        }
+
+        async fn get_group(
+            &self,
+            owner: String,
+            evaluation_id: u32,
+            group_number: u32,
+        ) -> Option<Group> {
+            GroupTable::with_service(evaluations::SERVICE)
+                .get_index_pk()
+                .get(&(
+                    AccountNumber::from(owner.as_str()),
+                    evaluation_id,
+                    group_number,
+                ))
         }
 
         async fn get_evaluation(&self, owner: String, evaluation_id: u32) -> Option<Evaluation> {
@@ -93,6 +109,7 @@ mod service {
             &self,
             owner: String,
             evaluation_id: u32,
+            group_number: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
@@ -100,7 +117,11 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, User>> {
             TableQuery::subindex::<AccountNumber>(
                 UserTable::with_service(evaluations::SERVICE).get_index_by_group(),
-                &(AccountNumber::from(owner.as_str()), evaluation_id),
+                &(
+                    AccountNumber::from(owner.as_str()),
+                    evaluation_id,
+                    Some(group_number),
+                ),
             )
             .first(first)
             .last(last)
@@ -135,15 +156,17 @@ mod service {
         //     evaluations::Wrapper::call().getUser(id, user)
         // }
 
-        // async fn get_user_settings(
-        //     &self,
-        //     account_numbers: Vec<AccountNumber>,
-        // ) -> Vec<Option<UserSettings>> {
-        //     account_numbers
-        //         .iter()
-        //         .map(|account_number| evaluations::Wrapper::call().getUserSettings(*account_number))
-        //         .collect()
-        // }
+        async fn get_user_settings(&self, accounts: Vec<String>) -> Vec<Option<UserSettings>> {
+            accounts
+                .iter()
+                .map(|account| AccountNumber::from(account.as_str()))
+                .map(|account_number| {
+                    UserSettingsTable::with_service(evaluations::SERVICE)
+                        .get_index_pk()
+                        .get(&account_number)
+                })
+                .collect()
+        }
     }
 
     #[action]

@@ -4,56 +4,72 @@ use crate::errors::ErrorType::*;
 use host::common::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
 use serde::Deserialize;
-
-#[derive(Deserialize)]
-pub struct ResponseRoot<T> {
-    pub data: T,
-}
+use std::ops::{Deref, DerefMut};
 
 pub trait TryParseGqlResponse: Sized {
     fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
 }
 
-#[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct EvaluationRecordSubset {
-    pub evaluationId: u32,
-    pub keySubmitter: Option<String>,
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct ResponseRoot<T> {
+    pub data: T,
 }
 
-#[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GroupUserSubset {
+pub struct Data {
+    pub get_evaluation: Option<GetEvaluation>,
+    pub get_group: Option<GetGroup>,
+    pub get_group_users: Option<GetGroupUsers>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetEvaluation {
+    pub num_options: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetGroup {
+    pub evaluation_id: u32,
+    pub key_submitter: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetGroupUsers {
+    pub nodes: Vec<Node>,
+}
+
+impl Deref for GetGroupUsers {
+    type Target = Vec<Node>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.nodes
+    }
+}
+
+impl DerefMut for GetGroupUsers {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.nodes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Node {
     pub user: String,
     pub attestation: Option<Vec<u8>>,
     pub proposal: Option<Vec<u8>>,
 }
 
-#[allow(non_snake_case)]
-#[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct EvaluationRecord {
-    pub numOptions: u8,
-}
-
-#[allow(non_snake_case)]
-#[derive(Deserialize)]
-pub struct GetEvaluationResponse {
-    pub getEvaluation: Option<EvaluationRecord>,
-    pub getGroup: Option<EvaluationRecordSubset>,
-    pub getGroupUsers: Option<Vec<GroupUserSubset>>,
-}
-
-impl TryFrom<String> for GetEvaluationResponse {
+impl TryFrom<String> for Data {
     type Error = CommonTypes::Error;
 
     fn try_from(response: String) -> Result<Self, Self::Error> {
-        let response_root: ResponseRoot<GetEvaluationResponse> = serde_json::from_str(&response)
-            .map_err(|e| {
-                QueryResponseParseError("GetEvaluationResponse: ".to_string() + &e.to_string())
-            })?;
+        let response_root: ResponseRoot<Data> = serde_json::from_str(&response).map_err(|e| {
+            QueryResponseParseError("GetEvaluationResponse: ".to_string() + &e.to_string())
+        })?;
 
         Ok(response_root.data)
     }
@@ -61,7 +77,6 @@ impl TryFrom<String> for GetEvaluationResponse {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct UserSetting {
     pub user: String,
     pub key: Vec<u8>,
@@ -69,7 +84,6 @@ pub struct UserSetting {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct GetUserSettingsResponse {
     pub getUserSettings: Vec<Option<UserSetting>>,
 }
@@ -89,7 +103,6 @@ impl TryFrom<String> for GetUserSettingsResponse {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct KeyHistory {
     pub evaluationId: String,
     pub hash: String,
@@ -99,21 +112,18 @@ pub struct KeyHistory {
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct KeyHistoryRoot {
     pub edges: Vec<Edge>,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct Edge {
     pub node: KeyHistory,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct KeyHistoryResponse {
     pub getGroupKey: KeyHistoryRoot,
 }

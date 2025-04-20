@@ -90,6 +90,7 @@ pub mod tables {
             table.put(&self).unwrap();
         }
     }
+    
     impl User {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u32, AccountNumber) {
@@ -97,8 +98,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_group(&self) -> (u32, Option<u32>, AccountNumber) {
-            (self.evaluation_id, self.group_number, self.user)
+        fn by_group(&self) -> (AccountNumber, u32, Option<u32>) {
+            (self.owner, self.evaluation_id, self.group_number)
         }
 
         pub fn new(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {

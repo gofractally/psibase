@@ -1,10 +1,9 @@
-import { queryClient } from "@/main";
-import { zUser } from "@lib/graphql/getUsers";
 import { getSupervisor } from "@psibase/common-lib";
 import { useMutation } from "@tanstack/react-query";
 import { useCurrentUser } from "../use-current-user";
 import { zAccount } from "@lib/zod/Account";
 import { z } from "zod";
+import { addUserToCache } from "./use-users";
 
 const Params = z.object({
     owner: zAccount,
@@ -27,24 +26,7 @@ export const useRegister = () => {
                 params: [params.owner, params.id, currentUser],
             }));
 
-            queryClient.setQueryData(
-                ["users", params.owner, params.id],
-                (data: unknown) => {
-                    const users = zUser.array().parse(data);
-
-                    const newUserObject: z.infer<typeof zUser> = {
-                        user: currentUser,
-                        groupNumber: null,
-                        proposal: null,
-                        attestation: null,
-                        evaluationId: params.id,
-                    };
-
-                    const newUser = zUser.parse(newUserObject);
-
-                    return zUser.array().parse([...users, newUser]);
-                },
-            );
+            addUserToCache(params.owner, params.id, currentUser);
         },
     });
 };

@@ -117,13 +117,13 @@ impl Api for EvaluationsPlugin {
         let submissions =
             get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
 
-        let evaluation = fetch_and_decode(evaluation_id, group_number)?;
+        let evaluation = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
         let consensus = consensus::calculate_consensus(
             submissions
                 .into_iter()
                 .map(|(_, submission)| submission)
                 .collect(),
-            evaluation.getEvaluation.unwrap().numOptions,
+            evaluation.get_evaluation.unwrap().num_options,
             group_number,
         );
 
@@ -158,12 +158,11 @@ impl Api for EvaluationsPlugin {
     fn propose(
         evaluation_owner: String,
         evaluation_id: u32,
+        group_number: u32,
         proposal: Vec<String>,
     ) -> Result<(), Error> {
         let evaluation_owner = psibase::AccountNumber::from_str(evaluation_owner.as_str()).unwrap();
         let current_user = current_user()?;
-
-        let group_number = 1;
 
         let symmetric_key =
             get_symmetric_key(evaluation_owner, evaluation_id, group_number, current_user)?;

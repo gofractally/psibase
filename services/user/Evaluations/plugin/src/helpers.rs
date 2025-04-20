@@ -28,7 +28,7 @@ pub fn current_user() -> Result<AccountNumber, Error> {
 pub fn create_new_symmetric_key(
     evaluation_owner: AccountNumber,
     evaluation_id: u32,
-    users: &Vec<types::GroupUserSubset>,
+    users: &types::GetGroupUsers,
     creator: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
@@ -81,8 +81,8 @@ pub fn get_decrypted_proposals(
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<Vec<(AccountNumber, Option<Vec<u8>>)>, Error> {
-    let res = fetch_and_decode(evaluation_id, group_number)?;
-    let mut proposals = res.getGroupUsers.unwrap();
+    let res = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
+    let mut proposals = res.get_group_users.unwrap();
 
     proposals.sort_by(|a, b| {
         parse_account_number(&a.user)
@@ -94,7 +94,7 @@ pub fn get_decrypted_proposals(
     let symmetric_key = get_symmetric_key(evaluation_owner, evaluation_id, group_number, sender)?;
 
     let proposals = proposals
-        .into_iter()
+        .iter()
         .map(|s| {
             let user = parse_account_number(&s.user).unwrap();
             if s.proposal.is_some() {
@@ -128,11 +128,11 @@ pub fn get_symmetric_key(
     //     return Ok(key);
     // }
 
-    let res = fetch_and_decode(evaluation_id, group_number)?;
-    let group = res.getGroup.ok_or(ErrorType::GroupNotFound)?;
-    let users = res.getGroupUsers.ok_or(ErrorType::UsersNotFound)?;
+    let res = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
+    let group = res.get_group.ok_or(ErrorType::GroupNotFound)?;
+    let users = res.get_group_users.ok_or(ErrorType::UsersNotFound)?;
 
-    if group.keySubmitter.is_some() {
+    if group.key_submitter.is_some() {
         decrypt_existing_key(
             evaluation_id,
             group_number,
@@ -140,7 +140,7 @@ pub fn get_symmetric_key(
             &users,
             parse_account_number(
                 &group
-                    .keySubmitter
+                    .key_submitter
                     .expect("keySubmitter is invalid account number"),
             )?,
         )
@@ -170,10 +170,11 @@ pub fn decrypt_existing_key(
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
-    users: &Vec<types::GroupUserSubset>,
+    users: &types::GetGroupUsers,
     submitter: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
+
     let my_index = sorted_users
         .iter()
         .position(|user| parse_account_number(&user.user).unwrap() == sender)
@@ -203,9 +204,7 @@ pub fn decrypt_existing_key(
     Ok(symmetric_key)
 }
 
-pub fn sort_users_by_account(
-    users: &Vec<types::GroupUserSubset>,
-) -> Result<Vec<types::GroupUserSubset>, Error> {
+pub fn sort_users_by_account(users: &types::GetGroupUsers) -> Result<types::GetGroupUsers, Error> {
     let mut sorted = users.clone();
     sorted.sort_by(|a, b| {
         parse_account_number(&a.user)

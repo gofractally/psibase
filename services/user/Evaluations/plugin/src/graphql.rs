@@ -3,43 +3,49 @@ use crate::bindings::host::common::types::Error;
 use crate::types::*;
 
 pub fn fetch_and_decode(
-    owner: String,
+    owner: psibase::AccountNumber,
     evaluation_id: u32,
     group_number: u32,
-) -> Result<GetEvaluationResponse, CommonServer::Error> {
+) -> Result<Data, CommonServer::Error> {
     let id = evaluation_id;
 
     let query = format!(
         r#"query {{
-            getEvaluation(owner: {owner}, evaluationId: {id}) {{
+            getEvaluation(owner: "{owner}", evaluationId: {id}) {{
                 numOptions
             }}
-            getGroup(id: {id}, groupNumber: {group_number}) {{
+            getGroup(owner: "{owner}", evaluationId: {id}, groupNumber: {group_number}) {{
                 evaluationId
                 keySubmitter
             }}
-            getGroupUsers(id: {id}, groupNumber: {group_number}) {{
-                user
-                attestation
-                proposal
+            getGroupUsers(owner: "{owner}", evaluationId: {id}, groupNumber: {group_number}) {{
+                nodes {{
+                    user
+                    attestation
+                    proposal
+                }}
             }}
         }}"#,
         owner = owner,
         id = id,
         group_number = group_number
     );
-    GetEvaluationResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
+    Data::try_from(CommonServer::post_graphql_get_json(&query)?)
 }
 
 pub fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettingsResponse, Error> {
     let query = format!(
         r#"query {{
-            getUserSettings(accountNumbers: [{account_numbers}]) {{
+            getUserSettings(accounts: [{account_numbers}]) {{
                 user
                 key
             }}
         }}"#,
-        account_numbers = account_numbers.join(",")
+        account_numbers = account_numbers
+            .iter()
+            .map(|acc| format!("\"{}\"", acc))
+            .collect::<Vec<_>>()
+            .join(",")
     );
     GetUserSettingsResponse::try_from(CommonServer::post_graphql_get_json(&query)?)
 }

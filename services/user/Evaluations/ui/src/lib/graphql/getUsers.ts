@@ -10,9 +10,25 @@ export const zUser = z.object({
     evaluationId: z.number(),
 });
 
+export const zGroup = z.object({
+    owner: z.string(),
+    number: z.number(),
+    evaluationId: z.number(),
+    keySubmitter: z.string().nullable(),
+    result: z.number().array().nullable(),
+});
+
 export type User = z.infer<typeof zUser>;
 
-export const getUsers = async (owner: Account, evaluationId: number) => {
+export const FunctionResponse = z.object({
+    users: zUser.array(),
+    groups: zGroup.array(),
+});
+
+export const getUsersAndGroups = async (
+    owner: Account,
+    evaluationId: number,
+) => {
     console.log("getUsers", owner, evaluationId);
     const res = await graphql(
         `{ 
@@ -23,11 +39,20 @@ export const getUsers = async (owner: Account, evaluationId: number) => {
                     evaluationId
                     proposal 
                     attestation 
-                }} 
+                }
+            }
+            getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { 
+                nodes { 
+                    owner 
+                    number 
+                    evaluationId 
+                    keySubmitter 
+                    result 
+                } 
+            }
         }`,
         "evaluations",
     );
-    console.log("res", res);
 
     const response = z
         .object({
@@ -35,9 +60,15 @@ export const getUsers = async (owner: Account, evaluationId: number) => {
                 getUsers: z.object({
                     nodes: zUser.array(),
                 }),
+                getGroups: z.object({
+                    nodes: zGroup.array(),
+                }),
             }),
         })
         .parse(res);
 
-    return response.data.getUsers.nodes;
+    return FunctionResponse.parse({
+        users: response.data.getUsers.nodes,
+        groups: response.data.getGroups.nodes,
+    });
 };

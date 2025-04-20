@@ -181,6 +181,7 @@ export const getStatus = (
                 (group) => group.number === user.groupNumber,
             );
             if (!group) {
+                
                 throw new Error(
                     `Expected group to be found for ${currentUser}`,
                 );

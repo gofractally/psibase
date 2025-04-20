@@ -1,11 +1,10 @@
 import { useCloseEvaluation } from "@hooks/app/use-close-evaluation";
 import { useCurrentUser } from "@hooks/use-current-user";
 import { useEvaluation } from "@hooks/app/use-evaluation";
-import { useGroups } from "@hooks/app/use-groups";
 import { useRegister } from "@hooks/app/use-register";
 import { useStartEvaluation } from "@hooks/app/use-start-evaluation";
 import { useUnregister } from "@hooks/app/use-unregister";
-import { useUsers } from "@hooks/app/use-users";
+import { useUsersAndGroups } from "@hooks/app/use-users";
 import { getStatus, Types } from "@lib/getStatus";
 import { humanize } from "@lib/humanize";
 import { Button } from "@shadcn/button";
@@ -33,26 +32,25 @@ export const EvaluationPage = () => {
     const { mutate: unregister, isPending: isUnregisterPending } =
         useUnregister();
 
-    const { data: users, error: usersError } = useUsers(
-        owner,
-        evaluation?.id,
-        refreshInterval,
-    );
-    const { data: groups, error: groupsError } = useGroups(
-        owner,
-        evaluation?.id,
-    );
+    const { data: usersAndGroups, error: usersAndGroupsError } =
+        useUsersAndGroups(owner, evaluation?.id, refreshInterval);
+    const { users, groups } = usersAndGroups || { users: [], groups: [] };
+
     const {
         mutateAsync: startEvaluation,
         isPending: isStartEvaluationPending,
         isError: isStartEvaluationError,
+        isSuccess: isStartEvaluationSuccess,
     } = useStartEvaluation();
 
     useInterval(() => {
         setTick(ticks + 1);
     }, 1000);
 
-    const [autoStart, setAutoStart] = useLocalStorage(`autoStart-${id}`, false);
+    const [autoStart, setAutoStart] = useLocalStorage(
+        `autoStart-${owner}-${id}`,
+        false,
+    );
 
     const {
         mutateAsync: closeEvaluation,
@@ -79,8 +77,7 @@ export const EvaluationPage = () => {
         users,
         currentUser,
         groups,
-        usersError,
-        groupsError,
+        usersAndGroupsError,
     });
 
     useEffect(() => {
@@ -101,14 +98,21 @@ export const EvaluationPage = () => {
             status.type === Types.AwaitingEvaluationStart &&
             status.userShouldStart &&
             !isStartEvaluationError &&
-            !isStartEvaluationPending
+            !isStartEvaluationPending &&
+            !isStartEvaluationSuccess
         ) {
             startEvaluation({
                 id: evaluation!.id,
                 entropy: Math.floor(1000000 * Math.random()),
             });
         }
-    }, [autoStart, status]);
+    }, [
+        autoStart,
+        status,
+        isStartEvaluationError,
+        isStartEvaluationPending,
+        isStartEvaluationSuccess,
+    ]);
 
     const navigate = useNavigate();
 
