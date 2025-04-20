@@ -90,7 +90,7 @@ pub mod tables {
             table.put(&self).unwrap();
         }
     }
-    
+
     impl User {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u32, AccountNumber) {
@@ -274,11 +274,9 @@ pub mod tables {
             (self.owner, self.evaluation_id, self.number)
         }
 
-        pub fn get(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32, number: u32) -> Option<Self> {
             let table = GroupTable::new();
-            let result = table.get_index_pk().get(&(owner, evaluation_id, number));
-            psibase::check(result.is_some(), "group not found");
-            result.unwrap()
+            table.get_index_pk().get(&(owner, evaluation_id, number))
         }
 
         pub fn save(&self) {

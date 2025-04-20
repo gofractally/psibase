@@ -117,7 +117,7 @@ pub mod service {
 
         let group_number = check_some(user.group_number, "user is not sorted into a group");
 
-        let mut group = Group::get(sender, evaluation_id, group_number);
+        let mut group = Group::get(sender, evaluation_id, group_number).expect("group not found");
 
         check_none(group.key_submitter, "group key has already been submitted");
 
@@ -134,11 +134,18 @@ pub mod service {
         let evaluation = Evaluation::get(get_sender(), id);
         let current_phase = evaluation.get_current_phase();
 
-        check(
-            current_phase == EvaluationStatus::Closed
-                || current_phase == EvaluationStatus::Registration,
-            "evaluation must be in registration or closed phase",
-        );
+        match current_phase {
+            EvaluationStatus::Submission => {
+                let is_successful_evaluation_start = Group::get(get_sender(), id, 1).is_some();
+                if is_successful_evaluation_start {
+                    abort_message("evaluation is still in submission phase");
+                }
+            }
+            EvaluationStatus::Deliberation | EvaluationStatus::Registration => {
+                abort_message("evaluation must be in registration or closed phase");
+            }
+            EvaluationStatus::Pending | EvaluationStatus::Closed => {}
+        }
 
         evaluation.delete();
     }
@@ -150,7 +157,8 @@ pub mod service {
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
         let mut user = User::get(owner, evaluation_id, sender);
-        let group = Group::get(owner, evaluation_id, user.group_number.unwrap());
+        let group =
+            Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
 
         check(
             group.key_submitter.is_some(),
@@ -179,7 +187,8 @@ pub mod service {
         user.attestation = Some(attestation);
         user.save();
 
-        let mut group = Group::get(owner, evaluation_id, user.group_number.unwrap());
+        let mut group =
+            Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
 
         check(group.key_submitter.is_some(), "cannot attest without key");
         check(group.result.is_none(), "group result already set");
@@ -197,15 +206,6 @@ pub mod service {
                             service: evaluation.owner,
                             sender: get_sender(),
                         };
-
-                        // caller.call(
-                        //     MethodNumber::from(hooks::action_structs::evalGroupFin::ACTION_NAME),
-                        //     hooks::action_structs::evalGroupFin {
-                        //         evaluation_id: evaluation.id,
-                        //         group_number: user.group_number.unwrap(),
-                        //         result: result.clone(),
-                        //     },
-                        // )
 
                         caller.call(
                             MethodNumber::from(
