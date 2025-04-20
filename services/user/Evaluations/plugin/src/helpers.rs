@@ -4,11 +4,10 @@ use crate::errors::ErrorType;
 use crate::key_table;
 use crate::types;
 use ecies::{decrypt, encrypt};
-use psibase::AccountNumber;
+use psibase::{fracpack::Pack, AccountNumber};
 
 use crate::bindings::host::common::types::Error;
 use crate::graphql::{fetch_and_decode, fetch_key_history, fetch_user_settings};
-use psibase::fracpack::Pack;
 
 pub fn parse_account_number(s: &str) -> Result<AccountNumber, Error> {
     AccountNumber::from_exact(s).map_err(|_| ErrorType::InvalidAccountNumber.into())
@@ -122,9 +121,11 @@ pub fn get_symmetric_key(
     group_number: u32,
     sender: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
-    // if let Some(key) = key_table::SymmetricKey::from_storage(evaluation_id)? {
-    //     return Ok(key);
-    // }
+    if let Some(key) =
+        key_table::SymmetricKey::from_storage(evaluation_owner, evaluation_id, group_number)?
+    {
+        return Ok(key);
+    }
 
     let res = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
     let group = res.get_group.ok_or(ErrorType::GroupNotFound)?;
@@ -132,6 +133,7 @@ pub fn get_symmetric_key(
 
     if group.key_submitter.is_some() {
         decrypt_existing_key(
+            evaluation_owner,
             evaluation_id,
             group_number,
             sender,
@@ -161,6 +163,7 @@ pub fn get_user_public_key(user: AccountNumber) -> Result<Vec<u8>, Error> {
 }
 
 pub fn decrypt_existing_key(
+    evaluation_owner: AccountNumber,
     evaluation_id: u32,
     group_number: u32,
     sender: AccountNumber,
@@ -198,7 +201,7 @@ pub fn decrypt_existing_key(
         return Err(ErrorType::KeyMismatch.into());
     }
 
-    symmetric_key.save(evaluation_id)?;
+    symmetric_key.save(evaluation_owner, evaluation_id, group_number)?;
     Ok(symmetric_key)
 }
 

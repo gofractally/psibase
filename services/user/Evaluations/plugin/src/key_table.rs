@@ -2,7 +2,10 @@ use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
 use crate::bindings::host::common::types::Error;
 use crate::errors::ErrorType;
 use ecies::{utils::generate_keypair, PublicKey};
-use psibase::fracpack::{Pack, Unpack};
+use psibase::{
+    fracpack::{Pack, Unpack},
+    AccountNumber,
+};
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -76,16 +79,20 @@ pub struct SymmetricKey {
 use sha2::{Digest, Sha256};
 
 impl SymmetricKey {
-    fn storage_key(evaluation_id: u32) -> String {
-        format!("symmetric_key_{}", evaluation_id)
+    fn storage_key(owner: AccountNumber, evaluation_id: u32, group_number: u32) -> String {
+        format!("symmetric_key_{}_{}_{}", owner, evaluation_id, group_number)
     }
 
     pub fn salt_base_64(&self) -> String {
         crate::bindings::base64::plugin::standard::encode(&self.salt)
     }
 
-    pub fn from_storage(evaluation_id: u32) -> Result<Option<Self>, Error> {
-        let key = Self::storage_key(evaluation_id);
+    pub fn from_storage(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<Option<Self>, Error> {
+        let key = Self::storage_key(owner, evaluation_id, group_number);
         let key_value = Keyvalue::get(&key);
         Ok(match key_value {
             Some(value) => Some(
@@ -114,8 +121,13 @@ impl SymmetricKey {
         }
     }
 
-    pub fn save(&self, evaluation_id: u32) -> Result<(), Error> {
-        let key = Self::storage_key(evaluation_id);
+    pub fn save(
+        &self,
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<(), Error> {
+        let key = Self::storage_key(owner, evaluation_id, group_number);
         let packed_key = self.packed();
         Keyvalue::set(&key, &packed_key)
     }
