@@ -15,8 +15,8 @@ use psibase::{
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    PackagePreference, PackageRegistry, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
+    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -26,7 +26,7 @@ use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -297,6 +297,43 @@ struct InstallArgs {
 }
 
 #[derive(Args, Debug)]
+struct UpgradeArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Packages to update
+    packages: Vec<OsString>,
+
+    /// Set all accounts to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// A URL or path to a package repository (repeatable)
+    #[clap(long, value_name = "URL")]
+    package_source: Vec<String>,
+
+    /// Sender to use for installing. The packages and all accounts
+    /// that they create will be owned by this account.
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
+
+    /// Install the latest version
+    #[clap(long)]
+    latest: bool,
+
+    /// Configure compression level to use for uploaded files
+    /// (1=fastest, 11=most compression)
+    #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
+    compression_level: u32,
+}
+
+#[derive(Args, Debug)]
 struct ListArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -395,6 +432,9 @@ enum Command {
 
     /// Install apps to the chain
     Install(InstallArgs),
+
+    /// Upgrade apps
+    Upgrade(UpgradeArgs),
 
     /// Prints a list of apps
     List(ListArgs),
@@ -1127,18 +1167,18 @@ async fn apply_packages<
     Ok(())
 }
 
-async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
-    let mut package_registry = JointRegistry::new();
-    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
-    package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
-    let to_install = installed
-        .resolve_changes(&package_registry, &packages, args.reinstall)
-        .await?;
-
-    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+async fn do_install<T: Read + Seek>(
+    mut client: reqwest::Client,
+    package_registry: JointRegistry<T>,
+    to_install: Vec<PackageOp>,
+    sender: AccountNumber,
+    node_args: &NodeArgs,
+    sig_args: &SigArgs,
+    tx_args: &TxArgs,
+    key: &Option<AnyPublicKey>,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
 
     let mut id_bytes = <[u8; 8]>::default();
     getrandom::getrandom(&mut id_bytes)?;
@@ -1154,11 +1194,11 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         let auto_exec = auto_exec_cell.get();
         actions.insert(
             0,
-            packages::Wrapper::pack_from(args.sender.into()).checkOrder(id.clone(), index),
+            packages::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
         );
         Ok(sign_transaction(
-            with_tapos(&tapos, actions, &args.sig_args.proposer, auto_exec),
-            &args.sig_args.sign,
+            with_tapos(&tapos, actions, &sig_args.proposer, auto_exec),
+            &sig_args.sign,
         )?)
     };
 
@@ -1166,43 +1206,40 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
     let new_accounts = get_accounts_to_create(
-        &args.node_args.api,
+        &node_args.api,
         &mut client,
         &get_package_accounts(&to_install),
-        args.sender.into(),
+        sender,
     )
     .await?;
-    create_accounts(new_accounts, &mut trx_builder, args.sender.into())?;
+    create_accounts(new_accounts, &mut trx_builder, sender)?;
 
-    let uploader = StagedUpload::new(
-        id.clone(),
-        args.sig_args.proposer.unwrap_or(args.sender).into(),
-    );
+    let uploader = StagedUpload::new(id.clone(), sig_args.proposer.map_or(sender, |s| s.into()));
 
     let mut upload_builder = TransactionBuilder::new(
         action_limit,
         |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
             Ok(sign_transaction(
                 with_tapos(&tapos, actions, &None, false),
-                &args.sig_args.sign,
+                &sig_args.sign,
             )?)
         },
     );
     apply_packages(
-        &args.node_args.api,
+        &node_args.api,
         &mut client,
         &package_registry,
         to_install,
         uploader,
         &mut trx_builder,
         &mut upload_builder,
-        args.sender.into(),
-        &args.key,
-        args.compression_level,
+        sender,
+        key,
+        compression_level,
     )
     .await?;
 
-    trx_builder.push(packages::Wrapper::pack_from(args.sender.into()).removeOrder(id.clone()))?;
+    trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
 
     let upload_transactions = upload_builder.finish()?;
     {
@@ -1224,11 +1261,11 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             for trx in transactions {
                 let len = trx.transaction.len() as u64;
                 let result = push_transaction(
-                    &args.node_args.api,
+                    &node_args.api,
                     client.clone(),
                     trx.packed(),
-                    args.tx_args.trace,
-                    args.tx_args.console,
+                    tx_args.trace,
+                    tx_args.console,
                     Some(&progress),
                 )
                 .await;
@@ -1255,18 +1292,78 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
     push_transactions(
-        &args.node_args.api,
+        &node_args.api,
         client.clone(),
         transactions,
-        args.tx_args.trace,
-        args.tx_args.console,
+        tx_args.trace,
+        tx_args.console,
         &progress,
     )
     .await?;
 
-    finish_progress(&args.sig_args, progress, num_transactions);
+    finish_progress(sig_args, progress, num_transactions);
 
     Ok(())
+}
+
+async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let mut package_registry = JointRegistry::new();
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
+    package_registry.push(files)?;
+    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    let to_install = installed
+        .resolve_changes(&package_registry, &packages, args.reinstall)
+        .await?;
+
+    do_install(
+        client,
+        package_registry,
+        to_install,
+        args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
+        &args.key,
+        args.compression_level,
+    )
+    .await
+}
+
+async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let mut package_registry = JointRegistry::new();
+
+    let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
+    package_registry.push(files)?;
+    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+
+    let to_install = installed
+        .resolve_upgrade(
+            &package_registry,
+            &packages,
+            if args.latest {
+                PackagePreference::Latest
+            } else {
+                PackagePreference::Compatible
+            },
+        )
+        .await?;
+
+    do_install(
+        client,
+        package_registry,
+        to_install,
+        args.sender.into(),
+        &args.node_args,
+        &args.sig_args,
+        &args.tx_args,
+        &args.key,
+        args.compression_level,
+    )
+    .await
 }
 
 async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
@@ -1714,6 +1811,7 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         Command::Install(args) => install(&args).await?,
+        Command::Upgrade(args) => upgrade(&args).await?,
         Command::List(args) => list(&args).await?,
         Command::Search(args) => search(&args).await?,
         Command::Info(args) => package_info(&args).await?,
