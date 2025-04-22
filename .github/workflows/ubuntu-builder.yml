@@ -4,9 +4,7 @@ on:
   workflow_call:
     secrets:
       publish-package-login:
-        description: 'Login credentials for publishing packages'
         required: false
-        type: string
 
 jobs:
   build:
