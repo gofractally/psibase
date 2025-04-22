@@ -10,6 +10,8 @@ jobs:
   build:
     name: Ubuntu ${{ matrix.ubuntu-version }} - Build
     runs-on: ubuntu-latest
+    env:
+      can-publish: ${{ !! secrets.publish-login }}
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +39,7 @@ jobs:
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
       - name: Publish packages
-        if: ${{ secrets.publish-login && matrix.ubuntu-version == '2404' }}
+        if: ${{ env.can-publish && matrix.ubuntu-version == '2404' }}
         env:
           PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
         working-directory: ${GITHUB_WORKSPACE}/build
