@@ -1178,21 +1178,9 @@ impl PackageList {
         let mut end_cursor: Option<String> = None;
         let mut result = PackageList::new();
         loop {
-            // Construct the `after` clause based on `end_cursor`
-            let after_clause = match &end_cursor {
-                Some(cursor) => format!(", after: \"{}\"", cursor),
-                None => String::new(),
-            };
-            let query = format!(
-                "query {{ installed(first: 100{}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts owner }} }} }} }}",
-                after_clause
-            );
-
-            let data =
-                crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE, query)
-                    .await
-                    .with_context(|| "Failed to list installed packages")?;
-
+            let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
             }

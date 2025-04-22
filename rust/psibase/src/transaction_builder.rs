@@ -57,20 +57,8 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
     // - If the carry bit is set, then previous labels had some actions
     //   that are in this (or a later) group.
     pub fn finish(mut self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
-        if self.transactions.is_empty() && !self.actions.is_empty() {
-            eprintln!(
-                "Creating default transaction group for actions: {:?}",
-                self.actions
-            );
-            self.transactions
-                .push(("default".to_string(), vec![], false));
-            self.index = 0;
-        }
-
-        if !self.transactions.is_empty() && self.index + 1 < self.transactions.len() {
-            for new_group in &mut self.transactions[(self.index + 1)..] {
-                new_group.2 = false;
-            }
+        for new_group in &mut self.transactions[(self.index + 1)..] {
+            new_group.2 = false;
         }
         if !self.actions.is_empty() {
             self.transactions[self.index]

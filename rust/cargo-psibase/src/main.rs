@@ -69,10 +69,6 @@ struct Args {
     #[clap(long, global = true, value_name = "PATH", default_value_os_t = find_psibase(), env = "CARGO_PSIBASE_PSIBASE")]
     psibase: PathBuf,
 
-    /// Use release profile for builds (default: true)
-    #[clap(long, global = true, action = clap::ArgAction::Set, default_value_t = true)]
-    release: bool,
-
     #[clap(subcommand)]
     command: Command,
 }
@@ -374,11 +370,7 @@ async fn build(
         .envs(envs)
         .arg("rustc")
         .args(extra_args)
-        .args(if args.release {
-            vec!["--release"]
-        } else {
-            vec![]
-        })
+        .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
@@ -417,11 +409,7 @@ async fn build_schema(
         .envs(vec![("CARGO_PSIBASE_TEST", "")])
         .arg("test")
         .args(extra_args)
-        .args(if args.release {
-            vec!["--release"]
-        } else {
-            vec![]
-        })
+        .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
@@ -495,11 +483,7 @@ async fn build_plugin(
         .arg("component")
         .arg("build")
         .args(extra_args)
-        .args(if args.release {
-            vec!["--release"]
-        } else {
-            vec![]
-        })
+        .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
         .args(get_target_dir(args))
@@ -527,11 +511,7 @@ async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .arg("rustc")
         .args(&["-p", package])
-        .args(if args.release {
-            vec!["--release"]
-        } else {
-            vec![]
-        })
+        .arg("--release")
         .arg("--lib")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
