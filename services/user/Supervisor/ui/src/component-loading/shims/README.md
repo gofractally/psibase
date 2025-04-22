@@ -1,8 +1,6 @@
 # Description
 
-These are browser shims for core libraries that components may depend on. The wasip2 shims are copied the minified browser shims provided by the BytecodeAlliance.
-
--   [Source](https://github.com/bytecodealliance/jco/tree/main/packages/preview2-shim/lib/browser)
+The wasip2 shims are provided by the JCO library.
 
 There is no provided wasi-keyvalue browser shim, because the interface is not yet accepted as a wasi standard. `wasi-keyvalue.js` is therefore a custom shim used to remain maximally compliant and simplify the efforts to migrate once it's standardized.
 
