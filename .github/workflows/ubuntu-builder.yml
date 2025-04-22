@@ -2,6 +2,11 @@ name: Ubuntu builds
 
 on:
   workflow_call:
+    secrets:
+      publish-package-login:
+        description: 'Login credentials for publishing packages'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -33,6 +38,12 @@ jobs:
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
+      - name: Publish packages
+        if: ${{ secrets.publish-login && matrix.ubuntu-version == '2404' }}
+        env:
+          PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
+        working-directory: ${GITHUB_WORKSPACE}/build
+        run bash ${GITHUB_WORKSPACE}/.github/scripts/publish.sh
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v4
         with:
