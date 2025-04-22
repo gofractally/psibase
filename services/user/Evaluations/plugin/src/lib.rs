@@ -204,3 +204,15 @@ impl Api for EvaluationsPlugin {
 }
 
 bindings::export!(EvaluationsPlugin with_types_in bindings);
+
+#[cfg(test)]
+mod tests {
+
+    use psibase::*;
+
+    #[test]
+    fn test_hello() {
+        let result = "story";
+        assert_eq!(result, "ssss");
+    }
+}
