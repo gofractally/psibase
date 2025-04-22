@@ -36,6 +36,13 @@ const psibase = (_service: string, isServing?: boolean) => {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/common-lib.js",
+                                // These are required by the wasm-transpiled package
+                                "@bytecodealliance/preview2-shim/cli",
+                                "@bytecodealliance/preview2-shim/clocks",
+                                "@bytecodealliance/preview2-shim/filesystem",
+                                "@bytecodealliance/preview2-shim/io",
+                                "@bytecodealliance/preview2-shim/random",
+                                // wasm-transpiled
                             ],
                             makeAbsoluteExternalsRelative: false,
                             output: {
