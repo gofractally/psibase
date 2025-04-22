@@ -21,6 +21,7 @@ export default defineConfig({
         target: "esnext",
         minify: false,
         rollupOptions: {
+            external: ["hash.js", "elliptic"],
             input: {
                 main: resolve(__dirname, "index.html"),
                 oauth: resolve(__dirname, "oauth.html"),
