@@ -43,7 +43,7 @@ jobs:
         env:
           PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
         working-directory: ${GITHUB_WORKSPACE}/build
-        run bash ${GITHUB_WORKSPACE}/.github/scripts/publish.sh
+        run: bash ${GITHUB_WORKSPACE}/.github/scripts/publish.sh
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v4
         with:
