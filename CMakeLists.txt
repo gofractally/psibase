@@ -225,6 +225,7 @@ set(JS_DIRS
     services/system/AuthSig/ui:AuthSig_js
     services/system/Producers/ui:Producers_js
     services/user/Branding/ui:Branding_js
+    services/user/Evaluations/ui:Evaluations_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     services/user/Explorer/ui:Explorer_js
     services/user/Homepage/ui:Homepage_js
