@@ -30,7 +30,6 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@psibase/common-lib", "workspace:."],\
           ["@types/elliptic", "npm:6.4.18"],\
-          ["@types/node", "npm:18.19.76"],\
           ["elliptic", "npm:6.6.1"],\
           ["hash.js", "npm:1.1.7"],\
           ["prettier", "npm:3.5.1"],\
@@ -417,7 +416,6 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@psibase/common-lib", "workspace:."],\
           ["@types/elliptic", "npm:6.4.18"],\
-          ["@types/node", "npm:18.19.76"],\
           ["elliptic", "npm:6.6.1"],\
           ["hash.js", "npm:1.1.7"],\
           ["prettier", "npm:3.5.1"],\
@@ -567,14 +565,6 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@types/node", [\
-      ["npm:18.19.76", {\
-        "packageLocation": "../../../../../../../.yarn/berry/cache/@types-node-npm-18.19.76-2ccce654bf-10c0.zip/node_modules/@types/node/",\
-        "packageDependencies": [\
-          ["@types/node", "npm:18.19.76"],\
-          ["undici-types", "npm:5.26.5"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["npm:22.13.4", {\
         "packageLocation": "../../../../../../../.yarn/berry/cache/@types-node-npm-22.13.4-80985669cb-10c0.zip/node_modules/@types/node/",\
         "packageDependencies": [\
@@ -2256,13 +2246,6 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["undici-types", [\
-      ["npm:5.26.5", {\
-        "packageLocation": "../../../../../../../.yarn/berry/cache/undici-types-npm-5.26.5-de4f7c7bb9-10c0.zip/node_modules/undici-types/",\
-        "packageDependencies": [\
-          ["undici-types", "npm:5.26.5"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["npm:6.20.0", {\
         "packageLocation": "../../../../../../../.yarn/berry/cache/undici-types-npm-6.20.0-bd21e669af-10c0.zip/node_modules/undici-types/",\
         "packageDependencies": [\
@@ -2323,7 +2306,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@types/less", null],\
           ["@types/lightningcss", null],\
-          ["@types/node", "npm:18.19.76"],\
+          ["@types/node", null],\
           ["@types/sass", null],\
           ["@types/stylus", null],\
           ["@types/sugarss", null],\
