@@ -18,7 +18,7 @@
     {
       "label": "Continue",
       "type": "shell",
-      "command": ".vscode/scripts/continue.sh <YOUR_HOST_IP> myprod 8080",
+      "command": ".vscode/scripts/continue.sh $HOST_IP myprod 8080",
       "options": {
         "statusbar": {
           "label": "$(play) Continue"
@@ -28,7 +28,7 @@
     {
       "label": "Launch",
       "type": "shell",
-      "command": ".vscode/scripts/launch.sh <YOUR_HOST_IP> myprod 8080",
+      "command": ".vscode/scripts/launch.sh $HOST_IP myprod 8080",
       "options": {
         "statusbar": {
           "label": "$(play) Launch"
@@ -38,7 +38,7 @@
     {
       "label": "Launch Secure",
       "type": "shell",
-      "command": ".vscode/scripts/launch_secure.sh <YOUR_HOST_IP> myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
+      "command": ".vscode/scripts/launch_secure.sh $HOST_IP myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
       "options": {
         "statusbar": {
           "label": "$(play)$(lock) Launch Secure"
