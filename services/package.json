@@ -1,0 +1,23 @@
+{
+  "workspaces": {
+    "packages": [
+      "user/CommonApi/common/packages/common-lib",
+      "user/Supervisor/ui",
+      "user/Branding/ui",
+      "system/Accounts/ui",
+      "user/XAdmin/ui"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1"
+  },
+  "noHoist": [
+    "**/tailwindcss",
+    "**/postcss",
+    "**/autoprefixer",
+    "**/elliptic",
+    "**/@types/elliptic",
+    "**/hash.js"
+  ],
+  "packageManager": "yarn@4.9.1"
+}

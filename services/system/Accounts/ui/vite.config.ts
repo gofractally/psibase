@@ -8,7 +8,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
   const buildAliases = [
     {
       find: "@",
-      replacement: path.resolve(__dirname, "./src"),
+      replacement: path.resolve("./src"),
     },
   ];
 
@@ -80,7 +80,7 @@ const psibase = (appletContract: string, isServing?: boolean) => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
   plugins: [
     react(),
     // svgr({ exportAsDefault: true }),
@@ -88,7 +88,7 @@ export default defineConfig(({ command }) => ({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve("./src"),
     },
   },
   build: {
