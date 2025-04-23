@@ -137,6 +137,15 @@ namespace psibase
       }
    }
 
+   static void reportError(TransactionContext& self, const ActionTrace& atrace)
+   {
+      if (!self.blockContext.isReadOnly)
+      {
+         self.ownedSockets.close(*self.blockContext.writer,
+                                 *self.blockContext.systemContext.sockets, atrace.error);
+      }
+   }
+
    // TODO: eliminate extra copies
    static void execProcessTransaction(TransactionContext& self, bool checkFirstAuthAndExit)
    {
@@ -159,8 +168,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         self.ownedSockets.close(*self.blockContext.writer,
-                                 *self.blockContext.systemContext.sockets, atrace.error);
+         reportError(self, atrace);
          throw;
       }
    }
@@ -209,8 +217,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -236,8 +243,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -280,8 +286,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
@@ -307,8 +312,7 @@ namespace psibase
       catch (std::exception& e)
       {
          atrace.error = e.what();
-         ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets,
-                            atrace.error);
+         reportError(*this, atrace);
          throw;
       }
    }
