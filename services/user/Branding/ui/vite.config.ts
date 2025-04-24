@@ -4,7 +4,6 @@ import path from "path";
 import * as fs from "fs";
 import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const psibase = (service: string, isServing?: boolean) => {
@@ -138,7 +137,6 @@ export default defineConfig(({ command }) => ({
         react(),
         psibase("branding", command === "serve"),
         wasm(),
-        topLevelAwait(),
         tsconfigPaths(),
     ],
 }));
