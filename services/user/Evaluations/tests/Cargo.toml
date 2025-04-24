@@ -1,0 +1,9 @@
+[package]
+name = "tests"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+average = "0.16.0"
