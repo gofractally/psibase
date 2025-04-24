@@ -360,6 +360,325 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@dicebear/adventurer-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/adventurer-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/72f02e169fddcac4568e1b4046e5185550600e9435a363a545e9fc576e46f1cd63d089d357cdfd90da283d0b9a476cfc199d0ce94bb9beca9a38a4c9723bad17
+  languageName: node
+  linkType: hard
+
+"@dicebear/adventurer@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/adventurer@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/63e6ba331a28de84efcba2dadb514624cf8a27495d1df9f32c87340de6b964f1e5ea521cf4a1fc07c7f320d68af9c481c8d8d96fbaee1bb4b0b1f94da7f95fbb
+  languageName: node
+  linkType: hard
+
+"@dicebear/avataaars-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/avataaars-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/599436e6271617eb8bc3af5e2285c19b948ac5a03e5772b51974516e73db7d65176d3886514398bea1139b3fd30949a37ba41e6da8922bd4b6509e0390135db4
+  languageName: node
+  linkType: hard
+
+"@dicebear/avataaars@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/avataaars@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/4e512390d9e1b41d2b07df33c1258b916cdf37289d40773ccab1c969dbc4d660fb51fb66304bcbd3fc22c734c07bed0da4c5fa1ea4202f86a472c5f75d989f91
+  languageName: node
+  linkType: hard
+
+"@dicebear/big-ears-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/big-ears-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/bab77a005751c983a6d510905b5ffd8ca1ab83e6f9fffb565f00747b48262d5b2797a4d4e5d21a96491aaa5fc660d4636dfe139584e7c24f0b825fcb3f8ec48c
+  languageName: node
+  linkType: hard
+
+"@dicebear/big-ears@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/big-ears@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/3cd0b6601dc3037dcd5cb6b444cc2b8a7bb33451d8359f57118a26206f2ec6fc170607f798fc7af9b34e90b6395ff0d257a1c6afa8b3d05045abda76ea09dba0
+  languageName: node
+  linkType: hard
+
+"@dicebear/big-smile@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/big-smile@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/511e629d6bab0b981946c02c45e97841b880e7a894c0b36a657a3e8a014c77c1844c88f7b3eb85efa9b205ff9716cc9b1e0ca29591ef243af92953fbe725cc10
+  languageName: node
+  linkType: hard
+
+"@dicebear/bottts-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/bottts-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/885b57f0a68e0aac3d6e6f5b34f00301d3c591596b86b390cb1c98e176d48191c865da0bcf406da6dbbccaf35dc7ee7c8ad14b375c9f51e440a3d199c1da87ba
+  languageName: node
+  linkType: hard
+
+"@dicebear/bottts@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/bottts@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/39e65d2892ddb9bf0c40bc2399b8b0a9631754b6da242278b92ec551bf1a3a542340623f4391565a8fa9e09afee49fe896028bb7f6844dbfc585748085d02d92
+  languageName: node
+  linkType: hard
+
+"@dicebear/collection@npm:^9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/collection@npm:9.2.2"
+  dependencies:
+    "@dicebear/adventurer": "npm:9.2.2"
+    "@dicebear/adventurer-neutral": "npm:9.2.2"
+    "@dicebear/avataaars": "npm:9.2.2"
+    "@dicebear/avataaars-neutral": "npm:9.2.2"
+    "@dicebear/big-ears": "npm:9.2.2"
+    "@dicebear/big-ears-neutral": "npm:9.2.2"
+    "@dicebear/big-smile": "npm:9.2.2"
+    "@dicebear/bottts": "npm:9.2.2"
+    "@dicebear/bottts-neutral": "npm:9.2.2"
+    "@dicebear/croodles": "npm:9.2.2"
+    "@dicebear/croodles-neutral": "npm:9.2.2"
+    "@dicebear/dylan": "npm:9.2.2"
+    "@dicebear/fun-emoji": "npm:9.2.2"
+    "@dicebear/glass": "npm:9.2.2"
+    "@dicebear/icons": "npm:9.2.2"
+    "@dicebear/identicon": "npm:9.2.2"
+    "@dicebear/initials": "npm:9.2.2"
+    "@dicebear/lorelei": "npm:9.2.2"
+    "@dicebear/lorelei-neutral": "npm:9.2.2"
+    "@dicebear/micah": "npm:9.2.2"
+    "@dicebear/miniavs": "npm:9.2.2"
+    "@dicebear/notionists": "npm:9.2.2"
+    "@dicebear/notionists-neutral": "npm:9.2.2"
+    "@dicebear/open-peeps": "npm:9.2.2"
+    "@dicebear/personas": "npm:9.2.2"
+    "@dicebear/pixel-art": "npm:9.2.2"
+    "@dicebear/pixel-art-neutral": "npm:9.2.2"
+    "@dicebear/rings": "npm:9.2.2"
+    "@dicebear/shapes": "npm:9.2.2"
+    "@dicebear/thumbs": "npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/6bd33aa1239e46a499d8f3a7ceef6132a8d9cadab3263c55860ca4052e7f867ab4abbb3a1e8c9f6e2db5aa5c18c58410107afd7f62ceb5803d32d9c6392b9fa3
+  languageName: node
+  linkType: hard
+
+"@dicebear/core@npm:^9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/core@npm:9.2.2"
+  dependencies:
+    "@types/json-schema": "npm:^7.0.11"
+  checksum: 10c0/87d07320db9cd6e8c268c57aa099a5d8338c74d6dfad3bf834b1fc9fde45916708a4d668fdc193d2db7652e097ee330137a9823d791d2713730f8bb18e5d8759
+  languageName: node
+  linkType: hard
+
+"@dicebear/croodles-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/croodles-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/36746f37fa56d91f19f4214d99898ffbe4a0d11f4449dde621be6b40156e735b38c8fe0c740ec49f9c5edab8d6cfdffe45231fb6b0d9f242c3b662341653471e
+  languageName: node
+  linkType: hard
+
+"@dicebear/croodles@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/croodles@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/ccd36b470382ad8039e84134bb1baacca689ab2514f9b97454c77d2f1a405647adc9f8cfe225c4c7a11a5a2328bb0dd9069546cf86ee7b309384ca5896c24aa4
+  languageName: node
+  linkType: hard
+
+"@dicebear/dylan@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/dylan@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/4126424a25e0f0c1b054f0d16f52b9997b0a371731758431fa45f03ef6f68e7e4687a53ff5b4afa37bcf932ed9ea234fd442914e06e8db44e22358bbff700fe9
+  languageName: node
+  linkType: hard
+
+"@dicebear/fun-emoji@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/fun-emoji@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/18f8cd6ed92916296cbf9cb63a5a5d6f7931493455ac81d531159392e02f8a4d3148cdac521ec78555bbea184b79801fbddefc0e5ddbd51fcd14c757a0a82167
+  languageName: node
+  linkType: hard
+
+"@dicebear/glass@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/glass@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/5288c813c0eac15982cfe6f566cd193bb2f0ba0a3b844f22ca92f10c2b3a34738ef5a39855eae9bffbede42adedbaec052abca24ef1851e45f2a8a0f4620808b
+  languageName: node
+  linkType: hard
+
+"@dicebear/icons@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/icons@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/a7ca7e223cf51ad4eb65e38161f3e54a42e1acf8347e19e7840d0dcf95fa897cae8225cae32b89126abcce39f8f4ad3b89c9ba76fc519ac98b1d31495cabf24c
+  languageName: node
+  linkType: hard
+
+"@dicebear/identicon@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/identicon@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/e96702987242385fc9df354e890ec06e73679ecdd7004d63bad77059657ffcd391ecf73625b9eb317493e9365d1f6c80f05ef15b23c5345db55632b3958142ae
+  languageName: node
+  linkType: hard
+
+"@dicebear/initials@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/initials@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/c2e730618127edd832f15ac66b96a4248580082fca035b99f9b321b6c879a7275327edf05837997727e7e47eb259f8405e088c161be5b1f4a13bc2028fdf2bfb
+  languageName: node
+  linkType: hard
+
+"@dicebear/lorelei-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/lorelei-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/1720dc80b0022803a90dca92e8cd8a3511f130eff6c49aa355dedc125adfd729b2f8edbc06a2a43d3a648229faa46e090cd6691f652e08501026e2d3bc998ff8
+  languageName: node
+  linkType: hard
+
+"@dicebear/lorelei@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/lorelei@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/91e8c7ef98d19da4e5add652cb558000376617c704e7c408b9e26a674bad48d2dd8cfe4d8fd7c147b60437bf1c67bd3e7125a22434c09a63b065535c0bde21f5
+  languageName: node
+  linkType: hard
+
+"@dicebear/micah@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/micah@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/fc3edea587fbfd766ca58d56c79aa137394ec090427dbd28b7df3375657146647883097ba958d6ceb6fe285723110a379f7f74bb2573d9af773c7ac161183ef7
+  languageName: node
+  linkType: hard
+
+"@dicebear/miniavs@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/miniavs@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/d2eda6cadd290bff9f333ce76f8a02a598f15695cfd0e7b2da91f60e3a64c095accedd133fa567740f6a633db3809df7c3b4475cf20cd5c97f39305305573423
+  languageName: node
+  linkType: hard
+
+"@dicebear/notionists-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/notionists-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/fb959d56c6feaeee0e960b1a54e1816c48c653886bd5c2dd905bee5ebac629f780fc017013eef88a6e4bf58772eb2cc53f4580b4fd8a983b6e6eb29f0f05e6fe
+  languageName: node
+  linkType: hard
+
+"@dicebear/notionists@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/notionists@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/14df3d880aac4c93eef788a740388f62d758ec2d807bac12e9b386f8365e72e10369c2a2c3b9a18ae47165d767214df2c9c5c883c7487e959e32d075ed138504
+  languageName: node
+  linkType: hard
+
+"@dicebear/open-peeps@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/open-peeps@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/907b895a2c45f0778b24936c1f039d80f7458b661de9f41c955fdf688ae4030d77f8b7eae7294aa74fb457aece66388f729344fb83efdbb33276869f6920bda9
+  languageName: node
+  linkType: hard
+
+"@dicebear/personas@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/personas@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/9b2cb3808a1463eb91bbd5368970c2cedd5be787a5a83261b4417ce3c1d1e571a72dad4ee747ed2cf9bede57682d2b02d82f5e69959c3daa1df5c04516b67fa0
+  languageName: node
+  linkType: hard
+
+"@dicebear/pixel-art-neutral@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/pixel-art-neutral@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/85aa8974290d4af704c6396be44ea8cfefe85b2e964a60e0129924bc8b3285f736bd93219c1199d0681ebde321be5261e661820b72ad823cdf14ad9420a27ba9
+  languageName: node
+  linkType: hard
+
+"@dicebear/pixel-art@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/pixel-art@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/5df2261bdbd6c97ff28443d6772f95083d30a8ec3b093d65d2dd51d944b87ae61dc0b5630e69d362de8200b4e9ae5b3800887743e9a5510a91917fb0917aa8e9
+  languageName: node
+  linkType: hard
+
+"@dicebear/rings@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/rings@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/125aaecb1de5bdafac3cf3a41d0face6926fd0fd34ee986fb51671814e788e2b4e4a4222c3a2a7c51c0d8ec43a357308c95e439d1a60afe1c7d141fbab686d43
+  languageName: node
+  linkType: hard
+
+"@dicebear/shapes@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/shapes@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/db3e8d101ac55ae34d0302906aff9069172975779a54852c2ee625f1c1615411d08d41ffa4bf7469590ed235a1c99c8f02014ae1c41bb19dc8ec5b50f90e8ca8
+  languageName: node
+  linkType: hard
+
+"@dicebear/thumbs@npm:9.2.2":
+  version: 9.2.2
+  resolution: "@dicebear/thumbs@npm:9.2.2"
+  peerDependencies:
+    "@dicebear/core": ^9.0.0
+  checksum: 10c0/9d3043923d200e919b55acd95748468b69ddcfcf69c5435162ac699de38eaaa057c102b8e6b760e0c641e80be176212688fa4cdda7c572d53c16969851d6f002
+  languageName: node
+  linkType: hard
+
 "@emnapi/core@npm:^1.4.0":
   version: 1.4.3
   resolution: "@emnapi/core@npm:1.4.3"
@@ -1366,6 +1685,64 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@psibase/producers-ui@workspace:system/Producers/ui":
+  version: 0.0.0-use.local
+  resolution: "@psibase/producers-ui@workspace:system/Producers/ui"
+  dependencies:
+    "@dicebear/collection": "npm:^9.2.2"
+    "@dicebear/core": "npm:^9.2.2"
+    "@eslint/js": "npm:^9.9.0"
+    "@hookform/resolvers": "npm:^3.9.0"
+    "@radix-ui/react-avatar": "npm:^1.1.3"
+    "@radix-ui/react-collapsible": "npm:^1.1.3"
+    "@radix-ui/react-dialog": "npm:^1.1.6"
+    "@radix-ui/react-dropdown-menu": "npm:^2.1.6"
+    "@radix-ui/react-label": "npm:^2.1.2"
+    "@radix-ui/react-scroll-area": "npm:^1.2.3"
+    "@radix-ui/react-select": "npm:^2.1.6"
+    "@radix-ui/react-separator": "npm:^1.1.2"
+    "@radix-ui/react-slot": "npm:^1.1.2"
+    "@radix-ui/react-switch": "npm:^1.1.3"
+    "@radix-ui/react-tooltip": "npm:^1.1.8"
+    "@rollup/plugin-alias": "npm:^5.1.1"
+    "@tanstack/react-query": "npm:^5.52.0"
+    "@types/humanize-duration": "npm:^3.27.4"
+    "@types/node": "npm:^22.5.0"
+    "@types/react": "npm:^18.3.3"
+    "@types/react-dom": "npm:^18.3.0"
+    "@uidotdev/usehooks": "npm:^2.4.1"
+    "@vitejs/plugin-react": "npm:^4.3.1"
+    autoprefixer: "npm:^10.4.20"
+    axios: "npm:^1.7.8"
+    class-variance-authority: "npm:^0.7.1"
+    clsx: "npm:^2.1.1"
+    dayjs: "npm:^1.11.13"
+    debounce: "npm:^2.1.0"
+    eslint: "npm:^9.9.0"
+    eslint-plugin-react-hooks: "npm:^5.1.0-rc.0"
+    eslint-plugin-react-refresh: "npm:^0.4.9"
+    framer-motion: "npm:^11.3.29"
+    globals: "npm:^15.9.0"
+    humanize-duration: "npm:^3.32.1"
+    lucide-react: "npm:^0.474.0"
+    next-themes: "npm:^0.4.4"
+    postcss: "npm:^8.4.41"
+    react: "npm:^18.3.1"
+    react-dom: "npm:^18.3.1"
+    react-hook-form: "npm:^7.53.0"
+    react-router-dom: "npm:^6.26.1"
+    slugify: "npm:^1.6.6"
+    sonner: "npm:^1.7.2"
+    tailwind-merge: "npm:^2.5.2"
+    tailwindcss: "npm:^3.4.10"
+    tailwindcss-animate: "npm:^1.0.7"
+    typescript: "npm:^5.5.3"
+    typescript-eslint: "npm:^8.0.1"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.23.8"
+  languageName: unknown
+  linkType: soft
+
 "@psibase/supervisor@workspace:user/Supervisor/ui":
   version: 0.0.0-use.local
   resolution: "@psibase/supervisor@workspace:user/Supervisor/ui"
@@ -1538,7 +1915,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-avatar@npm:^1.1.0":
+"@radix-ui/react-avatar@npm:^1.1.0, @radix-ui/react-avatar@npm:^1.1.3":
   version: 1.1.7
   resolution: "@radix-ui/react-avatar@npm:1.1.7"
   dependencies:
@@ -1587,7 +1964,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-collapsible@npm:1.1.8":
+"@radix-ui/react-collapsible@npm:1.1.8, @radix-ui/react-collapsible@npm:^1.1.3":
   version: 1.1.8
   resolution: "@radix-ui/react-collapsible@npm:1.1.8"
   dependencies:
@@ -1661,7 +2038,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-dialog@npm:1.1.11, @radix-ui/react-dialog@npm:^1.1.1, @radix-ui/react-dialog@npm:^1.1.4":
+"@radix-ui/react-dialog@npm:1.1.11, @radix-ui/react-dialog@npm:^1.1.1, @radix-ui/react-dialog@npm:^1.1.4, @radix-ui/react-dialog@npm:^1.1.6":
   version: 1.1.11
   resolution: "@radix-ui/react-dialog@npm:1.1.11"
   dependencies:
@@ -1729,7 +2106,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-dropdown-menu@npm:^2.0.6":
+"@radix-ui/react-dropdown-menu@npm:^2.0.6, @radix-ui/react-dropdown-menu@npm:^2.1.6":
   version: 2.1.12
   resolution: "@radix-ui/react-dropdown-menu@npm:2.1.12"
   dependencies:
@@ -1803,7 +2180,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-label@npm:^2.0.2, @radix-ui/react-label@npm:^2.1.0":
+"@radix-ui/react-label@npm:^2.0.2, @radix-ui/react-label@npm:^2.1.0, @radix-ui/react-label@npm:^2.1.2":
   version: 2.1.4
   resolution: "@radix-ui/react-label@npm:2.1.4"
   dependencies:
@@ -2053,7 +2430,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-scroll-area@npm:^1.0.5":
+"@radix-ui/react-scroll-area@npm:^1.0.5, @radix-ui/react-scroll-area@npm:^1.2.3":
   version: 1.2.6
   resolution: "@radix-ui/react-scroll-area@npm:1.2.6"
   dependencies:
@@ -2080,7 +2457,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-select@npm:^2.0.0, @radix-ui/react-select@npm:^2.1.4":
+"@radix-ui/react-select@npm:^2.0.0, @radix-ui/react-select@npm:^2.1.4, @radix-ui/react-select@npm:^2.1.6":
   version: 2.2.2
   resolution: "@radix-ui/react-select@npm:2.2.2"
   dependencies:
@@ -2119,7 +2496,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-separator@npm:^1.0.3, @radix-ui/react-separator@npm:^1.1.0":
+"@radix-ui/react-separator@npm:^1.0.3, @radix-ui/react-separator@npm:^1.1.0, @radix-ui/react-separator@npm:^1.1.2":
   version: 1.1.4
   resolution: "@radix-ui/react-separator@npm:1.1.4"
   dependencies:
@@ -2138,7 +2515,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-slot@npm:1.2.0, @radix-ui/react-slot@npm:^1.0.2, @radix-ui/react-slot@npm:^1.1.0, @radix-ui/react-slot@npm:^1.1.1, @radix-ui/react-slot@npm:^1.2.0":
+"@radix-ui/react-slot@npm:1.2.0, @radix-ui/react-slot@npm:^1.0.2, @radix-ui/react-slot@npm:^1.1.0, @radix-ui/react-slot@npm:^1.1.1, @radix-ui/react-slot@npm:^1.1.2, @radix-ui/react-slot@npm:^1.2.0":
   version: 1.2.0
   resolution: "@radix-ui/react-slot@npm:1.2.0"
   dependencies:
@@ -2153,7 +2530,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-switch@npm:^1.0.3":
+"@radix-ui/react-switch@npm:^1.0.3, @radix-ui/react-switch@npm:^1.1.3":
   version: 1.2.2
   resolution: "@radix-ui/react-switch@npm:1.2.2"
   dependencies:
@@ -2280,7 +2657,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-tooltip@npm:^1.0.7":
+"@radix-ui/react-tooltip@npm:^1.0.7, @radix-ui/react-tooltip@npm:^1.1.8":
   version: 1.2.4
   resolution: "@radix-ui/react-tooltip@npm:1.2.4"
   dependencies:
@@ -3098,7 +3475,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/json-schema@npm:^7.0.15":
+"@types/humanize-duration@npm:^3.27.4":
+  version: 3.27.4
+  resolution: "@types/humanize-duration@npm:3.27.4"
+  checksum: 10c0/0d92b036ac284c4ae248dca6efa826f9d397e7369f2d5e11de1813e05b32fd44e3d696f999acdc5a7eb412efc33668b8a68f6ad671392c0bbcf797a6329d674f
+  languageName: node
+  linkType: hard
+
+"@types/json-schema@npm:^7.0.11, @types/json-schema@npm:^7.0.15":
   version: 7.0.15
   resolution: "@types/json-schema@npm:7.0.15"
   checksum: 10c0/a996a745e6c5d60292f36731dd41341339d4eeed8180bb09226e5c8d23759067692b1d88e5d91d72ee83dfc00d3aca8e7bd43ea120516c17922cbcb7c3e252db
@@ -3288,6 +3672,16 @@ __metadata:
     "@typescript-eslint/types": "npm:8.31.0"
     eslint-visitor-keys: "npm:^4.2.0"
   checksum: 10c0/e41e2a9e287d11232cda6126377d1df4de69c6e9dc2a14058819cff15280ec654a3877886a6806728196f299766cfbb0b299eb021c2ce168eb15dff5eb07b51b
+  languageName: node
+  linkType: hard
+
+"@uidotdev/usehooks@npm:^2.4.1":
+  version: 2.4.1
+  resolution: "@uidotdev/usehooks@npm:2.4.1"
+  peerDependencies:
+    react: ">=18.0.0"
+    react-dom: ">=18.0.0"
+  checksum: 10c0/181c43fb324dbe4fef9762c61ab4b8235efa48abedf39a9bfeab65872522c43dae789c4f85b82a1164ed7bb18ae7ff25c3a19e7c4e0eb944937ac7f8109cee9b
   languageName: node
   linkType: hard
 
@@ -4043,7 +4437,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"class-variance-authority@npm:^0.7.0":
+"class-variance-authority@npm:^0.7.0, class-variance-authority@npm:^0.7.1":
   version: 0.7.1
   resolution: "class-variance-authority@npm:0.7.1"
   dependencies:
@@ -5687,6 +6081,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"humanize-duration@npm:^3.32.1":
+  version: 3.32.1
+  resolution: "humanize-duration@npm:3.32.1"
+  checksum: 10c0/76cadedd4c5552912f04955a65e8776ce540da1c5e88bc8873a55fed20f312d0875d1642f13d4cd275dd837b19b8f10e460cbdddfc9e5596bf0dbcb383c11ec6
+  languageName: node
+  linkType: hard
+
 "iconv-lite@npm:^0.6.2":
   version: 0.6.3
   resolution: "iconv-lite@npm:0.6.3"
@@ -6397,6 +6798,15 @@ __metadata:
   peerDependencies:
     react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0-rc
   checksum: 10c0/256d18dce24114fe705755030ab57b6be698f275f3a75565678f8b1de1ce85075f16aed0950b0a762d25be02176f4eb0650cf34bd934ace44fc60fd222bd6b70
+  languageName: node
+  linkType: hard
+
+"lucide-react@npm:^0.474.0":
+  version: 0.474.0
+  resolution: "lucide-react@npm:0.474.0"
+  peerDependencies:
+    react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/60c88c251b2ed4d1074d24a7041122dc280c48cf68a1a25b23e35a296f49955e0edc22744f278929bc7e48dcd4248bed27d6a8227d5a42fc49fceb134194b310
   languageName: node
   linkType: hard
 
@@ -8105,6 +8515,13 @@ __metadata:
   version: 4.1.0
   resolution: "signal-exit@npm:4.1.0"
   checksum: 10c0/41602dce540e46d599edba9d9860193398d135f7ff72cab629db5171516cfae628d21e7bfccde1bbfdf11c48726bc2a6d1a8fb8701125852fbfda7cf19c6aa83
+  languageName: node
+  linkType: hard
+
+"slugify@npm:^1.6.6":
+  version: 1.6.6
+  resolution: "slugify@npm:1.6.6"
+  checksum: 10c0/e7e63f08f389a371d6228bc19d64ec84360bf0a538333446cc49dbbf3971751a6d180d2f31551188dd007a65ca771e69f574e0283290a7825a818e90b75ef44d
   languageName: node
   linkType: hard
 
