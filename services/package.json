@@ -12,6 +12,7 @@
       "user/Branding/ui",
       "user/Explorer/ui",
       "user/Homepage/ui",
+      "user/Identity/ui",
       "user/XAdmin/ui"
     ]
   },
@@ -50,8 +51,8 @@
     "@tailwindcss/forms": "^0.5.7",
     "@types/elliptic": "^6",
     "@types/node": "^22.14.1",
-    "@types/react": "^18.2.15",
-    "@types/react-dom": "^18.2.7",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
