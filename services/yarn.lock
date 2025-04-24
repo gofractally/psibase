@@ -1495,7 +1495,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-alert-dialog@npm:^1.1.1":
+"@radix-ui/react-alert-dialog@npm:^1.1.1, @radix-ui/react-alert-dialog@npm:^1.1.4":
   version: 1.1.11
   resolution: "@radix-ui/react-alert-dialog@npm:1.1.11"
   dependencies:
@@ -1661,7 +1661,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-dialog@npm:1.1.11, @radix-ui/react-dialog@npm:^1.1.1":
+"@radix-ui/react-dialog@npm:1.1.11, @radix-ui/react-dialog@npm:^1.1.1, @radix-ui/react-dialog@npm:^1.1.4":
   version: 1.1.11
   resolution: "@radix-ui/react-dialog@npm:1.1.11"
   dependencies:
@@ -2080,7 +2080,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-select@npm:^2.0.0":
+"@radix-ui/react-select@npm:^2.0.0, @radix-ui/react-select@npm:^2.1.4":
   version: 2.2.2
   resolution: "@radix-ui/react-select@npm:2.2.2"
   dependencies:
@@ -2138,7 +2138,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@radix-ui/react-slot@npm:1.2.0, @radix-ui/react-slot@npm:^1.0.2, @radix-ui/react-slot@npm:^1.1.0, @radix-ui/react-slot@npm:^1.2.0":
+"@radix-ui/react-slot@npm:1.2.0, @radix-ui/react-slot@npm:^1.0.2, @radix-ui/react-slot@npm:^1.1.0, @radix-ui/react-slot@npm:^1.1.1, @radix-ui/react-slot@npm:^1.2.0":
   version: 1.2.0
   resolution: "@radix-ui/react-slot@npm:1.2.0"
   dependencies:
@@ -3128,7 +3128,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:^22.14.1":
+"@types/node@npm:*, @types/node@npm:^22.14.1, @types/node@npm:^22.5.0":
   version: 22.14.1
   resolution: "@types/node@npm:22.14.1"
   dependencies:
@@ -3678,6 +3678,56 @@ __metadata:
   languageName: node
   linkType: hard
 
+"auth-sig@workspace:system/AuthSig/ui":
+  version: 0.0.0-use.local
+  resolution: "auth-sig@workspace:system/AuthSig/ui"
+  dependencies:
+    "@eslint/js": "npm:^9.9.0"
+    "@hookform/resolvers": "npm:^3.9.0"
+    "@radix-ui/react-alert-dialog": "npm:^1.1.4"
+    "@radix-ui/react-avatar": "npm:^1.1.0"
+    "@radix-ui/react-dialog": "npm:^1.1.4"
+    "@radix-ui/react-label": "npm:^2.1.0"
+    "@radix-ui/react-select": "npm:^2.1.4"
+    "@radix-ui/react-separator": "npm:^1.1.0"
+    "@radix-ui/react-slot": "npm:^1.1.1"
+    "@rollup/plugin-alias": "npm:^5.1.1"
+    "@tanstack/react-query": "npm:^5.52.0"
+    "@types/node": "npm:^22.5.0"
+    "@types/react": "npm:^18.3.3"
+    "@types/react-dom": "npm:^18.3.0"
+    "@vitejs/plugin-react": "npm:^4.3.1"
+    autoprefixer: "npm:^10.4.20"
+    axios: "npm:^1.7.9"
+    class-variance-authority: "npm:^0.7.0"
+    clsx: "npm:^2.1.1"
+    dayjs: "npm:^1.11.13"
+    debounce: "npm:^2.1.0"
+    eslint: "npm:^9.9.0"
+    eslint-plugin-react-hooks: "npm:^5.1.0-rc.0"
+    eslint-plugin-react-refresh: "npm:^0.4.9"
+    framer-motion: "npm:^11.3.29"
+    globals: "npm:^15.9.0"
+    lucide-react: "npm:^0.429.0"
+    next-themes: "npm:^0.4.4"
+    postcss: "npm:^8.4.41"
+    react: "npm:^18.3.1"
+    react-dom: "npm:^18.3.1"
+    react-hook-form: "npm:^7.53.0"
+    react-qr-code: "npm:^2.0.15"
+    react-router-dom: "npm:^6.26.1"
+    sonner: "npm:^1.7.2"
+    tailwind-merge: "npm:^2.5.2"
+    tailwindcss: "npm:^3.4.10"
+    tailwindcss-animate: "npm:^1.0.7"
+    typescript: "npm:^5.5.3"
+    typescript-eslint: "npm:^8.0.1"
+    usehooks-ts: "npm:^3.1.0"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.23.8"
+  languageName: unknown
+  linkType: soft
+
 "autoprefixer@npm:^10.4.19, autoprefixer@npm:^10.4.20":
   version: 10.4.21
   resolution: "autoprefixer@npm:10.4.21"
@@ -3705,7 +3755,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.7.2, axios@npm:^1.7.8":
+"axios@npm:^1.7.2, axios@npm:^1.7.8, axios@npm:^1.7.9":
   version: 1.8.4
   resolution: "axios@npm:1.8.4"
   dependencies:
@@ -6242,6 +6292,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash.debounce@npm:^4.0.8":
+  version: 4.0.8
+  resolution: "lodash.debounce@npm:4.0.8"
+  checksum: 10c0/762998a63e095412b6099b8290903e0a8ddcb353ac6e2e0f2d7e7d03abd4275fe3c689d88960eb90b0dde4f177554d51a690f22a343932ecbc50a5d111849987
+  languageName: node
+  linkType: hard
+
 "lodash.isplainobject@npm:^4.0.6":
   version: 4.0.6
   resolution: "lodash.isplainobject@npm:4.0.6"
@@ -7319,6 +7376,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"qr.js@npm:0.0.0":
+  version: 0.0.0
+  resolution: "qr.js@npm:0.0.0"
+  checksum: 10c0/1c6a4c7a58d04e52ec2fee99e39b680fdc5b2a510a981df42c36b716a8eac6634d130fc4d65af8f030f2a07dbf5fa046b97cdfa7456c250ebb50a73916efdcb5
+  languageName: node
+  linkType: hard
+
 "quansync@npm:^0.2.8":
   version: 0.2.10
   resolution: "quansync@npm:0.2.10"
@@ -7365,6 +7429,18 @@ __metadata:
   version: 18.3.1
   resolution: "react-is@npm:18.3.1"
   checksum: 10c0/f2f1e60010c683479e74c63f96b09fb41603527cd131a9959e2aee1e5a8b0caf270b365e5ca77d4a6b18aae659b60a86150bb3979073528877029b35aecd2072
+  languageName: node
+  linkType: hard
+
+"react-qr-code@npm:^2.0.15":
+  version: 2.0.15
+  resolution: "react-qr-code@npm:2.0.15"
+  dependencies:
+    prop-types: "npm:^15.8.1"
+    qr.js: "npm:0.0.0"
+  peerDependencies:
+    react: "*"
+  checksum: 10c0/6a9d73918623eecbf6204da02bae1851b584f22f0724b2e5cf529a7eee991a757a211822146f670db63c21860ccb2d245b9288f48cd58ca2bff16de0dcdbdb25
   languageName: node
   linkType: hard
 
@@ -8758,6 +8834,17 @@ __metadata:
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
   checksum: 10c0/1b8663515c0be34fa653feb724fdcce3984037c78dd4a18f68b2c8be55cc1a1084c578d5b75f158d41b5ddffc2bf5600766d1af3c19c8e329bb20af2ec6f52f4
+  languageName: node
+  linkType: hard
+
+"usehooks-ts@npm:^3.1.0":
+  version: 3.1.1
+  resolution: "usehooks-ts@npm:3.1.1"
+  dependencies:
+    lodash.debounce: "npm:^4.0.8"
+  peerDependencies:
+    react: ^16.8.0  || ^17 || ^18 || ^19 || ^19.0.0-rc
+  checksum: 10c0/8bbebf52b063f2e705eb27364f08ec2eff987b9e8d28d82a28248652dd89ef53cb514e1f2ee1cbc6ac6e083a8dce86310301c3e92a99902b98c32a26381202d7
   languageName: node
   linkType: hard
 
