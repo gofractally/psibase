@@ -10,19 +10,19 @@ use jwt::SignWithKey;
 use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_tapos_for_head, login_action,
-    new_account_action, push_transaction, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, ChainUrl, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp, PackageOrigin,
-    PackagePreference, PackageRegistry, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload,
-    Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
-    TransactionTrace,
+    get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
+    get_tapos_for_head, login_action, new_account_action, push_transaction, push_transactions,
+    reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
+    AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
+    DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRegistry,
+    PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use std::cell::Cell;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -260,6 +260,25 @@ struct UploadArgs {
 }
 
 #[derive(Args, Debug)]
+struct PublishArgs {
+    #[command(flatten)]
+    node_args: NodeArgs,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
+
+    #[command(flatten)]
+    tx_args: TxArgs,
+
+    /// Package files to publish
+    packages: Vec<PathBuf>,
+
+    /// Sender to use (required). Files are uploaded to this account's subdomain.
+    #[clap(short = 'S', long, value_name = "SENDER", required = true)]
+    sender: ExactAccountNumber,
+}
+
+#[derive(Args, Debug)]
 struct InstallArgs {
     #[command(flatten)]
     node_args: NodeArgs,
@@ -352,6 +371,10 @@ struct ListArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -366,6 +389,10 @@ struct SearchArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -380,6 +407,10 @@ struct InfoArgs {
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
+
+    /// Account that would install the packages
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -430,6 +461,9 @@ enum Command {
 
     /// Upload a file to a service
     Upload(UploadArgs),
+
+    /// Publish a package
+    Publish(PublishArgs),
 
     /// Install apps to the chain
     Install(InstallArgs),
@@ -880,30 +914,44 @@ fn data_directory() -> Result<PathBuf, anyhow::Error> {
 }
 
 async fn add_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
-    client: reqwest::Client,
+    mut client: reqwest::Client,
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
-    if sources.is_empty() {
+    let chain_sources = if let Some(account) = account {
+        get_package_sources(base_url, &mut client, account).await?
+    } else {
+        Vec::new()
+    };
+    if sources.is_empty() && chain_sources.is_empty() {
         result.push(DirectoryRegistry::new(data_directory()?.join("packages")))?;
     } else {
         for source in sources {
             if source.starts_with("http:") || source.starts_with("https:") {
                 result.push(HTTPRegistry::new(Url::parse(source)?, client.clone()).await?)?;
+            } else if let Ok(owner) = AccountNumber::from_exact(&*source) {
+                result.push(HTTPRegistry::with_account(base_url, owner, client.clone()).await?)?;
             } else {
                 result.push(DirectoryRegistry::new(source.into()))?;
             }
+        }
+        for source in chain_sources {
+            result.push(HTTPRegistry::with_source(base_url, source, client.clone()).await?)?;
         }
     }
     Ok(())
 }
 
 async fn get_package_registry(
+    base_url: &reqwest::Url,
+    account: Option<AccountNumber>,
     sources: &Vec<String>,
     client: reqwest::Client,
 ) -> Result<JointRegistry<BufReader<File>>, anyhow::Error> {
     let mut result = JointRegistry::new();
-    add_package_registry(sources, client, &mut result).await?;
+    add_package_registry(base_url, account, sources, client, &mut result).await?;
     Ok(result)
 }
 
@@ -919,7 +967,14 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         package_registry.push(files)?;
         packages
     };
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        None,
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
@@ -1052,6 +1107,115 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     }
 
     finish_progress(&args.sig_args, progress, num_trx);
+    Ok(())
+}
+
+async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
+    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+
+    // Read package metadata and determine which packages are already published
+    let mut query_existing = "query {".to_string();
+
+    let mut all_meta = Vec::new();
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        let package = PackagedService::new(BufReader::new(f))?;
+        let meta = package.meta();
+        use std::fmt::Write;
+        write!(
+            &mut query_existing,
+            " p{}: package(owner: {}, name: {}, version: {}) {{ sha256 }}",
+            i,
+            serde_json::to_string(&args.sender)?,
+            serde_json::to_string(&meta.name)?,
+            serde_json::to_string(&meta.version)?
+        )?;
+        all_meta.push(meta.clone());
+    }
+
+    query_existing += " }";
+
+    let existing = psibase::gql_query::<serde_json::Value>(
+        &args.node_args.api,
+        &mut client,
+        packages::SERVICE,
+        query_existing,
+    )
+    .await?;
+    let existing = existing.as_object().unwrap();
+    let num_new = existing.values().filter(|p| p.is_null()).count();
+
+    let progress = ProgressBar::new(num_new as u64).with_style(ProgressStyle::with_template(
+        "{wide_bar} {pos}/{len}\n{msg}",
+    )?);
+    progress.set_message("Preparing transactions");
+
+    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+
+    let action_limit: usize = 1024 * 1024;
+    let mut builder = TransactionBuilder::new(
+        action_limit,
+        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
+            Ok(sign_transaction(
+                with_tapos(&tapos, actions, &args.sig_args.proposer, false),
+                &args.sig_args.sign,
+            )?)
+        },
+    );
+
+    for (i, path) in args.packages.iter().enumerate() {
+        let mut f = File::open(path).with_context(|| format!("Cannot open {}", path.display()))?;
+        // Read the file
+        let mut content = Vec::new();
+        f.read_to_end(&mut content)?;
+        // Calculate the package hash
+        let hash: [u8; 32] = Sha256::digest(&content).into();
+        let existing_info = &existing[&format!("p{}", i)];
+        let meta = &all_meta[i];
+        if existing_info.is_null() {
+            let dest = format!("/packages/{}-{}.psi", &meta.name, &meta.version);
+            builder.set_label(format!("Publishing {}-{}", &meta.name, &meta.version));
+            builder.push(vec![
+                sites::Wrapper::pack_from(args.sender.into()).storeSys(
+                    dest.clone(),
+                    "application/zip".to_string(),
+                    None,
+                    content.into(),
+                ),
+                packages::Wrapper::pack_from(args.sender.into()).publish(
+                    meta.clone(),
+                    hash.into(),
+                    dest,
+                ),
+            ])?;
+            progress.inc(1);
+        } else if &serde_json::from_value::<Checksum256>(existing_info["sha256"].clone())?.0
+            != &hash
+        {
+            progress.suspend(|| {
+                eprintln!(
+                    "{}-{} has already been published",
+                    &meta.name, &meta.version
+                );
+            })
+        }
+    }
+    progress.reset();
+
+    let transactions = builder.finish()?;
+    let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
+
+    push_transactions(
+        &args.node_args.api,
+        client,
+        transactions,
+        args.tx_args.trace,
+        args.tx_args.console,
+        &progress,
+    )
+    .await?;
+    finish_progress(&args.sig_args, progress, num_transactions);
     Ok(())
 }
 
@@ -1318,7 +1482,14 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let to_install = installed
         .resolve_changes(&package_registry, &packages, args.reinstall)
         .await?;
@@ -1344,7 +1515,14 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
 
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
 
     let to_install = installed
         .resolve_upgrade(
@@ -1380,7 +1558,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in installed.union(reglist).into_vec() {
             println!("{}", name);
@@ -1394,7 +1578,13 @@ async fn list(args: &ListArgs) -> Result<(), anyhow::Error> {
     } else if args.available {
         let installed =
             handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
-        let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+        let package_registry = get_package_registry(
+            &args.node_args.api,
+            Some(args.sender.into()),
+            &args.package_source,
+            client.clone(),
+        )
+        .await?;
         let reglist = PackageList::from_registry(&package_registry)?;
         for name in reglist.difference(installed).into_vec() {
             println!("{}", name);
@@ -1410,7 +1600,13 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
     }
     // TODO: search installed packages as well
-    let package_registry = get_package_registry(&args.package_source, client.clone()).await?;
+    let package_registry = get_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+    )
+    .await?;
     let mut primary_matches = vec![];
     let mut secondary_matches = vec![];
     for info in package_registry.index()? {
@@ -1543,7 +1739,14 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
-    add_package_registry(&args.package_source, client.clone(), &mut package_registry).await?;
+    add_package_registry(
+        &args.node_args.api,
+        Some(args.sender.into()),
+        &args.package_source,
+        client.clone(),
+        &mut package_registry,
+    )
+    .await?;
     let reglist = PackageList::from_registry(&package_registry)?;
 
     for package in &packages {
@@ -1816,6 +2019,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 upload(&args).await?
             }
         }
+        Command::Publish(args) => publish(&args).await?,
         Command::Install(args) => install(&args).await?,
         Command::Upgrade(args) => upgrade(&args).await?,
         Command::List(args) => list(&args).await?,

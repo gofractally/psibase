@@ -48,6 +48,7 @@ custom_error! {
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
     UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
     MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
+    InvalidPackageSource = "Invalid package source",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -1112,6 +1113,22 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
+        // Check if the URL points to an account on chain
+        if let Some(domain) = url.domain() {
+            if let Ok(rootdomain) =
+                crate::as_json::<String>(client.get(url.join("/common/rootdomain")?)).await
+            {
+                let mut root_url = url.clone();
+                root_url.set_host(Some(&rootdomain))?;
+                let account = if domain == &rootdomain {
+                    packages::SERVICE
+                } else {
+                    crate::as_json::<AccountNumber>(client.get(url.join("/common/thisservice")?))
+                        .await?
+                };
+                return Self::with_account(&root_url, account, client).await;
+            }
+        }
         let mut index_url = url.clone();
         index_url
             .path_segments_mut()
@@ -1129,6 +1146,56 @@ impl HTTPRegistry {
             client,
             index,
         })
+    }
+    pub async fn with_account(
+        url: &reqwest::Url,
+        owner: AccountNumber,
+        mut client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        let mut index = HashMap::new();
+
+        let mut end_cursor: Option<String> = None;
+        loop {
+            let data = crate::gql_query::<PackagesQuery>(
+                url,
+                &mut client,
+                packages::SERVICE,
+                format!(
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    serde_json::to_string(&owner)?,
+                    serde_json::to_string(&end_cursor)?,
+                ))
+                .await.with_context(|| "Failed to list packages")?;
+            for edge in data.packages.edges {
+                let package = edge.node;
+                if let Some(prev) = index.insert(package.name.clone(), package) {
+                    Err(Error::DuplicatePackage { package: prev.name })?
+                }
+            }
+            if !data.packages.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.packages.pageInfo.endCursor);
+        }
+        Ok(HTTPRegistry {
+            index_url: owner.url(url)?,
+            client,
+            index,
+        })
+    }
+    pub async fn with_source(
+        base_url: &reqwest::Url,
+        source: packages::PackageSource,
+        client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        match (source.url, source.account) {
+            (Some(url), Some(account)) => {
+                Self::with_account(&reqwest::Url::parse(&url)?, account, client).await
+            }
+            (None, Some(account)) => Self::with_account(base_url, account, client).await,
+            (Some(url), None) => Self::new(reqwest::Url::parse(&url)?, client).await,
+            (None, None) => return Err(Error::InvalidPackageSource)?,
+        }
     }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let url = self.index_url.join(filename)?;
@@ -1269,6 +1336,28 @@ struct NewAccountsQuery {
     newAccounts: Vec<AccountNumber>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesEdge {
+    node: PackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<PackagesEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesQuery {
+    packages: PackagesConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SourcesQuery {
+    sources: Vec<packages::PackageSource>,
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub async fn get_accounts_to_create(
     base_url: &reqwest::Url,
@@ -1288,6 +1377,25 @@ pub async fn get_accounts_to_create(
     )
     .await?;
     Ok(result.newAccounts)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_package_sources(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    account: AccountNumber,
+) -> Result<Vec<packages::PackageSource>, anyhow::Error> {
+    let result: SourcesQuery = crate::gql_query(
+        base_url,
+        client,
+        packages::SERVICE,
+        format!(
+            "query {{ sources(account: {}) {{ url account }} }}",
+            serde_json::to_string(&account)?
+        ),
+    )
+    .await?;
+    Ok(result.sources)
 }
 
 #[cfg(not(target_family = "wasm"))]
