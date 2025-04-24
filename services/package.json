@@ -9,6 +9,7 @@
       "system/Producers/ui",
       "user/CommonApi/common/packages/common-lib",
       "user/Supervisor/ui",
+      "user/Explorer/ui",
       "user/Branding/ui",
       "user/XAdmin/ui"
     ]
@@ -66,7 +67,7 @@
     "prettier-plugin-tailwindcss": "^0.5.13",
     "rollup": "^4.40.0",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.2.2",
+    "typescript": "^5.7.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",
     "vite-plugin-dts": "^4.5.0",
