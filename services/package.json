@@ -9,8 +9,9 @@
       "system/Producers/ui",
       "user/CommonApi/common/packages/common-lib",
       "user/Supervisor/ui",
-      "user/Explorer/ui",
       "user/Branding/ui",
+      "user/Explorer/ui",
+      "user/Homepage/ui",
       "user/XAdmin/ui"
     ]
   },
