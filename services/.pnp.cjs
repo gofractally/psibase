@@ -3035,7 +3035,7 @@ const RAW_RUNTIME_STATE =
           ["vite-plugin-top-level-await", "virtual:1fcb701667dc44a51950829a8dc02182e2b20facacd6ef02b43e0fa181d01bd09facf668420b97389022bf1b30a3f100aa6b0dab4cf6924471dfe1b260e5f203#npm:1.5.0"],\
           ["vite-plugin-wasm", "virtual:1fcb701667dc44a51950829a8dc02182e2b20facacd6ef02b43e0fa181d01bd09facf668420b97389022bf1b30a3f100aa6b0dab4cf6924471dfe1b260e5f203#npm:3.4.1"],\
           ["waait", "npm:1.0.5"],\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=c05ca5&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui"],\
+          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui"],\
           ["zod", "npm:3.24.3"]\
         ],\
         "linkType": "SOFT"\
@@ -16854,10 +16854,10 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["wasm-transpiled", [\
-      ["file:./wasm-transpiled#./wasm-transpiled::hash=c05ca5&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui", {\
-        "packageLocation": "../../.yarn/berry/cache/wasm-transpiled-file-67e5cf2796-10c0.zip/node_modules/wasm-transpiled/",\
+      ["file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui", {\
+        "packageLocation": "../../.yarn/berry/cache/wasm-transpiled-file-3747496564-10c0.zip/node_modules/wasm-transpiled/",\
         "packageDependencies": [\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=c05ca5&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui"]\
+          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin%40workspace%3Auser%2FXAdmin%2Fui"]\
         ],\
         "linkType": "HARD"\
       }]\

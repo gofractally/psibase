@@ -233,42 +233,41 @@ set(JS_DIRS
     services/user/Permissions/ui:Permissions_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Workshop/ui:Workshop_js
+    services/user/XAdmin/ui:XAdmin_js
+    services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js
 )
+
 set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
 
-function(add_js_target TARGET_TUPLE OUTPUT_FILE)
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
-    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
-    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
-    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
+# Create targets for each UI and set up dependencies
+foreach(ROW ${JS_DIRS})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ROW})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${ROW})
+    
+    # Special handling for XAdmin and CommonApi
+    if(${TARGET_NAME} STREQUAL "XAdmin_js")
+        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
+        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
+    elseif(${TARGET_NAME} STREQUAL "CommonApiCommonLib_js")
+        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/common-lib.js)
+        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/common-lib.js)
+    else()
+        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
+        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
+    endif()
+    
+    add_dependencies(${TARGET_NAME} build_uis)
+endforeach()
 
-    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
-    add_custom_command(
-        OUTPUT ${OUTPUT_FILEPATH}
-        BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
-        DEPENDS ${SOURCES} ${ARGN}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn && yarn build
-    )
-    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
-    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
-    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
-    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
-endfunction()
+# Single target to build all UIs, relying on Yarn's caching
+add_custom_target(build_uis
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn dlx @yarnpkg/sdks vscode && yarn run build:all
+)
 
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
-
-# Builds the Common files that the UIs (just below) depend on
-add_js_target(${COMMON_LIB_DIR} common-lib.js)
-
-# Build each UI
-# Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
-foreach(ROW ${JS_DIRS})
-    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
-endforeach()
 
 # Static (not built) resource dependencies
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
@@ -303,7 +302,6 @@ add_rs_component_workspace(services/:Plugins
 
 set(XADMIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui)
 set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_PATH}/wasm-transpiled/x_admin.core.wasm)
-add_js_target(${ADMIN_DIR} index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
 add_dependencies(XAdmin_js XAdminWasm)
 
 add_custom_command(
