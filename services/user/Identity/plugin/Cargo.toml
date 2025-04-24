@@ -7,10 +7,10 @@ publish.workspace = true
 
 [dependencies]
 wit-bindgen-rt = { version = "0.30.0" }
-psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
+psibase = { path = "../../../../rust/psibase/", version = "0.16.0" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.125" }
-identity = { path = "../service/", version = "0.15.0" }
+identity = { path = "../service/", version = "0.16.0" }
 
 [lib]
 crate-type = ["cdylib"]
@@ -30,4 +30,4 @@ world = "impl"
 "sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.15.0" }
+identity-pkg = { path = "..", version = "0.16.0" }

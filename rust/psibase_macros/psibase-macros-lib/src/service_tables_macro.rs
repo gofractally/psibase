@@ -39,7 +39,10 @@ pub fn service_tables_macro_impl(attr: TokenStream, item: TokenStream) -> TokenS
 
     let item = syn::parse2::<syn::Item>(item).unwrap();
     match item {
-        Item::Mod(impl_mod) => process_mod(&psibase_mod, impl_mod),
+        Item::Mod(mut impl_mod) => {
+            process_mod(&psibase_mod, &mut impl_mod);
+            quote! { #impl_mod }.into()
+        }
         _ => {
             abort!(
                 item,
@@ -49,7 +52,7 @@ pub fn service_tables_macro_impl(attr: TokenStream, item: TokenStream) -> TokenS
     }
 }
 
-fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) -> TokenStream {
+pub(crate) fn process_mod(psibase_mod: &proc_macro2::TokenStream, impl_mod: &mut ItemMod) {
     if let Some((_, items)) = &mut impl_mod.content {
         let mut table_structs: HashMap<Ident, Vec<usize>> = HashMap::new();
         let mut table_names = Vec::new();
@@ -104,8 +107,4 @@ fn process_mod(psibase_mod: &proc_macro2::TokenStream, mut impl_mod: ItemMod) ->
             "#[psibase::service_tables] module must have inline contents"
         )
     }
-    quote! {
-        #impl_mod
-    }
-    .into()
 } // process_mod

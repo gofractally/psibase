@@ -16,7 +16,7 @@ Here is a basic service definition. Place `example.cpp` and `CMakeLists.txt` in 
 
 ## Building
 
-This will create `Example.psi`:
+This will create a psibase package, `Example.psi`:
 
 ```sh
 mkdir build
@@ -35,19 +35,3 @@ This, when run on a local test chain, will:
 ```sh
 psibase install ./Example.psi
 ```
-
-## Trying the service
-
-Even though other services may call into our service's `add` and `multiply` methods,
-we haven't provided end users with a way to construct transactions which use them.
-That's the topic of the next section, [Minimal User Interface](../minimal-ui/).
-
-## Homework
-
-There's a potentially-exploitable bug in `add` and `multiply`. What is it? Why is it
-more dangerous in C++ than it is in psibase's other service languages? How can
-you avoid it?
-
-## vscode support
-
-Code completion and symbol lookup in VSCode won't work until you add `.vscode/c_cpp_properties.json` and `.vscode/settings.json` to the root of your project. You can check the corresponding `*.sample` files at the root of the [psibase](https://github.com/gofractally/psibase) repository for an example.

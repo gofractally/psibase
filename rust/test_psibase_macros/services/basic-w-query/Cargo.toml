@@ -12,7 +12,7 @@ package-name = "basicwquery"
 server = "basicwquery"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.15.0"
+HttpServer = "0.16.0"
 
 [dependencies]
 psibase = { path = "../../../psibase" }
