@@ -15,6 +15,7 @@ psibase - The psibase blockchain command line client
 `psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
 `psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
 `psibase` [`-a` *url*] `search` *regex*\.\.\.  
+`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
 `psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` `create-token` [`-e` *expiration*] [`-m` *mode*]  
 `psibase` *subcommand* [*args*\.\.\.]  
@@ -236,6 +237,20 @@ Search for packages
 - `--package-source` *url*
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
+### upgrade
+
+`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
+
+Upgrade installed packages. This will not upgrade packages to a new major version unless `--latest` is used.
+
+- `--latest`
+
+  Don't limit upgrades to versions that are compatible with the current version.
+
+- *packages*
+
+  The names of packages to upgrade. The default is to upgrade all packages that are currently installed.
 
 ### upload
 

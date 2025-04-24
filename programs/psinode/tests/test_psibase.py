@@ -94,7 +94,7 @@ class TestPsibase(unittest.TestCase):
         a.graphql('tokens', '''query { userBalances(user: "alice") { edges { node { symbolId tokenId balance precision { value } } } } }''')
 
     @testutil.psinode_test
-    def test_upgrade(self, cluster):
+    def test_install_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
@@ -126,6 +126,55 @@ class TestPsibase(unittest.TestCase):
             self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
             self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
             self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    def do_test_upgrade(self, cluster, command, v2=False):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        foo20 = TestPackage('foo', '2.0.0').depends('Sites').service('foo', data={'file1.txt': 'version 2'})
+
+        # These just need to be valid and distinct
+        original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
+        updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
+        deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
+        added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
+
+        foo10.service('bar1', wasm=original_wasm, flags=['allowWriteNative'])
+        foo10.service('bar2', wasm=deleted_wasm, flags=['allowSudo'], server='bar1')
+        foo11.service('bar1', wasm=updated_wasm)
+        foo11.service('bar2', data={'file4.txt': 'cancel server'})
+        foo11.service('bar3', wasm=added_wasm)
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo10])
+            a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
+            a.wait(new_block())
+            self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
+            self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
+            make_package_repository(dir, [foo10, foo11, foo20])
+            a.run_psibase(command + a.node_args() + ['foo', '--package-source', dir])
+            a.wait(new_block())
+            if v2:
+                self.assertResponse(a.get('/file1.txt', 'foo'), 'version 2')
+            else:
+                self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
+                self.assertEqual(a.get('/file2.txt', 'foo').status_code, 404)
+                self.assertResponse(a.get('/file3.txt', 'foo'), 'added')
+                self.assertResponse(a.get('/file4.txt', 'bar2'), 'cancel server')
+
+    @testutil.psinode_test
+    def test_upgrade(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade", "foo"])
+
+    @testutil.psinode_test
+    def test_upgrade_all(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade"])
+
+    @testutil.psinode_test
+    def test_upgrade_latest(self, cluster):
+        self.do_test_upgrade(cluster, ["upgrade", "--latest"], True)
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):

@@ -5,7 +5,8 @@ use crate::services::{
 use crate::{
     new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
     solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, Schema, ToSchema, Unpack, Version,
+    GenesisService, Pack, PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema,
+    Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -823,7 +824,15 @@ pub trait PackageRegistry {
         let mut result = vec![];
         let index = self.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        for op in solve_dependencies(index, make_refs(packages)?, vec![], essential, false)? {
+        for op in solve_dependencies(
+            index,
+            make_refs(packages)?,
+            vec![],
+            essential,
+            false,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -1356,6 +1365,30 @@ impl PackageList {
             self.as_upgradable(),
             essential,
             reinstall,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )
+    }
+    pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        pref: PackagePreference,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        solve_dependencies(
+            index,
+            make_refs(packages)?,
+            self.as_upgradable(),
+            essential,
+            false,
+            pref,
+            if packages.is_empty() {
+                pref
+            } else {
+                PackagePreference::Current
+            },
         )
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
