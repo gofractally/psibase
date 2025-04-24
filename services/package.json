@@ -8,6 +8,7 @@
       "system/AuthSig/ui",
       "system/Producers/ui",
       "user/CommonApi/common/packages/common-lib",
+      "user/CommonApi/common/packages/plugin-tester/ui",
       "user/Supervisor/ui",
       "user/Branding/ui",
       "user/Explorer/ui",

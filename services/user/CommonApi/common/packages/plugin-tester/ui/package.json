@@ -1,5 +1,5 @@
 {
-  "name": "app1",
+  "name": "@psibase/plugin-tester-ui",
   "private": true,
   "version": "0.0.0",
   "type": "module",
