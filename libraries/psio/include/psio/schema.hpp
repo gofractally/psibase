@@ -1354,7 +1354,7 @@ namespace psio
          {
             if constexpr (std::is_signed_v<To>)
             {
-               if (from < std::numeric_limits<From>::min() || from > std::numeric_limits<To>::max())
+               if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max())
                {
                   abort_error("Integer overflow");
                }
