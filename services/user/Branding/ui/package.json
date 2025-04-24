@@ -1,5 +1,5 @@
 {
-    "name": "branding",
+    "name": "@psibase/branding-ui",
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -56,5 +56,8 @@
         "vite-plugin-wasm": "^3.3.0",
         "vite-tsconfig-paths": "^4.3.2"
     },
-    "packageManager": "yarn@4.9.1"
+    "packageManager": "yarn@4.9.1",
+    "resolutions": {
+        "rollup": "4.40.0"
+    }
 }

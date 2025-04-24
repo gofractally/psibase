@@ -17,7 +17,8 @@
     "**/autoprefixer",
     "**/elliptic",
     "**/@types/elliptic",
-    "**/hash.js"
+    "**/hash.js",
+    "**/rollup"
   ],
   "packageManager": "yarn@4.9.1"
 }
