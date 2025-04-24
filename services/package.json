@@ -8,6 +8,7 @@
       "user/Supervisor/ui",
       "user/Branding/ui",
       "system/Accounts/ui",
+      "system/AuthSig/ui",
       "user/XAdmin/ui"
     ]
   },
