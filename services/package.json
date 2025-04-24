@@ -14,6 +14,7 @@
       "user/Homepage/ui",
       "user/Identity/ui",
       "user/Permissions/ui",
+      "user/Workshop/ui",
       "user/XAdmin/ui"
     ]
   },
