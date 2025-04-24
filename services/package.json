@@ -4,11 +4,12 @@
   },
   "workspaces": {
     "packages": [
+      "system/Accounts/ui",
+      "system/AuthSig/ui",
+      "system/Producers/ui",
       "user/CommonApi/common/packages/common-lib",
       "user/Supervisor/ui",
       "user/Branding/ui",
-      "system/Accounts/ui",
-      "system/AuthSig/ui",
       "user/XAdmin/ui"
     ]
   },
