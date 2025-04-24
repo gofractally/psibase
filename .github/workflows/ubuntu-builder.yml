@@ -42,7 +42,7 @@ jobs:
         if: ${{ env.can-publish && matrix.ubuntu-version == '2404' }}
         env:
           PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
-        working-directory: ${GITHUB_WORKSPACE}/build
+        working-directory: build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/publish.sh
       - name: Upload psidk-ubuntu-${{ matrix.ubuntu-version }}
         uses: actions/upload-artifact@v4
