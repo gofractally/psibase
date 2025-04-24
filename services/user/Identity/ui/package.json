@@ -17,8 +17,8 @@
   "devDependencies": {
     "@rollup/plugin-alias": "^5.1.0",
     "@types/d3": "^7.4.3",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^18.2.22",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.2.1",
