@@ -17,4 +17,23 @@ mod service {
     fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
+
+    #[action]
+    fn create(
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+        allowed_group_sizes: Vec<u8>,
+        num_options: u8,
+        use_hooks: bool,
+    ) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn close(id: u32){
+        unimplemented!()
+    }
+    
 }
