@@ -1,0 +1,14 @@
+[package]
+name = "r-fractal"
+description = "RPC service for fractal"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase = { path = "../../../../rust/psibase/", version = "0.15.0" }
+serde = "1.0"
+serde_json = "1.0"
+fractal = { path = "../service", version = "0.15.0" }
+async-graphql = { version = "7.0.10" }
