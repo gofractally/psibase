@@ -4,6 +4,7 @@ import path from "path";
 import * as fs from "fs";
 import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const psibase = (service: string, isServing?: boolean) => {
@@ -115,7 +116,25 @@ const psibase = (service: string, isServing?: boolean) => {
                                 assetFileNames: "[name][extname]",
                                 // Enable chunk splitting for better caching
                                 manualChunks: {
-                                    vendor: ['react', 'react-dom']
+                                    // Radix UI components
+                                    'radix-ui': [
+                                        '@radix-ui/react-dropdown-menu',
+                                        '@radix-ui/react-label',
+                                        '@radix-ui/react-separator',
+                                        '@radix-ui/react-slot',
+                                        '@radix-ui/react-tabs',
+                                        '@radix-ui/react-tooltip'
+                                    ],
+                                    // Animation libraries
+                                    animation: ['framer-motion'],
+                                    // UI utilities
+                                    'ui-utils': [
+                                        'class-variance-authority',
+                                        'clsx',
+                                        'tailwind-merge',
+                                        'tailwindcss-animate',
+                                        'lucide-react'
+                                    ],
                                 }
                             },
                         },
@@ -144,6 +163,7 @@ export default defineConfig(({ command }) => ({
         react(),
         psibase("branding", command === "serve"),
         wasm(),
+        topLevelAwait(),
         tsconfigPaths(),
     ],
 }));
