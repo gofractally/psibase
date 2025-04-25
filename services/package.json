@@ -1,22 +1,23 @@
 {
   "scripts": {
-    "build:all": "yarn workspaces foreach --all --topological -pvi run build"
+    "build:all": "yarn workspaces foreach --all --cache-if-present -pv run build",
+    "build:dev": "yarn workspaces foreach --all --cache-if-present -pvi run build:dev"
   },
   "workspaces": {
     "packages": [
+      "user/CommonApi/common/packages/common-lib",
+      "user/CommonApi/common/packages/plugin-tester/ui",
+      "user/XAdmin/ui",
       "system/Accounts/ui",
       "system/AuthSig/ui",
       "system/Producers/ui",
-      "user/CommonApi/common/packages/common-lib",
-      "user/CommonApi/common/packages/plugin-tester/ui",
       "user/Supervisor/ui",
       "user/Branding/ui",
       "user/Explorer/ui",
       "user/Homepage/ui",
       "user/Identity/ui",
       "user/Permissions/ui",
-      "user/Workshop/ui",
-      "user/XAdmin/ui"
+      "user/Workshop/ui"
     ]
   },
   "dependencies": {
@@ -53,14 +54,15 @@
     "@rollup/plugin-alias": "^5.1.0",
     "@tailwindcss/forms": "^0.5.7",
     "@types/elliptic": "^6",
-    "@types/node": "^22.14.1",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.0.3",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^9.1.2",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
@@ -72,7 +74,7 @@
     "prettier-plugin-tailwindcss": "^0.5.13",
     "rollup": "^4.40.0",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.7.3",
+    "typescript": "^5.8.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",
     "vite-plugin-dts": "^4.5.0",

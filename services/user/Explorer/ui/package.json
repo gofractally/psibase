@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0 --strictPort",
     "prepare": "svelte-kit sync",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build:dev": "tsc && vite build --mode development",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@rollup/plugin-alias": "^3.1.9",

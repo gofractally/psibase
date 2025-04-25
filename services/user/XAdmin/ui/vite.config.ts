@@ -30,6 +30,10 @@ const psibase = (_service: string, isServing?: boolean) => {
             config: () => {
                 return {
                     build: {
+        // Enable build cache in a project-specific directory
+        cacheDir: path.resolve(__dirname, ".vite-cache"),
+        // Enable sourcemap for better caching
+        sourcemap: true,
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {
@@ -122,6 +126,10 @@ export default defineConfig(({ command }) => ({
         },
     },
     build: {
+        // Enable build cache in a project-specific directory
+        cacheDir: path.resolve(__dirname, ".vite-cache"),
+        // Enable sourcemap for better caching
+        sourcemap: true,
         minify: false,
     },
 }));
