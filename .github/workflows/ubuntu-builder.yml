@@ -39,7 +39,7 @@ jobs:
       - name: Build
         run: bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} ${{ matrix.builder-image }} ${{ matrix.ubuntu-version }}
       - name: Publish packages
-        if: env.can-publish && matrix.ubuntu-version == '2404'
+        if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'
         env:
           PUBLISH_LOGIN: ${{ secrets.publish-package-login }}
         working-directory: build
