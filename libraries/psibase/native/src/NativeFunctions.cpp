@@ -745,8 +745,7 @@ namespace psibase
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
-      check(!transactionContext.blockContext.isReadOnly,
-            "Sockets disabled during proof verification or first auth");
+      check(!dbMode.isReadOnly, "Sockets disabled during proof verification or first auth");
       return transactionContext.blockContext.systemContext.sockets->send(
           *transactionContext.blockContext.writer, fd, msg);
    }
@@ -755,8 +754,7 @@ namespace psibase
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::allowSocket, "Service is not allowed to write to socket");
-      check(!transactionContext.blockContext.isReadOnly,
-            "Sockets disabled during proof verification or first auth");
+      check(!dbMode.isReadOnly, "Sockets disabled during proof verification or first auth");
       return database.socketAutoClose(fd, value,
                                       *transactionContext.blockContext.systemContext.sockets,
                                       transactionContext.ownedSockets);

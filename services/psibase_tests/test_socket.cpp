@@ -15,8 +15,9 @@ TEST_CASE("socket in auth")
    Action act{
        .sender  = alice,
        .service = AccountNumber{"nop"},
-       .method  = MethodNumber{"a1"},
+       .method  = MethodNumber{"autoClose"},
        .rawData = {},
    };
-   CHECK(TraceResult{t.pushTransaction(t.makeTransaction({act}))}.failed("..."));
+   CHECK(TraceResult{t.pushTransaction(t.makeTransaction({act}))}.failed(
+       "Sockets disabled during proof verification or first auth"));
 }

@@ -51,11 +51,12 @@ namespace psibase
    {
       bool                    isSubjective;
       bool                    isSync;
-      static constexpr DbMode transaction() { return {false, true}; }
-      static constexpr DbMode verify() { return {false, false}; }
-      static constexpr DbMode callback() { return {true, true}; }
-      static constexpr DbMode rpc() { return {true, false}; }
-      static constexpr DbMode firstAuth() { return transaction(); }
+      bool                    isReadOnly;
+      static constexpr DbMode transaction() { return {false, true, false}; }
+      static constexpr DbMode verify() { return {false, false, true}; }
+      static constexpr DbMode callback() { return {true, true, false}; }
+      static constexpr DbMode rpc() { return {true, false, false}; }
+      static constexpr DbMode firstAuth() { return {false, true, true}; }
    };
 
    struct ExecutionContextImpl;

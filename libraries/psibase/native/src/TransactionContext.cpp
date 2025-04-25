@@ -39,12 +39,12 @@ namespace psibase
          dbMode(dbMode),
          impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
-      //assert(!blockContext.readOnly || dbMode.isReadOnly());
+      assert(blockContext.writer || dbMode.isReadOnly);
    }
 
    TransactionContext::~TransactionContext()
    {
-      if (!blockContext.isReadOnly)
+      if (blockContext.writer)
       {
          ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
          blockContext.db.clearTemporary();
@@ -134,7 +134,7 @@ namespace psibase
 
    static void reportError(TransactionContext& self, const ActionTrace& atrace)
    {
-      if (!self.blockContext.isReadOnly)
+      if (self.blockContext.writer)
       {
          self.ownedSockets.close(*self.blockContext.writer,
                                  *self.blockContext.systemContext.sockets, atrace.error);
