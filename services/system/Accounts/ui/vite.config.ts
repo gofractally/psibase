@@ -93,5 +93,9 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
   },
   build: {
     minify: false,
+    // Enable build cache in a project-specific directory
+    cacheDir: path.resolve(__dirname, ".vite-cache"),
+    // Enable sourcemap for better caching
+    sourcemap: true,
   },
 }));

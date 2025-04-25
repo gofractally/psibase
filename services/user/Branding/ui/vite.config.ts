@@ -98,7 +98,10 @@ const psibase = (service: string, isServing?: boolean) => {
             config: () => {
                 return {
                     build: {
-                        sourcemap: false,
+                        // Enable build cache in a project-specific directory
+                        cacheDir: path.resolve(__dirname, ".vite-cache"),
+                        // Enable sourcemap for better caching
+                        sourcemap: true,
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {
@@ -110,6 +113,10 @@ const psibase = (service: string, isServing?: boolean) => {
                             output: {
                                 entryFileNames: "index.js",
                                 assetFileNames: "[name][extname]",
+                                // Enable chunk splitting for better caching
+                                manualChunks: {
+                                    vendor: ['react', 'react-dom']
+                                }
                             },
                         },
                     },

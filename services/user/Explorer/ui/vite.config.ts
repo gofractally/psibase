@@ -30,12 +30,22 @@ const psibase = (service: string, isServing?: boolean) => {
             config: () => {
                 return {
                     build: {
+                        // Enable build cache in a project-specific directory
+                        cacheDir: path.resolve(__dirname, ".vite-cache"),
+                        // Enable sourcemap for better caching
+                        sourcemap: true,
                         rollupOptions: {
                             external: [
                                 "/common/rootdomain.mjs",
                                 "/common/common-lib.js",
                             ],
                             makeAbsoluteExternalsRelative: false,
+                            output: {
+                                // Enable chunk splitting for better caching
+                                manualChunks: {
+                                    vendor: ['svelte', '@sveltejs/kit']
+                                }
+                            }
                         },
                     },
                     server: {
