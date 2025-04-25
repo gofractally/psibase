@@ -29,4 +29,12 @@ export default defineConfig(({ command }) => ({
         topLevelAwait(),
         tsconfigPaths(),
     ],
+    build: {
+        rollupOptions: {
+            input: {
+                main: path.resolve(__dirname, "index.html"),
+                perms: path.resolve(__dirname, "permissions.html"),
+            },
+        },
+    },
 }));

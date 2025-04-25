@@ -10,3 +10,7 @@ storybook-static
 .idea
 .DS_Store
 target
+
+Caller
+Fractal/ui
+Fractal/plugin
