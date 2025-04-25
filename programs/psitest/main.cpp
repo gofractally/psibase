@@ -1268,9 +1268,7 @@ struct callbacks
          psibase::SignedTransaction  trx;
          psibase::TransactionContext tc{*bc, trx, trace, psibase::DbMode::verify()};
 
-         //auto session = db.startWrite(writer);
          tc.execNonTrxAction(0, act, trace.actionTraces.back());
-         //session.commit();
       }
       catch (const std::exception& e)
       {
