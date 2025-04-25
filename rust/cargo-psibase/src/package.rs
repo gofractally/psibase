@@ -2,7 +2,8 @@ use crate::{build, build_package_root, build_plugin, build_schema, Args, SERVICE
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Action, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, ServiceInfo,
+    AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, PrettyAction,
+    ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -29,7 +30,7 @@ pub struct PsibaseMetadata {
     flags: Vec<String>,
     dependencies: HashMap<String, String>,
     services: Option<Vec<String>>,
-    postinstall: Option<Vec<Action>>,
+    postinstall: Option<Vec<PrettyAction>>,
     data: Vec<DataFiles>,
 }
 
@@ -111,7 +112,7 @@ fn should_build_package(
     meta: &Meta,
     services: &[(AccountNumber, ServiceInfo, PathBuf)],
     data: &[(AccountNumber, String, PathBuf)],
-    postinstall: &[Action],
+    postinstall: &[PrettyAction],
 ) -> Result<bool, anyhow::Error> {
     let timestamp = if let Ok(metadata) = filename.metadata() {
         metadata.modified()?
@@ -160,8 +161,7 @@ fn should_build_package(
         return Ok(true);
     }
     // check postinstall
-    let mut existing_postinstall = Vec::new();
-    existing.postinstall(&mut existing_postinstall)?;
+    let existing_postinstall = existing.read_postinstall()?;
     if &existing_postinstall[..] != postinstall {
         return Ok(true);
     }

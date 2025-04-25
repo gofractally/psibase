@@ -1,6 +1,7 @@
 #pragma once
 
 #include <psio/fracpack.hpp>
+#include <psio/json/any.hpp>
 #include <psio/nested.hpp>
 #include <psio/schema.hpp>
 #include <psio/shared_view_ptr.hpp>
@@ -229,6 +230,35 @@ auto test_base(const T& value)
       CHECK(std::string_view{json.data(), json.size()} == psio::convert_to_json(value));
       CHECK(parser.in.pos == parser.in.end_pos);
       CHECK(!parser.in.has_unknown);
+
+      // json->fracpack
+      auto                ctype = cschema.get(cschema.schema.get("T")->resolve(cschema.schema));
+      std::vector<char>   schema_bin;
+      psio::vector_stream bin_stream{schema_bin};
+      // There are a few special cases where JSON doesn't round-trip
+      std::optional<std::vector<char>> expected;
+      try
+      {
+         expected =
+             psio::to_frac(psio::convert_from_json<T>(std::string{json.data(), json.size()}));
+      }
+      catch (std::exception&)
+      {
+      }
+      if (expected)
+      {
+         to_frac(*ctype,
+                 psio::convert_from_json<psio::json::any>(std::string{json.data(), json.size()}),
+                 bin_stream, cschema.builtin);
+         CHECK(psio::to_hex(schema_bin) == psio::to_hex(*expected));
+      }
+      else
+      {
+         CHECK_THROWS(to_frac(
+             *ctype,
+             psio::convert_from_json<psio::json::any>(std::string{json.data(), json.size()}),
+             bin_stream, cschema.builtin));
+      }
    }
    // Any prefix of the data should fail to verify
    for (std::size_t i = 0; i < data.size(); ++i)
@@ -282,6 +312,11 @@ template <typename T, typename Stream>
 void to_json(const packable_wrapper<T>& wrapper, Stream& stream)
 {
    to_json(wrapper.value, stream);
+}
+template <typename T, typename Stream>
+void from_json(packable_wrapper<T>& wrapper, Stream& stream)
+{
+   from_json(wrapper.value, stream);
 }
 template <typename T>
 constexpr const char* get_type_name(const packable_wrapper<T>*)
