@@ -1602,7 +1602,7 @@ __metadata:
     "@tailwindcss/forms": "npm:^0.5.7"
     "@tailwindcss/typography": "npm:^0.5.16"
     "@types/elliptic": "npm:^6"
-    "@types/node": "npm:^20.12.12"
+    "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^18.2.66"
     "@types/react-dom": "npm:^18.2.22"
     "@types/uuid": "npm:^10.0.0"
@@ -4293,39 +4293,30 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:^22.14.1, @types/node@npm:^22.5.0":
-  version: 22.14.1
-  resolution: "@types/node@npm:22.14.1"
+"@types/node@npm:*, @types/node@npm:^22.14.1, @types/node@npm:^22.15.0, @types/node@npm:^22.5.0":
+  version: 22.15.2
+  resolution: "@types/node@npm:22.15.2"
   dependencies:
     undici-types: "npm:~6.21.0"
-  checksum: 10c0/d49c4d00403b1c2348cf0701b505fd636d80aabe18102105998dc62fdd36dcaf911e73c7a868c48c21c1022b825c67b475b65b1222d84b704d8244d152bb7f86
+  checksum: 10c0/39da31d5fc63b14fabd217bb8a921c4a7fc3d99f233440209f9fc2d5d736e8773f7efc65223e2fd0e8db8390b0baab9c0cd2e951c2ece8b237f07313ab3cf295
   languageName: node
   linkType: hard
 
 "@types/node@npm:^18.7.15":
-  version: 18.19.86
-  resolution: "@types/node@npm:18.19.86"
+  version: 18.19.87
+  resolution: "@types/node@npm:18.19.87"
   dependencies:
     undici-types: "npm:~5.26.4"
-  checksum: 10c0/1017c4ba61661ab30e4b4a78040cb66980919549f56d85755326dcccbe7a0405be7d6be1b2a91bace8eaef0d2a24b63d4f104b381be7f957c2483e465d829690
+  checksum: 10c0/12b9c83d37a1f202bc8ce70e64ab2c981ebebf9290773ce371a60214406bf3e5278b807e4ada8198873c28afba88d23bf106f3cbaccd0f5ebe24daf9cfe096e3
   languageName: node
   linkType: hard
 
 "@types/node@npm:^20.10.5, @types/node@npm:^20.11.19, @types/node@npm:^20.12.12, @types/node@npm:^20.12.13":
-  version: 20.17.30
-  resolution: "@types/node@npm:20.17.30"
+  version: 20.17.31
+  resolution: "@types/node@npm:20.17.31"
   dependencies:
     undici-types: "npm:~6.19.2"
-  checksum: 10c0/649782c7822367d751472d70c948bcc50cded1a4744610f706f81cd54e1fc015523567d7e3e17f6b19e3e2797f6f23b653e898bdb4a2f21f8759ceba49976310
-  languageName: node
-  linkType: hard
-
-"@types/node@npm:^22.15.0":
-  version: 22.15.0
-  resolution: "@types/node@npm:22.15.0"
-  dependencies:
-    undici-types: "npm:~6.21.0"
-  checksum: 10c0/f60c716f473ec7cbb6fffd8488d29a9ea697f4f5d71c1ebca72e17cdce1c7df054c295122a2589463c44490d875f485f9251ada3c3167bdbe4fbe8a677059780
+  checksum: 10c0/ab6fb60a7957bef39a9fcd3b9fbd8ea2f4a51d7b8522b0fd56e11b9fbbd3ff6cbd361e3bd510cdf9bbef54956332374c6646e28cce8ae597244623a0659153d0
   languageName: node
   linkType: hard
 
@@ -5284,13 +5275,13 @@ __metadata:
   linkType: hard
 
 "axios@npm:^1.7.2, axios@npm:^1.7.8, axios@npm:^1.7.9":
-  version: 1.8.4
-  resolution: "axios@npm:1.8.4"
+  version: 1.9.0
+  resolution: "axios@npm:1.9.0"
   dependencies:
     follow-redirects: "npm:^1.15.6"
     form-data: "npm:^4.0.0"
     proxy-from-env: "npm:^1.1.0"
-  checksum: 10c0/450993c2ba975ffccaf0d480b68839a3b2435a5469a71fa2fb0b8a55cdb2c2ae47e609360b9c1e2b2534b73dfd69e2733a1cf9f8215bee0bcd729b72f801b0ce
+  checksum: 10c0/9371a56886c2e43e4ff5647b5c2c3c046ed0a3d13482ef1d0135b994a628c41fbad459796f101c655e62f0c161d03883454474d2e435b2e021b1924d9f24994c
   languageName: node
   linkType: hard
 
@@ -6539,9 +6530,9 @@ __metadata:
   linkType: hard
 
 "electron-to-chromium@npm:^1.5.73":
-  version: 1.5.141
-  resolution: "electron-to-chromium@npm:1.5.141"
-  checksum: 10c0/3e17fecee4420cfa312f5c38333b9428dec4fae8ebcc54bf20754e781d7551adfa2cd3b96f597e8323f2ac015d6050e60cc311011084ecd61ec7aaeff1b67dcf
+  version: 1.5.142
+  resolution: "electron-to-chromium@npm:1.5.142"
+  checksum: 10c0/05bc0c695a4b7c6fac499700199bfd90d767eea352e67171f005920a225e42fa08dc62ba0d31523fcd2e9b49e25aab133f82270e784888fb5c3c032f6607cdeb
   languageName: node
   linkType: hard
 
