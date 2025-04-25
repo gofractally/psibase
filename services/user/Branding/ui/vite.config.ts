@@ -6,6 +6,7 @@ import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
@@ -158,12 +159,16 @@ const psibase = (service: string, isServing?: boolean) => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
-    plugins: [
-        react(),
-        psibase("branding", command === "serve"),
-        wasm(),
-        topLevelAwait(),
-        tsconfigPaths(),
-    ],
-}));
+export default defineConfig(({ command }) => {
+    const psibaseConfig = psibase("branding", command === "serve");
+    return {
+        plugins: [
+            react(),
+            ...psibaseConfig,
+            wasm(),
+            topLevelAwait(),
+            tsconfigPaths(),
+            createSkipUnchangedBuildPlugin(path.dirname(__filename))
+        ],
+    };
+});
