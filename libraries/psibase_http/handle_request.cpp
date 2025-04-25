@@ -792,7 +792,7 @@ namespace psibase::http
 
             SignedTransaction  trx;
             TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace, true, false, true};
+            TransactionContext tc{bc, trx, trace, DbMode::rpc()};
             ActionTrace&       atrace        = trace.actionTraces.emplace_back();
             auto               startExecTime = steady_clock::now();
 

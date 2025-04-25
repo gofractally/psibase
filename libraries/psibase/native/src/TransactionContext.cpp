@@ -32,19 +32,14 @@ namespace psibase
    TransactionContext::TransactionContext(BlockContext&            blockContext,
                                           const SignedTransaction& signedTransaction,
                                           TransactionTrace&        transactionTrace,
-                                          bool                     allowDbRead,
-                                          bool                     allowDbWrite,
-                                          bool                     allowDbReadSubjective,
-                                          bool                     allowDbWriteSubjective)
+                                          DbMode                   dbMode)
        : blockContext{blockContext},
          signedTransaction{signedTransaction},
          transactionTrace{transactionTrace},
-         allowDbRead{allowDbRead},
-         allowDbWrite{allowDbWrite},
-         allowDbReadSubjective{allowDbReadSubjective},
-         allowDbWriteSubjective{allowDbWriteSubjective},
+         dbMode(dbMode),
          impl{std::make_unique<TransactionContextImpl>(blockContext.systemContext)}
    {
+      //assert(!blockContext.readOnly || dbMode.isReadOnly());
    }
 
    TransactionContext::~TransactionContext()

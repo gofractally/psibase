@@ -18,5 +18,5 @@ TEST_CASE("socket in auth")
        .method  = MethodNumber{"a1"},
        .rawData = {},
    };
-   CHECK(TraceResult{t.pushTransaction(Transaction{.actions = {act}})}.failed("..."));
+   CHECK(TraceResult{t.pushTransaction(t.makeTransaction({act}))}.failed("..."));
 }
