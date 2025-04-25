@@ -1,16 +1,78 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import alias from '@rollup/plugin-alias'
+import svgr from 'vite-plugin-svgr'
 import { fileURLToPath } from 'url'
 import { createSharedViteConfig } from '../../../vite.shared'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const psibase = (appletContract: string, isServing?: boolean) => {
+    const buildAliases = [
+        {
+            find: '@',
+            replacement: path.resolve(__dirname, './src'),
+        },
+    ]
+
+    if (isServing) {
+        buildAliases.push({
+            find: /^@psibase\/common-lib.*$/,
+            replacement: path.resolve(
+                '../../CommonApi/common/packages/common-lib/src'
+            ),
+        })
+    }
+
+    return [
+        {
+            name: 'psibase',
+            config: () => {
+                return {
+                    build: {
+                        assetsDir: '',
+                        cssCodeSplit: false,
+                        rollupOptions: {
+                            external: [
+                                '/common/rootdomain.mjs',
+                                '/common/common-lib.js',
+                            ],
+                            makeAbsoluteExternalsRelative: false,
+                            output: {
+                                entryFileNames: 'index.js',
+                                assetFileNames: '[name][extname]',
+                            },
+                        },
+                    },
+                    server: {
+                        host: 'psibase.127.0.0.1.sslip.io',
+                        port: 8081,
+                        proxy: {
+                            '/': {
+                                target: 'http://psibase.127.0.0.1.sslip.io:8079/',
+                                changeOrigin: true,
+                            },
+                        },
+                    },
+                }
+            },
+        },
+        alias({
+            entries: buildAliases,
+        }),
+    ]
+}
+
 export default defineConfig({
   ...createSharedViteConfig({
     projectDir: __dirname,
-    additionalPlugins: [react()],
+    additionalPlugins: [
+      react(),
+      svgr(),
+      ...psibase('homepage', process.env.NODE_ENV === 'development'),
+    ],
     additionalManualChunks: {
       // Radix UI components
       'radix-ui': [
