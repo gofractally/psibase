@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd build
+
 URL=$( echo "$PUBLISH_LOGIN" | jq -r '.["url"]' )
 ACCOUNT=$( echo "$PUBLISH_LOGIN" | jq -r '.["account"]' )
 KEY=/tmp/publish-key
