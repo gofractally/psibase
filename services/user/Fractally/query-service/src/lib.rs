@@ -15,12 +15,7 @@ mod service {
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            fractally::Wrapper::call().getExampleThing()
-        }
 
-        /// This query gets paginated historical updates of the Example Thing.
         async fn historical_updates(
             &self,
             first: Option<i32>,

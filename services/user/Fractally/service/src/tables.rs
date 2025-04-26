@@ -64,7 +64,7 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub reputation: u32,
+        pub reputation: f32,
     }
 
     impl Member {
@@ -78,7 +78,7 @@ pub mod tables {
                 account,
                 fractal,
                 created_at: TransactSvc::call().currentBlock().time.seconds(),
-                reputation: 0
+                reputation: 0.0
             }
         }
 

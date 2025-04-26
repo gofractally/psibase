@@ -17,7 +17,7 @@ interface api {
 
     start: func(evaluation-id: u32) -> result<_, error>;
 
-    close: func(evaluation-id: u32) -> result<_, error>;
+    close: func(owner: string, evaluation-id: u32) -> result<_, error>;
 
     attest: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<_, error>;
 

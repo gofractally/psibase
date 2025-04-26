@@ -9,7 +9,10 @@ pub mod service {
     use crate::helpers;
 
     use crate::helpers::EvaluationStatus;
+
     use psibase::*;
+
+    use psibase::services::evaluations::action_structs as EvalStructs;
 
     #[event(history)]
     pub fn keysset(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {}
@@ -18,12 +21,77 @@ pub mod service {
     pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
+    pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
     pub fn group_finished(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
+        users: Vec<AccountNumber>,
         result: Vec<u8>,
     ) {
+    }
+
+    fn declare_group_result(evaluation: Evaluation, group_number: u32, result: Vec<u8>) {
+        let group = check_some(
+            Group::get(evaluation.owner, evaluation.id, group_number),
+            "failed to find group",
+        );
+
+        let caller = ServiceCaller {
+            service: evaluation.owner,
+            sender: get_sender(),
+        };
+
+        let users: Vec<AccountNumber> = evaluation
+            .get_users()
+            .into_iter()
+            .map(|user: User| user.owner)
+            .collect();
+
+        if evaluation.use_hooks {
+            caller.call(
+                MethodNumber::from(EvalStructs::evalGroupFin::ACTION_NAME),
+                EvalStructs::evalGroupFin {
+                    owner: evaluation.owner,
+                    evaluation_id: evaluation.id,
+                    group_number,
+                    users: users.clone(),
+                    result: result.clone(),
+                },
+            )
+        }
+
+        Wrapper::emit().history().group_finished(
+            evaluation.owner,
+            evaluation.id,
+            group_number,
+            users,
+            result,
+        );
+
+        group.delete();
+
+        if !evaluation.is_groups() {
+            if evaluation.use_hooks {
+                let caller = ServiceCaller {
+                    service: evaluation.owner,
+                    sender: get_sender(),
+                };
+
+                caller.call(
+                    MethodNumber::from(EvalStructs::evalFin::ACTION_NAME),
+                    EvalStructs::evalFin {
+                        evaluation_id: evaluation.id,
+                    },
+                )
+            }
+
+            Wrapper::emit().history().evaluation_finished(evaluation.owner, evaluation.id);
+
+            evaluation.delete();
+        }
     }
 
     #[action]
@@ -130,31 +198,28 @@ pub mod service {
     }
 
     #[action]
-    fn close(id: u32) {
-        let evaluation = Evaluation::get(get_sender(), id);
-        let current_phase = evaluation.get_current_phase();
+    fn close_group(owner: AccountNumber, evaluation_id: u32, group_number: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+        evaluation.assert_status(EvaluationStatus::Closed);
 
-        match current_phase {
-            EvaluationStatus::Submission => {
-                let is_successful_evaluation_start = Group::get(get_sender(), id, 1).is_some();
-                if is_successful_evaluation_start {
-                    abort_message("evaluation is still in submission phase");
-                }
-            }
-            EvaluationStatus::Deliberation | EvaluationStatus::Registration => {
-                abort_message("evaluation must be in registration or closed phase");
-            }
-            EvaluationStatus::Pending | EvaluationStatus::Closed => {}
-        }
+        declare_group_result(evaluation, group_number, vec![]);
+    }
 
-        evaluation.delete();
+    #[action]
+    fn close_groups(owner: AccountNumber, evaluation_id: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+        evaluation.assert_status(EvaluationStatus::Closed);
+
+        evaluation.get_groups().iter().for_each(|group| {
+            declare_group_result(Evaluation::get(owner, evaluation_id), group.number, vec![]);
+        });
     }
 
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
         let sender = get_sender();
         let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
+        evaluation.assert_status(EvaluationStatus::Deliberation);
 
         let mut user = User::get(owner, evaluation_id, sender);
         let group =
@@ -179,7 +244,7 @@ pub mod service {
             .all(|rank| rank <= &evaluation.num_options);
         check(ranks_within_scope, "attestation is out of scope");
 
-        evaluation.assert_status(helpers::EvaluationStatus::Submission);
+        evaluation.assert_status(EvaluationStatus::Submission);
 
         let mut user = User::get(owner, evaluation_id, sender);
         check(user.attestation.is_none(), "you have already submitted");
@@ -187,47 +252,22 @@ pub mod service {
         user.attestation = Some(attestation);
         user.save();
 
-        let mut group =
-            Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
+        let group = check_some(
+            Group::get(owner, evaluation_id, user.group_number.unwrap()),
+            "failed to find group",
+        );
 
         check(group.key_submitter.is_some(), "cannot attest without key");
-        check(group.result.is_none(), "group result already set");
 
-        if group.result.is_none() {
-            let result =
-                helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
-            match result {
-                helpers::GroupResult::ConsensusSuccess(result) => {
-                    group.result = Some(result.clone());
-                    group.save();
-
-                    if evaluation.use_hooks {
-                        let caller = ServiceCaller {
-                            service: evaluation.owner,
-                            sender: get_sender(),
-                        };
-
-                        caller.call(
-                            MethodNumber::from(
-                                psibase::services::evaluations::action_structs::evalGroupFin::ACTION_NAME,
-                            ),
-                            psibase::services::evaluations::action_structs::evalGroupFin {
-                                evaluation_id: evaluation.id,
-                                group_number: user.group_number.unwrap(),
-                                result: result.clone(),
-                            },
-                        )
-                    }
-
-                    Wrapper::emit().history().group_finished(
-                        evaluation.owner,
-                        evaluation.id,
-                        user.group_number.unwrap(),
-                        result.clone(),
-                    );
-                }
-                _ => {}
+        let result = helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
+        match result {
+            helpers::GroupResult::ConsensusSuccess(result) => {
+                declare_group_result(evaluation, user.group_number.unwrap(), result.clone());
             }
+            helpers::GroupResult::IrreconcilableFailure => {
+                declare_group_result(evaluation, user.group_number.unwrap(), vec![]);
+            }
+            _ => {}
         }
     }
 
@@ -235,7 +275,7 @@ pub mod service {
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
-        evaluation.assert_status(helpers::EvaluationStatus::Registration);
+        evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
         check(
@@ -259,10 +299,8 @@ pub mod service {
             };
 
             caller.call(
-                MethodNumber::from(
-                    psibase::services::evaluations::action_structs::evalRegister::ACTION_NAME,
-                ),
-                psibase::services::evaluations::action_structs::evalRegister {
+                MethodNumber::from(EvalStructs::evalRegister::ACTION_NAME),
+                EvalStructs::evalRegister {
                     account: registrant,
                     evaluation_id: evaluation.id,
                 },
@@ -273,7 +311,7 @@ pub mod service {
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(helpers::EvaluationStatus::Registration);
+        evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
         check(
@@ -291,10 +329,8 @@ pub mod service {
             };
 
             caller.call(
-                MethodNumber::from(
-                    psibase::services::evaluations::action_structs::evalUnregister::ACTION_NAME,
-                ),
-                psibase::services::evaluations::action_structs::evalUnregister {
+                MethodNumber::from(EvalStructs::evalUnregister::ACTION_NAME),
+                EvalStructs::evalUnregister {
                     account: registrant,
                     evaluation_id: evaluation.id,
                 },

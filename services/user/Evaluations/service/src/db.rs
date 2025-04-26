@@ -64,7 +64,6 @@ pub mod tables {
         pub evaluation_id: u32,
         pub number: u32,
         pub key_submitter: Option<AccountNumber>,
-        pub result: Option<Vec<u8>>,
     }
 
     #[table(name = "UserSettingsTable", index = 4)]
@@ -171,6 +170,10 @@ pub mod tables {
                 .range((self.owner, self.id, 0)..=(self.owner, self.id, u32::MAX))
                 .collect();
             result
+        }
+
+        pub fn is_groups(&self) -> bool {
+            self.get_groups().len() > 0
         }
 
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
@@ -284,13 +287,30 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
+        pub fn delete(&self) {
+            let users_table = UserTable::new();
+
+            let users: Vec<User> = users_table
+                .get_index_pk()
+                .range(
+                    (self.owner, self.evaluation_id, AccountNumber::new(0))
+                        ..=(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            for user in users {
+                users_table.erase(&user.pk());
+            }
+
+            GroupTable::new().erase(&self.pk());
+        }
+
         pub fn new(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
             Self {
                 owner,
                 evaluation_id,
                 number,
                 key_submitter: None,
-                result: None,
             }
         }
     }

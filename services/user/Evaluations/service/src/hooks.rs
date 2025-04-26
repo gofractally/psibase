@@ -17,4 +17,9 @@ pub mod eval_hooks {
     fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
+
+    #[action]
+    fn evalFin(evaluation_id: u32) {
+        unimplemented!()
+    }
 }
