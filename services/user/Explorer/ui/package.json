@@ -15,7 +15,7 @@
     "@rollup/plugin-alias": "^3.1.9",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
     "@types/node": "^18.7.15",
-    "rollup": "^2.0.0"
+    "rollup": "^4.40.0"
   },
   "devDependencies": {
     "@poppanator/sveltekit-svg": "^5.0.0",
@@ -27,7 +27,7 @@
     "autoprefixer": "^10.4.8",
     "classnames": "^2.3.1",
     "eslint": "9.15.0",
-    "eslint-config-prettier": "^8.5.0",
+    "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-svelte": "^2.46.0",
@@ -36,7 +36,7 @@
     "postcss-load-config": "^4.0.1",
     "prettier": "^3.3.3",
     "prettier-plugin-svelte": "^3.2.8",
-    "prettier-plugin-tailwindcss": "^0.1.13",
+    "prettier-plugin-tailwindcss": "^0.5.13",
     "react": "^18.2.0",
     "svelte": "^5.2.4",
     "svelte-check": "^4.0.9",
