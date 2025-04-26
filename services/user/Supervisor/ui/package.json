@@ -11,7 +11,7 @@
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
-        "@types/node": "^20.10.5",
+        "@types/node": "^22.15.0",
         "@types/react": "^18.2.15",
         "@types/react-dom": "^18.2.7",
         "@vitejs/plugin-react": "^4.0.3",

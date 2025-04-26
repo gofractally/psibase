@@ -1727,6 +1727,7 @@ __metadata:
   dependencies:
     "@rollup/plugin-alias": "npm:^5.1.0"
     "@types/d3": "npm:^7.4.3"
+    "@types/node": "npm:^22.15.2"
     "@types/react": "npm:^18.2.0"
     "@types/react-dom": "npm:^18.2.0"
     "@typescript-eslint/eslint-plugin": "npm:^8.15.0"
@@ -4240,7 +4241,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:^22.14.1, @types/node@npm:^22.15.0, @types/node@npm:^22.5.0":
+"@types/node@npm:*, @types/node@npm:^22.14.1, @types/node@npm:^22.15.0, @types/node@npm:^22.15.2, @types/node@npm:^22.5.0":
   version: 22.15.2
   resolution: "@types/node@npm:22.15.2"
   dependencies:
