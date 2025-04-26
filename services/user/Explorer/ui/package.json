@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rollup/plugin-alias": "^3.1.9",
+    "@rollup/plugin-alias": "^5.1.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
     "@types/node": "^18.7.15",
     "rollup": "^4.40.0"
