@@ -14,7 +14,7 @@
   "dependencies": {
     "@rollup/plugin-alias": "^5.1.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
-    "@types/node": "^18.7.15",
+    "@types/node": "^22.15.0",
     "rollup": "^4.40.0"
   },
   "devDependencies": {
