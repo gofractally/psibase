@@ -1,8 +1,8 @@
 {
   "scripts": {
     "build:all": "yarn workspaces foreach --all -pv run build",
-    "build:dev": "yarn workspaces foreach --all -pvi run build:dev",
-    "re:set:env": "yarn cache clean --all && rm -rf .yarn/cache .yarn/sdks .yarn/unplugged install-state.gz && yarn install && yarn dlx @yarnpkg/sdks vscode"
+    "clear-cache": "yarn cache clean --all && rm -rf .yarn/cache .yarn/sdks .yarn/unplugged install-state.gz",
+    "install-dev-tools": "yarn dlx @yarnpkg/sdks vscode"
   },
   "workspaces": {
     "packages": [
