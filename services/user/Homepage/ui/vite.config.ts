@@ -69,7 +69,7 @@ export default defineConfig({
   ...createSharedViteConfig({
     projectDir: __dirname,
     additionalPlugins: [
-        react(),
+      react(),
       svgr(),
       ...psibase('homepage', process.env.NODE_ENV === 'development'),
     ],

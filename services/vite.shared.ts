@@ -111,7 +111,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
         }
       },
       // Increase chunk size warning limit
-      chunkSizeWarningLimit: 1000
+      // chunkSizeWarningLimit: 1000
     },
     optimizeDeps: {
       // Enable dependency pre-bundling
