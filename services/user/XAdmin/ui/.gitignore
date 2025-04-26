@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 wasm-transpiled
+.vite-cache
 
 # Editor directories and files
 .vscode/*

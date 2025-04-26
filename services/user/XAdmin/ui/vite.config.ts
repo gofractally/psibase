@@ -4,6 +4,7 @@ import path from "path";
 import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 const psibase = (_service: string, isServing?: boolean) => {
     const buildAliases = [
@@ -114,6 +115,7 @@ export default defineConfig(({ command }) => ({
         psibase("__contract__(kebabCase)", command === "serve"),
         wasm(),
         topLevelAwait(),
+        createSkipUnchangedBuildPlugin(__dirname)
     ],
     resolve: {
         alias: {

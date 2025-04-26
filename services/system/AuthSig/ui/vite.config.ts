@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
 // import svgr from "vite-plugin-svgr";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 // ../../../user/CommonApi/common/packages/common-lib
 
@@ -91,6 +92,7 @@ export default defineConfig(({ command }) => ({
     react(),
     // svgr({ exportAsDefault: true }),
     psibase("auth-sig", command === "serve"),
+    createSkipUnchangedBuildPlugin(__dirname)
   ],
   resolve: {
     alias: {

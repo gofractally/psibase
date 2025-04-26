@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
+import { createSkipUnchangedBuildPlugin } from '../../../vite.shared'
 
 const psibase = () => {
   return [
@@ -40,7 +41,7 @@ const psibase = () => {
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
-  plugins: [react(), psibase()],
+  plugins: [react(), psibase(),, createSkipUnchangedBuildPlugin(__dirname)],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
