@@ -4,8 +4,19 @@ import fs from 'fs'
 import crypto from 'crypto'
 
 export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
+  // Skip if NO_REBUILD is set to false
+  if (process.env.NO_REBUILD === 'false') {
+    return {
+      name: 'skip-unchanged-build',
+      buildStart() {
+        console.log('No-rebuild functionality disabled (NO_REBUILD=false)')
+      }
+    }
+  }
+
   const cacheFile = path.resolve(projectDir, '.vite-cache/hash.json')
   const srcDir = path.resolve(projectDir, 'src')
+  const distDir = path.resolve(projectDir, 'dist')
 
   function calculateHash(dir: string): string {
     const hash = crypto.createHash('md5')
@@ -25,10 +36,26 @@ export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
     return hash.digest('hex')
   }
 
+  function isDistEmpty(): boolean {
+    if (!fs.existsSync(distDir)) {
+      return true
+    }
+    const files = fs.readdirSync(distDir)
+    return files.length === 0
+  }
+
   return {
     name: 'skip-unchanged-build',
     buildStart() {
       if (!fs.existsSync(srcDir)) {
+        return
+      }
+
+      const pkgName = path.basename(projectDir)
+
+      // If dist directory doesn't exist or is empty, always build
+      if (isDistEmpty()) {
+        console.log(`Building ${pkgName} (dist folder missing or empty)`)
         return
       }
 
@@ -44,9 +71,11 @@ export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
       }
 
       if (currentHash === previousHash) {
-        console.log('No changes detected, skipping build...')
+        console.log(`Not building ${pkgName}; No source changes.`)
         process.exit(0)
       }
+
+      console.log(`Rebuilding ${pkgName} (source files changed)`)
 
       // Ensure cache directory exists
       fs.mkdirSync(path.dirname(cacheFile), { recursive: true })

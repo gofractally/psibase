@@ -100,10 +100,10 @@ const psibase = (service: string, isServing?: boolean) => {
             config: () => {
                 return {
                     build: {
-                        // Enable build cache in a project-specific directory
-                        cacheDir: path.resolve(__dirname, ".vite-cache"),
-                        // Enable sourcemap for better caching
-                        sourcemap: true,
+        // Enable build cache in a project-specific directory
+        cacheDir: path.resolve(__dirname, ".vite-cache"),
+        // Enable sourcemap for better caching
+        sourcemap: true,
                         assetsDir: "",
                         cssCodeSplit: false,
                         rollupOptions: {
@@ -162,13 +162,13 @@ const psibase = (service: string, isServing?: boolean) => {
 export default defineConfig(({ command }) => {
     const psibaseConfig = psibase("branding", command === "serve");
     return {
-        plugins: [
-            react(),
+    plugins: [
+        react(),
             ...psibaseConfig,
-            wasm(),
+        wasm(),
             topLevelAwait(),
-            tsconfigPaths(),
+        tsconfigPaths(),
             createSkipUnchangedBuildPlugin(path.dirname(__filename))
-        ],
+    ],
     };
 });

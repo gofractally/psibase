@@ -69,7 +69,7 @@ export default defineConfig({
   ...createSharedViteConfig({
     projectDir: __dirname,
     additionalPlugins: [
-      react(),
+        react(),
       svgr(),
       ...psibase('homepage', process.env.NODE_ENV === 'development'),
     ],
@@ -110,8 +110,8 @@ export default defineConfig({
       avatar: ['@dicebear/core', '@dicebear/collection']
     }
   }),
-  resolve: {
-    alias: {
+    resolve: {
+        alias: {
       '@': path.resolve(__dirname, 'src'),
       '/common': path.resolve(__dirname, '../../CommonApi/common'),
       '@psibase/common-lib': path.resolve(__dirname, '../../CommonApi/common/packages/common-lib/src'),
