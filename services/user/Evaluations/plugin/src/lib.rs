@@ -106,8 +106,10 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("start", &packed_args)
     }
 
-    fn close(id: u32) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::close { id }.packed();
+    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+        .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let packed_args = evaluations::action_structs::close_groups { owner: evaluation_owner, evaluation_id }.packed();
         add_action_to_transaction("close", &packed_args)
     }
 
