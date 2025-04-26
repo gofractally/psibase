@@ -46,7 +46,6 @@ const psibase = (service: string, isServing?: boolean) => {
                         subdomain === service &&
                         req.method !== "POST" &&
                         req.headers.accept !== "application/json" &&
-                        !req.url.startsWith("/messages") &&
                         !req.url.startsWith("/common") &&
                         !req.url.startsWith("/api")
                     ) {
