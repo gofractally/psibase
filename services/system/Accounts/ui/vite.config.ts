@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import alias from "@rollup/plugin-alias";
-// import svgr from "vite-plugin-svgr";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 const psibase = (appletContract: string, isServing?: boolean) => {
   const buildAliases = [
@@ -85,6 +85,7 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
     react(),
     // svgr({ exportAsDefault: true }),
     psibase("psibase", command === "serve"),
+    createSkipUnchangedBuildPlugin(__dirname)
   ],
   resolve: {
     alias: {

@@ -164,11 +164,11 @@ export default defineConfig(({ command }) => {
     return {
     plugins: [
         react(),
-            ...psibaseConfig,
+        ...psibaseConfig,
         wasm(),
-            topLevelAwait(),
+        topLevelAwait(),
         tsconfigPaths(),
-            createSkipUnchangedBuildPlugin(path.dirname(__filename))
+        createSkipUnchangedBuildPlugin(path.dirname(__filename))
     ],
     };
 });

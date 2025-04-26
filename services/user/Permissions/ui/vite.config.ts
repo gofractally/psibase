@@ -6,6 +6,7 @@ import alias from "@rollup/plugin-alias";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
@@ -145,6 +146,7 @@ export default defineConfig(({ command }) => ({
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),
+        createSkipUnchangedBuildPlugin(__dirname)
     ],
     build: {
         // Enable build cache in a project-specific directory

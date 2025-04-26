@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import fs from "fs";
+import { createSkipUnchangedBuildPlugin } from "../../../../../vite.shared";
 
 // Ensure cache directory exists
 const cacheDir = resolve(__dirname, ".vite-cache");
@@ -28,5 +29,5 @@ export default defineConfig({
             cache: true,
         },
     },
-    plugins: [dts()],
+    plugins: [dts(),createSkipUnchangedBuildPlugin(__dirname)],
 });

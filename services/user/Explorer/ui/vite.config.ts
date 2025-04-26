@@ -5,6 +5,7 @@ import alias from "@rollup/plugin-alias";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { isoImport } from "vite-plugin-iso-import";
 import svg from "@poppanator/sveltekit-svg";
+import { createSkipUnchangedBuildPlugin } from "../../../vite.shared";
 
 const psibase = (service: string, isServing?: boolean) => {
     const buildAliases = [
@@ -108,5 +109,6 @@ export default defineConfig(({ command }) => ({
                 ],
             },
         }),
+        createSkipUnchangedBuildPlugin(__dirname)
     ],
 }));
