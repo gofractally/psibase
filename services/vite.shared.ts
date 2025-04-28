@@ -4,13 +4,13 @@ import fs from 'fs'
 import crypto from 'crypto'
 import alias from '@rollup/plugin-alias'
 
-export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
+function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
   // Skip if REBUILD_ALWAYS is set to false
-  if (process.env.REBUILD_ALWAYS === 'true') {
+  if (process.env.PSIREBUILD === 'true') {
     return {
       name: 'skip-unchanged-build',
       buildStart() {
-        console.log('No-rebuild functionality disabled (NO_REBUILD=false)')
+        console.log('No-rebuild functionality disabled (PSIREBUILD=true)')
       }
     }
   }

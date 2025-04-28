@@ -2,7 +2,7 @@
 import path from "path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
-import { createSkipUnchangedBuildPlugin, verifyViteCache } from "../../../../../vite.shared";
+import { createSharedViteConfig, verifyViteCache } from "../../../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -17,7 +17,13 @@ export default defineConfig({
             fileName: "common-lib",
         },
     },
-    plugins: [dts(),createSkipUnchangedBuildPlugin(serviceDir)],
+    plugins: [
+        dts(),
+        createSharedViteConfig({
+            projectDir: serviceDir,
+            manualChunks: {},
+        }),
+    ],
 });
 
 

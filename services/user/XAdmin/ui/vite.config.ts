@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
-import { createSkipUnchangedBuildPlugin, verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -19,11 +19,7 @@ export default defineConfig(({ command }) => ({
                 },
             },
         }),
-        createSharedViteConfig({
-            projectDir: serviceDir,
-            // framework: 'react',
-        }),
-        // psibase("__contract__(kebabCase)", command === "serve"),
+        createSharedViteConfig({ projectDir: serviceDir, }),
         ...createPsibaseConfig({
             service: "x-admin",
             serviceDir,
@@ -46,7 +42,6 @@ export default defineConfig(({ command }) => ({
         }),
         wasm(),
         topLevelAwait(),
-        createSkipUnchangedBuildPlugin(serviceDir),
         [{
             resolve: {
                 alias: {

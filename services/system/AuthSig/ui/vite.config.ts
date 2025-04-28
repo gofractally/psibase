@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { createSkipUnchangedBuildPlugin, verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -13,13 +13,11 @@ export default defineConfig(({ command }) => ({
     react(),
     createSharedViteConfig({
       projectDir: serviceDir,
-      // framework: 'react',
     }),
     ...createPsibaseConfig({
       service: "auth-sig",
       serviceDir: serviceDir,
       isServing: command === "serve"
     }),
-    createSkipUnchangedBuildPlugin(serviceDir)
   ],
 }));

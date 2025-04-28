@@ -5,7 +5,7 @@ import * as fs from "fs";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { createSkipUnchangedBuildPlugin, verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -17,7 +17,6 @@ export default defineConfig(({ command }) => ({
         react(),
         createSharedViteConfig({
             projectDir: serviceDir,
-            // framework: 'react',
         }),
         ...createPsibaseConfig({
             service: "permissions",
@@ -28,7 +27,6 @@ export default defineConfig(({ command }) => ({
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),
-        createSkipUnchangedBuildPlugin(serviceDir)
     ],
     build: {
         rollupOptions: {
