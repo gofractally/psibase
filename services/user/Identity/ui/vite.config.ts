@@ -9,16 +9,16 @@ verifyViteCache(serviceDir);
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  createSharedViteConfig({
-    projectDir: serviceDir,
-    // framework: 'react',
-    additionalPlugins: [
-      react(),
-      ...createPsibaseConfig({
-        service: "identity",
-        serviceDir,
-        isServing: process.env.NODE_ENV === 'development'
-      })
-    ]
-  }),
+  plugins: [
+    react(),
+    createSharedViteConfig({
+      projectDir: serviceDir,
+
+    }),
+    ...createPsibaseConfig({
+      service: "identity",
+      serviceDir,
+      isServing: process.env.NODE_ENV === 'development'
+    })
+  ],
 })
