@@ -4,13 +4,13 @@ import fs from 'fs'
 import crypto from 'crypto'
 import alias from '@rollup/plugin-alias'
 
-export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
-  // Skip if NO_REBUILD is set to false
-  if (process.env.NO_REBUILD === 'false') {
+function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
+  // Skip if REBUILD_ALWAYS is set to false
+  if (process.env.PSIREBUILD === 'true') {
     return {
       name: 'skip-unchanged-build',
       buildStart() {
-        console.log('No-rebuild functionality disabled (NO_REBUILD=false)')
+        console.log('No-rebuild functionality disabled (PSIREBUILD=true)')
       }
     }
   }
@@ -88,13 +88,34 @@ export function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
 export interface SharedViteConfigOptions {
   projectDir: string
   additionalPlugins?: Plugin[]
+  manualChunks?: Record<string, string[]>
   additionalManualChunks?: Record<string, string[]>
+  uiFramework?: string
 }
 
 export function createSharedViteConfig(options: SharedViteConfigOptions): UserConfig {
-  const { projectDir, additionalPlugins = [], additionalManualChunks = {} } = options
+  const { projectDir, uiFramework = "react", additionalPlugins = [], manualChunks = {
+    vendor: ['react', 'react-dom', 'react-router-dom'],
+  }, additionalManualChunks = {} } = options
 
-  return {
+  const rollupOptions = {
+        cache: true,
+        outDir: 'dist',
+        emptyOutDir: true,
+        output: {
+          entryFileNames: 'index.js',
+          assetFileNames: '[name][extname]',
+          manualChunks: {
+            // Core UI libraries
+            ...manualChunks,
+            ...additionalManualChunks
+          }
+        }
+      };
+  // if (uiFramework === "react") {
+  //   rollupOptions.output.dir = "dist"
+  // }
+  return [{
     name: 'shared-vite-config',
     build: {
       // Generate manifest for caching
@@ -105,39 +126,25 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
       // Enable build cache in a project-specific directory
       cacheDir: path.resolve(__dirname, ".vite-cache"),
       // Configure Rollup caching
-      rollupOptions: {
-        cache: true,
-        // TODO: split this out to a createReactAppConfig() and include only in React apps
-        output: {
-          dir: "dist",
-          manualChunks: {
-            // Core UI libraries
-            // TODO: these should only be for react apps; need a toggle
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-            ...additionalManualChunks
-          }
-        }
-      },
+      rollupOptions,
       // Increase chunk size warning limit
       chunkSizeWarningLimit: 1000
     },
     optimizeDeps: {
       // Enable dependency pre-bundling
-      include: [
+      include: uiFramework === "react" ? [
         'react',
         'react-dom',
         'react-router-dom'
-      ],
+      ] : [],
       // Use persistent cache for dependencies
       cacheDir: path.resolve(projectDir, '.vite-cache/deps')
     },
     // Enable caching of transform results
     cacheDir: path.resolve(projectDir, '.vite-cache'),
-    plugins: [
-      createSkipUnchangedBuildPlugin(projectDir),
-      ...additionalPlugins
-    ]
-  }
+  },
+  createSkipUnchangedBuildPlugin(projectDir),
+]
 } 
 
 export function verifyViteCache(dirname: any) {
@@ -284,10 +291,6 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
                             "@bytecodealliance/preview2-shim/random"
                         ],
                         makeAbsoluteExternalsRelative: false,
-                        output: {
-                            entryFileNames: 'index.js',
-                            assetFileNames: '[name][extname]',
-                        },
                     },
                 },
                 // TODO: No server entry in Producers at all

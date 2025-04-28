@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { createSkipUnchangedBuildPlugin, verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
+import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 
@@ -37,6 +37,5 @@ export default defineConfig(({ command }: { command: 'serve' | 'build' }) => ({
         (req) => !req.url.startsWith("/api")
       ]
     }),
-    createSkipUnchangedBuildPlugin(serviceDir)
   ],
 }));

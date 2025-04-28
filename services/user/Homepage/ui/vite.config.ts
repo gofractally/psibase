@@ -14,12 +14,10 @@ verifyViteCache(serviceDir);
 
 export default defineConfig({
     plugins: [
+        react(),
+        svgr(),
         createSharedViteConfig({
             projectDir: serviceDir,
-            additionalPlugins: [
-                react(),
-                svgr(),
-            ],
             additionalManualChunks: {
                 // Radix UI components
                 'radix-ui': [
