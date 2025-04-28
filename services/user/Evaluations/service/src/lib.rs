@@ -103,7 +103,7 @@ pub mod service {
         allowed_group_sizes: Vec<u8>,
         num_options: u8,
         use_hooks: bool,
-    ) {
+    ) -> u32 {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
@@ -128,6 +128,7 @@ pub mod service {
         Wrapper::emit()
             .history()
             .evaluation_created(get_sender(), new_evaluation.id);
+        new_evaluation.id
     }
 
     #[action]
@@ -198,7 +199,7 @@ pub mod service {
     }
 
     #[action]
-    fn close_group(owner: AccountNumber, evaluation_id: u32, group_number: u32) {
+    fn flush_group(owner: AccountNumber, evaluation_id: u32, group_number: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Closed);
 
@@ -206,13 +207,19 @@ pub mod service {
     }
 
     #[action]
-    fn close_groups(owner: AccountNumber, evaluation_id: u32) {
+    fn flush_groups(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Closed);
 
         evaluation.get_groups().iter().for_each(|group| {
             declare_group_result(Evaluation::get(owner, evaluation_id), group.number, vec![]);
         });
+    }
+
+    #[action]
+    fn delete(evaluation_id: u32) {
+        let evaluation = Evaluation::get(get_sender(), evaluation_id);
+        evaluation.delete();
     }
 
     #[action]

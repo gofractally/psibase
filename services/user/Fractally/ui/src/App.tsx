@@ -6,94 +6,134 @@ import { Input } from "@shadcn/input";
 
 import { Nav } from "@components/nav";
 
-import { useCreateConnectionToken } from "@hooks";
+import {
+    useCreateConnectionToken,
+    useCurrentAccounts,
+    useLoggedInUser,
+    useSelectAccount,
+} from "@hooks";
 
 import { getSupervisor } from "@psibase/common-lib";
+import { useForm } from "@tanstack/react-form";
 const supervisor = getSupervisor();
 
+
+const fc = async(method: string, params: any[]) => {
+    return supervisor.functionCall({
+        method,
+        params,
+        service: 'fractally',
+        intf: 'api'
+    })
+}
+
 export const App = () => {
-    const [changesMade, setChangesMade] = useState<boolean>(false);
-    const [exampleThing, setExampleThing] = useState<string>("");
-    const [uploadStatus, setUploadStatus] = useState<string>("");
-    const thisServiceName = "fractally"
+    const { data: accounts } = useCurrentAccounts();
+    const { mutateAsync: selectAccount } = useSelectAccount();
 
-    const { mutateAsync: onLogin } = useCreateConnectionToken();
+    const { data: currentUser } = useLoggedInUser();
 
-    const init = async () => {
-        await supervisor.onLoaded();
-        await getExampleThing();
-    };
+    const newFractalForm = useForm({
+        defaultValues: {
+            name: "",
+            mission: "",
+        },
+        onSubmit: async ({ value }) => {
+            await fc('createFractal', [value.name, value.mission])
 
-    useEffect(() => {
-        init();
-    }, []);
+        },
+    });
 
-    const getExampleThing = async () => {
-        const queriedExampleThing = (await supervisor.functionCall({
-            service: thisServiceName,
-            intf: "queries",
-            method: "getExampleThing",
-            params: [],
-        })) as string;
-        setExampleThing(queriedExampleThing);
-    };
-    const updateAssets: React.MouseEventHandler<HTMLButtonElement> = async (
-        e,
-    ) => {
-        e.preventDefault();
-        try {
-            if (exampleThing) {
-                await supervisor.functionCall({
-                    service: thisServiceName,
-                    intf: "api",
-                    method: "setExampleThing",
-                    params: [exampleThing],
-                });
-            }
-            setChangesMade(false);
-        } catch (e) {
-            if (e instanceof Error) {
-                console.error(`Error: ${e.message}\nStack: ${e.stack}`);
-                setUploadStatus(`Error: ${e.message}`);
-            } else {
-                console.error(
-                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
-                );
-                setUploadStatus(
-                    `Caught exception: ${JSON.stringify(e, null, 2)}`,
-                );
-            }
+    const joinFractalForm = useForm({
+        defaultValues: {
+            name: ''
+        },
+        onSubmit: async({ value}) => {
+            await fc('join', [value.name])
         }
-    };
+    })
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="Example Thing Page" />
-            <form className="mx-auto grid max-w-screen-md grid-cols-6">
-                <div className="col-span-6 mt-6 grid grid-cols-6">
-                    <Label htmlFor="exampleThing" className="col-span-2">
-                        Example Thing
-                    </Label>
-                    <Input
-                        id="exampleThing"
-                        className="col-span-4"
-                        onChange={(e) => {
-                            setExampleThing(e.target.value);
-                            setChangesMade(true);
+            <Nav title="fractally" />
+
+            <div>
+                <div className="pb-1 text-muted-foreground">
+                    {" "}
+                    Selected account:{" "}
+                    <span className="text-primary">{currentUser}</span>
+                </div>
+                <div className="flex gap-2">
+                    {accounts.map((account) => (
+                        <div key={account}>
+                            <Button
+                                onClick={() => {
+                                    selectAccount(account);
+                                }}
+                                variant={
+                                    currentUser == account
+                                        ? "default"
+                                        : "secondary"
+                                }
+                                className="w-32"
+                            >
+                                {account}
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div>
+                <div>Create fractal</div>
+                <div className="flex flex-col gap-2">
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            newFractalForm.handleSubmit();
                         }}
-                        value={exampleThing}
-                    />
-                </div>
-                <div className="col-span-6 mt-6 font-medium">
-                    <Button
-                        type="submit"
-                        disabled={!changesMade}
-                        onClick={updateAssets}
                     >
-                        Save
-                    </Button>
+                        <newFractalForm.Field
+                            name="name"
+                            children={(field) => {
+                                return (
+                                    <Input
+                                        placeholder="Name"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                            field.handleChange(e.target.value)
+                                        }
+                                    />
+                                );
+                            }}
+                        />
+                        <newFractalForm.Field
+                            name="mission"
+                            children={(field) => {
+                                return (
+                                    <Input
+                                        placeholder="Mission"
+                                        value={field.state.value}
+                                        onChange={(e) =>
+                                            field.handleChange(e.target.value)
+                                        }
+                                    />
+                                );
+                            }}
+                        />
+                        <newFractalForm.Subscribe 
+                            selector={(state) => [state.isSubmitting, state.isSubmitSuccessful]}
+                            children={([submitting, isSuccessful]) => <Button>{isSuccessful ? "Success": submitting ?  "Saving" : "Save"}</Button>}
+                        />
+                    </form>
                 </div>
-            </form>
+            </div>
+            <div>
+                <div>Set schedule</div>
+                <div className="flex flex-col gap-2">
+                    
+                </div>
+            </div>
         </div>
     );
 };

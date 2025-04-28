@@ -17,14 +17,17 @@ interface api {
 
     start: func(evaluation-id: u32) -> result<_, error>;
 
-    close: func(owner: string, evaluation-id: u32) -> result<_, error>;
-
+    
     attest: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<_, error>;
-
+    
     propose: func(evaluation-owner: account, evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
-
+    
     get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
-   
+    
+    flush-group: func(owner: string, evaluation-id: u32, group-number: u32) -> result<_, error>;
+    flush-groups: func(owner: string, evaluation-id: u32) -> result<_, error>;
+    
+    delete: func(evaluation-id: u32) -> result<_, error>;
 }
 
 

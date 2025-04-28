@@ -9,9 +9,7 @@ publish.workspace = true
 server = "r-fractally"
 plugin = "plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
-postinstall = [
-    { sender = "fractally", service = "fractally", method = "init", rawData = "0000" },
-]
+
 
 [dependencies]
 psibase = { version = "0.16.0", path = "../../../../rust/psibase" }

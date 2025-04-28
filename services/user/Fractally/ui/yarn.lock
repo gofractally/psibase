@@ -938,10 +938,27 @@
     lodash.merge "^4.6.2"
     postcss-selector-parser "6.0.10"
 
+"@tanstack/form-core@1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@tanstack/form-core/-/form-core-1.8.0.tgz#d7de44a2d7ed9f5f1357eaccceaf54a57336b90d"
+  integrity sha512-7ZmoCZoMYrep8Ta4Vjc4czT4M8mspEL3mkXQYUydshWCLeDB7otnwy0v6LR/xdvdzKSEodgsIWQibPpgykLoWA==
+  dependencies:
+    "@tanstack/store" "^0.7.0"
+
 "@tanstack/query-core@5.74.4":
   version "5.74.4"
   resolved "https://registry.yarnpkg.com/@tanstack/query-core/-/query-core-5.74.4.tgz#08c4f88f336738d822d9242c5e7d2be50f5c25b3"
   integrity sha512-YuG0A0+3i9b2Gfo9fkmNnkUWh5+5cFhWBN0pJAHkHilTx6A0nv8kepkk4T4GRt4e5ahbtFj2eTtkiPcVU1xO4A==
+
+"@tanstack/react-form@^1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@tanstack/react-form/-/react-form-1.8.0.tgz#a4fc3b486a0381b4114379a57cabcd32d873eb9a"
+  integrity sha512-FS3AJ+qnKlne1JmgWh4tKw5Ze23+3LA1cqbtxTD9uBd4+UFzcTkT7BiBNN/rbQFEMGFfvDvlH5TwU20IcW8/Lw==
+  dependencies:
+    "@tanstack/form-core" "1.8.0"
+    "@tanstack/react-store" "^0.7.0"
+    decode-formdata "^0.9.0"
+    devalue "^5.1.1"
 
 "@tanstack/react-query@^5.62.8":
   version "5.74.4"
@@ -949,6 +966,19 @@
   integrity sha512-mAbxw60d4ffQ4qmRYfkO1xzRBPUEf/72Dgo3qqea0J66nIKuDTLEqQt0ku++SDFlMGMnB6uKDnEG1xD/TDse4Q==
   dependencies:
     "@tanstack/query-core" "5.74.4"
+
+"@tanstack/react-store@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@tanstack/react-store/-/react-store-0.7.0.tgz#62d5d1c9b1c66ee04b06b88bc96cfbc4ee53002a"
+  integrity sha512-S/Rq17HaGOk+tQHV/yrePMnG1xbsKZIl/VsNWnNXt4XW+tTY8dTlvpJH2ZQ3GRALsusG5K6Q3unAGJ2pd9W/Ng==
+  dependencies:
+    "@tanstack/store" "0.7.0"
+    use-sync-external-store "^1.4.0"
+
+"@tanstack/store@0.7.0", "@tanstack/store@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@tanstack/store/-/store-0.7.0.tgz#afef29b06c6b592e93181cee9baa62fe77454459"
+  integrity sha512-CNIhdoUsmD2NolYuaIs8VfWM467RK6oIBAW4nPEKZhg1smZ+/CwtCdpURgp7nxSqOaV9oKkzdWD80+bC66F/Jg==
 
 "@types/babel__core@^7.20.5":
   version "7.20.5"
@@ -1492,6 +1522,11 @@ debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.4:
   dependencies:
     ms "^2.1.3"
 
+decode-formdata@^0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/decode-formdata/-/decode-formdata-0.9.0.tgz#fa9c0c0ea0a279d6d1ea825c156534d2d5fa6721"
+  integrity sha512-q5uwOjR3Um5YD+ZWPOF/1sGHVW9A5rCrRwITQChRXlmPkxDFBqCm4jNTIVdGHNH9OnR+V9MoZVgRhsFb+ARbUw==
+
 deep-is@^0.1.3:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/deep-is/-/deep-is-0.1.4.tgz#a6f2dce612fadd2ef1f519b73551f17e85199831"
@@ -1519,6 +1554,11 @@ detect-node-es@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/detect-node-es/-/detect-node-es-1.1.0.tgz#163acdf643330caa0b4cd7c21e7ee7755d6fa493"
   integrity sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ==
+
+devalue@^5.1.1:
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/devalue/-/devalue-5.1.1.tgz#a71887ac0f354652851752654e4bd435a53891ae"
+  integrity sha512-maua5KUiapvEwiEAe+XnlZ3Rh0GD+qI1J/nb9vrJc3muPXvcF/8gXYTWF76+5DAqHyDUtOIImEuo0YKE9mshVw==
 
 didyoumean@^1.2.2:
   version "1.2.2"
@@ -3533,7 +3573,7 @@ use-sidecar@^1.1.3:
     detect-node-es "^1.1.0"
     tslib "^2.0.0"
 
-use-sync-external-store@^1.5.0:
+use-sync-external-store@^1.4.0, use-sync-external-store@^1.5.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.5.0.tgz#55122e2a3edd2a6c106174c27485e0fd59bcfca0"
   integrity sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A==

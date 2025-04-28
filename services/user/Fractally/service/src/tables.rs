@@ -1,20 +1,12 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{abort_message, AccountNumber, Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
     use psibase::services::transact::Wrapper as TransactSvc;
 
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "FractalTable", index = 1)]
+    #[table(name = "FractalTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Fractal {
         pub account: AccountNumber,
@@ -57,14 +49,34 @@ pub mod tables {
         
     }
 
+    #[derive(PartialEq)]
+    pub enum MemberStatus {
+        Visa = 1,
+        Citizen = 2,
+        Exiled = 3
+    }
 
-    #[table(name = "MemberTable", index = 2)]
+    pub type StatusU32 = u32;
+
+    impl From<StatusU32> for MemberStatus  {
+        fn from(status: StatusU32) -> Self {
+            match status {
+                1 => MemberStatus::Visa,
+                2 => MemberStatus::Citizen,
+                3 => MemberStatus::Exiled,
+                _ => abort_message("invalid member status")
+            }
+        }
+    }
+
+    #[table(name = "MemberTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Member {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub reputation: f32,
+        pub member_status: StatusU32
     }
 
     impl Member {
@@ -73,12 +85,15 @@ pub mod tables {
             (self.fractal, self.account)
         }
 
-        pub fn new(fractal: AccountNumber, account: AccountNumber) -> Self {
+    
+
+        pub fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
             Self {
                 account,
                 fractal,
                 created_at: TransactSvc::call().currentBlock().time.seconds(),
-                reputation: 0.0
+                reputation: 0.0,
+                member_status: status as StatusU32
             }
         }
 
@@ -93,7 +108,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "EvaluationTable", index = 3)]
+    #[table(name = "EvaluationTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Evaluation {
         pub fractal: AccountNumber,

@@ -39,7 +39,12 @@ mod service {
     }
 
     #[action]
-    fn close(id: u32){
+    fn close_groups(owner: AccountNumber, evaluation_id: u32){
+        unimplemented!()
+    }
+
+    #[action]
+    fn delete(evaluation_id: u32){
         unimplemented!()
     }
     

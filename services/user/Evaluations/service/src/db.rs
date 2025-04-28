@@ -198,7 +198,7 @@ pub mod tables {
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
             let result = table.get_index_pk().get(&(owner, evaluation_id));
-            psibase::check(result.is_some(), "evaluation not found");
+            psibase::check(result.is_some(), &format!("evaluation {} {} not found", owner, evaluation_id));
             result.unwrap()
         }
 

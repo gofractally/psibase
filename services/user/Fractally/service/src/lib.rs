@@ -1,27 +1,15 @@
-pub mod tables;
 mod scoring;
+pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::{Evaluation, Fractal, InitTable, Member};
     use crate::scoring::calculate_ema;
-    use psibase::*;
-
-    #[action]
-    fn init() {}
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
-    }
+    use crate::tables::tables::{Fractal, Member, MemberStatus};
+    use psibase::{AccountNumber, *};
 
     #[action]
     #[allow(non_snake_case)]
-    fn create_fractal(name: String, mission: String) {
+    fn createFractal(name: String, mission: String) {
         let sender = get_sender();
 
         check_none(Fractal::get(sender), "fractal already exists");
@@ -36,9 +24,19 @@ pub mod service {
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
-        check_none(Member::get(fractal, sender), "already a member");
-        let new_member = Member::new(fractal, sender);
-        new_member.save();
+        check(sender != fractal, "a fractal cannot join itself");
+        check_none(Member::get(fractal, sender), "you are already a member");
+        check_none(
+            Fractal::get(sender),
+            "a fractal cannot join another fractal",
+        );
+
+        let member = Member::new(
+            fractal,
+            sender,
+            MemberStatus::Citizen,
+        );
+        member.save();
 
         Wrapper::emit().history().joined_fractal(sender, fractal);
     }
@@ -57,16 +55,25 @@ pub mod service {
             sender: get_service(),
         };
 
+        check(
+            get_service() == AccountNumber::from("fractally"),
+            "not as expected",
+        );
+        check(
+            get_sender() == AccountNumber::from("cats"),
+            "not cats account",
+        );
+
         let mut fractal =
             Fractal::get(get_sender()).unwrap_or_else(|| abort_message("fractal does not exist"));
 
         if fractal.scheduled_evaluation.is_some() {
-            caller.call(
+            caller.call_returns_nothing(
                 MethodNumber::from(
-                    psibase::services::evaluations::action_structs::close::ACTION_NAME,
+                    psibase::services::evaluations::action_structs::delete::ACTION_NAME,
                 ),
-                psibase::services::evaluations::action_structs::close {
-                    id: fractal.scheduled_evaluation.unwrap(),
+                psibase::services::evaluations::action_structs::delete {
+                    evaluation_id: fractal.scheduled_evaluation.unwrap(),
                 },
             )
         };
@@ -100,12 +107,14 @@ pub mod service {
     #[allow(non_snake_case)]
     fn evalRegister(fractal: AccountNumber, evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
-        psibase::check_some(
+        let member = psibase::check_some(
             Member::get(fractal, account),
             "account is not a member of fractal",
         );
+        let status = MemberStatus::from(member.member_status);
 
-        // check(!member.is_banned)?
+        check(status == MemberStatus::Citizen, "must be a citizen to participate");
+
     }
 
     #[action]
@@ -153,7 +162,6 @@ pub mod service {
         let mapped_user_results: Vec<(AccountNumber, u8)> = mapped_users
             .into_iter()
             .map(|mapped_user| {
-
                 let user_level_achieved = user_levels
                     .iter()
                     .find_map(|user_level| {
@@ -164,26 +172,28 @@ pub mod service {
                         }
                     })
                     .unwrap_or(0);
-            
-                return (mapped_user.1, user_level_achieved)
+
+                return (mapped_user.1, user_level_achieved);
             })
             .collect();
 
-
         mapped_user_results.iter().for_each(|result| {
-            let mut member = check_some(Member::get(fractal, result.0), "failed to get member of fractal");
-            let new_ema = calculate_ema(result.1, member.reputation, 0.2).expect("failed calculating new ema");
-            member.reputation = new_ema;
+            let mut member = check_some(
+                Member::get(fractal, result.0),
+                "failed to get member of fractal",
+            );
+
+            member.reputation = calculate_ema(result.1, member.reputation, 0.2)
+                .expect("failed calculating new ema");
             member.save();
         });
-
-        
     }
 
     #[action]
     #[allow(non_snake_case)]
     fn evalFin(evaluation_id: u32) {
-        unimplemented!()
+
+        // I guess do nothing for now.
     }
 
     #[event(history)]

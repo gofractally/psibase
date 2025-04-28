@@ -106,10 +106,36 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("start", &packed_args)
     }
 
-    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+    fn delete(evaluation_id: u32) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::delete { evaluation_id }.packed();
+
+        add_action_to_transaction("delete", &packed_args)
+    }
+
+    fn flush_groups(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-        .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let packed_args = evaluations::action_structs::close_groups { owner: evaluation_owner, evaluation_id }.packed();
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let packed_args = evaluations::action_structs::flush_groups {
+            owner: evaluation_owner,
+            evaluation_id,
+        }
+        .packed();
+        add_action_to_transaction("close", &packed_args)
+    }
+
+    fn flush_group(
+        evaluation_owner: String,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let packed_args = evaluations::action_structs::flush_group {
+            owner: evaluation_owner,
+            evaluation_id,
+            group_number,
+        }
+        .packed();
         add_action_to_transaction("close", &packed_args)
     }
 
