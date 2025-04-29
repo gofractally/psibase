@@ -12183,11 +12183,17 @@ __metadata:
   linkType: hard
 
 "wasm-transpiled@file:./wasm-transpiled::locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui":
-  version: 1.0.0
-  resolution: "wasm-transpiled@file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"
-  checksum: 10c0/3b14a540ed56e6770322f7167e92502e5718041ae51364209a71402e0761b7993d75d81c99b5afc309e259b1efae37722c9759fc1db2c9aed176060456225481
+  version: 0.0.0
+  resolution: "wasm-transpiled@file:./wasm-transpiled#./wasm-transpiled::hash=f58532&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"
+  checksum: 10c0/db4b8312f7282fde79473b2d2ff1665d8eb400f49fe51317912ccb92dc4e4495607fd0a0917228bb3704dcddb1f2d124ddcaf0a7426bb4ba0181c9bab211b4ee
   languageName: node
   linkType: hard
+
+"wasm-transpiled@workspace:user/XAdmin/ui/wasm":
+  version: 0.0.0-use.local
+  resolution: "wasm-transpiled@workspace:user/XAdmin/ui/wasm"
+  languageName: unknown
+  linkType: soft
 
 "which-boxed-primitive@npm:^1.1.0, which-boxed-primitive@npm:^1.1.1":
   version: 1.1.1

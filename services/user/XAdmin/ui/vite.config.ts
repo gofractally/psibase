@@ -19,7 +19,7 @@ export default defineConfig(({ command }) => ({
                 },
             },
         }),
-        createSharedViteConfig({ projectDir: serviceDir, }),
+        createSharedViteConfig({ projectDir: serviceDir }),
         ...createPsibaseConfig({
             service: "x-admin",
             serviceDir,

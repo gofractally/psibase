@@ -5,8 +5,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
-        "build:dev": "vite build --mode development",
+        "build": "cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build",
+        "build:dev": "cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build --mode development",
         "preview": "vite preview",
         "typecheck": "tsc --noEmit"
     },
