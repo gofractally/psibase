@@ -63,9 +63,8 @@ pub mod service {
     }
 
     #[action]
-    fn start(evaluation_id: u32) {
-        let sender = get_sender();
-        let evaluation = Evaluation::get(sender, evaluation_id);
+    fn start(owner: AccountNumber, evaluation_id: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
@@ -87,7 +86,7 @@ pub mod service {
 
         for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
             let group_number: u32 = (index as u32) + 1;
-            let new_group = Group::new(sender, evaluation.id, group_number);
+            let new_group = Group::new(owner, evaluation.id, group_number);
             new_group.save();
 
             for mut user in grouped_users {
