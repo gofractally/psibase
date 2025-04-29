@@ -9,7 +9,7 @@
     "packages": [
       "user/CommonApi/common/packages/common-lib",
       "user/CommonApi/common/packages/plugin-tester/ui",
-      "user/XAdmin/ui",
+      "user/XAdmin/ui/wasm",
       "system/Accounts/ui",
       "system/AuthSig/ui",
       "system/Producers/ui",
@@ -19,7 +19,8 @@
       "user/Homepage/ui",
       "user/Identity/ui",
       "user/Permissions/ui",
-      "user/Workshop/ui"
+      "user/Workshop/ui",
+      "user/XAdmin/ui"
     ]
   },
   "dependencies": {

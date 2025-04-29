@@ -65,6 +65,10 @@ const RAW_RUNTIME_STATE =
     {\
       "name": "@psibase/xadmin-ui",\
       "reference": "workspace:user/XAdmin/ui"\
+    },\
+    {\
+      "name": "wasm-transpiled",\
+      "reference": "workspace:user/XAdmin/ui/wasm"\
     }\
   ],\
   "enableTopLevelFallback": true,\
@@ -84,7 +88,8 @@ const RAW_RUNTIME_STATE =
     ["@psibase/supervisor-ui", ["workspace:user/Supervisor/ui"]],\
     ["@psibase/workshop-ui", ["workspace:user/Workshop/ui"]],\
     ["@psibase/xadmin-ui", ["workspace:user/XAdmin/ui"]],\
-    ["root-workspace-0b6124", ["workspace:."]]\
+    ["root-workspace-0b6124", ["workspace:."]],\
+    ["wasm-transpiled", ["workspace:user/XAdmin/ui/wasm"]]\
   ],\
   "fallbackPool": [\
   ],\
@@ -467,6 +472,21 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@bytecodealliance/componentize-js", "npm:0.17.0"],\
           ["@bytecodealliance/jco", "npm:1.10.2"],\
+          ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
+          ["binaryen", "npm:122.0.0"],\
+          ["chalk-template", "npm:1.1.0"],\
+          ["commander", "npm:12.1.0"],\
+          ["mkdirp", "npm:3.0.1"],\
+          ["ora", "npm:8.2.0"],\
+          ["terser", "npm:5.39.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:1.11.1", {\
+        "packageLocation": "../../.yarn/berry/cache/@bytecodealliance-jco-npm-1.11.1-bcf2d4fdb0-10c0.zip/node_modules/@bytecodealliance/jco/",\
+        "packageDependencies": [\
+          ["@bytecodealliance/componentize-js", "npm:0.17.0"],\
+          ["@bytecodealliance/jco", "npm:1.11.1"],\
           ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
           ["binaryen", "npm:122.0.0"],\
           ["chalk-template", "npm:1.1.0"],\
@@ -2889,7 +2909,7 @@ const RAW_RUNTIME_STATE =
           ["vite-plugin-top-level-await", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.5.0"],\
           ["vite-plugin-wasm", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.4.1"],\
           ["waait", "npm:1.0.5"],\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"],\
+          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=f58532&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"],\
           ["zod", "npm:3.24.3"]\
         ],\
         "linkType": "SOFT"\
@@ -16178,12 +16198,20 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["wasm-transpiled", [\
-      ["file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui", {\
-        "packageLocation": "../../.yarn/berry/cache/wasm-transpiled-file-752128ffdc-10c0.zip/node_modules/wasm-transpiled/",\
+      ["file:./wasm-transpiled#./wasm-transpiled::hash=f58532&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui", {\
+        "packageLocation": "../../.yarn/berry/cache/wasm-transpiled-file-a3a4d72e0b-10c0.zip/node_modules/wasm-transpiled/",\
         "packageDependencies": [\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=e7ecde&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"]\
+          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=f58532&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["workspace:user/XAdmin/ui/wasm", {\
+        "packageLocation": "./user/XAdmin/ui/wasm/",\
+        "packageDependencies": [\
+          ["@bytecodealliance/jco", "npm:1.11.1"],\
+          ["wasm-transpiled", "workspace:user/XAdmin/ui/wasm"]\
+        ],\
+        "linkType": "SOFT"\
       }]\
     ]],\
     ["which", [\

@@ -1,0 +1,14 @@
+{
+    "name": "wasm-transpiled",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled"
+    },
+    "main": "./index.js",
+    "types": "./index.d.ts",
+    "dependencies": {
+        "@bytecodealliance/jco": "^1.9.1"
+    }
+}
