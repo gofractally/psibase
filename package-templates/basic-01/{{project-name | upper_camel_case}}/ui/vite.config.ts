@@ -4,10 +4,12 @@ import path from "path";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { createSharedViteConfig, createPsibaseConfig } from "../../../vite.shared";
+import { createSharedViteConfig, createPsibaseConfig, verifyViteCache } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
 const serviceName = "{{project-name}}";
+
+verifyViteCache(serviceDir);
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
