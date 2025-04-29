@@ -2016,6 +2016,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/xadmin-ui@workspace:user/XAdmin/ui"
   dependencies:
+    "@bytecodealliance/jco": "npm:^1.9.1"
     "@hookform/resolvers": "npm:^3.6.0"
     "@radix-ui/react-accordion": "npm:^1.2.0"
     "@radix-ui/react-alert-dialog": "npm:^1.1.1"
@@ -12191,8 +12192,6 @@ __metadata:
 "wasm-transpiled@workspace:user/XAdmin/ui/wasm":
   version: 0.0.0-use.local
   resolution: "wasm-transpiled@workspace:user/XAdmin/ui/wasm"
-  dependencies:
-    "@bytecodealliance/jco": "npm:^1.9.1"
   languageName: unknown
   linkType: soft
 
