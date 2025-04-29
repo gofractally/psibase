@@ -1,7 +1,6 @@
 {
     "compilerOptions": {
         "composite": true,
-        "skipLibCheck": true,
         "module": "ESNext",
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
@@ -10,8 +9,6 @@
             "react",
             "react-dom"
         ],
-        "resolveJsonModule": true,
-        "esModuleInterop": true
     },
     "include": [
         "vite.config.ts",

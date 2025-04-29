@@ -6,9 +6,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "build:dev": "vite build --mode development",
         "preview": "vite preview",
-        "typecheck": "tsc --noEmit",
         "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
         "lint:fix": "yarn lint --fix",
         "lint:format": "prettier --loglevel warn --write \"./**/*.{js,jsx,ts,tsx,css,md,json}\" "

@@ -5,10 +5,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build",
-        "build:dev": "cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build --mode development",
-        "preview": "vite preview",
-        "typecheck": "tsc --noEmit"
+        "build": "node ../../../if-build-needed.mjs src wasm:wasm-transpiled 'cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build'",
+        "preview": "vite preview"
     },
     "dependencies": {
         "@bytecodealliance/jco": "^1.9.1",
