@@ -12184,8 +12184,8 @@ __metadata:
 
 "wasm-transpiled@file:./wasm-transpiled::locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui":
   version: 0.0.0
-  resolution: "wasm-transpiled@file:./wasm-transpiled#./wasm-transpiled::hash=8ea904&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"
-  checksum: 10c0/3316600ab961c98dce3941555050ed5d6d791662ff50646958a686c61bc2cccd8e4b06295257d40f306d66ade9c568cd4249adfbad3f404b27f43ba8e67e4303
+  resolution: "wasm-transpiled@file:./wasm-transpiled#./wasm-transpiled::hash=9eb0b8&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"
+  checksum: 10c0/a18be077da71d8b2c0b995ea3c66fc1fb40a0ddb46a35bd100e45d74e47076bccb7974f708e6b774ee4bb707572024fec0d3bf9d89d15ece1481521ff6919af4
   languageName: node
   linkType: hard
 
