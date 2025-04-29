@@ -100,7 +100,7 @@ if(DEFINED WASI_SDK_PREFIX)
         RHttpServer RSetCode RTokens RTransact SetCode Symbol
         Tokens Transact VerifySig
         PSubjectiveService CounterService AsyncQueryService
-        SubjectiveCounterService KeepSocketService)
+        SubjectiveCounterService KeepSocketService SocketListService)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
