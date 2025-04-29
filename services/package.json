@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build:all": "yarn workspace @psibase/explorer-ui prepare && yarn workspaces foreach --all -ptv run build",
+    "build:all": "yarn workspaces foreach --all -ptv run build",
     "build:pkg": "yarn workspace @psibase/${1}-ui build",
     "clear-cache": "yarn cache clean --all && rm -rf .yarn/cache .yarn/sdks .yarn/unplugged install-state.gz",
     "install-dev-tools": "yarn add -D @yarnpkg/sdks && yarn sdks vscode && cd user/Explorer/ui && yarn prepare"

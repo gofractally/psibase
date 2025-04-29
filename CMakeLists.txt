@@ -262,7 +262,7 @@ endforeach()
 
 # Single target to build all UIs, relying on Yarn's caching
 add_custom_target(build_uis
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn dlx @yarnpkg/sdks vscode && yarn run build:all
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn install-dev-tools && yarn build:all
 )
 
 # Static (not built) resource dependencies
@@ -309,8 +309,8 @@ add_custom_command(
     OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
     WORKING_DIRECTORY ${XADMIN_PATH}
-    COMMAND yarn
-    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
+    # COMMAND yarn
+    # COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
 )
 add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
 add_dependencies(xadmin-wasm-transpiled rust)
