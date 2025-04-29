@@ -89,7 +89,7 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Group>> {
             let account_number: AccountNumber = AccountNumber::from(owner.as_str());
-            TableQuery::subindex::<AccountNumber>(
+            TableQuery::subindex::<u32>(
                 GroupTable::with_service(evaluations::SERVICE).get_index_pk(),
                 &(account_number, evaluation_id),
             )
@@ -100,10 +100,6 @@ mod service {
             .query()
             .await
         }
-
-        // async fn get_group(&self, id: u32, group_number: u32) -> Option<Group> {
-        //     evaluations::Wrapper::call().getGroup(id, group_number)
-        // }
 
         async fn get_group_users(
             &self,
@@ -151,10 +147,6 @@ mod service {
             .query()
             .await
         }
-
-        // async fn get_user(&self, id: u32, user: AccountNumber) -> Option<User> {
-        //     evaluations::Wrapper::call().getUser(id, user)
-        // }
 
         async fn get_user_settings(&self, accounts: Vec<String>) -> Vec<Option<UserSettings>> {
             accounts

@@ -1,6 +1,5 @@
 package evaluations:plugin;
 
-
 interface types {
     type account = string;
 }
@@ -8,25 +7,97 @@ interface types {
 interface api {
     use host:common/types.{error};
     use types.{account};
-    
-    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, rank-amount: u8, use-hooks: bool) -> result<_, error>;
 
+    /// Schedules a new evaluation.
+    ///
+    /// Requires:
+    /// * Must be called by the evaluation owner.
+    ///
+    /// Parameters:
+    /// * `registration`: Unix timestamp (in seconds) for when registration opens.
+    /// * `deliberation`: Unix timestamp (in seconds) for when deliberation begins.
+    /// * `submission`: Unix timestamp (in seconds) for when proposal submission starts.
+    /// * `finish-by`: Unix timestamp (in seconds) for when the evaluation must be completed.
+    /// * `group-sizes`: List of possible group sizes (e.g., ["4", "5", "6"]) for dividing participants.
+    /// * `num-options`: Number of options each group can deliberate on (e.g. 3 for three options).
+    /// * `use-hooks`: Enable evaluations service to call the evaluation owner service.
+    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, num-options: u8, use-hooks: bool) -> result<_, error>;
+
+    /// Registers an account for a specific evaluation.
+    /// 
+    /// Requires:
+    /// * Must be called by registrant OR the evaluation owner
+    /// * Must be in registration phase 
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `registrant`: The account to be registered.
     register: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
 
+    /// Unregisters an account from a specific evaluation.
+    /// 
+    /// Requires:
+    /// * Must be in registration phase 
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `registrant`: The account to be unregistered.
     unregister: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
 
-    start: func(evaluation-id: u32) -> result<_, error>;
+    /// Starts a specific evaluation.
+    ///
+    /// Requires:
+    /// * Callable by anyone
+    /// * Must be in deliberation phase (ideally at the beginning)
+    /// 
+    /// Parameters:
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    start: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
 
+    /// Closes a specific evaluation
+    ///
+    /// Requires:
+    /// * Must be called by the evaluation owner.
+    /// * Must be in closed phase
+    ///
+    /// Parameters:
+    /// * `evaluation-id`: Unique identifier for the evaluation.
     close: func(evaluation-id: u32) -> result<_, error>;
 
-    attest: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<_, error>;
-
+    /// Submits a proposal for a group in an evaluation.
+    ///
+    /// Requires:
+    /// * Callable unlimited times, only during the deliberation phase.
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `group-number`: Identifier for the group submitting the proposal.
+    /// * `proposal`: List of `num-options` expressing the users latest vote.
     propose: func(evaluation-owner: account, evaluation-id: u32, group-number: u32, proposal: list<string>) -> result<_, error>;
 
-    get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
-   
-}
+    /// Attests participation or completion for a group in an evaluation. Callable only once per group member until result is determined.
+    ///
+    /// Requires:
+    /// * Callable only during the attestation phase.
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `group-number`: Identifier for the group attesting.
+    attest: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<_, error>;
 
+
+    /// Retrieves a proposal for a group in an evaluation.
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    /// * `group-number`: Identifier for the group whose proposal is being retrieved.
+    get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
+}
 
 world imports {
     import api;
