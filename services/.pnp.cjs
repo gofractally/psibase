@@ -481,21 +481,6 @@ const RAW_RUNTIME_STATE =
           ["terser", "npm:5.39.0"]\
         ],\
         "linkType": "HARD"\
-      }],\
-      ["npm:1.11.1", {\
-        "packageLocation": "../../.yarn/berry/cache/@bytecodealliance-jco-npm-1.11.1-bcf2d4fdb0-10c0.zip/node_modules/@bytecodealliance/jco/",\
-        "packageDependencies": [\
-          ["@bytecodealliance/componentize-js", "npm:0.17.0"],\
-          ["@bytecodealliance/jco", "npm:1.11.1"],\
-          ["@bytecodealliance/preview2-shim", "npm:0.17.2"],\
-          ["binaryen", "npm:122.0.0"],\
-          ["chalk-template", "npm:1.1.0"],\
-          ["commander", "npm:12.1.0"],\
-          ["mkdirp", "npm:3.0.1"],\
-          ["ora", "npm:8.2.0"],\
-          ["terser", "npm:5.39.0"]\
-        ],\
-        "linkType": "HARD"\
       }]\
     ]],\
     ["@bytecodealliance/preview2-shim", [\
@@ -2850,7 +2835,6 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/XAdmin/ui", {\
         "packageLocation": "./user/XAdmin/ui/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.10.2"],\
           ["@hookform/resolvers", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:3.10.0"],\
           ["@psibase/xadmin-ui", "workspace:user/XAdmin/ui"],\
           ["@radix-ui/react-accordion", "virtual:cea68cd7a6877fbb0324aa6f916fd8881df057802d179215149edb5fec5febbf3f9092270225ab4be9bf87b3a890ddc4cebbb0bcfba6594767811947022b8322#npm:1.2.8"],\
@@ -16208,7 +16192,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/XAdmin/ui/wasm", {\
         "packageLocation": "./user/XAdmin/ui/wasm/",\
         "packageDependencies": [\
-          ["@bytecodealliance/jco", "npm:1.11.1"],\
+          ["@bytecodealliance/jco", "npm:1.10.2"],\
           ["wasm-transpiled", "workspace:user/XAdmin/ui/wasm"]\
         ],\
         "linkType": "SOFT"\
