@@ -281,6 +281,7 @@ pub mod tables {
                 caller.call(
                     psibase::MethodNumber::from(EvalStructs::evalFin::ACTION_NAME),
                     EvalStructs::evalFin {
+                        owner: self.owner,
                         evaluation_id: self.id,
                     },
                 )
@@ -299,7 +300,6 @@ pub mod tables {
                     sender: psibase::get_service(),
                 };
 
-                // owner: AccountNumber, evaluation_id: u32, group_number: u32, users: Vec<AccountNumber>, result:
 
                 caller.call(
                     psibase::MethodNumber::from(EvalStructs::evalGroupFin::ACTION_NAME),

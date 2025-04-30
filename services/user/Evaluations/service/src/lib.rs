@@ -22,12 +22,12 @@ pub mod service {
     pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
-    pub fn group_finished(
-        owner: AccountNumber,
-        evaluation_id: u32,
-        group_number: u32,
-        users: Vec<AccountNumber>,
-        result: Vec<u8>,
+    pub fn groupfinished(
+        owner: String,
+        evaluation_id: String,
+        group_number: String,
+        users: Vec<String>,
+        result: Vec<String>,
     ) {
     }
 
@@ -45,10 +45,17 @@ pub mod service {
 
         evaluation.notify_group_finish(group_number, users.clone(), result.clone());
 
-        Wrapper::emit().history().group_finished(
-            evaluation.owner,
-            evaluation.id,
-            group_number,
+        let users: Vec<String> = users
+            .into_iter()
+            .map(|account| account.to_string())
+            .collect();
+
+        let result: Vec<String> = result.into_iter().map(|res| res.to_string()).collect();
+
+        Wrapper::emit().history().groupfinished(
+            evaluation.owner.to_string(),
+            evaluation.id.to_string(),
+            group_number.to_string(),
             users,
             result,
         );
@@ -56,7 +63,6 @@ pub mod service {
         group.delete();
 
         if !evaluation.is_groups() {
-
             evaluation.notify_evaluation_finish();
 
             Wrapper::emit()
@@ -201,7 +207,10 @@ pub mod service {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Deliberation);
 
-        let mut user = check_some(User::get(owner, evaluation_id, get_sender()), "user not found");
+        let mut user = check_some(
+            User::get(owner, evaluation_id, get_sender()),
+            "user not found",
+        );
 
         let group =
             Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
@@ -245,15 +254,25 @@ pub mod service {
         match result {
             helpers::GroupResult::ConsensusSuccess(result) => {
                 group.save();
-                
-                let users: Vec<AccountNumber> = evaluation.get_users().into_iter().map(|user| { user.user }).collect();
-                evaluation.notify_group_finish(user.group_number.unwrap(), users.clone(), result.clone());
 
-                Wrapper::emit().history().group_finished(
-                    evaluation.owner,
-                    evaluation.id,
+                let users: Vec<AccountNumber> = evaluation
+                    .get_users()
+                    .into_iter()
+                    .map(|user| user.user)
+                    .collect();
+                evaluation.notify_group_finish(
                     user.group_number.unwrap(),
-                    users,
+                    users.clone(),
+                    result.clone(),
+                );
+
+                let result: Vec<String> = result.into_iter().map(|id| id.to_string()).collect();
+
+                Wrapper::emit().history().groupfinished(
+                    evaluation.owner.to_string(),
+                    evaluation.id.to_string(),
+                    user.group_number.unwrap().to_string(),
+                    users.into_iter().map(|user| user.to_string()).collect(),
                     result,
                 );
             }
@@ -280,7 +299,10 @@ pub mod service {
             user_settings,
             "user must have a pre-existing key to be registered",
         );
-        check_none(User::get(evaluation.owner, evaluation_id, registrant), "user is already registered");
+        check_none(
+            User::get(evaluation.owner, evaluation_id, registrant),
+            "user is already registered",
+        );
         let user = User::new(evaluation.owner, evaluation.id, registrant);
         user.save();
 
@@ -299,7 +321,10 @@ pub mod service {
             "user is not allowed to unregister",
         );
 
-        let user = check_some(User::get(owner, evaluation_id, registrant), "user is not registered");
+        let user = check_some(
+            User::get(owner, evaluation_id, registrant),
+            "user is not registered",
+        );
         user.delete();
 
         evaluation.notify_unregister(registrant);

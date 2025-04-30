@@ -14,7 +14,13 @@ mod service {
     }
 
     #[action]
-    fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+    fn evalGroupFin(owner: AccountNumber, evaluation_id: u32, group_number: u32, users: Vec<AccountNumber>, result: Vec<u8>) {
+        unimplemented!()
+    }
+
+    
+    #[action]
+    fn evalFin(owner: AccountNumber, evaluation_id: u32) {
         unimplemented!()
     }
 }

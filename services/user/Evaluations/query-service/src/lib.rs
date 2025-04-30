@@ -11,20 +11,21 @@ mod service {
     use serde::Deserialize;
 
     struct Query;
-
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        a: String,
-        b: String,
-        res: String,
-    }
-
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
         evaluation_id: String,
         group_number: String,
         keys: Vec<Vec<u8>>,
         hash: String,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct GroupFinish {
+        owner: String,
+        evaluation_id: String,
+        group_number: String,
+        users: Vec<String>,
+        result: Vec<String>,
     }
 
     #[Object]
@@ -40,6 +41,15 @@ mod service {
                     evaluation_id, group_number
                 ))
                 .query()
+        }
+
+        async fn get_group_result(
+            &self,
+            evaluation_owner: String,
+            evaluation_id: u32,
+            group_number: u32,
+        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+            EventQuery::new("history.evaluations.groupfinished").query()
         }
 
         async fn get_group(
