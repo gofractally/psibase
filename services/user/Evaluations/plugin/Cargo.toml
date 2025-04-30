@@ -31,7 +31,6 @@ world = "impl"
 "clientdata:plugin" = { path = "../../ClientData/plugin/wit/world.wit" }
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
 "transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
-"sites:plugin" = { path = "../../Sites/plugin/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 
 [dev-dependencies]

@@ -199,12 +199,12 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     validators={{
                         onChange: ({ value }) => {
                             if (value < 2 || value > 255) {
-                                return "Rank amount must be between 2 and 255";
+                                return "Number of options must be between 2 and 255";
                             }
                         },
                     }}
                     children={(field) => (
-                        <field.NumberField label="Rank Amount" />
+                        <field.NumberField label="Number of options" />
                     )}
                 />
                 <div className="flex py-2">

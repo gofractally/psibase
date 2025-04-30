@@ -76,7 +76,8 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub reputation: f32,
-        pub member_status: StatusU32
+        pub member_status: StatusU32,
+        pub last_evaluation: Option<u32>
     }
 
     impl Member {
@@ -93,7 +94,8 @@ pub mod tables {
                 fractal,
                 created_at: TransactSvc::call().currentBlock().time.seconds(),
                 reputation: 0.0,
-                member_status: status as StatusU32
+                member_status: status as StatusU32,
+                last_evaluation: None
             }
         }
 

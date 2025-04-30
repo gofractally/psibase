@@ -101,39 +101,34 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("unregister", &packed_args)
     }
 
-    fn start(evaluation_id: u32) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::start { evaluation_id }.packed();
-        add_action_to_transaction("start", &packed_args)
-    }
-
-    fn delete(evaluation_id: u32) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::delete { evaluation_id }.packed();
-
-        add_action_to_transaction("delete", &packed_args)
-    }
-
-    fn flush_groups(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+    fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
             .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let packed_args = evaluations::action_structs::flush_groups {
+
+        let packed_args = evaluations::action_structs::start {
             owner: evaluation_owner,
             evaluation_id,
         }
         .packed();
-        add_action_to_transaction("close", &packed_args)
+        add_action_to_transaction("start", &packed_args)
     }
 
-    fn flush_group(
-        evaluation_owner: String,
-        evaluation_id: u32,
-        group_number: u32,
-    ) -> Result<(), Error> {
+    fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::delete {
+            evaluation_id,
+            force,
+        }
+        .packed();
+
+        add_action_to_transaction("delete", &packed_args)
+    }
+
+    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
             .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let packed_args = evaluations::action_structs::flush_group {
+        let packed_args = evaluations::action_structs::close {
             owner: evaluation_owner,
             evaluation_id,
-            group_number,
         }
         .packed();
         add_action_to_transaction("close", &packed_args)

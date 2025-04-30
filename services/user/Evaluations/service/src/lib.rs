@@ -12,8 +12,6 @@ pub mod service {
 
     use psibase::*;
 
-    use psibase::services::evaluations::action_structs as EvalStructs;
-
     #[event(history)]
     pub fn keysset(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {}
 
@@ -39,29 +37,13 @@ pub mod service {
             "failed to find group",
         );
 
-        let caller = ServiceCaller {
-            service: evaluation.owner,
-            sender: get_sender(),
-        };
-
         let users: Vec<AccountNumber> = evaluation
             .get_users()
             .into_iter()
             .map(|user: User| user.owner)
             .collect();
 
-        if evaluation.use_hooks {
-            caller.call(
-                MethodNumber::from(EvalStructs::evalGroupFin::ACTION_NAME),
-                EvalStructs::evalGroupFin {
-                    owner: evaluation.owner,
-                    evaluation_id: evaluation.id,
-                    group_number,
-                    users: users.clone(),
-                    result: result.clone(),
-                },
-            )
-        }
+        evaluation.notify_group_finish(group_number, users.clone(), result.clone());
 
         Wrapper::emit().history().group_finished(
             evaluation.owner,
@@ -74,26 +56,18 @@ pub mod service {
         group.delete();
 
         if !evaluation.is_groups() {
-            if evaluation.use_hooks {
-                let caller = ServiceCaller {
-                    service: evaluation.owner,
-                    sender: get_sender(),
-                };
 
-                caller.call(
-                    MethodNumber::from(EvalStructs::evalFin::ACTION_NAME),
-                    EvalStructs::evalFin {
-                        evaluation_id: evaluation.id,
-                    },
-                )
-            }
+            evaluation.notify_evaluation_finish();
 
-            Wrapper::emit().history().evaluation_finished(evaluation.owner, evaluation.id);
+            Wrapper::emit()
+                .history()
+                .evaluation_finished(evaluation.owner, evaluation.id);
 
             evaluation.delete();
         }
     }
 
+    // Create / schedule an evaluation
     #[action]
     fn create(
         registration: u32,
@@ -131,10 +105,10 @@ pub mod service {
         new_evaluation.id
     }
 
+    // Commences an evaluation, sorts registrants into groups and allows proposals
     #[action]
-    fn start(evaluation_id: u32) {
-        let sender = get_sender();
-        let evaluation = Evaluation::get(sender, evaluation_id);
+    fn start(owner: AccountNumber, evaluation_id: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
@@ -156,7 +130,7 @@ pub mod service {
 
         for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
             let group_number: u32 = (index as u32) + 1;
-            let new_group = Group::new(sender, evaluation.id, group_number);
+            let new_group = Group::new(owner, evaluation.id, group_number);
             new_group.save();
 
             for mut user in grouped_users {
@@ -168,12 +142,14 @@ pub mod service {
         evaluation.save();
     }
 
+    // Sets the public key for the user to receive the symmetric key
     #[action]
     fn setKey(key: Vec<u8>) {
         let user = UserSettings::new(get_sender(), key);
         user.save();
     }
 
+    // Sets the symmetric key for a group
     #[action]
     fn groupKey(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
         let evaluation = Evaluation::get(owner, evaluation_id);
@@ -182,7 +158,7 @@ pub mod service {
 
         let sender: AccountNumber = get_sender();
 
-        let user = User::get(sender, evaluation_id, sender);
+        let user = check_some(User::get(sender, evaluation_id, sender), "user not found");
 
         let group_number = check_some(user.group_number, "user is not sorted into a group");
 
@@ -198,16 +174,9 @@ pub mod service {
             .keysset(evaluation_id, group_number, keys, hash);
     }
 
+    // Close the evaluation
     #[action]
-    fn flush_group(owner: AccountNumber, evaluation_id: u32, group_number: u32) {
-        let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(EvaluationStatus::Closed);
-
-        declare_group_result(evaluation, group_number, vec![]);
-    }
-
-    #[action]
-    fn flush_groups(owner: AccountNumber, evaluation_id: u32) {
+    fn close(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Closed);
 
@@ -217,18 +186,23 @@ pub mod service {
     }
 
     #[action]
-    fn delete(evaluation_id: u32) {
+    fn delete(evaluation_id: u32, force: bool) {
         let evaluation = Evaluation::get(get_sender(), evaluation_id);
+        if !force {
+            let phase = evaluation.get_current_phase();
+            // pending or closed;
+        }
         evaluation.delete();
     }
 
+    // Accepts a group members encrypted proposal, to be decrypted and attested by group members in attestation phase
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
-        let sender = get_sender();
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Deliberation);
 
-        let mut user = User::get(owner, evaluation_id, sender);
+        let mut user = check_some(User::get(owner, evaluation_id, get_sender()), "user not found");
+
         let group =
             Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
 
@@ -241,6 +215,7 @@ pub mod service {
         user.save();
     }
 
+    // Sends group member attestation from decrypted proposals, triggers evalGroupFin in a successful consensus result
     #[action]
     fn attest(owner: AccountNumber, evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
@@ -253,8 +228,8 @@ pub mod service {
 
         evaluation.assert_status(EvaluationStatus::Submission);
 
-        let mut user = User::get(owner, evaluation_id, sender);
-        check(user.attestation.is_none(), "you have already submitted");
+        let mut user = check_some(User::get(owner, evaluation_id, sender), "user not found");
+        check_none(user.attestation, "you have already submitted");
 
         user.attestation = Some(attestation);
         user.save();
@@ -264,20 +239,29 @@ pub mod service {
             "failed to find group",
         );
 
-        check(group.key_submitter.is_some(), "cannot attest without key");
+        check_some(group.key_submitter, "cannot attest without key");
 
         let result = helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
         match result {
             helpers::GroupResult::ConsensusSuccess(result) => {
-                declare_group_result(evaluation, user.group_number.unwrap(), result.clone());
-            }
-            helpers::GroupResult::IrreconcilableFailure => {
-                declare_group_result(evaluation, user.group_number.unwrap(), vec![]);
+                group.save();
+                
+                let users: Vec<AccountNumber> = evaluation.get_users().into_iter().map(|user| { user.user }).collect();
+                evaluation.notify_group_finish(user.group_number.unwrap(), users.clone(), result.clone());
+
+                Wrapper::emit().history().group_finished(
+                    evaluation.owner,
+                    evaluation.id,
+                    user.group_number.unwrap(),
+                    users,
+                    result,
+                );
             }
             _ => {}
         }
     }
 
+    // Registers a user for an evaluation
     #[action]
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
@@ -292,29 +276,18 @@ pub mod service {
 
         let user_settings = UserSettings::get(registrant);
 
-        check(
-            user_settings.is_some(),
+        check_some(
+            user_settings,
             "user must have a pre-existing key to be registered",
         );
+        check_none(User::get(evaluation.owner, evaluation_id, registrant), "user is already registered");
         let user = User::new(evaluation.owner, evaluation.id, registrant);
         user.save();
 
-        if evaluation.use_hooks {
-            let caller = ServiceCaller {
-                service: evaluation.owner,
-                sender: get_sender(),
-            };
-
-            caller.call(
-                MethodNumber::from(EvalStructs::evalRegister::ACTION_NAME),
-                EvalStructs::evalRegister {
-                    account: registrant,
-                    evaluation_id: evaluation.id,
-                },
-            )
-        }
+        evaluation.notify_register(registrant);
     }
 
+    // Removes a registrant from an evaluation pre-deliberation
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
@@ -326,23 +299,10 @@ pub mod service {
             "user is not allowed to unregister",
         );
 
-        let user = User::get(owner, evaluation_id, registrant);
+        let user = check_some(User::get(owner, evaluation_id, registrant), "user is not registered");
         user.delete();
 
-        if evaluation.use_hooks {
-            let caller = ServiceCaller {
-                service: evaluation.owner,
-                sender: get_sender(),
-            };
-
-            caller.call(
-                MethodNumber::from(EvalStructs::evalUnregister::ACTION_NAME),
-                EvalStructs::evalUnregister {
-                    account: registrant,
-                    evaluation_id: evaluation.id,
-                },
-            )
-        }
+        evaluation.notify_unregister(registrant);
     }
 }
 

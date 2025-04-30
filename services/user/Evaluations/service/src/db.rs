@@ -2,7 +2,8 @@
 pub mod tables {
     use crate::helpers::{get_current_time_seconds, EvaluationStatus};
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Table, ToKey, ToSchema};
+    use psibase::services::evaluations::action_structs as EvalStructs;
+    use psibase::{AccountNumber, Caller, Fracpack, Table, ToKey, ToSchema};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -97,8 +98,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_group(&self) -> (AccountNumber, u32, Option<u32>) {
-            (self.owner, self.evaluation_id, self.group_number)
+        fn by_group(&self) -> (AccountNumber, u32, Option<u32>, AccountNumber) {
+            (self.owner, self.evaluation_id, self.group_number, self.user)
         }
 
         pub fn new(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {
@@ -112,11 +113,9 @@ pub mod tables {
             }
         }
 
-        pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Option<Self> {
             let table = UserTable::new();
-            let result = table.get_index_pk().get(&(owner, evaluation_id, user));
-            psibase::check(result.is_some(), "user not found");
-            result.unwrap()
+            table.get_index_pk().get(&(owner, evaluation_id, user))
         }
 
         pub fn save(&self) {
@@ -198,8 +197,10 @@ pub mod tables {
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
             let result = table.get_index_pk().get(&(owner, evaluation_id));
-            psibase::check(result.is_some(), &format!("evaluation {} {} not found", owner, evaluation_id));
-            result.unwrap()
+            psibase::check_some(
+                result,
+                &format!("evaluation {} {} not found", owner, evaluation_id),
+            )
         }
 
         pub fn save(&self) {
@@ -268,6 +269,83 @@ pub mod tables {
                 current_phase == expected_status,
                 format!("evaluation must be in {phase_name} phase").as_str(),
             );
+        }
+
+        pub fn notify_evaluation_finish(&self) {
+            if self.use_hooks {
+                let caller = psibase::ServiceCaller {
+                    service: self.owner,
+                    sender: psibase::get_sender(),
+                };
+
+                caller.call(
+                    psibase::MethodNumber::from(EvalStructs::evalFin::ACTION_NAME),
+                    EvalStructs::evalFin {
+                        evaluation_id: self.id,
+                    },
+                )
+            }
+        }
+
+        pub fn notify_group_finish(
+            &self,
+            group_number: u32,
+            users: Vec<AccountNumber>,
+            result: Vec<u8>,
+        ) {
+            if self.use_hooks {
+                let caller = psibase::ServiceCaller {
+                    service: self.owner,
+                    sender: psibase::get_service(),
+                };
+
+                // owner: AccountNumber, evaluation_id: u32, group_number: u32, users: Vec<AccountNumber>, result:
+
+                caller.call(
+                    psibase::MethodNumber::from(EvalStructs::evalGroupFin::ACTION_NAME),
+                    EvalStructs::evalGroupFin {
+                        owner: self.owner,
+                        evaluation_id: self.id,
+                        group_number: group_number,
+                        users,
+                        result,
+                    },
+                )
+            }
+        }
+
+        pub fn notify_register(&self, registrant: AccountNumber) {
+            if self.use_hooks {
+                let caller = psibase::ServiceCaller {
+                    service: self.owner,
+                    sender: psibase::get_service(),
+                };
+
+                caller.call(
+                    psibase::MethodNumber::from(EvalStructs::evalRegister::ACTION_NAME),
+                    EvalStructs::evalRegister {
+                        account: registrant,
+                        evaluation_id: self.id,
+                    },
+                )
+            }
+        }
+
+        pub fn notify_unregister(&self, registrant: AccountNumber) {
+            if self.use_hooks {
+                let caller = psibase::ServiceCaller {
+                    service: self.owner,
+                    sender: psibase::get_service(),
+                };
+
+                caller.call(
+                    psibase::MethodNumber::from(EvalStructs::evalUnregister::ACTION_NAME),
+                    EvalStructs::evalUnregister {
+                        account: registrant,
+                        evaluation_id: self.id,
+                    },
+                )
+            }
         }
     }
 

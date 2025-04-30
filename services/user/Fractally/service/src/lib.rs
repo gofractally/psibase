@@ -31,11 +31,7 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        let member = Member::new(
-            fractal,
-            sender,
-            MemberStatus::Citizen,
-        );
+        let member = Member::new(fractal, sender, MemberStatus::Citizen);
         member.save();
 
         Wrapper::emit().history().joined_fractal(sender, fractal);
@@ -64,18 +60,19 @@ pub mod service {
             "not cats account",
         );
 
-        let mut fractal =
-            Fractal::get(get_sender()).unwrap_or_else(|| abort_message("fractal does not exist"));
+        let mut fractal = check_some(Fractal::get(get_sender()), "failed to find fractal");
 
         if fractal.scheduled_evaluation.is_some() {
-            caller.call_returns_nothing(
-                MethodNumber::from(
-                    psibase::services::evaluations::action_structs::delete::ACTION_NAME,
-                ),
-                psibase::services::evaluations::action_structs::delete {
-                    evaluation_id: fractal.scheduled_evaluation.unwrap(),
-                },
-            )
+            psibase::services::evaluations::Wrapper::call()
+                .delete(fractal.scheduled_evaluation.unwrap());
+            // caller.call_returns_nothing(
+            //     MethodNumber::from(
+            //         psibase::services::evaluations::action_structs::delete::ACTION_NAME,
+            //     ),
+            //     psibase::services::evaluations::action_structs::delete {
+            //         evaluation_id: fractal.scheduled_evaluation.unwrap(),
+            //     },
+            // )
         };
 
         let eval_id: u32 = caller.call(
@@ -96,6 +93,8 @@ pub mod service {
         fractal.save();
     }
 
+    fn closeEval() {}
+
     fn check_is_eval() {
         check(
             get_sender() == AccountNumber::from("evaluations"),
@@ -113,8 +112,10 @@ pub mod service {
         );
         let status = MemberStatus::from(member.member_status);
 
-        check(status == MemberStatus::Citizen, "must be a citizen to participate");
-
+        check(
+            status == MemberStatus::Citizen,
+            "must be a citizen to participate",
+        );
     }
 
     #[action]
