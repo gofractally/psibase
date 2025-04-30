@@ -65,7 +65,6 @@ pub mod tables {
         pub evaluation_id: u32,
         pub number: u32,
         pub key_submitter: Option<AccountNumber>,
-        pub result: Option<Vec<u8>>,
     }
 
     #[table(name = "UserSettingsTable", index = 4)]
@@ -114,11 +113,9 @@ pub mod tables {
             }
         }
 
-        pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Self {
+        pub fn get(owner: AccountNumber, evaluation_id: u32, user: AccountNumber) -> Option<Self> {
             let table = UserTable::new();
-            let result = table.get_index_pk().get(&(owner, evaluation_id, user));
-            psibase::check(result.is_some(), "user not found");
-            result.unwrap()
+            table.get_index_pk().get(&(owner, evaluation_id, user))
         }
 
         pub fn save(&self) {
@@ -174,6 +171,10 @@ pub mod tables {
             result
         }
 
+        pub fn is_groups(&self) -> bool {
+            self.get_groups().len() > 0
+        }
+
         pub fn get_group(&self, group_number: u32) -> Option<Group> {
             let table = GroupTable::new();
             let result = table
@@ -196,8 +197,10 @@ pub mod tables {
         pub fn get(owner: AccountNumber, evaluation_id: u32) -> Self {
             let table = EvaluationTable::new();
             let result = table.get_index_pk().get(&(owner, evaluation_id));
-            psibase::check(result.is_some(), "evaluation not found");
-            result.unwrap()
+            psibase::check_some(
+                result,
+                &format!("evaluation {} {} not found", owner, evaluation_id),
+            )
         }
 
         pub fn save(&self) {
@@ -268,18 +271,43 @@ pub mod tables {
             );
         }
 
-        pub fn notify_group_finish(&self, group_number: u32, result: Vec<u8>) {
+        pub fn notify_evaluation_finish(&self) {
+            if self.use_hooks {
+                let caller = psibase::ServiceCaller {
+                    service: self.owner,
+                    sender: psibase::get_sender(),
+                };
+
+                caller.call(
+                    psibase::MethodNumber::from(EvalStructs::evalFin::ACTION_NAME),
+                    EvalStructs::evalFin {
+                        evaluation_id: self.id,
+                    },
+                )
+            }
+        }
+
+        pub fn notify_group_finish(
+            &self,
+            group_number: u32,
+            users: Vec<AccountNumber>,
+            result: Vec<u8>,
+        ) {
             if self.use_hooks {
                 let caller = psibase::ServiceCaller {
                     service: self.owner,
                     sender: psibase::get_service(),
                 };
 
+                // owner: AccountNumber, evaluation_id: u32, group_number: u32, users: Vec<AccountNumber>, result:
+
                 caller.call(
                     psibase::MethodNumber::from(EvalStructs::evalGroupFin::ACTION_NAME),
                     EvalStructs::evalGroupFin {
+                        owner: self.owner,
                         evaluation_id: self.id,
                         group_number: group_number,
+                        users,
                         result,
                     },
                 )
@@ -337,13 +365,30 @@ pub mod tables {
             table.put(&self).unwrap();
         }
 
+        pub fn delete(&self) {
+            let users_table = UserTable::new();
+
+            let users: Vec<User> = users_table
+                .get_index_pk()
+                .range(
+                    (self.owner, self.evaluation_id, AccountNumber::new(0))
+                        ..=(self.owner, self.evaluation_id, AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            for user in users {
+                users_table.erase(&user.pk());
+            }
+
+            GroupTable::new().erase(&self.pk());
+        }
+
         pub fn new(owner: AccountNumber, evaluation_id: u32, number: u32) -> Self {
             Self {
                 owner,
                 evaluation_id,
                 number,
                 key_submitter: None,
-                result: None,
             }
         }
     }

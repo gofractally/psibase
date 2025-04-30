@@ -64,7 +64,7 @@ interface api {
     ///
     /// Parameters:
     /// * `evaluation-id`: Unique identifier for the evaluation.
-    close: func(evaluation-id: u32) -> result<_, error>;
+    close: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
 
     /// Submits a proposal for a group in an evaluation.
     ///
@@ -97,6 +97,13 @@ interface api {
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `group-number`: Identifier for the group whose proposal is being retrieved.
     get-proposal: func(evaluation-owner: account, evaluation-id: u32, group-number: u32) -> result<option<list<u8>>, error>;
+
+
+    ///  Deletes the entire evaluation, should only be done in cancellation / edge cases
+    ///
+    /// Parameters:
+    /// * `evaluation-id`: Unique identifier for the evaluation
+    delete: func(evaluation-id: u32, force: bool) -> result<_, error>;
 }
 
 world imports {

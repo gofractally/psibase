@@ -180,26 +180,15 @@ export const getStatus = (
             const group = groups.find(
                 (group) => group.number === user.groupNumber,
             );
-            if (!group) {
-                
-                throw new Error(
-                    `Expected group to be found for ${currentUser}`,
-                );
-            }
-            if (group.result) {
+
+            if (group) {
                 return CanWatchResults.parse({
                     type: Types.CanWatchResults,
                     groups,
                     submissionDeadline: evaluation.finishBy,
                 });
             } else {
-                const userState = users.find(
-                    (user) => user.user === currentUser,
-                );
-
-                if (!userState) throw new Error("User not found");
-
-                if (userState.attestation && userState.attestation.length > 0) {
+                if (user.attestation && user.attestation.length > 0) {
                     return CanWatchResults.parse({
                         type: Types.CanWatchResults,
                         groups,
@@ -209,7 +198,7 @@ export const getStatus = (
                     return AwaitingUserSubmission.parse({
                         type: Types.UserMustSubmit,
                         submissionDeadline: evaluation.finishBy,
-                        groupNumber: group.number,
+                        groupNumber: user.groupNumber,
                     });
                 }
             }

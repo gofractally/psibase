@@ -327,13 +327,7 @@ export const EvaluationPage = () => {
                             <div className="text-center text-lg font-semibold">
                                 Group {group.number}
                             </div>
-                            {group.result && (
-                                <div className="flex flex-col text-center">
-                                    {group.result.map((r) => (
-                                        <div key={r}>{r}</div>
-                                    ))}
-                                </div>
-                            )}
+  
                             <div>
                                 Members:{" "}
                                 {users

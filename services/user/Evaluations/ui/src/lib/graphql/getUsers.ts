@@ -15,7 +15,6 @@ export const zGroup = z.object({
     number: z.number(),
     evaluationId: z.number(),
     keySubmitter: z.string().nullable(),
-    result: z.number().array().nullable(),
 });
 
 export type User = z.infer<typeof zUser>;
@@ -47,7 +46,6 @@ export const getUsersAndGroups = async (
                     number 
                     evaluationId 
                     keySubmitter 
-                    result 
                 } 
             }
         }`,

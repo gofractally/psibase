@@ -23,7 +23,6 @@ export const zGroup = z.object({
     number: z.number(),
     evaluationId: z.number(),
     keySubmitter: z.string().nullable(),
-    result: z.number().array().nullable(),
 });
 
 const SuccessResponse = z.object({

@@ -9,6 +9,7 @@ pub mod service {
     use crate::helpers;
 
     use crate::helpers::EvaluationStatus;
+
     use psibase::*;
 
     #[event(history)]
@@ -18,12 +19,52 @@ pub mod service {
     pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
+    pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
     pub fn group_finished(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
+        users: Vec<AccountNumber>,
         result: Vec<u8>,
     ) {
+    }
+
+    fn declare_group_result(evaluation: Evaluation, group_number: u32, result: Vec<u8>) {
+        let group = check_some(
+            Group::get(evaluation.owner, evaluation.id, group_number),
+            "failed to find group",
+        );
+
+        let users: Vec<AccountNumber> = evaluation
+            .get_users()
+            .into_iter()
+            .map(|user: User| user.owner)
+            .collect();
+
+        evaluation.notify_group_finish(group_number, users.clone(), result.clone());
+
+        Wrapper::emit().history().group_finished(
+            evaluation.owner,
+            evaluation.id,
+            group_number,
+            users,
+            result,
+        );
+
+        group.delete();
+
+        if !evaluation.is_groups() {
+
+            evaluation.notify_evaluation_finish();
+
+            Wrapper::emit()
+                .history()
+                .evaluation_finished(evaluation.owner, evaluation.id);
+
+            evaluation.delete();
+        }
     }
 
     // Create / schedule an evaluation
@@ -36,7 +77,7 @@ pub mod service {
         allowed_group_sizes: Vec<u8>,
         num_options: u8,
         use_hooks: bool,
-    ) {
+    ) -> u32 {
         check(
             registration < deliberation && deliberation < submission && submission < finish_by,
             "invalid times",
@@ -61,6 +102,7 @@ pub mod service {
         Wrapper::emit()
             .history()
             .evaluation_created(get_sender(), new_evaluation.id);
+        new_evaluation.id
     }
 
     // Commences an evaluation, sorts registrants into groups and allows proposals
@@ -116,7 +158,7 @@ pub mod service {
 
         let sender: AccountNumber = get_sender();
 
-        let user = User::get(sender, evaluation_id, sender);
+        let user = check_some(User::get(sender, evaluation_id, sender), "user not found");
 
         let group_number = check_some(user.group_number, "user is not sorted into a group");
 
@@ -132,25 +174,24 @@ pub mod service {
             .keysset(evaluation_id, group_number, keys, hash);
     }
 
-    // Closes the evaluation
+    // Close the evaluation
     #[action]
-    fn close(id: u32) {
-        let evaluation = Evaluation::get(get_sender(), id);
-        let current_phase = evaluation.get_current_phase();
+    fn close(owner: AccountNumber, evaluation_id: u32) {
+        let evaluation = Evaluation::get(owner, evaluation_id);
+        evaluation.assert_status(EvaluationStatus::Closed);
 
-        match current_phase {
-            EvaluationStatus::Submission => {
-                let is_successful_evaluation_start = Group::get(get_sender(), id, 1).is_some();
-                if is_successful_evaluation_start {
-                    abort_message("evaluation is still in submission phase");
-                }
-            }
-            EvaluationStatus::Deliberation | EvaluationStatus::Registration => {
-                abort_message("evaluation must be in registration or closed phase");
-            }
-            EvaluationStatus::Pending | EvaluationStatus::Closed => {}
+        evaluation.get_groups().iter().for_each(|group| {
+            declare_group_result(Evaluation::get(owner, evaluation_id), group.number, vec![]);
+        });
+    }
+
+    #[action]
+    fn delete(evaluation_id: u32, force: bool) {
+        let evaluation = Evaluation::get(get_sender(), evaluation_id);
+        if !force {
+            let phase = evaluation.get_current_phase();
+            // pending or closed;
         }
-
         evaluation.delete();
     }
 
@@ -158,9 +199,9 @@ pub mod service {
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
         let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
+        evaluation.assert_status(EvaluationStatus::Deliberation);
 
-        let mut user = User::get(owner, evaluation_id, get_sender());
+        let mut user = check_some(User::get(owner, evaluation_id, get_sender()), "user not found");
 
         let group =
             Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
@@ -185,40 +226,38 @@ pub mod service {
             .all(|rank| rank <= &evaluation.num_options);
         check(ranks_within_scope, "attestation is out of scope");
 
-        evaluation.assert_status(helpers::EvaluationStatus::Submission);
+        evaluation.assert_status(EvaluationStatus::Submission);
 
-        let mut user = User::get(owner, evaluation_id, sender);
-        check(user.attestation.is_none(), "you have already submitted");
+        let mut user = check_some(User::get(owner, evaluation_id, sender), "user not found");
+        check_none(user.attestation, "you have already submitted");
 
         user.attestation = Some(attestation);
         user.save();
 
-        let mut group =
-            Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
+        let group = check_some(
+            Group::get(owner, evaluation_id, user.group_number.unwrap()),
+            "failed to find group",
+        );
 
-        check(group.key_submitter.is_some(), "cannot attest without key");
-        check(group.result.is_none(), "group result already set");
+        check_some(group.key_submitter, "cannot attest without key");
 
-        if group.result.is_none() {
-            let result =
-                helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
-            match result {
-                helpers::GroupResult::ConsensusSuccess(result) => {
-                    group.result = Some(result.clone());
-                    group.save();
+        let result = helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
+        match result {
+            helpers::GroupResult::ConsensusSuccess(result) => {
+                group.save();
+                
+                let users: Vec<AccountNumber> = evaluation.get_users().into_iter().map(|user| { user.user }).collect();
+                evaluation.notify_group_finish(user.group_number.unwrap(), users.clone(), result.clone());
 
-                    evaluation.notify_group_finish(user.group_number.unwrap(), result.clone());
-
-
-                    Wrapper::emit().history().group_finished(
-                        evaluation.owner,
-                        evaluation.id,
-                        user.group_number.unwrap(),
-                        result,
-                    );
-                }
-                _ => {}
+                Wrapper::emit().history().group_finished(
+                    evaluation.owner,
+                    evaluation.id,
+                    user.group_number.unwrap(),
+                    users,
+                    result,
+                );
             }
+            _ => {}
         }
     }
 
@@ -227,7 +266,7 @@ pub mod service {
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
-        evaluation.assert_status(helpers::EvaluationStatus::Registration);
+        evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
         check(
@@ -241,6 +280,7 @@ pub mod service {
             user_settings,
             "user must have a pre-existing key to be registered",
         );
+        check_none(User::get(evaluation.owner, evaluation_id, registrant), "user is already registered");
         let user = User::new(evaluation.owner, evaluation.id, registrant);
         user.save();
 
@@ -251,7 +291,7 @@ pub mod service {
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
-        evaluation.assert_status(helpers::EvaluationStatus::Registration);
+        evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
         check(
@@ -259,7 +299,7 @@ pub mod service {
             "user is not allowed to unregister",
         );
 
-        let user = User::get(owner, evaluation_id, registrant);
+        let user = check_some(User::get(owner, evaluation_id, registrant), "user is not registered");
         user.delete();
 
         evaluation.notify_unregister(registrant);

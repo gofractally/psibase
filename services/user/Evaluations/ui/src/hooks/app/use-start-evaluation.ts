@@ -22,7 +22,7 @@ export const useStartEvaluation = () =>
                 intf: "api",
                 params: [owner, id],
             }));
-            await wait(2500);
+            await wait(3000);
             await Promise.all([
                 queryClient.refetchQueries({ queryKey: ["evaluation", id] }),
                 queryClient.refetchQueries({ queryKey: ["users", id] }),

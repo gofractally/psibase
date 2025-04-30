@@ -113,8 +113,24 @@ impl Api for EvaluationsPlugin {
         add_action_to_transaction("start", &packed_args)
     }
 
-    fn close(id: u32) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::close { id }.packed();
+    fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::delete {
+            evaluation_id,
+            force,
+        }
+        .packed();
+
+        add_action_to_transaction("delete", &packed_args)
+    }
+
+    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let packed_args = evaluations::action_structs::close {
+            owner: evaluation_owner,
+            evaluation_id,
+        }
+        .packed();
         add_action_to_transaction("close", &packed_args)
     }
 
