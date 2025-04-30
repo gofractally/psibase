@@ -65,7 +65,7 @@ export function shouldSkipBuild(projectDir, additionalSrcDirs = []) {
       previousHash = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')).hash;
     }
   } catch (e) {
-    // Ignore read errors
+    console.warn('Error reading cache file', e);
   }
 
   if (currentHash === previousHash) {

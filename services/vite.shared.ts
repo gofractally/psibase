@@ -145,7 +145,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
       sourcemap: process.env.NODE_ENV === 'development',
       minify: process.env.NODE_ENV !== 'development',
       // Enable build cache in a project-specific directory
-      cacheDir: path.resolve(__dirname, ".vite-cache"),
+      // cacheDir: path.resolve(__dirname, ".vite-cache"),
       // Configure Rollup caching
       rollupOptions,
       // Increase chunk size warning limit
@@ -159,12 +159,12 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
         'react-router-dom'
       ] : [],
       // Use persistent cache for dependencies
-      cacheDir: path.resolve(projectDir, '.vite-cache/deps')
+      // cacheDir: path.resolve(projectDir, '.vite-cache/deps')
     },
     // Enable caching of transform results
-    cacheDir: path.resolve(projectDir, '.vite-cache'),
+    // cacheDir: path.resolve(projectDir, '.vite-cache'),
   },
-  createSkipUnchangedBuildPlugin(projectDir, additionalSrcDirs),
+  // createSkipUnchangedBuildPlugin(projectDir, additionalSrcDirs),
 ]
 } 
 
