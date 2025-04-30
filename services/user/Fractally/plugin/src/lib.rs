@@ -7,7 +7,6 @@ use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-
 use psibase::fracpack::Pack;
 
 mod errors;
@@ -17,11 +16,6 @@ use psibase::AccountNumber;
 struct FractallyPlugin;
 
 impl Api for FractallyPlugin {
-    fn set_example_thing(thing: String) -> () {
-        ()
-    }
-
-
     fn set_schedule(
         registration: u32,
         deliberation: u32,
@@ -29,39 +23,31 @@ impl Api for FractallyPlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-
-
         let packed_args = fractally::action_structs::setSchedule {
             deliberation,
             finish_by,
             interval_seconds,
             registration,
-            submission
-        }.packed();
+            submission,
+        }
+        .packed();
 
         add_action_to_transaction("setSchedule", &packed_args)
     }
 
-
-    fn join(
-        fractal: String,
-    ) -> Result<(), Error> {
+    fn join(fractal: String) -> Result<(), Error> {
         let packed_args = fractally::action_structs::join {
             fractal: AccountNumber::from(fractal.as_str()),
-
-        }.packed();
+        }
+        .packed();
         add_action_to_transaction("join", &packed_args)
     }
 
     fn create_fractal(name: String, mission: String) -> Result<(), Error> {
-        let packed_args = fractally::action_structs::createFractal {
-            name,
-            mission
-        }.packed();
+        let packed_args = fractally::action_structs::createFractal { name, mission }.packed();
 
         add_action_to_transaction("createFractal", &packed_args)
     }
-
 }
 
 #[derive(serde::Deserialize, Debug)]
