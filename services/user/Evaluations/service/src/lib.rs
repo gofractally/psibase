@@ -27,7 +27,7 @@ pub mod service {
         evaluation_id: String,
         group_number: String,
         users: Vec<String>,
-        result: Vec<String>,
+        result: Vec<u8>,
     ) {
     }
 
@@ -49,8 +49,6 @@ pub mod service {
             .into_iter()
             .map(|account| account.to_string())
             .collect();
-
-        let result: Vec<String> = result.into_iter().map(|res| res.to_string()).collect();
 
         Wrapper::emit().history().groupfinished(
             evaluation.owner.to_string(),
@@ -265,8 +263,6 @@ pub mod service {
                     users.clone(),
                     result.clone(),
                 );
-
-                let result: Vec<String> = result.into_iter().map(|id| id.to_string()).collect();
 
                 Wrapper::emit().history().groupfinished(
                     evaluation.owner.to_string(),
