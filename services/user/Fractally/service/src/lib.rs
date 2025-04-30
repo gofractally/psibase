@@ -31,9 +31,8 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        let member = Member::new(fractal, sender, MemberStatus::Citizen);
-        member.save();
-
+        Member::new(fractal, sender, MemberStatus::Citizen).save();
+        
         Wrapper::emit().history().joined_fractal(sender, fractal);
     }
 
@@ -46,47 +45,13 @@ pub mod service {
         finish_by: u32,
         interval_seconds: u32,
     ) {
-        let caller = ServiceCaller {
-            service: AccountNumber::from("evaluations"),
-            sender: get_service(),
-        };
-
-        check(
-            get_service() == AccountNumber::from("fractally"),
-            "not as expected",
-        );
-        check(
-            get_sender() == AccountNumber::from("cats"),
-            "not cats account",
-        );
-
         let mut fractal = check_some(Fractal::get(get_sender()), "failed to find fractal");
 
         if fractal.scheduled_evaluation.is_some() {
-            psibase::services::evaluations::Wrapper::call()
-                .delete(fractal.scheduled_evaluation.unwrap());
-            // caller.call_returns_nothing(
-            //     MethodNumber::from(
-            //         psibase::services::evaluations::action_structs::delete::ACTION_NAME,
-            //     ),
-            //     psibase::services::evaluations::action_structs::delete {
-            //         evaluation_id: fractal.scheduled_evaluation.unwrap(),
-            //     },
-            // )
+            psibase::services::evaluations::Wrapper::call().delete(fractal.scheduled_evaluation.unwrap(), false);
         };
 
-        let eval_id: u32 = caller.call(
-            MethodNumber::from(psibase::services::evaluations::action_structs::create::ACTION_NAME),
-            psibase::services::evaluations::action_structs::create {
-                allowed_group_sizes: vec![4, 5, 6],
-                use_hooks: true,
-                num_options: 6,
-                registration,
-                deliberation,
-                submission,
-                finish_by,
-            },
-        );
+        let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(registration, deliberation, submission, finish_by, vec![4, 5, 6], 6, true);
 
         fractal.scheduled_evaluation = Some(eval_id);
         fractal.evaluation_interval = Some(interval_seconds);
