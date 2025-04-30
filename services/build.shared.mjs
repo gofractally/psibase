@@ -27,6 +27,8 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
         const stat = fs.statSync(filePath);
         
         if (stat.isDirectory()) {
+          // Skip target directories as they are build outputs
+          if (file === 'target') continue;
           hash.update(calculateHash(filePath));
         } else {
           hash.update(fs.readFileSync(filePath));
