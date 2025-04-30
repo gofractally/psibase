@@ -3,7 +3,7 @@
 mod service {
     use async_graphql::connection::Connection;
     use async_graphql::*;
-    use evaluations::db::tables::{
+    use evaluations::service::{
         ConfigTable, Evaluation, EvaluationTable, Group, GroupTable, User, UserSettings,
         UserSettingsTable, UserTable,
     };
@@ -45,10 +45,11 @@ mod service {
 
         async fn get_group_result(
             &self,
-            evaluation_owner: String,
-            evaluation_id: u32,
-            group_number: u32,
+            _evaluation_owner: String,
+            _evaluation_id: u32,
+            _group_number: u32,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+            // TODO
             EventQuery::new("history.evaluations.groupfinished").query()
         }
 

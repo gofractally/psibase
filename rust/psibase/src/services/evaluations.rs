@@ -1,6 +1,6 @@
-#[crate::service(name = "evaluation", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "eval-hooks", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-mod service {
+pub mod Hooks {
     use crate::AccountNumber;
 
     #[action]
@@ -14,13 +14,7 @@ mod service {
     }
 
     #[action]
-    fn evalGroupFin(owner: AccountNumber, evaluation_id: u32, group_number: u32, users: Vec<AccountNumber>, result: Vec<u8>) {
-        unimplemented!()
-    }
-
-    
-    #[action]
-    fn evalFin(owner: AccountNumber, evaluation_id: u32) {
+    fn evalGroupFin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
         unimplemented!()
     }
 }
