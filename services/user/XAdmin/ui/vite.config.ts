@@ -6,6 +6,7 @@ import topLevelAwait from "vite-plugin-top-level-await";
 import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
 const serviceDir = path.resolve(__dirname);
+const wasmDir = path.resolve(__dirname, "./wasm");
 
 verifyViteCache(serviceDir);
 
@@ -19,7 +20,7 @@ export default defineConfig(({ command }) => ({
                 },
             },
         }),
-        createSharedViteConfig({ projectDir: serviceDir }),
+        createSharedViteConfig({ projectDir: serviceDir, additionalSrcDirs: [wasmDir] }),
         ...createPsibaseConfig({
             service: "x-admin",
             serviceDir,

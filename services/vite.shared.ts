@@ -4,7 +4,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import alias from '@rollup/plugin-alias'
 
-function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
+function createSkipUnchangedBuildPlugin(projectDir: string, additionalSrcDirs: string[] = []): Plugin {
   // Skip if REBUILD_ALWAYS is set to false
   if (process.env.PSIREBUILD === 'true') {
     return {
@@ -19,18 +19,38 @@ function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
   const srcDir = path.resolve(projectDir, 'src')
   const distDir = path.resolve(projectDir, 'dist')
 
-  function calculateHash(dir: string): string {
+  function calculateHash(dir: string, additionalSrcDirs: string[] = []): string {
     const hash = crypto.createHash('md5')
-    const files = fs.readdirSync(dir)
     
-    for (const file of files) {
-      const filePath = path.join(dir, file)
-      const stat = fs.statSync(filePath)
-      
-      if (stat.isDirectory()) {
-        hash.update(calculateHash(filePath))
-      } else {
-        hash.update(fs.readFileSync(filePath))
+    // Process main directory
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir)
+      for (const file of files) {
+        const filePath = path.join(dir, file)
+        const stat = fs.statSync(filePath)
+        
+        if (stat.isDirectory()) {
+          hash.update(calculateHash(filePath))
+        } else {
+          hash.update(fs.readFileSync(filePath))
+        }
+      }
+    }
+    
+    // Process additional source directories
+    for (const additionalDir of additionalSrcDirs) {
+      if (fs.existsSync(additionalDir)) {
+        const additionalFiles = fs.readdirSync(additionalDir)
+        for (const file of additionalFiles) {
+          const filePath = path.join(additionalDir, file)
+          const stat = fs.statSync(filePath)
+          
+          if (stat.isDirectory()) {
+            hash.update(calculateHash(filePath))
+          } else {
+            hash.update(fs.readFileSync(filePath))
+          }
+        }
       }
     }
     
@@ -60,7 +80,7 @@ function createSkipUnchangedBuildPlugin(projectDir: string): Plugin {
         return
       }
 
-      const currentHash = calculateHash(srcDir)
+      const currentHash = calculateHash(srcDir, additionalSrcDirs)
       let previousHash = ''
 
       try {
@@ -91,12 +111,13 @@ export interface SharedViteConfigOptions {
   manualChunks?: Record<string, string[]>
   additionalManualChunks?: Record<string, string[]>
   uiFramework?: string
+  additionalSrcDirs?: string[]
 }
 
 export function createSharedViteConfig(options: SharedViteConfigOptions): UserConfig {
   const { projectDir, uiFramework = "react", additionalPlugins = [], manualChunks = {
     vendor: ['react', 'react-dom', 'react-router-dom'],
-  }, additionalManualChunks = {} } = options
+  }, additionalManualChunks = {}, additionalSrcDirs = [] } = options
 
   const rollupOptions = {
         cache: true,
@@ -143,7 +164,7 @@ export function createSharedViteConfig(options: SharedViteConfigOptions): UserCo
     // Enable caching of transform results
     cacheDir: path.resolve(projectDir, '.vite-cache'),
   },
-  createSkipUnchangedBuildPlugin(projectDir),
+  createSkipUnchangedBuildPlugin(projectDir, additionalSrcDirs),
 ]
 } 
 
