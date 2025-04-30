@@ -255,14 +255,15 @@ foreach(ROW ${JS_DIRS})
     else()
         add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
         set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
+        COMMAND yarn build
     endif()
     
     add_dependencies(${TARGET_NAME} build_uis)
 endforeach()
 
-# Single target to build all UIs, relying on Yarn's caching
+# Single target to install deps for all UIs, relying on Yarn's caching
 add_custom_target(build_uis
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn install-dev-tools && yarn build:all
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn install-dev-tools
 )
 
 # Static (not built) resource dependencies
@@ -309,8 +310,7 @@ add_custom_command(
     OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
     WORKING_DIRECTORY ${XADMIN_PATH}
-    # COMMAND yarn
-    # COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
+    COMMAND yarn build
 )
 add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
 add_dependencies(xadmin-wasm-transpiled rust)
