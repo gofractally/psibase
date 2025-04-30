@@ -3,12 +3,22 @@
     "compilerOptions": {
         "target": "ESNext",
         "useDefineForClassFields": true,
-        "lib": ["DOM", "DOM.Iterable", "ESNext"],
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ESNext"
+        ],
         "allowJs": false,
         "paths": {
-            "/common": ["../../CommonApi/common"],
-            "$lib": ["./src/lib"],
-            "$lib/*": ["./src/lib/*"],
+            "/common": [
+                "../../CommonApi/common"
+            ],
+            "$lib": [
+                "./src/lib"
+            ],
+            "$lib/*": [
+                "./src/lib/*"
+            ],
             "@psibase/common-lib": [
                 "../../CommonApi/common/packages/common-lib/src"
             ],
@@ -21,12 +31,15 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "moduleResolution": "Node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true
     },
-    "include": ["src", "../../CommonApi/common/resources/useGraphQLQuery.d.ts"],
+    "include": [
+        "src",
+        "../../CommonApi/common/resources/useGraphQLQuery.d.ts"
+    ],
     "references": [
         {
             "path": "./tsconfig.node.json"

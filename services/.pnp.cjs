@@ -2865,6 +2865,7 @@ const RAW_RUNTIME_STATE =
           ["@types/react", "npm:18.3.20"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:18.3.6"],\
           ["@vitejs/plugin-react", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:4.4.1"],\
+          ["@yarnpkg/sdks", "npm:3.2.1"],\
           ["autoprefixer", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:10.4.21"],\
           ["axios", "npm:1.9.0"],\
           ["class-variance-authority", "npm:0.7.1"],\
@@ -2894,7 +2895,6 @@ const RAW_RUNTIME_STATE =
           ["vite-plugin-top-level-await", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.5.0"],\
           ["vite-plugin-wasm", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.4.1"],\
           ["waait", "npm:1.0.5"],\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=9eb0b8&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"],\
           ["zod", "npm:3.24.3"]\
         ],\
         "linkType": "SOFT"\
@@ -16183,13 +16183,6 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["wasm-transpiled", [\
-      ["file:./wasm-transpiled#./wasm-transpiled::hash=9eb0b8&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui", {\
-        "packageLocation": "../../.yarn/berry/cache/wasm-transpiled-file-f421e0a9d4-10c0.zip/node_modules/wasm-transpiled/",\
-        "packageDependencies": [\
-          ["wasm-transpiled", "file:./wasm-transpiled#./wasm-transpiled::hash=9eb0b8&locator=%40psibase%2Fxadmin-ui%40workspace%3Auser%2FXAdmin%2Fui"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["workspace:user/XAdmin/ui/wasm", {\
         "packageLocation": "./user/XAdmin/ui/wasm/",\
         "packageDependencies": [\
