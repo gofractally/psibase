@@ -30,7 +30,7 @@ pub mod service {
         evaluation_id: String,
         group_number: String,
         users: Vec<String>,
-        result: Vec<u8>,
+        result: Vec<String>,
     ) {
     }
 
