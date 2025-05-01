@@ -25,7 +25,7 @@ export const EvaluationPage = () => {
         defaultRefreshInterval,
     );
     const [ticks, setTick] = useState<number>(0);
-    const { data: evaluation, error: evaluationError } = useEvaluation(
+    const { data: evaluation } = useEvaluation(
         owner,
         Number(id),
     );

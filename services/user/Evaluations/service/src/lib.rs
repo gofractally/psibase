@@ -1,19 +1,22 @@
-pub mod helpers;
-
-pub mod db;
+mod db;
+mod helpers;
 
 #[psibase::service(tables = "db::tables")]
 #[allow(non_snake_case)]
 pub mod service {
-    use crate::db::tables::{Evaluation, Group, User, UserSettings};
-    use crate::helpers;
-
-    use crate::helpers::EvaluationStatus;
-
+    pub use crate::db::tables::*;
+    use crate::helpers::{self, EvaluationStatus};
     use psibase::*;
 
     #[event(history)]
-    pub fn keysset(evaluation_id: u32, group_number: u32, keys: Vec<Vec<u8>>, hash: String) {}
+    pub fn keysset(
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        keys: Vec<Vec<u8>>,
+        hash: String,
+    ) {
+    }
 
     #[event(history)]
     pub fn evaluation_created(owner: AccountNumber, evaluation_id: u32) {}
@@ -22,56 +25,28 @@ pub mod service {
     pub fn evaluation_finished(owner: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
-    pub fn groupfinished(
+    pub fn group_finished(
         owner: String,
         evaluation_id: String,
         group_number: String,
         users: Vec<String>,
-        result: Vec<u8>,
+        result: Vec<String>,
     ) {
     }
 
-    fn declare_group_result(evaluation: Evaluation, group_number: u32, result: Vec<u8>) {
-        let group = check_some(
-            Group::get(evaluation.owner, evaluation.id, group_number),
-            "failed to find group",
-        );
-
-        let users: Vec<AccountNumber> = evaluation
-            .get_users()
-            .into_iter()
-            .map(|user: User| user.owner)
-            .collect();
-
-        evaluation.notify_group_finish(group_number, users.clone(), result.clone());
-
-        let users: Vec<String> = users
-            .into_iter()
-            .map(|account| account.to_string())
-            .collect();
-
-        Wrapper::emit().history().groupfinished(
-            evaluation.owner.to_string(),
-            evaluation.id.to_string(),
-            group_number.to_string(),
-            users,
-            result,
-        );
-
-        group.delete();
-
-        if !evaluation.is_groups() {
-            evaluation.notify_evaluation_finish();
-
-            Wrapper::emit()
-                .history()
-                .evaluation_finished(evaluation.owner, evaluation.id);
-
-            evaluation.delete();
-        }
-    }
-
-    // Create / schedule an evaluation
+    /// Creates and schedules a new evaluation with specified phases and parameters.
+    ///
+    /// # Arguments
+    /// * `registration` - Unix seconds timestamp for the start of the registration phase.
+    /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
+    /// * `submission` - Unix seconds timestamp for the start of the submission phase.
+    /// * `finish_by` - Unix seconds timestamp for the start of the evaluation completion phase.
+    /// * `allowed_group_sizes` - Vector of allowed group sizes (must be greater than 0, traditionally 4, 5, or 6).
+    /// * `num_options` - Number of options available for proposals (traditionally 6).
+    /// * `use_hooks` - Flag to enable or disable hooks for the evaluation.
+    ///
+    /// # Returns
+    /// The ID of the newly created evaluation.
     #[action]
     fn create(
         registration: u32,
@@ -92,7 +67,7 @@ pub mod service {
             "allowable group sizes must be greater than 0",
         );
 
-        let new_evaluation = Evaluation::new(
+        let new_evaluation = Evaluation::add(
             allowed_group_sizes,
             registration,
             deliberation,
@@ -102,127 +77,137 @@ pub mod service {
             use_hooks,
         );
 
-        new_evaluation.save();
         Wrapper::emit()
             .history()
             .evaluation_created(get_sender(), new_evaluation.id);
         new_evaluation.id
     }
 
-    // Commences an evaluation, sorts registrants into groups and allows proposals
+    /// Starts an evaluation, sorting registrants into groups and enabling proposal submission.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation to start.
     #[action]
     fn start(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
-        check(
-            evaluation.get_groups().len() == 0,
-            "groups have already been created",
-        );
-
-        let mut users_to_process = evaluation.get_users();
-
-        users_to_process.sort_by_key(|user| user.user.value);
-
-        helpers::shuffle_vec(&mut users_to_process, evaluation_id as u64);
-
-        let chunked_groups = check_some(
-            helpers::spread_users(&users_to_process, &evaluation),
-            "unable to spread users into groups",
-        );
-
-        for (index, grouped_users) in chunked_groups.into_iter().enumerate() {
-            let group_number: u32 = (index as u32) + 1;
-            let new_group = Group::new(owner, evaluation.id, group_number);
-            new_group.save();
-
-            for mut user in grouped_users {
-                user.group_number = Some(group_number);
-                user.save();
-            }
-        }
-
-        evaluation.save();
+        evaluation.create_groups();
     }
 
-    // Sets the public key for the user to receive the symmetric key
+    /// Sets the public key for the user to receive the symmetric key.
+    ///
+    /// # Arguments
+    /// * `key` - The public key to be set for the user.
     #[action]
-    fn setKey(key: Vec<u8>) {
+    fn set_key(key: Vec<u8>) {
         let user = UserSettings::new(get_sender(), key);
         user.save();
     }
 
-    // Sets the symmetric key for a group
+    /// Sets the symmetric key for a group during the deliberation phase, callable only once by any group member
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `keys` - Vector of keys to set for the group.
+    /// * `hash` - Hash of the keys for verification.
     #[action]
-    fn groupKey(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
+    fn group_key(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);
 
-        let sender: AccountNumber = get_sender();
+        let sender = get_sender();
 
-        let user = check_some(User::get(sender, evaluation_id, sender), "user not found");
+        let group_number = evaluation
+            .get_user(sender)
+            .expect("user not found")
+            .group_number
+            .expect("user not grouped");
 
-        let group_number = check_some(user.group_number, "user is not sorted into a group");
-
-        let mut group = Group::get(sender, evaluation_id, group_number).expect("group not found");
-
-        check_none(group.key_submitter, "group key has already been submitted");
-
-        group.key_submitter = Some(sender);
-        group.save();
+        let mut group = evaluation.get_group(group_number).expect("group not found");
+        group.set_key_submitter(sender);
 
         Wrapper::emit()
             .history()
-            .keysset(evaluation_id, group_number, keys, hash);
+            .keysset(owner, evaluation_id, group_number, keys, hash);
     }
 
-    // Close the evaluation
+    /// Closes an evaluation and deletes its groups.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation to close.
     #[action]
     fn close(owner: AccountNumber, evaluation_id: u32) {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Closed);
 
         evaluation.get_groups().iter().for_each(|group| {
-            declare_group_result(Evaluation::get(owner, evaluation_id), group.number, vec![]);
+            group.delete();
         });
+
+        Wrapper::emit()
+            .history()
+            .evaluation_finished(evaluation.owner, evaluation.id);
+
+        evaluation.delete();
     }
 
+    /// Deletes an evaluation, optionally forcing deletion.
+    ///
+    /// # Arguments
+    /// * `evaluation_id` - The ID of the evaluation to delete.
+    /// * `force` - If true, allows deletion regardless of the evaluation's phase.
     #[action]
     fn delete(evaluation_id: u32, force: bool) {
         let evaluation = Evaluation::get(get_sender(), evaluation_id);
         if !force {
             let phase = evaluation.get_current_phase();
-            // pending or closed;
+            check(
+                phase == EvaluationStatus::Pending || phase == EvaluationStatus::Closed,
+                "evaluation is not deletable unless pending or closed",
+            );
         }
         evaluation.delete();
     }
 
-    // Accepts a group members encrypted proposal, to be decrypted and attested by group members in attestation phase
+    /// Submits an encrypted proposal for a user in a group.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `proposal` - The encrypted proposal data.
     #[action]
     fn propose(owner: AccountNumber, evaluation_id: u32, proposal: Vec<u8>) {
         let evaluation = Evaluation::get(owner, evaluation_id);
         evaluation.assert_status(EvaluationStatus::Deliberation);
 
-        let mut user = check_some(
-            User::get(owner, evaluation_id, get_sender()),
-            "user not found",
-        );
-
-        let group =
-            Group::get(owner, evaluation_id, user.group_number.unwrap()).expect("group not found");
+        let sender = get_sender();
+        let user = evaluation.get_user(sender);
+        let mut user = psibase::check_some(user, format!("user {} not found", sender).as_str());
 
         check(
-            group.key_submitter.is_some(),
+            evaluation
+                .get_group(user.group_number.unwrap())
+                .expect("group not found")
+                .key_submitter
+                .is_some(),
             "group key has not been submitted",
         );
 
-        user.proposal = Some(proposal);
-        user.save();
+        user.propose(proposal);
     }
 
-    // Sends group member attestation from decrypted proposals, triggers evalGroupFin in a successful consensus result
+    /// Submits an attestation for decrypted proposals, potentially triggering group result declaration.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `attestation` - The attestation data containing ranks.
     #[action]
     fn attest(owner: AccountNumber, evaluation_id: u32, attestation: Vec<u8>) {
         let sender = get_sender();
@@ -235,52 +220,28 @@ pub mod service {
 
         evaluation.assert_status(EvaluationStatus::Submission);
 
-        let mut user = check_some(User::get(owner, evaluation_id, sender), "user not found");
-        check_none(user.attestation, "you have already submitted");
+        let mut user = evaluation.get_user(sender).expect("user not found");
+        user.attest(attestation);
 
-        user.attestation = Some(attestation);
-        user.save();
+        let group = evaluation
+            .get_group(user.group_number.unwrap())
+            .expect("group not found");
 
-        let group = check_some(
-            Group::get(owner, evaluation_id, user.group_number.unwrap()),
-            "failed to find group",
-        );
-
-        check_some(group.key_submitter, "cannot attest without key");
-
-        let result = helpers::get_group_result(owner, evaluation_id, user.group_number.unwrap());
-        match result {
-            helpers::GroupResult::ConsensusSuccess(result) => {
-                group.save();
-
-                let users: Vec<AccountNumber> = evaluation
-                    .get_users()
-                    .into_iter()
-                    .map(|user| user.user)
-                    .collect();
-                evaluation.notify_group_finish(
-                    user.group_number.unwrap(),
-                    users.clone(),
-                    result.clone(),
-                );
-
-                Wrapper::emit().history().groupfinished(
-                    evaluation.owner.to_string(),
-                    evaluation.id.to_string(),
-                    user.group_number.unwrap().to_string(),
-                    users.into_iter().map(|user| user.to_string()).collect(),
-                    result,
-                );
-            }
-            _ => {}
+        let result = group.get_result();
+        if result.is_some() {
+            group.declare_result(result.unwrap());
         }
     }
 
-    // Registers a user for an evaluation
+    /// Registers a user for an evaluation during the registration phase.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `registrant` - The account number of the user to register.
     #[action]
     fn register(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
-
         evaluation.assert_status(EvaluationStatus::Registration);
 
         let sender = get_sender();
@@ -289,23 +250,20 @@ pub mod service {
             "user is not allowed to register",
         );
 
-        let user_settings = UserSettings::get(registrant);
-
         check_some(
-            user_settings,
+            UserSettings::get(registrant),
             "user must have a pre-existing key to be registered",
         );
-        check_none(
-            User::get(evaluation.owner, evaluation_id, registrant),
-            "user is already registered",
-        );
-        let user = User::new(evaluation.owner, evaluation.id, registrant);
-        user.save();
 
-        evaluation.notify_register(registrant);
+        evaluation.register_user(registrant);
     }
 
-    // Removes a registrant from an evaluation pre-deliberation
+    /// Unregisters a user from an evaluation during the registration phase.
+    ///
+    /// # Arguments
+    /// * `owner` - The account number of the evaluation owner.
+    /// * `evaluation_id` - The ID of the evaluation.
+    /// * `registrant` - The account number of the user to unregister.
     #[action]
     fn unregister(owner: AccountNumber, evaluation_id: u32, registrant: AccountNumber) {
         let evaluation = Evaluation::get(owner, evaluation_id);
@@ -317,13 +275,7 @@ pub mod service {
             "user is not allowed to unregister",
         );
 
-        let user = check_some(
-            User::get(owner, evaluation_id, registrant),
-            "user is not registered",
-        );
-        user.delete();
-
-        evaluation.notify_unregister(registrant);
+        evaluation.unregister_user(registrant);
     }
 }
 

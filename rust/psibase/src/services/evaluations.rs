@@ -1,6 +1,6 @@
-#[crate::service(name = "evaluation", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "eval-hooks", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
-mod service {
+pub mod Hooks {
     use crate::AccountNumber;
 
     #[action]
