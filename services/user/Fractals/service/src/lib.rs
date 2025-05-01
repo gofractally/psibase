@@ -32,7 +32,7 @@ pub mod service {
         );
 
         Member::new(fractal, sender, MemberStatus::Citizen).save();
-        
+
         Wrapper::emit().history().joined_fractal(sender, fractal);
     }
 
@@ -48,10 +48,19 @@ pub mod service {
         let mut fractal = check_some(Fractal::get(get_sender()), "failed to find fractal");
 
         if fractal.scheduled_evaluation.is_some() {
-            psibase::services::evaluations::Wrapper::call().delete(fractal.scheduled_evaluation.unwrap(), false);
+            psibase::services::evaluations::Wrapper::call()
+                .delete(fractal.scheduled_evaluation.unwrap(), false);
         };
 
-        let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(registration, deliberation, submission, finish_by, vec![4, 5, 6], 6, true);
+        let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(
+            registration,
+            deliberation,
+            submission,
+            finish_by,
+            vec![4, 5, 6],
+            6,
+            true,
+        );
 
         fractal.scheduled_evaluation = Some(eval_id);
         fractal.evaluation_interval = Some(interval_seconds);
@@ -153,13 +162,6 @@ pub mod service {
                 .expect("failed calculating new ema");
             member.save();
         });
-    }
-
-    #[action]
-    #[allow(non_snake_case)]
-    fn evalFin(evaluation_id: u32) {
-
-        // I guess do nothing for now.
     }
 
     #[event(history)]
