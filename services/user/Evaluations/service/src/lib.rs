@@ -84,14 +84,14 @@ pub mod service {
 
     // Sets the public key for the user to receive the symmetric key
     #[action]
-    fn setKey(key: Vec<u8>) {
+    fn set_key(key: Vec<u8>) {
         let user = UserSettings::new(get_sender(), key);
         user.save();
     }
 
     // Sets the symmetric key for a group
     #[action]
-    fn groupKey(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
+    fn group_key(owner: AccountNumber, evaluation_id: u32, keys: Vec<Vec<u8>>, hash: String) {
         let evaluation = Evaluation::get(owner, evaluation_id);
 
         evaluation.assert_status(helpers::EvaluationStatus::Deliberation);

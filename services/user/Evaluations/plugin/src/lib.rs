@@ -60,11 +60,11 @@ impl Api for EvaluationsPlugin {
         let key = key_table::AsymKey::new();
         let public_key_vectored = key.public_key()?.serialize().to_vec();
 
-        let packed_args = evaluations::action_structs::setKey {
+        let packed_args = evaluations::action_structs::set_key {
             key: public_key_vectored,
         }
         .packed();
-        add_action_to_transaction("setKey", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::set_key::ACTION_NAME, &packed_args)
             .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
         key.save()?;
 
@@ -79,7 +79,7 @@ impl Api for EvaluationsPlugin {
             registrant,
         }
         .packed();
-        add_action_to_transaction("register", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::register::ACTION_NAME, &packed_args)
     }
 
     fn unregister(
@@ -98,7 +98,7 @@ impl Api for EvaluationsPlugin {
             registrant,
         }
         .packed();
-        add_action_to_transaction("unregister", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::unregister::ACTION_NAME, &packed_args)
     }
 
     fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
@@ -110,7 +110,7 @@ impl Api for EvaluationsPlugin {
             evaluation_id,
         }
         .packed();
-        add_action_to_transaction("start", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::start::ACTION_NAME, &packed_args)
     }
 
     fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
@@ -120,7 +120,7 @@ impl Api for EvaluationsPlugin {
         }
         .packed();
 
-        add_action_to_transaction("delete", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::delete::ACTION_NAME, &packed_args)
     }
 
     fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
@@ -131,7 +131,7 @@ impl Api for EvaluationsPlugin {
             evaluation_id,
         }
         .packed();
-        add_action_to_transaction("close", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::close::ACTION_NAME, &packed_args)
     }
 
     fn attest(
@@ -166,7 +166,7 @@ impl Api for EvaluationsPlugin {
             attestation: consensus,
         }
         .packed();
-        add_action_to_transaction("attest", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::attest::ACTION_NAME, &packed_args)
     }
 
     fn get_proposal(
@@ -222,7 +222,7 @@ impl Api for EvaluationsPlugin {
         }
         .packed();
 
-        add_action_to_transaction("propose", &packed_args)
+        add_action_to_transaction(evaluations::action_structs::propose::ACTION_NAME, &packed_args)
     }
 }
 

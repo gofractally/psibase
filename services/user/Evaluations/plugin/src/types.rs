@@ -81,10 +81,10 @@ pub struct UserSetting {
     pub key: Vec<u8>,
 }
 
-#[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct GetUserSettingsResponse {
-    pub getUserSettings: Vec<Option<UserSetting>>,
+    pub get_user_settings: Vec<Option<UserSetting>>,
 }
 
 impl TryFrom<String> for GetUserSettingsResponse {
@@ -97,17 +97,16 @@ impl TryFrom<String> for GetUserSettingsResponse {
         Ok(response_root.data)
     }
 }
-
-#[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyHistory {
-    pub evaluationId: String,
+    pub evaluation_id: String,
     pub hash: String,
-    pub groupNumber: String,
+    pub group_number: String,
     pub keys: Vec<Vec<u8>>,
 }
 
-#[allow(non_snake_case)]
+
 #[derive(Deserialize, Pack, Unpack, Debug)]
 pub struct KeyHistoryRoot {
     pub edges: Vec<Edge>,
@@ -119,10 +118,10 @@ pub struct Edge {
     pub node: KeyHistory,
 }
 
-#[allow(non_snake_case)]
 #[derive(Deserialize, Pack, Unpack, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyHistoryResponse {
-    pub getGroupKey: KeyHistoryRoot,
+    pub get_group_key: KeyHistoryRoot,
 }
 
 impl TryFrom<String> for KeyHistoryResponse {

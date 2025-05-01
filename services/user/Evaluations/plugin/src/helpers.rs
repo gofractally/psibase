@@ -29,7 +29,7 @@ pub fn create_new_symmetric_key(
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
     let user_settings =
-        fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.getUserSettings;
+        fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.get_user_settings;
 
     let creator_public_key = user_settings
         .iter()
@@ -60,14 +60,14 @@ pub fn create_new_symmetric_key(
 
     let hash = symmetric_key.hash();
 
-    let packed_args = evaluations::action_structs::groupKey {
+    let packed_args = evaluations::action_structs::group_key {
         owner: evaluation_owner,
         evaluation_id,
         keys: payloads,
         hash,
     }
     .packed();
-    add_action_to_transaction("groupKey", &packed_args)?;
+    add_action_to_transaction(evaluations::action_structs::group_key::ACTION_NAME, &packed_args)?;
     Ok(symmetric_key)
 }
 
@@ -147,7 +147,7 @@ pub fn get_symmetric_key(
 
 pub fn get_user_public_key(user: AccountNumber) -> Result<Vec<u8>, Error> {
     let user_public_key = fetch_user_settings(vec![user.to_string()])?
-        .getUserSettings
+        .get_user_settings
         .iter()
         .find_map(|s| {
             s.as_ref().and_then(|s| {
@@ -183,10 +183,10 @@ pub fn decrypt_existing_key(
 
     let key_history = fetch_key_history(evaluation_id, group_number)?;
     let edge = key_history
-        .getGroupKey
+        .get_group_key
         .edges
         .iter()
-        .find(|edge| edge.node.evaluationId == evaluation_id.to_string())
+        .find(|edge| edge.node.evaluation_id == evaluation_id.to_string())
         .ok_or(ErrorType::FailedToFindEvaluation)?;
 
     let my_cipher = &edge.node.keys[my_index];
