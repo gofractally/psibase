@@ -45,12 +45,16 @@ mod service {
 
         async fn get_group_result(
             &self,
-            _evaluation_owner: String,
-            _evaluation_id: u32,
-            _group_number: u32,
+            evaluation_owner: String,
+            evaluation_id: u32,
+            group_number: u32,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
-            // TODO
-            EventQuery::new("history.evaluations.groupfinished").query()
+            EventQuery::new("history.evaluations.group_finished")
+                .condition(format!(
+                    "owner = {} AND evaluation_id = {} AND group_number = {}",
+                    evaluation_owner, evaluation_id, group_number
+                ))
+                .query()
         }
 
         async fn get_group(
