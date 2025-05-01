@@ -495,7 +495,7 @@ pub mod impls {
                 self.evaluation_id.to_string(),
                 self.number.to_string(),
                 users,
-                result,
+                result.into_iter().map(|res| res.to_string()).collect(),
             );
         }
 

@@ -25,7 +25,7 @@ mod service {
         evaluation_id: String,
         group_number: String,
         users: Vec<String>,
-        result: Vec<u8>,
+        result: Vec<String>,
     }
 
     #[Object]
@@ -51,7 +51,7 @@ mod service {
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
             EventQuery::new("history.evaluations.groupfinished")
                 .condition(format!(
-                    "owner = {} AND evaluation_id = {} AND group_number = {}",
+                    "owner = '{}' AND evaluation_id = '{}' AND group_number = '{}'",
                     evaluation_owner, evaluation_id, group_number
                 ))
                 .query()
