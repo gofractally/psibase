@@ -3,11 +3,8 @@
 #[cfg(test)]
 mod tests {
 
-
-    #[psibase::test_case(packages("Fractally"))]
+    #[psibase::test_case(packages("Fractals"))]
     fn test_set_thing() -> Result<(), psibase::Error> {
-
-
         Ok(())
     }
 }

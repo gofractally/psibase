@@ -9,7 +9,7 @@ edition = "2021"
 publish = false
 
 [package]
-name = "fractally-pkg"   # Crate name
+name = "fractals-pkg"   # Crate name
 description = "Fractal governance"
 version.workspace = true
 rust-version.workspace = true
@@ -24,8 +24,8 @@ strip = true
 lto = true
 
 [package.metadata.psibase]
-package-name = "Fractally"
-services = ["fractally"]
+package-name = "Fractals"
+services = ["fractals"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.16.0"
@@ -35,6 +35,6 @@ Sites = "0.16.0"
 crate-type = ["rlib"]
 
 [dependencies]
-fractally = { path = "service", version = "0.16.0" }
-r-fractally = { path = "query-service", version = "0.16.0" }
+fractals = { path = "service", version = "0.16.0" }
+r-fractals = { path = "query-service", version = "0.16.0" }
 plugin = { path = "plugin", version = "0.16.0" }

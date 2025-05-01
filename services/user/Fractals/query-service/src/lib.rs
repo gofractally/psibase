@@ -2,7 +2,7 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use fractally::tables::tables::{Fractal, FractalTable, Member, MemberTable};
+    use fractals::tables::tables::{Fractal, FractalTable, Member, MemberTable};
     use psibase::*;
     use serde::Deserialize;
 
@@ -23,7 +23,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.fractally.updated")
+            EventQuery::new("history.fractals.updated")
                 .first(first)
                 .last(last)
                 .before(before)
@@ -32,7 +32,7 @@ mod service {
         }
 
         async fn fractal(&self, fractal: String) -> Option<Fractal> {
-            FractalTable::with_service(fractally::SERVICE)
+            FractalTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&AccountNumber::from(fractal.as_str()))
         }
@@ -44,7 +44,7 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Fractal>> {
-            TableQuery::new(FractalTable::with_service(fractally::SERVICE).get_index_pk())
+            TableQuery::new(FractalTable::with_service(fractals::SERVICE).get_index_pk())
                 .first(first)
                 .last(last)
                 .before(before)
@@ -65,7 +65,7 @@ mod service {
             let account_name = AccountNumber::from(fractal.as_str());
             
             TableQuery::subindex::<AccountNumber>(
-                MemberTable::with_service(fractally::SERVICE).get_index_pk(),
+                MemberTable::with_service(fractals::SERVICE).get_index_pk(),
                 &(account_name)
             )
             .first(first)

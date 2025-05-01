@@ -136,7 +136,7 @@ const psibase = (service: string, isServing?: boolean) => {
 export default defineConfig(({ command }) => ({
     plugins: [
         react(),
-        psibase("fractally", command === "serve"),
+        psibase("fractals", command === "serve"),
         wasm(),
         topLevelAwait(),
         tsconfigPaths(),

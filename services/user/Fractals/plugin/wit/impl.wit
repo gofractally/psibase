@@ -1,4 +1,4 @@
-package fractally:plugin;
+package fractals:plugin;
 
 world impl {
     include host:common/imports;

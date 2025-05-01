@@ -22,7 +22,7 @@ const fc = async(method: string, params: any[]) => {
     return supervisor.functionCall({
         method,
         params,
-        service: 'fractally',
+        service: 'fractals',
         intf: 'api'
     })
 }
@@ -55,7 +55,7 @@ export const App = () => {
 
     return (
         <div className="mx-auto h-screen w-screen max-w-screen-lg">
-            <Nav title="fractally" />
+            <Nav title="fractals" />
 
             <div>
                 <div className="pb-1 text-muted-foreground">

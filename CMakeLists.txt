@@ -226,7 +226,7 @@ set(JS_DIRS
     services/system/Producers/ui:Producers_js
     services/user/Branding/ui:Branding_js
     services/user/Evaluations/ui:Evaluations_js
-    services/user/Fractally/ui:Fractally_js
+    services/user/Fractals/ui:Fractally_js
     services/user/CommonApi/common/packages/plugin-tester/ui:PluginTester_js
     services/user/Explorer/ui:Explorer_js
     services/user/Homepage/ui:Homepage_js
@@ -454,8 +454,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/Fractally.psi
-    PATH services/user/Fractally
+    OUTPUT ${SERVICE_DIR}/Fractals.psi
+    PATH services/user/Fractals
     DEPENDS ${Fractally_js_DEP}
 )
 
@@ -909,7 +909,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}
     DESCRIPTION "All development services"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit 
-                    Docs Evaluations Events Fractally Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs Evaluations Events Fractals Explorer Fractal HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens Transact Homepage Workshop 
 )
 
@@ -956,7 +956,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit DevDefault ProdDefault
-    Docs Events Evaluations Fractally Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs Events Evaluations Fractals Explorer Fractal Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens Transact Homepage Workshop)
 
 install(
@@ -978,7 +978,7 @@ install(
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
           ${SERVICE_DIR}/Fractal.psi
-          ${SERVICE_DIR}/Fractally.psi
+          ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi

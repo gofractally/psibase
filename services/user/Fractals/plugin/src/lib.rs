@@ -1,8 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::fractally::plugin::api::Guest as Api;
-use bindings::exports::fractally::plugin::queries::Guest as Queries;
+use bindings::exports::fractals::plugin::api::Guest as Api;
+use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -23,7 +23,7 @@ impl Api for FractallyPlugin {
         finish_by: u32,
         interval_seconds: u32,
     ) -> Result<(), Error> {
-        let packed_args = fractally::action_structs::setSchedule {
+        let packed_args = fractals::action_structs::setSchedule {
             deliberation,
             finish_by,
             interval_seconds,
@@ -36,7 +36,7 @@ impl Api for FractallyPlugin {
     }
 
     fn join(fractal: String) -> Result<(), Error> {
-        let packed_args = fractally::action_structs::join {
+        let packed_args = fractals::action_structs::join {
             fractal: AccountNumber::from(fractal.as_str()),
         }
         .packed();
@@ -44,7 +44,7 @@ impl Api for FractallyPlugin {
     }
 
     fn create_fractal(name: String, mission: String) -> Result<(), Error> {
-        let packed_args = fractally::action_structs::createFractal { name, mission }.packed();
+        let packed_args = fractals::action_structs::createFractal { name, mission }.packed();
 
         add_action_to_transaction("createFractal", &packed_args)
     }

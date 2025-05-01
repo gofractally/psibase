@@ -790,11 +790,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "fractally"
+name = "fractals"
 version = "0.16.0"
 dependencies = [
  "async-graphql",
- "fractally-pkg",
+ "fractals-pkg",
  "psibase",
  "psibase_macros",
  "serde",
@@ -802,12 +802,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "fractally-pkg"
+name = "fractals-pkg"
 version = "0.16.0"
 dependencies = [
- "fractally",
+ "fractals",
  "plugin",
- "r-fractally",
+ "r-fractals",
 ]
 
 [[package]]
@@ -1658,8 +1658,8 @@ dependencies = [
 name = "plugin"
 version = "0.16.0"
 dependencies = [
- "fractally",
- "fractally-pkg",
+ "fractals",
+ "fractals-pkg",
  "psibase",
  "serde",
  "serde_json",
@@ -1824,11 +1824,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
 
 [[package]]
-name = "r-fractally"
+name = "r-fractals"
 version = "0.16.0"
 dependencies = [
  "async-graphql",
- "fractally",
+ "fractals",
  "psibase",
  "serde",
  "serde_json",
