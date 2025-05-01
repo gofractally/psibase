@@ -490,7 +490,7 @@ pub mod impls {
                 .map(|account| account.user.to_string())
                 .collect();
 
-            crate::Wrapper::emit().history().group_finished(
+            crate::Wrapper::emit().history().groupfinished(
                 self.owner.to_string(),
                 self.evaluation_id.to_string(),
                 self.number.to_string(),
