@@ -49,7 +49,7 @@ mod service {
             evaluation_id: u32,
             group_number: u32,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
-            EventQuery::new("history.evaluations.groupfinished")
+            EventQuery::new("history.evaluations.group_finished")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = '{}' AND group_number = '{}'",
                     evaluation_owner, evaluation_id, group_number
