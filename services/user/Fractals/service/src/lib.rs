@@ -7,8 +7,7 @@ pub mod service {
 
     use crate::helpers::parse_rank_to_accounts;
     use crate::tables::tables::{Fractal, Member, MemberStatus};
-    use evaluations::service::EvaluationTable;
-    use psibase::{AccountNumber, *};
+    use psibase::*;
 
     use std::collections::HashMap;
 
@@ -17,8 +16,7 @@ pub mod service {
         let sender = get_sender();
 
         check_none(Fractal::get(sender), "fractal already exists");
-        let new_fractal = Fractal::new(sender, name, mission);
-        new_fractal.save();
+        Fractal::add(sender, name, mission);
 
         Wrapper::emit().history().created_fractal(sender);
     }
@@ -103,8 +101,7 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn evalRegister(fractal: AccountNumber, evaluation_id: u32, account: AccountNumber) {
+    fn on_eval_register(fractal: AccountNumber, evaluation_id: u32, account: AccountNumber) {
         check_is_eval();
         let member = psibase::check_some(
             Member::get(fractal, account),
@@ -119,8 +116,7 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn evalUnregister(evaluation_id: u32, account: AccountNumber) {}
+    fn on_eval_unregister(evaluation_id: u32, account: AccountNumber) {}
 
     #[action]
     fn on_attestation(
@@ -138,8 +134,7 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn evalGroupFin(
+    fn on_eval_group_fin(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,

@@ -1,3 +1,5 @@
+
+
 #[psibase::service_tables]
 pub mod tables {
     use std::u64;
@@ -24,6 +26,7 @@ pub mod tables {
         pub mission: String,
         pub scheduled_evaluation: Option<u32>,
         pub evaluation_interval: Option<u32>,
+        pub reward_wait_period: u32
     }
 
     impl Fractal {
@@ -37,7 +40,7 @@ pub mod tables {
             (self.account, self.scheduled_evaluation)
         }
 
-        pub fn new(account: AccountNumber, name: String, mission: String) -> Self {
+        fn new(account: AccountNumber, name: String, mission: String) -> Self {
             let now = TransactSvc::call().currentBlock().time.seconds();
 
             Self {
@@ -47,7 +50,12 @@ pub mod tables {
                 name,
                 scheduled_evaluation: None,
                 evaluation_interval: None,
+                reward_wait_period: 86400 * 7 * 1
             }
+        }
+
+        pub fn add(account: AccountNumber, name: String, mission: String) {
+            Self::new(account, name, mission).save();
         }
 
         pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -232,6 +240,10 @@ pub mod tables {
         pub created_at: psibase::TimePointSec,
         pub reputation: f32,
         pub member_status: StatusU32,
+
+        pub reward_balance: u64,
+        pub reward_start_time: psibase::TimePointSec,
+        pub reward_wait: u32,
     }
 
     impl Member {
@@ -241,13 +253,107 @@ pub mod tables {
         }
 
         fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
+            let now = TransactSvc::call().currentBlock().time.seconds();
             Self {
                 account,
                 fractal,
-                created_at: TransactSvc::call().currentBlock().time.seconds(),
+                created_at: now,
                 reputation: 0.0,
                 member_status: status as StatusU32,
+                reward_balance: 0,
+                reward_start_time: now,
+                reward_wait: 0,
             }
+        }
+
+        fn deposit(&mut self, amount: u64) {
+            psibase::check(amount > 0, "amount must be greater than 0");
+        
+            let current_time = TransactSvc::call().currentBlock().time.seconds();
+        
+            let elapsed = if current_time.seconds >= self.reward_start_time.seconds {
+                (current_time.seconds - self.reward_start_time.seconds) as u64
+            } else {
+                0
+            };
+        
+            let original_balance = self.reward_balance;
+            let new_balance = original_balance.saturating_add(amount);
+        
+            let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
+        
+            let remaining_waiting = reward_wait_period as u64 - elapsed.min(reward_wait_period as u64);
+        
+            let weight_original = if new_balance == 0 {
+                0.0
+            } else {
+                original_balance as f64 / new_balance as f64
+            };
+            let weight_new = if new_balance == 0 {
+                0.0
+            } else {
+                amount as f64 / new_balance as f64
+            };
+        
+            let new_period = if original_balance == 0 {
+                reward_wait_period as f64
+            } else {
+                (weight_original * remaining_waiting as f64) + (weight_new * reward_wait_period as f64)
+            };
+        
+            self.reward_wait = new_period.ceil().min(u32::MAX as f64) as u32;
+            self.reward_balance = new_balance;
+            self.save();
+        }
+
+        fn withdrawable_amount(&self) -> u64 {
+            let current_time = TransactSvc::call().currentBlock().time.seconds();
+            if current_time.seconds < self.reward_start_time.seconds {
+                return 0;
+            }
+
+            let elasped = if current_time.seconds >= self.reward_start_time.seconds {
+                (current_time.seconds - self.reward_start_time.seconds) as u32
+            } else {
+                0
+            };
+
+            if elasped >= self.reward_wait {
+                self.reward_balance
+            } else {
+                let percent_waited = (elasped as f64) / (self.reward_wait as f64);
+                let withdrawable_amount = percent_waited * (self.reward_balance as f64).floor();
+                withdrawable_amount as u64
+            }
+
+        }
+
+        fn withdraw(mut self) {
+            let current_time = TransactSvc::call().currentBlock().time.seconds();
+
+            let withdrawable = self.withdrawable_amount();
+            if withdrawable == 0 {
+                abort_message("nothing to withdraw");
+            }
+
+            self.reward_balance = self.reward_balance.saturating_sub(withdrawable);
+            self.reward_start_time = current_time;
+
+            let reward_wait_period = Fractal::get_assert(self.fractal).reward_wait_period;
+            
+            self.reward_wait = if self.reward_balance == 0 {
+                reward_wait_period
+            } else {
+                let original_balance = self.reward_balance + withdrawable;
+                let new_period = if original_balance == 0 {
+                    reward_wait_period as f64
+                } else {
+                    (self.reward_wait as f64 * self.reward_balance as f64) / original_balance as f64
+                };
+                new_period.ceil() as u32
+            };
+
+            self.save();
         }
 
         pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
@@ -271,7 +377,7 @@ pub mod tables {
         }
 
         pub fn feed_new_score(&mut self, incoming_score: f32) {
-            self.reputation = calculate_ema(incoming_score, self.reputation, 0.2).unwrap();
+            self.reputation = calculate_ema(incoming_score, self.reputation, 0.2);
             self.save();
         }
     }
