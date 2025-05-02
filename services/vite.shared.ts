@@ -94,7 +94,7 @@ export interface buildAlias{
     replacement: string;
 };
 
-const servicesDir = path.resolve(__dirname, "/root/psibase/services");
+const servicesDir = path.resolve(__dirname);
 
 export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin[] {
     const {

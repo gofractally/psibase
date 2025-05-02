@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "node ../../../if-build-needed.mjs src wasm:wasm-transpiled 'cd ./wasm && cargo-component build --release && cd .. && jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build'",
+        "build": "cd ./wasm && cargo-component build --release && cd .. && node ../../../if-build-needed.mjs src wasm:wasm-transpiled 'jco transpile ./wasm/target/wasm32-wasip1/release/x_admin.wasm --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ./wasm-transpiled && vite build'",
         "preview": "vite preview"
     },
     "dependencies": {
@@ -58,6 +58,7 @@
         "@types/react": "^18.0.17",
         "@types/react-dom": "^18.0.6",
         "@vitejs/plugin-react": "^4.0.0",
+        "@yarnpkg/sdks": "^3.2.1",
         "autoprefixer": "^10.4.19",
         "eslint": "^9.15.0",
         "eslint-config-prettier": "^9.1.0",

@@ -2045,6 +2045,7 @@ __metadata:
     "@types/react": "npm:^18.0.17"
     "@types/react-dom": "npm:^18.0.6"
     "@vitejs/plugin-react": "npm:^4.0.0"
+    "@yarnpkg/sdks": "npm:^3.2.1"
     autoprefixer: "npm:^10.4.19"
     axios: "npm:^1.7.2"
     class-variance-authority: "npm:^0.7.0"

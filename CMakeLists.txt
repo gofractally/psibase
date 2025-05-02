@@ -234,41 +234,46 @@ set(JS_DIRS
     services/user/Supervisor/ui:Supervisor_js
     services/user/Workshop/ui:Workshop_js
     services/user/XAdmin/ui:XAdmin_js
-    services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js
 )
 
-set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
 
-# Create targets for each UI and set up dependencies
-foreach(ROW ${JS_DIRS})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${ROW})
-    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${ROW})
-    
-    # Special handling for XAdmin and CommonApi
-    if(${TARGET_NAME} STREQUAL "XAdmin_js")
-        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
-        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
-    elseif(${TARGET_NAME} STREQUAL "CommonApiCommonLib_js")
-        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/common-lib.js)
-        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/common-lib.js)
-    else()
-        add_custom_target(${TARGET_NAME} DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
-        set(${TARGET_NAME}_DEP ${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/index.html)
-        COMMAND yarn build
-    endif()
-    
-    add_dependencies(${TARGET_NAME} build_uis)
-endforeach()
+function(add_js_target TARGET_TUPLE OUTPUT_FILE)
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
+    string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
+    set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
 
-# Single target to install deps for all UIs, relying on Yarn's caching
-add_custom_target(build_uis
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services/ && yarn && yarn install-dev-tools
-)
+    # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
+    add_custom_command(
+        OUTPUT ${OUTPUT_FILEPATH}
+        BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
+        DEPENDS ${ARGN}
+        # TODO: moved `yarn` to L262 to run only once
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn build
+    )
+    # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
+    add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
+    # Expose `${TARGET_NAME}` and its dependency to the parent scope for further use
+    set(${TARGET_NAME}_DEP ${TARGET_NAME} ${OUTPUT_FILEPATH} PARENT_SCOPE)
+endfunction()
 
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/services/yarn.lock
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn
+)
+
+# Builds the Common files that the UIs (just below) depend on
+add_js_target(${COMMON_LIB_DIR} common-lib.js)
+
+# Build each UI
+# Each of these UIs receives the build output of CommonApi, so CommonApi files are listed as dependencies
+foreach(ROW ${JS_DIRS})
+    add_js_target(${ROW} index.html ${common-misc-resources} ${common-fonts} ${CommonApiCommonLib_js_DEP})
+endforeach()
 
 # Static (not built) resource dependencies
 file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/packages/wit/*)
@@ -276,7 +281,6 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
-add_rs_component(services/user/XAdmin/ui/wasm:XAdminWasm x_admin.wasm wasm32-wasip1)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
@@ -301,20 +305,6 @@ add_rs_component_workspace(services/:Plugins
     producers
 )
 
-set(XADMIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui)
-set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_PATH}/wasm-transpiled/x_admin.core.wasm)
-add_dependencies(XAdmin_js XAdminWasm)
-
-# TODO: Remove this code; not sure how to yet
-add_custom_command(
-    OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
-    WORKING_DIRECTORY ${XADMIN_PATH}
-    COMMAND yarn build
-)
-add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
-add_dependencies(xadmin-wasm-transpiled rust)
-
 function(psinode_files target pfx)
     add_custom_target(
     ${target}
@@ -332,7 +322,6 @@ function(psinode_files target pfx)
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-add_dependencies(XAdmin_js xadmin-wasm-transpiled CommonApiCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
