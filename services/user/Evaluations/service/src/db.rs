@@ -507,6 +507,8 @@ pub mod impls {
                 users,
                 result.into_iter().map(|res| res.to_string()).collect(),
             );
+            
+            self.delete();
         }
 
         pub fn set_key_submitter(&mut self, submitter: AccountNumber) {

@@ -1,15 +1,19 @@
+mod helpers;
 mod scoring;
 pub mod tables;
 
 #[psibase::service(tables = "tables::tables")]
 pub mod service {
-    use crate::scoring::calculate_ema;
+
+    use crate::helpers::parse_rank_to_accounts;
     use crate::tables::tables::{Fractal, Member, MemberStatus};
+    use evaluations::service::EvaluationTable;
     use psibase::{AccountNumber, *};
 
+    use std::collections::HashMap;
+
     #[action]
-    #[allow(non_snake_case)]
-    fn createFractal(name: String, mission: String) {
+    fn create_fractal(name: String, mission: String) {
         let sender = get_sender();
 
         check_none(Fractal::get(sender), "fractal already exists");
@@ -20,7 +24,41 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
+    fn start_eval(fractal: AccountNumber) {
+        let fractal = Fractal::get_assert(fractal);
+        let evaluation_id = check_some(fractal.scheduled_evaluation, "no evaluation is scheduled");
+
+        let fractal_members = fractal.members();
+        let registered_evaluation_users = fractal.evaluation_users(None);
+
+        fractal_members.into_iter().for_each(|mut member| {
+            let is_partcipating = registered_evaluation_users
+                .iter()
+                .any(|user| user.user == member.account);
+
+            if !is_partcipating {
+                member.feed_new_score(0.0);
+            }
+        });
+
+        psibase::services::evaluations::Wrapper::call().start(get_service(), evaluation_id);
+    }
+
+    #[action]
+    fn close_eval(fractal: AccountNumber) {
+        let mut fractal = Fractal::get_assert(fractal);
+        let remaining_users = fractal.evaluation_users(None);
+
+        for user in remaining_users {
+            Member::get(fractal.account, user.user).map(|mut member| {
+                member.feed_new_score(0.0);
+            });
+        }
+
+        fractal.schedule_next_evaluation();
+    }
+
+    #[action]
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
@@ -31,43 +69,31 @@ pub mod service {
             "a fractal cannot join another fractal",
         );
 
-        Member::new(fractal, sender, MemberStatus::Citizen).save();
+        Member::add(fractal, sender, MemberStatus::Citizen).save();
 
         Wrapper::emit().history().joined_fractal(sender, fractal);
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn setSchedule(
+    fn set_schedule(
         registration: u32,
         deliberation: u32,
         submission: u32,
         finish_by: u32,
         interval_seconds: u32,
+        force_delete: bool,
     ) {
-        let mut fractal = check_some(Fractal::get(get_sender()), "failed to find fractal");
+        let mut fractal = Fractal::get_assert(get_sender());
 
-        if fractal.scheduled_evaluation.is_some() {
-            psibase::services::evaluations::Wrapper::call()
-                .delete(fractal.scheduled_evaluation.unwrap(), false);
-        };
-
-        let eval_id: u32 = psibase::services::evaluations::Wrapper::call().create(
+        fractal.set_evaluation_schedule(
             registration,
             deliberation,
             submission,
             finish_by,
-            vec![4, 5, 6],
-            6,
-            true,
+            interval_seconds,
+            force_delete,
         );
-
-        fractal.scheduled_evaluation = Some(eval_id);
-        fractal.evaluation_interval = Some(interval_seconds);
-        fractal.save();
     }
-
-    fn closeEval() {}
 
     fn check_is_eval() {
         check(
@@ -97,71 +123,66 @@ pub mod service {
     fn evalUnregister(evaluation_id: u32, account: AccountNumber) {}
 
     #[action]
+    fn on_attestation(
+        evaluation_id: u32,
+        group_number: u32,
+        user: AccountNumber,
+        attestation: Vec<u8>,
+    ) {
+        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
+        let acceptable_numbers = fractal.evaluation_users(Some(group_number)).len();
+        let is_valid_attestion = attestation
+            .iter()
+            .all(|num| *num as usize <= acceptable_numbers);
+        check(is_valid_attestion, "invalid attestation");
+    }
+
+    #[action]
     #[allow(non_snake_case)]
     fn evalGroupFin(
         owner: AccountNumber,
         evaluation_id: u32,
         group_number: u32,
-        users: Vec<AccountNumber>,
-        result: Vec<u8>,
+        group_result: Vec<u8>,
     ) {
         check_is_eval();
+        check(owner == get_service(), "unexpected owner of evaluation");
 
-        let fractal = owner;
-        let acceptable_numbers = users.len();
-        let is_valid_numbers = result.iter().all(|num| *num as usize <= acceptable_numbers);
-        if !is_valid_numbers {
-            // Ut oh
-            return;
+        let fractal = Fractal::get_by_evaluation_id(evaluation_id);
+
+        let evaluation = check_some(
+            fractal.evaluation().map(|eval| eval.num_options),
+            "failed getting evaluation",
+        );
+        let group_members: Vec<AccountNumber> = fractal
+            .evaluation_users(Some(group_number))
+            .into_iter()
+            .map(|user| user.user)
+            .collect();
+
+        let mut new_member_scores: HashMap<AccountNumber, f32> = group_members
+            .clone()
+            .into_iter()
+            .map(|member| (member, 0.0))
+            .collect();
+
+        let group_result = parse_rank_to_accounts(group_result, group_members);
+
+        group_result
+            .into_iter()
+            .enumerate()
+            .for_each(|(index, ranked_member)| {
+                let level = (evaluation as usize) - index;
+                let score = level as f32;
+                new_member_scores.insert(ranked_member, score);
+            });
+
+        for (account, new_score) in new_member_scores.into_iter() {
+            Member::get(fractal.account, account).map(|mut member| {
+                member.feed_new_score(new_score);
+            });
         }
 
-        let user_levels: Vec<(u8, usize)> = result
-            .iter()
-            .enumerate()
-            .map(|(index, user)| {
-                let level = 6 - index;
-                let user_position = *user;
-                (user_position, level)
-            })
-            .collect();
-
-        let mut the_users = users;
-        the_users.sort_by(|a, b| a.value.cmp(&b.value));
-
-        let mapped_users: Vec<(usize, AccountNumber)> = the_users
-            .into_iter()
-            .enumerate()
-            .map(|(index, user)| (index + 1, user))
-            .collect();
-
-        let mapped_user_results: Vec<(AccountNumber, u8)> = mapped_users
-            .into_iter()
-            .map(|mapped_user| {
-                let user_level_achieved = user_levels
-                    .iter()
-                    .find_map(|user_level| {
-                        if user_level.0 as u32 == mapped_user.0 as u32 {
-                            return Some(user_level.1 as u8);
-                        } else {
-                            return None;
-                        }
-                    })
-                    .unwrap_or(0);
-
-                return (mapped_user.1, user_level_achieved);
-            })
-            .collect();
-
-        mapped_user_results.iter().for_each(|result| {
-            let mut member = check_some(
-                Member::get(fractal, result.0),
-                "failed to get member of fractal",
-            );
-
-            member.reputation = calculate_ema(result.1, member.reputation, 0.2)
-                .expect("failed calculating new ema");
-            member.save();
-        });
     }
 
     #[event(history)]
