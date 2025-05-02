@@ -233,27 +233,23 @@ set(JS_DIRS
     services/user/Permissions/ui:Permissions_js
     services/user/Supervisor/ui:Supervisor_js
     services/user/Workshop/ui:Workshop_js
-    services/user/XAdmin/ui:XAdmin_js
 )
-
+set(ADMIN_DIR services/user/XAdmin/ui:XAdmin_js)
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
-
-add_custom_target(YarnInstall
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn && yarn install-dev-tools
-    COMMENT "Installing yarn dependencies"
-)
 
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
     set(OUTPUT_FILEPATH ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist/${OUTPUT_FILE})
+    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/src/*)
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/package.json ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/yarn.lock)
 
     # Add a command that rebuilds `${OUTPUT_FILEPATH}` whenever any sources or dependencies are updated
     add_custom_command(
         OUTPUT ${OUTPUT_FILEPATH}
         BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
-        DEPENDS ${ARGN} YarnInstall
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn build
+        DEPENDS ${SOURCES} ${ARGN}
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn --mutex network && yarn build
     )
     # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
     add_custom_target(${TARGET_NAME} DEPENDS ${OUTPUT_FILEPATH})
@@ -280,6 +276,7 @@ file(GLOB plugin-wit LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services
 # Build each component
 include(libraries/psibase/sdk/rs-components.cmake)
 add_rs_component(services/user/CommonApi/common/packages/component-parser:ComponentParser component_parser.wasm wasm32-unknown-unknown)
+add_rs_component(services/user/XAdmin/ui/wasm:XAdminWasm x_admin.wasm wasm32-wasip1)
 add_dependencies(CommonApiCommonLib_js ComponentParser)
 
 add_rs_component_workspace(services/:Plugins 
@@ -304,6 +301,21 @@ add_rs_component_workspace(services/:Plugins
     producers
 )
 
+set(XADMIN_PATH ${CMAKE_CURRENT_SOURCE_DIR}/services/user/XAdmin/ui)
+set(XADMIN_TRANSPILE_BYPRODUCT ${XADMIN_PATH}/wasm-transpiled/x_admin.core.wasm)
+add_js_target(${ADMIN_DIR} index.html ${XADMIN_TRANSPILE_BYPRODUCT} ${CommonApiCommonLib_js_DEP})
+add_dependencies(XAdmin_js XAdminWasm)
+
+add_custom_command(
+    OUTPUT ${XADMIN_TRANSPILE_BYPRODUCT}
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE}
+    WORKING_DIRECTORY ${XADMIN_PATH}
+    COMMAND yarn --mutex network
+    COMMAND yarn jco transpile ${COMPONENT_BIN_DIR}/${XAdminWasm_OUTPUT_FILE} --minify --no-nodejs-compat --base64-cutoff=4096 --valid-lifting-optimization -o ${XADMIN_PATH}/wasm-transpiled
+)
+add_custom_target(xadmin-wasm-transpiled ALL DEPENDS ${XADMIN_TRANSPILE_BYPRODUCT})
+add_dependencies(xadmin-wasm-transpiled rust)
+
 function(psinode_files target pfx)
     add_custom_target(
     ${target}
@@ -321,6 +333,7 @@ function(psinode_files target pfx)
 endfunction()
 
 psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(XAdmin_js xadmin-wasm-transpiled CommonApiCommonLib_js)
 
 include(GNUInstallDirs)
 install(DIRECTORY services/user/XAdmin/ui/dist/ DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
