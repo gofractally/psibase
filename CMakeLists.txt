@@ -238,6 +238,11 @@ set(JS_DIRS
 
 set(COMMON_LIB_DIR services/user/CommonApi/common/packages/common-lib/:CommonApiCommonLib_js)
 
+add_custom_target(YarnInstall
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn && yarn install-dev-tools
+    COMMENT "Installing yarn dependencies"
+)
+
 function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\1 PATH ${TARGET_TUPLE})
     string(REGEX REPLACE "^([^:]+):([^:]+)$" \\2 TARGET_NAME ${TARGET_TUPLE})
@@ -247,8 +252,7 @@ function(add_js_target TARGET_TUPLE OUTPUT_FILE)
     add_custom_command(
         OUTPUT ${OUTPUT_FILEPATH}
         BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/${PATH}/dist
-        DEPENDS ${ARGN}
-        # TODO: moved `yarn` to L262 to run only once
+        DEPENDS ${ARGN} YarnInstall
         COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/${PATH} && yarn build
     )
     # Create a custom target to ensure `${OUTPUT_FILEPATH}` is built before `${TARGET_NAME}`
@@ -260,11 +264,6 @@ endfunction()
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/*)
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/services/user/CommonApi/common/resources/fonts/*)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/services/yarn.lock
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/services && yarn
-)
 
 # Builds the Common files that the UIs (just below) depend on
 add_js_target(${COMMON_LIB_DIR} common-lib.js)
