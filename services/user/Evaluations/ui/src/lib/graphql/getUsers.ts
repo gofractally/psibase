@@ -28,7 +28,6 @@ export const getUsersAndGroups = async (
     owner: Account,
     evaluationId: number,
 ) => {
-    console.log("getUsers", owner, evaluationId);
     const res = await graphql(
         `{ 
             getUsers(owner: "${owner}", evaluationId: ${evaluationId}) {

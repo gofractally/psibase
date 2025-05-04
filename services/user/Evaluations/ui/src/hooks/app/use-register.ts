@@ -22,7 +22,7 @@ export const useRegister = () => {
             void (await getSupervisor().functionCall({
                 method: "register",
                 service: "evaluations",
-                intf: "api",
+                intf: "user",
                 params: [params.owner, params.id, currentUser],
             }));
 

@@ -19,7 +19,7 @@ export const useStartEvaluation = () =>
             void (await getSupervisor().functionCall({
                 method: "start",
                 service: "evaluations",
-                intf: "api",
+                intf: "admin",
                 params: [owner, id],
             }));
             await wait(3000);

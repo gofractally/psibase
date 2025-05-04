@@ -26,7 +26,7 @@ export const useSetGroupKey = () =>
                     service: "evaluations",
                     method: "groupKey",
                     params: [evaluationId, keys, hash],
-                    intf: "api",
+                    intf: "user",
                 }));
 
                 const currentUser = zAccount.safeParse(

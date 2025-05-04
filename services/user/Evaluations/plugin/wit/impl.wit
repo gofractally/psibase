@@ -8,6 +8,6 @@ world impl {
     include base64:plugin/imports;
     include accounts:plugin/imports;
 
-
-    export api;
+    export admin;
+    export user;
 }

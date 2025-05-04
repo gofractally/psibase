@@ -60,7 +60,7 @@ export const useCreateEvaluation = () => {
             void (await getSupervisor().functionCall({
                 method: "create",
                 service: "evaluations",
-                intf: "api",
+                intf: "admin",
                 params: [
                     registration,
                     deliberation,

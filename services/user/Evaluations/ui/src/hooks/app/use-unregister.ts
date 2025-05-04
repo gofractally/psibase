@@ -15,7 +15,7 @@ export const useUnregister = () => {
             void (await getSupervisor().functionCall({
                 method: "unregister",
                 service: "evaluations",
-                intf: "api",
+                intf: "user",
                 params: [id],
             }));
 

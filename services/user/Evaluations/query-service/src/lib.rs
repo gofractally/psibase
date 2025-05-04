@@ -10,7 +10,6 @@ mod service {
     use psibase::*;
     use serde::Deserialize;
 
-    struct Query;
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
         evaluation_id: String,
@@ -27,6 +26,8 @@ mod service {
         users: Vec<String>,
         result: Vec<String>,
     }
+
+    struct Query;
 
     #[Object]
     impl Query {
@@ -51,7 +52,7 @@ mod service {
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
             EventQuery::new("history.evaluations.group_finished")
                 .condition(format!(
-                    "owner = '{}' AND evaluation_id = '{}' AND group_number = '{}'",
+                    "owner = '{}' AND evaluation_id = {} AND group_number = {}",
                     evaluation_owner, evaluation_id, group_number
                 ))
                 .query()
@@ -59,54 +60,43 @@ mod service {
 
         async fn get_group(
             &self,
-            owner: String,
+            owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
         ) -> Option<Group> {
             GroupTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
-                .get(&(
-                    AccountNumber::from(owner.as_str()),
-                    evaluation_id,
-                    group_number,
-                ))
+                .get(&(owner, evaluation_id, group_number))
         }
 
-        async fn get_evaluation(&self, owner: String, evaluation_id: u32) -> Option<Evaluation> {
+        async fn get_evaluation(&self, owner: AccountNumber, evaluation_id: u32) -> Option<Evaluation> {
             EvaluationTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
-                .get(&(AccountNumber::from(owner.as_str()), evaluation_id))
+                .get(&(owner, evaluation_id))
         }
 
-        async fn get_last_evaluation(&self, owner: String) -> Option<Evaluation> {
-            let account_number = AccountNumber::from(owner.as_str());
-
-            let last_config_number = ConfigTable::with_service(evaluations::SERVICE)
+        async fn get_last_evaluation(&self, owner: AccountNumber) -> Option<Evaluation> {
+            let last_config = ConfigTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
-                .get(&account_number);
-
-            if last_config_number.is_none() {
-                return None;
-            }
+                .get(&owner)?;
 
             EvaluationTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
-                .get(&(account_number, last_config_number.unwrap().last_used_id))
+                .get(&(owner, last_config.last_used_id))
         }
 
         async fn get_groups(
             &self,
-            owner: String,
+            owner: AccountNumber,
             evaluation_id: u32,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Group>> {
-            let account_number: AccountNumber = AccountNumber::from(owner.as_str());
             TableQuery::subindex::<u32>(
                 GroupTable::with_service(evaluations::SERVICE).get_index_pk(),
-                &(account_number, evaluation_id),
+                &(owner, evaluation_id),
             )
             .first(first)
             .last(last)
@@ -118,7 +108,7 @@ mod service {
 
         async fn get_group_users(
             &self,
-            owner: String,
+            owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
             first: Option<i32>,
@@ -128,11 +118,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, User>> {
             TableQuery::subindex::<AccountNumber>(
                 UserTable::with_service(evaluations::SERVICE).get_index_by_group(),
-                &(
-                    AccountNumber::from(owner.as_str()),
-                    evaluation_id,
-                    Some(group_number),
-                ),
+                &(owner, evaluation_id, Some(group_number)),
             )
             .first(first)
             .last(last)
@@ -144,7 +130,7 @@ mod service {
 
         async fn get_users(
             &self,
-            owner: String,
+            owner: AccountNumber,
             evaluation_id: u32,
             first: Option<i32>,
             last: Option<i32>,
@@ -153,7 +139,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, User>> {
             TableQuery::subindex::<AccountNumber>(
                 UserTable::with_service(evaluations::SERVICE).get_index_pk(),
-                &(AccountNumber::from(owner.as_str()), evaluation_id),
+                &(owner, evaluation_id),
             )
             .first(first)
             .last(last)
@@ -163,14 +149,13 @@ mod service {
             .await
         }
 
-        async fn get_user_settings(&self, accounts: Vec<String>) -> Vec<Option<UserSettings>> {
+        async fn get_user_settings(&self, accounts: Vec<AccountNumber>) -> Vec<Option<UserSettings>> {
             accounts
-                .iter()
-                .map(|account| AccountNumber::from(account.as_str()))
-                .map(|account_number| {
+                .into_iter()
+                .map(|account| {
                     UserSettingsTable::with_service(evaluations::SERVICE)
                         .get_index_pk()
-                        .get(&account_number)
+                        .get(&account)
                 })
                 .collect()
         }

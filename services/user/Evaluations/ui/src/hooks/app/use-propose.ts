@@ -18,7 +18,7 @@ export const usePropose = () =>
             const pars = {
                 method: "propose",
                 service: "evaluations",
-                intf: "api",
+                intf: "user",
                 params: [
                     owner,
                     evaluationId,

@@ -1,7 +1,8 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::exports::evaluations::plugin::api::Guest as Api;
+use bindings::exports::evaluations::plugin::admin::Guest as Admin;
+use bindings::exports::evaluations::plugin::user::Guest as User;
 use bindings::host::common::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -21,7 +22,7 @@ use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
 
 struct EvaluationsPlugin;
 
-impl Api for EvaluationsPlugin {
+impl Admin for EvaluationsPlugin {
     fn create(
         registration: u32,
         deliberation: u32,
@@ -49,9 +50,56 @@ impl Api for EvaluationsPlugin {
             use_hooks,
         }
         .packed();
-        add_action_to_transaction("create", &packed_args)
+        add_action_to_transaction(
+            evaluations::action_structs::create::ACTION_NAME,
+            &packed_args,
+        )
     }
 
+    fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+
+        let packed_args = evaluations::action_structs::start {
+            owner: evaluation_owner,
+            evaluation_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            evaluations::action_structs::start::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let packed_args = evaluations::action_structs::close {
+            owner: evaluation_owner,
+            evaluation_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            evaluations::action_structs::close::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
+        let packed_args = evaluations::action_structs::delete {
+            evaluation_id,
+            force,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            evaluations::action_structs::delete::ACTION_NAME,
+            &packed_args,
+        )
+    }
+}
+
+impl User for EvaluationsPlugin {
     fn register(
         evaluation_owner: String,
         evaluation_id: u32,
@@ -64,8 +112,11 @@ impl Api for EvaluationsPlugin {
             key: public_key_vectored,
         }
         .packed();
-        add_action_to_transaction(evaluations::action_structs::set_key::ACTION_NAME, &packed_args)
-            .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
+        add_action_to_transaction(
+            evaluations::action_structs::set_key::ACTION_NAME,
+            &packed_args,
+        )
+        .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
         key.save()?;
 
         let registrant =
@@ -79,7 +130,10 @@ impl Api for EvaluationsPlugin {
             registrant,
         }
         .packed();
-        add_action_to_transaction(evaluations::action_structs::register::ACTION_NAME, &packed_args)
+        add_action_to_transaction(
+            evaluations::action_structs::register::ACTION_NAME,
+            &packed_args,
+        )
     }
 
     fn unregister(
@@ -98,94 +152,10 @@ impl Api for EvaluationsPlugin {
             registrant,
         }
         .packed();
-        add_action_to_transaction(evaluations::action_structs::unregister::ACTION_NAME, &packed_args)
-    }
-
-    fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-
-        let packed_args = evaluations::action_structs::start {
-            owner: evaluation_owner,
-            evaluation_id,
-        }
-        .packed();
-        add_action_to_transaction(evaluations::action_structs::start::ACTION_NAME, &packed_args)
-    }
-
-    fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::delete {
-            evaluation_id,
-            force,
-        }
-        .packed();
-
-        add_action_to_transaction(evaluations::action_structs::delete::ACTION_NAME, &packed_args)
-    }
-
-    fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let packed_args = evaluations::action_structs::close {
-            owner: evaluation_owner,
-            evaluation_id,
-        }
-        .packed();
-        add_action_to_transaction(evaluations::action_structs::close::ACTION_NAME, &packed_args)
-    }
-
-    fn attest(
-        evaluation_owner: String,
-        evaluation_id: u32,
-        group_number: u32,
-    ) -> Result<(), Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let current_user = current_user()?;
-        let submissions =
-            get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
-
-        let evaluation = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
-        let num_options = evaluation
-            .get_evaluation
-            .ok_or(ErrorType::EvaluationDataMissing)?
-            .num_options;
-
-        let consensus = consensus::calculate_consensus(
-            submissions
-                .into_iter()
-                .map(|(_, submission)| submission)
-                .collect(),
-            num_options,
-            group_number,
-        );
-
-        let packed_args = evaluations::action_structs::attest {
-            owner: evaluation_owner,
-            evaluation_id,
-            attestation: consensus,
-        }
-        .packed();
-        add_action_to_transaction(evaluations::action_structs::attest::ACTION_NAME, &packed_args)
-    }
-
-    fn get_proposal(
-        evaluation_owner: String,
-        evaluation_id: u32,
-        group_number: u32,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
-            .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let current_user = current_user()?;
-        let submissions =
-            get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
-
-        let user_submission = submissions
-            .into_iter()
-            .find(|(account, _)| account.value == current_user.value)
-            .ok_or(ErrorType::UserSubmissionNotFound)?;
-
-        Ok(user_submission.1)
+        add_action_to_transaction(
+            evaluations::action_structs::unregister::ACTION_NAME,
+            &packed_args,
+        )
     }
 
     fn propose(
@@ -222,7 +192,67 @@ impl Api for EvaluationsPlugin {
         }
         .packed();
 
-        add_action_to_transaction(evaluations::action_structs::propose::ACTION_NAME, &packed_args)
+        add_action_to_transaction(
+            evaluations::action_structs::propose::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn attest(
+        evaluation_owner: String,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let current_user = current_user()?;
+        let submissions =
+            get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
+
+        let evaluation = fetch_and_decode(evaluation_owner, evaluation_id, group_number)?;
+        let num_options = evaluation
+            .get_evaluation
+            .ok_or(ErrorType::EvaluationDataMissing)?
+            .num_options;
+
+        let consensus = consensus::calculate_consensus(
+            submissions
+                .into_iter()
+                .map(|(_, submission)| submission)
+                .collect(),
+            num_options,
+            group_number,
+        );
+
+        let packed_args = evaluations::action_structs::attest {
+            owner: evaluation_owner,
+            evaluation_id,
+            attestation: consensus,
+        }
+        .packed();
+        add_action_to_transaction(
+            evaluations::action_structs::attest::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn get_proposal(
+        evaluation_owner: String,
+        evaluation_id: u32,
+        group_number: u32,
+    ) -> Result<Option<Vec<u8>>, Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+        let current_user = current_user()?;
+        let submissions =
+            get_decrypted_proposals(evaluation_owner, evaluation_id, group_number, current_user)?;
+
+        let user_submission = submissions
+            .into_iter()
+            .find(|(account, _)| account.value == current_user.value)
+            .ok_or(ErrorType::UserSubmissionNotFound)?;
+
+        Ok(user_submission.1)
     }
 }
 
@@ -230,7 +260,6 @@ bindings::export!(EvaluationsPlugin with_types_in bindings);
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn test_hello() {
         let result = "story";

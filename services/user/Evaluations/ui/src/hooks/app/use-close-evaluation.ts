@@ -9,7 +9,7 @@ export const useCloseEvaluation = () => {
             void (await getSupervisor().functionCall({
                 method: "close",
                 service: "evaluations",
-                intf: "api",
+                intf: "admin",
                 params: [evaluationId],
             }));
             navigate(`/`);

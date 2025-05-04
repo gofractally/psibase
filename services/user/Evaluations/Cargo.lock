@@ -311,18 +311,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "323c168002ab149ce5258ebaf5177751e7c4d5ebfe87aad8000ca9aee7d3ecda"
 dependencies = [
  "conv",
- "float-ord 0.2.0",
- "num-traits",
-]
-
-[[package]]
-name = "average"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75aacce61912644dbb732271789748142bc4bf7ce6382d67bb26850516b7a391"
-dependencies = [
- "easy-cast",
- "float-ord 0.3.2",
+ "float-ord",
  "num-traits",
 ]
 
@@ -818,15 +807,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8975ffdaa0ef3661bfe02dbdcc06c9f829dfafe6a3c474de366a8d5e44276921"
 
 [[package]]
-name = "easy-cast"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72852736692ec862655eca398c9bb1b476161b563c9f80f45f4808b9629750d6"
-dependencies = [
- "libm",
-]
-
-[[package]]
 name = "ecies"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -886,7 +866,6 @@ name = "evaluations"
 version = "0.16.0"
 dependencies = [
  "async-graphql",
- "evaluations-pkg",
  "psibase",
  "psibase_macros",
  "rand 0.9.1",
@@ -933,12 +912,6 @@ name = "float-ord"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
-
-[[package]]
-name = "float-ord"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ce81f49ae8a0482e4c55ea62ebbd7e5a686af544c00b9d090bba3ff9be97b3d"
 
 [[package]]
 name = "fnv"
@@ -1573,12 +1546,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libm"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9627da5196e5d8ed0b0495e61e518847578da83483c37288316d9b2e03a7f72"
-
-[[package]]
 name = "libsecp256k1"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1717,7 +1684,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -1905,7 +1871,7 @@ dependencies = [
 name = "plugin"
 version = "0.16.0"
 dependencies = [
- "average 0.10.6",
+ "average",
  "ecies",
  "evaluations",
  "evaluations-pkg",
@@ -2708,13 +2674,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "tests"
-version = "0.16.0"
-dependencies = [
- "average 0.16.0",
 ]
 
 [[package]]
