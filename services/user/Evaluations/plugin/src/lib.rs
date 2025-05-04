@@ -225,7 +225,7 @@ impl User for EvaluationsPlugin {
         let consensus = consensus::calculate_consensus(
             submissions
                 .into_iter()
-                .map(|(_, submission)| submission)
+                .filter_map(|(_, submission)| submission)
                 .collect(),
             num_options,
             group_number,

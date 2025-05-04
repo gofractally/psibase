@@ -17,7 +17,7 @@ pub fn remove_eliminated_options(submissions: Vec<Vec<u8>>, options_size: u8) ->
             *acc.entry(option).or_insert(0) += 1;
             acc
         });
-    
+
     let eliminated_options: Vec<u8> = unranked_counts
         .into_iter()
         .filter(|(_, count)| count >= &elimination_threshold)
@@ -43,20 +43,18 @@ pub fn get_level(option: &u8, ranked_options: &Vec<u8>, options_size: u8) -> u8 
         .unwrap_or(0)
 }
 
-pub fn calculate_consensus(
-    submissions: Vec<Option<Vec<u8>>>,
-    options_size: u8,
-    seed: u32,
-) -> Vec<u8> {
+pub fn calculate_consensus(submissions: Vec<Vec<u8>>, options_size: u8, seed: u32) -> Vec<u8> {
     let ranked_options = remove_eliminated_options(
-        submissions
-            .into_iter()
-            .filter(|sub| sub.is_some())
-            .map(|sub| sub.unwrap())
-            .collect(),
+        submissions,
         options_size,
     );
-    let mut unique_ranked_options: Vec<u8> = ranked_options.iter().flatten().cloned().collect::<HashSet<u8>>().into_iter().collect();
+    let mut unique_ranked_options: Vec<u8> = ranked_options
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<HashSet<u8>>()
+        .into_iter()
+        .collect();
     unique_ranked_options.sort();
 
     let mut results: Vec<(u8, f64)> = unique_ranked_options
