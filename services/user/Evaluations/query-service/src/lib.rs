@@ -12,6 +12,7 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
+        owner: AccountNumber,
         evaluation_id: String,
         group_number: String,
         keys: Vec<Vec<u8>>,
@@ -33,13 +34,14 @@ mod service {
     impl Query {
         async fn get_group_key(
             &self,
+            evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
         ) -> async_graphql::Result<Connection<u64, KeysSet>> {
             EventQuery::new("history.evaluations.keysset")
                 .condition(format!(
-                    "evaluation_id = {} AND group_number = {}",
-                    evaluation_id, group_number
+                    "owner = '{}' AND evaluation_id = {} AND group_number = {}",
+                    evaluation_owner, evaluation_id, group_number
                 ))
                 .query()
         }

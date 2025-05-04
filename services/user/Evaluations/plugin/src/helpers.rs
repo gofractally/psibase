@@ -28,8 +28,8 @@ pub fn create_new_symmetric_key(
     creator: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
-    let user_settings =
-        fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?.get_user_settings;
+    let user_settings = fetch_user_settings(sorted_users.iter().map(|u| u.user.clone()).collect())?
+        .get_user_settings;
 
     let creator_public_key = user_settings
         .iter()
@@ -67,7 +67,10 @@ pub fn create_new_symmetric_key(
         hash,
     }
     .packed();
-    add_action_to_transaction(evaluations::action_structs::group_key::ACTION_NAME, &packed_args)?;
+    add_action_to_transaction(
+        evaluations::action_structs::group_key::ACTION_NAME,
+        &packed_args,
+    )?;
     Ok(symmetric_key)
 }
 
@@ -181,7 +184,7 @@ pub fn decrypt_existing_key(
         })
         .ok_or(ErrorType::UserNotFound)?;
 
-    let key_history = fetch_key_history(evaluation_id, group_number)?;
+    let key_history = fetch_key_history(evaluation_owner, evaluation_id, group_number)?;
     let edge = key_history
         .get_group_key
         .edges

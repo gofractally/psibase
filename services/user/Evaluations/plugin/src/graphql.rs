@@ -51,12 +51,13 @@ pub fn fetch_user_settings(account_numbers: Vec<String>) -> Result<GetUserSettin
 }
 
 pub fn fetch_key_history(
+    owner: psibase::AccountNumber,
     evaluation_id: u32,
     group_number: u32,
 ) -> Result<KeyHistoryResponse, Error> {
     let query = format!(
         r#"query {{
-            getGroupKey(evaluationId: {evaluation_id}, groupNumber: {group_number}) {{
+            getGroupKey(evaluationOwner: "{owner}", evaluationId: {evaluation_id}, groupNumber: {group_number}) {{
                 edges {{
                     node {{
                         evaluationId
@@ -67,6 +68,7 @@ pub fn fetch_key_history(
                 }}
             }}
         }}"#,
+        owner = owner,
         evaluation_id = evaluation_id,
         group_number = group_number
     );
