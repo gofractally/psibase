@@ -34,4 +34,3 @@ world = "impl"
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 
 [dev-dependencies]
-evaluations-pkg = { path = "..", version = "0.16.0" }
