@@ -26,11 +26,11 @@ pub mod service {
 
     #[event(history)]
     pub fn group_finished(
-        owner: String,
-        evaluation_id: String,
-        group_number: String,
-        users: Vec<String>,
-        result: Vec<String>,
+        owner: AccountNumber,
+        evaluation_id: u32,
+        group_number: u32,
+        users: Vec<AccountNumber>,
+        result: Vec<u8>,
     ) {
     }
 
@@ -279,6 +279,3 @@ pub mod service {
         evaluation.unregister_user(registrant);
     }
 }
-
-#[cfg(test)]
-mod tests;

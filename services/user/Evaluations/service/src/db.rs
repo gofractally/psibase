@@ -484,18 +484,14 @@ pub mod impls {
                 );
             }
 
-            let users = self
-                .get_users()
-                .into_iter()
-                .map(|account| account.user.to_string())
-                .collect();
+            let users = self.get_users().into_iter().map(|user| user.user).collect();
 
             crate::Wrapper::emit().history().group_finished(
-                self.owner.to_string(),
-                self.evaluation_id.to_string(),
-                self.number.to_string(),
+                self.owner,
+                self.evaluation_id,
+                self.number,
                 users,
-                result.into_iter().map(|res| res.to_string()).collect(),
+                result,
             );
         }
 

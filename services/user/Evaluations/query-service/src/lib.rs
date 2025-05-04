@@ -20,11 +20,11 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct GroupFinish {
-        owner: String,
+        owner: AccountNumber,
         evaluation_id: String,
         group_number: String,
-        users: Vec<String>,
-        result: Vec<String>,
+        users: Vec<AccountNumber>,
+        result: Vec<u8>,
     }
 
     struct Query;
@@ -50,10 +50,12 @@ mod service {
             evaluation_id: u32,
             group_number: u32,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+            let owner = AccountNumber::from_str(&evaluation_owner).unwrap();
+
             EventQuery::new("history.evaluations.group_finished")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {} AND group_number = {}",
-                    evaluation_owner, evaluation_id, group_number
+                    owner, evaluation_id, group_number
                 ))
                 .query()
         }
