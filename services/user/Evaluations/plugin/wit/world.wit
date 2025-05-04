@@ -8,10 +8,7 @@ interface admin {
     use host:common/types.{error};
     use types.{account};
 
-    /// Schedules a new evaluation.
-    ///
-    /// Requires:
-    /// * Must be called by the evaluation owner.
+    /// Schedules a new evaluation, sender account becomes the owner.
     ///
     /// Parameters:
     /// * `registration`: Unix timestamp (in seconds) for when registration opens.
@@ -51,11 +48,6 @@ interface admin {
     /// * `evaluation-id`: Unique identifier for the evaluation
     /// * `force`: If true, will delete evaluation during any phase 
     delete: func(evaluation-id: u32, force: bool) -> result<_, error>;
-}
-
-interface user {
-    use host:common/types.{error};
-    use types.{account};
 
     /// Registers an account for a specific evaluation.
     /// 
@@ -67,7 +59,7 @@ interface user {
     /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `registrant`: The account to be registered.
-    register: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+    register-other: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
 
     /// Unregisters an account from a specific evaluation.
     /// 
@@ -78,7 +70,33 @@ interface user {
     /// * `evaluation-owner`: The account that owns the evaluation.
     /// * `evaluation-id`: Unique identifier for the evaluation.
     /// * `registrant`: The account to be unregistered.
-    unregister: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+    unregister-other: func(evaluation-owner: account, evaluation-id: u32, registrant: account) -> result<_, error>;
+}
+
+interface user {
+    use host:common/types.{error};
+    use types.{account};
+
+    /// Register for a specific evaluation.
+    /// 
+    /// Requires:
+    /// * Must be called by registrant
+    /// * Must be in registration phase 
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    register: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
+
+    /// Unregister from a specific evaluation.
+    /// 
+    /// Requires:
+    /// * Must be in registration phase 
+    ///
+    /// Parameters:
+    /// * `evaluation-owner`: The account that owns the evaluation.
+    /// * `evaluation-id`: Unique identifier for the evaluation.
+    unregister: func(evaluation-owner: account, evaluation-id: u32) -> result<_, error>;
 
     /// Submits a proposal for a group in an evaluation.
     ///

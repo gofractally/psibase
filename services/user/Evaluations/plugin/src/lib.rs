@@ -17,6 +17,7 @@ mod key_table;
 pub mod types;
 
 use errors::ErrorType;
+use evaluations::action_structs as Actions;
 use graphql::fetch_and_decode;
 use helpers::{current_user, get_decrypted_proposals, get_symmetric_key};
 
@@ -40,7 +41,7 @@ impl Admin for EvaluationsPlugin {
             })
             .collect::<Result<Vec<u8>, Error>>()?;
 
-        let packed_args = evaluations::action_structs::create {
+        let packed_args = Actions::create {
             registration,
             deliberation,
             submission,
@@ -50,93 +51,63 @@ impl Admin for EvaluationsPlugin {
             use_hooks,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::create::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::create::ACTION_NAME, &packed_args)
     }
 
     fn start(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
             .map_err(|_| ErrorType::InvalidAccountNumber)?;
 
-        let packed_args = evaluations::action_structs::start {
+        let packed_args = Actions::start {
             owner: evaluation_owner,
             evaluation_id,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::start::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::start::ACTION_NAME, &packed_args)
     }
 
     fn close(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
         let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
             .map_err(|_| ErrorType::InvalidAccountNumber)?;
-        let packed_args = evaluations::action_structs::close {
+        let packed_args = Actions::close {
             owner: evaluation_owner,
             evaluation_id,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::close::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::close::ACTION_NAME, &packed_args)
     }
 
     fn delete(evaluation_id: u32, force: bool) -> Result<(), Error> {
-        let packed_args = evaluations::action_structs::delete {
+        let packed_args = Actions::delete {
             evaluation_id,
             force,
         }
         .packed();
 
-        add_action_to_transaction(
-            evaluations::action_structs::delete::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::delete::ACTION_NAME, &packed_args)
     }
-}
 
-impl User for EvaluationsPlugin {
-    fn register(
+    fn register_other(
         evaluation_owner: String,
         evaluation_id: u32,
         registrant: String,
     ) -> Result<(), Error> {
-        let key = key_table::AsymKey::new();
-        let public_key_vectored = key.public_key()?.serialize().to_vec();
-
-        let packed_args = evaluations::action_structs::set_key {
-            key: public_key_vectored,
-        }
-        .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::set_key::ACTION_NAME,
-            &packed_args,
-        )
-        .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
-        key.save()?;
-
         let registrant =
             AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
+
         let owner = AccountNumber::from_exact(&evaluation_owner)
             .map_err(|_| ErrorType::InvalidAccountNumber)?;
 
-        let packed_args = evaluations::action_structs::register {
+        let packed_args = Actions::register {
             owner,
             evaluation_id,
             registrant,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::register::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
     }
 
-    fn unregister(
+    fn unregister_other(
         evaluation_owner: String,
         evaluation_id: u32,
         registrant: String,
@@ -146,16 +117,55 @@ impl User for EvaluationsPlugin {
         let registrant =
             AccountNumber::from_exact(&registrant).map_err(|_| ErrorType::InvalidAccountNumber)?;
 
-        let packed_args = evaluations::action_structs::unregister {
+        let packed_args = Actions::unregister {
             owner: evaluation_owner,
             evaluation_id,
             registrant,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::unregister::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
+    }
+}
+
+impl User for EvaluationsPlugin {
+    fn register(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let key = key_table::AsymKey::new();
+        let public_key_vectored = key.public_key()?.serialize().to_vec();
+
+        let packed_args = Actions::set_key {
+            key: public_key_vectored,
+        }
+        .packed();
+        add_action_to_transaction(Actions::set_key::ACTION_NAME, &packed_args)
+            .map_err(|e| ErrorType::TransactionFailed(e.to_string()))?;
+        key.save()?;
+
+        let registrant = current_user().expect("not authenticated");
+        let owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+
+        let packed_args = Actions::register {
+            owner,
+            evaluation_id,
+            registrant,
+        }
+        .packed();
+        add_action_to_transaction(Actions::register::ACTION_NAME, &packed_args)
+    }
+
+    fn unregister(evaluation_owner: String, evaluation_id: u32) -> Result<(), Error> {
+        let evaluation_owner = AccountNumber::from_exact(&evaluation_owner)
+            .map_err(|_| ErrorType::InvalidAccountNumber)?;
+
+        let registrant = current_user().expect("not authenticated");
+
+        let packed_args = Actions::unregister {
+            owner: evaluation_owner,
+            evaluation_id,
+            registrant,
+        }
+        .packed();
+        add_action_to_transaction(Actions::unregister::ACTION_NAME, &packed_args)
     }
 
     fn propose(
@@ -185,17 +195,14 @@ impl User for EvaluationsPlugin {
             symmetric_key.salt_base_64().as_str(),
         );
 
-        let packed_args = evaluations::action_structs::propose {
+        let packed_args = Actions::propose {
             owner: evaluation_owner,
             evaluation_id,
             proposal: encrypted_proposal,
         }
         .packed();
 
-        add_action_to_transaction(
-            evaluations::action_structs::propose::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::propose::ACTION_NAME, &packed_args)
     }
 
     fn attest(
@@ -224,16 +231,13 @@ impl User for EvaluationsPlugin {
             group_number,
         );
 
-        let packed_args = evaluations::action_structs::attest {
+        let packed_args = Actions::attest {
             owner: evaluation_owner,
             evaluation_id,
             attestation: consensus,
         }
         .packed();
-        add_action_to_transaction(
-            evaluations::action_structs::attest::ACTION_NAME,
-            &packed_args,
-        )
+        add_action_to_transaction(Actions::attest::ACTION_NAME, &packed_args)
     }
 
     fn get_proposal(
