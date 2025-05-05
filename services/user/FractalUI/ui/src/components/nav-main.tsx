@@ -55,7 +55,7 @@ export const fractalMenus = [
             },
         ],
     },
-];
+] as const;
 
 export function NavMain() {
     const location = useLocation();
