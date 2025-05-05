@@ -253,12 +253,3 @@ impl User for EvaluationsPlugin {
 }
 
 bindings::export!(EvaluationsPlugin with_types_in bindings);
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_hello() {
-        let result = "story";
-        assert_eq!(result, "ssss");
-    }
-}
