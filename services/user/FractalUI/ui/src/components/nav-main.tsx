@@ -30,7 +30,7 @@ export const fractalMenus = [
             {
                 title: "All members",
                 icon: Users,
-                path: "",
+                path: "members",
             },
         ],
     },
@@ -39,7 +39,7 @@ export const fractalMenus = [
         path: "evaluations",
         menus: [
             {
-                title: "Active &amp; upcoming",
+                title: "Active & upcoming",
                 icon: CalendarClock,
                 path: "",
             },
