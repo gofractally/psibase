@@ -15,9 +15,10 @@ use psibase::{
     reg_server, set_auth_service_action, set_code_action, set_key_action, sign_transaction,
     AccountNumber, Action, AnyPrivateKey, AnyPublicKey, AutoAbort, ChainUrl, Checksum256,
     DirectoryRegistry, ExactAccountNumber, FileSetRegistry, HTTPRegistry, JointRegistry, Meta,
-    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRegistry,
-    PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
+    PackageDataFile, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
+    PackageRegistry, PackagedService, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload,
+    Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1684,9 +1685,35 @@ async fn show_package<T: PackageRegistry + ?Sized>(
     client: &mut reqwest::Client,
     package: &Meta,
     origin: &PackageOrigin,
+    alt: Option<&(Meta, PackageOrigin)>,
 ) -> Result<(), anyhow::Error> {
     let mut manifest = get_manifest(reg, base_url, client, package, origin).await?;
     println!("name: {}-{}", &package.name, &package.version);
+    let alt_version = if let Some((alt_package, _)) = alt {
+        if &alt_package.version != &package.version {
+            Some(&alt_package.version)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    match origin {
+        PackageOrigin::Installed { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: upgrade to {} available", alt_version);
+            } else {
+                println!("status: installed");
+            }
+        }
+        PackageOrigin::Repo { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: version {} installed", alt_version);
+            } else {
+                println!("status: not installed");
+            }
+        }
+    }
     println!("description: {}", &package.description);
     let mut services: Vec<_> = manifest.services.into_iter().collect();
     services.sort_by(|lhs, rhs| lhs.0.to_string().cmp(&rhs.0.to_string()));
@@ -1751,21 +1778,31 @@ async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
 
     for package in &packages {
         if let Some((meta, origin)) = installed.get_by_name(package)? {
+            let alt = reglist.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: format!(">{}", &meta.version),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else if let Some((meta, origin)) = reglist.get_by_name(package)? {
+            let alt = installed.get_by_ref(&PackageRef {
+                name: meta.name.clone(),
+                version: "*".to_string(),
+            })?;
             show_package(
                 &package_registry,
                 &args.node_args.api,
                 &mut client,
                 meta,
                 origin,
+                alt,
             )
             .await?;
         } else {

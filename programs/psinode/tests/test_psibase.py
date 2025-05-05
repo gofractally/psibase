@@ -13,16 +13,19 @@ import hashlib
 import unittest
 import os
 from io import TextIOWrapper
+import subprocess
 
 class TestPackage:
-    def __init__(self, name, version, accounts=None, depends=None):
+    def __init__(self, name, version, accounts=None, depends=None, description=None):
         if accounts is None:
             accounts = []
         if depends is None:
             depends = []
+        if description is None:
+            description = "Test package"
         self.name = name
         self.version = version
-        self.description = "Test package"
+        self.description = description
         self.accounts = accounts
         self._depends = depends
         self.files = dict()
@@ -84,6 +87,24 @@ def make_package_repository(directory, packages):
     with open(os.path.join(directory, 'index.json'), 'w') as file:
         file.write(json.dumps(index))
 
+class Foo:
+    def __init__(self):
+        self.foo10 = TestPackage('foo', '1.0.0', description='The original foo').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        self.foo11 = TestPackage('foo', '1.1.0', description='Minor version update').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        self.foo20 = TestPackage('foo', '2.0.0', description='Major version update').depends('Sites').service('foo', data={'file1.txt': 'version 2'})
+
+        # These just need to be valid and distinct
+        self.original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
+        self.updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
+        self.deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
+        self.added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
+
+        self.foo10.service('bar1', wasm=self.original_wasm, flags=['allowWriteNative'])
+        self.foo10.service('bar2', wasm=self.deleted_wasm, flags=['allowSudo'], server='bar1')
+        self.foo11.service('bar1', wasm=self.updated_wasm)
+        self.foo11.service('bar2', data={'file4.txt': 'cancel server'})
+        self.foo11.service('bar3', wasm=self.added_wasm)
+
 class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install(self, cluster):
@@ -98,28 +119,15 @@ class TestPsibase(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
-        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
-
-        # These just need to be valid and distinct
-        original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
-        updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
-        deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
-        added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
-
-        foo10.service('bar1', wasm=original_wasm, flags=['allowWriteNative'])
-        foo10.service('bar2', wasm=deleted_wasm, flags=['allowSudo'], server='bar1')
-        foo11.service('bar1', wasm=updated_wasm)
-        foo11.service('bar2', data={'file4.txt': 'cancel server'})
-        foo11.service('bar3', wasm=added_wasm)
+        foo = Foo()
 
         with tempfile.TemporaryDirectory() as dir:
-            make_package_repository(dir, [foo10])
+            make_package_repository(dir, [foo.foo10])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
-            make_package_repository(dir, [foo10, foo11])
+            make_package_repository(dir, [foo.foo10, foo.foo11])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'updated')
@@ -131,29 +139,15 @@ class TestPsibase(unittest.TestCase):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
-        foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        foo11 = TestPackage('foo', '1.1.0').depends('Sites').service('foo', data={'file1.txt': 'updated', 'file3.txt': 'added'})
-        foo20 = TestPackage('foo', '2.0.0').depends('Sites').service('foo', data={'file1.txt': 'version 2'})
-
-        # These just need to be valid and distinct
-        original_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071d0305737461727400000663616c6c65640001086f726967696e616c00000a070202000b02000b');
-        updated_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c65640001077570646174656400000a070202000b02000b')
-        deleted_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071c0305737461727400000663616c6c656400010764656c6574656400000a070202000b02000b')
-        added_wasm = bytes.fromhex('0061736d01000000010a0260017e0060027e7e000303020001071a0305737461727400000663616c6c6564000105616464656400000a070202000b02000b')
-
-        foo10.service('bar1', wasm=original_wasm, flags=['allowWriteNative'])
-        foo10.service('bar2', wasm=deleted_wasm, flags=['allowSudo'], server='bar1')
-        foo11.service('bar1', wasm=updated_wasm)
-        foo11.service('bar2', data={'file4.txt': 'cancel server'})
-        foo11.service('bar3', wasm=added_wasm)
+        foo = Foo()
 
         with tempfile.TemporaryDirectory() as dir:
-            make_package_repository(dir, [foo10])
+            make_package_repository(dir, [foo.foo10])
             a.run_psibase(['install'] + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'original')
             self.assertResponse(a.get('/file2.txt', 'foo'), 'deleted')
-            make_package_repository(dir, [foo10, foo11, foo20])
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
             a.run_psibase(command + a.node_args() + ['foo', '--package-source', dir])
             a.wait(new_block())
             if v2:
@@ -175,6 +169,48 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_upgrade_latest(self, cluster):
         self.do_test_upgrade(cluster, ["upgrade", "--latest"], True)
+
+    @testutil.psinode_test
+    def test_info(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+
+        foo = Foo()
+
+        with tempfile.TemporaryDirectory() as dir:
+            make_package_repository(dir, [foo.foo10, foo.foo11, foo.foo20])
+            def get_info(package):
+                return a.run_psibase(['info'] + a.node_args() + [package, '--package-source', dir], stdout=subprocess.PIPE, encoding='utf-8').stdout
+            info = get_info('foo')
+            self.assertIn('status: not installed', info)
+            self.assertIn('description: Major version update', info)
+            self.assertIn('name: foo-2.0.0', info)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-1.0', '--package-source', dir])
+            a.wait(new_block())
+
+            for name in ['foo', 'foo-1', 'foo-1.0', 'foo-1.0.0']:
+                info = get_info('foo')
+                self.assertIn('status: upgrade to 2.0.0 available', info)
+                self.assertIn('description: The original foo', info)
+                self.assertIn('name: foo-1.0.0', info)
+            for name in ["foo-2", "foo-2.0", "foo-2.0.0"]:
+                info = get_info(name)
+                self.assertIn('status: version 1.0.0 installed', info)
+                self.assertIn('description: Major version update', info)
+                self.assertIn('name: foo-2.0.0', info)
+
+            a.run_psibase(['install'] + a.node_args() + ['foo-2.0', '--package-source', dir])
+            a.wait(new_block())
+
+            info = get_info('foo')
+            self.assertIn('status: installed', info)
+            self.assertIn('description: Major version update', info)
+            self.assertIn('name: foo-2.0.0', info)
+            info = get_info('foo-1.0')
+            self.assertIn('status: version 2.0.0 installed', info)
+            self.assertIn('description: The original foo', info)
+            self.assertIn('name: foo-1.0.0', info)
 
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
