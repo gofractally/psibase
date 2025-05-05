@@ -409,12 +409,12 @@ namespace psio
    }
 
    template <typename T>
-   std::string get_gql_schema(T* p = nullptr)
+   std::vector<char> get_gql_schema(T* = nullptr)
    {
       size_stream ss;
       fill_gql_schema((T*)nullptr, ss);
-      std::string      result(ss.size, 0);
-      fixed_buf_stream fbs(result.data(), result.size());
+      std::vector<char> result(ss.size);
+      fixed_buf_stream  fbs(result.data(), result.size());
       fill_gql_schema((T*)nullptr, fbs);
       check(fbs.pos == fbs.end, error_to_str(stream_error::underrun));
       return result;
@@ -1600,58 +1600,88 @@ namespace psio
       return error("expected end of input");
    }
 
-   template <typename Stream = string_stream, typename T>
-   std::string gql_query(const T&         value,
-                         std::string_view query,
-                         std::string_view variables,
-                         bool             allow_unknown_members = false)
+   template <typename OutStream>
+   void write_error_json(const std::string& error, OutStream& out)
    {
-      gql_stream  input_stream{query};
-      std::string result;
-      Stream      output_stream(result);
-      output_stream.write('{');
-      increase_indent(output_stream);
-      write_newline(output_stream);
-      write_str("\"data\": ", output_stream);
-      std::string error;
-      bool        ok = true;
+      out.write('{');
+      increase_indent(out);
+      write_newline(out);
+      write_str("\"errors\": {", out);
+      increase_indent(out);
+      write_newline(out);
+      write_str("\"message\": ", out);
+      to_json(error, out);
+      decrease_indent(out);
+      write_newline(out);
+      out.write('}');
+      decrease_indent(out);
+      write_newline(out);
+      out.write('}');
+   }
+
+   template <typename OutStream, typename T>
+   bool write_data_json(const T&         value,
+                        std::string_view query,
+                        std::string_view variables,
+                        bool             allow_unknown_members,
+                        OutStream&       out,
+                        std::string&     error)
+   {
+      out.write('{');
+      increase_indent(out);
+      write_newline(out);
+      write_str("\"data\": ", out);
+
       if (!variables.empty())
       {
          error = "variables not supported; argument must be empty";
-         ok    = false;
+         return false;
       }
-      else
-         ok = gql_query_root(
-             value, input_stream, output_stream,
-             [&](const auto& e)
-             {
-                error = e;
-                return false;
-             },
-             allow_unknown_members);
+
+      gql_stream input_stream(query);
+
+      bool ok = gql_query_root(
+          value, input_stream, out,
+          [&](const auto& e)
+          {
+             error = e;
+             return false;
+          },
+          allow_unknown_members);
+
       if (!ok)
+         return false;
+
+      decrease_indent(out);
+      write_newline(out);
+      out.write('}');
+      return true;
+   }
+
+   template <typename Stream = string_stream, typename T>
+   std::vector<char> gql_query(const T&         value,
+                               std::string_view query,
+                               std::string_view variables,
+                               bool             allow_unknown_members = false)
+   {
+      std::string                error;
+      pretty_stream<size_stream> measure;
+      if (!write_data_json(value, query, variables, allow_unknown_members, measure, error))
       {
-         result.clear();
-         Stream error_stream(result);
-         error_stream.write('{');
-         increase_indent(error_stream);
-         write_newline(error_stream);
-         write_str("\"errors\": {", error_stream);
-         increase_indent(error_stream);
-         write_newline(error_stream);
-         write_str("\"message\": ", error_stream);
-         to_json(error, error_stream);
-         decrease_indent(error_stream);
-         write_newline(error_stream);
-         error_stream.write('}');
-         decrease_indent(error_stream);
-         write_newline(error_stream);
-         error_stream.write('}');
-         return result;
+         // Measure and write error
+         pretty_stream<size_stream> err_measure;
+         write_error_json(error, err_measure);
+
+         std::vector<char>               err_result(err_measure.written());
+         pretty_stream<fixed_buf_stream> error_stream(err_result.data(), err_result.size());
+         write_error_json(error, error_stream);
+         return err_result;
       }
-      decrease_indent(output_stream);
-      write_newline(output_stream);
-      output_stream.write('}');
+
+      // Write valid data
+      std::vector<char>               result(measure.written());
+      pretty_stream<fixed_buf_stream> out(result.data(), result.size());
+      write_data_json(value, query, variables, allow_unknown_members, out, error);
       return result;
    }
 
