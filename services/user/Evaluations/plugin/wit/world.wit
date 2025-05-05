@@ -15,10 +15,10 @@ interface admin {
     /// * `deliberation`: Unix timestamp (in seconds) for when deliberation begins.
     /// * `submission`: Unix timestamp (in seconds) for when proposal submission starts.
     /// * `finish-by`: Unix timestamp (in seconds) for when the evaluation must be completed.
-    /// * `group-sizes`: List of possible group sizes (e.g., ["4", "5", "6"]) for dividing participants.
+    /// * `group-sizes`: List of possible group sizes (e.g., [4, 5, 6]) for dividing participants.
     /// * `num-options`: Number of options each group can deliberate on (e.g. 3 for three options).
     /// * `use-hooks`: Enable evaluations service to call the evaluation owner service.
-    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<string>, num-options: u8, use-hooks: bool) -> result<_, error>;
+    create: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, group-sizes: list<u8>, num-options: u8, use-hooks: bool) -> result<_, error>;
 
     /// Starts a specific evaluation.
     ///

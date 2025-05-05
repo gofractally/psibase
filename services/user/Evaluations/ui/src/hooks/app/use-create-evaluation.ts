@@ -66,7 +66,7 @@ export const useCreateEvaluation = () => {
                     deliberation,
                     submission,
                     finishBy,
-                    allowableGroupSizes.map(String),
+                    Uint8Array.from(allowableGroupSizes),
                     numOptions,
                     useHooks,
                 ],

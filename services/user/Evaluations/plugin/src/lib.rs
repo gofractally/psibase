@@ -29,24 +29,16 @@ impl Admin for EvaluationsPlugin {
         deliberation: u32,
         submission: u32,
         finish_by: u32,
-        allowed_group_sizes: Vec<String>,
+        allowed_group_sizes: Vec<u8>,
         num_options: u8,
         use_hooks: bool,
     ) -> Result<(), Error> {
-        let sizes = allowed_group_sizes
-            .iter()
-            .map(|s| {
-                s.parse::<u8>()
-                    .map_err(|_| ErrorType::InvalidGroupSize.into())
-            })
-            .collect::<Result<Vec<u8>, Error>>()?;
-
         let packed_args = Actions::create {
             registration,
             deliberation,
             submission,
             finish_by,
-            allowed_group_sizes: sizes,
+            allowed_group_sizes,
             num_options,
             use_hooks,
         }

@@ -25,7 +25,7 @@ pub mod Hooks {
     /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
     /// * `submission` - Unix seconds timestamp for the start of the submission phase.
     /// * `finish_by` - Unix seconds timestamp for the start of the evaluation completion phase.
-    /// * `allowed_group_sizes` - Vector of allowed group sizes (must be greater than 0, traditionally 4, 5, or 6).
+    /// * `allowed_group_sizes` - Vector of allowed group sizes (sizes must be greater than 0, traditionally [4, 5, 6]).
     /// * `num_options` - Number of options available for proposals (traditionally 6).
     /// * `use_hooks` - Flag to enable or disable hooks for the evaluation.
     ///

@@ -22,8 +22,8 @@ mod service {
     #[derive(Deserialize, SimpleObject)]
     struct GroupFinish {
         owner: AccountNumber,
-        evaluation_id: String,
-        group_number: String,
+        evaluation_id: u32,
+        group_number: u32,
         users: Vec<AccountNumber>,
         result: Vec<u8>,
     }
