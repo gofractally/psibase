@@ -3,11 +3,7 @@
         "target": "ESNext",
         "useDefineForClassFields": true,
         "module": "ESNext",
-        "lib": [
-            "ES2020",
-            "DOM",
-            "DOM.Iterable"
-        ],
+        "lib": ["ES2020", "DOM", "DOM.Iterable"],
         "skipLibCheck": true,
         "jsx": "react-jsx",
         /* Bundler mode */
@@ -16,6 +12,7 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "noEmit": true,
+        "baseUrl": "./",
         "paths": {
             "@psibase/common-lib": [
                 "../../CommonApi/common/packages/common-lib/src"
@@ -23,6 +20,15 @@
             "@psibase/common-lib/*": [
                 "../../CommonApi/common/packages/common-lib/src/*"
             ],
+            "@components": ["src/components"],
+            "@components/*": ["src/components/*"],
+            "@shadcn": ["src/shad/components/ui"],
+            "@shadcn/*": ["src/shad/components/ui/*"],
+            "@lib": ["src/lib"],
+            "@lib/*": ["src/lib/*"],
+            "@hooks": ["src/hooks"],
+            "@hooks/*": ["src/hooks/*"],
+            "@/*": ["./src/*"]
         },
         /* Linting */
         "strict": true,
@@ -30,7 +36,5 @@
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true
     },
-    "include": [
-        "src"
-    ]
+    "include": ["src"]
 }
