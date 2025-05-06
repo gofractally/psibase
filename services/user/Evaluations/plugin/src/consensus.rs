@@ -4,8 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-// TODO: remove debug trait
-
 fn get_max_variance<T: PartialEq + Copy + Eq + Hash>(
     lists: &Vec<Vec<T>>,
     unique_elements: &HashSet<T>,
