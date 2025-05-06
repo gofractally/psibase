@@ -53,7 +53,11 @@ echo "===== ccache  ====="
 ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
-echo "===== yarn cache: ${YARN_CACHE_FOLDER} ====="
+echo "===== yarn cache: ====="
+echo "HOME=$HOME"
+echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
+echo "cacheFolder:"
+echo yarn config get cacheFolder
 ${DOCKER} yarn config set cacheFolder ${YARN_CACHE_FOLDER}
 echo "===== build start ====="
 mkdir -p build
