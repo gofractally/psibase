@@ -66,19 +66,15 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
         let nr_unique = self.elements.len();
         self.lists
             .iter()
-            .filter_map(|list| {
+            .map(|list| {
                 assert!(
                     list.len() <= nr_unique,
                     "Unique elements in list greater than unique across all lists."
                 ); // Should never happen.
                 let offset = nr_unique - list.len();
-
-                let index = list.iter().position(|o| o == element);
-                if let Some(index) = index {
-                    Some(index + offset)
-                } else {
-                    Some(0)
-                }
+                list.iter()
+                    .position(|o| o == element)
+                    .map_or(0, |idx| idx + offset)
             })
             .collect()
     }
