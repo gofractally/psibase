@@ -54,6 +54,9 @@ ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== yarn cache: ====="
+echo ${DOCKER} bash -c "cd ${WORKSPACE_ROOT}; pwd"
+echo ${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}"
+echo ${DOCKER} bash -c "echo '.yarnrc.yml=${WORKSPACE_ROOT}/.yarnrc.yml'"
 echo "HOME=$HOME"
 ${DOCKER} bash -c "echo docker.HOME='$HOME'"
 echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
@@ -61,6 +64,7 @@ ${DOCKER} bash -c "echo docker.YARN_CACHE_FOLDER='$YARN_CACHE_FOLDER'"
 echo "cacheFolder:"
 ${DOCKEr} bash -c "yarn config get cacheFolder"
 ${DOCKER} bash -c "yarn config set cacheFolder ${YARN_CACHE_FOLDER}"
+echo "cacheFolder after setting:"
 ${DOCKEr} bash -c "yarn config get cacheFolder"
 echo "===== build start ====="
 mkdir -p build
