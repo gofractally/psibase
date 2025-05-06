@@ -897,7 +897,9 @@ pub fn validate_dependencies<T: Read + Seek>(
 }
 
 pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> {
-    let re = Regex::new(r"^(.*?)(?:-(\d+\.\d+\.\d+(?:-[0-9a-zA-Z-.]+)?(?:\+[0-9a-zA-Z-.]+)?))?$")?;
+    let re = Regex::new(
+        r"^(.*?)(?:-(\d+(?:\.\d+(?:\.\d+(?:-[0-9a-zA-Z-.]+)?(?:\+[0-9a-zA-Z-.]+)?)?)?))?$",
+    )?;
     let mut refs = vec![];
     for package in packages {
         if let Some(captures) = re.captures(package) {
@@ -912,6 +914,10 @@ pub fn make_refs(packages: &[String]) -> Result<Vec<PackageRef>, anyhow::Error> 
         }
     }
     Ok(refs)
+}
+
+pub fn make_ref(package: &str) -> Result<PackageRef, anyhow::Error> {
+    Ok(make_refs(&[package.to_string()])?.pop().unwrap())
 }
 
 // services that should be installed first
@@ -1554,26 +1560,31 @@ impl PackageList {
         });
         result
     }
-    pub fn get_by_name(
+    pub fn get_by_ref(
         &self,
-        packages: &str,
+        package: &PackageRef,
     ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
-        for package in make_refs(&[packages.to_string()])? {
-            if let Some(versions) = self.packages.get(&package.name) {
-                let mut found: Option<&(Meta, PackageOrigin)> = None;
-                for (version, item) in versions {
-                    if version_match(&package.version, version)? {
-                        if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
-                            Ok(Version::new(&prev.0.version)? < Version::new(version)?)
-                        })? {
-                            found = Some(item)
-                        }
+        if let Some(versions) = self.packages.get(&package.name) {
+            let mut found: Option<&(Meta, PackageOrigin)> = None;
+            for (version, item) in versions {
+                if version_match(&package.version, version)? {
+                    if found.map_or(Ok::<bool, anyhow::Error>(true), |prev| {
+                        Ok(Version::new(&prev.0.version)? < Version::new(version)?)
+                    })? {
+                        found = Some(item)
                     }
                 }
-                return Ok(found);
             }
+            Ok(found)
+        } else {
+            Ok(None)
         }
-        Ok(None)
+    }
+    pub fn get_by_name(
+        &self,
+        package: &str,
+    ) -> Result<Option<&(Meta, PackageOrigin)>, anyhow::Error> {
+        self.get_by_ref(&make_ref(package)?)
     }
     pub fn into_vec(mut self) -> Vec<String> {
         let mut result: Vec<String> = self.packages.drain().map(|(k, _)| k).collect();
