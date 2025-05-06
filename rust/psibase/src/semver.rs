@@ -239,6 +239,9 @@ impl VersionMatch<'_> {
                                 return false;
                             }
                             if let Some(patch) = self.patch {
+                                if v.patch != patch && min == (DecNum { value: "0" }) {
+                                    return false;
+                                }
                                 if v.patch < patch {
                                     return false;
                                 }
