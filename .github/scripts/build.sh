@@ -44,6 +44,8 @@ DOCKER="docker run --rm \
   -e RUSTC_WRAPPER \
   -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
   -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
+  -e YARN_ENABLE_LOGS=1 \
+  -e YARN_DEBUG=1 \
   -e USER \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
@@ -54,10 +56,12 @@ ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== yarn cache: ====="
+${DOCKER} bash -c "yarn config -v"
 ${DOCKER} bash -c "cd ${WORKSPACE_ROOT}; pwd"
 ${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}"
+${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}/.yarn"
 ${DOCKER} bash -c "echo '.yarnrc.yml=${WORKSPACE_ROOT}/.yarnrc.yml'"
-${DOCKER} bash -c "cat ${WORKSPACE_ROOT}/.yarnrc.yml"
+# ${DOCKER} bash -c "cat ${WORKSPACE_ROOT}/.yarnrc.yml"
 echo "HOME=$HOME"
 ${DOCKER} bash -c "echo docker.HOME='$HOME'"
 echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
