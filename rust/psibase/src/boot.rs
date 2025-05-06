@@ -1,9 +1,9 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    method_raw, new_account_action, set_auth_service_action, set_key_action, validate_dependencies,
-    AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
-    PackagedService, Producer, SignedTransaction, Tapos, TimePointSec, Transaction,
-    TransactionBuilder,
+    get_schemas, method_raw, new_account_action, set_auth_service_action, set_key_action,
+    validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim, EssentialServices,
+    GenesisActionData, MethodNumber, PackagedService, Producer, SchemaMap, SignedTransaction,
+    Tapos, TimePointSec, Transaction, TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -84,13 +84,14 @@ fn genesis_block_actions<R: Read + Seek>(
     block_signing_key: &Option<AnyPublicKey>,
     initial_producer: AccountNumber,
     service_packages: &mut [PackagedService<R>],
+    schemas: &SchemaMap,
 ) -> Result<Vec<Action>, anyhow::Error> {
     let mut actions = Vec::new();
 
     for s in &mut service_packages[..] {
         if s.get_accounts().contains(&transact::SERVICE) {
             s.reg_server(&mut actions)?;
-            s.postinstall(&mut actions)?;
+            s.postinstall(schemas, &mut actions)?;
         }
     }
 
@@ -117,6 +118,7 @@ pub fn get_initial_actions<
     service_packages: &mut [PackagedService<R>],
     compression_level: u32,
     builder: &mut TransactionBuilder<F>,
+    schemas: &SchemaMap,
 ) -> Result<(), anyhow::Error> {
     let has_packages = true;
 
@@ -159,7 +161,7 @@ pub fn get_initial_actions<
             s.store_data(&mut actions, None, compression_level)?;
         }
 
-        s.postinstall(&mut actions)?;
+        s.postinstall(schemas, &mut actions)?;
         for act in &actions {
             if act.service == accounts::SERVICE && act.method == method!("setAuthServ") {
                 accounts_with_auth.insert(act.sender);
@@ -251,6 +253,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
     anyhow::Error,
 > {
     validate_dependencies(service_packages)?;
+    let (schemas, _) = get_schemas(&mut service_packages[..])?;
     let mut boot_transactions = vec![genesis_transaction(expiration, service_packages)?];
 
     const TARGET_SIZE: usize = 1024 * 1024;
@@ -267,13 +270,19 @@ pub fn create_boot_transactions<R: Read + Seek>(
         service_packages,
         compression_level,
         &mut builder,
+        &schemas,
     )?;
 
     let transaction_groups = builder.finish()?;
 
     boot_transactions.push(SignedTransaction {
         transaction: without_tapos(
-            genesis_block_actions(block_signing_key, initial_producer, service_packages)?,
+            genesis_block_actions(
+                block_signing_key,
+                initial_producer,
+                service_packages,
+                &schemas,
+            )?,
             expiration,
         )
         .packed()

@@ -3,14 +3,16 @@ use crate::services::{
     sites, transact,
 };
 use crate::{
-    new_account_action, reg_server, set_auth_service_action, set_code_action, set_key_action,
-    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256,
-    GenesisService, Pack, PackageDisposition, PackageOp, Schema, ToSchema, Unpack, Version,
+    new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
+    set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
+    Checksum256, GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition,
+    PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
+use fracpack::CompiledSchema;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -44,6 +46,9 @@ custom_error! {
     PackageDigestFailure{package: String} = "The package file for {package} does not match the package index",
     PackageMetaMismatch{package: String} = "The package metadata for {package} does not match the package index",
     CrossOriginFile{file: String} = "The package file {file} has a different origin from the package index",
+    UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
+    MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
+    InvalidPackageSource = "Invalid package source",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -194,6 +199,53 @@ pub struct PackagedService<R: Read + Seek> {
     meta: Meta,
     services: Vec<(AccountNumber, usize, ServiceInfo)>,
     data: Vec<(AccountNumber, usize)>,
+}
+
+pub type SchemaMap = HashMap<AccountNumber, Schema>;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrettyAction {
+    /// Account sending the action
+    pub sender: AccountNumber,
+
+    /// Service to execute the action
+    pub service: AccountNumber,
+
+    /// Service method to execute
+    pub method: MethodNumber,
+
+    /// Data for the method
+    pub raw_data: Option<Hex<Vec<u8>>>,
+    pub data: Option<serde_json::Value>,
+}
+
+impl PrettyAction {
+    fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let raw_data = match self.raw_data {
+            Some(raw_data) => raw_data,
+            None => {
+                let schema = schemas.get(&self.service).unwrap();
+                let custom = schema_types();
+                let mut cschema = CompiledSchema::new(&schema.types, &custom);
+                let Some(act) = schema.actions.get(&MethodString(self.method.to_string())) else {
+                    Err(Error::UnknownAction {
+                        service: self.service,
+                        method: self.method,
+                    })?
+                };
+                cschema.extend(&act.params);
+                let data = self.data.unwrap_or_else(|| serde_json::json!({}));
+                cschema.from_value(&act.params, &data)?.into()
+            }
+        };
+        Ok(Action {
+            sender: self.sender,
+            service: self.service,
+            method: self.method,
+            rawData: raw_data,
+        })
+    }
 }
 
 fn translate_flags(flags: &[String]) -> Result<u64, Error> {
@@ -410,11 +462,27 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
-    pub fn postinstall(&mut self, actions: &mut Vec<Action>) -> Result<(), anyhow::Error> {
+    pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
         if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            actions.append(&mut serde_json::de::from_str(&std::io::read_to_string(
-                file,
-            )?)?);
+            Ok(serde_json::de::from_str(&std::io::read_to_string(file)?)?)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+    pub fn postinstall(
+        &mut self,
+        schemas: &SchemaMap,
+        actions: &mut Vec<Action>,
+    ) -> Result<(), anyhow::Error> {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let script: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            actions.append(
+                &mut script
+                    .into_iter()
+                    .map(|act| act.into_action(schemas))
+                    .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+            );
         }
         Ok(())
     }
@@ -552,13 +620,14 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         install_ui: bool,
         compression_level: u32,
+        schemas: &SchemaMap,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
             self.store_data(actions, uploader, compression_level)?;
         }
 
-        self.postinstall(actions)?;
+        self.postinstall(schemas, actions)?;
         self.commit_install(sender, actions)?;
         Ok(())
     }
@@ -585,7 +654,8 @@ impl<R: Read + Seek> PackagedService<R> {
         }
 
         if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<Action> = serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            let actions: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
                 result.push(act.sender);
                 result.push(act.service);
@@ -597,6 +667,89 @@ impl<R: Read + Seek> PackagedService<R> {
 
         Ok(result)
     }
+
+    // returns accounts whose schemas are required
+    pub fn get_required_schemas(
+        &mut self,
+        out: &mut HashSet<AccountNumber>,
+    ) -> Result<(), anyhow::Error> {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let actions: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
+            for act in actions {
+                if act.raw_data.is_none() {
+                    out.insert(act.service);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Gets schemas for services in this package.
+    // Removes the accounts found from accounts.
+    pub fn get_schemas(
+        &self,
+        accounts: &mut HashSet<AccountNumber>,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if accounts.remove(account) {
+                schemas.insert(
+                    *account,
+                    info.schema
+                        .clone()
+                        .ok_or_else(|| Error::MissingSchema { service: *account })?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn load_schemas(
+        &mut self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        for (account, _, info) in &self.services {
+            if let Some(schema) = info.schema.clone() {
+                schemas.insert(*account, schema);
+            }
+        }
+        let mut required = HashSet::new();
+        self.get_required_schemas(&mut required)?;
+        for account in required {
+            if !schemas.contains_key(&account) {
+                schemas.insert(
+                    account,
+                    crate::as_json(
+                        client.get(
+                            packages::SERVICE
+                                .url(base_url)?
+                                .join(&format!("/schema?service={account}"))?,
+                        ),
+                    )
+                    .await?,
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn get_schemas<T: Read + Seek>(
+    packages: &mut [PackagedService<T>],
+) -> Result<(SchemaMap, HashSet<AccountNumber>), anyhow::Error> {
+    let mut accounts = HashSet::new();
+    for package in &mut packages[..] {
+        package.get_required_schemas(&mut accounts)?
+    }
+    let mut schemas = HashMap::new();
+    for package in &mut packages[..] {
+        package.get_schemas(&mut accounts, &mut schemas)?
+    }
+    Ok((schemas, accounts))
 }
 
 pub trait ActionGroup {
@@ -822,7 +975,15 @@ pub trait PackageRegistry {
         let mut result = vec![];
         let index = self.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        for op in solve_dependencies(index, make_refs(packages)?, vec![], essential, false)? {
+        for op in solve_dependencies(
+            index,
+            make_refs(packages)?,
+            vec![],
+            essential,
+            false,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )? {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages");
             };
@@ -952,6 +1113,22 @@ impl HTTPRegistry {
         url: reqwest::Url,
         client: reqwest::Client,
     ) -> Result<HTTPRegistry, anyhow::Error> {
+        // Check if the URL points to an account on chain
+        if let Some(domain) = url.domain() {
+            if let Ok(rootdomain) =
+                crate::as_json::<String>(client.get(url.join("/common/rootdomain")?)).await
+            {
+                let mut root_url = url.clone();
+                root_url.set_host(Some(&rootdomain))?;
+                let account = if domain == &rootdomain {
+                    packages::SERVICE
+                } else {
+                    crate::as_json::<AccountNumber>(client.get(url.join("/common/thisservice")?))
+                        .await?
+                };
+                return Self::with_account(&root_url, account, client).await;
+            }
+        }
         let mut index_url = url.clone();
         index_url
             .path_segments_mut()
@@ -969,6 +1146,56 @@ impl HTTPRegistry {
             client,
             index,
         })
+    }
+    pub async fn with_account(
+        url: &reqwest::Url,
+        owner: AccountNumber,
+        mut client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        let mut index = HashMap::new();
+
+        let mut end_cursor: Option<String> = None;
+        loop {
+            let data = crate::gql_query::<PackagesQuery>(
+                url,
+                &mut client,
+                packages::SERVICE,
+                format!(
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    serde_json::to_string(&owner)?,
+                    serde_json::to_string(&end_cursor)?,
+                ))
+                .await.with_context(|| "Failed to list packages")?;
+            for edge in data.packages.edges {
+                let package = edge.node;
+                if let Some(prev) = index.insert(package.name.clone(), package) {
+                    Err(Error::DuplicatePackage { package: prev.name })?
+                }
+            }
+            if !data.packages.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.packages.pageInfo.endCursor);
+        }
+        Ok(HTTPRegistry {
+            index_url: owner.url(url)?,
+            client,
+            index,
+        })
+    }
+    pub async fn with_source(
+        base_url: &reqwest::Url,
+        source: packages::PackageSource,
+        client: reqwest::Client,
+    ) -> Result<HTTPRegistry, anyhow::Error> {
+        match (source.url, source.account) {
+            (Some(url), Some(account)) => {
+                Self::with_account(&reqwest::Url::parse(&url)?, account, client).await
+            }
+            (None, Some(account)) => Self::with_account(base_url, account, client).await,
+            (Some(url), None) => Self::new(reqwest::Url::parse(&url)?, client).await,
+            (None, None) => return Err(Error::InvalidPackageSource)?,
+        }
     }
     async fn download(&self, filename: &str) -> Result<(File, Checksum256), anyhow::Error> {
         let url = self.index_url.join(filename)?;
@@ -1109,6 +1336,28 @@ struct NewAccountsQuery {
     newAccounts: Vec<AccountNumber>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesEdge {
+    node: PackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<PackagesEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PackagesQuery {
+    packages: PackagesConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct SourcesQuery {
+    sources: Vec<packages::PackageSource>,
+}
+
 #[cfg(not(target_family = "wasm"))]
 pub async fn get_accounts_to_create(
     base_url: &reqwest::Url,
@@ -1128,6 +1377,25 @@ pub async fn get_accounts_to_create(
     )
     .await?;
     Ok(result.newAccounts)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn get_package_sources(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    account: AccountNumber,
+) -> Result<Vec<packages::PackageSource>, anyhow::Error> {
+    let result: SourcesQuery = crate::gql_query(
+        base_url,
+        client,
+        packages::SERVICE,
+        format!(
+            "query {{ sources(account: {}) {{ url account }} }}",
+            serde_json::to_string(&account)?
+        ),
+    )
+    .await?;
+    Ok(result.sources)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -1248,6 +1516,30 @@ impl PackageList {
             self.as_upgradable(),
             essential,
             reinstall,
+            PackagePreference::Latest,
+            PackagePreference::Current,
+        )
+    }
+    pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
+        &self,
+        reg: &T,
+        packages: &[String],
+        pref: PackagePreference,
+    ) -> Result<Vec<PackageOp>, anyhow::Error> {
+        let index = reg.index()?;
+        let essential = get_essential_packages(&index, &EssentialServices::new());
+        solve_dependencies(
+            index,
+            make_refs(packages)?,
+            self.as_upgradable(),
+            essential,
+            false,
+            pref,
+            if packages.is_empty() {
+                pref
+            } else {
+                PackagePreference::Current
+            },
         )
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {

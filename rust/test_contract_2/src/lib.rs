@@ -3,11 +3,14 @@
 /// features such as writing tables, and providing a graphiql
 /// query interface.
 
-#[psibase::service_tables]
-mod tables {
-    use async_graphql::*;
+#[psibase::service]
+#[allow(non_snake_case)]
+mod service {
+    use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::{Deserialize, Serialize};
+    use serde_aux::field_attributes::deserialize_number_from_string;
+
     /// Holds an answer to a calculation done by an account `id`
     #[table(name = "AnswerTable", index = 0)]
     #[derive(Fracpack, Serialize, Deserialize, SimpleObject, ToSchema)]
@@ -19,16 +22,6 @@ mod tables {
         /// The result of the calculation
         pub result: i32,
     }
-}
-
-#[psibase::service(tables = "tables")]
-#[allow(non_snake_case)]
-mod service {
-    use crate::tables::{Answer, AnswerTable};
-    use async_graphql::{connection::Connection, *};
-    use psibase::*;
-    use serde::{Deserialize, Serialize};
-    use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(SimpleObject, Deserialize)]
     pub struct AddEvent {

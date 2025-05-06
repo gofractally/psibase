@@ -145,28 +145,3 @@ tar xvfz prometheus-*.tar.gz
 cd prometheus-*
 ./prometheus --config.file=../prometheus.yml
 ```
-
-## Setup grafana:
-
-Grafana
-
-```sh
-wget https://dl.grafana.com/enterprise/release/grafana-enterprise-9.3.2.linux-amd64.tar.gz
-tar -zxvf grafana-enterprise-9.3.2.linux-amd64.tar.gz
-```
-
-Manually edit the defaults.ini config file:
-
-```ini
-allow_embedding=true
-
-#################################### Anonymous Auth ######################
-[auth.anonymous]
-# enable anonymous access
-enabled = true
-
-# specify role for unauthenticated users
-org_role = Admin
-```
-
-Then run `./graphana-server`. Add prometheus as a data source and use the `./dashboards/psinode-dashboard.json` to import it.
