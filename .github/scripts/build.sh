@@ -54,7 +54,7 @@ ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== yarn cache: ${YARN_CACHE_FOLDER} ====="
-${DOCKER} yarn config set cache-folder ${YARN_CACHE_FOLDER}
+${DOCKER} yarn config set cacheFolder ${YARN_CACHE_FOLDER}
 echo "===== build start ====="
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
