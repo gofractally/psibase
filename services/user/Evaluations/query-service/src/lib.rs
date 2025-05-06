@@ -9,6 +9,7 @@ mod service {
     };
     use psibase::*;
     use serde::Deserialize;
+    use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]
     struct KeysSet {
@@ -22,7 +23,9 @@ mod service {
     #[derive(Deserialize, SimpleObject)]
     struct GroupFinish {
         owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
         group_number: u32,
         users: Vec<AccountNumber>,
         result: Vec<u8>,
@@ -52,7 +55,6 @@ mod service {
             evaluation_id: u32,
             group_number: u32,
         ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
-
             EventQuery::new("history.evaluations.group_finished")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {} AND group_number = {}",
@@ -72,7 +74,11 @@ mod service {
                 .get(&(owner, evaluation_id, group_number))
         }
 
-        async fn get_evaluation(&self, owner: AccountNumber, evaluation_id: u32) -> Option<Evaluation> {
+        async fn get_evaluation(
+            &self,
+            owner: AccountNumber,
+            evaluation_id: u32,
+        ) -> Option<Evaluation> {
             EvaluationTable::with_service(evaluations::SERVICE)
                 .get_index_pk()
                 .get(&(owner, evaluation_id))
@@ -152,7 +158,10 @@ mod service {
             .await
         }
 
-        async fn get_user_settings(&self, accounts: Vec<AccountNumber>) -> Vec<Option<UserSettings>> {
+        async fn get_user_settings(
+            &self,
+            accounts: Vec<AccountNumber>,
+        ) -> Vec<Option<UserSettings>> {
             accounts
                 .into_iter()
                 .map(|account| {
