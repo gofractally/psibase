@@ -18,6 +18,7 @@ plugin_error! {
     KeyDeserializationFailed => "Failed to deserialize key data",
     InvalidKeyLength => "Invalid key length",
     InvalidPrivateKey => "Invalid private key format",
+    DuplicateElement => "Duplicate element found in proposal during attestation",
     DecryptionFailed => "Failed to decrypt data",
     MissingKeySubmitter => "Key submitter not found",
     GraphQLParseError(msg: String) => "GraphQL parsing error: {msg}",
