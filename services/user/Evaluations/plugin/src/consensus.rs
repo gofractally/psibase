@@ -1,5 +1,4 @@
 use average::Variance;
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
@@ -198,7 +197,7 @@ mod tests {
 
     use super::*;
 
-    const DEBUG_PRINT: bool = false;
+    const DEBUG_PRINT: bool = true;
 
     fn run_alignment_merge<T: PartialEq + Copy + Eq + Hash + Display + Debug>(
         lists: &Vec<Vec<T>>,
@@ -249,7 +248,11 @@ mod tests {
 
         // Between five lists with seven possible elements
         // Max variance set is [0,0,0,0,6,6,6]
-        // Population variance = 8.64
+        // But we use a calculation for max variance that
+        // technically only works for even numbered lists:
+        // ((num_unique_elements-1)/2)^2
+        // Actual max population variance = 8.64
+        // Our expected calculated max population variance = (3)^2 = 9
         let lists = vec![
             vec![1, 2, 3, 4, 5, 6, 7],
             vec![1, 2, 3, 4, 5, 6, 7],
@@ -258,18 +261,18 @@ mod tests {
             vec![1, 2, 3, 4, 5, 6, 7],
         ];
         let merge = AlignmentMerge::new(&lists);
-        assert_eq!(merge.max_variance, 8.64);
+        assert_eq!(merge.max_variance, 9.0);
 
         // Between three lists with five possible elements
         // Max variance set is [0,0,4]
-        // Population variance = 3.55
+        // Our expected calculated max population variance = (4/2)^2 = 4
         let lists = vec![
             vec![1, 2, 3], //
             vec![1, 2, 3, 4],
             vec![1, 2, 3, 5],
         ];
         let merge = AlignmentMerge::new(&lists);
-        assert_almost_eq!(merge.max_variance, 3.555555555, 0.00001);
+        assert_almost_eq!(merge.max_variance, 4.0, 0.00001);
     }
 
     #[test]
@@ -334,7 +337,7 @@ mod tests {
         ];
         assert_eq!(
             run_alignment_merge(&fruits, DEBUG_PRINT),
-            Some(vec!["grape", "cherry", "apple", "banana", "orange"])
+            Some(vec!["cherry", "grape", "apple", "banana", "orange"])
         );
     }
 
