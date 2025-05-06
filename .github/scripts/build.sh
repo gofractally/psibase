@@ -55,10 +55,12 @@ echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== yarn cache: ====="
 echo "HOME=$HOME"
+${DOCKER} bash -c "echo docker.HOME='$HOME'"
 echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
+${DOCKER} bash -c "echo docker.YARN_CACHE_FOLDER='$YARN_CACHE_FOLDER'"
 echo "cacheFolder:"
-echo yarn config get cacheFolder
-${DOCKER} yarn config set cacheFolder ${YARN_CACHE_FOLDER}
+${DOCKEr} bash -c "yarn config get cacheFolder"
+${DOCKER} bash -c "yarn config set cacheFolder ${YARN_CACHE_FOLDER}"
 echo "===== build start ====="
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
