@@ -4,18 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-fn get_max_variance<T: PartialEq + Copy + Eq + Hash>(
-    lists: &Vec<Vec<T>>,
-    unique_elements: &HashSet<T>,
-) -> f64 {
-    let half = lists.len() / 2;
-    let remaining = lists.len() - half;
+fn get_max_variance<T: PartialEq + Copy + Eq + Hash>(unique_elements: &HashSet<T>) -> f64 {
     let max_value = unique_elements.len() - 1;
-
-    let mut vec = Vec::with_capacity(lists.len());
-    vec.extend(std::iter::repeat(0.0).take(half));
-    vec.extend(std::iter::repeat(max_value as f64).take(remaining));
-    vec.iter().collect::<Variance>().population_variance()
+    (max_value as f64 / 2.0).powi(2)
 }
 
 #[derive(Clone, Default, Debug)]
@@ -37,7 +28,7 @@ struct AlignmentMerge<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> {
 impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T> {
     pub fn new(lists: &'a Vec<Vec<T>>) -> Self {
         let unique_elements: HashSet<T> = lists.iter().flatten().copied().collect();
-        let max_variance = get_max_variance(&lists, &unique_elements);
+        let max_variance = get_max_variance(&unique_elements);
         let mut elements = HashMap::new();
         for element in unique_elements {
             elements.insert(element, ElementStats::default());
