@@ -73,24 +73,19 @@ export function NavMain() {
                                 to={`/fractal/${fractalName}/${item.path}/${menu.path}`}
                                 end
                             >
-                                {({ isActive }) => {
-                                    console.log(isActive);
-                                    return (
-                                        <SidebarMenuItem
-                                            className={cn({
-                                                "rounded-sm bg-muted/50 font-semibold":
-                                                    isActive,
-                                            })}
-                                        >
-                                            <SidebarMenuButton
-                                                tooltip={menu.title}
-                                            >
-                                                {menu.icon && <menu.icon />}
-                                                <span>{menu.title}</span>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    );
-                                }}
+                                {({ isActive }) => (
+                                    <SidebarMenuItem
+                                        className={cn({
+                                            "rounded-sm bg-muted/50 font-semibold":
+                                                isActive,
+                                        })}
+                                    >
+                                        <SidebarMenuButton tooltip={menu.title}>
+                                            {menu.icon && <menu.icon />}
+                                            <span>{menu.title}</span>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                )}
                             </NavLink>
                         ))}
                     </SidebarMenu>
