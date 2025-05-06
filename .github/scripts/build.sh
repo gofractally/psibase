@@ -54,9 +54,10 @@ ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
 echo "===== yarn cache: ====="
-echo ${DOCKER} bash -c "cd ${WORKSPACE_ROOT}; pwd"
-echo ${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}"
-echo ${DOCKER} bash -c "echo '.yarnrc.yml=${WORKSPACE_ROOT}/.yarnrc.yml'"
+${DOCKER} bash -c "cd ${WORKSPACE_ROOT}; pwd"
+${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}"
+${DOCKER} bash -c "echo '.yarnrc.yml=${WORKSPACE_ROOT}/.yarnrc.yml'"
+${DOCKER} bash -c "cat ${WORKSPACE_ROOT}/.yarnrc.yml"
 echo "HOME=$HOME"
 ${DOCKER} bash -c "echo docker.HOME='$HOME'"
 echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
