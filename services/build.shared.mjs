@@ -9,6 +9,19 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
     return false;
   }
 
+  // Validate source directories and output parent directories exist
+  for (const { source, output } of buildDirs) {
+    if (!fs.existsSync(source)) {
+      console.error(`Error: Source directory does not exist: ${path.relative(projectDir, source)}`);
+      process.exit(1);
+    }
+    const outputParent = path.dirname(output);
+    if (!fs.existsSync(outputParent)) {
+      console.error(`Error: Output parent directory does not exist: ${path.relative(projectDir, outputParent)}`);
+      process.exit(1);
+    }
+  }
+
   // Check if any output directories are missing or empty
   for (const { output } of buildDirs) {
     if (!fs.existsSync(output) || fs.readdirSync(output).length === 0) {
@@ -44,6 +57,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
   for (const { source } of buildDirs) {
     hash.update(calculateHash(source));
   }
+
   const currentHash = hash.digest('hex');
 
   const cacheFile = path.resolve(projectDir, '.vite-cache/hash.json');

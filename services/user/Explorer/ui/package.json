@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@psibase/common-lib": "workspace:*",
     "@rollup/plugin-alias": "^3.1.9",
     "@sveltejs/vite-plugin-svelte": "^4.0.1",
     "@types/node": "^18.7.15",

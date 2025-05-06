@@ -301,8 +301,6 @@ psibase_package(
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION})" "CpuLimit(^${PSIBASE_VERSION})" "HttpServer(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION})"
 )
 
-message("Trying to resolve DEP ${CMAKE_CURRENT_SOURCE_DIR}/services/system/Accounts/ui/dist/index.html")
-message("Accounts_js_DEP ${Accounts_js_DEP}")
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Accounts.psi
     NAME Accounts

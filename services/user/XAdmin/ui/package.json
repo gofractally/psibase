@@ -11,6 +11,7 @@
     "dependencies": {
         "@bytecodealliance/jco": "^1.9.1",
         "@hookform/resolvers": "^3.6.0",
+        "@psibase/common-lib": "workspace:*",
         "@radix-ui/react-accordion": "^1.2.0",
         "@radix-ui/react-alert-dialog": "^1.1.1",
         "@radix-ui/react-checkbox": "^1.0.4",
