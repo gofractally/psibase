@@ -28,10 +28,7 @@ namespace psibase
       KvResourceMap                       kvResourceDeltas;
       std::uint32_t                       remainingStack = 0;
       std::chrono::steady_clock::duration databaseTime;
-      bool                                allowDbRead;
-      bool                                allowDbWrite;
-      bool                                allowDbReadSubjective;
-      bool                                allowDbWriteSubjective;
+      DbMode                              dbMode;
       std::vector<std::vector<char>>      subjectiveData;
       size_t                              nextSubjectiveRead = 0;
 
@@ -41,10 +38,7 @@ namespace psibase
       TransactionContext(BlockContext&            blockContext,
                          const SignedTransaction& signedTransaction,
                          TransactionTrace&        transactionTrace,
-                         bool                     allowDbRead,
-                         bool                     allowDbWrite,
-                         bool                     allowDbReadSubjective,
-                         bool                     allowDbWriteSubjective = false);
+                         DbMode                   dbMode);
       ~TransactionContext();
 
       // Caution: each call to exec*(), except execCalledAction(),

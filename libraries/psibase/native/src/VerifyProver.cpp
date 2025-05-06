@@ -12,7 +12,7 @@ std::vector<char> psibase::VerifyProver::prove(std::span<const char> data, const
    }
    SignedTransaction  tx;
    TransactionTrace   trace;
-   TransactionContext tc{bc, tx, trace, false, false, false};
+   TransactionContext tc{bc, tx, trace, DbMode::verify()};
    tc.execVerifyProof(sha256(data.data(), data.size()), claim, proof);
    return proof;
 }

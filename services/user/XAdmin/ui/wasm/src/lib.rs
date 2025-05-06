@@ -113,8 +113,16 @@ impl Packages for XAdminPlugin {
         let refs = make_refs(&packages).map_err(|e| e.to_string())?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
 
-        let solved =
-            solve_dependencies(index, refs, pinned, essential, false).map_err(|e| e.to_string())?;
+        let solved = solve_dependencies(
+            index,
+            refs,
+            pinned,
+            essential,
+            false,
+            PackagePreference::Latest,
+            PackagePreference::Latest,
+        )
+        .map_err(|e| e.to_string())?;
 
         Ok(serde_json::to_string(&solved).map_err(|e| e.to_string())?)
     }

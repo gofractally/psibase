@@ -30,7 +30,7 @@ namespace psio
       typedef T value_type;
 
       shared_view_ptr() = default;
-      shared_view_ptr(std::nullptr_t){};
+      shared_view_ptr(std::nullptr_t) {};
       shared_view_ptr(const T& from) : shared_view_ptr{size_tag{psio::fracpack_size(from)}}
       {
          fast_buf_stream out(data(), size());
@@ -188,7 +188,10 @@ namespace psio
       auto s = stream.get_string();
       if (s.size() & 1)
          abort_error(from_json_error::expected_hex_string);
-      shared_view_ptr<T> tmp{size_tag{s.size() / 2}};
+      auto size = s.size() / 2;
+      if (size > std::numeric_limits<std::uint32_t>::max())
+         abort_error(from_json_error::number_out_of_range);
+      shared_view_ptr<T> tmp{size_tag{static_cast<std::uint32_t>(size)}};
       if (!unhex(tmp.data(), s.begin(), s.end()))
          abort_error(from_json_error::expected_hex_string);
       value = std::move(tmp);

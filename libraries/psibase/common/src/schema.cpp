@@ -6,5 +6,6 @@ psio::schema_types::CustomTypes psibase::psibase_types()
 {
    auto result = psio::schema_types::standard_types();
    result.insert<AccountNumber>("AccountNumber");
+   result.insert<MethodNumber>("MethodNumber");
    return result;
 }

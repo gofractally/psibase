@@ -57,8 +57,10 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
     // - If the carry bit is set, then previous labels had some actions
     //   that are in this (or a later) group.
     pub fn finish(mut self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
-        for new_group in &mut self.transactions[(self.index + 1)..] {
-            new_group.2 = false;
+        if self.index < self.transactions.len() {
+            for new_group in &mut self.transactions[(self.index + 1)..] {
+                new_group.2 = false;
+            }
         }
         if !self.actions.is_empty() {
             self.transactions[self.index]

@@ -1,42 +1,73 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Build",
-            "type": "shell",
-            "command": "mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX=\"psidk\" .. && make install",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "options": {
-                "statusbar": {
-                    "label": "$(tools) Build"
-                }
-            }
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": ".vscode/scripts/build.sh",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "options": {
+        "statusbar": {
+          "label": "$(tools) Build"
         }
-        // Keeping the below example to show how to run service unit tests:
-        // {
-        //     "label": "Test NFT",
-        //     "type": "shell",
-        //     "command": "cd build && psitest Nft-test-debug.wasm -s -r compact",
-        //     "group": {
-        //         "kind": "test",
-        //         "isDefault": false
-        //     },
-        //     "options": {
-        //         "statusbar": {
-        //             "label": "$(beaker) Test Nft"
-        //         }
-        //     }
-        // },
-    ],
-    "inputs": [
-        {
-            "id": "testsuite",
-            "type": "promptString",
-            "default": "[mytestsuite]",
-            "description": "Enter test suite key (Example: \"[MyTestSuite]\""
+      }
+    },
+    {
+      "label": "Continue",
+      "type": "shell",
+      "command": ".vscode/scripts/continue.sh $HOST_IP myprod 8080",
+      "options": {
+        "statusbar": {
+          "label": "$(play) Continue"
         }
-    ]
+      }
+    },
+    {
+      "label": "Launch",
+      "type": "shell",
+      "command": ".vscode/scripts/launch.sh $HOST_IP myprod 8080",
+      "options": {
+        "statusbar": {
+          "label": "$(play) Launch"
+        }
+      }
+    },
+    {
+      "label": "Launch Secure",
+      "type": "shell",
+      "command": ".vscode/scripts/launch_secure.sh $HOST_IP myprod 8080 /usr/lib/softhsm/libsofthsm2.so",
+      "options": {
+        "statusbar": {
+          "label": "$(play)$(lock) Launch Secure"
+        }
+      }
+    }
+
+    // Keeping the below example to show how to run service unit tests:
+    // {
+    //     "label": "Test NFT",
+    //     "type": "shell",
+    //     "command": "cd build && psitest Nft-test-debug.wasm -s -r compact",
+    //     "group": {
+    //         "kind": "test",
+    //         "isDefault": false
+    //     },
+    //     "options": {
+    //         "statusbar": {
+    //             "label": "$(beaker) Test Nft"
+    //         }
+    //     }
+    // },
+  ],
+  "inputs": [
+    {
+      "id": "testsuite",
+      "type": "promptString",
+      "default": "[mytestsuite]",
+      "description": "Enter test suite key (Example: \"[MyTestSuite]\""
+    }
+  ]
 }

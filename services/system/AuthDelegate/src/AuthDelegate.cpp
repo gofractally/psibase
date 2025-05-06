@@ -80,9 +80,10 @@ namespace SystemService
    {
       auto table  = db.open<AuthDelegateTable>();
       auto record = table.getIndex<0>().get(owner);
-      if (record.has_value())
+      auto sender = getSender();
+      if (sender == owner || record && record->owner == sender)
       {
-         check(record->owner != getSender(), "circular ownership");
+         abortMessage("circular ownership");
       }
 
       auto authTable = db.open<AuthDelegateTable>();

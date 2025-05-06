@@ -69,12 +69,6 @@ namespace psibase
                            bool                                     enableUndo = true,
                            bool                                     commit     = true);
 
-      // The action is not allowed to modify any consensus state.
-      // It is allowed to read and write subjective tables.
-      void execNonTrxAction(Action&& action, ActionTrace& trace);
-      auto execExport(std::string_view  fn,
-                      Action&&          action,
-                      TransactionTrace& trace) -> ActionTrace&;
       // The action has the same database access rules as queries
       void execAsyncAction(Action&& action);
       auto execAsyncExport(std::string_view  fn,

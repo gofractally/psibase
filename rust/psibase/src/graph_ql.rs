@@ -54,6 +54,16 @@ impl<Key: ToKey, Record: TableRecord + OutputType> TableQuery<Key, Record> {
     }
 
     /// Query a subindex of a table
+    ///
+    /// Holds the first field(s) of a key constant, while searching and
+    /// iterating through the remaining fields of the key.
+    ///
+    /// Parameters:
+    /// - Type argument `RemainingKey`: specifies the types of the
+    /// remaining fields. If there's more than 1 remaining field, then use a tuple.
+    /// - `table_index`: The table index to query.
+    /// - `subkey`: Provides the key fields that remain constant. If there's more
+    /// than 1 field, then use a tuple.
     pub fn subindex<RemainingKey: ToKey>(
         table_index: TableIndex<Key, Record>,
         subkey: &impl ToKey,

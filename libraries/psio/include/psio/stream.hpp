@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string.h>
 #include <algorithm>
+#include <cstring>
 #include <psio/check.hpp>
 #include <span>
 #include <string>
@@ -95,11 +95,24 @@ namespace psio
          data.insert(data.end(), s, s + size);
       }
 
+      void rewrite(size_t offset, const void* src, size_t size)
+      {
+         std::memcpy(data.data() + offset, src, size);
+      }
+
       template <typename T>
       void write_raw(const T& v)
       {
          write(&v, sizeof(v));
       }
+
+      template <typename T>
+      void rewrite_raw(size_t offset, const T& v)
+      {
+         rewrite(offset, &v, sizeof(v));
+      }
+
+      size_t written() const { return data.size(); }
    };
 
    struct vector_stream
@@ -117,6 +130,11 @@ namespace psio
          data.insert(data.end(), s, s + size);
       }
 
+      void rewrite(size_t offset, const void* src, size_t size)
+      {
+         std::memcpy(data.data() + offset, src, size);
+      }
+
       template <typename T>
       void write_raw(const T& v)
       {
@@ -126,7 +144,7 @@ namespace psio
       template <typename T>
       void rewrite_raw(size_t offset, const T& v)
       {
-         memcpy(data.data() + offset, &v, sizeof(v));
+         rewrite(offset, &v, sizeof(v));
       }
 
       size_t written() const { return data.size(); }
@@ -153,8 +171,13 @@ namespace psio
       {
          if (pos + size > end)
             abort_error(stream_error::overrun);
-         memcpy(pos, src, size);
+         std::memcpy(pos, src, size);
          pos += size;
+      }
+
+      void rewrite(size_t offset, const void* src, size_t size)
+      {
+         std::memcpy(begin + offset, src, size);
       }
 
       template <typename T>
@@ -166,7 +189,7 @@ namespace psio
       template <typename T>
       void rewrite_raw(size_t offset, const T& v)
       {
-         memcpy(begin + offset, &v, sizeof(v));
+         rewrite(offset, &v, sizeof(v));
       }
 
       void skip(int32_t s)
@@ -198,8 +221,13 @@ namespace psio
 
       void write(const void* src, size_t size)
       {
-         memcpy(pos, src, size);
+         std::memcpy(pos, src, size);
          pos += size;
+      }
+
+      void rewrite(size_t offset, const void* src, size_t size)
+      {
+         std::memcpy(begin + offset, src, size);
       }
 
       template <typename T>
@@ -211,7 +239,7 @@ namespace psio
       template <typename T>
       void rewrite_raw(size_t offset, const T& v)
       {
-         memcpy(begin + offset, &v, sizeof(v));
+         rewrite(offset, &v, sizeof(v));
       }
 
       void skip(int32_t s) { pos += s; }
@@ -229,6 +257,8 @@ namespace psio
 
       void write(char ch) { ++size; }
       void write(const void* src, size_t size) { this->size += size; }
+
+      void rewrite(size_t offset, const void* src, size_t size) {}
 
       template <typename T>
       void write_raw(const T& v)
@@ -335,7 +365,7 @@ namespace psio
       {
          if (size > size_t(end - pos))
             abort_error(stream_error::overrun);
-         memcpy(dest, pos, size);
+         std::memcpy(dest, pos, size);
          pos += size;
       }
 
@@ -415,7 +445,7 @@ namespace psio
       {
          if (size > size_t(end - pos))
             abort_error(stream_error::overrun);
-         memcpy(dest, pos, size);
+         std::memcpy(dest, pos, size);
          pos += size;
       }
 

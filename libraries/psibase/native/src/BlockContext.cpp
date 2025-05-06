@@ -152,7 +152,7 @@ namespace psibase
       };
       SignedTransaction  trx;
       TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, true, false};
+      TransactionContext tc{*this, trx, trace, DbMode::transaction()};
       auto&              atrace = trace.actionTraces.emplace_back();
 
       // Failure here aborts the block since Transact relies on startBlock
@@ -191,7 +191,7 @@ namespace psibase
             continue;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -243,7 +243,7 @@ namespace psibase
          action.method  = a.method;
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -295,7 +295,7 @@ namespace psibase
          action.method  = a.method();
          SignedTransaction  trx;
          TransactionTrace   trace;
-         TransactionContext tc{*this, trx, trace, true, false, true, true};
+         TransactionContext tc{*this, trx, trace, DbMode::callback()};
          auto&              atrace = trace.actionTraces.emplace_back();
 
          try
@@ -518,7 +518,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, false, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::verify()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.execVerifyProof(i);
@@ -550,7 +550,7 @@ namespace psibase
       try
       {
          checkActive();
-         TransactionContext t{*this, trx, trace, true, false, false};
+         TransactionContext t{*this, trx, trace, DbMode::firstAuth()};
          if (watchdogLimit)
             t.setWatchdog(*watchdogLimit);
          t.checkFirstAuth();
@@ -579,37 +579,12 @@ namespace psibase
       current.transactions.push_back(std::move(trx));
    }
 
-   void BlockContext::execNonTrxAction(Action&& action, ActionTrace& atrace)
-   {
-      SignedTransaction  trx;
-      TransactionTrace   trace;
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execNonTrxAction(0, action, atrace);
-      session.commit();
-   }
-
-   auto BlockContext::execExport(std::string_view  fn,
-                                 Action&&          action,
-                                 TransactionTrace& trace) -> ActionTrace&
-   {
-      SignedTransaction  trx;
-      auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true, true};
-
-      auto session = db.startWrite(writer);
-      tc.execExport(fn, action, atrace);
-      session.commit();
-      return atrace;
-   }
-
    void BlockContext::execAsyncAction(Action&& action)
    {
       SignedTransaction  trx;
       TransactionTrace   trace;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execNonTrxAction(0, action, atrace);
    }
@@ -620,7 +595,7 @@ namespace psibase
    {
       SignedTransaction  trx;
       auto&              atrace = trace.actionTraces.emplace_back();
-      TransactionContext tc{*this, trx, trace, true, false, true};
+      TransactionContext tc{*this, trx, trace, DbMode::rpc()};
 
       tc.execExport(fn, action, atrace);
       return atrace;
@@ -665,7 +640,7 @@ namespace psibase
 
          std::vector<std::vector<char>> result;
          {
-            TransactionContext t{*this, trx, trace, true, !isReadOnly, false};
+            TransactionContext t{*this, trx, trace, DbMode::transaction()};
             if (initialWatchdogLimit)
                t.setWatchdog(*initialWatchdogLimit);
             t.execTransaction();

@@ -303,6 +303,13 @@ namespace psio
       return from_json_int(result, stream);
    }
 
+   /// \group from_json_explicit
+   template <typename S>
+   void from_json(char& result, S& stream)
+   {
+      return from_json_int(result, stream);
+   }
+
    template <typename S>
    void from_json(float& result, S& stream)
    {
@@ -351,6 +358,18 @@ namespace psio
             break;
          result.emplace_back();
          from_json(result.back(), stream);
+      }
+      stream.get_end_array();
+   }
+
+   /// \group from_json_explicit
+   template <typename T, std::size_t N, typename S>
+   void from_json(std::array<T, N>& result, S& stream)
+   {
+      stream.get_start_array();
+      for (T& item : result)
+      {
+         from_json(item, stream);
       }
       stream.get_end_array();
    }
