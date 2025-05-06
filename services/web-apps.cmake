@@ -5,7 +5,7 @@ file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DI
 file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/user/CommonApi/common/resources/fonts/*)
 
 add_custom_target(YarnInstall
-    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} # && yarn && yarn install-dev-tools
+    COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && yarn --version && yarn #&& yarn install-dev-tools
     COMMENT "Installing yarn dependencies"
     BUILD_ALWAYS 1
 )

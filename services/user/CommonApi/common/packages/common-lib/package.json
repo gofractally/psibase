@@ -10,6 +10,18 @@
         ".": {
             "import": "./dist/common-lib.js",
             "require": "./dist/common-lib.umd.cjs"
+        },
+        "./rpc": {
+            "import": "./dist/rpc.js",
+            "require": "./dist/rpc.umd.cjs"
+        },
+        "./messaging": {
+            "import": "./dist/messaging/index.js",
+            "require": "./dist/messaging/index.umd.cjs"
+        },
+        "./messaging/*": {
+            "import": "./dist/messaging/*.js",
+            "require": "./dist/messaging/*.umd.cjs"
         }
     },
     "files": [
