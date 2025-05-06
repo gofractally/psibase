@@ -1,21 +1,11 @@
 use average::Variance;
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
-fn get_max_variance<T: PartialEq + Copy + Eq + Hash>(
-    lists: &Vec<Vec<T>>,
-    unique_elements: &HashSet<T>,
-) -> f64 {
-    let half = lists.len() / 2;
-    let remaining = lists.len() - half;
+fn get_max_variance<T: PartialEq + Copy + Eq + Hash>(unique_elements: &HashSet<T>) -> f64 {
     let max_value = unique_elements.len() - 1;
-
-    let mut vec = Vec::with_capacity(lists.len());
-    vec.extend(std::iter::repeat(0.0).take(half));
-    vec.extend(std::iter::repeat(max_value as f64).take(remaining));
-    vec.iter().collect::<Variance>().population_variance()
+    (max_value as f64 / 2.0).powi(2)
 }
 
 #[derive(Clone, Default, Debug)]
@@ -37,7 +27,7 @@ struct AlignmentMerge<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> {
 impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T> {
     pub fn new(lists: &'a Vec<Vec<T>>) -> Self {
         let unique_elements: HashSet<T> = lists.iter().flatten().copied().collect();
-        let max_variance = get_max_variance(&lists, &unique_elements);
+        let max_variance = get_max_variance(&unique_elements);
         let mut elements = HashMap::new();
         for element in unique_elements {
             elements.insert(element, ElementStats::default());
@@ -66,19 +56,15 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
         let nr_unique = self.elements.len();
         self.lists
             .iter()
-            .filter_map(|list| {
+            .map(|list| {
                 assert!(
                     list.len() <= nr_unique,
                     "Unique elements in list greater than unique across all lists."
                 ); // Should never happen.
                 let offset = nr_unique - list.len();
-
-                let index = list.iter().position(|o| o == element);
-                if let Some(index) = index {
-                    Some(index + offset)
-                } else {
-                    Some(0)
-                }
+                list.iter()
+                    .position(|o| o == element)
+                    .map_or(0, |idx| idx + offset)
             })
             .collect()
     }
@@ -120,8 +106,10 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
         let mut sorted_elements: Vec<(T, ElementStats)> =
             self.elements.iter().map(|(&k, v)| (k, v.clone())).collect();
         sorted_elements.sort_by(|a, b| {
-            match a.1.final_score.partial_cmp(&b.1.final_score).unwrap() {
-                Ordering::Equal => {
+            a.1.final_score
+                .partial_cmp(&b.1.final_score)
+                .unwrap()
+                .then_with(|| {
                     // Tiebreak-seed determines lexicographic or reverse-lexicographic ordering
                     let cmp = a.0.to_string().cmp(&b.0.to_string());
                     if tiebreak_seed % 2 == 0 {
@@ -129,9 +117,7 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
                     } else {
                         cmp.reverse()
                     }
-                }
-                ordering => ordering,
-            }
+                })
         });
 
         // Save sorted elements to result
@@ -211,7 +197,7 @@ mod tests {
 
     use super::*;
 
-    const DEBUG_PRINT: bool = false;
+    const DEBUG_PRINT: bool = true;
 
     fn run_alignment_merge<T: PartialEq + Copy + Eq + Hash + Display + Debug>(
         lists: &Vec<Vec<T>>,
@@ -262,7 +248,11 @@ mod tests {
 
         // Between five lists with seven possible elements
         // Max variance set is [0,0,0,0,6,6,6]
-        // Population variance = 8.64
+        // But we use a calculation for max variance that
+        // technically only works for even numbered lists:
+        // ((num_unique_elements-1)/2)^2
+        // Actual max population variance = 8.64
+        // Our expected calculated max population variance = (3)^2 = 9
         let lists = vec![
             vec![1, 2, 3, 4, 5, 6, 7],
             vec![1, 2, 3, 4, 5, 6, 7],
@@ -271,18 +261,18 @@ mod tests {
             vec![1, 2, 3, 4, 5, 6, 7],
         ];
         let merge = AlignmentMerge::new(&lists);
-        assert_eq!(merge.max_variance, 8.64);
+        assert_eq!(merge.max_variance, 9.0);
 
         // Between three lists with five possible elements
         // Max variance set is [0,0,4]
-        // Population variance = 3.55
+        // Our expected calculated max population variance = (4/2)^2 = 4
         let lists = vec![
             vec![1, 2, 3], //
             vec![1, 2, 3, 4],
             vec![1, 2, 3, 5],
         ];
         let merge = AlignmentMerge::new(&lists);
-        assert_almost_eq!(merge.max_variance, 3.555555555, 0.00001);
+        assert_almost_eq!(merge.max_variance, 4.0, 0.00001);
     }
 
     #[test]
@@ -347,7 +337,7 @@ mod tests {
         ];
         assert_eq!(
             run_alignment_merge(&fruits, DEBUG_PRINT),
-            Some(vec!["grape", "cherry", "apple", "banana", "orange"])
+            Some(vec!["cherry", "grape", "apple", "banana", "orange"])
         );
     }
 
