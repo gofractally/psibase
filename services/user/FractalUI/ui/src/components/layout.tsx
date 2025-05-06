@@ -28,11 +28,13 @@ export const Layout = () => {
         (menu) => location.pathname.split("/")[3] == menu.path,
     );
 
+    const selectedGroupName = selectedGroup?.groupLabel || "Evaluations";
+
     const selectedPage = selectedGroup?.menus.find(
         (menu) => location.pathname.split("/")[4] == menu.path,
     );
 
-    const pageName = selectedPage?.title || "Settings";
+    const pageName = selectedPage?.title || "Active & upcoming";
 
     return (
         <SidebarProvider>
@@ -51,6 +53,12 @@ export const Layout = () => {
                                     <BreadcrumbLink>
                                         {fractalName}
                                     </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block" />
+                                <BreadcrumbItem>
+                                    <BreadcrumbPage>
+                                        {selectedGroupName}
+                                    </BreadcrumbPage>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>

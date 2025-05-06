@@ -1,12 +1,14 @@
-import { createBrowserRouter } from "react-router-dom";
+import { Loader } from "@/pages/Loader";
+import { ActiveAndUpcoming } from "@/pages/evaluations/active-and-upcoming";
+import { Completed } from "@/pages/evaluations/completed";
+import { Proposed } from "@/pages/evaluations/proposed";
+import { AllMembers } from "@/pages/membership/all-members";
+import { MyMembership } from "@/pages/membership/my-membership";
+import { createBrowserRouter, redirect } from "react-router-dom";
 
-import { AppExists } from "./components/app-exists";
-import { Layout } from "./components/layout";
-import { ProtectedRoute } from "./components/protected-route";
-import { Loader } from "./pages/Loader";
-import { Settings } from "./pages/Settings";
-import { Support } from "./pages/Support";
-import { Upload } from "./pages/Upload";
+import { AppExists } from "@/components/app-exists";
+import { Layout } from "@/components/layout";
+import { ProtectedRoute } from "@/components/protected-route";
 
 export const router = createBrowserRouter([
     {
@@ -19,20 +21,15 @@ export const router = createBrowserRouter([
         children: [
             {
                 path: ":fractalName",
-                element: (
-                    <ProtectedRoute>
-                        <AppExists>
-                            <Settings />
-                        </AppExists>
-                    </ProtectedRoute>
-                ),
+                index: true,
+                loader: () => redirect("evaluations"),
             },
             {
                 path: ":fractalName/membership",
                 element: (
                     <ProtectedRoute>
                         <AppExists>
-                            <Upload />
+                            <MyMembership />
                         </AppExists>
                     </ProtectedRoute>
                 ),
@@ -42,37 +39,37 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <AppExists>
-                            <Upload />
+                            <AllMembers />
                         </AppExists>
                     </ProtectedRoute>
                 ),
             },
             {
-                path: ":appName/evaluations",
+                path: ":fractalName/evaluations",
                 element: (
                     <ProtectedRoute>
                         <AppExists>
-                            <Support />
+                            <ActiveAndUpcoming />
                         </AppExists>
                     </ProtectedRoute>
                 ),
             },
             {
-                path: ":appName/evaluations/proposed",
+                path: ":fractalName/evaluations/proposed",
                 element: (
                     <ProtectedRoute>
                         <AppExists>
-                            <Support />
+                            <Proposed />
                         </AppExists>
                     </ProtectedRoute>
                 ),
             },
             {
-                path: ":appName/evaluations/completed",
+                path: ":fractalName/evaluations/completed",
                 element: (
                     <ProtectedRoute>
                         <AppExists>
-                            <Support />
+                            <Completed />
                         </AppExists>
                     </ProtectedRoute>
                 ),
