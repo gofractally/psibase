@@ -107,8 +107,10 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
         let mut sorted_elements: Vec<(T, ElementStats)> =
             self.elements.iter().map(|(&k, v)| (k, v.clone())).collect();
         sorted_elements.sort_by(|a, b| {
-            match a.1.final_score.partial_cmp(&b.1.final_score).unwrap() {
-                Ordering::Equal => {
+            a.1.final_score
+                .partial_cmp(&b.1.final_score)
+                .unwrap()
+                .then_with(|| {
                     // Tiebreak-seed determines lexicographic or reverse-lexicographic ordering
                     let cmp = a.0.to_string().cmp(&b.0.to_string());
                     if tiebreak_seed % 2 == 0 {
@@ -116,9 +118,7 @@ impl<'a, T: PartialEq + Copy + Eq + Hash + Display + Debug> AlignmentMerge<'a, T
                     } else {
                         cmp.reverse()
                     }
-                }
-                ordering => ordering,
-            }
+                })
         });
 
         // Save sorted elements to result
