@@ -276,7 +276,14 @@ mod fractal_proposal_rules {
     use std::collections::HashSet;
     use std::hash::Hash;
 
-    /// Asserts that there are enough proposals to submit a fractal evaluation proposal.
+    /// Preparing the submissions for an attestation.
+    ///
+    /// Main preparations:
+    /// 1. Remove any empty proposals
+    /// 2. Remove any proposals that include their own account's index
+    /// 3. Prune outliers from proposals, where an outlier is an element that is not present in at least 2/3rds of the proposals
+    ///
+    /// Also asserts that there are enough proposals to submit a fractal evaluation proposal.
     /// In fractal evaluations, it is required that >= 2/3rds of the group has
     ///   submitted a proposal in order for attestations to be considered valid.
     ///
