@@ -24,7 +24,6 @@ cd ${WORKSPACE_ROOT}
 git submodule update --init --recursive
 export CCACHE_DIR=${WORKSPACE_ROOT}/.caches/ccache
 export SCCACHE_DIR=${WORKSPACE_ROOT}/.caches/sccache
-export YARN_CACHE_FOLDER=${WORKSPACE_ROOT}/.caches/yarn
 export CCACHE_CONFIGPATH=${WORKSPACE_ROOT}/ccache.conf
 echo max_size = 600M >${WORKSPACE_ROOT}/ccache.conf
 echo log_file = ${WORKSPACE_ROOT}/ccache.log >>${WORKSPACE_ROOT}/ccache.conf
@@ -40,12 +39,9 @@ DOCKER="docker run --rm \
   -e SCCACHE_DIR \
   -e SCCACHE_IDLE_TIMEOUT \
   -e SCCACHE_CACHE_SIZE \
-  -e YARN_CACHE_FOLDER \
   -e RUSTC_WRAPPER \
   -e WASM_PACK_CACHE=${WORKSPACE_ROOT}/.caches/wasm-pack \
   -e CARGO_COMPONENT_CACHE_DIR=${WORKSPACE_ROOT}/.caches/cargo-component \
-  -e YARN_ENABLE_LOGS=1 \
-  -e YARN_DEBUG=1 \
   -e USER \
   --user $(id -u):$(id -g) \
   ${BUILDER_IMAGE}"
@@ -55,22 +51,6 @@ echo "===== ccache  ====="
 ${DOCKER} ccache -s
 echo "===== sccache ====="
 ${DOCKER} sccache -s
-echo "===== yarn cache: ====="
-${DOCKER} bash -c "cd ${WORKSPACE_ROOT}; pwd"
-${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}"
-# Doesn't exist: ${DOCKER} bash -c "ls -al ${WORKSPACE_ROOT}/.yarn"
-echo "HOME=$HOME"
-${DOCKER} bash -c "echo docker.HOME='$HOME'"
-echo "YARN_CACHE_FOLDER=$YARN_CACHE_FOLDER"
-${DOCKER} bash -c "echo docker.YARN_CACHE_FOLDER='$YARN_CACHE_FOLDER'"
-${DOCKER} bash -c "echo '.yarnrc.yml=${WORKSPACE_ROOT}/.yarnrc.yml'"
-# Doesn't exist: ${DOCKER} bash -c "cat ${WORKSPACE_ROOT}/.yarnrc.yml"
-echo "cacheFolder:"
-${DOCKEr} bash -c "yarn config get cacheFolder"
-${DOCKER} bash -c "yarn config -v"
-${DOCKER} bash -c "yarn config set cacheFolder ${YARN_CACHE_FOLDER}"
-echo "cacheFolder after setting:"
-${DOCKEr} bash -c "yarn config get cacheFolder"
 echo "===== build start ====="
 mkdir -p build
 ${DOCKER} bash -c "cd build && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=no -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache .."
