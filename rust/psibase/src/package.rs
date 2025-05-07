@@ -1308,6 +1308,7 @@ pub enum PackageOrigin {
     Repo { sha256: Checksum256, file: String },
 }
 
+#[derive(Default)]
 pub struct PackageList {
     packages: HashMap<String, HashMap<String, (Meta, PackageOrigin)>>,
 }

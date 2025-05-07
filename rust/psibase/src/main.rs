@@ -922,7 +922,7 @@ async fn add_package_registry(
     result: &mut JointRegistry<BufReader<File>>,
 ) -> Result<(), anyhow::Error> {
     let chain_sources = if let Some(account) = account {
-        get_package_sources(base_url, &mut client, account).await?
+        handle_unbooted(get_package_sources(base_url, &mut client, account).await)?
     } else {
         Vec::new()
     };
@@ -1747,13 +1747,13 @@ async fn show_package<T: PackageRegistry + ?Sized>(
 }
 
 // an unbooted chain has no packages installed
-fn handle_unbooted(list: Result<PackageList, anyhow::Error>) -> Result<PackageList, anyhow::Error> {
+fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyhow::Error> {
     if let Err(e) = &list {
         if e.root_cause()
             .to_string()
             .contains("Node is not connected to any psibase network.")
         {
-            return Ok(PackageList::new());
+            return Ok(T::default());
         }
     }
     list
