@@ -85,9 +85,9 @@ impl TryFrom<String> for GetUserSettingsResponse {
 #[derive(Deserialize, Pack, Unpack, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyHistory {
-    pub evaluation_id: String,
+    pub evaluation_id: u32,
     pub hash: String,
-    pub group_number: String,
+    pub group_number: u32,
     pub keys: Vec<Vec<u8>>,
 }
 

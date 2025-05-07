@@ -7,7 +7,6 @@ import { z } from "zod";
 const StartParams = z.object({
     owner: zAccount,
     id: z.number(),
-    entropy: z.number(),
 });
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

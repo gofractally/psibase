@@ -76,11 +76,11 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
 
                     children={(field) => (
                         <field.DateTimeField
-                            label="Registration phase"
+                            label="Registration starts from"
                             description={
                                 dayjs(field.state.value).isBefore(now)
                                     ? "Now"
-                                    : "In " +
+                                    : 
                                       humanize(
                                           dayjs(field.state.value).diff(now),
                                       )
@@ -92,7 +92,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     name="deliberationSeconds"
                     children={(field) => (
                         <field.DurationField
-                            label="Deliberation phase"
+                            label="Registration duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("registration")),
@@ -105,7 +105,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     name="submissionSeconds"
                     children={(field) => (
                         <field.DurationField
-                            label="Submission phase"
+                            label="Deliberation duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("deliberationSeconds")),
@@ -118,7 +118,7 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                     name="finishBySeconds"
                     children={(field) => (
                         <field.DurationField
-                            label="Finish by"
+                            label="Submission duration"
                             description={humanize(
                                 dayjs(field.state.value).diff(
                                     dayjs(form.getFieldValue("submissionSeconds")),

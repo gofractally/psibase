@@ -28,8 +28,9 @@ pub fn create_new_symmetric_key(
     creator: AccountNumber,
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
-    let user_settings = fetch_user_settings(sorted_users.nodes.iter().map(|u| u.user.clone()).collect())?
-        .get_user_settings;
+    let user_settings =
+        fetch_user_settings(sorted_users.nodes.iter().map(|u| u.user.clone()).collect())?
+            .get_user_settings;
 
     let creator_public_key = user_settings
         .iter()
@@ -46,7 +47,8 @@ pub fn create_new_symmetric_key(
 
     let symmetric_key = key_table::SymmetricKey::generate(creator_public_key);
 
-    let payloads: Vec<Vec<u8>> = sorted_users.nodes
+    let payloads: Vec<Vec<u8>> = sorted_users
+        .nodes
         .iter()
         .map(|user| {
             let setting = user_settings
@@ -85,11 +87,11 @@ pub fn get_decrypted_proposals(
 
     let symmetric_key = get_symmetric_key(evaluation_owner, evaluation_id, group_number, sender)?;
 
-    let proposals = proposals.nodes
+    let proposals = proposals
+        .nodes
         .iter()
         .map(|s| {
-            let user =
-                parse_account_number(&s.user).unwrap();
+            let user = parse_account_number(&s.user).unwrap();
             Ok(if s.proposal.is_some() {
                 (
                     user,
@@ -168,7 +170,8 @@ pub fn decrypt_existing_key(
 ) -> Result<key_table::SymmetricKey, Error> {
     let sorted_users = sort_users_by_account(users)?;
 
-    let my_index = sorted_users.nodes
+    let my_index = sorted_users
+        .nodes
         .iter()
         .position(|user| {
             parse_account_number(&user.user)
@@ -182,7 +185,7 @@ pub fn decrypt_existing_key(
         .get_group_key
         .edges
         .iter()
-        .find(|edge| edge.node.evaluation_id == evaluation_id.to_string())
+        .find(|edge| edge.node.evaluation_id == evaluation_id)
         .ok_or(ErrorType::FailedToFindEvaluation)?;
 
     let my_cipher = &edge.node.keys[my_index];

@@ -388,9 +388,10 @@ pub mod impls {
                 .collect();
 
             let population = users.len() as u32;
-            let chunk_sizes = Subgroups::call()
-                .gmp(population, allowable_group_sizes)
-                .expect("unable to group users");
+            let chunk_sizes = psibase::check_some(
+                Subgroups::call().gmp(population, allowable_group_sizes),
+                "unable to group users",
+            );
 
             for (index, &chunk_size) in chunk_sizes.iter().enumerate() {
                 let group_number = (index as u32) + 1;

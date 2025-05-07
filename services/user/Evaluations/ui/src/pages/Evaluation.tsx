@@ -105,7 +105,6 @@ export const EvaluationPage = () => {
             startEvaluation({
                 owner: zAccount.parse(owner),
                 id: evaluation!.id,
-                entropy: Math.floor(1000000 * Math.random()),
             });
         }
     }, [
@@ -263,9 +262,7 @@ export const EvaluationPage = () => {
                                 startEvaluation({
                                     owner: zAccount.parse(owner),
                                     id: evaluation!.id,
-                                    entropy: Math.floor(
-                                        1000000 * Math.random(),
-                                    ),
+
                                 });
                             }}
                         >
@@ -298,7 +295,10 @@ export const EvaluationPage = () => {
                             <Button
                                 disabled={isCloseEvaluationPending}
                                 onClick={() => {
-                                    closeEvaluation(evaluation!.id);
+                                    closeEvaluation({
+                                        owner: evaluation!.owner,
+                                        evaluationId: evaluation.id
+                                    });
                                 }}
                             >
                                 {isCloseEvaluationPending
